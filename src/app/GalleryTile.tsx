@@ -30,6 +30,11 @@ const previewVariants = {
   exit: { opacity: 0, transition: { duration: 0.2 } },
 };
 
+function nodeName(node?: string) {
+  if (!node || /^\d+$/.test(node)) return "Rendering";
+  return node;
+}
+
 export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatElapsed, height, item, now, openItem, titleFromPrompt, width }: GalleryTileProps) {
   const ratio = item.progress?.max ? Math.min(1, Math.max(0, item.progress.value / item.progress.max)) : 0;
   const indeterminate = !item.progress?.max;
@@ -73,7 +78,7 @@ export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatEl
               )}
             </span>
             <span className="generate-info">
-              <span className="generate-state">{item.progress?.node || "Rendering"}</span>
+              <span className="generate-state">{nodeName(item.progress?.node)}</span>
               <span className="generate-info-dot" />
               <span className="generate-elapsed">{formatElapsed(now - Date.parse(item.createdAt || new Date().toISOString()))}</span>
             </span>

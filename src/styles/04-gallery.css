@@ -197,6 +197,7 @@
   .tile-action, .tile-delete, .tile-hover-actions { opacity: 1; transform: translateY(0); }
 }
 .tile.pending .tile-action { opacity: 1; }
+.tile.pending .tile-caption { display: none; }
 .tile.error { opacity: 0.7; }
 
 .generating {
@@ -265,8 +266,8 @@
   position: absolute; inset: 0;
   z-index: 1;
   pointer-events: none;
-  backdrop-filter: blur(calc(24px * (1 - var(--progress-ratio, 0))));
-  -webkit-backdrop-filter: blur(calc(24px * (1 - var(--progress-ratio, 0))));
+  backdrop-filter: blur(calc(14px * (1 - var(--progress-ratio, 0))));
+  -webkit-backdrop-filter: blur(calc(14px * (1 - var(--progress-ratio, 0))));
   transition: backdrop-filter 400ms var(--ease-out), -webkit-backdrop-filter 400ms var(--ease-out);
 }
 .generating .generate-preview {

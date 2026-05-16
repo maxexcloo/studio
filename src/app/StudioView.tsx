@@ -11,6 +11,12 @@ import { AspectPicker, Field, GallerySkeleton, Media, ModelPicker, NumberPicker,
 import { GalleryTile } from './GalleryTile';
 import { WorkflowGallery } from './WorkflowGallery';
 import type { GalleryItem } from './types';
+
+function nodeName(node?: string) {
+  if (!node || /^\d+$/.test(node)) return "Rendering";
+  return node;
+}
+
 export function StudioView({ view }: { view: Record<string, any> }) {
   const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
@@ -81,7 +87,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           )}
                         </span>
                         <span className="generate-info">
-                          <span className="generate-state">{zenDisplayItem.progress?.node || "Rendering"}</span>
+                          <span className="generate-state">{nodeName(zenDisplayItem.progress?.node)}</span>
                           <span className="generate-info-dot" />
                           <span className="generate-elapsed">{formatElapsed(now - Date.parse(zenDisplayItem.createdAt || new Date().toISOString()))}</span>
                         </span>
@@ -500,7 +506,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                             )}
                           </span>
                           <span className="generate-info">
-                            <span className="generate-state">{active.progress?.node || "Rendering"}</span>
+                            <span className="generate-state">{nodeName(active.progress?.node)}</span>
                             <span className="generate-info-dot" />
                             <span className="generate-elapsed">{formatElapsed(now - Date.parse(active.createdAt || new Date().toISOString()))}</span>
                           </span>
