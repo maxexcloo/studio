@@ -65,7 +65,7 @@ export function GallerySkeleton({ columns }: { columns: number }) {
   return skeletonColumns.map((column, columnIndex) => (
     <div className="gallery-column" key={`skeleton-column-${columnIndex}`}>
       {column.map((item) => (
-        <div key={item.id} className="tile skeleton-tile" style={{ "--tile-ratio": `${item.width || 1} / ${item.height || 1}` } as React.CSSProperties}>
+        <div key={item.id} className="tile skeleton-tile" style={{ "--tile-ratio": `${item.width || 1} / ${item.height || 1}`, animationDelay: `${item.id * 40}ms` } as React.CSSProperties}>
           <Skeleton className="skeleton-media" />
         </div>
       ))}

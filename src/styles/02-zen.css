@@ -2,6 +2,7 @@
   position: fixed; inset: 0; overflow: hidden;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
+  animation: appIn 500ms var(--ease-soft) both;
 }
 .zen-stage {
   position: absolute; inset: 0; display: grid; place-items: center;
@@ -65,14 +66,16 @@
   width: 38px; height: 38px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  background: hsl(var(--card));
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   color: hsl(var(--foreground));
   display: grid; place-items: center;
   cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out), transform 220ms var(--spring);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
 }
-.zen-control-button:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); transform: translateY(-1px); }
+.zen-control-button:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent) / 0.9); transform: translateY(-1px); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 
 .zen-zoom-dock {
   position: fixed;
@@ -87,10 +90,12 @@
   padding: 3px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  background: hsl(var(--card));
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   color: hsl(var(--foreground));
-  box-shadow: var(--shadow);
-  transition: left 220ms var(--spring);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  transition: left 260ms var(--ease-out);
 }
 .zen-zoom-dock.with-side { left: calc(min(360px, 100vw - 24px) + 24px); }
 .zen-zoom-dock .icon-button {
@@ -121,14 +126,16 @@
   width: 38px; height: 38px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  background: hsl(var(--card));
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   color: hsl(var(--foreground));
   display: grid; place-items: center;
   cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out), transform 220ms var(--spring);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
 }
-.zen-gallery-restore:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); transform: translateY(-1px); }
+.zen-gallery-restore:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent) / 0.9); transform: translateY(-1px); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 
 .zen-top-actions { position: fixed; bottom: 18px; right: 18px; z-index: 13; display: flex; gap: 8px; }
 
@@ -138,14 +145,16 @@
   padding: 14px;
   border: 1px solid hsl(var(--border));
   border-radius: calc(var(--radius) + 4px);
-  background: hsl(var(--card));
-  box-shadow: var(--shadow-lg);
+  background: hsl(var(--card) / 0.95);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.2);
   overflow: auto;
   overscroll-behavior: contain;
-  opacity: 0; transform: translateX(-12px); pointer-events: none;
-  transition: opacity 220ms var(--ease-out), transform 240ms var(--spring);
+  opacity: 0; transform: translateX(-8px); filter: blur(3px); pointer-events: none;
+  transition: opacity 240ms var(--ease-out), transform 280ms var(--ease-out), filter 240ms var(--ease-out);
 }
-.zen-controls.open { opacity: 1; transform: translateX(0); pointer-events: auto; }
+.zen-controls.open { opacity: 1; transform: translateX(0); filter: blur(0); pointer-events: auto; }
 
 .sidebar-dismiss {
   position: fixed;
@@ -165,8 +174,10 @@
   padding: 8px 8px 8px 14px;
   border: 1px solid hsl(var(--border));
   border-radius: calc(var(--radius) + 6px);
-  background: hsl(var(--card));
-  box-shadow: var(--shadow-xl);
+  background: hsl(var(--card) / 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.2);
 }
 .zen-prompt textarea {
   min-height: 44px;

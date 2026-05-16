@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { MasonryPhotoAlbum } from 'react-photo-album';
 import 'react-photo-album/masonry.css';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, GalleryHorizontalEnd, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { githubUrl } from './constants';
 import { cn } from './format';
 import { galleryPhoto, type GalleryPhoto } from './gallery';
@@ -43,17 +44,39 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   const indeterminate = !zenDisplayItem.progress?.max;
                   return (
                     <div className={cn("generating", "zen-generating", zenDisplayItem.preview && "has-preview")} style={{ "--progress-ratio": ratio } as React.CSSProperties}>
-                      {zenDisplayItem.preview ? <img className="generate-preview" src={zenDisplayItem.preview} alt="" draggable={false} /> : null}
+                      <AnimatePresence mode="popLayout">
+                        {zenDisplayItem.preview ? (
+                          <motion.img
+                            key={zenDisplayItem.preview}
+                            className="generate-preview"
+                            src={zenDisplayItem.preview}
+                            alt=""
+                            draggable={false}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1, transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const } }}
+                            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                          />
+                        ) : null}
+                      </AnimatePresence>
                       {!zenDisplayItem.preview ? <div className="noise-layer" /> : null}
                       <div className="generate-overlay">
-                        <span className="generate-step" key={zenDisplayItem.progress?.max ? `step-${zenDisplayItem.progress.value}-${zenDisplayItem.progress.max}` : zenDisplayItem.progress?.node || "queued"}>
+                        <span className="generate-step">
                           {zenDisplayItem.progress?.max ? (
-                            <>
-                              <span className="generate-step-label">Step</span>
-                              <span className="generate-step-count text-state">{zenDisplayItem.progress.value}<i>/</i>{zenDisplayItem.progress.max}</span>
-                            </>
+                            <span className="generate-step-count">
+                              <AnimatePresence mode="popLayout">
+                                <motion.span
+                                  key={zenDisplayItem.progress.value}
+                                  initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+                                  animate={{ opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const } }}
+                                  exit={{ opacity: 0, y: -6, filter: "blur(2px)", transition: { duration: 0.12 } }}
+                                >
+                                  {zenDisplayItem.progress.value}
+                                </motion.span>
+                              </AnimatePresence>
+                              <i>/</i>{zenDisplayItem.progress.max}
+                            </span>
                           ) : (
-                            <span className="generate-step-label is-queued text-state">Queued</span>
+                            <span className="generate-step-label is-queued">Queued</span>
                           )}
                         </span>
                         <span className="generate-elapsed">{formatElapsed(now - Date.parse(zenDisplayItem.createdAt || new Date().toISOString()))}</span>
@@ -435,10 +458,41 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     const ratio = active.progress?.max ? Math.min(1, Math.max(0, active.progress.value / active.progress.max)) : 0;
                     return (
                       <div className={cn("generating", "zen-generating", active.preview && "has-preview")} style={{ "--progress-ratio": ratio } as React.CSSProperties}>
-                        {active.preview ? <img className="generate-preview" src={active.preview} alt="" draggable={false} /> : null}
+                        <AnimatePresence mode="popLayout">
+                          {active.preview ? (
+                            <motion.img
+                              key={active.preview}
+                              className="generate-preview"
+                              src={active.preview}
+                              alt=""
+                              draggable={false}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1, transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const } }}
+                              exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                            />
+                          ) : null}
+                        </AnimatePresence>
                         {!active.preview ? <div className="noise-layer" /> : null}
                         <div className="generate-overlay">
-                          {active.progress?.max ? <span className="generate-step" key={`step-${active.progress.value}-${active.progress.max}`}><span className="generate-step-label">Step</span><span className="generate-step-count text-state">{active.progress.value}<i>/</i>{active.progress.max}</span></span> : <span className="generate-step-label is-queued text-state" key="queued">Queued</span>}
+                          <span className="generate-step">
+                            {active.progress?.max ? (
+                              <span className="generate-step-count">
+                                <AnimatePresence mode="popLayout">
+                                  <motion.span
+                                    key={active.progress.value}
+                                    initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const } }}
+                                    exit={{ opacity: 0, y: -6, filter: "blur(2px)", transition: { duration: 0.12 } }}
+                                  >
+                                    {active.progress.value}
+                                  </motion.span>
+                                </AnimatePresence>
+                                <i>/</i>{active.progress.max}
+                              </span>
+                            ) : (
+                              <span className="generate-step-label is-queued">Queued</span>
+                            )}
+                          </span>
                           <span className="generate-elapsed">{formatElapsed(now - Date.parse(active.createdAt || new Date().toISOString()))}</span>
                         </div>
                         <div className={cn("generate-bar", !active.progress?.max && "is-indeterminate")}><div className="generate-bar-fill" /></div>

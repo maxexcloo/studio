@@ -1,5 +1,6 @@
 import React from 'react';
 import { Copy, Download, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from './format';
 import { Media, Tip } from './components';
 import type { GalleryItem } from './types';
@@ -17,6 +18,18 @@ type GalleryTileProps = {
   deleteItem: (item: GalleryItem) => void;
 };
 
+const numberVariants = {
+  initial: { opacity: 0, y: 6, filter: "blur(2px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const } },
+  exit: { opacity: 0, y: -6, filter: "blur(2px)", transition: { duration: 0.12 } },
+};
+
+const previewVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const } },
+  exit: { opacity: 0, transition: { duration: 0.2 } },
+};
+
 export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatElapsed, height, item, now, openItem, titleFromPrompt, width }: GalleryTileProps) {
   const ratio = item.progress?.max ? Math.min(1, Math.max(0, item.progress.value / item.progress.max)) : 0;
   const indeterminate = !item.progress?.max;
@@ -24,17 +37,35 @@ export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatEl
     <button className={cn("tile", item.status)} style={{ width, height } as React.CSSProperties} onClick={() => item.status !== "pending" && openItem(item)}>
       {item.status === "pending" ? (
         <div className={cn("generating", item.preview && "has-preview")} style={{ "--progress-ratio": ratio } as React.CSSProperties}>
-          {item.preview ? <img className="generate-preview" src={item.preview} alt="" draggable={false} /> : null}
+          <AnimatePresence mode="popLayout">
+            {item.preview ? (
+              <motion.img
+                key={item.preview}
+                className="generate-preview"
+                src={item.preview}
+                alt=""
+                draggable={false}
+                variants={previewVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              />
+            ) : null}
+          </AnimatePresence>
           {!item.preview ? <div className="noise-layer" /> : null}
           <div className="generate-overlay">
-            <span className="generate-step" key={item.progress?.max ? `step-${item.progress.value}-${item.progress.max}` : item.progress?.node || "queued"}>
+            <span className="generate-step">
               {item.progress?.max ? (
-                <>
-                  <span className="generate-step-label">Step</span>
-                  <span className="generate-step-count text-state">{item.progress.value}<i>/</i>{item.progress.max}</span>
-                </>
+                <span className="generate-step-count">
+                  <AnimatePresence mode="popLayout">
+                    <motion.span key={item.progress.value} variants={numberVariants} initial="initial" animate="animate" exit="exit">
+                      {item.progress.value}
+                    </motion.span>
+                  </AnimatePresence>
+                  <i>/</i>{item.progress.max}
+                </span>
               ) : (
-                <span className="generate-step-label is-queued text-state">Queued</span>
+                <span className="generate-step-label is-queued">Queued</span>
               )}
             </span>
             <span className="generate-elapsed">{formatElapsed(now - Date.parse(item.createdAt || new Date().toISOString()))}</span>

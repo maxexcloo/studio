@@ -63,7 +63,7 @@
 body { margin: 0; min-width: 320px; min-height: 100vh; background: hsl(var(--background)); color: hsl(var(--foreground)); }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
-button:not(:disabled) { transition-timing-function: var(--ease-out); }
+button:not(:disabled) { transition-timing-function: var(--ease-out); transition-duration: 180ms; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 0;
   border-color: hsl(var(--ring));
@@ -80,7 +80,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   }
 }
 
-.app-shell { position: fixed; inset: 0; overflow: hidden; background: hsl(var(--background)); color: hsl(var(--foreground)); }
+.app-shell {
+  position: fixed; inset: 0; overflow: hidden;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  animation: appIn 600ms var(--ease-soft) both;
+}
+@keyframes appIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .stage-gallery {
   position: absolute; inset: 0;
   overflow: auto;
@@ -125,14 +133,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   color: hsl(var(--muted-foreground));
   font-size: 13px; font-weight: 500;
   cursor: pointer;
-  transition: color 160ms var(--ease-out), background 160ms var(--ease-out);
+  transition: color 200ms var(--ease-out), background 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 .mode-tabs button:hover { color: hsl(var(--foreground)); }
+.mode-tabs button:active { transform: scale(0.97); transition-duration: 60ms; }
 .mode-tabs button.active {
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.06) inset;
 }
 
 .workflow-sidebar-button {
@@ -338,7 +347,7 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
   transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out), transform 180ms var(--spring);
 }
 .aspect-trigger:hover, .aspect-option:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); }
-.aspect-trigger:active, .aspect-option:active { transform: scale(0.96); }
+.aspect-trigger:active, .aspect-option:active { transform: scale(0.97); transition-duration: 60ms; }
 .aspect-trigger > span:nth-child(2),
 .aspect-option > span:nth-child(2) {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -579,11 +588,14 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
   letter-spacing: -0.005em;
   display: flex; align-items: center; justify-content: center; gap: 8px;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: transform 220ms var(--spring), box-shadow 220ms var(--ease-out), opacity 160ms var(--ease-out);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06) inset;
+  transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out), opacity 200ms var(--ease-out);
 }
-.generate:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-md); }
-.generate:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-sm); }
+.generate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.08) inset;
+}
+.generate:active:not(:disabled) { transform: scale(0.98) translateY(0); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4); transition-duration: 80ms; }
 .generate:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .status-row { color: hsl(var(--muted-foreground)); font-size: 12px; padding: 12px 2px 0; min-height: 28px; }
