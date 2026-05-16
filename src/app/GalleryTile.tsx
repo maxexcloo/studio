@@ -52,12 +52,13 @@ export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatEl
               />
             ) : null}
           </AnimatePresence>
+          {item.preview ? <div className="generate-blur-veil" /> : null}
           {!item.preview ? <div className="noise-layer" /> : null}
           <div className="generate-overlay">
             <span className="generate-step">
               {item.progress?.max ? (
                 <span className="generate-step-count">
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence mode="wait">
                     <motion.span key={item.progress.value} variants={numberVariants} initial="initial" animate="animate" exit="exit">
                       {item.progress.value}
                     </motion.span>

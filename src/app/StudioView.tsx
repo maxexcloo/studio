@@ -58,12 +58,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           />
                         ) : null}
                       </AnimatePresence>
+                      {zenDisplayItem.preview ? <div className="generate-blur-veil" /> : null}
                       {!zenDisplayItem.preview ? <div className="noise-layer" /> : null}
                       <div className="generate-overlay">
                         <span className="generate-step">
                           {zenDisplayItem.progress?.max ? (
                             <span className="generate-step-count">
-                              <AnimatePresence mode="popLayout">
+                              <AnimatePresence mode="wait">
                                 <motion.span
                                   key={zenDisplayItem.progress.value}
                                   initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
@@ -472,12 +473,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                             />
                           ) : null}
                         </AnimatePresence>
+                        {active.preview ? <div className="generate-blur-veil" /> : null}
                         {!active.preview ? <div className="noise-layer" /> : null}
                         <div className="generate-overlay">
                           <span className="generate-step">
                             {active.progress?.max ? (
                               <span className="generate-step-count">
-                                <AnimatePresence mode="popLayout">
+                                <AnimatePresence mode="wait">
                                   <motion.span
                                     key={active.progress.value}
                                     initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}

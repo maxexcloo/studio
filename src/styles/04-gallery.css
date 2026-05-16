@@ -218,8 +218,10 @@
   background:
     radial-gradient(ellipse at 22% 28%, hsl(216 30% 60% / 0.04), transparent 40%),
     radial-gradient(ellipse at 80% 68%, hsl(216 20% 50% / 0.03), transparent 44%),
+    repeating-linear-gradient(0deg, hsl(var(--foreground) / 0.035) 0px, hsl(var(--foreground) / 0.035) 0.5px, transparent 0.5px, transparent 28px),
+    repeating-linear-gradient(90deg, hsl(var(--foreground) / 0.035) 0px, hsl(var(--foreground) / 0.035) 0.5px, transparent 0.5px, transparent 28px),
     radial-gradient(circle at 1px 1px, hsl(var(--foreground) / 0.06) 0.5px, transparent 0.5px);
-  background-size: 160% 160%, 150% 150%, 28px 28px;
+  background-size: 160% 160%, 150% 150%, 28px 28px, 28px 28px, 28px 28px;
   mix-blend-mode: screen;
   opacity: 0.6;
   animation: genMesh 12s var(--ease-soft) infinite alternate;
@@ -238,6 +240,28 @@
 .generating.has-preview::after {
   opacity: 0;
   animation: genShimmer 3.2s var(--ease-soft) infinite;
+}
+.generating.has-preview .generate-step-count {
+  color: hsl(var(--foreground) / 0.92);
+}
+.generating.has-preview .generate-step-count i {
+  opacity: 0.6;
+}
+.generating.has-preview .generate-elapsed {
+  color: hsl(var(--foreground) / 0.65);
+}
+.generating.has-preview .generate-step-label {
+  color: hsl(var(--foreground) / 0.75);
+}
+.generate-blur-veil {
+  position: absolute; inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  backdrop-filter: blur(calc(12px * (1 - var(--progress-ratio, 0))));
+  -webkit-backdrop-filter: blur(calc(12px * (1 - var(--progress-ratio, 0))));
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  transition: backdrop-filter 400ms var(--ease-out), -webkit-backdrop-filter 400ms var(--ease-out);
 }
 .generating .generate-preview {
   position: absolute; inset: 0;
@@ -368,8 +392,8 @@
   animation: genIndeterminate 1.8s var(--ease-soft) infinite;
 }
 @keyframes genMesh {
-  0% { background-position: 0% 0%, 100% 0%, 0 0; filter: brightness(1); }
-  100% { background-position: 12% 10%, 82% 18%, 6px 6px; filter: brightness(1.03); }
+  0% { background-position: 0% 0%, 100% 0%, 0 0, 0 0, 0 0; filter: brightness(1); }
+  100% { background-position: 12% 10%, 82% 18%, 6px 6px, 6px 6px, 6px 6px; filter: brightness(1.03); }
 }
 @keyframes genShimmer {
   0% { background-position: 200% 0; opacity: 0; }
