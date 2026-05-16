@@ -250,6 +250,12 @@
 .generating.has-preview .generate-elapsed {
   color: hsl(var(--foreground) / 0.65);
 }
+.generating.has-preview .generate-state {
+  color: hsl(var(--foreground) / 0.75);
+}
+.generating.has-preview .generate-info-dot {
+  background: hsl(var(--foreground) / 0.45);
+}
 .generating.has-preview .generate-step-label {
   color: hsl(var(--foreground) / 0.75);
 }
@@ -257,10 +263,8 @@
   position: absolute; inset: 0;
   z-index: 1;
   pointer-events: none;
-  backdrop-filter: blur(calc(12px * (1 - var(--progress-ratio, 0))));
-  -webkit-backdrop-filter: blur(calc(12px * (1 - var(--progress-ratio, 0))));
-  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  backdrop-filter: blur(calc(24px * (1 - var(--progress-ratio, 0))));
+  -webkit-backdrop-filter: blur(calc(24px * (1 - var(--progress-ratio, 0))));
   transition: backdrop-filter 400ms var(--ease-out), -webkit-backdrop-filter 400ms var(--ease-out);
 }
 .generating .generate-preview {
@@ -293,10 +297,11 @@
 .generate-overlay {
   position: absolute;
   left: 10px;
-  bottom: 14px;
-  width: max-content;
+  right: 10px;
+  bottom: 12px;
   display: flex; align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 0;
   z-index: 3;
   pointer-events: none;
@@ -309,7 +314,7 @@
   animation: genOverlayIn 400ms var(--ease-out) 120ms both;
 }
 .generate-step {
-  display: inline-flex; align-items: baseline; gap: 0;
+  display: inline-flex; align-items: center; gap: 0;
   font-variant-numeric: tabular-nums;
 }
 .generate-step-count {
@@ -318,10 +323,9 @@
   line-height: 1;
   letter-spacing: -0.01em;
   color: hsl(var(--foreground) / 0.7);
-  position: relative;
-  overflow: hidden;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
+  height: 13px;
 }
 .generate-step-count i {
   font-style: normal;
@@ -329,11 +333,32 @@
   margin: 0 1px;
   opacity: 0.5;
 }
+.generate-info {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-width: 0;
+}
+.generate-state {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: hsl(var(--foreground) / 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.generate-info-dot {
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: hsl(var(--foreground) / 0.3);
+  flex-shrink: 0;
+}
 .generate-elapsed {
   font-size: 10px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: hsl(var(--foreground) / 0.4);
+  white-space: nowrap;
 }
 .generate-step-label {
   font-size: 11px;

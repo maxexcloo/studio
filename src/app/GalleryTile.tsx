@@ -19,9 +19,9 @@ type GalleryTileProps = {
 };
 
 const numberVariants = {
-  initial: { opacity: 0, y: 6, filter: "blur(2px)" },
-  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const } },
-  exit: { opacity: 0, y: -6, filter: "blur(2px)", transition: { duration: 0.12 } },
+  initial: { opacity: 0, filter: "blur(3px)" },
+  animate: { opacity: 1, filter: "blur(0px)", transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const } },
+  exit: { opacity: 0, filter: "blur(3px)", transition: { duration: 0.1 } },
 };
 
 const previewVariants = {
@@ -69,7 +69,11 @@ export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatEl
                 <span className="generate-step-label is-queued">Queued</span>
               )}
             </span>
-            <span className="generate-elapsed">{formatElapsed(now - Date.parse(item.createdAt || new Date().toISOString()))}</span>
+            <span className="generate-info">
+              <span className="generate-state">{item.progress?.node || "Rendering"}</span>
+              <span className="generate-info-dot" />
+              <span className="generate-elapsed">{formatElapsed(now - Date.parse(item.createdAt || new Date().toISOString()))}</span>
+            </span>
           </div>
           <div className={cn("generate-bar", indeterminate && "is-indeterminate")}>
             <div className="generate-bar-fill" />
