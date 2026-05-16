@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Copy, Download, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from './format';
@@ -33,8 +33,11 @@ const previewVariants = {
 export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatElapsed, height, item, now, openItem, titleFromPrompt, width }: GalleryTileProps) {
   const ratio = item.progress?.max ? Math.min(1, Math.max(0, item.progress.value / item.progress.max)) : 0;
   const indeterminate = !item.progress?.max;
+  const mountedRef = useRef(false);
+  const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
+  useEffect(() => { mountedRef.current = true; }, []);
   return (
-    <button className={cn("tile", item.status)} style={{ width, height } as React.CSSProperties} onClick={() => item.status !== "pending" && openItem(item)}>
+    <button className={cn("tile", item.status, isEntering && "is-entering")} style={{ width, height } as React.CSSProperties} onClick={() => item.status !== "pending" && openItem(item)}>
       {item.status === "pending" ? (
         <div className={cn("generating", item.preview && "has-preview")} style={{ "--progress-ratio": ratio } as React.CSSProperties}>
           <AnimatePresence mode="popLayout">
