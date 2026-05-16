@@ -289,6 +289,11 @@ export function inferModels(info, stats = {}) {
     const countRange = controls.count ? nodeRange(info, workflow.graph?.[controls.count.node]?.class_type, controls.count.input, { default: Number(defaults.count || 1), min: 1, max: 4096, step: 1 }) : {};
     const frameRange = controls.frames ? nodeRange(info, workflow.graph?.[controls.frames.node]?.class_type, controls.frames.input, { default: Number(defaults.frames || 33), min: 1, max: 16384, step: 1 }) : {};
     const fpsRange = controls.fps ? nodeRange(info, workflow.graph?.[controls.fps.node]?.class_type, controls.fps.input, { default: Number(defaults.fps || 16), min: 1, max: 120, step: 1 }) : {};
+    if (Number(defaults.width)) widthRange.default = Number(defaults.width);
+    if (Number(defaults.height)) heightRange.default = Number(defaults.height);
+    if (Number(defaults.count)) countRange.default = Number(defaults.count);
+    if (Number(defaults.frames)) frameRange.default = Number(defaults.frames);
+    if (Number(defaults.fps)) fpsRange.default = Number(defaults.fps);
     profiles.push(buildProfile({
       id: workflow.profileId,
       kind: workflow.kind,

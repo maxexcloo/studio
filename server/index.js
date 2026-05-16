@@ -62,6 +62,35 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
+app.get("/api/comfy/status", async (_req, res) => {
+  const startedAt = performance.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2000);
+  try {
+    const response = await fetch(`${comfyUrl}/system_stats`, { signal: controller.signal });
+    const latencyMs = Math.round(performance.now() - startedAt);
+    if (!response.ok) {
+      res.json({ connected: false, url: comfyUrl, latencyMs, error: `HTTP ${response.status}` });
+      return;
+    }
+    const stats = await response.json();
+    const device = stats?.devices?.[0]?.name || "";
+    res.json({
+      connected: true,
+      url: comfyUrl,
+      latencyMs,
+      version: stats?.system?.comfyui_version || "",
+      device
+    });
+  } catch (error) {
+    const latencyMs = Math.round(performance.now() - startedAt);
+    const message = error?.name === "AbortError" ? "Connection timed out" : error?.message || "Connection failed";
+    res.json({ connected: false, url: comfyUrl, latencyMs, error: message });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 app.get("/api/models", async (_req, res) => {
   try {
     const info = await comfy("/object_info");
@@ -148,12 +177,12 @@ app.get("/api/gallery", async (_req, res) => {
   const recovered = recordsFromComfyHistory(history);
   if (recovered.length) {
     const pending = gallery.filter((item) => item.status === "pending");
-    setGallery(filterVisibleGallery(dedupeGallery([...pending, ...gallery, ...recovered])).slice(0, galleryLimit));
+    setGallery(dedupeGallery([...pending, ...gallery, ...recovered]).slice(0, galleryLimit));
     saveGallery();
   }
-  setGallery(filterVisibleGallery(dedupeGallery(gallery)));
+  setGallery(dedupeGallery(gallery).slice(0, galleryLimit));
   saveGallery();
-  res.json({ outputs: gallery });
+  res.json({ outputs: filterVisibleGallery(gallery) });
 });
 
 app.post("/api/generate", async (req, res) => {

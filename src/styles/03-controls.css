@@ -118,6 +118,46 @@
 .text-button { color: hsl(var(--foreground)); font-size: 12px; text-decoration: none; white-space: nowrap; font-weight: 500; }
 .icon-button:hover, .queue-button:hover, .text-button:hover { background: hsl(var(--accent)); border-color: hsl(var(--border-strong)); color: hsl(var(--foreground)); }
 .status-pill:hover { background: hsl(var(--card)); border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+.comfy-status-dot {
+  width: 34px;
+  min-height: 34px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.comfy-status-dot:hover {
+  background: hsl(var(--accent));
+  border-color: hsl(var(--border-strong));
+  transform: translateY(-1px);
+}
+.comfy-status-dot span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: hsl(45 90% 58%);
+  box-shadow: 0 0 0 4px hsl(45 90% 58% / 0.12), 0 0 14px hsl(45 90% 58% / 0.2);
+  transition: background 220ms var(--ease-out), box-shadow 220ms var(--ease-out), transform 220ms var(--ease-out);
+}
+.comfy-status-dot.is-connected span {
+  background: hsl(145 70% 48%);
+  box-shadow: 0 0 0 4px hsl(145 70% 48% / 0.12), 0 0 14px hsl(145 70% 48% / 0.32);
+}
+.comfy-status-dot.is-disconnected span {
+  background: hsl(0 74% 58%);
+  box-shadow: 0 0 0 4px hsl(0 74% 58% / 0.12), 0 0 14px hsl(0 74% 58% / 0.22);
+}
+.comfy-status-dot.is-checking span {
+  animation: comfyStatusPulse 1.2s var(--ease-soft) infinite;
+}
+@keyframes comfyStatusPulse {
+  0%, 100% { transform: scale(0.86); opacity: 0.62; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
 
 .skeleton {
   display: block;

@@ -6,7 +6,7 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import "./styles.css";
 
-import type { GalleryItem, Health, LoraSelection, Mode, Models, Paths, Preferences, Profile, TouchGesture, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
+import type { ComfyStatus, GalleryItem, Health, LoraSelection, Mode, Models, Paths, Preferences, Profile, TouchGesture, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets, galleryBatchSize, galleryInitialBatch } from './app/constants';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -23,6 +23,7 @@ function App() {
   const [mode, setMode] = useState<Mode>(initialDraft.mode === "video" ? "video" : "image");
   const [models, setModels] = useState<Models | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
+  const [comfyStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [prefs, setPrefsState] = useState<Preferences>(() => loadPrefs());
@@ -85,10 +86,16 @@ function App() {
 
   useEffect(() => {
     refreshHealth();
+    refreshComfyStatus();
     refreshModels(false);
     refreshWorkflows();
     refreshPaths();
     loadGallery();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(refreshComfyStatus, 5000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -382,6 +389,13 @@ function App() {
       .catch((error) => setHealth({ ok: false, error: error instanceof Error ? error.message : "Connection failed" }));
   }
 
+  function refreshComfyStatus() {
+    setComfyStatus((current) => ({ ...current, checking: true }));
+    apiJson<ComfyStatus>("/api/comfy/status")
+      .then((data) => setComfyStatus({ ...data, checking: false }))
+      .catch((error) => setComfyStatus({ connected: false, checking: false, error: error instanceof Error ? error.message : "Connection failed" }));
+  }
+
   function refreshPaths() {
     apiJson<Paths>("/api/paths")
       .then(setPaths)
@@ -630,7 +644,7 @@ function App() {
 
   const sidebarControls = <SidebarControls view={{ canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, currentProfile, customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler, setScheduler, setSeed, setStartImage, setStartImageName, setTextEncoder, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, textEncoder, vae, weightDtype, width, widthMeta }} />;
 
-  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshHealth, refreshModels, refreshWorkflows, renderedGallery, resetAllSettings, resetViewer, runningCount, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
+  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, refreshWorkflows, renderedGallery, resetAllSettings, resetViewer, runningCount, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
 
   return <StudioView view={view} />;
 }

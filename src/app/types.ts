@@ -47,6 +47,7 @@ export type Models = {
 };
 export type Paths = { outputDir?: string; galleryDir?: string; workflowsDir?: string };
 export type Health = { ok: boolean; comfyUrl?: string; error?: string };
+export type ComfyStatus = { connected: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean };
 export type UpdateStatus = { ok: boolean; available?: boolean; current?: string; latest?: string; branch?: string; behind?: number; updated?: boolean; restartRequired?: boolean; message?: string; error?: string };
 export type AspectPreset = { label: string; value: string; w: number; h: number };
 export type WorkflowValidation = { ok: boolean; issues: string[]; warnings?: string[]; missingNodes?: string[] };

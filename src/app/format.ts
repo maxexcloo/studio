@@ -13,8 +13,15 @@ export function aspectIconStyle(option: AspectPreset): React.CSSProperties {
   };
 }
 
-export function titleFromPrompt(text = "") {
-  const compact = text.replace(/\s+/g, " ").trim();
+function textValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map((item) => (typeof item === "string" || typeof item === "number") ? String(item) : "").filter(Boolean).join(" ");
+  if (typeof value === "number") return String(value);
+  return "";
+}
+
+export function titleFromPrompt(text: unknown = "") {
+  const compact = textValue(text).replace(/\s+/g, " ").trim();
   return compact.length > 76 ? `${compact.slice(0, 73)}...` : compact;
 }
 

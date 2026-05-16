@@ -1,12 +1,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 
 export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 export const comfyUrl = process.env.COMFY_URL || "http://127.0.0.1:8188";
 export const host = process.env.HOST || "127.0.0.1";
 export const port = Number(process.env.PORT || 8787);
-export const comfyOutputDir = process.env.COMFY_OUTPUT_DIR || "";
+const localComfyOutputDir = "C:\\CUVenv\\ComfyUI\\output";
+export const comfyOutputDir = process.env.COMFY_OUTPUT_DIR || (fs.existsSync(localComfyOutputDir) ? localComfyOutputDir : "");
 export const localHosts = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 export const allowLanActions = process.env.JAI_ALLOW_LAN === "1" || host === "0.0.0.0" || host === "::";
 
