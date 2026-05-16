@@ -6,11 +6,12 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import "./styles.css";
 
-import type { GalleryItem, Health, Mode, Models, Paths, Preferences, Profile, TouchGesture, UpdateStatus } from './app/types';
+import type { GalleryItem, Health, LoraSelection, Mode, Models, Paths, Preferences, Profile, TouchGesture, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets, galleryBatchSize, galleryInitialBatch } from './app/constants';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { sortGalleryItems, useGalleryColumnCount } from './app/gallery';
+import { normalizeLoras } from './app/loras';
 import { StudioView } from './app/StudioView';
 import { SidebarControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
@@ -44,6 +45,7 @@ function App() {
   const [fps, setFps] = useState(Number(initialDraft.fps || prefs.defaultFps));
   const [sampler, setSampler] = useState(String(initialDraft.sampler || "euler_ancestral"));
   const [scheduler, setScheduler] = useState(String(initialDraft.scheduler || "beta"));
+  const [loras, setLoras] = useState<LoraSelection[]>(() => normalizeLoras(initialDraft.loras));
   const advanced = true;
   const [settings, setSettings] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
@@ -55,6 +57,9 @@ function App() {
   const [zenSelectedId, setZenSelectedId] = useState(String(initialDraft.zenSelectedId || ""));
   const [status, setStatus] = useState("Ready");
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
+  const [workflowPreferences, setWorkflowPreferences] = useState<WorkflowPreferences>({ favorites: [], lastUsed: {}, thumbnails: {} });
+  const [workflowGalleryOpen, setWorkflowGalleryOpen] = useState(false);
   const [galleryLoaded, setGalleryLoaded] = useState(false);
   const [galleryRenderCount, setGalleryRenderCount] = useState(galleryInitialBatch);
   const [active, setActive] = useState<GalleryItem | null>(null);
@@ -81,6 +86,7 @@ function App() {
   useEffect(() => {
     refreshHealth();
     refreshModels(false);
+    refreshWorkflows();
     refreshPaths();
     loadGallery();
   }, []);
@@ -125,13 +131,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!active && !settings) return;
+    if (!active && !settings && !workflowGalleryOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [active, settings]);
+  }, [active, settings, workflowGalleryOpen]);
 
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
@@ -153,6 +159,11 @@ function App() {
         setSettings(false);
         return;
       }
+      if (workflowGalleryOpen) {
+        event.preventDefault();
+        setWorkflowGalleryOpen(false);
+        return;
+      }
       if (active) {
         event.preventDefault();
         setActive(null);
@@ -165,7 +176,7 @@ function App() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [settings, active, zenControls]);
+  }, [settings, active, zenControls, workflowGalleryOpen]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -201,6 +212,7 @@ function App() {
       fps,
       sampler,
       scheduler,
+      loras,
       customSize,
       startImage,
       startImageName,
@@ -217,7 +229,7 @@ function App() {
     } catch {
       localStorage.setItem("j-ai-studio-draft", JSON.stringify({ ...draft, startImage: "" }));
     }
-  }, [mode, prompt, negative, model, textEncoder, vae, clipType, weightDtype, width, height, steps, cfg, denoise, seed, count, frames, fps, sampler, scheduler, customSize, startImage, startImageName, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId]);
+  }, [mode, prompt, negative, model, textEncoder, vae, clipType, weightDtype, width, height, steps, cfg, denoise, seed, count, frames, fps, sampler, scheduler, loras, customSize, startImage, startImageName, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId]);
 
   useEffect(() => {
     if (!active) return;
@@ -355,6 +367,15 @@ function App() {
       });
   }
 
+  function refreshWorkflows() {
+    apiJson<{ workflows: WorkflowSummary[]; preferences: WorkflowPreferences }>("/api/workflows")
+      .then((data) => {
+        setWorkflows(data.workflows || []);
+        if (data.preferences) setWorkflowPreferences(data.preferences);
+      })
+      .catch(() => null);
+  }
+
   function refreshHealth() {
     apiJson<Health>("/api/health")
       .then(setHealth)
@@ -451,10 +472,28 @@ function App() {
 
   const modelProfiles = useMemo(() => {
     if (!models) return [];
-    return models.profiles.filter((profile) => profile.kind === mode);
-  }, [mode, models]);
+    const favorites = new Set(workflowPreferences.favorites || []);
+    const lastUsed = workflowPreferences.lastUsed || {};
+    return models.profiles.filter((profile) => profile.kind === mode).sort((a, b) => {
+      const favoriteDelta = Number(favorites.has(b.id)) - Number(favorites.has(a.id));
+      if (favoriteDelta) return favoriteDelta;
+      const recentDelta = Date.parse(lastUsed[b.id] || "0") - Date.parse(lastUsed[a.id] || "0");
+      if (recentDelta) return recentDelta;
+      const customDelta = Number(a.family === "custom") - Number(b.family === "custom");
+      if (customDelta) return customDelta;
+      return (a.displayName || a.label).localeCompare(b.displayName || b.label);
+    });
+  }, [mode, models, workflowPreferences]);
 
   const currentProfile = useMemo(() => models?.profiles.find((profile) => profile.id === model) || null, [model, models]);
+  const profileBadges = useMemo(() => {
+    const favorites = new Set(workflowPreferences.favorites || []);
+    const lastUsed = workflowPreferences.lastUsed || {};
+    return Object.fromEntries((models?.profiles || []).map((profile) => [
+      profile.id,
+      favorites.has(profile.id) ? "Favorite" : lastUsed[profile.id] ? "Recent" : profile.family === "custom" ? "Workflow" : ""
+    ]).filter(([, badge]) => badge));
+  }, [models, workflowPreferences]);
   const aspectOptions = currentProfile?.aspectPresets?.length ? currentProfile.aspectPresets : fallbackAspectPresets[mode];
   const canUseStartImage = mode === "image" && Boolean(currentProfile?.capabilities.startImage);
   const widthMeta = currentProfile?.constraints?.width || {};
@@ -482,6 +521,7 @@ function App() {
   const zenItem = zenGallery.find((item) => item.id === zenSelectedId) || zenGallery[0] || null;
   const zenDisplayItem = zenItem;
   const generateDisabled = !currentProfile || (currentProfile.capabilities.textEncoder && !textEncoder) || (currentProfile.capabilities.vae && !vae);
+  const loraActiveCount = mode === "image" && currentProfile?.capabilities.lora ? loras.filter((item) => item.enabled && item.name).length : 0;
 
   useEffect(() => {
     setGalleryRenderCount(galleryInitialBatch);
@@ -507,6 +547,18 @@ function App() {
     const profile = models?.profiles.find((item) => item.id === profileId);
     if (profile) applyProfile(profile);
     else setModel(profileId);
+  }
+
+  function selectWorkflow(profileId: string) {
+    chooseModel(profileId);
+    apiJson<{ preferences: WorkflowPreferences }>("/api/workflows/preferences", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lastUsed: { [profileId]: new Date().toISOString() } })
+    }).then((data) => {
+      if (data.preferences) setWorkflowPreferences(data.preferences);
+      refreshWorkflows();
+    }).catch(() => null);
   }
 
   async function readStartImage(file: File | undefined) {
@@ -557,6 +609,7 @@ function App() {
         body: JSON.stringify({ workflow })
       });
       refreshModels(false);
+      refreshWorkflows();
       showToast("Workflow imported", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Workflow import failed", "error");
@@ -566,18 +619,18 @@ function App() {
 
 
   const generationActions = useGenerationActions({
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, mode, model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery, setStatus, setZenSelectedId, showToast, startImage, startImageName, steps, cfg, textEncoder, vae, clipType, weightDtype, width
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loras, mode, model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery, setStatus, setZenSelectedId, showToast, startImage, startImageName, steps, cfg, textEncoder, vae, clipType, weightDtype, width
   });
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem } = generationActions;
 
   const viewerActions = useViewerControls({
-    active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageName, setSteps, setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
+    active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageName, setSteps, setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
   });
   const { resetViewer, openItem, applyAllSettings, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
-  const sidebarControls = <SidebarControls view={{ canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, currentProfile, customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setDenoise, setFps, setFrames, setHeight, setSampler, setScheduler, setSeed, setStartImage, setStartImageName, setTextEncoder, setVae, setWeightDtype, setWidth, startImageName, textEncoder, vae, weightDtype, width, widthMeta }} />;
+  const sidebarControls = <SidebarControls view={{ canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, currentProfile, customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler, setScheduler, setSeed, setStartImage, setStartImageName, setTextEncoder, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, textEncoder, vae, weightDtype, width, widthMeta }} />;
 
-  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, prompt, promptLimit, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
+  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshHealth, refreshModels, refreshWorkflows, renderedGallery, resetAllSettings, resetViewer, runningCount, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
 
   return <StudioView view={view} />;
 }

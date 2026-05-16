@@ -38,6 +38,27 @@ export function ensureOption(info, node, key, value, label) {
   }
 }
 
+function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image") {
+  if (kind !== "image" || !profile?.capabilities?.lora) return [];
+  const installed = optionsFor(info, "LoraLoader", "lora_name");
+  if (!installed.length) return [];
+  const strengthRange = nodeRange(info, "LoraLoader", "strength_model", { default: 0.7, min: -100, max: 100, step: 0.01 });
+  const raw = Array.isArray(input.loras) ? input.loras : [];
+  const sanitized = [];
+  for (const item of raw.slice(0, 4)) {
+    if (!item || item.enabled === false) continue;
+    const name = String(item.name || "").trim();
+    if (!name) continue;
+    if (!installed.includes(name)) throw new Error(`LoRA is not installed or ComfyUI cannot see it: ${name}`);
+    sanitized.push({
+      name,
+      enabled: true,
+      strength: snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange)
+    });
+  }
+  return sanitized;
+}
+
 export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
@@ -84,6 +105,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const cfgRange = nodeRange(info, "KSampler", "cfg", { default: kind === "video" ? 5 : 1, min: 0, max: 100 });
   const denoiseRange = nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1 });
 
+  const loras = sanitizeLoras(input, info, profile, kind);
   return {
     ...input,
     kind,
@@ -108,6 +130,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     frames: snapInteger(input.frames, frameRange.default, frameRange),
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
     startImage: String(input.startImage || ""),
-    startImageName: String(input.startImageName || "")
+    startImageName: String(input.startImageName || ""),
+    loras
   };
 }

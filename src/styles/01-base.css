@@ -135,6 +135,27 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   box-shadow: var(--shadow-sm);
 }
 
+.workflow-sidebar-button {
+  width: 100%;
+  min-height: 36px;
+  margin: -4px 0 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.workflow-sidebar-button:hover {
+  border-color: hsl(var(--border-strong));
+  background: hsl(var(--accent));
+}
+
 .panel {
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
@@ -369,6 +390,158 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
 .advanced-toggle:hover { color: hsl(var(--foreground)); }
 .advanced-toggle svg { transition: transform 220ms var(--spring); }
 .flip { transform: rotate(180deg); }
+
+.sidebar-section { margin-top: 12px; }
+
+.lora-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.lora-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.lora-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input) / 0.5);
+}
+
+.lora-row.is-disabled {
+  opacity: 0.58;
+}
+
+.lora-enable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lora-enable input {
+  width: 16px;
+  min-height: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: hsl(var(--foreground));
+}
+
+.lora-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.lora-picker input {
+  height: 34px;
+  min-height: 34px;
+}
+
+.lora-menu {
+  position: absolute;
+  z-index: 18;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 2px);
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-lg);
+  animation: pop 180ms var(--spring);
+}
+
+.lora-option-group {
+  display: grid;
+  gap: 2px;
+}
+
+.lora-option-group > span,
+.lora-empty {
+  padding: 4px 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lora-option-group button {
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: hsl(var(--foreground));
+  padding: 0 8px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lora-option-group button:hover,
+.lora-option-group button.active {
+  background: hsl(var(--accent));
+}
+
+.lora-row .number-picker,
+.lora-row-actions,
+.lora-add {
+  grid-column: 1 / -1;
+}
+
+.lora-row-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.lora-row-actions button,
+.lora-add {
+  min-height: 32px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  color: hsl(var(--muted-foreground));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.lora-row-actions button:hover:not(:disabled),
+.lora-add:hover:not(:disabled) {
+  border-color: hsl(var(--border-strong));
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.lora-row-actions button:disabled,
+.lora-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lora-add {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+}
 
 .file-pick {
   display: flex; align-items: center; gap: 8px;

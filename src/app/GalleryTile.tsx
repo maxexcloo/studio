@@ -27,14 +27,14 @@ export function GalleryTile({ cancelJob, copyImageAndToast, deleteItem, formatEl
           {item.preview ? <img className="generate-preview" src={item.preview} alt="" draggable={false} /> : null}
           {!item.preview ? <div className="noise-layer" /> : null}
           <div className="generate-overlay">
-            <span className="generate-step">
+            <span className="generate-step" key={item.progress?.max ? `step-${item.progress.value}-${item.progress.max}` : item.progress?.node || "queued"}>
               {item.progress?.max ? (
                 <>
                   <span className="generate-step-label">Step</span>
-                  <span className="generate-step-count">{item.progress.value}<i>/</i>{item.progress.max}</span>
+                  <span className="generate-step-count text-state">{item.progress.value}<i>/</i>{item.progress.max}</span>
                 </>
               ) : (
-                <span className="generate-step-label is-queued">{item.progress?.node === "running" ? "Rendering" : "Queued"}</span>
+                <span className="generate-step-label is-queued text-state">Queued</span>
               )}
             </span>
             <span className="generate-elapsed">{formatElapsed(now - Date.parse(item.createdAt || new Date().toISOString()))}</span>

@@ -283,10 +283,11 @@ export function familyLabel(profile: Profile | null) {
   if (profile.family === "z-image") return "Z image";
   if (profile.family === "checkpoint") return "Checkpoint";
   if (profile.family === "wan") return "Wan video";
+  if (profile.family === "custom") return "Workflow";
   return profile.family;
 }
 
-export function ModelPicker({ value, profiles, onChange, compact = false }: { value: string; profiles: Profile[]; onChange: (value: string) => void; compact?: boolean }) {
+export function ModelPicker({ value, profiles, onChange, compact = false, badges = {} }: { value: string; profiles: Profile[]; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const selected = profiles.find((profile) => profile.id === value) || profiles[0] || null;
@@ -326,7 +327,7 @@ export function ModelPicker({ value, profiles, onChange, compact = false }: { va
                   <strong>{profile.displayName || profile.label}</strong>
                   <em>{profile.description || familyLabel(profile)}</em>
                 </span>
-                <span className="model-badge">{familyLabel(profile)}</span>
+                <span className="model-badge">{badges[profile.id] || familyLabel(profile)}</span>
               </button></Tip>
           ))}
         </div>

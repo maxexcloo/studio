@@ -8,6 +8,17 @@ export const host = process.env.HOST || "127.0.0.1";
 export const port = Number(process.env.PORT || 8787);
 export const comfyOutputDir = process.env.COMFY_OUTPUT_DIR || "";
 export const localHosts = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+export const allowLanActions = process.env.JAI_ALLOW_LAN === "1" || host === "0.0.0.0" || host === "::";
+
+export function isTrustedClient(remote = "") {
+  if (localHosts.has(remote)) return true;
+  const address = String(remote || "").replace(/^::ffff:/, "");
+  if (!allowLanActions) return false;
+  if (/^10\./.test(address)) return true;
+  if (/^192\.168\./.test(address)) return true;
+  const match = address.match(/^172\.(\d+)\./);
+  return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31);
+}
 
 export async function comfy(pathname, options = {}) {
   const response = await fetch(`${comfyUrl}${pathname}`, options);

@@ -1,7 +1,8 @@
 export type Mode = "image" | "video";
 export type Progress = { value: number; max: number; node?: string };
 export type Output = { url: string; filename: string; type: "image" | "video"; prompt?: string; negative?: string; outputName?: string };
-export type GenerationSettings = Record<string, string | number | boolean | null | undefined>;
+export type LoraSelection = { name: string; enabled: boolean; strength: number };
+export type GenerationSettings = Record<string, string | number | boolean | null | undefined | LoraSelection[]>;
 export type GalleryItem = Output & { id: string; jobId?: string; status: "done" | "pending" | "error" | "canceled"; progress?: Progress; preview?: string; width?: number; height?: number; createdAt?: string; durationMs?: number; model?: string; settings?: GenerationSettings; index?: number; referenceImage?: string; referenceImageName?: string };
 export type Job = { status: string; outputs: GalleryItem[]; error?: string; progress?: Progress; preview?: string };
 export type TouchGesture = { mode: "pan"; id: number; x: number; y: number; panX: number; panY: number; moved: boolean } | { mode: "pinch"; distance: number; zoom: number; panX: number; panY: number; centerX: number; centerY: number; moved: boolean };
@@ -25,6 +26,7 @@ export type Profile = {
     weightDtypes?: string[];
     samplers?: string[];
     schedulers?: string[];
+    loras?: string[];
   };
   capabilities: Record<string, boolean>;
 };
@@ -39,6 +41,7 @@ export type Models = {
   weightDtypes?: string[];
   samplers: string[];
   schedulers: string[];
+  loras?: string[];
   defaults: Record<string, string>;
   capabilities: Record<string, boolean>;
 };
@@ -46,6 +49,45 @@ export type Paths = { outputDir?: string; galleryDir?: string; workflowsDir?: st
 export type Health = { ok: boolean; comfyUrl?: string; error?: string };
 export type UpdateStatus = { ok: boolean; available?: boolean; current?: string; latest?: string; branch?: string; behind?: number; updated?: boolean; restartRequired?: boolean; message?: string; error?: string };
 export type AspectPreset = { label: string; value: string; w: number; h: number };
+export type WorkflowValidation = { ok: boolean; issues: string[]; warnings?: string[]; missingNodes?: string[] };
+export type WorkflowSummary = {
+  id: string;
+  profileId: string;
+  workflow: string;
+  name: string;
+  description?: string;
+  kind: Mode;
+  family: string;
+  source: "builtin" | "custom";
+  deleteId?: string;
+  controls?: string[];
+  capabilities?: Record<string, boolean>;
+  defaults?: Record<string, string | number | boolean | null | undefined>;
+  path?: string;
+  favorite?: boolean;
+  lastUsedAt?: string;
+  thumbnail?: string;
+  tags?: string[];
+  validation: WorkflowValidation;
+};
+export type WorkflowPreferences = { favorites: string[]; lastUsed: Record<string, string>; thumbnails: Record<string, string> };
+export type WorkflowImportPreview = {
+  filename?: string;
+  hasJaiStudio: boolean;
+  detected: {
+    id: string;
+    name: string;
+    description?: string;
+    kind: Mode;
+    family: string;
+    controls: Record<string, { node: string; input: string }>;
+    defaults?: Record<string, unknown>;
+    capabilities?: Record<string, boolean>;
+    aspectRatios?: unknown[];
+    nodes: Array<{ id: string; classType: string; inputs: string[]; suggestedInputs: string[] }>;
+  };
+  validation: WorkflowValidation;
+};
 
 export type Preferences = {
   defaultImageCount: number;

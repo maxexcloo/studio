@@ -231,12 +231,73 @@
   color: hsl(var(--foreground));
   line-height: 1.45;
 }
+.negative-unavailable-frame {
+  position: relative;
+  min-width: 0;
+}
+.negative-unavailable-frame textarea {
+  width: 100%;
+}
 .negative-drawer textarea::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
 .negative-drawer textarea:focus { box-shadow: none; border: 0; }
 .negative-drawer span {
   justify-self: end;
   color: hsl(var(--muted-foreground) / 0.7);
   font-size: 11px;
+}
+.negative-drawer.is-unavailable {
+  border-top-color: hsl(var(--border));
+}
+.negative-drawer.is-unavailable .negative-drawer-label {
+  color: hsl(var(--foreground));
+}
+.negative-drawer.is-unavailable textarea {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, hsl(var(--input) / 0.96), hsl(var(--secondary) / 0.54)),
+    hsl(var(--input));
+  color: hsl(var(--muted-foreground));
+  padding: 10px 12px;
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+.negative-drawer.is-unavailable .negative-unavailable-frame::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--radius) - 1px);
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 9px,
+      hsl(var(--foreground) / 0.035) 9px 10px,
+      transparent 10px 18px
+    ),
+    linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.035), transparent);
+  mask-image: linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%);
+  opacity: 0.95;
+}
+.negative-drawer.is-unavailable textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.86);
+}
+.negative-drawer.is-unavailable span {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+}
+.negative-drawer.is-unavailable span::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground));
+  opacity: 0.72;
 }
 
 .zen-prompt-actions {
@@ -327,6 +388,23 @@
   color: hsl(var(--foreground));
   border-color: hsl(var(--border-strong));
 }
+.negative-toggle.is-unavailable {
+  border-style: dashed;
+  background: hsl(var(--input) / 0.7);
+  color: hsl(var(--muted-foreground));
+}
+.negative-toggle.is-unavailable.active {
+  background: hsl(var(--secondary) / 0.7);
+  color: hsl(var(--foreground));
+}
+.negative-toggle.is-unavailable::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground));
+  opacity: 0.8;
+}
 .negative-toggle svg { transition: transform 160ms var(--ease-out); }
 .negative-toggle svg.flip { transform: rotate(180deg); }
 
@@ -345,6 +423,22 @@
 .zen-inline-settings .number-picker-input { height: 34px; min-width: 28px; padding: 0 6px; font-size: 13px; }
 .zen-inline-settings .number-picker-input { width: 40px; min-width: 40px; }
 .zen-inline-settings .number-picker-label { padding: 0 4px 0 7px; }
+
+.lora-pill {
+  height: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 .number-picker {
   display: inline-flex;

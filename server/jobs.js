@@ -1,6 +1,7 @@
 import { comfy, comfyUrl, normalizeComfyError } from './comfy.js';
 import { imageGraph, videoGraph } from './graphs.js';
 import { outputsFrom, replaceGalleryJob, updateGalleryJob } from './gallery-store.js';
+import { markWorkflowUsed } from './workflow-catalog.js';
 
 export const jobs = new Map();
 
@@ -153,6 +154,7 @@ async function runJob(id, body) {
       if (history[queued.prompt_id]) {
         const outputs = outputsFrom(history[queued.prompt_id]);
         const completed = replaceGalleryJob(id, outputs, body, jobs);
+        markWorkflowUsed(body.profileId || body.model || body.workflow || "", completed[0]?.url || "");
         jobs.set(id, { ...jobs.get(id), status: "done", outputs: completed });
         socket?.close();
         return;

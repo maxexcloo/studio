@@ -5,7 +5,7 @@ import type { GalleryItem, Job } from './types';
 export function useGenerationActions(view: any) {
   const {
     active, canUseStartImage, confirmAction, count, currentProfile, denoise,
-    frames, fps, generateDisabled, generatePostingRef, height, loadGallery, mode,
+    frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loras, mode,
     model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery,
     setStatus, setZenSelectedId, showToast, startImage, startImageName, steps, cfg,
     textEncoder, vae, clipType, weightDtype, width
@@ -39,6 +39,7 @@ export function useGenerationActions(view: any) {
         kind: mode,
         prompt,
         negative,
+        profileId: currentProfile?.id || model,
         model: currentProfile?.model || model,
         workflow: currentProfile?.workflow || "",
         textEncoder,
@@ -56,6 +57,7 @@ export function useGenerationActions(view: any) {
         count,
         frames,
         fps,
+        loras,
         startImage: canUseStartImage ? startImage : "",
         startImageName
       };

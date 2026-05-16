@@ -137,6 +137,8 @@ export function inferModels(info, stats = {}) {
   const samplers = optionsFor(info, "KSampler", "sampler_name");
   const schedulers = optionsFor(info, "KSampler", "scheduler");
   const weightDtypes = optionsFor(info, "UNETLoader", "weight_dtype");
+  const loras = optionsFor(info, "LoraLoader", "lora_name");
+  const canUseLoras = Boolean(info.LoraLoader && loras.length);
   const incompatibleModels = unets.filter((name) => isNvfp4Model(name) && !torchSupportsNvfp4(stats));
   const runnableUnets = unets.filter((name) => !incompatibleModels.includes(name));
   const textMeta = textRange(info, "CLIPTextEncode", "text");
@@ -200,9 +202,9 @@ export function inferModels(info, stats = {}) {
         ["3:4", 3, 4],
         ["2.35:1", 235, 100]
       ], { width: sd3Range.width, height: sd3Range.height }),
-      options: { textEncoders: clips, vaes, clipTypes, weightDtypes, samplers, schedulers },
+      options: { textEncoders: clips, vaes, clipTypes, weightDtypes, samplers, schedulers, loras },
       constraints: { prompt: textMeta, negative: textMeta, width: sd3Range.width, height: sd3Range.height, count: sd3Range.count, ...samplerRange },
-      capabilities: { textEncoder: true, vae: true, weightDtype: true }
+      capabilities: { textEncoder: true, vae: true, weightDtype: true, lora: canUseLoras }
     }));
   }
 
@@ -233,9 +235,9 @@ export function inferModels(info, stats = {}) {
         ["3:4", 3, 4],
         ["2.35:1", 235, 100]
       ], { width: imageRange.width, height: imageRange.height }),
-      options: { samplers, schedulers },
+      options: { samplers, schedulers, loras },
       constraints: { prompt: textMeta, negative: textMeta, width: imageRange.width, height: imageRange.height, count: imageRange.count, ...samplerRange },
-      capabilities: { startImage: Boolean(info.LoadImage && info.VAEEncode), denoise: Boolean(info.LoadImage && info.VAEEncode) }
+      capabilities: { startImage: Boolean(info.LoadImage && info.VAEEncode), denoise: Boolean(info.LoadImage && info.VAEEncode), lora: canUseLoras }
     }));
   }
 
@@ -333,6 +335,7 @@ export function inferModels(info, stats = {}) {
     weightDtypes,
     samplers,
     schedulers,
+    loras,
     defaults: {
       imageModel: imageProfiles[0]?.id || "",
       videoModel: videoProfiles[0]?.id || ""
@@ -355,6 +358,7 @@ function emptyModelResult(extra = {}) {
     vaes: [],
     clipTypes: [],
     weightDtypes: [],
+    loras: [],
     samplers: [],
     schedulers: [],
     defaults: { imageModel: "", videoModel: "" },

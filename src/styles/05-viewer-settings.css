@@ -479,3 +479,321 @@
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 220ms var(--spring);
 }
 .danger-button:hover { background: hsl(var(--destructive) / 0.32); border-color: hsl(var(--destructive) / 0.7); transform: translateY(-1px); }
+
+.workflow-gallery {
+  position: relative;
+  width: min(1180px, calc(100vw - 32px));
+  height: min(840px, calc(100vh - 32px));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 8px);
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-xl);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  animation: pop 220ms var(--spring);
+}
+
+.workflow-gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.workflow-gallery-head h2,
+.workflow-gallery-head p,
+.workflow-gallery-head h3 { margin: 0; }
+.workflow-gallery-head h2 { font-size: 17px; font-weight: 650; }
+.workflow-gallery-head p { margin-top: 3px; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.workflow-head-actions { display: flex; align-items: center; gap: 8px; }
+.workflow-import-button {
+  min-height: 34px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.workflow-import-button input,
+.wide-button input { display: none; }
+.workflow-import-button:hover { background: hsl(var(--accent)); border-color: hsl(var(--border-strong)); }
+
+.workflow-gallery-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(420px, 0.98fr) minmax(360px, 0.72fr);
+}
+.workflow-gallery-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border-right: 1px solid hsl(var(--border));
+}
+.workflow-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  padding: 0 10px;
+  margin-bottom: 10px;
+}
+.workflow-search input {
+  border: 0;
+  background: transparent;
+  padding-left: 0;
+  box-shadow: none !important;
+}
+.workflow-drop {
+  min-height: 42px;
+  border: 1px dashed hsl(var(--border-strong));
+  border-radius: var(--radius);
+  background: hsl(var(--input) / 0.42);
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.workflow-group { margin-bottom: 18px; }
+.workflow-group h3 {
+  margin: 0 0 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.workflow-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.workflow-tile {
+  min-width: 0;
+  min-height: 108px;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 2px);
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  padding: 8px;
+  display: grid;
+  grid-template-rows: 76px auto auto;
+  gap: 7px;
+  text-align: left;
+  cursor: pointer;
+}
+.workflow-tile:hover,
+.workflow-tile.active {
+  border-color: hsl(var(--border-strong));
+  background: hsl(var(--accent));
+}
+.workflow-tile.is-broken { border-color: hsl(var(--destructive) / 0.42); }
+.workflow-thumb,
+.workflow-detail-thumb {
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.workflow-thumb img,
+.workflow-detail-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.workflow-tile-copy { min-width: 0; display: grid; gap: 2px; }
+.workflow-tile-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+}
+.workflow-tile-copy span,
+.workflow-tile em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-style: normal;
+}
+
+.workflow-details {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+}
+.workflow-detail-hero {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.workflow-detail-thumb {
+  width: 132px;
+  aspect-ratio: 1;
+}
+.workflow-detail-hero h3 {
+  margin: 0 0 5px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.workflow-detail-hero p {
+  margin: 0 0 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.5;
+}
+.workflow-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.workflow-tags span {
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--input));
+  color: hsl(var(--muted-foreground));
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.workflow-actions,
+.workflow-import-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0;
+}
+.workflow-actions button,
+.workflow-import-actions button {
+  min-height: 38px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.workflow-actions button:hover:not(:disabled),
+.workflow-import-actions button:hover:not(:disabled) {
+  background: hsl(var(--accent));
+  border-color: hsl(var(--border-strong));
+}
+.workflow-actions button:disabled,
+.workflow-import-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+.workflow-detail-grid {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 9px 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  padding: 12px;
+}
+.workflow-detail-grid span,
+.workflow-issues h4 {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  margin: 0;
+}
+.workflow-detail-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 500;
+}
+.workflow-issues {
+  margin-top: 12px;
+  border: 1px solid hsl(var(--destructive) / 0.38);
+  border-radius: var(--radius);
+  background: hsl(var(--destructive) / 0.1);
+  padding: 12px;
+}
+.workflow-issues p {
+  margin: 7px 0 0;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.workflow-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: hsl(var(--muted-foreground));
+}
+
+.workflow-import-panel {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(520px, 100%);
+  z-index: 4;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  padding: 18px;
+  border-left: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-xl);
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+}
+.workflow-import-panel.open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.workflow-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.workflow-import-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.workflow-import-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.workflow-import-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--input));
+  padding: 12px;
+}
+.workflow-map-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}

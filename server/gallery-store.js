@@ -53,7 +53,6 @@ export function isComfyOutputItem(item) {
 export function hideGalleryItems(items) {
   const hiddenAt = Date.now();
   for (const item of items) {
-    if (isComfyOutputItem(item)) continue;
     const key = galleryKey(item);
     if (key) hiddenGalleryIds.set(key, hiddenAt);
   }
@@ -71,6 +70,7 @@ export function isGalleryHidden(item) {
 
 export function filterVisibleGallery(items) {
   return items.filter((item) => {
+    if (isGalleryHidden(item)) return false;
     if (isComfyOutputItem(item)) return hasExistingOutputFile(item);
     return !isGalleryHidden(item);
   });
@@ -190,6 +190,13 @@ export function recordsFromComfyHistory(history) {
     const latent = latentNode?.inputs || {};
     const modelLoader = Object.values(graph).find((node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name);
     const model = modelLoader?.inputs?.unet_name || modelLoader?.inputs?.ckpt_name || "";
+    const loras = Object.values(graph)
+      .filter((node) => node?.class_type === "LoraLoader" && node?.inputs?.lora_name)
+      .map((node) => ({
+        name: node.inputs.lora_name,
+        enabled: true,
+        strength: Number(node.inputs.strength_model ?? node.inputs.strength_clip ?? 0.7)
+      }));
     const rawCreatedAt = Number(item?.prompt?.[3]?.create_time || Date.now());
     const createdAtMs = rawCreatedAt > 0 && rawCreatedAt < 1e12 ? rawCreatedAt * 1000 : rawCreatedAt;
     for (const output of outputsFrom(item)) {
@@ -206,7 +213,7 @@ export function recordsFromComfyHistory(history) {
         width: Number(latent.width || 0),
         height: Number(latent.height || 0),
         model,
-        settings: {}
+        settings: loras.length ? { loras } : {}
       };
       if (hasExistingOutputFile(record)) records.push(record);
     }
@@ -279,6 +286,7 @@ export function cleanupGalleryState(jobs) {
 export function generationSettings(body) {
   const settings = {
     workflow: body.workflow || "",
+    profileId: body.profileId || "",
     steps: Number(body.steps || 0),
     cfg: Number(body.cfg || 0),
     sampler: body.sampler || "",
@@ -292,6 +300,14 @@ export function generationSettings(body) {
   };
   if (body.kind === "image") {
     settings.count = Number(body.count || 1);
+    const loras = Array.isArray(body.loras)
+      ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, 4).map((item) => ({
+        name: String(item.name || ""),
+        enabled: true,
+        strength: Number(item.strength ?? 0.7)
+      }))
+      : [];
+    if (loras.length) settings.loras = loras;
     if (body.startImage) settings.denoise = Number(body.denoise || 0);
   }
   if (body.kind === "video") {

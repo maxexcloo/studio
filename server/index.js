@@ -4,12 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { comfy, comfyOutputDir, comfyUrl, host, localHosts, port, root } from './comfy.js';
+import { comfy, comfyOutputDir, comfyUrl, host, isTrustedClient, port, root } from './comfy.js';
 import { inferModels } from './models.js';
 import { sanitizeGenerateBody } from './validation.js';
 import { dedupeGallery, deleteGalleryFiles, filterVisibleGallery, gallery, galleryLimit, dataDir, hideGalleryItems, makePendingItems, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob } from './gallery-store.js';
 import { jobs, runJob } from './jobs.js';
-import { loadCustomWorkflows, saveCustomWorkflow, userWorkflowsDir } from './custom-workflows.js';
+import { deleteImportedWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
+import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 
 const app = express();
 app.use(express.json({ limit: "25mb" }));
@@ -18,8 +19,8 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 function requireLocal(req, res) {
   const remote = req.socket.remoteAddress || "";
-  if (localHosts.has(remote)) return true;
-  res.status(403).json({ ok: false, error: "This action is only allowed from this computer." });
+  if (isTrustedClient(remote)) return true;
+  res.status(403).json({ ok: false, error: "This action is only allowed from this computer or trusted local network." });
   return false;
 }
 
@@ -75,17 +76,67 @@ app.get("/api/paths", (_req, res) => {
   res.json({ outputDir: comfyOutputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir });
 });
 
-app.get("/api/workflows", (_req, res) => {
-  res.json({ workflows: loadCustomWorkflows().map(({ graph, ...workflow }) => workflow) });
+app.get("/api/workflows", async (_req, res) => {
+  try {
+    const info = await comfy("/object_info").catch(() => ({}));
+    const stats = await comfy("/system_stats").catch(() => ({}));
+    const models = inferModels(info, stats);
+    const preferences = loadWorkflowPreferences();
+    res.json({ workflows: workflowSummaries({ info, profiles: models.profiles, preferences }), preferences });
+  } catch (error) {
+    res.status(503).json({ error: error.message });
+  }
+});
+
+app.put("/api/workflows/preferences", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    const current = loadWorkflowPreferences();
+    const favorites = Array.isArray(req.body?.favorites) ? req.body.favorites.map(String) : current.favorites;
+    const preferences = {
+      favorites,
+      lastUsed: { ...current.lastUsed, ...(req.body?.lastUsed || {}) },
+      thumbnails: { ...current.thumbnails, ...(req.body?.thumbnails || {}) }
+    };
+    saveWorkflowPreferences(preferences);
+    res.json({ ok: true, preferences });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/workflows/import/preview", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    const raw = req.body?.workflow || req.body;
+    res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "") });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
 });
 
 app.post("/api/workflows/import", (req, res) => {
   if (!requireLocal(req, res)) return;
   try {
     const raw = req.body?.workflow || req.body;
-    const workflow = saveCustomWorkflow(raw);
+    const workflow = saveImportedWorkflow(raw, req.body?.metadata || {});
     const { graph, ...summary } = workflow;
     res.json({ ok: true, workflow: summary });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/workflows/:id", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    const result = deleteImportedWorkflow(decodeURIComponent(req.params.id).replace(/^custom:/, ""));
+    const preferences = loadWorkflowPreferences();
+    preferences.favorites = preferences.favorites.filter((id) => id !== `custom:${result.id}` && id !== result.id);
+    delete preferences.lastUsed[`custom:${result.id}`];
+    delete preferences.thumbnails[`custom:${result.id}`];
+    saveWorkflowPreferences(preferences);
+    res.json(result);
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
@@ -117,6 +168,7 @@ app.post("/api/generate", async (req, res) => {
   }
   const id = crypto.randomUUID();
   const items = makePendingItems(id, body);
+  markWorkflowUsed(body.profileId || body.model || body.workflow || "");
   setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
   saveGallery();
   jobs.set(id, { status: "queued", kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: Date.now() });
@@ -174,6 +226,7 @@ app.post("/api/queue/cancel", async (_req, res) => {
 app.post("/api/gallery/clear", (_req, res) => {
   const cleared = gallery.filter((item) => item.status === "done");
   const files = deleteGalleryFiles(cleared);
+  hideGalleryItems(cleared);
   setGallery(gallery.filter((item) => item.status !== "done"));
   saveGallery();
   res.json({ ok: true, files, outputs: gallery });
@@ -207,7 +260,7 @@ app.delete("/api/gallery/:id", (req, res) => {
   const before = gallery.length;
   const removed = gallery.filter((item) => item.id === id || item.url === id);
   const files = deleteGalleryFiles(removed);
-  hideGalleryItems(removed.filter((item) => item.status !== "done"));
+  hideGalleryItems(removed);
   setGallery(gallery.filter((item) => item.id !== id && item.url !== id));
   if (gallery.length !== before) saveGallery();
   res.json({ ok: true, files, removed: before - gallery.length, outputs: gallery });

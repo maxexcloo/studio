@@ -2,15 +2,17 @@ import React from 'react';
 import { Toaster } from 'sonner';
 import { MasonryPhotoAlbum } from 'react-photo-album';
 import 'react-photo-album/masonry.css';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, GalleryHorizontalEnd, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { githubUrl } from './constants';
 import { cn } from './format';
 import { galleryPhoto, type GalleryPhoto } from './gallery';
 import { AspectPicker, Field, GallerySkeleton, Media, ModelPicker, NumberPicker, Skeleton, StudioSelect as Select, Tip } from './components';
 import { GalleryTile } from './GalleryTile';
+import { WorkflowGallery } from './WorkflowGallery';
 import type { GalleryItem } from './types';
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, prompt, promptLimit, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
+  const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
+  const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
   return (
     <div className={cn(prefs.zenMode ? "zen-shell" : "app-shell", showNegativePrompt && "negative-open")}>
       {prefs.zenMode ? (
@@ -44,14 +46,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       {zenDisplayItem.preview ? <img className="generate-preview" src={zenDisplayItem.preview} alt="" draggable={false} /> : null}
                       {!zenDisplayItem.preview ? <div className="noise-layer" /> : null}
                       <div className="generate-overlay">
-                        <span className="generate-step">
+                        <span className="generate-step" key={zenDisplayItem.progress?.max ? `step-${zenDisplayItem.progress.value}-${zenDisplayItem.progress.max}` : zenDisplayItem.progress?.node || "queued"}>
                           {zenDisplayItem.progress?.max ? (
                             <>
                               <span className="generate-step-label">Step</span>
-                              <span className="generate-step-count">{zenDisplayItem.progress.value}<i>/</i>{zenDisplayItem.progress.max}</span>
+                              <span className="generate-step-count text-state">{zenDisplayItem.progress.value}<i>/</i>{zenDisplayItem.progress.max}</span>
                             </>
                           ) : (
-                            <span className="generate-step-label is-queued">{zenDisplayItem.progress?.node === "running" ? "Rendering" : "Queued"}</span>
+                            <span className="generate-step-label is-queued text-state">Queued</span>
                           )}
                         </span>
                         <span className="generate-elapsed">{formatElapsed(now - Date.parse(zenDisplayItem.createdAt || new Date().toISOString()))}</span>
@@ -97,6 +99,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             </button></Tip>
           ) : null}
           <div className="zen-top-actions">
+            <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={15} /></button></Tip>
             <Tip content="Settings"><button className="icon-button" aria-label="Settings" onClick={() => setSettings(true)}><Settings size={15} /></button></Tip>
             <Tip content="Exit zen"><button className="icon-button" aria-label="Exit zen" onClick={() => setZenMode(false)}><Minimize2 size={15} /></button></Tip>
           </div>
@@ -107,20 +110,22 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} value={prompt} placeholder="Describe what to make..." onKeyDown={submitZenPrompt} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span>
-            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && "open")}>
+            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
               <label className="negative-drawer-label">Negative prompt</label>
-              <textarea value={negative} placeholder="What to avoid..." onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-              <span>{characterMeta(negative, negativeLimit)}</span>
+              <div className="negative-unavailable-frame">
+                <textarea value={canUseNegativePrompt ? negative : ""} disabled={!canUseNegativePrompt} placeholder={canUseNegativePrompt ? "What to avoid..." : "This workflow does not expose a negative prompt"} onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+              </div>
+              <span>{canUseNegativePrompt ? characterMeta(negative, negativeLimit) : "Unavailable for this workflow"}</span>
             </div>
             <div className="zen-prompt-actions">
               <div className="prompt-left-actions">
-                <Tip content={showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}><button data-open-trigger type="button" className={cn("negative-toggle", showNegativePrompt && "active")} onClick={() => setShowNegativePrompt((value: boolean) => !value)}>
+                <Tip content={!canUseNegativePrompt ? "Negative prompt is unavailable for this workflow" : showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}><button data-open-trigger type="button" className={cn("negative-toggle", showNegativePrompt && "active", !canUseNegativePrompt && "is-unavailable")} onClick={() => setShowNegativePrompt((value: boolean) => !value)}>
                   <ChevronUp size={13} className={cn(!showNegativePrompt && "flip")} />
                   Negative
                 </button></Tip>
               </div>
               <div className="zen-inline-settings">
-                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact /> : <Skeleton className="skeleton-control" />}
+                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : <Skeleton className="skeleton-control" />}
                 <AspectPicker value={aspectPickerValue} onChange={(value) => applyAspect(value)} options={aspectOptions} currentSize={aspectValue} defaultSize={defaultAspectSize} />
                 {customSize ? (
                   <>
@@ -130,6 +135,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 ) : null}
                 <NumberPicker label="Steps" value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
+                {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
               <Tip content={mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className="generate" onClick={generate} disabled={!currentProfile}>
                 <Wand2 size={15} />
@@ -194,6 +200,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </button></Tip>
           <div className="zen-top-actions">
             {runningCount ? <Tip content="Cancel all running and queued generations"><button className="queue-button" onClick={cancelQueue}>Cancel queue</button></Tip> : null}
+            <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={15} /></button></Tip>
             <Tip content="Settings"><button className="icon-button" aria-label="Settings" onClick={() => setSettings(true)}><Settings size={15} /></button></Tip>
             <Tip content="Zen mode"><button className="icon-button" aria-label="Enter zen mode" onClick={() => setZenMode(true)}><Maximize2 size={15} /></button></Tip>
           </div>
@@ -204,20 +211,22 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} value={prompt} placeholder="Describe what to make..." onKeyDown={submitZenPrompt} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span>
-            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && "open")}>
+            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
               <label className="negative-drawer-label">Negative prompt</label>
-              <textarea value={negative} placeholder="What to avoid..." onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-              <span>{characterMeta(negative, negativeLimit)}</span>
+              <div className="negative-unavailable-frame">
+                <textarea value={canUseNegativePrompt ? negative : ""} disabled={!canUseNegativePrompt} placeholder={canUseNegativePrompt ? "What to avoid..." : "This workflow does not expose a negative prompt"} onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+              </div>
+              <span>{canUseNegativePrompt ? characterMeta(negative, negativeLimit) : "Unavailable for this workflow"}</span>
             </div>
             <div className="zen-prompt-actions">
               <div className="prompt-left-actions">
-                <Tip content={showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}><button data-open-trigger type="button" className={cn("negative-toggle", showNegativePrompt && "active")} onClick={() => setShowNegativePrompt((value: boolean) => !value)}>
+                <Tip content={!canUseNegativePrompt ? "Negative prompt is unavailable for this workflow" : showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}><button data-open-trigger type="button" className={cn("negative-toggle", showNegativePrompt && "active", !canUseNegativePrompt && "is-unavailable")} onClick={() => setShowNegativePrompt((value: boolean) => !value)}>
                   <ChevronUp size={13} className={cn(!showNegativePrompt && "flip")} />
                   Negative
                 </button></Tip>
               </div>
               <div className="zen-inline-settings">
-                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact /> : <Skeleton className="skeleton-control" />}
+                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : <Skeleton className="skeleton-control" />}
                 <AspectPicker value={aspectPickerValue} onChange={(value) => applyAspect(value)} options={aspectOptions} currentSize={aspectValue} defaultSize={defaultAspectSize} />
                 {customSize ? (
                   <>
@@ -227,6 +236,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 ) : null}
                 <NumberPicker label="Steps" value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
+                {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
               <Tip content={mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className="generate" onClick={generate} disabled={!currentProfile}>
                 <Wand2 size={15} />
@@ -305,6 +315,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <span>Import ComfyUI API workflow</span>
                 </label>
                 <div className="setting-actions single">
+                  <Tip content="Open workflow gallery"><button onClick={() => { setSettings(false); setWorkflowGalleryOpen(true); }}>Open Workflow Gallery</button></Tip>
                   <Tip content="Reload workflow templates from disk"><button onClick={() => refreshModels()}>Refresh workflows</button></Tip>
                 </div>
                 <span className="field-meta">Imported workflows appear only when their required ComfyUI nodes are installed.</span>
@@ -427,7 +438,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         {active.preview ? <img className="generate-preview" src={active.preview} alt="" draggable={false} /> : null}
                         {!active.preview ? <div className="noise-layer" /> : null}
                         <div className="generate-overlay">
-                          {active.progress?.max ? <span className="generate-step"><span className="generate-step-label">Step</span><span className="generate-step-count">{active.progress.value}<i>/</i>{active.progress.max}</span></span> : <span className="generate-step-label is-queued">{active.progress?.node === "running" ? "Rendering" : "Queued"}</span>}
+                          {active.progress?.max ? <span className="generate-step" key={`step-${active.progress.value}-${active.progress.max}`}><span className="generate-step-label">Step</span><span className="generate-step-count text-state">{active.progress.value}<i>/</i>{active.progress.max}</span></span> : <span className="generate-step-label is-queued text-state" key="queued">Queued</span>}
                           <span className="generate-elapsed">{formatElapsed(now - Date.parse(active.createdAt || new Date().toISOString()))}</span>
                         </div>
                         <div className={cn("generate-bar", !active.progress?.max && "is-indeterminate")}><div className="generate-bar-fill" /></div>
@@ -500,6 +511,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </div>
         );
       })() : null}
+      {workflowGalleryOpen ? <WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /> : null}
       <Toaster theme="dark" position={isMobile ? "top-center" : "bottom-left"} richColors closeButton toastOptions={{ className: "sonner-toast" }} />
     </div>
   );

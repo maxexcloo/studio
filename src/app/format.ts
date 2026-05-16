@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { AspectPreset, GalleryItem } from './types';
+import type { AspectPreset, GalleryItem, LoraSelection } from './types';
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -56,6 +56,15 @@ export function clampText(text: string, limit?: number) {
   return limit ? Array.from(text).slice(0, limit).join("") : text;
 }
 
+function activeLoras(value: unknown): LoraSelection[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item?.enabled !== false && item?.name);
+}
+
+function formatLoraStack(value: unknown) {
+  return activeLoras(value).map((item) => `${item.name} (${Number(item.strength ?? 0.7).toFixed(2)})`).join(", ");
+}
+
 export function fullGenerationText(item: GalleryItem) {
   const settings = item.settings || {};
   const lines = [
@@ -69,7 +78,7 @@ export function fullGenerationText(item: GalleryItem) {
   ];
   for (const [key, value] of Object.entries(settings)) {
     if (value !== "" && value !== undefined && value !== null && value !== 0) {
-      lines.push(`${key}: ${value}`);
+      lines.push(`${key}: ${key === "loras" ? formatLoraStack(value) : value}`);
     }
   }
   return lines.join("\n");
@@ -94,6 +103,7 @@ export function generationDetailEntries(item: GalleryItem) {
   add("Sampler", settings.sampler);
   add("Scheduler", settings.scheduler);
   add("Seed", settings.seed);
+  add("LoRAs", formatLoraStack(settings.loras));
   if (item.type === "image") {
     const count = Number(settings.count || 0);
     if (count > 1) add("Images", count);

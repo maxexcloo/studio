@@ -14,6 +14,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite --host 127.0.0.1 --port 5173\" \"node server/index.js\"",
+    "dev:lan": "concurrently \"vite --host 0.0.0.0 --port 5173\" \"node -e \\\"process.env.HOST='0.0.0.0';process.env.JAI_ALLOW_LAN='1';import('./server/index.js')\\\"\"",
     "build": "tsc -b && vite build",
     "start": "node server/index.js",
     "preview": "vite preview --host 127.0.0.1 --port 5173",

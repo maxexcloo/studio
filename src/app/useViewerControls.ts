@@ -1,6 +1,7 @@
 import { fallbackAspectPresets } from './constants';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
+import { normalizeLoras } from './loras';
 import type React from 'react';
 import type { GalleryItem, Profile } from './types';
 
@@ -8,7 +9,7 @@ export function useViewerControls(view: any) {
   const {
     active, doneGallery, generate, generateDisabled, height, lastTapRef,
     models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps,
-    setFrames, setHeight, setIsDraggingViewer, setMode, setModel, setNegative, setPrompt,
+    setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
     setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageName, setSteps,
     setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth,
     setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan,
@@ -53,6 +54,7 @@ export function useViewerControls(view: any) {
     if (itemSettings.vae) setVae(String(itemSettings.vae));
     if (itemSettings.clipType) setClipType(String(itemSettings.clipType));
     if (itemSettings.weightDtype) setWeightDtype(String(itemSettings.weightDtype));
+    setLoras(normalizeLoras(itemSettings.loras));
     setStartImage(item.referenceImage || "");
     setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));

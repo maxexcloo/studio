@@ -64,6 +64,40 @@ async function applyMappedInputs(graph, workflow, body) {
   }
 }
 
+function enabledLoras(body) {
+  return Array.isArray(body.loras)
+    ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, 4)
+    : [];
+}
+
+function applyLoraStack(graph, body, { startId, modelSource, clipSource, modelTargets, clipTargets }) {
+  const loras = enabledLoras(body);
+  if (!loras.length) return;
+  let currentModel = modelSource;
+  let currentClip = clipSource;
+  loras.forEach((lora, index) => {
+    const id = String(startId + index);
+    graph[id] = {
+      class_type: "LoraLoader",
+      inputs: {
+        model: currentModel,
+        clip: currentClip,
+        lora_name: lora.name,
+        strength_model: Number(lora.strength ?? 0.7),
+        strength_clip: Number(lora.strength ?? 0.7)
+      }
+    };
+    currentModel = [id, 0];
+    currentClip = [id, 1];
+  });
+  for (const target of modelTargets) {
+    if (graph[target.node]) graph[target.node].inputs[target.input] = currentModel;
+  }
+  for (const target of clipTargets) {
+    if (graph[target.node]) graph[target.node].inputs[target.input] = currentClip;
+  }
+}
+
 export async function customWorkflowGraph(body) {
   const workflow = getCustomWorkflow(body.workflow);
   if (!workflow) throw new Error("Custom workflow is not installed.");
@@ -75,7 +109,7 @@ export async function customWorkflowGraph(body) {
 export async function unetImageGraph(body) {
   const seed = Number(body.seed || crypto.randomInt(1, 2 ** 31));
   const count = Math.max(1, Math.min(8, Number(body.count || 1)));
-  return {
+  const graph = {
     "1": { class_type: "UNETLoader", inputs: { unet_name: body.model, weight_dtype: body.weightDtype || "default" } },
     "2": { class_type: "CLIPLoader", inputs: { clip_name: body.textEncoder, type: body.clipType || "wan", device: body.clipDevice || "default" } },
     "3": { class_type: "VAELoader", inputs: { vae_name: body.vae } },
@@ -100,6 +134,14 @@ export async function unetImageGraph(body) {
     "8": { class_type: "VAEDecode", inputs: { samples: ["7", 0], vae: ["3", 0] } },
     "9": { class_type: "SaveImage", inputs: { images: ["8", 0], filename_prefix: "j-ai-studio/image" } }
   };
+  applyLoraStack(graph, body, {
+    startId: 10,
+    modelSource: ["1", 0],
+    clipSource: ["2", 0],
+    modelTargets: [{ node: "7", input: "model" }],
+    clipTargets: [{ node: "4", input: "clip" }, { node: "5", input: "clip" }]
+  });
+  return graph;
 }
 
 export async function checkpointImageGraph(body) {
@@ -139,6 +181,14 @@ export async function checkpointImageGraph(body) {
     graph["7"] = { class_type: "VAEDecode", inputs: { samples: ["5", 0], vae: ["1", 2] } };
     graph["9"].inputs.images = ["7", 0];
   }
+
+  applyLoraStack(graph, body, {
+    startId: 10,
+    modelSource: ["1", 0],
+    clipSource: ["1", 1],
+    modelTargets: [{ node: "5", input: "model" }],
+    clipTargets: [{ node: "2", input: "clip" }, { node: "3", input: "clip" }]
+  });
 
   return graph;
 }
