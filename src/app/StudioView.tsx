@@ -2,7 +2,7 @@ import React from 'react';
 import { Toaster } from 'sonner';
 import { MasonryPhotoAlbum } from 'react-photo-album';
 import 'react-photo-album/masonry.css';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, GalleryHorizontalEnd, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, GalleryHorizontalEnd, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, WifiOff, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { githubUrl } from './constants';
 import { cn } from './format';
@@ -40,6 +40,7 @@ function ComfyConnectionDot({ status, onClick }: { status: any; onClick: () => v
 export function StudioView({ view }: { view: Record<string, any> }) {
   const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
+  const comfyOffline = comfyStatus && !comfyStatus.connected && !comfyStatus.checking;
   return (
     <div className={cn(prefs.zenMode ? "zen-shell" : "app-shell", showNegativePrompt && "negative-open")}>
       {prefs.zenMode ? (
@@ -180,7 +181,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 </button></Tip>
               </div>
               <div className="zen-inline-settings">
-                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : <Skeleton className="skeleton-control" />}
+                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : comfyOffline ? null : <Skeleton className="skeleton-control" />}
                 <AspectPicker value={aspectPickerValue} onChange={(value) => applyAspect(value)} options={aspectOptions} currentSize={aspectValue} defaultSize={defaultAspectSize} />
                 {customSize ? (
                   <>
@@ -192,9 +193,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
                 {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
-              <Tip content={mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className="generate" onClick={generate} disabled={!currentProfile}>
-                <Wand2 size={15} />
-                Generate
+              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className={cn("generate", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
+                {comfyOffline ? <WifiOff size={14} /> : <Wand2 size={15} />}
+                {comfyOffline ? "Offline" : "Generate"}
               </button></Tip>
             </div>
           </section>
@@ -236,6 +237,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 }
               }}
             />
+          ) : comfyOffline ? (
+            <div className="empty is-offline">
+              <WifiOff size={32} strokeWidth={1.5} />
+              <h2>ComfyUI is offline</h2>
+              <p>Start ComfyUI or check the connection in settings</p>
+              <button className="reconnect-btn" onClick={refreshComfyStatus}><RefreshCw size={13} /> Retry connection</button>
+            </div>
           ) : (
             <div className="empty">
               <img src="/j-ai-logo.png" alt="" />
@@ -282,7 +290,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 </button></Tip>
               </div>
               <div className="zen-inline-settings">
-                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : <Skeleton className="skeleton-control" />}
+                {models ? <ModelPicker value={model} profiles={modelProfiles} onChange={chooseModel} compact badges={profileBadges} /> : comfyOffline ? null : <Skeleton className="skeleton-control" />}
                 <AspectPicker value={aspectPickerValue} onChange={(value) => applyAspect(value)} options={aspectOptions} currentSize={aspectValue} defaultSize={defaultAspectSize} />
                 {customSize ? (
                   <>
@@ -294,9 +302,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
                 {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
-              <Tip content={mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className="generate" onClick={generate} disabled={!currentProfile}>
-                <Wand2 size={15} />
-                Generate
+              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className={cn("generate", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
+                {comfyOffline ? <WifiOff size={14} /> : <Wand2 size={15} />}
+                {comfyOffline ? "Offline" : "Generate"}
               </button></Tip>
             </div>
           </section>

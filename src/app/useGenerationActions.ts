@@ -92,13 +92,19 @@ export function useGenerationActions(view: any) {
             return job;
           }
           if (job.status === "done" || job.status === "canceled") return job;
-          if (job.preview || job.progress || job.status === "queued" || job.status === "running") {
-            setGallery((current: GalleryItem[]) => current.map((item: GalleryItem) => item.jobId === jobId ? {
-              ...item,
-              preview: job.preview || item.preview,
-              progress: job.progress || item.progress || { value: 0, max: 0, node: job.status },
-              status: item.status === "pending" ? "pending" : item.status
-            } : item));
+          if (job.preview || job.previews?.length || job.progress || job.status === "queued" || job.status === "running") {
+            setGallery((current: GalleryItem[]) => current.map((item: GalleryItem) => {
+              if (item.jobId !== jobId) return item;
+              const batchCount = Number(item.settings?.count || 1);
+              const indexedPreview = Number.isInteger(item.index) ? job.previews?.[item.index || 0] : undefined;
+              const sharedPreview = batchCount <= 1 ? job.preview : undefined;
+              return {
+                ...item,
+                preview: indexedPreview || sharedPreview || item.preview,
+                progress: job.progress || item.progress || { value: 0, max: 0, node: job.status },
+                status: item.status === "pending" ? "pending" : item.status
+              };
+            }));
           }
           if (job.progress?.max) {
             setStatus(`Rendering ${job.progress.value}/${job.progress.max}`);

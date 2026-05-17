@@ -1,6 +1,6 @@
 import { comfy, comfyUrl, normalizeComfyError } from './comfy.js';
 import { imageGraph, videoGraph } from './graphs.js';
-import { outputsFrom, replaceGalleryJob, updateGalleryJob } from './gallery-store.js';
+import { outputsFrom, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
 import { markWorkflowUsed } from './workflow-catalog.js';
 
 export const jobs = new Map();
@@ -47,7 +47,25 @@ function applyPreviewBuffer(id, buffer) {
   const preview = `data:${mime};base64,${image.toString("base64")}`;
   const current = jobs.get(id) || {};
   jobs.set(id, { ...current, preview });
-  updateGalleryJob(id, { preview }, { persist: false });
+  if ((current.items?.length || 1) <= 1) updateGalleryJob(id, { preview }, { persist: false });
+  return true;
+}
+
+function outputsFromExecutedOutput(output = {}) {
+  return outputsFrom({ outputs: { executed: output } });
+}
+
+function applyExecutedOutputPreviews(id, output) {
+  const outputs = outputsFromExecutedOutput(output);
+  if (!outputs.length) return false;
+  const previews = outputs.map((item) => item.url);
+  const current = jobs.get(id) || {};
+  const nextPreviews = [...(Array.isArray(current.previews) ? current.previews : [])];
+  previews.forEach((preview, index) => {
+    if (preview) nextPreviews[index] = preview;
+  });
+  jobs.set(id, { ...current, previews: nextPreviews });
+  updateGalleryJobPreviews(id, nextPreviews);
   return true;
 }
 
@@ -103,6 +121,9 @@ function watchProgress(id, promptId, socket = openProgressSocket(id)) {
         const progress = { value: Number(data.value || 0), max: Number(data.max || 0), node: data.node || "" };
         jobs.set(id, { ...current, status: "running", progress });
         updateGalleryJob(id, { status: "pending", progress });
+      }
+      if (message.type === "executed" && data.output) {
+        applyExecutedOutputPreviews(id, data.output);
       }
       if (message.type === "execution_interrupted") {
         jobs.set(id, { ...current, status: "canceled" });

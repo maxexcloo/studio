@@ -227,6 +227,7 @@ export function makePendingItems(id, body) {
   return Array.from({ length: count }, (_, index) => ({
     id: `${id}-${index}`,
     jobId: id,
+    index,
     url: "",
     filename: body.kind === "image" && count > 1 ? `${title} ${index + 1}` : title,
     type: body.kind === "video" ? "video" : "image",
@@ -365,5 +366,21 @@ export function updateGalleryJob(id, patch, options = {}) {
     return item;
   });
   if (changed && options.persist !== false) saveGallery();
+  return changed;
+}
+
+export function updateGalleryJobPreviews(id, previews = []) {
+  if (!Array.isArray(previews) || !previews.length) return false;
+  let changed = false;
+  let fallbackIndex = 0;
+  gallery = gallery.map((item) => {
+    if (item.jobId !== id) return item;
+    const index = Number.isInteger(item.index) ? item.index : fallbackIndex;
+    fallbackIndex += 1;
+    const preview = previews[index];
+    if (!preview || item.preview === preview) return item;
+    changed = true;
+    return { ...item, preview };
+  });
   return changed;
 }
