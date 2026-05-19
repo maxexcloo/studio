@@ -4,21 +4,40 @@ import { dataDir, gallery } from './gallery-store.js';
 import { allCustomWorkflowRecords, detectWorkflowMetadata, graphFromJson, validateGraph } from './custom-workflows.js';
 
 const preferencesPath = path.join(dataDir, "workflow-preferences.json");
+let preferencesCache = null;
+let preferencesSaveTimer = null;
 
 export function loadWorkflowPreferences() {
+  if (preferencesCache) return preferencesCache;
   try {
     const raw = JSON.parse(fs.readFileSync(preferencesPath, "utf8"));
-    return {
+    preferencesCache = {
       favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
       lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
       thumbnails: raw.thumbnails && typeof raw.thumbnails === "object" ? raw.thumbnails : {}
     };
+    return preferencesCache;
   } catch {
-    return { favorites: [], lastUsed: {}, thumbnails: {} };
+    preferencesCache = { favorites: [], lastUsed: {}, thumbnails: {} };
+    return preferencesCache;
   }
 }
 
-export function saveWorkflowPreferences(preferences) {
+export function saveWorkflowPreferences(preferences, { immediate = false } = {}) {
+  preferencesCache = preferences;
+  if (!immediate) {
+    if (!preferencesSaveTimer) {
+      preferencesSaveTimer = setTimeout(() => {
+        preferencesSaveTimer = null;
+        saveWorkflowPreferences(preferencesCache, { immediate: true });
+      }, 300);
+    }
+    return;
+  }
+  if (preferencesSaveTimer) {
+    clearTimeout(preferencesSaveTimer);
+    preferencesSaveTimer = null;
+  }
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(preferencesPath, JSON.stringify(preferences, null, 2));
 }

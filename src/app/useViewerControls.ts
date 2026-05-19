@@ -10,7 +10,7 @@ export function useViewerControls(view: any) {
     active, doneGallery, generate, generateDisabled, height, lastTapRef,
     models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps,
     setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
-    setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageName, setSteps,
+    setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageId, setStartImageName, setSteps,
     setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth,
     setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan,
     viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
@@ -56,6 +56,7 @@ export function useViewerControls(view: any) {
     if (itemSettings.weightDtype) setWeightDtype(String(itemSettings.weightDtype));
     setLoras(normalizeLoras(itemSettings.loras));
     setStartImage(item.referenceImage || "");
+    if (setStartImageId) setStartImageId(item.startImageId || item.referenceImage || "");
     setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));
     showToast("All settings applied", "success");

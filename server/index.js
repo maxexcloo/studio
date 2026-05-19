@@ -4,18 +4,43 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { comfy, comfyOutputDir, comfyUrl, host, isTrustedClient, port, root } from './comfy.js';
+import { allowLanActions, comfy, comfyOutputDir, comfyUrl, host, isLocalClient, isTrustedClient, port, root } from './comfy.js';
 import { inferModels } from './models.js';
 import { sanitizeGenerateBody } from './validation.js';
-import { dedupeGallery, deleteGalleryFiles, filterVisibleGallery, gallery, galleryLimit, dataDir, hideGalleryItems, makePendingItems, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob } from './gallery-store.js';
+import { dedupeGallery, deleteGalleryFiles, filterVisibleGallery, gallery, galleryLimit, dataDir, hideGalleryItems, makePendingItems, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, pageGallery, galleryDelta, galleryRevisionValue, writeGalleryNow } from './gallery-store.js';
 import { jobs, runJob } from './jobs.js';
 import { deleteImportedWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
+import { saveStartImage } from './start-images.js';
+import { clearUnlockCookie, encryptionKeyFromRequest, isPrivacyEnabled, privacyStatusFor, revealGalleryItemsForRequest, setPrivacyPassword, setUnlockCookie, verifyPrivacyPassword } from './privacy.js';
 
 const app = express();
 app.use(express.json({ limit: "25mb" }));
 const execFileAsync = promisify(execFile);
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+let comfyCache = { info: null, stats: null, fetchedAt: 0 };
+
+async function loadComfyContext({ force = false } = {}) {
+  const fresh = !force && comfyCache.info && Date.now() - comfyCache.fetchedAt < 30000;
+  if (fresh) return comfyCache;
+  const info = await comfy("/object_info");
+  const stats = await comfy("/system_stats").catch(() => ({}));
+  comfyCache = { info, stats, fetchedAt: Date.now() };
+  return comfyCache;
+}
+
+function refreshComfyContextSoon() {
+  setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
+}
+
+async function recoverGalleryFromHistory() {
+  cleanupGalleryState(jobs);
+  const history = await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({}));
+  const recovered = recordsFromComfyHistory(history);
+  if (!recovered.length) return;
+  const pending = gallery.filter((item) => item.status === "pending");
+  setGallery(dedupeGallery([...pending, ...gallery, ...recovered]).slice(0, galleryLimit));
+}
 
 function requireLocal(req, res) {
   const remote = req.socket.remoteAddress || "";
@@ -23,6 +48,35 @@ function requireLocal(req, res) {
   res.status(403).json({ ok: false, error: "This action is only allowed from this computer or trusted local network." });
   return false;
 }
+
+function requireTrustedAccess(req, res) {
+  const remote = req.socket.remoteAddress || "";
+  if (isLocalClient(remote) || isTrustedClient(remote)) return true;
+  res.status(403).json({ ok: false, error: "This app is only available from this computer or trusted local network." });
+  return false;
+}
+
+function requireLanUnlock(req, res, next) {
+  if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
+  if (req.path.startsWith("/api/privacy")) return next();
+  const remote = req.socket.remoteAddress || "";
+  if (isLocalClient(remote)) return next();
+  if (!allowLanActions || !isTrustedClient(remote)) {
+    res.status(403).json({ ok: false, error: "This app is only available from this computer unless LAN mode is enabled." });
+    return;
+  }
+  if (!isPrivacyEnabled()) {
+    res.status(403).json({ ok: false, error: "Set a privacy password on this computer before using LAN mode." });
+    return;
+  }
+  if (!encryptionKeyFromRequest(req)) {
+    res.status(401).json({ ok: false, locked: true, error: "Unlock J AI Studio with the LAN password." });
+    return;
+  }
+  next();
+}
+
+app.use(requireLanUnlock);
 
 async function runRepoCommand(command, args) {
   const { stdout = "", stderr = "" } = await execFileAsync(command, args, {
@@ -52,6 +106,43 @@ function openFolder(folder) {
   if (process.platform === "darwin") return execFile("open", [folder]);
   return execFile("xdg-open", [folder]);
 }
+
+app.get("/api/privacy/status", (req, res) => {
+  res.json(privacyStatusFor(req));
+});
+
+app.post("/api/privacy/setup", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    if (isPrivacyEnabled()) {
+      res.status(400).json({ ok: false, error: "Privacy password is already set." });
+      return;
+    }
+    const key = setPrivacyPassword(req.body?.password || "");
+    setUnlockCookie(res, key);
+    writeGalleryNow();
+    res.json({ ok: true, ...privacyStatusFor(req), enabled: true, unlocked: true });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/privacy/unlock", (req, res) => {
+  if (!requireTrustedAccess(req, res)) return;
+  const key = verifyPrivacyPassword(req.body?.password || "");
+  if (!key) {
+    res.status(401).json({ ok: false, locked: true, error: "Password did not match." });
+    return;
+  }
+  setUnlockCookie(res, key);
+  res.json({ ok: true, enabled: true, unlocked: true });
+});
+
+app.post("/api/privacy/lock", (_req, res) => {
+  if (!requireTrustedAccess(_req, res)) return;
+  clearUnlockCookie(res);
+  res.json({ ok: true, enabled: isPrivacyEnabled(), unlocked: false });
+});
 
 app.get("/api/health", async (_req, res) => {
   try {
@@ -93,8 +184,7 @@ app.get("/api/comfy/status", async (_req, res) => {
 
 app.get("/api/models", async (_req, res) => {
   try {
-    const info = await comfy("/object_info");
-    const stats = await comfy("/system_stats").catch(() => ({}));
+    const { info, stats } = await loadComfyContext({ force: true });
     res.json(inferModels(info, stats));
   } catch (error) {
     res.status(503).json({ error: error.message });
@@ -107,8 +197,7 @@ app.get("/api/paths", (_req, res) => {
 
 app.get("/api/workflows", async (_req, res) => {
   try {
-    const info = await comfy("/object_info").catch(() => ({}));
-    const stats = await comfy("/system_stats").catch(() => ({}));
+    const { info, stats } = await loadComfyContext().catch(() => ({ info: {}, stats: {} }));
     const models = inferModels(info, stats);
     const preferences = loadWorkflowPreferences();
     res.json({ workflows: workflowSummaries({ info, profiles: models.profiles, preferences }), preferences });
@@ -171,42 +260,79 @@ app.delete("/api/workflows/:id", (req, res) => {
   }
 });
 
-app.get("/api/gallery", async (_req, res) => {
+app.get("/api/gallery", (req, res) => {
   cleanupGalleryState(jobs);
-  const history = await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({}));
-  const recovered = recordsFromComfyHistory(history);
-  if (recovered.length) {
-    const pending = gallery.filter((item) => item.status === "pending");
-    setGallery(dedupeGallery([...pending, ...gallery, ...recovered]).slice(0, galleryLimit));
-    saveGallery();
+  const type = String(req.query.type || "");
+  const limit = Number(req.query.limit || 0);
+  const cursor = String(req.query.cursor || "");
+  const includeFailed = req.query.includeFailed !== "0";
+  const page = pageGallery({ type, limit: limit || 200, cursor, includeFailed });
+  res.json({
+    ...page,
+    items: revealGalleryItemsForRequest(page.items, req),
+    outputs: revealGalleryItemsForRequest(cursor || limit ? page.items : filterVisibleGallery(gallery), req)
+  });
+});
+
+app.get("/api/gallery/delta", (req, res) => {
+  const since = Number(req.query.since || 0);
+  const type = String(req.query.type || "");
+  const includeFailed = req.query.includeFailed !== "0";
+  const delta = galleryDelta({ since, type, includeFailed });
+  res.json({ ...delta, upserts: revealGalleryItemsForRequest(delta.upserts || [], req) });
+});
+
+app.post("/api/gallery/recover", async (req, res) => {
+  if (!requireLocal(req, res)) return;
+  await recoverGalleryFromHistory();
+  res.json({ ok: true, revision: galleryRevisionValue() });
+});
+
+app.post("/api/start-image", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    const result = saveStartImage({ dataUrl: req.body?.dataUrl || req.body?.startImage || "", name: req.body?.name || req.body?.startImageName || "" });
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
   }
-  setGallery(dedupeGallery(gallery).slice(0, galleryLimit));
-  saveGallery();
-  res.json({ outputs: filterVisibleGallery(gallery) });
 });
 
 app.post("/api/generate", async (req, res) => {
+  if (isPrivacyEnabled() && !encryptionKeyFromRequest(req)) {
+    res.status(401).json({ ok: false, locked: true, error: "Unlock privacy mode before generating so prompts can be encrypted." });
+    return;
+  }
   let body;
   try {
-    const info = await comfy("/object_info");
-    const stats = await comfy("/system_stats").catch(() => ({}));
+    const { info, stats } = await loadComfyContext();
     body = sanitizeGenerateBody(req.body, info, stats);
   } catch (error) {
     res.status(400).json({ error: error.message });
+    refreshComfyContextSoon();
     return;
   }
-  const id = crypto.randomUUID();
+  const clientJobId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
+  const id = clientJobId || crypto.randomUUID();
   const items = makePendingItems(id, body);
   markWorkflowUsed(body.profileId || body.model || body.workflow || "");
   setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-  saveGallery();
   jobs.set(id, { status: "queued", kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: Date.now() });
-  runJob(id, body);
-  res.json({ jobId: id, items });
+  res.json({ jobId: id, items: revealGalleryItemsForRequest(items, req), revision: galleryRevisionValue() });
+  setTimeout(() => runJob(id, body), 0);
+  refreshComfyContextSoon();
 });
 
 app.get("/api/jobs/:id", (req, res) => {
-  res.json(jobs.get(req.params.id) || { status: "missing" });
+  const job = jobs.get(req.params.id);
+  if (!job) {
+    res.json({ status: "missing" });
+    return;
+  }
+  const key = encryptionKeyFromRequest(req);
+  const safeJob = { ...job, items: revealGalleryItemsForRequest(job.items || [], req) };
+  if (isPrivacyEnabled() && !key) delete safeJob.prompt;
+  res.json(safeJob);
 });
 
 app.post("/api/jobs/:id/cancel", async (req, res) => {
@@ -258,7 +384,7 @@ app.post("/api/gallery/clear", (_req, res) => {
   hideGalleryItems(cleared);
   setGallery(gallery.filter((item) => item.status !== "done"));
   saveGallery();
-  res.json({ ok: true, files, outputs: gallery });
+  res.json({ ok: true, files, outputs: revealGalleryItemsForRequest(gallery, _req) });
 });
 
 app.post("/api/gallery/errors/clear", (_req, res) => {
@@ -266,7 +392,7 @@ app.post("/api/gallery/errors/clear", (_req, res) => {
   hideGalleryItems(cleared);
   setGallery(gallery.filter((item) => item.status !== "error" && item.status !== "canceled"));
   saveGallery();
-  res.json({ ok: true, outputs: gallery });
+  res.json({ ok: true, outputs: revealGalleryItemsForRequest(gallery, _req) });
 });
 
 app.post("/api/cache/clear", async (_req, res) => {
@@ -281,7 +407,7 @@ app.post("/api/cache/clear", async (_req, res) => {
   await comfy("/queue", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ clear: true }) }).catch(() => null);
   await comfy("/interrupt", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).catch(() => null);
   await comfy("/free", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unload_models: true, free_memory: true }) }).catch(() => null);
-  res.json({ ok: true, outputs: gallery });
+  res.json({ ok: true, outputs: revealGalleryItemsForRequest(gallery, _req) });
 });
 
 app.delete("/api/gallery/:id", (req, res) => {
@@ -292,7 +418,7 @@ app.delete("/api/gallery/:id", (req, res) => {
   hideGalleryItems(removed);
   setGallery(gallery.filter((item) => item.id !== id && item.url !== id));
   if (gallery.length !== before) saveGallery();
-  res.json({ ok: true, files, removed: before - gallery.length, outputs: gallery });
+  res.json({ ok: true, files, removed: before - gallery.length, outputs: revealGalleryItemsForRequest(gallery, req) });
 });
 
 app.post("/api/open-output-folder", (req, res) => {
@@ -361,6 +487,8 @@ if (fs.existsSync(dist)) {
   app.use(express.static(dist));
   app.get("*splat", (_req, res) => res.sendFile(path.join(dist, "index.html")));
 }
+
+setTimeout(() => recoverGalleryFromHistory().catch(() => null), 1200);
 
 app.listen(port, host, () => {
   console.log(`J AI Studio listening on http://${host}:${port}`);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Minus, Plus } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
@@ -14,7 +14,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
-export function Media({ item, muted = false }: { item: Output; muted?: boolean }) {
+function MediaComponent({ item, muted = false }: { item: Output; muted?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -52,6 +52,8 @@ export function Media({ item, muted = false }: { item: Output; muted?: boolean }
     />
   );
 }
+
+export const Media = memo(MediaComponent, (previous, next) => previous.item === next.item && previous.muted === next.muted);
 
 export function Skeleton({ className = "" }: { className?: string }) {
   return <span className={cn("skeleton", className)} aria-hidden="true" />;

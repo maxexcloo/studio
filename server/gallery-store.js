@@ -1,11 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir, root } from './comfy.js';
+import { protectGalleryItemForStorage } from './privacy.js';
 
 export const dataDir = process.env.JAI_DATA_DIR ? path.resolve(process.env.JAI_DATA_DIR) : path.join(root, "data");
 export const galleryPath = path.join(dataDir, "gallery.json");
 export const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
-export const galleryLimit = Number(process.env.JAI_GALLERY_LIMIT || 1000);
+export const galleryLimit = Number(process.env.JAI_GALLERY_LIMIT || 50000);
+
+const changeLogLimit = Number(process.env.JAI_GALLERY_CHANGELOG_LIMIT || 10000);
+let galleryRevision = Date.now();
+let saveTimer = null;
+const galleryChanges = [];
 
 function loadGallery() {
   try {
@@ -24,10 +30,6 @@ function loadGallery() {
 export let gallery = loadGallery();
 export let hiddenGalleryIds = loadHiddenGalleryIds();
 
-export function setGallery(items) {
-  gallery = items;
-}
-
 function loadHiddenGalleryIds() {
   try {
     const raw = JSON.parse(fs.readFileSync(hiddenGalleryPath, "utf8"));
@@ -42,8 +44,64 @@ function loadHiddenGalleryIds() {
   }
 }
 
+function galleryTime(item) {
+  const parsed = Date.parse(item?.createdAt || "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function galleryKey(item) {
   return item?.url || item?.id || item?.outputName || item?.filename || "";
+}
+
+export function galleryRevisionValue() {
+  return galleryRevision;
+}
+
+export function sortGallery(items = gallery) {
+  return [...items].sort((a, b) => {
+    const timeDelta = galleryTime(b) - galleryTime(a);
+    if (timeDelta) return timeDelta;
+    const aIndex = Number(a.index ?? 0);
+    const bIndex = Number(b.index ?? 0);
+    if (a.jobId && b.jobId && a.jobId === b.jobId && aIndex !== bIndex) return aIndex - bIndex;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
+function bumpRevision(changes = {}) {
+  galleryRevision = Math.max(galleryRevision + 1, Date.now());
+  const upserts = Array.isArray(changes.upserts) ? changes.upserts : [];
+  const removes = Array.isArray(changes.removes) ? changes.removes : [];
+  if (upserts.length || removes.length) {
+    galleryChanges.push({ revision: galleryRevision, upserts, removes });
+    if (galleryChanges.length > changeLogLimit) galleryChanges.splice(0, galleryChanges.length - changeLogLimit);
+  }
+  return galleryRevision;
+}
+
+function diffGallery(before, after) {
+  const beforeMap = new Map(before.map((item) => [galleryKey(item), item]).filter(([key]) => key));
+  const afterMap = new Map(after.map((item) => [galleryKey(item), item]).filter(([key]) => key));
+  const upserts = [];
+  const removes = [];
+  for (const [key, item] of afterMap) {
+    const previous = beforeMap.get(key);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(item)) upserts.push(item);
+  }
+  for (const key of beforeMap.keys()) {
+    if (!afterMap.has(key)) removes.push(key);
+  }
+  return { upserts, removes };
+}
+
+export function setGallery(items, options = {}) {
+  const before = gallery;
+  gallery = sortGallery(items).slice(0, galleryLimit);
+  if (options.track !== false) {
+    const changes = diffGallery(before, gallery);
+    if (changes.upserts.length || changes.removes.length) bumpRevision(changes);
+  }
+  if (options.persist !== false) saveGallery();
 }
 
 export function isComfyOutputItem(item) {
@@ -52,10 +110,15 @@ export function isComfyOutputItem(item) {
 
 export function hideGalleryItems(items) {
   const hiddenAt = Date.now();
+  const removes = [];
   for (const item of items) {
     const key = galleryKey(item);
-    if (key) hiddenGalleryIds.set(key, hiddenAt);
+    if (key) {
+      hiddenGalleryIds.set(key, hiddenAt);
+      removes.push(key);
+    }
   }
+  if (removes.length) bumpRevision({ removes });
   saveHiddenGalleryIds();
 }
 
@@ -74,6 +137,69 @@ export function filterVisibleGallery(items) {
     if (isComfyOutputItem(item)) return hasExistingOutputFile(item);
     return !isGalleryHidden(item);
   });
+}
+
+function visibleItems({ type = "", includeFailed = true } = {}) {
+  return sortGallery(filterVisibleGallery(gallery)).filter((item) => {
+    if (type && item.type !== type) return false;
+    if (!includeFailed && item.status === "error") return false;
+    return item.status !== "canceled";
+  });
+}
+
+function cursorFor(item) {
+  if (!item) return "";
+  return `${galleryTime(item)}|${encodeURIComponent(String(item.id || item.url || ""))}`;
+}
+
+function afterCursor(item, cursor = "") {
+  if (!cursor) return true;
+  const [timeText, encodedId = ""] = String(cursor).split("|");
+  const cursorTime = Number(timeText || 0);
+  const cursorId = decodeURIComponent(encodedId);
+  const itemTime = galleryTime(item);
+  if (itemTime < cursorTime) return true;
+  if (itemTime > cursorTime) return false;
+  return String(item.id || item.url || "").localeCompare(cursorId) > 0;
+}
+
+export function pageGallery({ type = "", limit = 200, cursor = "", includeFailed = true } = {}) {
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
+  const all = visibleItems({ type, includeFailed });
+  const start = cursor ? all.findIndex((item) => afterCursor(item, cursor)) : 0;
+  const pageStart = Math.max(0, start);
+  const items = all.slice(pageStart, pageStart + safeLimit);
+  const nextCursor = pageStart + safeLimit < all.length ? cursorFor(items[items.length - 1]) : "";
+  return { items, nextCursor, hasMore: Boolean(nextCursor), revision: galleryRevision, totalApprox: all.length };
+}
+
+export function galleryDelta({ since = 0, type = "", includeFailed = true } = {}) {
+  const numericSince = Number(since || 0);
+  const earliest = galleryChanges[0]?.revision || galleryRevision;
+  if (!numericSince || numericSince < earliest - 1) {
+    return { revision: galleryRevision, reset: true, upserts: [], removes: [] };
+  }
+  const upsertMap = new Map();
+  const removes = new Set();
+  for (const change of galleryChanges) {
+    if (change.revision <= numericSince) continue;
+    for (const item of change.upserts || []) {
+      const key = galleryKey(item);
+      if (!key) continue;
+      upsertMap.set(key, item);
+      removes.delete(key);
+    }
+    for (const key of change.removes || []) {
+      removes.add(key);
+      upsertMap.delete(key);
+    }
+  }
+  const upserts = [...upsertMap.values()].filter((item) => {
+    if (type && item.type !== type) return false;
+    if (!includeFailed && item.status === "error") return false;
+    return item.status !== "canceled" && !isGalleryHidden(item);
+  });
+  return { revision: galleryRevision, reset: false, upserts, removes: [...removes] };
 }
 
 export function outputFileCandidates(item) {
@@ -148,8 +274,17 @@ export function hasExistingOutputFile(item) {
 }
 
 export function saveGallery() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(writeGalleryNow, 250);
+}
+
+export function writeGalleryNow() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
   fs.mkdirSync(dataDir, { recursive: true });
-  const persistable = gallery.slice(0, galleryLimit).map(({ preview, ...rest }) => rest);
+  const persistable = gallery.slice(0, galleryLimit).map(({ preview, ...rest }) => protectGalleryItemForStorage(rest));
   fs.writeFileSync(galleryPath, JSON.stringify(persistable, null, 2));
 }
 
@@ -167,13 +302,17 @@ export function promptTitle(text = "") {
 export function outputsFrom(history) {
   const urls = [];
   for (const output of Object.values(history.outputs || {})) {
-    for (const item of [...(output.images || []), ...(output.videos || [])]) {
+    const images = Array.isArray(output?.images) ? output.images : [];
+    const videos = Array.isArray(output?.videos) ? output.videos : [];
+    for (const item of [...images, ...videos]) {
+      const filename = typeof item?.filename === "string" ? item.filename : "";
+      if (!filename) continue;
       const params = new URLSearchParams({
-        filename: item.filename,
+        filename,
         subfolder: item.subfolder || "",
         type: item.type || "output"
       });
-      urls.push({ url: `/comfy/view?${params}`, filename: item.filename, type: item.filename.endsWith(".mp4") ? "video" : "image" });
+      urls.push({ url: `/comfy/view?${params}`, filename, type: filename.endsWith(".mp4") ? "video" : "image" });
     }
   }
   return urls;
@@ -224,6 +363,7 @@ export function recordsFromComfyHistory(history) {
 export function makePendingItems(id, body) {
   const count = body.kind === "image" ? Math.max(1, Math.min(8, Number(body.count || 1))) : 1;
   const title = promptTitle(body.prompt);
+  const createdAt = body.createdAt || new Date().toISOString();
   return Array.from({ length: count }, (_, index) => ({
     id: `${id}-${index}`,
     jobId: id,
@@ -234,12 +374,13 @@ export function makePendingItems(id, body) {
     status: "pending",
     prompt: body.prompt || "",
     negative: body.negative || "",
-    createdAt: new Date().toISOString(),
+    createdAt,
     width: Number(body.width || 0),
     height: Number(body.height || 0),
     model: body.model || "",
-    referenceImage: body.startImage || "",
+    referenceImage: body.startImageId || "",
     referenceImageName: body.startImageName || "",
+    startImageId: body.startImageId || "",
     settings: generationSettings(body)
   }));
 }
@@ -257,6 +398,7 @@ export function dedupeGallery(items) {
 
 export function cleanupGalleryState(jobs) {
   let changed = false;
+  const before = gallery;
   const doneKeys = new Set(
     gallery
       .filter((item) => item.status === "done")
@@ -281,7 +423,10 @@ export function cleanupGalleryState(jobs) {
     }
     return true;
   });
-  if (changed) saveGallery();
+  if (changed) {
+    bumpRevision(diffGallery(before, gallery));
+    saveGallery();
+  }
 }
 
 export function generationSettings(body) {
@@ -309,7 +454,7 @@ export function generationSettings(body) {
       }))
       : [];
     if (loras.length) settings.loras = loras;
-    if (body.startImage) settings.denoise = Number(body.denoise || 0);
+    if (body.startImage || body.startImageId) settings.denoise = Number(body.denoise || 0);
   }
   if (body.kind === "video") {
     settings.frames = Number(body.frames || 0);
@@ -317,6 +462,7 @@ export function generationSettings(body) {
   }
   return settings;
 }
+
 export function replaceGalleryJob(id, outputs, body, jobs, status = "done") {
   const title = promptTitle(body.prompt);
   const job = jobs.get(id) || {};
@@ -335,8 +481,9 @@ export function replaceGalleryJob(id, outputs, body, jobs, status = "done") {
     width: Number(body.width || 0),
     height: Number(body.height || 0),
     model: body.model || "",
-    referenceImage: body.startImage || "",
+    referenceImage: body.startImageId || "",
     referenceImageName: body.startImageName || "",
+    startImageId: body.startImageId || "",
     settings: generationSettings(body),
     outputName: item.filename,
     index
@@ -351,13 +498,13 @@ export function replaceGalleryJob(id, outputs, body, jobs, status = "done") {
     if (completed[nextIndex]) replaced.push(completed[nextIndex++]);
   });
   while (completed[nextIndex]) replaced.unshift(completed[nextIndex++]);
-  gallery = dedupeGallery(replaced).slice(0, galleryLimit);
-  saveGallery();
+  setGallery(dedupeGallery(replaced).slice(0, galleryLimit));
   return completed;
 }
 
 export function updateGalleryJob(id, patch, options = {}) {
   let changed = false;
+  const before = gallery;
   gallery = gallery.map((item) => {
     if (item.jobId === id || item.id === id || item.url === id) {
       changed = true;
@@ -365,7 +512,10 @@ export function updateGalleryJob(id, patch, options = {}) {
     }
     return item;
   });
-  if (changed && options.persist !== false) saveGallery();
+  if (changed) {
+    bumpRevision(diffGallery(before, gallery));
+    if (options.persist !== false) saveGallery();
+  }
   return changed;
 }
 
@@ -373,6 +523,7 @@ export function updateGalleryJobPreviews(id, previews = []) {
   if (!Array.isArray(previews) || !previews.length) return false;
   let changed = false;
   let fallbackIndex = 0;
+  const before = gallery;
   gallery = gallery.map((item) => {
     if (item.jobId !== id) return item;
     const index = Number.isInteger(item.index) ? item.index : fallbackIndex;
@@ -382,5 +533,6 @@ export function updateGalleryJobPreviews(id, previews = []) {
     changed = true;
     return { ...item, preview };
   });
+  if (changed) bumpRevision(diffGallery(before, gallery));
   return changed;
 }

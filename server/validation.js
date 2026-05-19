@@ -130,6 +130,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     frames: snapInteger(input.frames, frameRange.default, frameRange),
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
     startImage: String(input.startImage || ""),
+    startImageId: String(input.startImageId || ""),
     startImageName: String(input.startImageName || ""),
     loras
   };

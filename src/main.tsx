@@ -6,16 +6,17 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import "./styles.css";
 
-import type { ComfyStatus, GalleryItem, Health, LoraSelection, Mode, Models, Paths, Preferences, Profile, TouchGesture, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
-import { fallbackAspectPresets, galleryBatchSize, galleryInitialBatch } from './app/constants';
+import type { ComfyStatus, GalleryItem, Health, LoraSelection, Mode, Models, Paths, Preferences, PrivacyStatus, Profile, TouchGesture, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
+import { fallbackAspectPresets } from './app/constants';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
-import { sortGalleryItems, useGalleryColumnCount } from './app/gallery';
+import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras } from './app/loras';
 import { StudioView } from './app/StudioView';
 import { SidebarControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
 import { useViewerControls } from './app/useViewerControls';
+import { useGalleryStore } from './app/useGalleryStore';
 
 
 function App() {
@@ -26,6 +27,10 @@ function App() {
   const [comfyStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
+  const [privacyStatus, setPrivacyStatus] = useState<PrivacyStatus | null>(null);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [privacyPassword, setPrivacyPassword] = useState("");
+  const [privacyConfirmPassword, setPrivacyConfirmPassword] = useState("");
   const [prefs, setPrefsState] = useState<Preferences>(() => loadPrefs());
   const [prompt, setPrompt] = useState(String(initialDraft.prompt || ""));
   const [negative, setNegative] = useState(String(initialDraft.negative || ""));
@@ -57,12 +62,9 @@ function App() {
   const [zenGalleryOpen, setZenGalleryOpen] = useState(initialDraft.zenGalleryOpen !== false);
   const [zenSelectedId, setZenSelectedId] = useState(String(initialDraft.zenSelectedId || ""));
   const [status, setStatus] = useState("Ready");
-  const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowPreferences, setWorkflowPreferences] = useState<WorkflowPreferences>({ favorites: [], lastUsed: {}, thumbnails: {} });
   const [workflowGalleryOpen, setWorkflowGalleryOpen] = useState(false);
-  const [galleryLoaded, setGalleryLoaded] = useState(false);
-  const [galleryRenderCount, setGalleryRenderCount] = useState(galleryInitialBatch);
   const [active, setActive] = useState<GalleryItem | null>(null);
   const [viewerZoom, setViewerZoom] = useState(1);
   const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
@@ -70,7 +72,8 @@ function App() {
   const [showGenerationSettings, setShowGenerationSettings] = useState(Boolean(initialDraft.showGenerationSettings));
   const [customSize, setCustomSize] = useState(Boolean(initialDraft.customSize));
   const [now, setNow] = useState(Date.now());
-  const [startImage, setStartImage] = useState(String(initialDraft.startImage || ""));
+  const [startImage, setStartImage] = useState("");
+  const [startImageId, setStartImageId] = useState(String(initialDraft.startImageId || ""));
   const [startImageName, setStartImageName] = useState(String(initialDraft.startImageName || ""));
   const generatePostingRef = useRef(false);
   const viewerDragRef = useRef<{ id: number; x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
@@ -81,8 +84,26 @@ function App() {
   const zenStripRef = useRef<HTMLDivElement | null>(null);
   const zenStripDragRef = useRef<{ id: number; x: number; scrollLeft: number; moved: boolean } | null>(null);
   const latestZenIdRef = useRef("");
+  const privacyInitializedRef = useRef(false);
   const touchGestureRef = useRef<TouchGesture | null>(null);
   const lastTapRef = useRef(0);
+  const {
+    gallery,
+    visibleGallery,
+    renderedGallery,
+    galleryLoaded,
+    hasMoreGallery,
+    galleryTotalApprox,
+    galleryRevision,
+    loadGallery,
+    loadGalleryDelta,
+    loadMoreGalleryItems,
+    setGallery,
+    upsertGalleryItems,
+    removeGalleryItems,
+    removeGalleryItemsWhere,
+    patchGalleryItems,
+  } = useGalleryStore({ mode, showFailedItems: prefs.showFailedItems });
 
   useEffect(() => {
     refreshHealth();
@@ -90,8 +111,9 @@ function App() {
     refreshModels(false);
     refreshWorkflows();
     refreshPaths();
+    refreshPrivacyStatus();
     loadGallery();
-  }, []);
+  }, [loadGallery]);
 
   useEffect(() => {
     const timer = window.setInterval(refreshComfyStatus, 5000);
@@ -108,10 +130,10 @@ function App() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      loadGallery();
+      loadGalleryDelta();
     }, 2500);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [loadGalleryDelta]);
 
   useEffect(() => {
     if (!prefs.zenMode || active || settings || zenControls) return;
@@ -199,10 +221,11 @@ function App() {
   }, [settings, active]);
 
   useEffect(() => {
+    if (!privacyStatus) return;
     const draft = {
       mode,
-      prompt,
-      negative,
+      prompt: privacyStatus?.enabled ? "" : prompt,
+      negative: privacyStatus?.enabled ? "" : negative,
       model,
       textEncoder,
       vae,
@@ -221,7 +244,7 @@ function App() {
       scheduler,
       loras,
       customSize,
-      startImage,
+      startImageId,
       startImageName,
       advanced,
       showDetails,
@@ -234,9 +257,9 @@ function App() {
     try {
       localStorage.setItem("j-ai-studio-draft", JSON.stringify(draft));
     } catch {
-      localStorage.setItem("j-ai-studio-draft", JSON.stringify({ ...draft, startImage: "" }));
+      localStorage.setItem("j-ai-studio-draft", JSON.stringify({ ...draft, startImage: "", startImageId }));
     }
-  }, [mode, prompt, negative, model, textEncoder, vae, clipType, weightDtype, width, height, steps, cfg, denoise, seed, count, frames, fps, sampler, scheduler, loras, customSize, startImage, startImageName, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId]);
+  }, [mode, prompt, negative, model, textEncoder, vae, clipType, weightDtype, width, height, steps, cfg, denoise, seed, count, frames, fps, sampler, scheduler, loras, customSize, startImageId, startImageName, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId, privacyStatus?.enabled]);
 
   useEffect(() => {
     if (!active) return;
@@ -298,21 +321,13 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [prefs.zenMode, active, settings, gallery, mode, zenSelectedId]);
 
-  function loadGallery() {
-    fetch("/api/gallery")
-      .then((res) => res.json())
-      .then((data: { outputs: GalleryItem[] }) => {
-        const outputs = data.outputs.filter((item) => item.status !== "canceled");
-        setGallery(outputs);
-        setGalleryLoaded(true);
-        const latest = outputs.find((item) => item.type === mode && item.status === "done");
-        if (prefs.zenMode && prefs.followLatest && latest && (!zenSelectedId || (latestZenIdRef.current && latest.id !== latestZenIdRef.current))) {
-          setZenSelectedId(latest.id);
-        }
-        if (latest) latestZenIdRef.current = latest.id;
-      })
-      .catch(() => setGalleryLoaded(true));
-  }
+  useEffect(() => {
+    const latest = visibleGallery.find((item) => item.status === "done");
+    if (prefs.zenMode && prefs.followLatest && latest && (!zenSelectedId || (latestZenIdRef.current && latest.id !== latestZenIdRef.current))) {
+      setZenSelectedId(latest.id);
+    }
+    if (latest) latestZenIdRef.current = latest.id;
+  }, [prefs.zenMode, prefs.followLatest, visibleGallery, zenSelectedId]);
 
   function setPrefs(next: Partial<Preferences>) {
     const merged = { ...prefs, ...next };
@@ -402,6 +417,85 @@ function App() {
       .catch(() => null);
   }
 
+  function refreshPrivacyStatus() {
+    apiJson<PrivacyStatus>("/api/privacy/status")
+      .then((status) => {
+        setPrivacyStatus(status);
+        if (!privacyInitializedRef.current && status.enabled) {
+          setPrompt("");
+          setNegative("");
+        }
+        privacyInitializedRef.current = true;
+      })
+      .catch(() => setPrivacyStatus(null));
+  }
+
+  async function setupPrivacyPassword() {
+    if (privacyPassword.length < 8) {
+      showToast("Password must be at least 8 characters", "error");
+      return;
+    }
+    if (privacyPassword !== privacyConfirmPassword) {
+      showToast("Passwords do not match", "error");
+      return;
+    }
+    setPrivacyBusy(true);
+    try {
+      const status = await apiJson<PrivacyStatus>("/api/privacy/setup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: privacyPassword })
+      });
+      setPrivacyStatus(status);
+      setPrivacyPassword("");
+      setPrivacyConfirmPassword("");
+      await loadGallery();
+      showToast("Privacy password enabled", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not enable privacy password", "error");
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
+  async function unlockPrivacy() {
+    if (!privacyPassword) {
+      showToast("Enter the privacy password", "error");
+      return;
+    }
+    setPrivacyBusy(true);
+    try {
+      const status = await apiJson<PrivacyStatus>("/api/privacy/unlock", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: privacyPassword })
+      });
+      setPrivacyStatus(status);
+      setPrivacyPassword("");
+      await loadGallery();
+      showToast("Privacy unlocked", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unlock failed", "error");
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
+  async function lockPrivacy() {
+    setPrivacyBusy(true);
+    try {
+      const status = await apiJson<PrivacyStatus>("/api/privacy/lock", { method: "POST" });
+      setPrivacyStatus(status);
+      setActive(null);
+      await loadGallery();
+      showToast("Privacy locked", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not lock privacy", "error");
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
   async function checkForUpdates(notify = true) {
     try {
       setUpdateBusy(true);
@@ -450,6 +544,7 @@ function App() {
       setFps(Number(profile.defaults.fps || profile.constraints?.fps?.default || prefs.defaultFps));
     }
     setStartImage("");
+    setStartImageId("");
     setStartImageName("");
   }
 
@@ -525,10 +620,7 @@ function App() {
   const aspectValue = `${width}x${height}`;
   const defaultAspectSize = `${Number(currentProfile?.defaults.width || (mode === "video" ? 512 : 1024))}x${Number(currentProfile?.defaults.height || (mode === "video" ? 288 : 1024))}`;
   const aspectPickerValue = aspectValue === defaultAspectSize ? "default" : customSize || !aspectOptions.some((item) => item.value === aspectValue) ? "free" : aspectValue;
-  const visibleGallery = useMemo(() => sortGalleryItems(gallery.filter((item) => item.type === mode && item.status !== "canceled" && (prefs.showFailedItems || item.status !== "error"))), [gallery, mode, prefs.showFailedItems]);
-  const renderedGallery = useMemo(() => visibleGallery.slice(0, galleryRenderCount), [visibleGallery, galleryRenderCount]);
   const galleryColumnCount = useGalleryColumnCount();
-  const hasMoreGallery = renderedGallery.length < visibleGallery.length;
   const runningCount = visibleGallery.filter((item) => item.status === "pending").length;
   const doneGallery = visibleGallery.filter((item) => item.status === "done" || item.status === "error");
   const zenGallery = visibleGallery.filter((item) => item.status === "pending" || item.status === "done" || item.status === "error");
@@ -536,19 +628,6 @@ function App() {
   const zenDisplayItem = zenItem;
   const generateDisabled = !currentProfile || (currentProfile.capabilities.textEncoder && !textEncoder) || (currentProfile.capabilities.vae && !vae);
   const loraActiveCount = mode === "image" && currentProfile?.capabilities.lora ? loras.filter((item) => item.enabled && item.name).length : 0;
-
-  useEffect(() => {
-    setGalleryRenderCount(galleryInitialBatch);
-    galleryStageRef.current?.scrollTo({ top: 0 });
-  }, [mode]);
-
-  useEffect(() => {
-    setGalleryRenderCount((current) => Math.min(Math.max(galleryInitialBatch, current), Math.max(galleryInitialBatch, visibleGallery.length)));
-  }, [visibleGallery.length]);
-
-  function loadMoreGalleryItems() {
-    setGalleryRenderCount((current) => Math.min(current + galleryBatchSize, visibleGallery.length));
-  }
 
   function onGalleryScroll(event: React.UIEvent<HTMLElement>) {
     if (!hasMoreGallery) return;
@@ -583,7 +662,13 @@ function App() {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    setStartImage(data);
+    const uploaded = await apiJson<{ startImageId: string }>("/api/start-image", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dataUrl: data, name: file.name })
+    });
+    setStartImage("");
+    setStartImageId(uploaded.startImageId);
     setStartImageName(file.name);
   }
 
@@ -602,9 +687,16 @@ function App() {
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(blob);
       });
+      const outputName = item.outputName || item.filename || "output.png";
+      const uploaded = await apiJson<{ startImageId: string }>("/api/start-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dataUrl: data, name: outputName })
+      });
       setMode("image");
-      setStartImage(data);
-      setStartImageName(item.outputName || item.filename || "output.png");
+      setStartImage("");
+      setStartImageId(uploaded.startImageId);
+      setStartImageName(outputName);
       setActive(null);
       showToast("Start image set", "success");
     } catch (error) {
@@ -633,18 +725,18 @@ function App() {
 
 
   const generationActions = useGenerationActions({
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loras, mode, model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery, setStatus, setZenSelectedId, showToast, startImage, startImageName, steps, cfg, textEncoder, vae, clipType, weightDtype, width
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, mode, model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, vae, clipType, weightDtype, width
   });
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem } = generationActions;
 
   const viewerActions = useViewerControls({
-    active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageName, setSteps, setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
+    active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
   });
   const { resetViewer, openItem, applyAllSettings, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
-  const sidebarControls = <SidebarControls view={{ canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras, loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler, setScheduler, setSeed, setStartImage, setStartImageName, setSteps, setTextEncoder, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, vae, weightDtype, width, widthMeta }} />;
+  const sidebarControls = <SidebarControls view={{ canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras, loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, vae, weightDtype, width, widthMeta }} />;
 
-  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, refreshWorkflows, renderedGallery, resetAllSettings, resetViewer, runningCount, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
+  const view = { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryRevision, galleryStageRef, galleryTotalApprox, generate, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, lockPrivacy, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, privacyBusy, privacyConfirmPassword, privacyPassword, privacyStatus, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, refreshPrivacyStatus, refreshWorkflows, renderedGallery, resetAllSettings, resetViewer, runningCount, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrivacyConfirmPassword, setPrivacyPassword, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setupPrivacyPassword, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, unlockPrivacy, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, settings, setPrefs };
 
   return <StudioView view={view} />;
 }

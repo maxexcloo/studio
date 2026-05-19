@@ -1,14 +1,11 @@
 import React from 'react';
 import { Toaster } from 'sonner';
-import { MasonryPhotoAlbum } from 'react-photo-album';
-import 'react-photo-album/masonry.css';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, GalleryHorizontalEnd, Github, ImagePlus, Maximize2, Minimize2, PanelLeft, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Trash2, Wand2, WifiOff, X, ZoomIn, ZoomOut } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { githubUrl } from './constants';
 import { cn } from './format';
-import { galleryPhoto, type GalleryPhoto } from './gallery';
 import { AspectPicker, Field, GallerySkeleton, Media, ModelPicker, NumberPicker, Skeleton, StudioSelect as Select, Tip } from './components';
-import { GalleryTile } from './GalleryTile';
+import { VirtualMasonryGallery } from './VirtualMasonryGallery';
 import { WorkflowGallery } from './WorkflowGallery';
 import type { GalleryItem } from './types';
 
@@ -37,8 +34,32 @@ function ComfyConnectionDot({ status, onClick }: { status: any; onClick: () => v
   );
 }
 
+const generateButtonSpring = {
+  type: "spring" as const,
+  stiffness: 520,
+  damping: 32,
+  mass: 0.68,
+};
+
+function GenerateButton({ children, className, disabled, onClick }: { children: React.ReactNode; className?: string; disabled?: boolean; onClick?: React.MouseEventHandler<HTMLButtonElement> }) {
+  const prefersReducedMotion = useReducedMotion();
+  return (
+    <motion.button
+      type="button"
+      className={className}
+      onClick={onClick}
+      disabled={disabled}
+      whileHover={prefersReducedMotion || disabled ? undefined : { y: -1 }}
+      whileTap={prefersReducedMotion || disabled ? undefined : { y: 0, scale: 0.965 }}
+      transition={generateButtonSpring}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
+  const { active, applyAllSettings, applyAspect, aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, checkForUpdates, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyAndToast, copyImageAndToast, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, gallery, galleryColumnCount, galleryLoaded, galleryStageRef, generate, generationDetailEntries, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, lockPrivacy, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, privacyBusy, privacyConfirmPassword, privacyPassword, privacyStatus, profileBadges, prompt, promptLimit, refreshComfyStatus, refreshHealth, refreshModels, renderedGallery, resetAllSettings, resetViewer, runningCount, setActive, setCount, setHeight, setNegative, setPrivacyConfirmPassword, setPrivacyPassword, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setupPrivacyPassword, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, unlockPrivacy, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, visibleGallery, setPrefs } = view;
   const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
   const comfyOffline = comfyStatus && !comfyStatus.connected && !comfyStatus.checking;
   return (
@@ -193,10 +214,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
                 {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
-              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className={cn("generate", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
+              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><GenerateButton className={cn("generate", runningCount && !comfyOffline && "is-working", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
                 {comfyOffline ? <WifiOff size={14} /> : <Wand2 size={15} />}
                 {comfyOffline ? "Offline" : "Generate"}
-              </button></Tip>
+              </GenerateButton></Tip>
             </div>
           </section>
           {zenGallery.length && zenGalleryOpen ? (
@@ -223,34 +244,32 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll}>
-            <section className="gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}>
-          {!galleryLoaded ? <GallerySkeleton columns={galleryColumnCount} /> : renderedGallery.length ? (
-            <MasonryPhotoAlbum<GalleryPhoto>
-              photos={renderedGallery.map(galleryPhoto)}
-              spacing={7}
-              padding={0}
-              columns={(containerWidth) => containerWidth < 620 ? 2 : containerWidth < 980 ? 3 : containerWidth < 1400 ? 4 : containerWidth < 1900 ? 5 : 6}
-              render={{
-                photo: (_, { photo, width: photoWidth, height: photoHeight }) => {
-                  const item = photo.item;
-                  return <GalleryTile key={item.id} cancelJob={cancelJob} copyImageAndToast={copyImageAndToast} deleteItem={deleteItem} formatElapsed={formatElapsed} height={photoHeight} item={item} now={now} openItem={openItem} titleFromPrompt={titleFromPrompt} width={photoWidth} />;
-                }
-              }}
+          {!galleryLoaded ? <section className="gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}><GallerySkeleton columns={galleryColumnCount} /></section> : renderedGallery.length ? (
+            <VirtualMasonryGallery
+              cancelJob={cancelJob}
+              columns={galleryColumnCount}
+              copyImageAndToast={copyImageAndToast}
+              deleteItem={deleteItem}
+              formatElapsed={formatElapsed}
+              items={renderedGallery}
+              now={now}
+              openItem={openItem}
+              scrollRef={galleryStageRef}
+              titleFromPrompt={titleFromPrompt}
             />
           ) : comfyOffline ? (
-            <div className="empty is-offline">
+            <section className="gallery"><div className="empty is-offline">
               <WifiOff size={32} strokeWidth={1.5} />
               <h2>ComfyUI is offline</h2>
               <p>Start ComfyUI or check the connection in settings</p>
               <button className="reconnect-btn" onClick={refreshComfyStatus}><RefreshCw size={13} /> Retry connection</button>
-            </div>
+            </div></section>
           ) : (
-            <div className="empty">
+            <section className="gallery"><div className="empty">
               <img src="/j-ai-logo.png" alt="" />
               <h2>No outputs yet</h2>
-            </div>
+            </div></section>
           )}
-            </section>
             {galleryLoaded && hasMoreGallery ? (
               <button className="gallery-load-more" onClick={loadMoreGalleryItems}>
                 Load more
@@ -302,10 +321,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {mode === "image" ? <NumberPicker label="Variants" value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" /> : null}
                 {loraActiveCount ? <span className="lora-pill">LoRA {loraActiveCount}</span> : null}
               </div>
-              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><button className={cn("generate", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
+              <Tip content={comfyOffline ? "ComfyUI is offline" : mode === "image" ? `Generate ${count} image${count === 1 ? "" : "s"}` : "Generate video"}><GenerateButton className={cn("generate", runningCount && !comfyOffline && "is-working", comfyOffline && "is-offline")} onClick={comfyOffline ? refreshComfyStatus : generate} disabled={!currentProfile && !comfyOffline}>
                 {comfyOffline ? <WifiOff size={14} /> : <Wand2 size={15} />}
                 {comfyOffline ? "Offline" : "Generate"}
-              </button></Tip>
+              </GenerateButton></Tip>
             </div>
           </section>
         </>
@@ -458,12 +477,69 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 </div>
               </section>
               <section>
+                <h3>Privacy</h3>
+                <div className="setting-row"><span>Password</span><strong>{privacyStatus?.enabled ? privacyStatus.unlocked ? "Unlocked" : "Locked" : "Not set"}</strong></div>
+                <div className="privacy-form">
+                  <input
+                    type="password"
+                    autoComplete={privacyStatus?.enabled ? "current-password" : "new-password"}
+                    value={privacyPassword}
+                    placeholder={privacyStatus?.enabled ? "Privacy password" : "Create password"}
+                    onChange={(event) => setPrivacyPassword(event.target.value)}
+                  />
+                  {!privacyStatus?.enabled ? (
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={privacyConfirmPassword}
+                      placeholder="Confirm password"
+                      onChange={(event) => setPrivacyConfirmPassword(event.target.value)}
+                    />
+                  ) : null}
+                </div>
+                <div className="setting-actions">
+                  {!privacyStatus?.enabled ? (
+                    <Tip content="Encrypt saved prompts and require this password for LAN access"><button onClick={setupPrivacyPassword} disabled={privacyBusy}>{privacyBusy ? "Saving..." : "Enable password"}</button></Tip>
+                  ) : privacyStatus.unlocked ? (
+                    <Tip content="Hide encrypted prompts until the password is entered again"><button onClick={lockPrivacy} disabled={privacyBusy}>{privacyBusy ? "Locking..." : "Lock prompts"}</button></Tip>
+                  ) : (
+                    <Tip content="Decrypt prompts and save the LAN unlock cookie"><button onClick={unlockPrivacy} disabled={privacyBusy}>{privacyBusy ? "Unlocking..." : "Unlock"}</button></Tip>
+                  )}
+                  <Tip content="Refresh privacy status"><button onClick={view.refreshPrivacyStatus} disabled={privacyBusy}>Refresh</button></Tip>
+                </div>
+                <span className="field-meta">Prompts are encrypted in the local gallery file. LAN access requires the saved unlock cookie.</span>
+              </section>
+              <section>
                 <h3>Maintenance</h3>
                 <div className="setting-actions">
                   <Tip content="Reset prompts, layout, model choices, and saved settings"><button onClick={resetAllSettings}>Reset all settings</button></Tip>
                   <Tip content="Clear browser cache, stale queue state, and free ComfyUI memory"><button onClick={clearAllCache}>Clear all cache</button></Tip>
                 </div>
               </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {privacyStatus?.enabled && !privacyStatus.unlocked && !settings ? (
+        <div className="scrim modal-scrim privacy-lock">
+          <div data-open-surface className="privacy-lock-card">
+            <header>
+              <div>
+                <h2>Unlock J AI Studio</h2>
+                <p>Enter the privacy password to decrypt prompts and authorize this browser.</p>
+              </div>
+            </header>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={privacyPassword}
+              placeholder="Privacy password"
+              onChange={(event) => setPrivacyPassword(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") unlockPrivacy(); }}
+              autoFocus
+            />
+            <div className="setting-actions single">
+              <button onClick={unlockPrivacy} disabled={privacyBusy}>{privacyBusy ? "Unlocking..." : "Unlock"}</button>
             </div>
           </div>
         </div>

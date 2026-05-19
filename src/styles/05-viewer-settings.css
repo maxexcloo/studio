@@ -346,6 +346,64 @@
 .settings-grid section:nth-last-child(1):nth-child(odd) { grid-column: auto; }
 .settings-grid .field { margin-bottom: 16px; }
 
+.privacy-form {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.privacy-form input,
+.privacy-lock-card input {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 0 11px;
+  font: inherit;
+}
+
+.privacy-form input:focus,
+.privacy-lock-card input:focus {
+  outline: none;
+  border-color: hsl(var(--border-strong));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.14);
+}
+
+.privacy-lock {
+  z-index: 90;
+}
+
+.privacy-lock-card {
+  width: min(420px, calc(100vw - 28px));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  box-shadow: 0 24px 70px hsl(0 0% 0% / 0.24);
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.privacy-lock-card header {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+
+.privacy-lock-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.privacy-lock-card p {
+  margin: 6px 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .project-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);

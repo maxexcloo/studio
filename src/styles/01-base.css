@@ -651,6 +651,8 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
 .file-pick button:hover { background: hsl(var(--accent)); }
 
 .generate {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   min-height: 40px;
   border: 0;
@@ -665,11 +667,31 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06) inset;
   transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out), opacity 200ms var(--ease-out);
 }
+.generate::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 28%, hsl(var(--primary-foreground) / 0.18) 48%, transparent 68%);
+  opacity: 0;
+  transform: translateX(-120%);
+}
 .generate:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.08) inset;
 }
 .generate:active:not(:disabled) { transform: scale(0.98) translateY(0); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4); transition-duration: 80ms; }
+.generate:active:not(:disabled)::after {
+  opacity: 1;
+  transform: translateX(120%);
+  transition: transform 520ms var(--ease-soft), opacity 260ms var(--ease-out);
+}
+.generate.is-working:not(.is-offline) {
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.38), 0 0 0 1px rgb(255 255 255 / 0.08) inset, 0 0 24px hsl(var(--foreground) / 0.08);
+}
+.generate.is-working:not(.is-offline) svg {
+  animation: generateIconLift 1.6s var(--ease-soft) infinite;
+}
 .generate:disabled { opacity: 0.5; cursor: not-allowed; }
 .generate.is-offline {
   background: hsl(0 0% 20%);
@@ -679,6 +701,11 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) /
 }
 .generate.is-offline:hover {
   background: hsl(0 0% 24%);
+}
+@keyframes generateIconLift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  45% { transform: translateY(-1px) rotate(-6deg); }
+  70% { transform: translateY(0) rotate(4deg); }
 }
 
 .status-row { color: hsl(var(--muted-foreground)); font-size: 12px; padding: 12px 2px 0; min-height: 28px; }

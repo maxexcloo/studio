@@ -22,6 +22,10 @@ export function isTrustedClient(remote = "") {
   return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31);
 }
 
+export function isLocalClient(remote = "") {
+  return localHosts.has(remote) || localHosts.has(String(remote || "").replace(/^::ffff:/, ""));
+}
+
 export async function comfy(pathname, options = {}) {
   const response = await fetch(`${comfyUrl}${pathname}`, options);
   if (!response.ok) {

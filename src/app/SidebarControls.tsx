@@ -81,7 +81,7 @@ export function SidebarControls({ view }: { view: any }) {
     denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras,
     loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed,
     setCfg, setCount, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler,
-    setScheduler, setSeed, setStartImage, setStartImageName, setSteps, setTextEncoder, setVae,
+    setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setVae,
     setWeightDtype, setWidth, startImageName, steps, stepsMeta, textEncoder, vae, weightDtype,
     width, widthMeta, confirmAction, setWorkflowGalleryOpen
   } = view;
@@ -175,7 +175,7 @@ export function SidebarControls({ view }: { view: any }) {
                 <label className="file-pick">
                   <input type="file" accept="image/*" onChange={(event) => readStartImage(event.target.files?.[0])} />
                   <span>{startImageName || "Choose image"}</span>
-                  {startImageName ? <Tip content="Clear start image"><button type="button" onClick={(event) => { event.preventDefault(); if (confirmAction("Clear the selected start image?")) { setStartImage(""); setStartImageName(""); } }}>Clear</button></Tip> : null}
+                  {startImageName ? <Tip content="Clear start image"><button type="button" onClick={(event) => { event.preventDefault(); if (confirmAction("Clear the selected start image?")) { setStartImage(""); setStartImageId(""); setStartImageName(""); } }}>Clear</button></Tip> : null}
                 </label>
                 {currentProfile?.capabilities.denoise ? (
                   <NumberPicker label="Denoise" value={denoise} onChange={setDenoise} min={denoiseMeta.min ?? 0} max={denoiseMeta.max ?? 1} step={denoiseMeta.step || 0.05} precision={2} fill />

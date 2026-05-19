@@ -2,14 +2,55 @@ import { apiJson } from './api';
 import { dedupeGalleryItems } from './gallery';
 import type { GalleryItem, Job } from './types';
 
+type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
+
+function payloadItems(data: GalleryPayload | null | undefined) {
+  return data?.items || data?.outputs || [];
+}
+
 export function useGenerationActions(view: any) {
   const {
     active, canUseStartImage, confirmAction, count, currentProfile, denoise,
-    frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loras, mode,
+    frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, mode,
     model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery,
-    setStatus, setZenSelectedId, showToast, startImage, startImageName, steps, cfg,
+    upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
     textEncoder, vae, clipType, weightDtype, width
   } = view;
+  const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
+  const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
+  const galleryRemoveWhere = removeGalleryItemsWhere || ((predicate: (item: GalleryItem) => boolean) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !predicate(item))));
+  const galleryPatch = patchGalleryItems || ((update: (item: GalleryItem) => GalleryItem) => setGallery((current: GalleryItem[]) => current.map(update)));
+
+  function pendingItemsFor(jobId: string, body: any): GalleryItem[] {
+    const itemCount = body.kind === "image" ? Math.max(1, Math.min(8, Number(body.count || 1))) : 1;
+    const createdAt = new Date().toISOString();
+    const title = String(body.prompt || "Untitled prompt").replace(/\s+/g, " ").trim().slice(0, 68) || "Untitled prompt";
+    return Array.from({ length: itemCount }, (_, index) => ({
+      id: `${jobId}-${index}`,
+      jobId,
+      index,
+      url: "",
+      filename: body.kind === "image" && itemCount > 1 ? `${title} ${index + 1}` : title,
+      type: body.kind === "video" ? "video" : "image",
+      status: "pending",
+      optimistic: true,
+      prompt: body.prompt || "",
+      negative: body.negative || "",
+      createdAt,
+      width: Number(body.width || 0),
+      height: Number(body.height || 0),
+      model: body.model || "",
+      referenceImage: body.startImageId || "",
+      referenceImageName: body.startImageName || "",
+      startImageId: body.startImageId || "",
+      settings: { workflow: body.workflow || "", profileId: body.profileId || "", count: itemCount }
+    }));
+  }
+
+  function nextPaint() {
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+
   async function generate() {
     if (generatePostingRef.current) return;
     if (!prompt.trim()) {
@@ -25,6 +66,7 @@ export function useGenerationActions(view: any) {
       return;
     }
     generatePostingRef.current = true;
+    const optimisticJobIds: string[] = [];
     try {
       const imageRuns = mode === "image" && prefs.variationQueueMode === "separate" ? count : 1;
       const requestCount = mode === "image" && prefs.variationQueueMode === "separate" ? 1 : count;
@@ -58,19 +100,26 @@ export function useGenerationActions(view: any) {
         frames,
         fps,
         loras,
-        startImage: canUseStartImage ? startImage : "",
+        startImageId: canUseStartImage ? startImageId : "",
         startImageName
       };
       const queuedJobs: string[] = [];
       for (let index = 0; index < imageRuns; index += 1) {
-        const { jobId, items } = await apiJson<{ jobId: string; items: GalleryItem[] }>("/api/generate", {
+        const clientJobId = crypto.randomUUID();
+        optimisticJobIds.push(clientJobId);
+        const optimisticBody = { ...requestBody, count: requestCount, startImageId: canUseStartImage ? startImageId : "" };
+        const optimisticItems = pendingItemsFor(clientJobId, optimisticBody);
+        galleryUpsert(optimisticItems);
+        if (prefs.zenMode) setZenSelectedId(optimisticItems[0].id);
+        await nextPaint();
+        const { jobId, items } = await apiJson<{ jobId: string; items: GalleryItem[]; revision?: number }>("/api/generate", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...requestBody, count: requestCount })
+          body: JSON.stringify({ ...requestBody, clientJobId, count: requestCount, startImage: canUseStartImage && !startImageId ? startImage : "" })
         });
         queuedJobs.push(jobId);
         if (items?.length) {
-          setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current]));
+          galleryUpsert(items);
           if (prefs.zenMode) setZenSelectedId(items[0].id);
         }
       }
@@ -81,19 +130,19 @@ export function useGenerationActions(view: any) {
           await new Promise((resolve) => setTimeout(resolve, 1600));
           const job: Job = await apiJson<Job>(`/api/jobs/${jobId}`);
           if (job.status === "missing") {
-            setGallery((current: GalleryItem[]) => current.map((item: GalleryItem) => item.jobId === jobId ? { ...item, status: "error", filename: "Generation interrupted" } : item));
+            galleryPatch((item: GalleryItem) => item.jobId === jobId ? { ...item, status: "error", optimistic: false, filename: "Generation interrupted" } : item);
             return job;
           }
           if (job.status === "error") {
             const message = job.error || "Generation failed";
-            setGallery((current: GalleryItem[]) => current.map((item: GalleryItem) => item.jobId === jobId ? { ...item, status: "error", filename: message } : item));
+            galleryPatch((item: GalleryItem) => item.jobId === jobId ? { ...item, status: "error", optimistic: false, filename: message } : item);
             showToast(message, "error");
             setStatus(message);
             return job;
           }
           if (job.status === "done" || job.status === "canceled") return job;
           if (job.preview || job.previews?.length || job.progress || job.status === "queued" || job.status === "running") {
-            setGallery((current: GalleryItem[]) => current.map((item: GalleryItem) => {
+            galleryPatch((item: GalleryItem) => {
               if (item.jobId !== jobId) return item;
               const batchCount = Number(item.settings?.count || 1);
               const indexedPreview = Number.isInteger(item.index) ? job.previews?.[item.index || 0] : undefined;
@@ -104,7 +153,7 @@ export function useGenerationActions(view: any) {
                 progress: job.progress || item.progress || { value: 0, max: 0, node: job.status },
                 status: item.status === "pending" ? "pending" : item.status
               };
-            }));
+            });
           }
           if (job.progress?.max) {
             setStatus(`Rendering ${job.progress.value}/${job.progress.max}`);
@@ -113,19 +162,23 @@ export function useGenerationActions(view: any) {
           }
         }
       }));
-      loadGallery();
+      await (loadGalleryDelta ? loadGalleryDelta() : loadGallery());
       if (prefs.zenMode && prefs.followLatest) {
-        const data = await apiJson<{ outputs: GalleryItem[] }>("/api/gallery").catch(() => null);
-        const outputs = data?.outputs?.filter((item: GalleryItem) => item.status !== "canceled") || [];
+        const data = await apiJson<GalleryPayload>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=80`).catch(() => null);
+        const outputs = payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled");
         const latest = outputs.find((item: GalleryItem) => item.type === mode && item.status === "done");
         if (latest) {
-          setGallery(outputs);
+          galleryUpsert(outputs);
           setZenSelectedId(latest.id);
         }
       }
       setStatus("Ready");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
+      galleryPatch((item: GalleryItem) => {
+        if (item.status === "pending" && item.jobId && optimisticJobIds.includes(item.jobId)) return { ...item, status: "error", optimistic: false, filename: message };
+        return item;
+      });
       setStatus(message);
       showToast(message, "error");
     } finally {
@@ -136,29 +189,31 @@ export function useGenerationActions(view: any) {
   async function cancelJob(jobId: string | undefined) {
     if (!jobId) return;
     if (!confirmAction("Cancel this generation?")) return;
-    setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => item.jobId !== jobId));
+    galleryRemove([jobId]);
     await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" }).catch(() => null);
     setStatus("Ready");
   }
 
   async function cancelQueue() {
     if (!confirmAction("Cancel everything currently queued or generating?")) return;
-    setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => item.status !== "pending" && item.status !== "canceled"));
+    galleryRemoveWhere((item: GalleryItem) => item.status === "pending" || item.status === "canceled");
     await fetch("/api/queue/cancel", { method: "POST" }).catch(() => null);
     setStatus("Ready");
   }
 
   async function clearGallery() {
     if (!confirmAction("Clear finished gallery items from this app?")) return;
-    const data = await apiJson<{ outputs: GalleryItem[] }>("/api/gallery/clear", { method: "POST" }).catch(() => null);
-    if (data?.outputs) setGallery(data.outputs.filter((item: GalleryItem) => item.status !== "canceled"));
+    const data = await apiJson<GalleryPayload>("/api/gallery/clear", { method: "POST" }).catch(() => null);
+    const items = payloadItems(data);
+    if (data) setGallery(items.filter((item: GalleryItem) => item.status !== "canceled"));
     setStatus("Ready");
   }
 
   async function clearFailedItems() {
     if (!confirmAction("Clear failed and interrupted generations from this gallery?")) return;
-    const data = await apiJson<{ outputs: GalleryItem[] }>("/api/gallery/errors/clear", { method: "POST" }).catch(() => null);
-    if (data?.outputs) setGallery(data.outputs.filter((item: GalleryItem) => item.status !== "canceled"));
+    const data = await apiJson<GalleryPayload>("/api/gallery/errors/clear", { method: "POST" }).catch(() => null);
+    const items = payloadItems(data);
+    if (data) setGallery(items.filter((item: GalleryItem) => item.status !== "canceled"));
     setStatus("Ready");
   }
 
@@ -178,7 +233,8 @@ export function useGenerationActions(view: any) {
       await caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => null);
     }
     const data = await fetch("/api/cache/clear", { method: "POST" }).then((res) => res.json()).catch(() => null);
-    if (data?.outputs) setGallery(data.outputs.filter((item: GalleryItem) => item.status !== "canceled"));
+    const items = payloadItems(data);
+    if (data) setGallery(items.filter((item: GalleryItem) => item.status !== "canceled"));
     setStatus("Ready");
   }
 
@@ -189,7 +245,7 @@ export function useGenerationActions(view: any) {
 
   async function deleteItem(item: GalleryItem, confirmed = false) {
     if (!confirmed && !confirmAction("Delete this generation from the gallery?")) return;
-    setGallery((current: GalleryItem[]) => current.filter((next: GalleryItem) => next.id !== item.id));
+    galleryRemove([item.id, item.url].filter(Boolean));
     if (active?.id === item.id) setActive(null);
     const response = await fetch(`/api/gallery/${encodeURIComponent(item.id)}`, { method: "DELETE" }).catch(() => null);
     showToast(response?.ok ? "Deleted from gallery" : "Delete failed", response?.ok ? "success" : "error");

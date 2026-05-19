@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { comfy } from './comfy.js';
 import { getCustomWorkflow } from './custom-workflows.js';
+import { startImageDataUrl } from './start-images.js';
 
 export async function uploadReferenceImage(dataUrl) {
   if (!dataUrl || !dataUrl.includes(",")) return "";
@@ -15,6 +16,11 @@ export async function uploadReferenceImage(dataUrl) {
   form.append("type", "input");
   const uploaded = await comfy("/upload/image", { method: "POST", body: form });
   return uploaded.name || filename;
+}
+
+async function uploadBodyStartImage(body) {
+  const dataUrl = body.startImage || startImageDataUrl(body.startImageId);
+  return dataUrl ? uploadReferenceImage(dataUrl) : "";
 }
 
 export async function imageGraph(body) {
@@ -59,8 +65,9 @@ async function applyMappedInputs(graph, workflow, body) {
   for (const [key, value] of Object.entries(values)) {
     if (value !== "" && value !== 0) setMappedInput(graph, controls[key], value);
   }
-  if (body.startImage && controls.startImage) {
-    setMappedInput(graph, controls.startImage, await uploadReferenceImage(body.startImage));
+  if ((body.startImage || body.startImageId) && controls.startImage) {
+    const imageName = await uploadBodyStartImage(body);
+    if (imageName) setMappedInput(graph, controls.startImage, imageName);
   }
 }
 
@@ -171,8 +178,8 @@ export async function checkpointImageGraph(body) {
     "7": { class_type: "SaveImage", inputs: { images: ["6", 0], filename_prefix: "j-ai-studio/image" } }
   };
 
-  if (body.startImage) {
-    const imageName = await uploadReferenceImage(body.startImage);
+  if (body.startImage || body.startImageId) {
+    const imageName = await uploadBodyStartImage(body);
     graph["6"] = { class_type: "LoadImage", inputs: { image: imageName } };
     graph["8"] = { class_type: "VAEEncode", inputs: { pixels: ["6", 0], vae: ["1", 2] } };
     graph["5"].inputs.latent_image = ["8", 0];
