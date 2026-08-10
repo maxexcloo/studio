@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, GalleryHorizontalEnd, Minus, Plus, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronRight, GalleryHorizontalEnd, Minus, Plus, Search, Trash2, Wand2 } from 'lucide-react';
 import { fallbackSamplers, fallbackSchedulers } from './constants';
 import { cn } from './format';
 import { defaultLoraStrength, maxLoras, rankedLoras, recommendedLoras } from './loras';
 import { Field, NumberPicker, Skeleton, StudioSelect as Select, Tip } from './components';
-import type { LoraSelection, Profile } from './types';
+import type { LoraSelection, Profile, WorkflowSummary } from './types';
 
 const LORA_COLORS = [
   "hsl(280 60% 60%)",
@@ -17,7 +17,7 @@ const LORA_COLORS = [
   "hsl(340 65% 55%)",
 ];
 
-function LoraNamePicker({
+function LoraSelect({
   value,
   options,
   profile,
@@ -30,46 +30,100 @@ function LoraNamePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const search = query || value;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const recommended = useMemo(() => recommendedLoras(options, profile, query).slice(0, 8), [options, profile, query]);
-  const ranked = useMemo(() => rankedLoras(options, profile, query).slice(0, 18), [options, profile, query]);
+  const ranked = useMemo(() => rankedLoras(options, profile, query).slice(0, 24), [options, profile, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
   const choose = (name: string) => {
     onChange(name);
     setQuery("");
     setOpen(false);
   };
-  const list = (label: string, items: string[]) => items.length ? (
-    <div className="lora-option-group">
-      <span>{label}</span>
-      {items.map((name) => (
-        <button key={`${label}-${name}`} type="button" className={cn(name === value && "active")} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(name)}>
-          {name}
-        </button>
-      ))}
-    </div>
-  ) : null;
+
+  const displayName = (name: string) => {
+    const parts = name.split(/[\\/]/);
+    return parts[parts.length - 1] || name;
+  };
 
   return (
-    <div className="lora-picker" data-open-surface={open || undefined}>
-      <input
-        value={open ? search : value}
-        placeholder="Choose LoRA"
-        onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          onChange(event.target.value);
-          setOpen(true);
-        }}
-      />
+    <div className="lora-select" ref={containerRef} data-open-surface={open || undefined}>
+      <button type="button" className="lora-select-trigger" onClick={() => { setOpen(!open); if (!open) setTimeout(() => inputRef.current?.focus(), 0); }}>
+        <span className={cn(!value && "placeholder")}>{value ? displayName(value) : "Choose LoRA"}</span>
+      </button>
       {open ? (
-        <div className="lora-menu">
-          {list("Recommended", recommended)}
-          {list("All", ranked)}
-          {!ranked.length ? <div className="lora-empty">No LoRAs found</div> : null}
+        <div className="lora-select-dropdown">
+          <div className="lora-select-search">
+            <Search size={13} />
+            <input ref={inputRef} value={query} placeholder="Search LoRAs..." onChange={(event) => setQuery(event.target.value)} />
+          </div>
+          <div className="lora-select-list">
+            {recommended.length ? (
+              <div className="lora-select-group">
+                <span>Recommended</span>
+                {recommended.map((name) => (
+                  <button key={`r-${name}`} type="button" className={cn(name === value && "active")} onClick={() => choose(name)}>
+                    {displayName(name)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="lora-select-group">
+              <span>All</span>
+              {ranked.map((name) => (
+                <button key={`a-${name}`} type="button" className={cn(name === value && "active")} onClick={() => choose(name)}>
+                  {displayName(name)}
+                </button>
+              ))}
+              {!ranked.length ? <div className="lora-select-empty">No LoRAs match "{query}"</div> : null}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function WorkflowPreviewCard({ workflow, onOpen }: { workflow: WorkflowSummary | null; onOpen: () => void }) {
+  if (!workflow) return (
+    <button type="button" className="workflow-card" onClick={onOpen}>
+      <div className="workflow-card-thumb"><GalleryHorizontalEnd size={18} /></div>
+      <div className="workflow-card-info">
+        <strong>No workflow selected</strong>
+        <span>Browse workflows</span>
+      </div>
+      <ChevronRight size={15} className="workflow-card-arrow" />
+    </button>
+  );
+
+  const status = workflow.validation?.ok ? "Ready" : "Issues";
+  return (
+    <button type="button" className={cn("workflow-card", !workflow.validation?.ok && "has-issues")} onClick={onOpen}>
+      <div className="workflow-card-thumb">
+        {workflow.thumbnail ? <img src={workflow.thumbnail} alt="" /> : <Wand2 size={18} />}
+      </div>
+      <div className="workflow-card-info">
+        <strong>{workflow.name}</strong>
+        <span>{workflow.source === "builtin" ? "Built-in" : "Custom"} workflow</span>
+      </div>
+      <div className="workflow-card-status">
+        <span className={cn("workflow-status-dot", workflow.validation?.ok ? "is-ok" : "is-warn")} />
+        {status}
+      </div>
+      <ChevronRight size={15} className="workflow-card-arrow" />
+    </button>
   );
 }
 
@@ -77,8 +131,8 @@ type SidebarTab = "basics" | "advanced" | "loras";
 
 export function SidebarControls({ view }: { view: any }) {
   const {
-    canUseStartImage, cfg, cfgMeta, changeMode, count, countMeta, currentProfile, customSize,
-    denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras,
+    canUseStartImage, cfg, cfgMeta, changeMode, count, countMeta, currentProfile, currentWorkflow,
+    customSize, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras,
     loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed,
     setCfg, setCount, setDenoise, setFps, setFrames, setHeight, setLoras, setSampler,
     setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setVae,
@@ -94,6 +148,7 @@ export function SidebarControls({ view }: { view: any }) {
   useEffect(() => {
     if (!canUseLora && tab === "loras") setTab("basics");
   }, [canUseLora, tab]);
+
   const updateLora = (index: number, patch: Partial<LoraSelection>) => {
     setLoras((current: LoraSelection[]) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   };
@@ -113,10 +168,7 @@ export function SidebarControls({ view }: { view: any }) {
         <Tip content="Video generation"><button className={cn(mode === "video" && "active")} onClick={() => changeMode("video")}>Video</button></Tip>
       </div>
 
-      <Tip content="Browse workflows"><button type="button" className="workflow-sidebar-button" onClick={() => setWorkflowGalleryOpen(true)}>
-        <GalleryHorizontalEnd size={15} />
-        Workflow Gallery
-      </button></Tip>
+      <WorkflowPreviewCard workflow={currentWorkflow} onOpen={() => setWorkflowGalleryOpen(true)} />
 
       <div className="sidebar-subtabs">
         <button className={cn("sidebar-subtab", tab === "basics" && "active")} onClick={() => setTab("basics")}>Basics</button>
@@ -189,23 +241,23 @@ export function SidebarControls({ view }: { view: any }) {
           <div className="lora-tab">
             <div className="lora-list">
               {loras.length ? loras.map((item: LoraSelection, index: number) => (
-                <div className={cn("lora-list-row", !item.enabled && "is-disabled")} key={index}>
-                  <div className="lora-swatch" style={{ background: LORA_COLORS[index % LORA_COLORS.length] }} />
-                  <button
-                    type="button"
-                    className={cn("lora-check", item.enabled && "on")}
-                    onClick={() => updateLora(index, { enabled: !item.enabled })}
-                    aria-label={item.enabled ? "Disable LoRA" : "Enable LoRA"}
-                  />
-                  <div className="lora-list-info">
-                    <LoraNamePicker value={item.name} options={loraOptions} profile={currentProfile} onChange={(name) => updateLora(index, { name })} />
+                <div className={cn("lora-card", !item.enabled && "is-disabled")} key={index}>
+                  <div className="lora-card-header">
+                    <div className="lora-swatch" style={{ background: LORA_COLORS[index % LORA_COLORS.length] }} />
+                    <button
+                      type="button"
+                      className={cn("lora-check", item.enabled && "on")}
+                      onClick={() => updateLora(index, { enabled: !item.enabled })}
+                      aria-label={item.enabled ? "Disable LoRA" : "Enable LoRA"}
+                    />
+                    <div className="lora-card-weight">
+                      <button type="button" onClick={() => updateLora(index, { strength: Math.round((item.strength - 0.05) * 100) / 100 })}><Minus size={11} /></button>
+                      <span>{item.strength.toFixed(2)}</span>
+                      <button type="button" onClick={() => updateLora(index, { strength: Math.round((item.strength + 0.05) * 100) / 100 })}><Plus size={11} /></button>
+                    </div>
+                    <Tip content="Remove LoRA"><button type="button" className="lora-del" onClick={() => removeLora(index)}><Trash2 size={12} /></button></Tip>
                   </div>
-                  <div className="lora-weight-ctrl">
-                    <button type="button" onClick={() => updateLora(index, { strength: Math.round((item.strength - 0.05) * 100) / 100 })}><Minus size={11} /></button>
-                    <span className="wval">{item.strength.toFixed(2)}</span>
-                    <button type="button" onClick={() => updateLora(index, { strength: Math.round((item.strength + 0.05) * 100) / 100 })}><Plus size={11} /></button>
-                  </div>
-                  <Tip content="Remove LoRA"><button type="button" className="lora-del" onClick={() => removeLora(index)}><Trash2 size={12} /></button></Tip>
+                  <LoraSelect value={item.name} options={loraOptions} profile={currentProfile} onChange={(name) => updateLora(index, { name })} />
                 </div>
               )) : (
                 <div className="lora-list-empty">No LoRAs added yet</div>
