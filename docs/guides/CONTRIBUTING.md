@@ -16,12 +16,20 @@ npm test
 npm run build
 ```
 
+## Missing packages and demo mode
+
+Both `npm run dev` and `npm start` reinstall missing runtime packages, so an incomplete `node_modules` folder doesn't stop a normal start.
+
+`npm run dev:demo` (or `HEISS_DEMO=1`) is for agent and UI testing without a GPU. When ComfyUI is unreachable it offers fake models and returns placeholder images. It's off otherwise, so a normal install shows ComfyUI as offline instead.
+
+`npm run check:updates` lists outdated dependencies.
+
 ## Pull requests
 
 - Keep changes focused. One idea per PR is easier to review.
 - Keep the UI consistent with what's there: dark canvas, floating pill surfaces, one white primary action, and the square pixel accent used sparingly.
 - Keep server changes local-only by default.
-- Document any new environment variable in `.env.example` and the README.
+- Document any new environment variable in `.env.example` and [CONFIGURATION.md](./CONFIGURATION.md).
 - Don't commit model files, generated media, logs or `.env` files.
 - New workflow templates belong in `workflows/` with a `heissUi` mapping block. See [the workflow guide](../../workflows/README.md).
 - New model families (and the custom nodes, encoders or VAEs they need) follow [the model guide](./MODELS.md).
