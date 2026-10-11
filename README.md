@@ -28,14 +28,14 @@
 </p>
 
 <p align="center">
-  <sub>Free and open source under MIT. Built on the great work of <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper. <a href="#credits">More on that below.</a></sub>
+  <sub>Free and open source under MIT. Built on <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper. <a href="#credits">More on that below.</a></sub>
 </p>
 
 ---
 
 HEISS UI sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
 
-The node graph is great for building workflows and less great for the everyday loop of prompt, wait, look, tweak. HEISS UI is for that loop, and your workflows come along.
+The node graph is for building workflows. HEISS UI is for the everyday loop of prompt, wait, look, tweak, and your workflows come along.
 
 ## Features
 
@@ -53,13 +53,12 @@ The node graph is great for building workflows and less great for the everyday l
 <summary><b>More features</b></summary>
 
 - **Reference and start images.** Edit models like Flux.2 and Qwen-Image 2.1 take reference images. Every other image model takes a start image, with a slider for how much it may change. Either one can be painted on for [inpainting](#inpainting). [More ↓](#reference-and-start-images)
-- **LoRA stacks.** LoRAs grouped by folder, stacked per run and saved per model family, right below Basics in the sidebar. LoRAs made for the selected model sort first and show their trigger words, and a small note above the prompt bar says when an active LoRA was made for a different model.
+- **LoRA stacks.** LoRAs grouped by folder and saved per model family, right below Basics in the sidebar. LoRAs made for the selected model sort first and show their trigger words, and a note above the prompt bar says when an active one was made for a different model.
 - **Live previews.** Each image resolves from a pixel mosaic into the final result while ComfyUI works, with a countdown to done. Queue the next one or cancel any time.
 - **Videos in the gallery.** Video tiles play a silent preview, and opening one plays it with sound, seeking and full screen.
 - **Controls that fit the model.** Models, samplers, schedulers, size and prompt limits, text encoders and VAEs come from ComfyUI. Only what the selected model uses shows up.
 - **Zen mode.** A fullscreen prompt and output view without the panels.
-- **Find it again.** Press ↑ in an empty prompt for recent prompts (star the ones to keep), `/` to search the gallery by prompt, model or LoRA, and star images to keep them close. Earlier images from other folders (old ComfyUI outputs, AUTOMATIC1111, Forge) join the gallery where they are, from Settings › Library. Recent prompts can be turned off in Settings › Generation, and prompts from Hidden aren't saved.
-  <!-- MEDIA: GIF · find it again: ↑ in an empty prompt opens recent prompts → star one → / searches the gallery by a LoRA name · ~8 s loop · 1100 px wide · save as docs/screenshots/find-it-again.gif -->
+- **Find it again.** Press ↑ in an empty prompt for recent prompts (star the ones to keep), `/` to search the gallery by prompt, model or LoRA, and star images to keep them close. Earlier images from other folders (old ComfyUI outputs, AUTOMATIC1111, Forge) can join the gallery where they are, from Settings › Library.
 - **Civitai-ready images (beta).** With this on in Settings › Library, new PNGs also carry the prompt, LoRAs and settings the way AUTOMATIC1111 writes them, so Civitai fills in an upload.
 
 </details>
@@ -161,7 +160,7 @@ ComfyUI does the generating; HEISS UI is the studio on top. Install it once and 
 <details>
 <summary><b>Ports and how much memory you need</b></summary>
 
-A manual or portable install uses port 8188 and ComfyUI Desktop 8000, and both connect without any setup. A graphics card with 8 GB runs SDXL and the compact Flux.2 Klein; 12 to 16 GB is comfortable, and 24 GB or more runs nearly everything. On a Mac, 16 GB of memory runs SDXL, 18 GB or more Flux.2 Klein, and 48 GB or more Krea 2. **No ComfyUI yet?** on the offline screen says the same for your system.
+A manual or portable install uses port 8188 and ComfyUI Desktop 8000, and both connect without any setup. A graphics card with 8 GB runs SDXL and the compact Flux.2 Klein; 12 to 16 GB is comfortable, and 24 GB or more runs nearly everything. On a Mac, 16 GB of memory runs SDXL, 18 GB or more Flux.2 Klein, and 48 GB or more Krea 2.
 
 </details>
 
@@ -169,11 +168,10 @@ A manual or portable install uses port 8188 and ComfyUI Desktop 8000, and both c
 
 With no model installed, the studio offers three to start with: **Krea 2**, **Flux.2** and **SDXL**, each in three sizes. The one that suits your computer is marked, and the others are a tap away. One tap downloads the model with its text encoder and VAE, then selects it with a prompt ready to try. The model menu shows the same offer until the first model is installed. [Sizes ↓](#what-runs-where)
 
-<!-- MEDIA: GIF · first run: Pick a first model with the suggested size marked → one tap → download progress → model selected with a prompt ready · ~8 s loop · 1100 px wide · save as docs/screenshots/first-model.gif -->
 
 ## Supported models
 
-Model files are recognised from their weights, so a renamed file still works. Each family runs with the sampler, scheduler, steps, CFG, shift and resolution from its official ComfyUI templates and model cards, so a fresh install makes good images without touching a setting.
+Model files are recognized from their weights, so a renamed file still works. Each family runs with the sampler, scheduler, steps, CFG, shift and resolution from its official ComfyUI templates and model cards, so a fresh install makes good images without touching a setting.
 
 **Image:** 21 families, from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Ideogram 4. **Video (beta):** 7, including Wan 2.2, HunyuanVideo 1.5 and MiniMax H3.
 
@@ -185,9 +183,7 @@ Model files are recognised from their weights, so a renamed file still works. Ea
 | **Image** | Krea 2 (Turbo, Raw), Anima, Z-Image (Turbo, Base), Flux.2 Dev, Flux.2 Klein 4B and 9B, SDXL (NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo), Pony V7, Chroma, Qwen-Image (including 2512) and Qwen-Image 2.1, Ideogram 4, MageFlow, ERNIE-Image, Lumina Image 2.0 (including Neta Lumina and NetaYume), Sana (1.5, Sprint, 2K/4K), HiDream I1, SD 3.5, Flux.1 (Dev, Schnell, de-distilled), SD 2.x and SD 1.5 |
 | **Video** (beta) | MiniMax H3, HunyuanVideo 1.5 (text and image to video), Wan 2.2 5B, Wan 2.2 14B (high and low-noise pair, text and image to video) and Wan 2.1 |
 
-Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognised can be given a type under **Settings › Models › Model types**.
-
-Adding a family is mostly data. [MODELS.md](./docs/guides/MODELS.md) walks through it.
+Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**.
 
 </details>
 
@@ -208,7 +204,6 @@ The built-in models cover the everyday loop. For anything custom, bring your gra
 
 The workflow shows up in the model menu under **Your workflows** once the nodes it needs are installed.
 
-<!-- MEDIA: PNG · workflow import review: a dropped workflow with its connected controls, one guessed connection marked, and Change connections open · still · 1100 px wide · save as docs/screenshots/workflow-review.png -->
 
 <details>
 <summary><b>What gets connected, and what the review shows</b></summary>
@@ -247,15 +242,14 @@ The [workflow guide](./workflows/README.md) covers the full control list, image-
 
 Getting a new model running in ComfyUI usually means hunting for the right text encoder, the right VAE and a custom node pack or two. Here each part gets a button, and **Get all** fetches the lot. Nothing downloads until you press the button.
 
-<!-- MEDIA: GIF · missing parts: pick a model → setup lists the missing text encoder and VAE → Get all → parts tick off → “Krea 2 is ready” · ~10 s loop · 1100 px wide · save as docs/screenshots/missing-parts.gif -->
 
 <details>
 <summary><b>What's covered</b></summary>
 
 - **What each model needs.** Pick a model to see what's missing, whether that's a text encoder, a VAE, a companion file (like Wan 2.2's low-noise half), a custom node pack or a newer ComfyUI. The model menu shows what each model lacks, and a blocked Generate opens that model's setup.
-- **One click per part, or Get all.** Files come from Hugging Face into the folders ComfyUI reads from, including shared folders set up in `extra_model_paths.yaml`. **Get all** adds up the sizes and checks free space first. Where an abliterated text encoder exists, it comes first; other builds (smaller precisions, Comfy-Org's own) are under **Other versions**. A build that has moved or is gated falls back to the next one.
+- **One click per part, or Get all.** Files come from Hugging Face into the folders ComfyUI reads from, including shared folders set up in `extra_model_paths.yaml`. **Get all** adds up the sizes and checks free space first. Where an uncensored (abliterated) text encoder exists, it comes first; other builds (smaller precisions, Comfy-Org's own) are under **Other versions**. A build that has moved or is gated falls back to the next one.
 - **Custom node packs (beta).** Packs listed in ComfyUI-Manager install through it. Otherwise, with ComfyUI on this computer, the pack is cloned and its requirements installed with ComfyUI's own Python. The manual steps stay one tap away.
-- **Downloads that hold up.** Progress, speed and time left show as they run. Downloads resume after a restart, retry a dropped connection and check free space first, and gated files link to their Hugging Face page.
+- **Resumable downloads.** Progress, speed and time left show as they run. Downloads resume after a restart, retry a dropped connection and check free space first, and gated files link to their Hugging Face page.
 - **Ready at the end.** Each part is ticked off as it lands, and the last one turns the panel into “Krea 2 is ready”. Progress survives a ComfyUI restart halfway through.
 
 </details>
@@ -266,12 +260,11 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 - **Start images for everything else.** Every other built-in image model (Krea 2, SDXL, Flux, Z-Image and the rest) offers **Add start image**. The image then sits in the sidebar's Basics with **Change from the reference** right under it, for how far the result may move from it.
 - **Paint on either one.** Hover a reference or start image and press the brush to [inpaint](#inpainting) just part of it.
 
-<!-- MEDIA: PNG · reference images: the composer with two reference slots filled and the reference library open · still · 1100 px wide · save as docs/screenshots/reference-images.png -->
 
 <details>
 <summary><b>Reference slots, the library and your workflows</b></summary>
 
-- **One slot after another.** The composer offers one reference slot after another as you fill them, and the first reference frames the result.
+- **Slots as you need them.** The composer opens a new reference slot each time you fill one, and the first reference frames the result.
 - **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
 
@@ -279,13 +272,13 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 
 ## Inpainting
 
-Change one part of a picture and keep the rest. Hover a reference or start image in the prompt bar and press the brush. The studio rises out of the prompt bar: paint over what should change, then write what it becomes. Only the painted part is redrawn.
+Change one part of a picture and keep the rest. Hover a reference or start image in the prompt bar and press the brush. Paint over what should change, then write what it becomes. Only the painted part is redrawn.
 
 <p align="center">
   <a href="./docs/screenshots/inpainting.mp4"><img src="./docs/screenshots/inpainting.webp" alt="Inpainting in HEISS UI: a picture is dropped into the prompt bar as a reference, the brush opens the inpaint studio over the gallery, and a stroke is painted over the part to change" width="100%" /></a>
 </p>
 
-- **The rest stays pixel-exact.** HEISS UI renders a crop around what you painted, at the model's full working size, and lays it back onto the original. The untouched part is never re-encoded, so it doesn't soften or shift in color, and a small fix gets the model's full detail.
+- **The rest stays pixel-exact.** HEISS UI renders a crop around what you painted at the model's full size and lays it back onto the original. The untouched part never softens or shifts in color, and a small fix gets the model's full detail.
 - **Your models, no extra nodes.** 18 of the 21 image families inpaint with ComfyUI's own nodes, no inpainting checkpoint or node pack needed. Edit models (Flux.2 Dev, Klein 4B and 9B, Qwen-Image 2.1) paint on a reference image; SDXL, Krea 2, Z-Image, Flux.1, Qwen-Image, Chroma and the others on a start image. The model menu marks which models can.
 - **A real brush.** Brush, eraser and hand, undo and redo, zoom and a brush size. It works with a finger on the phone too.
 - **Two dials.** While a painted image is in the prompt bar, **Inpaint strength** (from touching it up to painting it anew, for models that take a start image) and **Edge softness** sit in the sidebar's Basics, under the image. On the phone they're in the Advanced sheet.
@@ -303,12 +296,11 @@ Inpainting is in beta and on by default. **Settings › Features › Inpainting*
 
 Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler), without leaving the studio.
 
-- **2K or 4K for every new picture.** Pick **None**, **2K** or **4K** next to the size menu (on the phone, in the create sheet). The upscale runs inside the picture's own ComfyUI job, so you can close the page and it still finishes. The next run waits for it, and if you stop it or it fails, you keep the picture at its generated size.
+- **2K or 4K for every new picture.** Pick **None**, **2K** or **4K** next to the size menu (on the phone, in the create sheet). The upscale is part of the run, so you can close the page and it still finishes. The next run waits for it, and if you stop it or it fails, you keep the picture at its generated size.
 - **Any picture, one click.** The upscale arrow on a tile or in the viewer upscales anything already in the gallery, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
 - **Time left, not a spinner.** Upscale times are learned per model and size, so the ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
 
-<!-- MEDIA: GIF · smart upscale: pick 4K next to the size menu → generate → ring counts down → drag the compare slider · ~8 s loop · 1100 px wide · save as docs/screenshots/smart-upscale.gif -->
 
 <details>
 <summary><b>Effort, faces and when it's skipped</b></summary>
@@ -329,25 +321,23 @@ Making ten takes of one idea fills a gallery fast. With auto-grouping on, pictur
 
 - **Stacks with a count.** A stack shows as a photo with two edges under it, or as a cover flow, with the number of pictures in the corner.
 - **Skim without opening.** Slide the pointer along the bottom of a stack to flip through it. Open it to spread the pictures out, or **Unstack** to keep them apart.
-- **It knows what changed.** Prompts are compared by the words that matter: the subject weighs a lot, shared boilerplate like "masterpiece, 8k" very little. Coming back to a prompt the next day starts a new stack.
-- **Nothing moves.** Grouping is only a way of looking at the gallery. No files are touched, and switching it off shows everything exactly as before.
+- **It knows what changed.** Similar prompts group together, and shared boilerplate like "masterpiece, 8k" barely counts. Coming back to a prompt the next day starts a new stack.
+- **Your files stay put.** Grouping changes no files. Switch it off and the gallery is as it was.
 
 Turn it on with the stack button next to gallery search, or under **Settings › Library › Auto-grouping**, where you also pick the photo or cover-flow look.
 
-<!-- MEDIA: GIF · auto-grouping: turn on the stack button → similar takes fold into one tile with a count → skim along its bottom → open → Unstack · ~8 s loop · 1100 px wide · save as docs/screenshots/auto-grouping.gif -->
 
 ## On your phone
 
-On a phone the studio switches to its own layout, made for one thumb. Prompt, browse, share and upscale while your PC renders.
+On a phone the studio switches to its own layout. Prompt, browse, share and upscale while your PC renders.
 
-On the PC running HEISS UI, open **Settings › Connection** and turn on **Open on other devices**. Set a **studio password** under **Signing in**, then scan the QR code shown in Connection with your phone and sign in. Both devices need to be on the same trusted network. For laptops, tablets and other desktops, see [Connect over LAN](#connect-over-lan).
+Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **Settings › Connection** with your phone and sign in. Both devices need to be on the same trusted network.
 
-<!-- MEDIA: GIF · phone studio: prompt → tile resolves → long press → Share → share sheet · ~6 s loop · 390 px wide (phone screen) · save as docs/screenshots/phone-studio.gif -->
 
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge, all the way under Safari's toolbar, and one **Describe…** pill opens the prompt, reference image, workflow, shape, number of images and Smart upscale's None, 2K or 4K, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share hands the file to the phone's share sheet. Added to the home screen, it opens full screen, with haptics where the phone supports them. A ring around Generate shows progress while you browse.
+The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference image, workflow, shape, number of images and Smart upscale's None, 2K or 4K, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share hands the file to the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
 
 **Use the full studio** under More switches a phone to the complete layout, and `?phone=1` shows the phone studio on any screen.
 
@@ -355,13 +345,13 @@ The gallery runs edge to edge, all the way under Safari's toolbar, and one **Des
 
 ## Connect over LAN
 
-LAN access is a feature for any device with a browser, not just the phone studio. Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. HEISS UI and ComfyUI keep running on your PC with its models and outputs; your other device needs only a browser. Wi-Fi and wired Ethernet both work.
+Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. HEISS UI and ComfyUI keep running on your PC with its models and outputs; the other device needs only a browser.
 
 1. On the PC running HEISS UI, open **Settings › Connection** and turn on **Open on other devices**.
 2. In the same settings, set a **studio password** under **Signing in**.
 3. On your other device, open the **network address** shown in Connection (for example, `http://192.168.1.20:8787`) and sign in with that password. Use your PC’s listed address, not `localhost`.
 
-Laptops and desktops use the full studio; phones use the layout made for one thumb. All devices reach the same models and gallery, while your PC does the rendering. Only enable access on a network you trust. Admin controls stay at the PC unless you explicitly allow them for signed-in devices.
+Laptops and desktops get the full studio and phones get the phone layout. Only enable access on a network you trust. Admin controls stay at the PC unless you allow them for signed-in devices.
 
 <details>
 <summary><b>More on setup</b></summary>
@@ -384,14 +374,14 @@ Switching on **Open on other devices** restarts HEISS UI on your network. For a 
 
 Hidden is a place for the images you'd rather keep to yourself. Open it from the lock in the dock. The first time, it walks you through a password and, where the browser supports it, Touch ID or Windows Hello.
 
-<!-- MEDIA: GIF · Hidden unlock: lock in the dock → Touch ID prompt → Hidden opens on its own grid → Lock hides it again · ~6 s loop · 1100 px wide · save as docs/screenshots/hidden-unlock.gif -->
 
 <details>
 <summary><b>What works in Hidden</b></summary>
 
 - **Generate straight into it.** Anything made while Hidden is open renders there, with the same live previews, and stays out of the gallery.
-- **Hide anything, any time.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out.
+- **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out.
 - **The usual tools work inside.** Upscale, compare, remix, reuse as a reference and video all work in Hidden, and anything made from a Hidden image stays hidden.
+- **Prompts stay private.** Prompts made in Hidden don't go into Recent prompts.
 - **Locked means out of sight.** A locked Hidden shows no thumbnails and no count. It locks after a while without activity (Settings › Hidden › Auto-lock), or right away with **Lock**.
 
 </details>
@@ -401,9 +391,9 @@ Hidden is a place for the images you'd rather keep to yourself. Open it from the
 
 Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open. Touch ID and Windows Hello (beta) unlock that key directly. The normal gallery isn't affected, locked or not.
 
-Passkeys need the page at `localhost` (not `127.0.0.1`) or over HTTPS, and a browser with passkey PRF support (current Chrome, Edge and Safari). Everywhere else, the password works.
+Passkeys need the page at `localhost` (not `127.0.0.1`) or over HTTPS, and a browser that supports passkey unlock (current Chrome, Edge and Safari). Everywhere else, the password works.
 
-ComfyUI writes a working file while it renders. That file is encrypted and removed when the run finishes, along with the run's entry in ComfyUI's history and any image ComfyUI was handed. Hiding an image later also removes its cached thumbnail and any copy ComfyUI kept from using it as a reference. Downloads and shares from Hidden leave out the prompt and workflow (Settings › Hidden › Share without settings). All of this needs ComfyUI's output folder, which is usually found without help and can be set in Settings › Library. Hidden keeps things out of casual view. It isn't a forensic guarantee against an administrator, disk recovery, swap, or backups taken while a job was running. [SECURITY.md](./docs/guides/SECURITY.md) has the technical details.
+ComfyUI's own copies are removed too: its working file when a run finishes, and the history entry and cached copies when you hide an image. That needs ComfyUI's output folder, which is usually found without help and can be set in Settings › Library. Downloads and shares from Hidden leave out the prompt and workflow (Settings › Hidden › Share without settings). Hidden keeps things out of casual view; it isn't a forensic guarantee against an administrator, disk recovery, swap or backups taken while a job was running. [SECURITY.md](./docs/guides/SECURITY.md) has the details.
 
 There's no password reset. If the password and every passkey are lost, **Erase Hidden** in Settings › Hidden starts over and takes everything in Hidden with it.
 
@@ -416,7 +406,7 @@ There's no password reset. If the password and every passkey are lost, **Erase H
 <details>
 <summary><b>Updating a Git checkout</b></summary>
 
-**Settings › About › Install update** works as long as the checkout has no local changes; restart the server afterwards. From the terminal:
+From the terminal (or **Settings › About › Install update**, then restart the server):
 
 ```bash
 git pull
@@ -454,32 +444,11 @@ Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a to
 
 </details>
 
-<details>
-<summary><b>Windows shortcut</b></summary>
-
-A shortcut that starts ComfyUI and HEISS UI if they aren't running, then opens the browser. It starts HEISS UI through `scripts/start.mjs` like the launcher does, so in-app updates keep working:
-
-```powershell
-$appRoot = "C:\path\to\heiss-ui"
-$comfyRoot = "C:\path\to\ComfyUI"
-$python = "C:\path\to\python.exe"
-
-if (-not (Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue)) {
-  Start-Process $python "main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch" -WorkingDirectory $comfyRoot -WindowStyle Hidden
-}
-
-if (-not (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue)) {
-  Start-Process node "scripts/start.mjs" -WorkingDirectory $appRoot -WindowStyle Hidden
-}
-
-Start-Process "http://localhost:8787/"
-```
-
-</details>
+A Windows shortcut that starts ComfyUI and HEISS UI together is in [WINDOWS-SHORTCUT.md](./docs/guides/WINDOWS-SHORTCUT.md).
 
 ## Troubleshooting
 
-[TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems in plain words, from ComfyUI not being found, the port and Node.js to each kind of failed generation, downloads and node packs, updates and phones. A failed card links to its section.
+[TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems, from ComfyUI not being found, the port and Node.js to each kind of failed generation, downloads and node packs, updates and phones. A failed card links to its section.
 
 <details>
 <summary><b>Quick fixes</b></summary>
@@ -499,9 +468,7 @@ Found a bug, want a feature, or not sure how something works? Post it on the **[
 
 Rather talk it through? **[Join the Discord](https://discord.gg/Hf7ysvDeGa)** for app ideas, bugs and general AI generation talk: workflows, models, settings and what you made with them.
 
-From the app, **Idea or bug?** at the bottom of the Settings sidebar sends a bug, idea or question straight to the board, and a failed generation has **Report bug** on its card with the error filled in. The dialog shows everything that goes with a post, and nothing is sent until you press Send. Setup lines (versions, system, GPU) are included only if you leave them on. GitHub issues work as well.
-
-When `DISCORD_BOARD_WEBHOOK_URL` is set as a server-only Vercel env var, the board doubles as an update channel in Discord. When the maintainer moves a post (planned, in progress, done or shipped in a version), replies to one or adds one, that goes in as its own message with a link to the post. The roadmap (in progress, up next, recently done) is always the newest message: it's posted again below each update. Votes and community comments stay on the board, and a Discord outage never blocks it.
+From the app, **Idea or bug?** at the bottom of the Settings sidebar sends a bug, idea or question straight to the board, and a failed generation has **Report bug** on its card with the error filled in. The dialog shows everything that goes with a post before you send it. Setup lines (versions, system, GPU) are included only if you leave them on. GitHub issues work as well.
 
 ## FAQ
 
@@ -529,7 +496,7 @@ Yes, both built in. [Inpainting](#inpainting) redraws only the part you paint, w
 <details>
 <summary><b>Where do my images go?</b></summary>
 
-Into the normal ComfyUI output folder. Gallery data lives in a local data folder. There's no account and no cloud in between.
+Into your normal ComfyUI output folder. HEISS UI keeps its gallery data in a local data folder.
 
 </details>
 
@@ -547,7 +514,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` starts Vite and the local API server together, and `npm test` runs the server and script tests. Contributions are welcome. See [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md), and leave generated media, model files, logs and `.env` files out of commits.
+`npm run dev` starts Vite and the local API server together, and `npm test` runs the server and script tests. Adding a model family is mostly data: [MODELS.md](./docs/guides/MODELS.md) walks through it. Contributions are welcome. See [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md), and leave generated media, model files, logs and `.env` files out of commits.
 
 <details>
 <summary><b>Missing packages and demo mode</b></summary>
@@ -564,9 +531,9 @@ HEISS UI started as a fork of **[J-AI Studio](https://github.com/jasperdevs/J-AI
 
 If HEISS UI is useful to you, go give the original a star too.
 
-Also standing on the shoulders of [ComfyUI](https://github.com/comfyanonymous/ComfyUI), which does the heavy lifting.
+Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 
-The app is set in [Geist](https://vercel.com/font). The pixel wordmark on the website uses PP Neue Bit by [Pangram Pangram](https://pangrampangram.com), a commercial font that ships with the site only and not with the app.
+Set in [Geist](https://vercel.com/font). The website's pixel wordmark uses PP Neue Bit by [Pangram Pangram](https://pangrampangram.com).
 
 ## License
 
