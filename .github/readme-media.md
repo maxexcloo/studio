@@ -3,7 +3,6 @@
 Shot list moved out of README.md. Each line: type · what it shows · length · width · file name.
 
 - GIF · find it again: ↑ in an empty prompt opens recent prompts → star one → / searches the gallery by a LoRA name · ~8 s loop · 1100 px wide · save as docs/screenshots/find-it-again.gif
-- GIF · first run: Pick a first model with the suggested size marked → one tap → download progress → model selected with a prompt ready · ~8 s loop · 1100 px wide · save as docs/screenshots/first-model.gif
 - PNG · workflow import review: a dropped workflow with its connected controls, one guessed connection marked, and Change connections open · still · 1100 px wide · save as docs/screenshots/workflow-review.png
 - GIF · missing parts: pick a model → setup lists the missing text encoder and VAE → Get all → parts tick off → “Krea 2 is ready” · ~10 s loop · 1100 px wide · save as docs/screenshots/missing-parts.gif
 - PNG · reference images: the composer with two reference slots filled and the reference library open · still · 1100 px wide · save as docs/screenshots/reference-images.png

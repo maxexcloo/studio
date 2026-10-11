@@ -43,7 +43,7 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 - **Inpainting (beta).** Paint over the part of a picture that should change and say what it becomes. Only that part is redrawn; every other pixel stays exactly as it was. Works with 18 image families and needs no extra nodes. [How it works ↓](#inpainting)
 - **Smart upscale, built in.** Pick **2K** or **4K** next to the size menu and every new picture comes out upscaled with SeedVR2, in the same run, with the time left on the clock. Any older picture upscales with one click. [More ↓](#smart-upscale)
 - **Auto-grouping.** Pictures from similar prompts stack themselves into one tile once you're done with them, so a gallery of hundreds stays easy to scan. [More ↓](#auto-grouping)
-- **Missing parts are a click away.** Pick a model to see what it still needs. Each part gets a Download or Install button, and **Get all** fetches the lot. With no model yet, the studio offers [a first one](#your-first-model). [What's covered ↓](#auto-downloads)
+- **Missing parts are a click away.** Pick a model to see what it still needs. Each part gets a Download or Install button, and **Get all** fetches the lot. With no model yet, the studio offers a first one to download. [What's covered ↓](#auto-downloads)
 - **A phone studio.** On a phone the studio switches to a layout made for one thumb. Prompt, browse, share and upscale from the couch while the computer renders. [Set it up ↓](#on-your-phone)
 - **Your studio over LAN.** Open HEISS UI from a laptop, tablet, phone or another desktop on your local network. The PC renders; every device uses the same models and gallery. Works over Wi-Fi or wired LAN. [Connect another device ↓](#connect-over-lan)
 - **Bring your own workflow.** Import a ComfyUI workflow (API or visual JSON) and it becomes a set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
@@ -69,9 +69,16 @@ The plain `heiss-ui-*.zip` (no system in its name) is for in-app updates; you ca
 
 **2. Unpack it and double-click Start HEISS UI** (`.bat` on Windows, `.command` on macOS, `.desktop` on Linux), or run `npm start` in the folder. Node.js and the packages are inside, so there's nothing else to install, and the studio opens in the browser.
 
-**3. Have ComfyUI running.** ComfyUI on this computer connects automatically, at `http://127.0.0.1:8188` or ComfyUI Desktop's port 8000. On another machine or port, set its address in **Settings › Connection**. [No ComfyUI yet?](#no-comfyui-yet)
+**3. Have ComfyUI running.** ComfyUI on this computer connects automatically, at `http://127.0.0.1:8188` or ComfyUI Desktop's port 8000. On another machine or port, set its address in **Settings › Connection**.
 
 Launcher won't open, or the window closes? [Troubleshooting › Starting HEISS UI](./docs/guides/TROUBLESHOOTING.md#starting-heiss-ui) covers macOS, Windows and Linux. To hand the whole setup to a coding agent (Claude Code, Codex), the [install section](https://heiss-ui.vercel.app/#install) has a prompt to paste.
+
+<details>
+<summary><b>No ComfyUI yet?</b></summary>
+
+Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and HEISS UI connects on its own.
+
+</details>
 
 <details>
 <summary><b>Install from source</b></summary>
@@ -90,28 +97,6 @@ npm start
 ComfyUI on another machine or port? Set its address in **Settings › Connection**, or copy `.env.example` to `.env` and set `COMFY_URL`.
 
 </details>
-
-### No ComfyUI yet?
-
-ComfyUI does the generating; HEISS UI is the studio on top. Install it once and leave it running while you work.
-
-| Your computer | Install |
-| --- | --- |
-| **Windows** | [ComfyUI Desktop](https://www.comfy.org/download) for NVIDIA graphics cards. With an AMD card, or to keep everything in one folder, the [portable version](https://docs.comfy.org/installation/comfyui_portable_windows). |
-| **Mac** | [ComfyUI Desktop](https://www.comfy.org/download), for Apple Silicon (M1 or later) on macOS 13 or newer. |
-| **Linux** | The [install guide](https://docs.comfy.org/installation/manual_install) (NVIDIA or AMD with ROCm), or [ComfyUI on GitHub](https://github.com/comfyanonymous/ComfyUI). |
-
-<details>
-<summary><b>Ports and how much memory you need</b></summary>
-
-A manual or portable install uses port 8188 and ComfyUI Desktop 8000, and both connect without any setup. A graphics card with 8 GB runs SDXL and the compact Flux.2 Klein; 12 to 16 GB is comfortable, and 24 GB or more runs nearly everything. On a Mac, 16 GB of memory runs SDXL, 18 GB or more Flux.2 Klein, and 48 GB or more Krea 2.
-
-</details>
-
-### Your first model
-
-With no model installed, the studio offers three to start with: **Krea 2**, **Flux.2** and **SDXL**, each in three sizes. The one that suits your computer is marked, and the others are a tap away. One tap downloads the model with its text encoder and VAE, then selects it with a prompt ready to try. The model menu shows the same offer until the first model is installed. [Memory by size ↓](#no-comfyui-yet)
-
 
 ## Supported models
 
