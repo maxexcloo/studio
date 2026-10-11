@@ -154,12 +154,7 @@ catalog, so a family that is described correctly needs no UI work.
 
 ## Supported families
 
-| | Families |
-| --- | --- |
-| **Image** | Krea 2 (Turbo, Raw), Anima, Z-Image (Turbo, Base), Flux.2 Dev, Flux.2 Klein 4B and 9B, SDXL (NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo), Pony V7, Chroma, Qwen-Image (including 2512) and Qwen-Image 2.1, Ideogram 4, MageFlow, ERNIE-Image, Lumina Image 2.0 (including Neta Lumina and NetaYume), Sana (1.5, Sprint, 2K/4K), HiDream I1, SD 3.5, Flux.1 (Dev, Schnell, de-distilled), SD 2.x and SD 1.5 |
-| **Video** (beta) | MiniMax H3, HunyuanVideo 1.5 (text and image to video), Wan 2.2 5B, Wan 2.2 14B (high and low-noise pair, text and image to video) and Wan 2.1 |
-
-Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**.
+The table of supported families is in the [README](../../README.md#supported-models).
 
 ## Formats
 

@@ -115,11 +115,40 @@ With no model installed, the studio offers three to start with: **Krea 2**, **Fl
 
 ## Supported models
 
-Model files are recognized from their weights, so a renamed file still works. Each family runs with the sampler, scheduler, steps, CFG, shift and resolution from its official ComfyUI templates and model cards, so a fresh install makes good images without touching a setting.
+28 families run out of the box with their makers' recommended settings, and a renamed file is still recognized.
 
-**Image:** 21 families, from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Ideogram 4. **Video (beta):** 7, including Wan 2.2, HunyuanVideo 1.5 and MiniMax H3. The [full list](https://heiss-ui.vercel.app/models/) is on the website.
+| Family | Type | Covers | Reference images | Inpaint |
+| --- | --- | --- | :-: | :-: |
+| Krea 2 | Image | Turbo, Raw |  | ✓ |
+| Anima | Image |  |  | ✓ |
+| Z-Image | Image | Turbo, Base |  | ✓ |
+| Flux.2 Dev | Image |  | ✓ | ✓ |
+| Flux.2 Klein 4B | Image |  | ✓ | ✓ |
+| Flux.2 Klein 9B | Image |  | ✓ | ✓ |
+| SDXL | Image | NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo |  | ✓ |
+| Pony V7 (AuraFlow) | Image |  |  | ✓ |
+| Chroma | Image |  |  | ✓ |
+| Qwen-Image | Image | Including 2512 |  | ✓ |
+| Qwen-Image 2.1 | Image |  | ✓ | ✓ |
+| Ideogram 4 | Image |  |  |  |
+| MageFlow | Image |  |  |  |
+| ERNIE-Image | Image |  |  | ✓ |
+| Lumina Image 2.0 | Image | Neta Lumina, NetaYume |  | ✓ |
+| Sana | Image | 1.5, Sprint, 2K/4K |  |  |
+| HiDream I1 | Image |  |  | ✓ |
+| SD 3.5 | Image |  |  | ✓ |
+| Flux.1 | Image | Dev, Schnell, de-distilled |  | ✓ |
+| SD 2.x | Image |  |  | ✓ |
+| SD 1.5 | Image |  |  | ✓ |
+| MiniMax H3 | Video (beta) |  |  |  |
+| HunyuanVideo 1.5 | Video (beta) | Text to video |  |  |
+| HunyuanVideo 1.5 I2V | Video (beta) | Image to video |  |  |
+| Wan 2.2 5B | Video (beta) |  |  |  |
+| Wan 2.2 14B | Video (beta) | Text to video, high and low-noise pair |  |  |
+| Wan 2.2 14B I2V | Video (beta) | Image to video |  |  |
+| Wan 2.1 | Video (beta) |  |  |  |
 
-Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)).
+Checkpoints and model-only files both work, and missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
 
 ## Bring your own workflow
 
