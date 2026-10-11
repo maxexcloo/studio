@@ -102,38 +102,11 @@ ComfyUI on another machine or port? Set its address in **Settings › Connection
 
 28 families run out of the box with their makers' recommended settings, and a renamed file is still recognized.
 
-| Family | Type | Covers | Reference images | Inpaint |
-| --- | --- | --- | :-: | :-: |
-| Krea 2 | Image | Turbo, Raw |  | ✓ |
-| Anima | Image |  |  | ✓ |
-| Z-Image | Image | Turbo, Base |  | ✓ |
-| Flux.2 Dev | Image |  | ✓ | ✓ |
-| Flux.2 Klein 4B | Image |  | ✓ | ✓ |
-| Flux.2 Klein 9B | Image |  | ✓ | ✓ |
-| SDXL | Image | NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo |  | ✓ |
-| Pony V7 (AuraFlow) | Image |  |  | ✓ |
-| Chroma | Image |  |  | ✓ |
-| Qwen-Image | Image | Including 2512 |  | ✓ |
-| Qwen-Image 2.1 | Image |  | ✓ | ✓ |
-| Ideogram 4 | Image |  |  |  |
-| MageFlow | Image |  |  |  |
-| ERNIE-Image | Image |  |  | ✓ |
-| Lumina Image 2.0 | Image | Neta Lumina, NetaYume |  | ✓ |
-| Sana | Image | 1.5, Sprint, 2K/4K |  |  |
-| HiDream I1 | Image |  |  | ✓ |
-| SD 3.5 | Image |  |  | ✓ |
-| Flux.1 | Image | Dev, Schnell, de-distilled |  | ✓ |
-| SD 2.x | Image |  |  | ✓ |
-| SD 1.5 | Image |  |  | ✓ |
-| MiniMax H3 | Video (beta) |  |  |  |
-| HunyuanVideo 1.5 | Video (beta) | Text to video |  |  |
-| HunyuanVideo 1.5 I2V | Video (beta) | Image to video |  |  |
-| Wan 2.2 5B | Video (beta) |  |  |  |
-| Wan 2.2 14B | Video (beta) | Text to video, high and low-noise pair |  |  |
-| Wan 2.2 14B I2V | Video (beta) | Image to video |  |  |
-| Wan 2.1 | Video (beta) |  |  |  |
+**Image (21):** Krea 2, Anima, Z-Image, Flux.2 (Dev, Klein 4B, Klein 9B), SDXL (NoobAI, Illustrious, Pony and more), Pony V7, Chroma, Qwen-Image (and 2.1), Ideogram 4, MageFlow, ERNIE-Image, Lumina Image 2.0, Sana, HiDream I1, SD 3.5, Flux.1, SD 2.x and SD 1.5.
 
-Checkpoints and model-only files both work, and missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
+**Video (7, beta):** MiniMax H3, HunyuanVideo 1.5, Wan 2.2 (5B and 14B) and Wan 2.1, with text and image to video where the model has both.
+
+Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
 
 ## Bring your own workflow
 
