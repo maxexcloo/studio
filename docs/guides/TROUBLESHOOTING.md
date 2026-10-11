@@ -51,6 +51,10 @@ Most file managers open a `.sh` file for editing. Use **Start HEISS UI.desktop**
 
 The studio lists the models ComfyUI lists: files in its `models/checkpoints` and `models/diffusion_models` folders, plus anything `extra_model_paths.yaml` adds. After adding a file, use **Settings › Models › Rescan**. **Find models** looks for model files elsewhere on this computer and links them in.
 
+### Video isn't there
+
+Switch the sidebar from Image to **Video** (beta). Wan 2.1, Wan 2.2 5B and 14B, HunyuanVideo 1.5 and MiniMax H3 run built in, and the model's setup lists anything missing.
+
 ## When a generation fails
 
 A failed run stays in the gallery as a card that says what went wrong. Open it for the fix, **Use these settings** to try again, or **Copy report** for the full error.

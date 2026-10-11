@@ -151,3 +151,16 @@ catalog, so a family that is described correctly needs no UI work.
 - Everything a model needs is named in its `missing` list with a way to get
   it: a Download button, node install steps, or a copyable command. A model
   that is not ready never runs.
+
+## Supported families
+
+| | Families |
+| --- | --- |
+| **Image** | Krea 2 (Turbo, Raw), Anima, Z-Image (Turbo, Base), Flux.2 Dev, Flux.2 Klein 4B and 9B, SDXL (NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo), Pony V7, Chroma, Qwen-Image (including 2512) and Qwen-Image 2.1, Ideogram 4, MageFlow, ERNIE-Image, Lumina Image 2.0 (including Neta Lumina and NetaYume), Sana (1.5, Sprint, 2K/4K), HiDream I1, SD 3.5, Flux.1 (Dev, Schnell, de-distilled), SD 2.x and SD 1.5 |
+| **Video** (beta) | MiniMax H3, HunyuanVideo 1.5 (text and image to video), Wan 2.2 5B, Wan 2.2 14B (high and low-noise pair, text and image to video) and Wan 2.1 |
+
+Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**.
+
+## Formats
+
+**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](../gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](#bring-your-own-workflow).

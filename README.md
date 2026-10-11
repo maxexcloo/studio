@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <sub>Free and open source under MIT. Built on <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper. <a href="#credits">More on that below.</a></sub>
+  <sub>Free and open source under MIT. Built on <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper.</sub>
 </p>
 
 ---
@@ -48,20 +48,10 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 - **Your studio over LAN.** Open HEISS UI from a laptop, tablet, phone or another desktop on your local network. The PC renders; every device uses the same models and gallery. Works over Wi-Fi or wired LAN. [Connect another device ↓](#connect-over-lan)
 - **Bring your own workflow.** Import a ComfyUI workflow (API or visual JSON) and it becomes a set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
 - **Hidden.** A locked place for images you keep to yourself. Generate into it or hide anything later, and unlock with Touch ID, Windows Hello or a password. [More ↓](#hidden)
-
-<details>
-<summary><b>More features</b></summary>
-
-- **Reference and start images.** Edit models like Flux.2 and Qwen-Image 2.1 take reference images. Every other image model takes a start image, with a slider for how much it may change. Either one can be painted on for [inpainting](#inpainting). [More ↓](#reference-and-start-images)
-- **LoRA stacks.** LoRAs grouped by folder and saved per model family, right below Basics in the sidebar. LoRAs made for the selected model sort first and show their trigger words, and a note above the prompt bar says when an active one was made for a different model.
-- **Live previews.** Each image resolves from a pixel mosaic into the final result while ComfyUI works, with a countdown to done. Queue the next one or cancel any time.
-- **Videos in the gallery.** Video tiles play a silent preview, and opening one plays it with sound, seeking and full screen.
-- **Controls that fit the model.** Models, samplers, schedulers, size and prompt limits, text encoders and VAEs come from ComfyUI. Only what the selected model uses shows up.
 - **Zen mode.** A fullscreen prompt and output view without the panels.
-- **Find it again.** Press ↑ in an empty prompt for recent prompts (star the ones to keep), `/` to search the gallery by prompt, model or LoRA, and star images to keep them close. Earlier images from other folders (old ComfyUI outputs, AUTOMATIC1111, Forge) can join the gallery where they are, from Settings › Library.
-- **Civitai-ready images (beta).** With this on in Settings › Library, new PNGs also carry the prompt, LoRAs and settings the way AUTOMATIC1111 writes them, so Civitai fills in an upload.
+- **Civitai-ready images (beta).** New PNGs also carry the prompt, LoRAs and settings the way AUTOMATIC1111 writes them, so Civitai fills in an upload. Turn it on in Settings › Library.
 
-</details>
+LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [website](https://heiss-ui.vercel.app/#features).
 
 <p align="center">
   <a href="./docs/screenshots/realtime-generation.mp4"><img src="./docs/screenshots/realtime-generation.gif" alt="Two new images resolving live in the gallery, from pixel-mosaic step previews to the finished photograph" width="100%" /></a>
@@ -81,26 +71,7 @@ The plain `heiss-ui-*.zip` (no system in its name) is for in-app updates; you ca
 
 **3. Have ComfyUI running.** ComfyUI on this computer connects automatically, at `http://127.0.0.1:8188` or ComfyUI Desktop's port 8000. On another machine or port, set its address in **Settings › Connection**. [No ComfyUI yet?](#no-comfyui-yet)
 
-<details>
-<summary><b>Windows: first launch</b></summary>
-
-Unpack with **Extract All** first; the launcher doesn't run from inside the zip. If Windows asks whether to run a downloaded file, right-click the zip › Properties › **Unblock** before unpacking. A plain folder such as `C:\HEISS-UI` works better than a Desktop or Documents folder synced by OneDrive, which can lock files during installs and updates.
-
-</details>
-
-<details>
-<summary><b>macOS: first launch</b></summary>
-
-The first time you open `Start HEISS UI.command`, macOS may say it can’t check the file. Right-click it › **Open**, then **Open** again (or allow it under System Settings › Privacy & Security).
-
-</details>
-
-<details>
-<summary><b>Linux: first launch</b></summary>
-
-File managers open a `.sh` in a text editor. Right-click `Start HEISS UI.desktop` › **Allow Launching**, then double-click it (it runs in a terminal), or run `./"Start HEISS UI.sh"`.
-
-</details>
+Launcher won't open, or the window closes? [Troubleshooting › Starting HEISS UI](./docs/guides/TROUBLESHOOTING.md#starting-heiss-ui) covers macOS, Windows and Linux. To hand the whole setup to a coding agent (Claude Code, Codex), the [install section](https://heiss-ui.vercel.app/#install) has a prompt to paste.
 
 <details>
 <summary><b>Install from source</b></summary>
@@ -117,33 +88,6 @@ npm start
 `npm start` builds the app the first time, then opens **http://localhost:8787** in the browser (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
 
 ComfyUI on another machine or port? Set its address in **Settings › Connection**, or copy `.env.example` to `.env` and set `COMFY_URL`.
-
-</details>
-
-<details>
-<summary><b>Paste into an agent</b>: let Claude Code, Codex or another coding agent do the setup</summary>
-
-Paste this in. It checks your setup, installs everything and confirms the app can reach ComfyUI. Models only download if you ask for them.
-
-```text
-Install and run HEISS UI from GitHub: https://github.com/tristmeister/HEISS-UI
-
-Do the full local setup:
-
-1. Check whether Node.js 20.9+ is installed (22 LTS recommended).
-2. Check whether ComfyUI is installed and running at http://127.0.0.1:8188 (ComfyUI Desktop: http://127.0.0.1:8000).
-3. If ComfyUI is not running, help me start my existing ComfyUI install. Do not download models unless I ask.
-4. Clone https://github.com/tristmeister/HEISS-UI into a normal projects folder.
-5. Run npm install.
-6. Copy .env.example to .env only if configuration changes are needed.
-7. Set COMFY_URL to my ComfyUI URL, usually http://127.0.0.1:8188.
-8. Run npm run build.
-9. Start the app with npm start.
-10. Open http://localhost:8787 and check that the app reaches ComfyUI, detects models and loads the gallery.
-11. For future updates, use Settings > About > Install update, or run git pull, npm install and npm run build.
-
-Keep everything local. Do not open it to other devices (npm start -- --lan, or Settings > Connection > Open on other devices) unless I ask for phone or LAN access. If something fails, read the error, check ComfyUI /object_info and /system_stats, and fix the setup instead of guessing.
-```
 
 </details>
 
@@ -166,33 +110,16 @@ A manual or portable install uses port 8188 and ComfyUI Desktop 8000, and both c
 
 ### Your first model
 
-With no model installed, the studio offers three to start with: **Krea 2**, **Flux.2** and **SDXL**, each in three sizes. The one that suits your computer is marked, and the others are a tap away. One tap downloads the model with its text encoder and VAE, then selects it with a prompt ready to try. The model menu shows the same offer until the first model is installed. [Sizes ↓](#what-runs-where)
+With no model installed, the studio offers three to start with: **Krea 2**, **Flux.2** and **SDXL**, each in three sizes. The one that suits your computer is marked, and the others are a tap away. One tap downloads the model with its text encoder and VAE, then selects it with a prompt ready to try. The model menu shows the same offer until the first model is installed. [Memory by size ↓](#no-comfyui-yet)
 
 
 ## Supported models
 
 Model files are recognized from their weights, so a renamed file still works. Each family runs with the sampler, scheduler, steps, CFG, shift and resolution from its official ComfyUI templates and model cards, so a fresh install makes good images without touching a setting.
 
-**Image:** 21 families, from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Ideogram 4. **Video (beta):** 7, including Wan 2.2, HunyuanVideo 1.5 and MiniMax H3.
+**Image:** 21 families, from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Ideogram 4. **Video (beta):** 7, including Wan 2.2, HunyuanVideo 1.5 and MiniMax H3. The [full list](https://heiss-ui.vercel.app/models/) is on the website.
 
-<details>
-<summary><b>All supported models</b></summary>
-
-| | Families |
-| --- | --- |
-| **Image** | Krea 2 (Turbo, Raw), Anima, Z-Image (Turbo, Base), Flux.2 Dev, Flux.2 Klein 4B and 9B, SDXL (NoobAI, Illustrious, Pony, v-prediction, DMD2, Hyper, Lightning, Turbo), Pony V7, Chroma, Qwen-Image (including 2512) and Qwen-Image 2.1, Ideogram 4, MageFlow, ERNIE-Image, Lumina Image 2.0 (including Neta Lumina and NetaYume), Sana (1.5, Sprint, 2K/4K), HiDream I1, SD 3.5, Flux.1 (Dev, Schnell, de-distilled), SD 2.x and SD 1.5 |
-| **Video** (beta) | MiniMax H3, HunyuanVideo 1.5 (text and image to video), Wan 2.2 5B, Wan 2.2 14B (high and low-noise pair, text and image to video) and Wan 2.1 |
-
-Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**.
-
-</details>
-
-<details>
-<summary><b>GGUF, Nunchaku and other formats</b></summary>
-
-**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](./docs/gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](#bring-your-own-workflow).
-
-</details>
+Both all-in-one checkpoints and model-only files work. Parts a file doesn't carry come from compatible files already installed, or get a Download button. A file that isn't recognized can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)).
 
 ## Bring your own workflow
 
@@ -240,19 +167,8 @@ The [workflow guide](./workflows/README.md) covers the full control list, image-
 
 ## Auto-downloads
 
-Getting a new model running in ComfyUI usually means hunting for the right text encoder, the right VAE and a custom node pack or two. Here each part gets a button, and **Get all** fetches the lot. Nothing downloads until you press the button.
+Getting a new model running in ComfyUI usually means hunting for the right text encoder, the right VAE and a custom node pack or two. Here each part gets a button, and **Get all** fetches the lot. Nothing downloads until you press the button. [What's covered](./docs/guides/DOWNLOADS.md).
 
-
-<details>
-<summary><b>What's covered</b></summary>
-
-- **What each model needs.** Pick a model to see what's missing, whether that's a text encoder, a VAE, a companion file (like Wan 2.2's low-noise half), a custom node pack or a newer ComfyUI. The model menu shows what each model lacks, and a blocked Generate opens that model's setup.
-- **One click per part, or Get all.** Files come from Hugging Face into the folders ComfyUI reads from, including shared folders set up in `extra_model_paths.yaml`. **Get all** adds up the sizes and checks free space first. Where an uncensored (abliterated) text encoder exists, it comes first; other builds (smaller precisions, Comfy-Org's own) are under **Other versions**. A build that has moved or is gated falls back to the next one.
-- **Custom node packs (beta).** Packs listed in ComfyUI-Manager install through it. Otherwise, with ComfyUI on this computer, the pack is cloned and its requirements installed with ComfyUI's own Python. The manual steps stay one tap away.
-- **Resumable downloads.** Progress, speed and time left show as they run. Downloads resume after a restart, retry a dropped connection and check free space first, and gated files link to their Hugging Face page.
-- **Ready at the end.** Each part is ticked off as it lands, and the last one turns the panel into “Krea 2 is ready”. Progress survives a ComfyUI restart halfway through.
-
-</details>
 
 ## Reference and start images
 
@@ -360,64 +276,26 @@ Switching on **Open on other devices** restarts HEISS UI on your network. For a 
 
 </details>
 
-<details>
-<summary><b>Security details</b>: signing in, admin, HTTPS, proxies</summary>
-
-- **Signing in.** Phones and other computers sign in once with the studio password and stay signed in for a week. The studio password only lets devices in; Hidden keeps its own password and unlocks on the phone the same way as on the computer. (Until a studio password is set, the Hidden password signs devices in.) Each wrong password locks that device out a little longer, and this computer isn't slowed down by them. **Settings › Connection** lists the signed-in devices, and **Sign out all devices** ends every session.
-- **Admin stays at the computer.** Updates, node packs and model downloads, the ComfyUI address, the output folder, the Hugging Face token, importing and deleting workflows, restarts and clearing the gallery are for the computer running HEISS UI, and other devices don't show those controls. Turn on **Trust other devices with admin** (at the computer) to allow them from signed-in devices too. The passwords, that switch, HTTPS and signing devices out only change at the computer.
-- **HTTPS.** Over plain http, what devices send (the studio password too) crosses the network unencrypted, and the phone's share sheet isn't available (Share saves the file instead). Under **Settings › Connection › Advanced › HTTPS for other devices**, add a certificate that browsers already trust, for example the two files `tailscale cert <machine>.<tailnet>.ts.net` writes (or set `HEISS_TLS_CERT` and `HEISS_TLS_KEY` in `.env`). After a restart, other devices open `https://<that name>:8788` (`HEISS_HTTPS_PORT`), and this computer keeps `http://localhost:8787`. There's no self-signed option, since a warning people learn to click through doesn't protect anything.
-- **Behind your own proxy or tunnel** (Caddy, nginx, `tailscale serve`, cloudflared), every visitor counts as another device and signs in like a phone, even though the proxy connects from this computer. Add the name they use to `HEISS_ALLOWED_HOSTS`; requests for any other name are turned away.
-
-</details>
+Signing in, admin rights, HTTPS and proxies are covered in [SECURITY.md](./docs/guides/SECURITY.md#other-devices-signing-in-admin-https-and-proxies).
 
 ## Hidden
 
 Hidden is a place for the images you'd rather keep to yourself. Open it from the lock in the dock. The first time, it walks you through a password and, where the browser supports it, Touch ID or Windows Hello.
 
 
-<details>
-<summary><b>What works in Hidden</b></summary>
-
 - **Generate straight into it.** Anything made while Hidden is open renders there, with the same live previews, and stays out of the gallery.
-- **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out.
-- **The usual tools work inside.** Upscale, compare, remix, reuse as a reference and video all work in Hidden, and anything made from a Hidden image stays hidden.
-- **Prompts stay private.** Prompts made in Hidden don't go into Recent prompts.
-- **Locked means out of sight.** A locked Hidden shows no thumbnails and no count. It locks after a while without activity (Settings › Hidden › Auto-lock), or right away with **Lock**.
+- **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out. Upscale, compare, remix and video all work inside it.
+- **Locked means out of sight.** A locked Hidden shows no thumbnails and no count, and its prompts stay out of Recent prompts. It locks after a while without activity (Settings › Hidden › Auto-lock), or right away with **Lock**.
 
-</details>
-
-<details>
-<summary><b>How Hidden keeps things private</b></summary>
-
-Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open. Touch ID and Windows Hello (beta) unlock that key directly. The normal gallery isn't affected, locked or not.
-
-Passkeys need the page at `localhost` (not `127.0.0.1`) or over HTTPS, and a browser that supports passkey unlock (current Chrome, Edge and Safari). Everywhere else, the password works.
-
-ComfyUI's own copies are removed too: its working file when a run finishes, and the history entry and cached copies when you hide an image. That needs ComfyUI's output folder, which is usually found without help and can be set in Settings › Library. Downloads and shares from Hidden leave out the prompt and workflow (Settings › Hidden › Share without settings). Hidden keeps things out of casual view; it isn't a forensic guarantee against an administrator, disk recovery, swap or backups taken while a job was running. [SECURITY.md](./docs/guides/SECURITY.md) has the details.
+Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open, and ComfyUI's own copies are removed. Hidden keeps things out of casual view; it isn't a forensic guarantee against an administrator, disk recovery or backups taken mid-run. [SECURITY.md](./docs/guides/SECURITY.md) has the details, including what passkeys need.
 
 There's no password reset. If the password and every passkey are lost, **Erase Hidden** in Settings › Hidden starts over and takes everything in Hidden with it.
-
-</details>
 
 ## Updating
 
 **Settings › About › Install update** updates a downloaded release in place, and a Git checkout too as long as it has no local changes. A downloaded release also offers new versions in a small pill at the top.
 
-<details>
-<summary><b>Updating a Git checkout</b></summary>
-
-From the terminal (or **Settings › About › Install update**, then restart the server):
-
-```bash
-git pull
-npm install
-npm run build
-npm start
-```
-
-`npm run check:updates` lists outdated dependencies.
-
-</details>
+Updating a checkout by hand is in [Troubleshooting](./docs/guides/TROUBLESHOOTING.md#a-git-checkout-wasnt-updated).
 
 ## Configuration
 
@@ -431,18 +309,7 @@ HEISS_DATA_DIR=./data
 COMFY_OUTPUT_DIR=
 ```
 
-<details>
-<summary><b>Configuration reference</b></summary>
-
-`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards and to remove ComfyUI's copies of what goes into Hidden. Settings only accepts a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). **Delete all finished images** moves them to `.heiss-trash` in that folder, where they wait 30 days (`HEISS_TRASH_DAYS`) in case you want them back.
-
-For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `HEISS_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `HEISS_TLS_CERT`, `HEISS_TLS_KEY` and `HEISS_HTTPS_PORT` for HTTPS. See [Connect over LAN](#connect-over-lan), [On your phone](#on-your-phone) and [SECURITY.md](./docs/guides/SECURITY.md).
-
-Also optional: `HEISS_NO_BROWSER=1` keeps the launcher from opening the browser, and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
-
-Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a token saved in **Settings › Models**) opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy.
-
-</details>
+Everything else (the output folder, other devices, HTTPS, the Hugging Face token, proxies) is in [CONFIGURATION.md](./docs/guides/CONFIGURATION.md).
 
 A Windows shortcut that starts ComfyUI and HEISS UI together is in [WINDOWS-SHORTCUT.md](./docs/guides/WINDOWS-SHORTCUT.md).
 
@@ -450,55 +317,18 @@ A Windows shortcut that starts ComfyUI and HEISS UI together is in [WINDOWS-SHOR
 
 [TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems, from ComfyUI not being found, the port and Node.js to each kind of failed generation, downloads and node packs, updates and phones. A failed card links to its section.
 
-<details>
-<summary><b>Quick fixes</b></summary>
-
-- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Connection. After adding files, use **Settings › Models › Rescan**. With no model at all, the studio offers [a first one](#your-first-model).
-- **A generation fails?** Open the card. It says what went wrong and offers a fix. **Copy report** includes versions and GPU for an issue.
-- **No brush on a reference image?** The selected model can't inpaint (Ideogram 4, MageFlow, Sana, video models and imported workflows), or inpainting is off in **Settings › Features**.
-- **A GGUF won't load?** See [ComfyUI-GGUF can't load this model yet](./docs/guides/TROUBLESHOOTING.md#comfyui-gguf-cant-load-this-model-yet).
-- **Looking for video?** Switch the sidebar from Image to **Video** (beta). Wan 2.1, Wan 2.2 5B and 14B, HunyuanVideo 1.5 and MiniMax H3 run built in, and the model's setup lists anything missing.
+- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Connection. After adding files, use **Settings › Models › Rescan**.
 - **Asking for help?** **Settings › About › Copy diagnostics** copies versions, system and GPU, without prompts or images. Paste it on the [board](https://heiss-ui.vercel.app/board/) or in the [Discord](https://discord.gg/Hf7ysvDeGa).
-
-</details>
 
 ## Feedback and community
 
-Found a bug, want a feature, or not sure how something works? Post it on the **[feedback board](https://heiss-ui.vercel.app/board/)**. It's public: upvote what matters to you, comment, and see what's planned, in progress and done. No account needed.
+Found a bug, want a feature, or not sure how something works? Post it on the **[feedback board](https://heiss-ui.vercel.app/board/)**: it's public, needs no account, and shows what's planned, in progress and done. Rather talk it through? **[Join the Discord](https://discord.gg/Hf7ysvDeGa)**.
 
-Rather talk it through? **[Join the Discord](https://discord.gg/Hf7ysvDeGa)** for app ideas, bugs and general AI generation talk: workflows, models, settings and what you made with them.
-
-From the app, **Idea or bug?** at the bottom of the Settings sidebar sends a bug, idea or question straight to the board, and a failed generation has **Report bug** on its card with the error filled in. The dialog shows everything that goes with a post before you send it. Setup lines (versions, system, GPU) are included only if you leave them on. GitHub issues work as well.
+From the app, **Idea or bug?** at the bottom of the Settings sidebar and **Report bug** on a failed generation send a post with the details filled in, and you see everything that goes with it before you send. GitHub issues work as well.
 
 ## FAQ
 
-<details>
-<summary><b>Do I still need ComfyUI?</b></summary>
-
-Yes. ComfyUI runs every job, and the controls come from what it has installed. Your ComfyUI install isn't changed, apart from the model files and node packs you choose to download, which go into its own folders.
-
-</details>
-
-<details>
-<summary><b>Which models work?</b></summary>
-
-28 families out of the box, 21 for images and 7 for video (beta). See [Supported models](#supported-models). Anything else runs as [your own workflow](#bring-your-own-workflow).
-
-</details>
-
-<details>
-<summary><b>Can it inpaint and upscale?</b></summary>
-
-Yes, both built in. [Inpainting](#inpainting) redraws only the part you paint, with 18 image families and no extra nodes. [Smart upscale](#smart-upscale) takes new pictures to 2K or 4K with SeedVR2 in the same run, or upscales any picture with one click.
-
-</details>
-
-<details>
-<summary><b>Where do my images go?</b></summary>
-
-Into your normal ComfyUI output folder. HEISS UI keeps its gallery data in a local data folder.
-
-</details>
+The [website FAQ](https://heiss-ui.vercel.app/#faq) answers the common questions.
 
 <details>
 <summary><b>Why "HEISS"?</b></summary>
@@ -516,24 +346,11 @@ npm run dev
 
 `npm run dev` starts Vite and the local API server together, and `npm test` runs the server and script tests. Adding a model family is mostly data: [MODELS.md](./docs/guides/MODELS.md) walks through it. Contributions are welcome. See [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md), and leave generated media, model files, logs and `.env` files out of commits.
 
-<details>
-<summary><b>Missing packages and demo mode</b></summary>
-
-Both `npm run dev` and `npm start` reinstall missing runtime packages, so an incomplete `node_modules` folder doesn't stop a normal start.
-
-`npm run dev:demo` (or `HEISS_DEMO=1`) is for agent and UI testing without a GPU. When ComfyUI is unreachable it offers fake models and returns placeholder images. It's off otherwise, so a normal install shows ComfyUI as offline instead.
-
-</details>
-
 ## Credits
 
-HEISS UI started as a fork of **[J-AI Studio](https://github.com/jasperdevs/J-AI-Studio)** by **[Jasper](https://github.com/jasperdevs)**. The core idea of a prompt-first front end for ComfyUI, and a big part of the foundation this is built on, are his work. HEISS UI takes it in its own direction from there, with its own name, design and features.
-
-If HEISS UI is useful to you, go give the original a star too.
+HEISS UI started as a fork of **[J-AI Studio](https://github.com/jasperdevs/J-AI-Studio)** by **[Jasper](https://github.com/jasperdevs)**. The prompt-first idea and much of the foundation are his work. If HEISS UI is useful to you, go give the original a star too.
 
 Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
-
-Set in [Geist](https://vercel.com/font). The website's pixel wordmark uses PP Neue Bit by [Pangram Pangram](https://pangrampangram.com).
 
 ## License
 
