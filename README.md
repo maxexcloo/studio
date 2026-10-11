@@ -40,7 +40,7 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 ## Features
 
 - **28 model families out of the box.** 21 for images and 7 for video (beta), from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2, Wan 2.2 and MiniMax H3, each with the settings from its makers' own templates. [The full list ↓](#supported-models)
-- **Inpainting (beta).** Paint over the part of a picture that should change and say what it becomes. Only that part is redrawn; every other pixel stays exactly as it was. Works with 18 image families and needs no extra nodes. [How it works ↓](#inpainting)
+- **Inpainting (beta).** Paint over the part of a picture that should change and say what it becomes. Only that part is redrawn. Works with 18 image families and needs no extra nodes. [How it works ↓](#inpainting)
 - **Smart upscale, built in.** Pick **2K** or **4K** next to the size menu and every new picture comes out upscaled with SeedVR2, in the same run, with the time left on the clock. Any older picture upscales with one click. [More ↓](#smart-upscale)
 - **Auto-grouping.** Pictures from similar prompts stack themselves into one tile once you're done with them, so a gallery of hundreds stays easy to scan. [More ↓](#auto-grouping)
 - **Missing parts are a click away.** Pick a model to see what it still needs. Each part gets a Download or Install button, and **Get all** fetches the lot. With no model yet, the studio offers a first one to download. [What's covered ↓](#auto-downloads)
@@ -92,7 +92,7 @@ npm install
 npm start
 ```
 
-`npm start` builds the app the first time, then opens **http://localhost:8787** in the browser (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
+`npm start` opens **http://localhost:8787** in the browser (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
 
 ComfyUI on another machine or port? Set its address in **Settings › Connection**, or copy `.env.example` to `.env` and set `COMFY_URL`.
 
@@ -106,7 +106,7 @@ ComfyUI on another machine or port? Set its address in **Settings › Connection
 
 **Video (7, beta):** MiniMax H3, HunyuanVideo 1.5, Wan 2.2 (5B and 14B) and Wan 2.1, with text and image to video where the model has both.
 
-Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF works through ComfyUI-GGUF; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
+Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF files work; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
 
 ## Bring your own workflow
 
@@ -119,38 +119,7 @@ The built-in models cover the everyday loop. For anything custom, bring your gra
 The workflow shows up in the model menu under **Your workflows** once the nodes it needs are installed.
 
 
-<details>
-<summary><b>What gets connected, and what the review shows</b></summary>
-
-The prompt, negative prompt, size, seed, steps, CFG, sampler, scheduler, denoise, frames and start image are connected for you. The review shows what follows the studio's controls and what stays as saved, marks connections that were guessed, and lets you change any of them under **Change connections**. It also points out nodes that run code, touch files elsewhere or go online.
-
-Only the connected inputs change; everything else runs as exported. If it uses a known model file you don't have, there's a Download button; otherwise the review says which folder the file belongs in.
-
-</details>
-
-<details>
-<summary><b>Advanced: a <code>heissUi</code> block</b></summary>
-
-To ship a workflow with its connections fixed, add a mapping to the exported JSON and drop the file into the `workflows/` folder:
-
-```json
-{
-  "heissUi": {
-    "id": "my-workflow",
-    "name": "My Workflow",
-    "kind": "image",
-    "controls": {
-      "prompt": { "node": "4", "input": "text" },
-      "steps": { "node": "7", "input": "steps" },
-      "seed": { "node": "7", "input": "seed" }
-    }
-  }
-}
-```
-
-The [workflow guide](./workflows/README.md) covers the full control list, image-to-image inputs and LoRA loaders.
-
-</details>
+The usual inputs (prompt, size, seed, steps and the like) are connected for you, and only those change; everything else runs as exported. The review marks anything it guessed, warns about nodes that run code, touch files or go online, and tells you where a missing model file belongs, with a Download button when it knows the file. To ship a workflow with its connections fixed, see the [workflow guide](./workflows/README.md).
 
 ## Auto-downloads
 
@@ -159,7 +128,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 
 ## Reference and start images
 
-- **Reference images for edit models.** Flux.2 (Klein 4B, Klein 9B and Dev) and Qwen-Image 2.1 edit from reference images the way ComfyUI's own edit templates do.
+- **Reference images for edit models.** Flux.2 (Klein 4B, Klein 9B and Dev) and Qwen-Image 2.1 edit from reference images.
 - **Start images for everything else.** Every other built-in image model (Krea 2, SDXL, Flux, Z-Image and the rest) offers **Add start image**. The image then sits in the sidebar's Basics with **Change from the reference** right under it, for how far the result may move from it.
 - **Paint on either one.** Hover a reference or start image and press the brush to [inpaint](#inpainting) just part of it.
 
@@ -175,25 +144,18 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 
 ## Inpainting
 
-Change one part of a picture and keep the rest. Hover a reference or start image in the prompt bar and press the brush. Paint over what should change, then write what it becomes. Only the painted part is redrawn.
+Change one part of a picture and keep the rest. Hover a reference or start image in the prompt bar and press the brush, paint over what should change, then write what it becomes.
 
 <p align="center">
   <a href="./docs/screenshots/inpainting.mp4"><img src="./docs/screenshots/inpainting.webp" alt="Inpainting in HEISS UI: a picture is dropped into the prompt bar as a reference, the brush opens the inpaint studio over the gallery, and a stroke is painted over the part to change" width="100%" /></a>
 </p>
 
-- **The rest stays pixel-exact.** HEISS UI renders a crop around what you painted at the model's full size and lays it back onto the original. The untouched part never softens or shifts in color, and a small fix gets the model's full detail.
-- **Your models, no extra nodes.** 18 of the 21 image families inpaint with ComfyUI's own nodes, no inpainting checkpoint or node pack needed. Edit models (Flux.2 Dev, Klein 4B and 9B, Qwen-Image 2.1) paint on a reference image; SDXL, Krea 2, Z-Image, Flux.1, Qwen-Image, Chroma and the others on a start image. The model menu marks which models can.
-- **A real brush.** Brush, eraser and hand, undo and redo, zoom and a brush size. It works with a finger on the phone too.
-- **Two dials.** While a painted image is in the prompt bar, **Inpaint strength** (from touching it up to painting it anew, for models that take a start image) and **Edge softness** sit in the sidebar's Basics, under the image. On the phone they're in the Advanced sheet.
+- **The rest stays untouched.** Only the painted part is redrawn, so the rest never softens or shifts in color.
+- **Works with your models.** 18 of the 21 image families inpaint, with no extra nodes. The model menu marks which ones.
+- **A proper brush.** Brush, eraser, hand, undo, zoom and size, on a phone too.
+- **Two dials.** **Inpaint strength** and **Edge softness** sit under the image in the sidebar (in the Advanced sheet on a phone).
 
-<details>
-<summary><b>What it doesn't do (yet), and turning it off</b></summary>
-
-Ideogram 4, MageFlow and Sana run their own graphs and can't inpaint, and neither can video models or imported workflows. There's no outpainting, layers or masking by selection; for that, [bring a workflow](#bring-your-own-workflow) or use a canvas tool next to HEISS UI on the same ComfyUI.
-
-Inpainting is in beta and on by default. **Settings › Features › Inpainting** lists which of your models can inpaint and turns the brush off everywhere.
-
-</details>
+Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no outpainting or layers. Inpainting is in beta and on by default; **Settings › Features › Inpainting** turns it off.
 
 ## Smart upscale
 
@@ -201,20 +163,14 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 
 - **2K or 4K for every new picture.** Pick **None**, **2K** or **4K** next to the size menu (on the phone, in the create sheet). The upscale is part of the run, so you can close the page and it still finishes. The next run waits for it, and if you stop it or it fails, you keep the picture at its generated size.
 - **Any picture, one click.** The upscale arrow on a tile or in the viewer upscales anything already in the gallery, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
-- **Time left, not a spinner.** Upscale times are learned per model and size, so the ring, the buttons and the queue count down the seconds that are left.
+- **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
 
 
 <details>
 <summary><b>Effort, faces and when it's skipped</b></summary>
 
-| | Scale | Model |
-| --- | --- | --- |
-| **Fast** | 1.5× | SeedVR2 3B, the least graphics memory |
-| **Balanced** (and **2K**) | 2× | SeedVR2 7B fp8 |
-| **High** (and **4K**) | 3× | SeedVR2 7B fp16, the slowest and the most memory |
-
-The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. A **face detail pass** (beta) redraws small faces before the upscale; it needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too. A run whose size is decided by a reference image (edit models) or by a painted mask skips the 2K/4K pick.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick.
 
 </details>
 
@@ -224,7 +180,7 @@ Making ten takes of one idea fills a gallery fast. With auto-grouping on, pictur
 
 - **Stacks with a count.** A stack shows as a photo with two edges under it, or as a cover flow, with the number of pictures in the corner.
 - **Skim without opening.** Slide the pointer along the bottom of a stack to flip through it. Open it to spread the pictures out, or **Unstack** to keep them apart.
-- **It knows what changed.** Similar prompts group together, and shared boilerplate like "masterpiece, 8k" barely counts. Coming back to a prompt the next day starts a new stack.
+- **It follows your prompts.** Similar prompts group together, and coming back to a prompt the next day starts a new stack.
 - **Your files stay put.** Grouping changes no files. Switch it off and the gallery is as it was.
 
 Turn it on with the stack button next to gallery search, or under **Settings › Library › Auto-grouping**, where you also pick the photo or cover-flow look.
@@ -240,9 +196,9 @@ Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **S
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference image, workflow, shape, number of images and Smart upscale's None, 2K or 4K, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share hands the file to the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
+The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference image, workflow, shape, number of images and Smart upscale's None, 2K or 4K, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
 
-**Use the full studio** under More switches a phone to the complete layout, and `?phone=1` shows the phone studio on any screen.
+**Use the full studio** under More switches a phone to the complete layout.
 
 </details>
 
@@ -259,7 +215,7 @@ Laptops and desktops get the full studio and phones get the phone layout. Only e
 <details>
 <summary><b>More on setup</b></summary>
 
-Switching on **Open on other devices** restarts HEISS UI on your network. For a single session, start with `npm start -- --lan` (or `npm run dev:lan` in a checkout) instead. The first time, your system may ask whether Node.js can accept connections; allow it for private networks.
+Turning on **Open on other devices** restarts HEISS UI. For a single session, start it with `npm start -- --lan` instead. The first time, your system may ask whether Node.js can accept connections; allow it for private networks.
 
 </details>
 
@@ -274,7 +230,7 @@ Hidden is a place for the images you'd rather keep to yourself. Open it from the
 - **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out. Upscale, compare, remix and video all work inside it.
 - **Locked means out of sight.** A locked Hidden shows no thumbnails and no count, and its prompts stay out of Recent prompts. It locks after a while without activity (Settings › Hidden › Auto-lock), or right away with **Lock**.
 
-Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open, and ComfyUI's own copies are removed. Hidden keeps things out of casual view; it isn't a forensic guarantee against an administrator, disk recovery or backups taken mid-run. [SECURITY.md](./docs/guides/SECURITY.md) has the details, including what passkeys need.
+Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open, and ComfyUI's own copies are removed. Hidden keeps things out of casual view; it isn't forensic-grade protection. [SECURITY.md](./docs/guides/SECURITY.md) has the details, including what passkeys need.
 
 There's no password reset. If the password and every passkey are lost, **Erase Hidden** in Settings › Hidden starts over and takes everything in Hidden with it.
 
@@ -302,7 +258,7 @@ A Windows shortcut that starts ComfyUI and HEISS UI together is in [WINDOWS-SHOR
 
 ## Troubleshooting
 
-[TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems, from ComfyUI not being found, the port and Node.js to each kind of failed generation, downloads and node packs, updates and phones. A failed card links to its section.
+[TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems. A failed generation links straight to its section.
 
 - **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Connection. After adding files, use **Settings › Models › Rescan**.
 - **Asking for help?** **Settings › About › Copy diagnostics** copies versions, system and GPU, without prompts or images. Paste it on the [board](https://heiss-ui.vercel.app/board/) or in the [Discord](https://discord.gg/Hf7ysvDeGa).
