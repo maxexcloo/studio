@@ -40,14 +40,14 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 ## Features
 
 - **28 model families, ready to go.** From SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Wan 2.2, each with its makers' recommended settings. [The full list ↓](#supported-models)
-- **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families. [More ↓](#inpainting)
-- **Smart upscale.** Pick 2K or 4K and every new picture comes out bigger and sharper, with a countdown. Any older picture upscales in one click. [More ↓](#smart-upscale)
-- **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan. [More ↓](#auto-grouping)
-- **Missing parts, one click away.** Pick a model and see what it still needs, with a Download button for each part and **Get all** for the lot. [What's covered ↓](#auto-downloads)
+- **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
+- **Smart upscale.** Pick 2K or 4K and every new picture comes out bigger and sharper, with a countdown. Any older picture upscales in one click.
+- **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan.
+- **Missing parts, one click away.** Pick a model and see what it still needs, with a Download button for each part and **Get all** for the lot.
 - **A phone studio.** A layout made for one thumb: prompt, browse, share and upscale from the couch while your computer renders. [Set it up ↓](#on-your-phone)
-- **Your studio on every device.** Open HEISS UI from a laptop, tablet or phone on your network. Your PC renders, and every device shares the same models and gallery. [Connect a device ↓](#connect-over-lan)
+- **Your studio on every device.** Open HEISS UI from a laptop, tablet or phone on your network. Your PC renders, and every device shares the same models and gallery.
 - **Bring your own workflow.** Import a ComfyUI workflow and it becomes a clean set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
-- **Hidden.** A locked place for images you keep to yourself, opened with Touch ID, Windows Hello or a password. Generate into it, or hide anything later. [More ↓](#hidden)
+- **Hidden.** A locked place for images you keep to yourself, opened with Touch ID, Windows Hello or a password. Generate into it, or hide anything later.
 - **Zen mode.** Just the prompt and the picture, fullscreen.
 - **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Library.
 
