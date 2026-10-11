@@ -39,17 +39,17 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 
 ## Features
 
-- **28 model families out of the box.** 21 for images and 7 for video (beta), from SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2, Wan 2.2 and MiniMax H3, each with the settings from its makers' own templates. [The full list ↓](#supported-models)
-- **Inpainting (beta).** Paint over the part of a picture that should change and say what it becomes. Only that part is redrawn. Works with 18 image families and needs no extra nodes. [How it works ↓](#inpainting)
-- **Smart upscale, built in.** Pick **2K** or **4K** next to the size menu and every new picture comes out upscaled with SeedVR2, in the same run, with the time left on the clock. Any older picture upscales with one click. [More ↓](#smart-upscale)
-- **Auto-grouping.** Pictures from similar prompts stack themselves into one tile once you're done with them, so a gallery of hundreds stays easy to scan. [More ↓](#auto-grouping)
-- **Missing parts are a click away.** Pick a model to see what it still needs. Each part gets a Download or Install button, and **Get all** fetches the lot. With no model yet, the studio offers a first one to download. [What's covered ↓](#auto-downloads)
-- **A phone studio.** On a phone the studio switches to a layout made for one thumb. Prompt, browse, share and upscale from the couch while the computer renders. [Set it up ↓](#on-your-phone)
-- **Your studio over LAN.** Open HEISS UI from a laptop, tablet, phone or another desktop on your local network. The PC renders; every device uses the same models and gallery. Works over Wi-Fi or wired LAN. [Connect another device ↓](#connect-over-lan)
-- **Bring your own workflow.** Import a ComfyUI workflow (API or visual JSON) and it becomes a set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
-- **Hidden.** A locked place for images you keep to yourself. Generate into it or hide anything later, and unlock with Touch ID, Windows Hello or a password. [More ↓](#hidden)
-- **Zen mode.** A fullscreen prompt and output view without the panels.
-- **Civitai-ready images (beta).** New PNGs also carry the prompt, LoRAs and settings the way AUTOMATIC1111 writes them, so Civitai fills in an upload. Turn it on in Settings › Library.
+- **28 model families, ready to go.** From SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Wan 2.2, each with its makers' recommended settings. [The full list ↓](#supported-models)
+- **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families. [More ↓](#inpainting)
+- **Smart upscale.** Pick 2K or 4K and every new picture comes out bigger and sharper, with a countdown. Any older picture upscales in one click. [More ↓](#smart-upscale)
+- **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan. [More ↓](#auto-grouping)
+- **Missing parts, one click away.** Pick a model and see what it still needs, with a Download button for each part and **Get all** for the lot. [What's covered ↓](#auto-downloads)
+- **A phone studio.** A layout made for one thumb: prompt, browse, share and upscale from the couch while your computer renders. [Set it up ↓](#on-your-phone)
+- **Your studio on every device.** Open HEISS UI from a laptop, tablet or phone on your network. Your PC renders, and every device shares the same models and gallery. [Connect a device ↓](#connect-over-lan)
+- **Bring your own workflow.** Import a ComfyUI workflow and it becomes a clean set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
+- **Hidden.** A locked place for images you keep to yourself, opened with Touch ID, Windows Hello or a password. Generate into it, or hide anything later. [More ↓](#hidden)
+- **Zen mode.** Just the prompt and the picture, fullscreen.
+- **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Library.
 
 LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [website](https://heiss-ui.vercel.app/#features).
 
