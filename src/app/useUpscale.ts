@@ -134,6 +134,48 @@ export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, 
   return { width: snap(width), height: snap(height) };
 }
 
+/** SeedVR2's sizing per effort; mirrors presets and upscalePlan in server/upscale.js. */
+const seedvr2Sizing: Record<UpscaleQuality, { scale: number; maxShort: number }> = {
+  fast: { scale: 1.5, maxShort: 1280 },
+  balanced: { scale: 2, maxShort: 2048 },
+  high: { scale: 3, maxShort: 2816 }
+};
+
+/** The tier a size tab lands on: a tab keeps the switch's way from the size picked before. */
+export function tierForTab(size: "none" | NativeSize, before: AutoUpscale | undefined): AutoUpscale {
+  if (size === "none") return "none";
+  const way = before?.endsWith("-native") ? "-native" : before?.endsWith("-upscale") ? "-upscale" : "";
+  return `${size}${way}` as AutoUpscale;
+}
+
+/**
+ * The size a run at this tier ends at, from the size picked: the long side at
+ * 2048/4096 when drawn natively, SeedVR2's short-side target otherwise. Null
+ * for no tier or no size.
+ */
+export function upscaledSize(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}) {
+  const plan = upscalePlan(tier, native);
+  if (plan.size === "none" || !(width > 0) || !(height > 0)) return null;
+  if (plan.native) return nativeUpscaleSize(tier, width, height, native) || { width, height };
+  const sizing = seedvr2Sizing[plan.quality || "balanced"];
+  const round = (value: number) => Math.max(16, Math.round(value / 16) * 16);
+  const short = Math.min(width, height);
+  const resolution = Math.max(Math.min(round(short * sizing.scale), sizing.maxShort), round(short));
+  const long = Math.round(resolution * Math.max(width, height) / short);
+  return width >= height ? { width: long, height: resolution } : { width: resolution, height: long };
+}
+
+/**
+ * A size's name by its long side, in K of 1024: a whole K within 7% reads as
+ * that ("4K" for 3840 or 4032), anything else to one decimal ("2.8K", "1.5K").
+ */
+export function resolutionName(width: number, height: number) {
+  const k = Math.max(width, height) / 1024;
+  const whole = Math.round(k);
+  if (whole >= 1 && Math.abs(k - whole) / whole <= 0.07) return `${whole}K`;
+  return `${Number(k.toFixed(1))}K`;
+}
+
 export function upscaleQualityLabel(quality = "balanced") {
   return upscaleEfforts.find((effort) => effort.value === quality)?.label || "Balanced";
 }
@@ -462,8 +504,7 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
   const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, native: NativeSupport = {}, exact = false) => {
     const before = prefs.autoUpscale || "none";
     const size = upscaleSize(picked);
-    const way = before.endsWith("-native") ? "-native" : before.endsWith("-upscale") ? "-upscale" : "";
-    const tier = (!exact && size !== "none" && picked === size ? `${size}${way}` : picked) as AutoUpscale;
+    const tier = !exact && picked === size ? tierForTab(size, before) : picked;
     if (tier === before) return;
     setPrefs({ autoUpscale: tier });
     const quality = upscalePlan(tier, native).quality;
