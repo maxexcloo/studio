@@ -154,23 +154,32 @@ catalog, so a family that is described correctly needs no UI work.
 
 ## Native 2K/4K
 
-`nativeSizes` on a family (or a variant) lists the Smart upscale sizes the
-model may also draw itself, shown as **Draw at 2K directly** under the size
-menu's tabs. The rule: show it unless the model plainly breaks there. Mixed or
-missing reports stay shown; only a clear consensus hides it.
+`native` on a family (or a variant) says, per size, whether the model draws 2K
+or 4K itself:
 
-- **Hidden at 2K and 4K:** SD 1.5 and SD 2.x (trained at 512/768, duplicated
-  subjects at large sizes are long settled), Sana 512px.
-- **Hidden at 4K:** models documented at about 1 MP, where 4096 px is 3-4x past
-  their training: SDXL and its finetunes, Pony V7/AuraFlow (768-1536), SD 3.5,
-  Flux.1 (BFL: 1.6 MP max), Chroma, HiDream, Qwen-Image (1328), Anima,
-  Lumina 2.0, ERNIE-Image, Krea 2 Raw (trained up to 1K), Sana 1024 and Sprint.
-- **Shown at both:** models trained or documented at about 2K or more: Flux.2
-  Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1 (native 2K), Z-Image (up to
-  2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to 2048), MageFlow (512-2048,
-  any aspect), Sana 2K and 4K. Their 4K has no hands-on reports either way.
+- **`"yes"`**: its makers document that size. 2K/4K draw natively by default,
+  the size menu reads **Resolution · Default / 2K / 4K**, and a **Use upscaler**
+  switch picks SeedVR2 instead.
+- **`"maybe"`**: reports are mixed or missing. SeedVR2 stays the default (the
+  menu reads **Smart upscale · None / 2K / 4K**), and a **Draw at 2K directly**
+  switch, marked "Results vary with this model", tries it.
+- **Left out**: the model plainly breaks there. No switch.
 
-A new family states its own `nativeSizes`; leaving it out means none.
+Current entries:
+
+- **Nothing:** SD 1.5 and SD 2.x (trained at 512/768, duplicated subjects at
+  large sizes are long settled), Sana 512px.
+- **2K maybe:** models documented at about 1 MP: SDXL and its finetunes,
+  Pony V7/AuraFlow (768-1536), SD 3.5, Flux.1 (BFL: 1.6 MP max), Chroma,
+  HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
+  (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
+  left out.
+- **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1
+  (native 2K), Z-Image (up to 2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to
+  2048), MageFlow (512-2048, any aspect), Sana 2K. No hands-on 4K reports.
+- **2K and 4K yes:** Sana 4K.
+
+A new family states its own `native`; leaving it out means none.
 
 ## Supported families
 

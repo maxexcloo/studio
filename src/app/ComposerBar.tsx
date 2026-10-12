@@ -6,7 +6,7 @@ import { cn } from './format';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import type { AspectPreset, AutoUpscale, MediaInput, NativeSize, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
+import type { AspectPreset, AutoUpscale, MediaInput, NativeSupport, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
 
 /* ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ export type ComposerBarProps = {
   applyAspect: (value: string) => void;
   /** Smart upscale's tabs on top of the size menu; left out where it doesn't apply (video). */
   autoUpscale?: AutoUpscale;
-  onAutoUpscaleChange?: (value: AutoUpscale, nativeSizes?: NativeSize[], exact?: boolean) => void;
+  onAutoUpscaleChange?: (value: AutoUpscale, native?: NativeSupport, exact?: boolean) => void;
   customSize: boolean;
   aspectLocked?: boolean;
   width: number;
@@ -305,8 +305,8 @@ export function ComposerBar(props: ComposerBarProps) {
       defaultSize={defaultAspectSize}
       density={density}
       upscale={autoUpscale}
-      nativeSizes={currentProfile?.nativeSizes}
-      onUpscaleChange={onAutoUpscaleChange ? (value, exact) => onAutoUpscaleChange(value, currentProfile?.nativeSizes, exact) : undefined}
+      native={currentProfile?.native}
+      onUpscaleChange={onAutoUpscaleChange ? (value, exact) => onAutoUpscaleChange(value, currentProfile?.native, exact) : undefined}
     />
   );
 

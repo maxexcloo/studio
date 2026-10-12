@@ -171,7 +171,7 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 - **Any picture, one click.** The upscale arrow on a tile or in the viewer upscales anything already in the gallery, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
 - **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
-- **Or drawn at that size.** Models made for big pictures (Flux.2, Qwen-Image 2.1, Z-Image and more) add **Draw at 2K directly** under the tabs: the model makes the picture at 2K or 4K itself, faster and with nothing in between.
+- **Or drawn at that size.** On models made for big pictures (Flux.2, Qwen-Image 2.1, Z-Image and more) the menu reads **Resolution**: 2K and 4K are drawn by the model itself, faster and with nothing in between, and **Use upscaler** switches to SeedVR2. Other models that may manage it offer **Draw at 2K directly**.
 
 
 <details>

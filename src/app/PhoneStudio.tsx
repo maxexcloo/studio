@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, Circle
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
-import { autoUpscaleTiers, canUpscaleItem, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { autoUpscaleTiers, canUpscaleItem, drawsNatively, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -548,6 +548,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   // Smart upscale, as in the desktop size menu: images only, and only while it is on in Settings.
   const smartUpscale = mode === 'image' && prefs?.smartUpscale !== false && typeof chooseAutoUpscale === 'function';
   const autoUpscale: AutoUpscale = prefs?.autoUpscale || 'none';
+  // A model that draws 2K/4K itself: the tiers are its resolution, not an upscale.
+  const phoneResolution = drawsNatively(currentProfile?.native);
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -652,13 +654,13 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
 
       {smartUpscale ? (
         <div className="phone-control">
-          <span className="phone-control-label" id="phone-upscale-label">Smart upscale</span>
+          <span className="phone-control-label" id="phone-upscale-label">{phoneResolution ? 'Resolution' : 'Smart upscale'}</span>
           <div className="phone-seg" role="radiogroup" aria-labelledby="phone-upscale-label">
             {autoUpscaleTiers.map((tier) => (
-              <button key={tier.value} type="button" role="radio" aria-checked={upscaleSize(autoUpscale) === tier.value} className={cn(upscaleSize(autoUpscale) === tier.value && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.nativeSizes)}>{tier.label}</button>
+              <button key={tier.value} type="button" role="radio" aria-checked={upscaleSize(autoUpscale) === tier.value} className={cn(upscaleSize(autoUpscale) === tier.value && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.native)}>{phoneResolution && tier.value === 'none' ? 'Default' : tier.label}</button>
             ))}
           </div>
-          <p className="phone-control-note">Upscales each new image with SeedVR2, rebuilding fine detail. Takes a little longer.</p>
+          <p className="phone-control-note">{phoneResolution ? 'This model draws 2K itself; where it can’t, SeedVR2 upscales after the run.' : 'Upscales each new image with SeedVR2, rebuilding fine detail. Takes a little longer.'}</p>
         </div>
       ) : null}
 

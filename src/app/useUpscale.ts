@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiJson } from './api';
-import type { AutoUpscale, GalleryItem, NativeSize, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
+import type { AutoUpscale, GalleryItem, NativeSize, NativeSupport, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
 import { formatLeft, useRunClock } from './GenerationProgress';
@@ -92,31 +92,40 @@ export const autoUpscaleTiers: { value: AutoUpscale; label: string; quality?: Up
 ];
 
 export function autoUpscaleQuality(tier: AutoUpscale | undefined) {
-  return autoUpscaleTiers.find((item) => item.value === tier)?.quality || null;
+  const size = upscaleSize(tier);
+  return autoUpscaleTiers.find((item) => item.value === size)?.quality || null;
 }
 
 /** The size a tier makes, whichever way it gets there: "2k-native" → "2k". */
 export function upscaleSize(tier: AutoUpscale | undefined): "none" | NativeSize {
-  return tier === "2k" || tier === "2k-native" ? "2k" : tier === "4k" || tier === "4k-native" ? "4k" : "none";
+  return tier?.startsWith("2k") ? "2k" : tier?.startsWith("4k") ? "4k" : "none";
+}
+
+/** A model that draws some size natively by default: its size menu reads Resolution, not Smart upscale. */
+export function drawsNatively(native: NativeSupport = {}) {
+  return Object.values(native).includes("yes");
 }
 
 /**
- * How a run reaches its tier on this model: drawn at that size when "-native"
- * was picked and the model draws it (Profile.nativeSizes), otherwise SeedVR2.
+ * How a run reaches its tier on this model. A plain size takes the model's own
+ * way (natively where it's documented, "yes"; SeedVR2 otherwise); the switch's
+ * "-native"/"-upscale" picks the other, natively only where the model may ("maybe" too).
  */
-export function upscalePlan(tier: AutoUpscale | undefined, nativeSizes: NativeSize[] = []) {
+export function upscalePlan(tier: AutoUpscale | undefined, native: NativeSupport = {}) {
   const size = upscaleSize(tier);
-  const native = size !== "none" && Boolean(tier?.endsWith("-native")) && nativeSizes.includes(size);
-  return { size, native, quality: native ? null : autoUpscaleQuality(size) };
+  const level = size === "none" ? undefined : native[size];
+  const nativeByDefault = level === "yes";
+  const drawn = Boolean(level) && (tier?.endsWith("-native") || (nativeByDefault && !tier?.endsWith("-upscale")));
+  return { size, level, nativeByDefault, native: drawn, quality: drawn ? null : autoUpscaleQuality(size) };
 }
 
 /**
- * A native tier's size on this model: the picked aspect scaled up so its long
- * side is 2048 (2K) or 4096 (4K), in steps of 64, never past the model's max and
- * never smaller than picked. Null when the run doesn't draw natively.
+ * A natively drawn tier's size on this model: the picked aspect scaled up so its
+ * long side is 2048 (2K) or 4096 (4K), in steps of 64, never past the model's max
+ * and never smaller than picked. Null when the run doesn't draw natively.
  */
-export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, height: number, nativeSizes: NativeSize[] = [], max = 8192) {
-  const plan = upscalePlan(tier, nativeSizes);
+export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192) {
+  const plan = upscalePlan(tier, native);
   const target = !plan.native ? 0 : plan.size === "2k" ? 2048 : 4096;
   const long = Math.max(width, height);
   if (!target || !long || long >= target) return null;
@@ -446,17 +455,18 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
   }, [markBusy, openSetup, prefs.upscaleQuality, refreshStatus, runUpscale, status?.ready]);
 
   /**
-   * A Smart upscale tab: on at once when its effort can run, otherwise through
-   * setup for that effort. Drawing natively is only ever the switch's pick
-   * (exact): a size tab keeps it when this model draws that size too.
+   * A size tab (or the switch under them, exact). A tab keeps the switch's way
+   * from the size before; whatever uses SeedVR2 is on at once when its effort
+   * can run, otherwise it goes through setup for that effort.
    */
-  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, nativeSizes: NativeSize[] = [], exact = false) => {
+  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, native: NativeSupport = {}, exact = false) => {
     const before = prefs.autoUpscale || "none";
     const size = upscaleSize(picked);
-    const tier = !exact && size !== "none" && !picked.endsWith("-native") && before.endsWith("-native") && nativeSizes.includes(size) ? `${size}-native` as AutoUpscale : picked;
+    const way = before.endsWith("-native") ? "-native" : before.endsWith("-upscale") ? "-upscale" : "";
+    const tier = (!exact && size !== "none" && picked === size ? `${size}${way}` : picked) as AutoUpscale;
     if (tier === before) return;
     setPrefs({ autoUpscale: tier });
-    const quality = autoUpscaleQuality(tier);
+    const quality = upscalePlan(tier, native).quality;
     if (!quality) return;
     const current = await refreshStatus(quality);
     if (current?.ready) return;

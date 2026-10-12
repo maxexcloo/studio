@@ -137,8 +137,8 @@ export function useGenerationActions(view: any) {
       const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
       // Native 2K/4K: the same aspect, sampled at that size instead of upscaled after (same conditions as Smart upscale).
       const native = mode === "image" && !inpaint && !framedByReference
-        ? nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.nativeSizes) : null;
-      const upscaleQuality = upscalePlan(prefs.autoUpscale, currentProfile?.nativeSizes).quality;
+        ? nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native) : null;
+      const upscaleQuality = upscalePlan(prefs.autoUpscale, currentProfile?.native).quality;
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
         prompt,

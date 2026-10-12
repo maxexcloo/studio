@@ -1250,11 +1250,11 @@ function App() {
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
   // Drawn at 2K/4K directly: estimated at that size, as generate() sends it.
-  const estimateSize = (mode === "image" && nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.nativeSizes)) || { width, height };
+  const estimateSize = (mode === "image" && nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native)) || { width, height };
   const generationEstimate = useGenerationEstimate({
     mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
-    upscale: mode === "image" && prefs.smartUpscale !== false ? upscalePlan(prefs.autoUpscale, currentProfile?.nativeSizes).quality || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
+    upscale: mode === "image" && prefs.smartUpscale !== false ? upscalePlan(prefs.autoUpscale, currentProfile?.native).quality || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {

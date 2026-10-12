@@ -6,8 +6,8 @@ import { Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } fro
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { AspectPreset, AutoUpscale, NativeSize, Output, Profile } from './types';
-import { upscalePlan } from './useUpscale';
+import type { AspectPreset, AutoUpscale, NativeSupport, Output, Profile } from './types';
+import { drawsNatively, upscalePlan } from './useUpscale';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
 import { wheelPixels } from './wheel';
 import { formatDownload, modelFits, useHardware } from './hardware';
@@ -309,29 +309,44 @@ const upscaleTabs: { value: AutoUpscale; label: string }[] = [
   { value: "4k", label: "4K" }
 ];
 
-/** Smart upscale's tabs, on top of the size menu: what every new image becomes once it finishes. */
-function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value: AutoUpscale; nativeSizes?: NativeSize[]; onChange: (value: AutoUpscale, exact?: boolean) => void }) {
-  // The tabs pick the size, the only choice there is. A model that can draw that size itself
-  // adds one switch under them for it; models that can't never show it.
-  const { size: value, native } = upscalePlan(picked, nativeSizes);
-  const canDraw = value !== "none" && nativeSizes.includes(value);
-  const index = Math.max(0, upscaleTabs.findIndex((tab) => tab.value === value));
+/**
+ * The 2K/4K tabs on top of the size menu. On a model that draws 2K/4K itself
+ * ("yes" in its catalog entry) they read Resolution · Default/2K/4K and draw
+ * natively, with SeedVR2 one switch away; elsewhere Smart upscale ·
+ * None/2K/4K through SeedVR2, with drawing directly a switch away where the
+ * model may manage it. Models that plainly can't show no switch.
+ */
+function SmartUpscaleTabs({ value: picked, native = {}, onChange }: { value: AutoUpscale; native?: NativeSupport; onChange: (value: AutoUpscale, exact?: boolean) => void }) {
+  const plan = upscalePlan(picked, native);
+  const value = plan.size;
+  const resolution = drawsNatively(native);
+  const tabs = resolution ? upscaleTabs.map((tab) => tab.value === "none" ? { ...tab, label: "Default" } : tab) : upscaleTabs;
+  // The switch is the other way to this size: SeedVR2 where drawing is the default, drawing where it isn't.
+  const other = value !== "none" && plan.level ? (plan.nativeByDefault ? "upscale" : "native") : null;
+  const switchOn = other === "upscale" ? !plan.native : plan.native;
+  const switchLabel = other === "upscale" ? "Use upscaler" : `Draw at ${value.toUpperCase()} directly`;
+  const switchNote = other === "upscale" ? "SeedVR2 rebuilds detail after the run. Slower." : plan.level === "maybe" ? "Results vary with this model." : "";
+  const index = Math.max(0, tabs.findIndex((tab) => tab.value === value));
+  const label = resolution ? "Resolution" : "Smart upscale";
+  const tip = resolution
+    ? "How big every new image comes out. Default is this model’s own size. At 2K and 4K it draws the picture at that size itself where it’s known to do that well, otherwise SeedVR2 upscales it after the run. The switch picks the other way."
+    : `Makes every new image 2K or 4K. SeedVR2 upscales each one as it finishes, rebuilding fine detail.${Object.keys(native).length ? " This model can also try drawing at that size itself." : ""}`;
   return (
     <div className="aspect-upscale">
       <div className="aspect-upscale-head">
-        <span id="aspect-upscale-label">Smart upscale</span>
-        <InfoTip side="top" content={`Makes every new image 2K or 4K. SeedVR2 upscales each one as it finishes, rebuilding fine detail.${nativeSizes.length ? " This model can also draw at that size itself: faster, with no upscaler in between." : ""}`} />
+        <span id="aspect-upscale-label">{label}</span>
+        <InfoTip side="top" content={tip} />
       </div>
       <div className="aspect-upscale-tabs" role="radiogroup" aria-labelledby="aspect-upscale-label" style={{ "--tab-index": index } as React.CSSProperties} onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         event.preventDefault();
         event.stopPropagation();
-        const next = upscaleTabs[(index + (event.key === "ArrowRight" ? 1 : -1) + upscaleTabs.length) % upscaleTabs.length];
+        const next = tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
         onChange(next.value);
         requestAnimationFrame(() => event.currentTarget.querySelector<HTMLButtonElement>(`[data-tier="${next.value}"]`)?.focus());
       }}>
         <i aria-hidden="true" />
-        {upscaleTabs.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.value}
             type="button"
@@ -344,25 +359,28 @@ function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value
           >{tab.label}</button>
         ))}
       </div>
-      {canDraw ? (
+      {other ? (
         <label className="aspect-upscale-native">
-          <span>Draw at {value.toUpperCase()} directly</span>
-          <button type="button" role="switch" aria-checked={native} aria-label={`Draw at ${value.toUpperCase()} directly`} className="switch is-sm" onClick={() => onChange(native ? value : `${value}-native` as AutoUpscale, true)}><span className="switch-thumb" /></button>
+          <span>{switchLabel}{switchNote ? <small>{switchNote}</small> : null}</span>
+          <button type="button" role="switch" aria-checked={switchOn} aria-label={switchLabel} className="switch is-sm" onClick={() => onChange(switchOn ? value : `${value}-${other}` as AutoUpscale, true)}><span className="switch-thumb" /></button>
         </label>
       ) : null}
     </div>
   );
 }
 
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", nativeSizes = [], onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; nativeSizes?: NativeSize[]; onUpscaleChange?: (value: AutoUpscale, exact?: boolean) => void }) {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", native = {}, onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; native?: NativeSupport; onUpscaleChange?: (value: AutoUpscale, exact?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);
   const isDefault = value === "default";
+  // The ratio the default size already is: one row ("Default 1:1"), not two with the same size.
+  const defaultOption = options.find((item) => item.value === defaultSize);
+  const listed = defaultOption ? options.filter((item) => item !== defaultOption) : options;
   const close = useCallback(() => setOpen(false), []);
   useDismiss(pickerRef, open, close);
   const label = selected ? selected.label : isDefault ? "Default" : "Free";
-  const upscaleWay = upscalePlan(upscale, nativeSizes);
+  const upscaleWay = upscalePlan(upscale, native);
   const upscaleLabel = onUpscaleChange && upscaleWay.size !== "none" ? upscaleWay.size.toUpperCase() : "";
   const upscaleTip = upscaleLabel ? `, ${upscaleWay.native ? "drawn at" : "smart upscale to"} ${upscaleLabel}` : "";
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -379,7 +397,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
       <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleTip}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleTip}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The tag sits on the icon's corner, so turning Smart upscale on never changes the button's width. */}
           <span className="aspect-shape-slot">
-            {selected ? <span className="aspect-shape" style={aspectIconStyle(selected)} /> : <span className={cn("aspect-shape", isDefault ? "default" : "custom")} />}
+            {selected || (isDefault && defaultOption) ? <span className="aspect-shape" style={aspectIconStyle((selected || defaultOption)!)} /> : <span className={cn("aspect-shape", isDefault ? "default" : "custom")} />}
             {upscaleLabel ? <b className="aspect-upscale-badge" aria-hidden="true">{upscaleLabel}</b> : null}
           </span>
           {density === "full" ? <span>{label}</span> : null}
@@ -387,7 +405,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
         </button></Tip>
       {open ? (
         <div className="aspect-menu" data-open-surface>
-        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} nativeSizes={nativeSizes} onChange={onUpscaleChange} /> : null}
+        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} native={native} onChange={onUpscaleChange} /> : null}
         <div className="aspect-list" role="listbox" aria-label="Aspect ratio" onKeyDown={(event) => {
           // Up and down move between options; the menu opens with focus on the chosen one.
           if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -406,11 +424,11 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                 setOpen(false);
               }}
             >
-              <span className="aspect-shape default" />
-              <span>Default</span>
+              {defaultOption ? <span className="aspect-shape" style={aspectIconStyle(defaultOption)} /> : <span className="aspect-shape default" />}
+              <span>Default{defaultOption ? <small>{defaultOption.label}</small> : null}</span>
               <em>{defaultSize}</em>
             </button>
-          {options.map((option) => (
+          {listed.map((option) => (
             <button
                 key={option.value}
                 type="button"

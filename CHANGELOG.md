@@ -22,21 +22,25 @@ version opens with a `> ` summary line, which the update pill shows.
   keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
   ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
   switches to the main one while its own is starting or restarting.
-- **Draw at 2K directly.** On models that can draw at 2K or 4K themselves,
-  a switch under the size menu's 2K/4K tabs skips the upscaler: the model
-  makes the image at that size (the aspect you picked, long side 2048 or
-  4096), faster and with nothing in between. Off, SeedVR2 upscales as
-  before, and picking 2K/4K without SeedVR2 still opens its setup. It shows
-  wherever a model may manage that size, and only stays away where it
-  plainly breaks: SD 1.5/2 at 2K, models made for about 1 MP (SDXL, Flux.1,
-  Qwen-Image and others) at 4K. The list and its sources are in
-  [MODELS.md](./docs/guides/MODELS.md#native-2k4k).
+- **Resolution: 2K and 4K drawn by the model itself.** On models made for
+  big pictures (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4,
+  MageFlow, Sana 2K/4K) the size menu reads **Resolution** with Default, 2K
+  and 4K: the model makes the picture at that size (the aspect you picked,
+  long side 2048 or 4096), faster and with nothing in between, and **Use
+  upscaler** switches to SeedVR2. Elsewhere it stays **Smart upscale**
+  through SeedVR2, with **Draw at 2K directly** where the model may manage
+  it ("Results vary"), and nothing where it plainly breaks (SD 1.5/2). The
+  list and its sources are in
+  [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
+  without SeedVR2 still opens its setup.
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
   first reference for Edit or Guide. Edit works as before: the result keeps
   that image's size. Guide keeps your size and aspect, and the image still
   guides the picture, 2K/4K included. A GUIDE tag on the thumbnail shows it.
 
 ### Changed
+- **A tighter size menu.** Default and the ratio it already is share one
+  row, rows are more compact, and 2.35:1 is gone.
 - **A 2K/4K pick survives a reference.** It is skipped while an edited
   reference or a painted mask sets the size, and back afterwards, together
   with the aspect you had.

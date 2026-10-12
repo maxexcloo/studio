@@ -170,9 +170,9 @@ export const starterModels = [
 
 /* ------------------------------------------------------------ Families */
 
-const square = [["1:1", 1, 1], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4], ["2.35:1", 235, 100]];
+const square = [["1:1", 1, 1], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4]];
 const portraitFirst = [["2:3", 2, 3], ["1:1", 1, 1], ["3:2", 3, 2], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4]];
-const wide = [["16:9", 16, 9], ["9:16", 9, 16], ["1:1", 1, 1], ["4:3", 4, 3], ["3:4", 3, 4], ["2.35:1", 235, 100]];
+const wide = [["16:9", 16, 9], ["9:16", 9, 16], ["1:1", 1, 1], ["4:3", 4, 3], ["3:4", 3, 4]];
 
 const speedName = /lightning|dmd2?|hyper|turbo|lcm|pcm|\d+[-_ ]?steps?|tcd|flash/i;
 const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
@@ -207,19 +207,22 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * docs/guides/MODELS.md walks through adding a family.
  */
 /**
- * Smart upscale sizes a family can also draw itself ("Draw at 2K directly").
- * Shown unless it plainly breaks there: the 1 MP generation (SD 1.5/2) at 2K,
- * and every model documented at ~1 MP at 4K (4096 px is 3-4x past it, where
- * subjects duplicate and tile). Mixed or unknown reports stay shown. Sources
- * per family: docs/guides/MODELS.md, "Native 2K/4K".
+ * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
+ * document that size (then 2K/4K draw natively by default, the size menu reads
+ * Resolution and offers SeedVR2 as the alternative), "maybe" where reports are
+ * mixed or missing (SeedVR2 stays the default, drawing directly is a switch
+ * away, marked as varying). Left out only where it plainly breaks: the 1 MP
+ * generation (SD 1.5/2) at 2K, and models documented at ~1 MP at 4K.
+ * Sources per family: docs/guides/MODELS.md, "Native 2K/4K".
  */
-const drawsNone = [];
-const drawsUpTo2k = ["2k"];
-const drawsUpTo4k = ["2k", "4k"];
+const drawsNone = {};
+const draws2kMaybe = { "2k": "maybe" };
+const draws2k = { "2k": "yes", "4k": "maybe" };
+const draws4k = { "2k": "yes", "4k": "yes" };
 
 export const families = {
   sd15: {
-    label: "SD 1.5", kind: "image", nativeSizes: drawsNone, sources: ["checkpoint", "unet"],
+    label: "SD 1.5", kind: "image", native: drawsNone, sources: ["checkpoint", "unet"],
     slots: [{ slot: "clip", label: "CLIP-L", kinds: ["clip_l"] }], clipType: "stable_diffusion",
     vae: ["sd15"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true,
     aspects: portraitFirst, clipSkip: (name) => (/anything|nai|counterfeit|meina|abyss|anime/i.test(name) ? -2 : 0),
@@ -230,7 +233,7 @@ export const families = {
     size: [512, 512]
   },
   sd2: {
-    label: "SD 2.x", kind: "image", nativeSizes: drawsNone, sources: ["checkpoint"],
+    label: "SD 2.x", kind: "image", native: drawsNone, sources: ["checkpoint"],
     slots: [{ slot: "clip", label: "CLIP-H", kinds: ["clip_h"] }], clipType: "stable_diffusion",
     vae: ["sd15"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true, aspects: square,
     // SD 2.0 and 2.1 come as 768 px v-prediction models and 512 px "base" ones
@@ -242,7 +245,7 @@ export const families = {
     size: [768, 768]
   },
   sdxl: {
-    label: "SDXL", kind: "image", nativeSizes: drawsUpTo2k, sources: ["checkpoint", "unet"],
+    label: "SDXL", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] }, { slot: "clip_g", label: "CLIP-G", kinds: ["clip_g"] }], clipType: "sdxl",
     vae: ["sdxl"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true, aspects: portraitFirst,
     // Pony, Illustrious and NoobAI descend from NovelAI-style training on the
@@ -264,7 +267,7 @@ export const families = {
     size: [1024, 1024]
   },
   auraflow: {
-    label: "Pony V7 / AuraFlow", kind: "image", nativeSizes: drawsUpTo2k, sources: ["checkpoint", "unet"],
+    label: "Pony V7 / AuraFlow", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "t5", label: "Pile T5-XL", kinds: ["t5xl"] }], clipType: "stable_diffusion",
     vae: ["aura", "sdxl"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: [["5:6", 5, 6], ...portraitFirst],
     variants: [
@@ -276,7 +279,7 @@ export const families = {
     size: [1024, 1024]
   },
   sd3: {
-    label: "SD 3.5", kind: "image", nativeSizes: drawsUpTo2k, sources: ["checkpoint", "unet"],
+    label: "SD 3.5", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [
       { slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] },
       { slot: "clip_g", label: "CLIP-G", kinds: ["clip_g"] },
@@ -290,7 +293,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux1: {
-    label: "Flux.1", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet", "checkpoint"],
+    label: "Flux.1", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] }, { slot: "t5", label: "T5-XXL", kinds: ["t5xxl"] }], clipType: "flux",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "zero", img2img: true, aspects: square,
     variants: [
@@ -303,7 +306,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_dev: {
-    label: "Flux.2 Dev", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Flux.2 Dev", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Mistral 3 Small", kinds: ["mistral3_24b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "none", sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "BasicGuider", "FluxGuidance"],
@@ -315,7 +318,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_klein_4b: {
-    label: "Flux.2 Klein 4B", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Flux.2 Klein 4B", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 4B", kinds: ["qwen3_4b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "CFGGuider"],
@@ -327,7 +330,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_klein_9b: {
-    label: "Flux.2 Klein 9B", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Flux.2 Klein 9B", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 8B", kinds: ["qwen3_8b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "CFGGuider"],
@@ -339,7 +342,7 @@ export const families = {
     size: [1024, 1024]
   },
   chroma: {
-    label: "Chroma", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet", "checkpoint"],
+    label: "Chroma", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "t5", label: "T5-XXL", kinds: ["t5xxl"] }], clipType: "chroma", t5Padding: { minPadding: 0, minLength: 0 },
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     modelSampling: { node: "ModelSamplingAuraFlow", shift: 1 },
@@ -350,7 +353,7 @@ export const families = {
     size: [1024, 1024]
   },
   hidream: {
-    label: "HiDream I1", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet", "checkpoint"], neverBundledEncoder: true,
+    label: "HiDream I1", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"], neverBundledEncoder: true,
     slots: [
       // HiDream's CLIPs are its own fine-tunes with the same shapes as everyone
       // else's; Flux's clip_l gives black images (ComfyUI issue 7715).
@@ -368,7 +371,7 @@ export const families = {
     size: [1024, 1024]
   },
   qwen_image: {
-    label: "Qwen-Image", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet", "checkpoint"],
+    label: "Qwen-Image", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen2.5-VL 7B", kinds: ["qwen25vl_7b"] }], clipType: "qwen_image",
     vae: ["qwen_image", "wan21"], latent: "EmptySD3LatentImage", sizeStep: 16, img2img: true, aspects: square,
     modelSampling: { node: "ModelSamplingAuraFlow", shift: 3.1 },
@@ -381,7 +384,7 @@ export const families = {
     size: [1328, 1328]
   },
   qwen_image_21: {
-    label: "Qwen-Image 2.1", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Qwen-Image 2.1", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }], clipType: "qwen_image",
     vae: ["qwen_image_21"], latent: "EmptyLatentImage", sizeStep: 32, negative: "qwen21", aspects: square,
     requiredNodes: ["TextEncodeQwenImage21"],
@@ -391,7 +394,7 @@ export const families = {
     size: [1024, 1024]
   },
   zimage: {
-    label: "Z-Image", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Z-Image", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 4B", kinds: ["qwen3_4b"] }], clipType: "lumina2",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     variants: [
@@ -401,20 +404,20 @@ export const families = {
     size: [1024, 1024]
   },
   krea2: {
-    label: "Krea 2", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet", "checkpoint"],
+    label: "Krea 2", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "krea2",
     vae: ["qwen_image"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     // ComfyUI-Krea2T-Enhancer, when installed, at its own default strength (0 neutral, 2 full).
     enhancer: { strength: 1 },
     variants: [
       // Raw is trained up to 1K (krea-ai/krea-2 README), Turbo up to 2K.
-      { id: "raw", label: "Raw", match: (name) => isKrea2Raw(name), rawShift: true, nativeSizes: drawsUpTo2k, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" } },
+      { id: "raw", label: "Raw", match: (name) => isKrea2Raw(name), rawShift: true, native: draws2kMaybe, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" } },
       { id: "turbo", label: "Turbo", defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" } }
     ],
     size: [1024, 1024]
   },
   anima: {
-    label: "Anima", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet", "checkpoint"],
+    label: "Anima", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 0.6B", kinds: ["qwen3_06b"] }], clipType: "stable_diffusion",
     vae: ["qwen_image", "wan21"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: portraitFirst,
     // The card: er_sde as the default sampler (both Comfy-Org templates use it);
@@ -564,7 +567,7 @@ export const families = {
   // system prompt before yours, as it did in training; the anime fine-tunes
   // were trained on their own, with a matching one for the negative.
   lumina2: {
-    label: "Lumina Image 2.0", kind: "image", nativeSizes: drawsUpTo2k, sources: ["checkpoint", "unet"],
+    label: "Lumina Image 2.0", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "encoder", label: "Gemma 2 2B", kinds: ["gemma2_2b"] }], clipType: "lumina2",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: portraitFirst,
     variants: [
@@ -589,7 +592,7 @@ export const families = {
   // CFG eases off for the last 30% of steps. Its scheduler follows the steps:
   // Comfy-Org's Turbo (12), Default (20) and Quality (48) presets.
   ideogram4: {
-    label: "Ideogram 4", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet"],
+    label: "Ideogram 4", kind: "image", native: draws2k, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }], clipType: "ideogram4",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "none", sampling: "ideogram4", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Ideogram4Scheduler", "DualModelGuider", "CFGOverride", "SamplerCustomAdvanced", "KSamplerSelect", "RandomNoise", "ConditioningZeroOut"],
@@ -605,7 +608,7 @@ export const families = {
   },
   // Mage-Flow encodes prompt and negative in one node that also makes the latent.
   mage_flow: {
-    label: "MageFlow", kind: "image", nativeSizes: drawsUpTo4k, sources: ["unet"],
+    label: "MageFlow", kind: "image", native: draws2k, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "mage",
     vae: ["mage_flow"], latent: "TextEncodeMageFlowEdit", sizeStep: 16, negative: "text", sampling: "mage", aspects: square,
     requiredNodes: ["TextEncodeMageFlowEdit"],
@@ -617,7 +620,7 @@ export const families = {
   },
   // ERNIE-Image: Ministral 3 3B through the Flux.2 text path, the Flux.2 VAE and latent, plain KSampler.
   ernie: {
-    label: "ERNIE-Image", kind: "image", nativeSizes: drawsUpTo2k, sources: ["unet"],
+    label: "ERNIE-Image", kind: "image", native: draws2kMaybe, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Ministral 3 3B", kinds: ["ministral3_3b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage"],
@@ -632,15 +635,15 @@ export const families = {
   // Settings follow NVlabs/Sana's ComfyUI workflows: CFG 2 for the 1.6B Sana 1.0
   // models (1K, 2K, 4K), 4.5 for SANA 1.5.
   sana: {
-    label: "Sana", kind: "image", nativeSizes: drawsUpTo2k, sources: ["sana", "sana_diffusers", "checkpoint"], ownLoaders: true,
+    label: "Sana", kind: "image", native: draws2kMaybe, sources: ["sana", "sana_diffusers", "checkpoint"], ownLoaders: true,
     slots: [], clipType: null, vae: [],
     latent: "EmptyHunyuanImageLatent", sizeStep: 32, negative: "text", sampling: "sana", aspects: square,
     variants: [
       // Sprint is a consistency model: its CFG goes in through ScmModelSampling, KSampler stays at 1.
-      { id: "sprint", label: "Sprint", match: (name, header, detail) => detail?.sprint ?? /sprint/i.test(name), nativeSizes: drawsUpTo2k, negative: "none", dtype: "FP32", defaults: { steps: 2, cfg: 4.5, sampler: "scm", scheduler: "sgm_uniform" } },
-      { id: "4k", label: "4K", match: (name) => /4k/i.test(name), size: [4096, 4096], nativeSizes: drawsUpTo4k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
-      { id: "2k", label: "2K", match: (name) => /2k/i.test(name), size: [2048, 2048], nativeSizes: drawsUpTo4k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
-      { id: "512", label: "512px", match: (name) => /512px/i.test(name), size: [512, 512], nativeSizes: drawsNone, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } },
+      { id: "sprint", label: "Sprint", match: (name, header, detail) => detail?.sprint ?? /sprint/i.test(name), native: draws2kMaybe, negative: "none", dtype: "FP32", defaults: { steps: 2, cfg: 4.5, sampler: "scm", scheduler: "sgm_uniform" } },
+      { id: "4k", label: "4K", match: (name) => /4k/i.test(name), size: [4096, 4096], native: draws4k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
+      { id: "2k", label: "2K", match: (name) => /2k/i.test(name), size: [2048, 2048], native: draws2k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
+      { id: "512", label: "512px", match: (name) => /512px/i.test(name), size: [512, 512], native: drawsNone, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } },
       // Sana 1.0 1.6B at 1024: 20 blocks without SANA 1.5's q/k norms.
       {
         id: "1600m", label: "1.6B", defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },

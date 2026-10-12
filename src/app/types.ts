@@ -45,10 +45,17 @@ export type PromptComposition = { prefix?: string; suffix?: string; policy?: str
 export type GenerationSettings = Record<string, string | number | boolean | null | undefined | LoraSelection[]>;
 export type UpscaleQuality = "fast" | "balanced" | "high";
 /** Smart upscale in the size menu: every new image comes out at this size, upscaled as part of its run. */
-/** The "-native" tiers skip SeedVR2 and sample at that size directly (useUpscale nativeUpscaleSize). */
-export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native";
-/** A Smart upscale size a model can also draw itself (Profile.nativeSizes). */
+/**
+ * The 2K/4K pick. A plain size takes the model's own best way there (drawn
+ * natively where its makers document that size, else SeedVR2); "-native" and
+ * "-upscale" are the size menu's switch picking the other way (useUpscale upscalePlan).
+ */
+export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native" | "2k-upscale" | "4k-upscale";
+/** A Smart upscale size a model may also draw itself. */
 export type NativeSize = "2k" | "4k";
+/** "yes": documented, drawn natively by default. "maybe": mixed reports, SeedVR2 by default. */
+export type NativeLevel = "yes" | "maybe";
+export type NativeSupport = Partial<Record<NativeSize, NativeLevel>>;
 export type UpscaleState = {
   status: "running" | "done" | "error" | "canceled";
   jobId?: string;
@@ -94,8 +101,8 @@ export type SelectOption = { label: string; value: string };
 export type Profile = {
   id: string;
   kind: Mode;
-  /** Smart upscale sizes this model can draw itself (family catalog), offered as "Draw at 2K directly". */
-  nativeSizes?: NativeSize[];
+  /** Whether this model draws 2K/4K itself, per size (family catalog). */
+  native?: NativeSupport;
   label: string;
   displayName?: string;
   description?: string;
