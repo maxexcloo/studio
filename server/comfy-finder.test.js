@@ -44,3 +44,12 @@ test("HEISS_COMFY_SEARCH=0 keeps HEISS on its own address", async () => {
     delete process.env.HEISS_COMFY_SEARCH;
   }
 });
+
+test("HEISS_COMFY_SEARCH=0 also holds for the search at startup", async () => {
+  process.env.HEISS_COMFY_SEARCH = "0";
+  try {
+    assert.equal(await findComfy({ current: "http://127.0.0.1:8189", probe: async () => true }), "");
+  } finally {
+    delete process.env.HEISS_COMFY_SEARCH;
+  }
+});

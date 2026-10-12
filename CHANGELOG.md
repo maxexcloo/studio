@@ -17,7 +17,8 @@ version opens with a `> ` summary line, which the update pill shows.
   the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
   non-root, for `docker run` without compose) and the how-to are in
   [DOCKER.md](./docs/guides/DOCKER.md).
-- **`HEISS_COMFY_SEARCH=0` keeps HEISS on its own ComfyUI.** With a second
+- **Settings › Connection › Change address › Find ComfyUI on its own.** Off
+  keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
   ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
   switches to the main one while its own is starting or restarting.
 

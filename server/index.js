@@ -47,7 +47,7 @@ import { applyBundles, createBundles, DEFAULT_COOLDOWN_MINUTES, dissolveBundle, 
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
 import { starterPlan } from './starter-models.js';
-import { findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
+import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
 import { addDevicePasskey, addPasskey, changePassword, issueChallenge, unlockWithDevicePasskey, clearUnlockCookie, encryptionKeyFromRequest, erasePrivacy, isPrivacyEnabled, passkeyUnlockOptions, privacyStatusFor, removePasskey, revealGalleryItemsForRequest, setupPrivacy, setUnlockCookie, unlockWithPasskey, unlockWithPassword } from './privacy.js';
@@ -672,9 +672,9 @@ app.get("/api/health", async (req, res) => {
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
-    res.json({ ok: true, comfyUrl, startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer });
+    res.json({ ok: true, comfyUrl, comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer });
   } catch (error) {
-    res.status(503).json({ ok: false, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt });
+    res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt });
   }
 });
 
@@ -1534,6 +1534,18 @@ app.post("/api/comfy-url", async (req, res) => {
     }
   }
   res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: comfyUrl });
+});
+
+/** The Settings switch for looking on the usual ports when the saved address doesn't answer. */
+app.post("/api/comfy-search", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    writeLocalEnvValue("HEISS_COMFY_SEARCH", req.body?.enabled === false ? "0" : "1");
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+    return;
+  }
+  res.json({ ok: true, enabled: comfySearchEnabled() });
 });
 
 app.post("/api/generate", async (req, res) => {
