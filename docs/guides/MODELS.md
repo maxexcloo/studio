@@ -152,6 +152,26 @@ catalog, so a family that is described correctly needs no UI work.
   it: a Download button, node install steps, or a copyable command. A model
   that is not ready never runs.
 
+## Native 2K/4K
+
+`nativeSizes` on a family (or a variant) lists the Smart upscale sizes the
+model may also draw itself, shown as **Draw at 2K directly** under the size
+menu's tabs. The rule: show it unless the model plainly breaks there. Mixed or
+missing reports stay shown; only a clear consensus hides it.
+
+- **Hidden at 2K and 4K:** SD 1.5 and SD 2.x (trained at 512/768, duplicated
+  subjects at large sizes are long settled), Sana 512px.
+- **Hidden at 4K:** models documented at about 1 MP, where 4096 px is 3-4x past
+  their training: SDXL and its finetunes, Pony V7/AuraFlow (768-1536), SD 3.5,
+  Flux.1 (BFL: 1.6 MP max), Chroma, HiDream, Qwen-Image (1328), Anima,
+  Lumina 2.0, ERNIE-Image, Krea 2 Raw (trained up to 1K), Sana 1024 and Sprint.
+- **Shown at both:** models trained or documented at about 2K or more: Flux.2
+  Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1 (native 2K), Z-Image (up to
+  2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to 2048), MageFlow (512-2048,
+  any aspect), Sana 2K and 4K. Their 4K has no hands-on reports either way.
+
+A new family states its own `nativeSizes`; leaving it out means none.
+
 ## Supported families
 
 The table of supported families is in the [README](../../README.md#supported-models).

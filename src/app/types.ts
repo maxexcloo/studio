@@ -47,6 +47,8 @@ export type UpscaleQuality = "fast" | "balanced" | "high";
 /** Smart upscale in the size menu: every new image comes out at this size, upscaled as part of its run. */
 /** The "-native" tiers skip SeedVR2 and sample at that size directly (useUpscale nativeUpscaleSize). */
 export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native";
+/** A Smart upscale size a model can also draw itself (Profile.nativeSizes). */
+export type NativeSize = "2k" | "4k";
 export type UpscaleState = {
   status: "running" | "done" | "error" | "canceled";
   jobId?: string;
@@ -92,6 +94,8 @@ export type SelectOption = { label: string; value: string };
 export type Profile = {
   id: string;
   kind: Mode;
+  /** Smart upscale sizes this model can draw itself (family catalog), offered as "Draw at 2K directly". */
+  nativeSizes?: NativeSize[];
   label: string;
   displayName?: string;
   description?: string;

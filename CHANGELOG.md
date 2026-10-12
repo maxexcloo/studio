@@ -21,11 +21,15 @@ version opens with a `> ` summary line, which the update pill shows.
   keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
   ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
   switches to the main one while its own is starting or restarting.
-- **Native 2K and 4K.** Under the size menu's 2K/4K tabs, pick how to get
-  there: SeedVR2 upscales after the run as before, Native has the model
-  sample at that size directly (the aspect you picked, long side 2048 or
-  4096). Many models render 2K natively. Without SeedVR2 installed, 2K/4K
-  go native instead of asking for setup.
+- **Draw at 2K directly.** On models that can draw at 2K or 4K themselves,
+  a switch under the size menu's 2K/4K tabs skips the upscaler: the model
+  makes the image at that size (the aspect you picked, long side 2048 or
+  4096), faster and with nothing in between. Off, SeedVR2 upscales as
+  before, and picking 2K/4K without SeedVR2 still opens its setup. It shows
+  wherever a model may manage that size, and only stays away where it
+  plainly breaks: SD 1.5/2 at 2K, models made for about 1 MP (SDXL, Flux.1,
+  Qwen-Image and others) at 4K. The list and its sources are in
+  [MODELS.md](./docs/guides/MODELS.md#native-2k4k).
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
   first reference for Edit or Ref. Edit works as before: the result keeps
   that image's size. Ref keeps your size and aspect, and the image still

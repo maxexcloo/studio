@@ -6,7 +6,8 @@ import { Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } fro
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { AspectPreset, AutoUpscale, Output, Profile } from './types';
+import type { AspectPreset, AutoUpscale, NativeSize, Output, Profile } from './types';
+import { upscalePlan } from './useUpscale';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
 import { wheelPixels } from './wheel';
 import { formatDownload, modelFits, useHardware } from './hardware';
@@ -309,17 +310,17 @@ const upscaleTabs: { value: AutoUpscale; label: string }[] = [
 ];
 
 /** Smart upscale's tabs, on top of the size menu: what every new image becomes once it finishes. */
-function SmartUpscaleTabs({ value: picked, onChange: pick }: { value: AutoUpscale; onChange: (value: AutoUpscale) => void }) {
-  // The tabs pick the size; the row under them picks how: SeedVR2 after the run, or sampled at that size.
-  const native = picked.endsWith("-native");
-  const value = picked.replace("-native", "") as AutoUpscale;
-  const onChange = (tier: AutoUpscale) => pick(native && tier !== "none" ? `${tier}-native` as AutoUpscale : tier);
+function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value: AutoUpscale; nativeSizes?: NativeSize[]; onChange: (value: AutoUpscale) => void }) {
+  // The tabs pick the size, the only choice there is. A model that can draw that size itself
+  // adds one switch under them for it; models that can't never show it.
+  const { size: value, native } = upscalePlan(picked, nativeSizes);
+  const canDraw = value !== "none" && nativeSizes.includes(value);
   const index = Math.max(0, upscaleTabs.findIndex((tab) => tab.value === value));
   return (
     <div className="aspect-upscale">
       <div className="aspect-upscale-head">
         <span id="aspect-upscale-label">Smart upscale</span>
-        <InfoTip side="top" content="2K or 4K for every new image. SeedVR2 upscales each one as it finishes, rebuilding fine detail; Native has the model sample at that size directly, which suits models made for it." />
+        <InfoTip side="top" content={`Makes every new image 2K or 4K. SeedVR2 upscales each one as it finishes, rebuilding fine detail.${nativeSizes.length ? " This model can also draw at that size itself: faster, with no upscaler in between." : ""}`} />
       </div>
       <div className="aspect-upscale-tabs" role="radiogroup" aria-labelledby="aspect-upscale-label" style={{ "--tab-index": index } as React.CSSProperties} onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -343,17 +344,17 @@ function SmartUpscaleTabs({ value: picked, onChange: pick }: { value: AutoUpscal
           >{tab.label}</button>
         ))}
       </div>
-      {value !== "none" ? (
-        <div className="aspect-upscale-how" role="radiogroup" aria-label="How to reach this size">
-          <button type="button" role="radio" aria-checked={!native} className={cn(!native && "is-active")} onClick={() => pick(value)}>SeedVR2</button>
-          <button type="button" role="radio" aria-checked={native} className={cn(native && "is-active")} onClick={() => pick(`${value}-native` as AutoUpscale)}>Native</button>
-        </div>
+      {canDraw ? (
+        <label className="aspect-upscale-native">
+          <span>Draw at {value.toUpperCase()} directly</span>
+          <button type="button" role="switch" aria-checked={native} className="switch is-sm" onClick={() => onChange(native ? value : `${value}-native` as AutoUpscale)}><span className="switch-thumb" /></button>
+        </label>
       ) : null}
     </div>
   );
 }
 
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; onUpscaleChange?: (value: AutoUpscale) => void }) {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", nativeSizes = [], onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; nativeSizes?: NativeSize[]; onUpscaleChange?: (value: AutoUpscale) => void }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);
@@ -361,7 +362,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const close = useCallback(() => setOpen(false), []);
   useDismiss(pickerRef, open, close);
   const label = selected ? selected.label : isDefault ? "Default" : "Free";
-  const upscaleLabel = onUpscaleChange && upscale !== "none" ? upscale.replace("-native", "").toUpperCase() : "";
+  const upscaleWay = upscalePlan(upscale, nativeSizes);
+  const upscaleLabel = onUpscaleChange && upscaleWay.size !== "none" ? upscaleWay.size.toUpperCase() : "";
+  const upscaleTip = upscaleLabel ? `, ${upscaleWay.native ? "drawn at" : "smart upscale to"} ${upscaleLabel}` : "";
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wasOpen = useRef(false);
   useEffect(() => {
@@ -373,7 +376,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   }, [open]);
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleLabel ? `, ${upscale.endsWith("-native") ? "native" : "smart upscale to"} ${upscaleLabel}` : ""}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleLabel ? `, ${upscale.endsWith("-native") ? "native" : "smart upscale to"} ${upscaleLabel}` : ""}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
+      <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleTip}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleTip}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The tag sits on the icon's corner, so turning Smart upscale on never changes the button's width. */}
           <span className="aspect-shape-slot">
             {selected ? <span className="aspect-shape" style={aspectIconStyle(selected)} /> : <span className={cn("aspect-shape", isDefault ? "default" : "custom")} />}
@@ -384,7 +387,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
         </button></Tip>
       {open ? (
         <div className="aspect-menu" data-open-surface>
-        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} onChange={onUpscaleChange} /> : null}
+        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} nativeSizes={nativeSizes} onChange={onUpscaleChange} /> : null}
         <div className="aspect-list" role="listbox" aria-label="Aspect ratio" onKeyDown={(event) => {
           // Up and down move between options; the menu opens with focus on the chosen one.
           if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;

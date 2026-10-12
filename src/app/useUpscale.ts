@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiJson } from './api';
-import type { AutoUpscale, GalleryItem, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
+import type { AutoUpscale, GalleryItem, NativeSize, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
 import { formatLeft, useRunClock } from './GenerationProgress';
@@ -95,13 +95,29 @@ export function autoUpscaleQuality(tier: AutoUpscale | undefined) {
   return autoUpscaleTiers.find((item) => item.value === tier)?.quality || null;
 }
 
+/** The size a tier makes, whichever way it gets there: "2k-native" → "2k". */
+export function upscaleSize(tier: AutoUpscale | undefined): "none" | NativeSize {
+  return tier === "2k" || tier === "2k-native" ? "2k" : tier === "4k" || tier === "4k-native" ? "4k" : "none";
+}
+
 /**
- * A "-native" tier's size: the picked aspect scaled up so its long side is
- * 2048 (2K) or 4096 (4K), in steps of 64, never past the model's max and never
- * smaller than picked. Null for any other tier.
+ * How a run reaches its tier on this model: drawn at that size when "-native"
+ * was picked and the model draws it (Profile.nativeSizes), otherwise SeedVR2.
  */
-export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, height: number, max = 8192) {
-  const target = tier === "2k-native" ? 2048 : tier === "4k-native" ? 4096 : 0;
+export function upscalePlan(tier: AutoUpscale | undefined, nativeSizes: NativeSize[] = []) {
+  const size = upscaleSize(tier);
+  const native = size !== "none" && Boolean(tier?.endsWith("-native")) && nativeSizes.includes(size);
+  return { size, native, quality: native ? null : autoUpscaleQuality(size) };
+}
+
+/**
+ * A native tier's size on this model: the picked aspect scaled up so its long
+ * side is 2048 (2K) or 4096 (4K), in steps of 64, never past the model's max and
+ * never smaller than picked. Null when the run doesn't draw natively.
+ */
+export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, height: number, nativeSizes: NativeSize[] = [], max = 8192) {
+  const plan = upscalePlan(tier, nativeSizes);
+  const target = !plan.native ? 0 : plan.size === "2k" ? 2048 : 4096;
   const long = Math.max(width, height);
   if (!target || !long || long >= target) return null;
   const scale = Math.min(target, max) / long;
@@ -429,20 +445,21 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     openSetup(item);
   }, [markBusy, openSetup, prefs.upscaleQuality, refreshStatus, runUpscale, status?.ready]);
 
-  /** A Smart upscale tab: on at once when its effort can run, otherwise through setup for that effort. */
-  const chooseAutoUpscale = useCallback(async (tier: AutoUpscale) => {
+  /**
+   * A Smart upscale tab: on at once when its effort can run, otherwise through
+   * setup for that effort. Drawing natively is only ever the switch's pick:
+   * a size tab keeps it when this model draws that size too.
+   */
+  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, nativeSizes: NativeSize[] = []) => {
     const before = prefs.autoUpscale || "none";
+    const size = upscaleSize(picked);
+    const tier = size !== "none" && !picked.endsWith("-native") && before.endsWith("-native") && nativeSizes.includes(size) ? `${size}-native` as AutoUpscale : picked;
     if (tier === before) return;
     setPrefs({ autoUpscale: tier });
     const quality = autoUpscaleQuality(tier);
     if (!quality) return;
     const current = await refreshStatus(quality);
     if (current?.ready) return;
-    // Without SeedVR2 a size tab samples natively; setup opens only for an explicit "SeedVR2" pick.
-    if (before !== `${tier}-native`) {
-      setPrefs({ autoUpscale: `${tier}-native` as AutoUpscale });
-      return;
-    }
     autoBefore.current = before;
     openSetup(null, { auto: tier });
   }, [openSetup, prefs.autoUpscale, refreshStatus, setPrefs]);

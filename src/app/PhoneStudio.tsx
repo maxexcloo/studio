@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, Circle
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
-import { autoUpscaleTiers, canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { autoUpscaleTiers, canUpscaleItem, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -655,7 +655,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           <span className="phone-control-label" id="phone-upscale-label">Smart upscale</span>
           <div className="phone-seg" role="radiogroup" aria-labelledby="phone-upscale-label">
             {autoUpscaleTiers.map((tier) => (
-              <button key={tier.value} type="button" role="radio" aria-checked={autoUpscale === tier.value} className={cn(autoUpscale === tier.value && 'active')} onClick={() => chooseAutoUpscale(tier.value)}>{tier.label}</button>
+              <button key={tier.value} type="button" role="radio" aria-checked={upscaleSize(autoUpscale) === tier.value} className={cn(upscaleSize(autoUpscale) === tier.value && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.nativeSizes)}>{tier.label}</button>
             ))}
           </div>
           <p className="phone-control-note">Upscales each new image with SeedVR2, rebuilding fine detail. Takes a little longer.</p>
