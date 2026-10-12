@@ -21,6 +21,20 @@ version opens with a `> ` summary line, which the update pill shows.
   keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
   ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
   switches to the main one while its own is starting or restarting.
+- **Native 2K and 4K.** Under the size menu's 2K/4K tabs, pick how to get
+  there: SeedVR2 upscales after the run as before, Native has the model
+  sample at that size directly (the aspect you picked, long side 2048 or
+  4096). Many models render 2K natively. Without SeedVR2 installed, 2K/4K
+  go native instead of asking for setup.
+- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
+  first reference for Edit or Ref. Edit works as before: the result keeps
+  that image's size. Ref keeps your size and aspect, and the image still
+  guides the picture. A REF tag on the thumbnail shows the choice.
+
+### Changed
+- **A 2K/4K pick survives a reference.** It is skipped while an edited
+  reference or a painted mask sets the size, and back afterwards, together
+  with the aspect you had.
 
 ### Fixed
 - **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax
