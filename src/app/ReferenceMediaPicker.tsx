@@ -395,7 +395,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
                 <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
               </Tip>
               <Tip content="Let it guide a new picture, at the size you picked">
-                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Guide</button>
+                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Ref</button>
               </Tip>
             </div>
           </>
@@ -416,7 +416,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
       </button>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
-      {role?.value === "reference" ? <i className="ref-role-badge" aria-hidden="true">GUIDE</i> : null}
+      {role?.value === "reference" ? <i className="ref-role-badge" aria-hidden="true">REF</i> : null}
     </div>
   );
 }
@@ -614,7 +614,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
             busy={uploadSlot === input.id}
             progress={progress}
             fresh={freshSlot === input.id}
-            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+            // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
+            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) && !(role?.slot === input.id && role.value === "reference") ? {
               masked: Boolean(inpaint.mask),
               open: painting,
               intro: introSlot === input.id,

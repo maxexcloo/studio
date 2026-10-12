@@ -467,7 +467,7 @@
 .sidebar-reference-copy small { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-reference-remove { color: hsl(var(--muted-foreground)); }
 
-/* Edit or Guide on the framing reference: what decides the output's size. */
+/* Edit or Ref on the framing reference: what decides the output's size. */
 .ref-menu-role {
   flex: none;
   display: inline-flex;

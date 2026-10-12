@@ -177,7 +177,7 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 <details>
 <summary><b>Effort, faces and when it's skipped</b></summary>
 
-**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick. A reference set to **Guide** leaves the size to you, so the pick applies.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick. A reference set to **Ref** leaves the size to you, so the pick applies.
 
 </details>
 

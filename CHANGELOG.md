@@ -34,9 +34,10 @@ version opens with a `> ` summary line, which the update pill shows.
   [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
   without SeedVR2 still opens its setup.
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference for Edit or Guide. Edit works as before: the result keeps
-  that image's size. Guide keeps your size and aspect, and the image still
-  guides the picture, 2K/4K included. A GUIDE tag on the thumbnail shows it.
+  first reference for Edit or Ref. Edit works as before: the result keeps
+  that image's size. Ref keeps your size and aspect, and the image still
+  guides the picture, 2K/4K included. A REF tag on the thumbnail shows it.
+  The inpainting brush belongs to Edit, so it hides while Ref is on.
 
 ### Changed
 - **A tighter size menu.** Default and the ratio it already is share one
