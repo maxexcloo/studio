@@ -193,7 +193,7 @@ export function familyGraph(body) {
     const encoded = add("TextEncodeQwenImage21", { clip, prompt: body.prompt || "", negative_prompt: body.negative || "", vae, resolution, ...images });
     positive = [encoded, 0];
     negative = [encoded, 1];
-    if (references.length) editLatent = [encoded, 2];
+    if (references.length && body.referenceRole !== "reference") editLatent = [encoded, 2];
   } else {
     positive = [add("CLIPTextEncode", { text: promptText, clip }), 0];
     if (variant.guidance) positive = [add("FluxGuidance", { conditioning: positive, guidance: variant.guidance }), 0];
@@ -211,7 +211,7 @@ export function familyGraph(body) {
     const megapixels = Math.max(0.01, Math.round(width * height / 10_000) / 100);
     references.forEach((name, index) => {
       const scaled = [add("ImageScaleToTotalPixels", { image: [add("LoadImage", { image: name }), 0], upscale_method: "lanczos", megapixels, resolution_steps: 1 }), 0];
-      if (index === 0) editSize = add("GetImageSize", { image: scaled });
+      if (index === 0 && body.referenceRole !== "reference") editSize = add("GetImageSize", { image: scaled });
       const encoded = [add("VAEEncode", { pixels: scaled, vae }), 0];
       if (index === 0) firstReference = encoded;
       positive = [add("ReferenceLatent", { conditioning: positive, latent: encoded }), 0];
