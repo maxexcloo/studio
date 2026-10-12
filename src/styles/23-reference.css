@@ -467,16 +467,33 @@
 .sidebar-reference-copy small { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-reference-remove { color: hsl(var(--muted-foreground)); }
 
-/* Edit or Ref on the framing reference: what decides the output's size. */
+/* Edit or Ref on the framing reference: what decides the output's size. One
+   thumb slides between the two halves, the same motion as the size menu's tabs. */
 .ref-menu-role {
+  position: relative;
   flex: none;
-  display: inline-flex;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   padding: 3px;
   border-radius: var(--r-pill);
   background: var(--control-fill);
 }
+.ref-menu-role > i {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--r-pill);
+  background: var(--selected);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
+  transition: transform 260ms var(--spring, cubic-bezier(.3, 1.3, .5, 1));
+  pointer-events: none;
+}
+.ref-menu-role.is-ref > i { transform: translateX(100%); }
 .ref-menu-role button {
+  position: relative;
+  min-width: 46px;
   height: 32px;
   padding: 0 10px;
   border: 0;
@@ -486,11 +503,24 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: color 160ms var(--ease-out), scale 180ms var(--spring);
 }
 .ref-menu-role button:hover { color: hsl(var(--foreground)); }
-.ref-menu-role button.is-active { background: var(--selected); color: hsl(var(--foreground)); }
+.ref-menu-role button:active { scale: .96; }
+.ref-menu-role button.is-active { color: hsl(var(--foreground)); }
 .ref-menu-role button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* The brush's divider and button, folding to nothing while the image is a Ref. */
+.ref-menu-paint-slot {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  max-width: 220px;
+  overflow: hidden;
+  transition: max-width 320ms var(--ease-out), opacity 200ms var(--ease-out), translate 360ms var(--ease-out);
+}
+.ref-selected .ref-menu > .ref-menu-paint-slot.is-hidden { max-width: 0; opacity: 0; pointer-events: none; }
+
 .ref-role-badge {
   position: absolute;
   z-index: 3;
@@ -505,4 +535,12 @@
   font-weight: 700;
   letter-spacing: .04em;
   pointer-events: none;
+  opacity: 0;
+  scale: .6;
+  transition: opacity 160ms var(--ease-out), scale 260ms var(--spring);
+}
+.ref-role-badge.is-on { opacity: 1; scale: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ref-menu-role > i, .ref-menu-paint-slot, .ref-role-badge { transition: none; }
 }

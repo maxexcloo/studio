@@ -317,7 +317,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   progress: number;
   fresh: boolean;
   /** Painting on this image, for a model that can inpaint: the studio's state and how to open it. */
-  paint?: { masked: boolean; open: boolean; intro: boolean; onOpen: () => void } | null;
+  paint?: { masked: boolean; open: boolean; intro: boolean; hidden?: boolean; onOpen: () => void } | null;
   /** For a reference that can frame the output: edit this image, or only use it as a reference. */
   role?: ReferenceRoleControl | null;
   onOpen: () => void;
@@ -390,7 +390,9 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         {role ? (
           <>
             <span className="ref-menu-divider" aria-hidden="true" />
-            <div className="ref-menu-role" role="radiogroup" aria-label="What this image is">
+            <div className={cn("ref-menu-role", role.value === "reference" && "is-ref")} role="radiogroup" aria-label="What this image is">
+              {/* One thumb slides between the two, like the size menu's tabs. */}
+              <i aria-hidden="true" />
               <Tip content="Change this picture: the result keeps its size and framing">
                 <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
               </Tip>
@@ -401,22 +403,23 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           </>
         ) : null}
         {paint ? (
-          <>
+          // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
+          <span className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
             <span className="ref-menu-divider" aria-hidden="true" />
             <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
-              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} onClick={paint.onOpen}>
+              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
                 <Brush size={17} />
                 <span className="ref-menu-paint-label"><span>{coarsePointer() ? "Tap" : "Click"} to inpaint</span></span>
               </button>
             </Tip>
-          </>
+          </span>
         ) : null}
       </div>
       <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
         {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
       </button>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
-      {role?.value === "reference" ? <i className="ref-role-badge" aria-hidden="true">REF</i> : null}
+      {role ? <i className={cn("ref-role-badge", role.value === "reference" && "is-on")} aria-hidden="true">REF</i> : null}
     </div>
   );
 }
@@ -615,7 +618,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
             progress={progress}
             fresh={freshSlot === input.id}
             // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
-            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) && !(role?.slot === input.id && role.value === "reference") ? {
+            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+              hidden: role?.slot === input.id && role.value === "reference",
               masked: Boolean(inpaint.mask),
               open: painting,
               intro: introSlot === input.id,
