@@ -16,7 +16,8 @@ version opens with a `> ` summary line, which the update pill shows.
   container next to your ComfyUI, keeping its data on a volume and serving
   the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
   non-root, for `docker run` without compose) and the how-to are in
-  [DOCKER.md](./docs/guides/DOCKER.md).
+  [DOCKER.md](./docs/guides/DOCKER.md). The studio is published to this
+  computer only, and settings made in the app are kept on the data volume.
 - **Settings › Connection › Change address › Find ComfyUI on its own.** Off
   keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
   ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
@@ -31,9 +32,9 @@ version opens with a `> ` summary line, which the update pill shows.
   Qwen-Image and others) at 4K. The list and its sources are in
   [MODELS.md](./docs/guides/MODELS.md#native-2k4k).
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference for Edit or Ref. Edit works as before: the result keeps
-  that image's size. Ref keeps your size and aspect, and the image still
-  guides the picture. A REF tag on the thumbnail shows the choice.
+  first reference for Edit or Guide. Edit works as before: the result keeps
+  that image's size. Guide keeps your size and aspect, and the image still
+  guides the picture, 2K/4K included. A GUIDE tag on the thumbnail shows it.
 
 ### Changed
 - **A 2K/4K pick survives a reference.** It is skipped while an edited

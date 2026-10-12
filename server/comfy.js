@@ -10,7 +10,8 @@ import { isInside } from "./paths.js";
 export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 // A live binding: importers see the new address as soon as setComfyUrl changes it.
-export let comfyUrl = normalizeComfyUrl(process.env.COMFY_URL || "") || "http://127.0.0.1:8188";
+// HEISS_DEFAULT_COMFY_URL: where to look before anything is saved (the Docker image's host.docker.internal).
+export let comfyUrl = normalizeComfyUrl(process.env.COMFY_URL || "") || normalizeComfyUrl(process.env.HEISS_DEFAULT_COMFY_URL || "") || "http://127.0.0.1:8188";
 
 /** "localhost:8000", "http://pc.local:8188/" or a bare port all become a clean http(s) origin. */
 export function normalizeComfyUrl(value = "") {
@@ -35,7 +36,10 @@ export function setComfyUrl(value = "") {
 }
 export const lan = resolveLan({ argv: process.argv, env: process.env, fileKeys: envFileKeys });
 export const host = lan.host;
-export const lanListening = listensBeyondThisComputer(host);
+/** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
+export const dockerHostOnly = process.env.HEISS_DOCKER_HOST_ONLY === "1";
+// Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
+export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
 /**
  * The Settings switch: remembered in .env, used from the next start. A HOST
@@ -156,7 +160,9 @@ export function setComfyFolderPaths(map = {}) {
  */
 export function modelFolders(kind, subfolders = [kind]) {
   const models = comfyModelsDir();
-  const dirs = [...(comfyFolderPaths[kind] || []), ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
+  // extra_model_paths.yaml keys are matched loosely by custom nodes (SEEDVR2: and seedvr2: are one folder kind).
+  const named = Object.keys(comfyFolderPaths).filter((key) => key.toLowerCase() === String(kind).toLowerCase()).flatMap((key) => comfyFolderPaths[key] || []);
+  const dirs = [...named, ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
   return [...new Set(dirs)].filter((dir) => {
     try { return fs.statSync(dir).isDirectory(); } catch { return false; }
   });

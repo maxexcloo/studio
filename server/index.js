@@ -729,7 +729,7 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     }
     const latencyMs = Math.round(performance.now() - startedAt);
     const message = error?.name === "AbortError" ? "Connection timed out" : error?.message || "Connection failed";
-    res.json({ connected: false, isMock: demoMode, url: comfyUrl, latencyMs, ...restartFields(), nearby: nearbyAddresses(comfyUrl), error: `${message}${demoMode ? " (Demo Mode Active)" : ""}` });
+    res.json({ connected: false, isMock: demoMode, url: comfyUrl, latencyMs, ...restartFields(), nearby: comfySearchEnabled() ? nearbyAddresses(comfyUrl) : [], error: `${message}${demoMode ? " (Demo Mode Active)" : ""}` });
   } finally {
     clearTimeout(timeout);
   }
@@ -1671,7 +1671,7 @@ app.post("/api/generate", async (req, res) => {
     body.width = startSize.width;
     body.height = startSize.height;
   }
-  if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize) })) body.autoUpscale = null;
+  if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize), referenceRole: body.referenceRole })) body.autoUpscale = null;
   // Every image this run handed ComfyUI: all of them go after a Hidden run, and
   // after a normal one, temporary resized copies and any Hidden references.
   const staged = (body.referenceAssets || []).filter((item) => item.comfyName);
@@ -2403,7 +2403,7 @@ startServers(app, {
     const pagePort = dev ? 5173 : listening;
     Promise.resolve(printBanner({ version: appVersion, url: `http://${shownHost}:${pagePort}`, comfyUrl })).then(async () => {
       // Listening beyond this computer: say where a phone can open it.
-      if ((host === "0.0.0.0" || host === "::") && !plan.tlsProblem) {
+      if (lanListening && (host === "0.0.0.0" || host === "::") && !plan.tlsProblem) {
         const addresses = plan.httpsHost
           ? startupTls.names.filter((name) => !name.startsWith("*.")).map((name) => `https://${name.includes(":") ? `[${name}]` : name}:${httpsPort}`)
           : Object.values(os.networkInterfaces()).flatMap((entries) => entries || []).filter((entry) => entry.family === "IPv4" && !entry.internal).map((entry) => `http://${entry.address}:${pagePort}`);

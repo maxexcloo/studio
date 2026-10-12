@@ -32,23 +32,27 @@ WORKDIR /app
 
 # In a container the server must listen beyond 127.0.0.1 to be reachable through
 # the published port. HEISS_NO_BROWSER=1 keeps it from opening a nonexistent
-# browser; data lives on the /data volume, not in the image.
+# browser. Data and the settings the app saves (.env) live on the /data volume,
+# not in the image, so Settings survive a new container. ComfyUI is looked for
+# on the machine Docker runs on until Settings › Connection saves another address.
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8787 \
     HEISS_NO_BROWSER=1 \
-    HEISS_DATA_DIR=/data
+    HEISS_DATA_DIR=/data \
+    HEISS_ENV_FILE=/data/.env \
+    HEISS_DEFAULT_COMFY_URL=http://host.docker.internal:8188
 
-COPY --from=deps  /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY server ./server
-COPY scripts ./scripts
-COPY workflows ./workflows
-COPY package.json ./
+COPY --chown=node:node --from=deps  /app/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/dist ./dist
+COPY --chown=node:node server ./server
+COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node workflows ./workflows
+COPY --chown=node:node package.json ./
 
-# The server rewrites its .env to remember settings (TLS, other devices), and
-# the data dir holds gallery, vault and downloads: both need to be writable.
-RUN mkdir -p /data && chown -R node:node /app /data
+# The data dir holds gallery, vault, downloads and the saved settings: writable.
+# (--chown above instead of chown -R, which would copy node_modules into a layer again.)
+RUN mkdir -p /data && chown node:node /app /data
 USER node
 
 EXPOSE 8787

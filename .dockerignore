@@ -11,7 +11,11 @@ data/
 dist
 node_modules
 
-# Not needed inside the image
+# Not needed inside the image (release builds, private notes, screenshots)
+private
+release
+artifacts
+product-screenshots
 docs
 *.md
 .vscode

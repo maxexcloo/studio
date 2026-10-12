@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { allowLanActions, root } from "./comfy.js";
+import { allowLanActions, dockerHostOnly, root } from "./comfy.js";
 import { classifyClient } from "./client-trust.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
@@ -40,7 +40,7 @@ export const deviceSessionSeconds = (() => {
 /** Who is asking, worked out once per request. */
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false, network: false };
-  if (!req.heissClient) req.heissClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.HEISS_DEV_PROXY_TOKEN || "" });
+  if (!req.heissClient) req.heissClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.HEISS_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
   return req.heissClient;
 }
 

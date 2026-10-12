@@ -171,12 +171,13 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 - **Any picture, one click.** The upscale arrow on a tile or in the viewer upscales anything already in the gallery, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
 - **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
+- **Or drawn at that size.** Models made for big pictures (Flux.2, Qwen-Image 2.1, Z-Image and more) add **Draw at 2K directly** under the tabs: the model makes the picture at 2K or 4K itself, faster and with nothing in between.
 
 
 <details>
 <summary><b>Effort, faces and when it's skipped</b></summary>
 
-**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick. A reference set to **Guide** leaves the size to you, so the pick applies.
 
 </details>
 
