@@ -465,14 +465,18 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   React.useEffect(() => { if (!inpaint) setPainting(false); }, [inpaint]);
   const paintedAsset = inpaint ? selected.find((item) => item.slot === inpaint.slot)?.asset || null : null;
   React.useEffect(() => { setPainting(false); }, [paintedAsset?.id]);
+  // Ref only guides a new picture, so there is nothing of this image to paint: Ref closes the brush studio.
+  const asRef = role?.value === "reference";
+  React.useEffect(() => { if (asRef) setPainting(false); }, [asRef]);
   // The first image that can be painted on shows where the brush is, once, by opening its menu for a moment.
   const [introSlot, setIntroSlot] = React.useState("");
   React.useEffect(() => {
-    if (!inpaint || !paintedAsset || inpaintIntroduced()) return;
+    // Not while it's a Ref: the brush is folded away, and the one-time intro would be spent on nothing.
+    if (!inpaint || !paintedAsset || asRef || inpaintIntroduced()) return;
     const start = window.setTimeout(() => setIntroSlot(inpaint.slot), 500);
     const end = window.setTimeout(() => { setIntroSlot(""); rememberInpaintIntro(); }, 3600);
     return () => { window.clearTimeout(start); window.clearTimeout(end); setIntroSlot(""); };
-  }, [inpaint?.slot, paintedAsset?.id]);
+  }, [inpaint?.slot, paintedAsset?.id, asRef]);
   // Find the prompt bar whenever this renders into it. On first mount there may be
   // no inputs yet (the workflow is still loading), so nothing is rendered to look from.
   React.useLayoutEffect(() => {
