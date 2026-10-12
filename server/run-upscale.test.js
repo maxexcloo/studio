@@ -88,4 +88,7 @@ test("a 2K/4K pick drops once a reference or a painted mask decides the size", (
   assert.equal(dropsAutoUpscale({ inpaint: { box: {} }, referencesFamily: 0, hasReference: false }), true);
   // A plain img2img start image (no references slot): still the model's own pick to make.
   assert.equal(dropsAutoUpscale({ inpaint: null, referencesFamily: 0, hasReference: true }), false);
+  // A reference that only guides (Ref): the picked size is the output's, so its 2K/4K stays.
+  assert.equal(dropsAutoUpscale({ inpaint: null, referencesFamily: 1, hasReference: true, referenceRole: "reference" }), false);
+  assert.equal(dropsAutoUpscale({ inpaint: { box: {} }, referencesFamily: 1, hasReference: true, referenceRole: "reference" }), true);
 });

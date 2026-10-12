@@ -30,7 +30,7 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { autoUpscaleQuality, upscaleDisplayThumbnail, upscaleDisplayUrl, useUpscale } from './app/useUpscale';
+import { autoUpscaleQuality, nativeUpscaleSize, upscaleDisplayThumbnail, upscaleDisplayUrl, upscalePlan, useUpscale } from './app/useUpscale';
 import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
@@ -1205,7 +1205,8 @@ function App() {
       }
       return;
     }
-    if (!sizeBeforeLock.current || sizeBeforeLock.current.model !== model) sizeBeforeLock.current = { model, width, height, customSize: Boolean(customSize) };
+    // Kept from before the first lock only: on another model the size is already the reference's.
+    if (!sizeBeforeLock.current) sizeBeforeLock.current = { model, width, height, customSize: Boolean(customSize) };
     setCustomSize(false);
     const pixels = Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024);
     const scale = prefs.autoResizeInputs === false ? 1 : Math.min(1, Math.sqrt(pixels / (referenceForAspect.width * referenceForAspect.height)));
@@ -1248,10 +1249,12 @@ function App() {
   // What Generate would take with these settings, the way generate() would send them.
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
+  // Drawn at 2K/4K directly: estimated at that size, as generate() sends it.
+  const estimateSize = (mode === "image" && nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.nativeSizes)) || { width, height };
   const generationEstimate = useGenerationEstimate({
-    mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width, height, steps,
+    mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
-    upscale: mode === "image" && prefs.smartUpscale !== false ? autoUpscaleQuality(prefs.autoUpscale) || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
+    upscale: mode === "image" && prefs.smartUpscale !== false ? upscalePlan(prefs.autoUpscale, currentProfile?.nativeSizes).quality || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {
@@ -1573,7 +1576,7 @@ function App() {
     onChange: (dataUrl: string | null) => setInpaintMask(dataUrl ? { assetId: referenceAsset.id, dataUrl } : null)
   } : null;
   // The switch shows on the framing reference, once one is there; a painted mask settles it as an edit.
-  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && referenceInput && framingReference && !activeInpaintMask ? {
+  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference && !activeInpaintMask ? {
     slot: referenceInput.id,
     value: referenceRole,
     onChange: (value: ReferenceRole) => setPrefs({ referenceRole: value })

@@ -447,13 +447,13 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
 
   /**
    * A Smart upscale tab: on at once when its effort can run, otherwise through
-   * setup for that effort. Drawing natively is only ever the switch's pick:
-   * a size tab keeps it when this model draws that size too.
+   * setup for that effort. Drawing natively is only ever the switch's pick
+   * (exact): a size tab keeps it when this model draws that size too.
    */
-  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, nativeSizes: NativeSize[] = []) => {
+  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, nativeSizes: NativeSize[] = [], exact = false) => {
     const before = prefs.autoUpscale || "none";
     const size = upscaleSize(picked);
-    const tier = size !== "none" && !picked.endsWith("-native") && before.endsWith("-native") && nativeSizes.includes(size) ? `${size}-native` as AutoUpscale : picked;
+    const tier = !exact && size !== "none" && !picked.endsWith("-native") && before.endsWith("-native") && nativeSizes.includes(size) ? `${size}-native` as AutoUpscale : picked;
     if (tier === before) return;
     setPrefs({ autoUpscale: tier });
     const quality = autoUpscaleQuality(tier);

@@ -310,7 +310,7 @@ const upscaleTabs: { value: AutoUpscale; label: string }[] = [
 ];
 
 /** Smart upscale's tabs, on top of the size menu: what every new image becomes once it finishes. */
-function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value: AutoUpscale; nativeSizes?: NativeSize[]; onChange: (value: AutoUpscale) => void }) {
+function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value: AutoUpscale; nativeSizes?: NativeSize[]; onChange: (value: AutoUpscale, exact?: boolean) => void }) {
   // The tabs pick the size, the only choice there is. A model that can draw that size itself
   // adds one switch under them for it; models that can't never show it.
   const { size: value, native } = upscalePlan(picked, nativeSizes);
@@ -347,14 +347,14 @@ function SmartUpscaleTabs({ value: picked, nativeSizes = [], onChange }: { value
       {canDraw ? (
         <label className="aspect-upscale-native">
           <span>Draw at {value.toUpperCase()} directly</span>
-          <button type="button" role="switch" aria-checked={native} className="switch is-sm" onClick={() => onChange(native ? value : `${value}-native` as AutoUpscale)}><span className="switch-thumb" /></button>
+          <button type="button" role="switch" aria-checked={native} aria-label={`Draw at ${value.toUpperCase()} directly`} className="switch is-sm" onClick={() => onChange(native ? value : `${value}-native` as AutoUpscale, true)}><span className="switch-thumb" /></button>
         </label>
       ) : null}
     </div>
   );
 }
 
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", nativeSizes = [], onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; nativeSizes?: NativeSize[]; onUpscaleChange?: (value: AutoUpscale) => void }) {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", nativeSizes = [], onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; nativeSizes?: NativeSize[]; onUpscaleChange?: (value: AutoUpscale, exact?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);

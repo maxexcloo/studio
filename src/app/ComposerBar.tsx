@@ -220,7 +220,7 @@ export type ComposerBarProps = {
   applyAspect: (value: string) => void;
   /** Smart upscale's tabs on top of the size menu; left out where it doesn't apply (video). */
   autoUpscale?: AutoUpscale;
-  onAutoUpscaleChange?: (value: AutoUpscale, nativeSizes?: NativeSize[]) => void;
+  onAutoUpscaleChange?: (value: AutoUpscale, nativeSizes?: NativeSize[], exact?: boolean) => void;
   customSize: boolean;
   aspectLocked?: boolean;
   width: number;
@@ -306,7 +306,7 @@ export function ComposerBar(props: ComposerBarProps) {
       density={density}
       upscale={autoUpscale}
       nativeSizes={currentProfile?.nativeSizes}
-      onUpscaleChange={onAutoUpscaleChange ? (value) => onAutoUpscaleChange(value, currentProfile?.nativeSizes) : undefined}
+      onUpscaleChange={onAutoUpscaleChange ? (value, exact) => onAutoUpscaleChange(value, currentProfile?.nativeSizes, exact) : undefined}
     />
   );
 

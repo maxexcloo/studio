@@ -17,8 +17,9 @@ const tierLabels = { balanced: "2K", high: "4K" };
  * output's size is already decided by that reference or mask, not the pick,
  * so a stale one from before either was set must not sneak an upscale in.
  */
-export function dropsAutoUpscale({ inpaint, referencesFamily, hasReference }) {
-  return Boolean(inpaint || (referencesFamily && hasReference));
+export function dropsAutoUpscale({ inpaint, referencesFamily, hasReference, referenceRole = "edit" }) {
+  // A reference that only guides (Edit | Ref) leaves the size to the pick, so its 2K/4K stays.
+  return Boolean(inpaint || (referencesFamily && hasReference && referenceRole !== "reference"));
 }
 
 /**

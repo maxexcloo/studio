@@ -391,11 +391,11 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           <>
             <span className="ref-menu-divider" aria-hidden="true" />
             <div className="ref-menu-role" role="radiogroup" aria-label="What this image is">
-              <Tip content="Edit this image: the result keeps its size and framing">
+              <Tip content="Change this picture: the result keeps its size and framing">
                 <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
               </Tip>
-              <Tip content="Use as a reference: the result takes the size you picked">
-                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Ref</button>
+              <Tip content="Let it guide a new picture, at the size you picked">
+                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Guide</button>
               </Tip>
             </div>
           </>
@@ -416,7 +416,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
       </button>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
-      {role?.value === "reference" ? <i className="ref-role-badge" aria-hidden="true">REF</i> : null}
+      {role?.value === "reference" ? <i className="ref-role-badge" aria-hidden="true">GUIDE</i> : null}
     </div>
   );
 }
