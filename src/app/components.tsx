@@ -600,7 +600,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
       const anchor = pickerRef.current?.getBoundingClientRect();
       const surface = menuRef.current;
       if (!anchor || !surface) return;
-      const width = Math.min(440, window.innerWidth - 32);
+      const width = Math.min(520, window.innerWidth - 32);
       const above = anchor.top - 16;
       const below = window.innerHeight - anchor.bottom - 16;
       const upward = compact ? above >= Math.min(320, below) : below < Math.min(320, above);

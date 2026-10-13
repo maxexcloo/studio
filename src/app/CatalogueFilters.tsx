@@ -14,12 +14,12 @@ export function CatalogueFilters({ kind = 'image', value, onChange }: { kind?: M
       {button('All', !value.favourites && !value.speed && !value.purpose, emptyCatalogueFilter)}
       {button('Favourites', value.favourites, { ...value, favourites: !value.favourites })}
     </span>
-    <span className="model-filter-group">
+    <span className="model-filter-group" role="group" aria-label="Speed">
       <span className="model-filter-label">Speed</span>
-      {button('Standard', value.speed === 'standard', { ...value, speed: value.speed === 'standard' ? '' : 'standard' })}
-      {button('Flash', value.speed === 'flash', { ...value, speed: value.speed === 'flash' ? '' : 'flash' })}
+      {button('Standard', value.speed === 'standard', { ...value, speed: value.speed === 'standard' ? '' : 'standard' }, 'Standard generation recipes')}
+      {button('Fast', value.speed === 'flash', { ...value, speed: value.speed === 'flash' ? '' : 'flash' }, 'Accelerated generation recipes')}
     </span>
-    <span className="model-filter-group">
+    <span className="model-filter-group" role="group" aria-label="Use">
       <span className="model-filter-label">Use</span>
       {button(kind === 'video' ? 'Non-Reference' : 'Generate', value.purpose === 'generate', { ...value, purpose: value.purpose === 'generate' ? '' : 'generate' }, 'Generate without a reference image')}
       {button(kind === 'video' ? 'Reference' : 'Edit', value.purpose === 'edit', { ...value, purpose: value.purpose === 'edit' ? '' : 'edit' }, 'Use a reference image')}

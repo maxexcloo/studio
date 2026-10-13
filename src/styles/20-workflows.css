@@ -57,6 +57,8 @@
 }
 .wf-filters button:hover, .model-filters button:hover { color: hsl(var(--foreground)); }
 .wf-filters button.active, .model-filters button.active { background: var(--selected); box-shadow: none; color: #fff; }
+.model-filters button.active { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.model-filters button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 
 .wf-grid {
   flex: 1;
