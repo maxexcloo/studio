@@ -448,8 +448,8 @@ export function WorkflowGallery({ view }: { view: any }) {
                 <span className="wf-card-footer">
                   <span className="wf-card-time">{workflowCardText(workflow).time}</span>
                   {workflow.profileId === model ? <span className="wf-current">In Use</span> : workflowCardText(workflow).input ? <span className="wf-input">{workflowCardText(workflow).input}</span> : null}
+                  {workflow.validation.ok && !workflow.validation.unverified ? null : <StatusBadge validation={workflow.validation} />}
                 </span>
-                {workflow.validation.ok && !workflow.validation.unverified ? null : <StatusBadge validation={workflow.validation} />}
               </button>
             ))}
           </div>
