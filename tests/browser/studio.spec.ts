@@ -230,6 +230,10 @@ test('model speed and reference filters combine and All clears them', async ({ p
   });
   await page.goto('/');
   await openComposer(page, isMobile);
+  const composerMode = page.getByRole('combobox', { name: 'Generation Mode', exact: true });
+  await composerMode.selectOption('video');
+  await expect(controls(page, isMobile).mode.getByText('Video', { exact: true })).toHaveAttribute(isMobile ? 'aria-checked' : 'aria-pressed', 'true');
+  await composerMode.selectOption('image');
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
   else await page.locator('.model-trigger').first().click();
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');

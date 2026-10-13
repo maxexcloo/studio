@@ -4,7 +4,7 @@ import { Modal } from './Modal';
 import type { ConfirmAction } from './useConfirmation';
 import { apiJson, copyText } from './api';
 import { cn } from './format';
-import { BetaTag, Field, StudioSelect as Select } from './components';
+import { Field, StudioSelect as Select } from './components';
 import { Segmented } from './SettingsControls';
 import { compareModelNames, workflowPurpose, workflowSpeed } from './catalogueNames';
 import { workflowState } from './workflowStatus';
@@ -426,7 +426,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             <input className="is-framed" aria-label="Search workflows" value={query} placeholder="Search workflows" onChange={(event) => setQuery(event.target.value)} />
             {query ? <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={13} /></button> : null}
           </label>
-          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Image" }, { value: "video", label: <>Video<BetaTag /></> }]} />
+          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Photo" }, { value: "video", label: "Video" }]} />
         </div>
         <div ref={filtersWheelRef} className="wf-filters" role="group" aria-label="Filter Workflows">
           {([["all", `All ${ofKind.length}`], ["favorites", "Favourites"], ...(attentionCount ? [["attention", `Needs Attention ${attentionCount}`]] : [])] as Array<[Filter, string]>).map(([value, label]) => (

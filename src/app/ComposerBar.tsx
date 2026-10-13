@@ -1,4 +1,5 @@
 import React from 'react';
+import { ComposerModeSelect } from './ComposerModeSelect';
 import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, History, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
@@ -281,6 +282,7 @@ export type ComposerBarProps = {
   historyOpen?: boolean;
   hasText?: boolean;
   onClearText?: () => void;
+  onModeChange?: (mode: 'image' | 'video') => void;
 };
 
 export function ComposerBar(props: ComposerBarProps) {
@@ -293,7 +295,7 @@ export function ComposerBar(props: ComposerBarProps) {
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false, hasText = false, onClearText
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false, hasText = false, onClearText, onModeChange
   } = props;
 
   const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
@@ -409,6 +411,7 @@ export function ComposerBar(props: ComposerBarProps) {
               </button>
             </Tip>
           ) : null}
+          {onModeChange ? <ComposerModeSelect mode={mode} onChange={onModeChange} /> : null}
           {onToggleHistory ? (
             // Styled as the Negative toggle at its icon-only size: one family of composer controls.
             <Tip content="Recent prompts (↑ in an empty prompt)">

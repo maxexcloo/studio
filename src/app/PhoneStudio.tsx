@@ -1,4 +1,5 @@
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
+import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
 import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
@@ -658,6 +659,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           <button type="button" className="phone-compose-recent" aria-label="Clear Prompt & Negative" disabled={!prompt && !negative} onClick={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }}>
             <X size={15} /> Clear Text
           </button>
+          <ComposerModeSelect mode={view.mode} onChange={view.changeMode} />
         </div>
       </div>
       <PromptHistorySheet
