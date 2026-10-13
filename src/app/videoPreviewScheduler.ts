@@ -4,8 +4,11 @@ const previews = new Map<HTMLVideoElement, Preview>();
 let nearObserver: IntersectionObserver | undefined;
 let visibleObserver: IntersectionObserver | undefined;
 let suspended = 0;
-let autoplay = true;
-try { autoplay = localStorage.getItem('heiss-grid-autoplay') !== 'off'; } catch { /* Storage may be disabled. */ }
+let autoplay = typeof window === 'undefined' || !window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+try {
+  const saved = localStorage.getItem('heiss-grid-autoplay');
+  if (saved !== null) autoplay = saved !== 'off';
+} catch { /* Storage may be disabled. */ }
 const autoplayListeners = new Set<() => void>();
 export const gridAutoplayEnabled = () => autoplay;
 export function subscribeGridAutoplay(listener: () => void) { autoplayListeners.add(listener); return () => { autoplayListeners.delete(listener); }; }
@@ -30,7 +33,7 @@ function forcedPhone() {
 function reconcile() {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   // A screenful of tiles plays at once on a computer; phones decode fewer, and Data Saver fewer still.
-  const limit = connection?.saveData ? 2 : phone?.matches || forcedPhone() ? 6 : 24;
+  const limit = connection?.saveData ? 2 : phone?.matches || forcedPhone() ? 2 : 24;
   const candidates = [...previews.values()].filter((p) => p.near).sort((a, b) => b.ratio - a.ratio);
   const selected = new Set(!suspended && autoplay ? candidates.slice(0, limit) : []);
   for (const p of previews.values()) {

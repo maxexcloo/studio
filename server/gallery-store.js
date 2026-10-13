@@ -5,6 +5,7 @@ import { comfyOutputDir, localOutputFile, root } from './comfy.js';
 import { hasLegacyPrompt, openLegacyPrompt } from './privacy.js';
 import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from './json-store.js';
 import { isInside } from './paths.js';
+import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from './gallery-order.js';
 
 export const dataDir = process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR) : path.join(root, "data");
 export const galleryPath = path.join(dataDir, "gallery.json");
@@ -105,21 +106,6 @@ function loadHiddenGalleryIds() {
   return markers;
 }
 
-// Sorting parses createdAt inside the comparator; items are replaced rather than
-// mutated, so the parsed time can be remembered per item object.
-const parsedTimes = new WeakMap();
-
-function galleryTime(item) {
-  if (!item || typeof item !== "object") return 0;
-  let time = parsedTimes.get(item);
-  if (time === undefined) {
-    const parsed = Date.parse(item.createdAt || "");
-    time = Number.isFinite(parsed) ? parsed : 0;
-    parsedTimes.set(item, time);
-  }
-  return time;
-}
-
 export function galleryKey(item) {
   return item?.url || item?.id || item?.outputName || item?.filename || "";
 }
@@ -129,14 +115,7 @@ export function galleryRevisionValue() {
 }
 
 export function sortGallery(items = gallery) {
-  return [...items].sort((a, b) => {
-    const timeDelta = galleryTime(b) - galleryTime(a);
-    if (timeDelta) return timeDelta;
-    const aIndex = Number(a.index ?? 0);
-    const bIndex = Number(b.index ?? 0);
-    if (a.jobId && b.jobId && a.jobId === b.jobId && aIndex !== bIndex) return aIndex - bIndex;
-    return String(b.id || "").localeCompare(String(a.id || ""));
-  });
+  return [...items].sort(compareGalleryItems);
 }
 
 function bumpRevision(changes = {}) {
@@ -286,6 +265,12 @@ function pageStart(entry, cursor) {
   if (!entry.positions) entry.positions = new Map(entry.items.map((item, index) => [cursorFor(item), index]));
   const exact = entry.positions.get(String(cursor));
   if (exact !== undefined) return exact + 1;
+  if (!String(cursor).startsWith("v2|")) {
+    const [timeText, encodedId = ""] = String(cursor).split("|");
+    const id = decodeURIComponent(encodedId);
+    const legacy = entry.items.findIndex((item) => String(item.id || item.url || "") === id && galleryTime(item) === Number(timeText || 0));
+    if (legacy >= 0) return legacy + 1;
+  }
   const found = entry.items.findIndex((item) => afterCursor(item, cursor));
   return found < 0 ? entry.items.length : found;
 }
@@ -349,18 +334,21 @@ export function setGalleryFavorites(keys, favorite) {
 
 function cursorFor(item) {
   if (!item) return "";
-  return `${galleryTime(item)}|${encodeURIComponent(String(item.id || item.url || ""))}`;
+  return `v2|${encodeURIComponent(JSON.stringify(galleryOrderKey(item)))}`;
 }
 
 function afterCursor(item, cursor = "") {
   if (!cursor) return true;
+  if (String(cursor).startsWith("v2|")) {
+    try {
+      const key = JSON.parse(decodeURIComponent(String(cursor).slice(3)));
+      return compareGalleryKeys(galleryOrderKey(item), key) > 0;
+    } catch { return false; }
+  }
   const [timeText, encodedId = ""] = String(cursor).split("|");
   const cursorTime = Number(timeText || 0);
   const cursorId = decodeURIComponent(encodedId);
-  const itemTime = galleryTime(item);
-  if (itemTime < cursorTime) return true;
-  if (itemTime > cursorTime) return false;
-  return String(item.id || item.url || "").localeCompare(cursorId) > 0;
+  return compareGalleryKeys(galleryOrderKey(item), { bucket: 0, time: cursorTime, id: cursorId, jobId: "", index: 0 }) > 0;
 }
 
 export function pageGallery({ type = "", limit = 200, cursor = "", includeFailed = true, filter = null } = {}) {
@@ -1057,11 +1045,16 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
 export function updateGalleryJob(id, patch, options = {}) {
   let changed = false;
   const upserts = [];
+  // Compare the patched fields only: a preview is a large base64 string and
+  // the item around it may hold another one, so stringifying both is costly at
+  // the rate progress and previews arrive (worse with two runs at once).
+  const fields = Object.keys(patch).map((key) => [key, JSON.stringify(patch[key])]);
   gallery = gallery.map((item) => {
     if (item.jobId === id || item.id === id || item.url === id) {
       changed = true;
+      if (fields.every(([key, encoded]) => JSON.stringify(item[key]) === encoded)) return item;
       const next = { ...item, ...patch };
-      if (JSON.stringify(item) !== JSON.stringify(next)) upserts.push(next);
+      upserts.push(next);
       return next;
     }
     return item;

@@ -23,6 +23,26 @@ test("uploaded references are validated, indexed, thumbnailed, and deletable", a
   assert.equal(referenceAssets.listReferenceAssets({}, { source: "upload" }).items.length, 0);
 });
 
+test("a reference page maps only the items it returns", async () => {
+  const saved = [];
+  for (let index = 0; index < 5; index += 1) {
+    // Distinct pixels: uploads are keyed by content, and five copies would be one asset.
+    const buffer = await sharp({ create: { width: 16 + index, height: 16, channels: 3, background: `#12345${index}` } }).png().toBuffer();
+    saved.push(await referenceAssets.saveUploadedReference({ buffer, name: `page-${index}.png`, mime: "image/png" }));
+  }
+  const first = referenceAssets.listReferenceAssets({}, { source: "upload", limit: 2 });
+  assert.equal(first.items.length, 2);
+  assert.equal(first.hasMore, true);
+  const second = referenceAssets.listReferenceAssets({}, { source: "upload", cursor: first.nextCursor, limit: 2 });
+  assert.equal(second.items.length, 2);
+  assert.equal(second.hasMore, true);
+  const third = referenceAssets.listReferenceAssets({}, { source: "upload", cursor: second.nextCursor, limit: 2 });
+  assert.equal(third.items.length, 1);
+  assert.equal(third.hasMore, false);
+  assert.equal(third.nextCursor, "");
+  for (const asset of saved) referenceAssets.deleteUploadedReference(asset.id);
+});
+
 test("non-image uploads are rejected", async () => {
   await assert.rejects(() => referenceAssets.saveUploadedReference({ buffer: Buffer.from("not an image"), name: "fake.png", mime: "image/png" }));
 });

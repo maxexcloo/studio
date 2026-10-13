@@ -62,7 +62,7 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
             setFailedSource(source);
             setResolved(true);
           }} />
-      ) : !pending ? <Media item={item} muted={muted} /> : null}
+      ) : !pending ? <Media item={item.type === "video" && item.upscaleActive && item.upscale?.url ? { ...item, url: displayUrl, thumbnailUrl: displayThumbnail } : item} muted={muted} /> : null}
       {pending && inpaint ? (
         <div className="generation-inpaint" aria-hidden="true">
           <SafeImg className="generation-inpaint-base" src={`/api/reference-assets/${encodeURIComponent(inpaint.referenceId)}/media`} draggable={false} />

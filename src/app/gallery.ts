@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { GalleryItem } from './types';
+import { compareGalleryItems } from '../../server/gallery-order.js';
+export { galleryTime } from '../../server/gallery-order.js';
 
 export type GalleryPhoto = {
   src: string;
@@ -21,29 +23,8 @@ export function dedupeGalleryItems(items: GalleryItem[]) {
   });
 }
 
-// Sorting parses createdAt inside the comparator; items are replaced rather than
-// mutated, so the parsed time can be remembered per item object.
-const parsedTimes = new WeakMap<GalleryItem, number>();
-
-export function galleryTime(item: GalleryItem) {
-  let time = parsedTimes.get(item);
-  if (time === undefined) {
-    const parsed = Date.parse(item.createdAt || "");
-    time = Number.isFinite(parsed) ? parsed : 0;
-    parsedTimes.set(item, time);
-  }
-  return time;
-}
-
 export function sortGalleryItems(items: GalleryItem[]) {
-  return [...items].sort((a, b) => {
-    const timeDelta = galleryTime(b) - galleryTime(a);
-    if (timeDelta) return timeDelta;
-    const aIndex = Number(a.index ?? 0);
-    const bIndex = Number(b.index ?? 0);
-    if (a.jobId && b.jobId && a.jobId === b.jobId && aIndex !== bIndex) return aIndex - bIndex;
-    return String(b.id || "").localeCompare(String(a.id || ""));
-  });
+  return [...items].sort(compareGalleryItems);
 }
 
 export function galleryColumnTarget() {

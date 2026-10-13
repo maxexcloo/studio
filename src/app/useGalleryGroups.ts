@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { groupGallery, type GalleryGroups, type Moment, type Run } from './runs';
 import type { GalleryItem } from './types';
+import { galleryBucket } from '../../server/gallery-order.js';
 
 const sameItems = (a: GalleryItem[], b: GalleryItem[]) => a.length === b.length && a.every((item, index) => item === b[index]);
 
@@ -14,7 +15,7 @@ const sameItems = (a: GalleryItem[], b: GalleryItem[]) => a.length === b.length 
  * groups come back.
  */
 export function useGalleryGroups(items: GalleryItem[], { runs }: { runs: boolean }): GalleryGroups {
-  const shape = useMemo(() => items.map((item) => `${item.id}${item.status[0]}${item.prompt ? item.prompt.length : 0}`).join(","), [items]);
+  const shape = useMemo(() => items.map((item) => `${item.id}${item.status[0]}${galleryBucket(item)}${item.prompt ? item.prompt.length : 0}`).join(","), [items]);
   // Names like "This evening" move on with the clock.
   const hour = Math.floor(Date.now() / 3_600_000);
   const structure = useMemo(() => groupGallery(items, { runs }), [shape, runs, hour]); // eslint-disable-line react-hooks/exhaustive-deps
