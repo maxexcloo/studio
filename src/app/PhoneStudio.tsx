@@ -1,6 +1,6 @@
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import React from 'react';
-import { modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
+import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
@@ -738,13 +738,13 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const [query, setQuery] = React.useState('');
   const [filters, setFilters] = React.useState(emptyCatalogueFilter);
   React.useEffect(() => { if (!open) setQuery(''); }, [open]);
-  const profiles = modelProfiles || [];
+  const profiles = React.useMemo(() => [...(modelProfiles || [])].sort(compareModelNames), [modelProfiles]);
   const favorites = new Set(modelMenu?.favorites || []);
   const needle = query.trim().toLowerCase();
   const matches = (profile: Profile) => profileMatchesFilters(profile, filters, modelMenu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
-  const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4);
+  const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
   const shown = new Set(starred.map((profile) => profile.id));
   const rest = profiles.filter((profile) => !shown.has(profile.id) && matches(profile));
   const row = (profile: Profile) => (

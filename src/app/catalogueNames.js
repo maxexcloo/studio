@@ -53,6 +53,15 @@ export function modelFamily(profile) {
   return familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
 }
 
+const catalogueCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/** Sort the visible model name before recipe details, with a stable identity tie-break. */
+export function compareModelNames(a, b) {
+  const left = modelName({ ...a, label: a.name || a.label });
+  const right = modelName({ ...b, label: b.name || b.label });
+  return catalogueCollator.compare(left.name, right.name) || catalogueCollator.compare(left.detail, right.detail) || catalogueCollator.compare(a.id, b.id);
+}
+
 /** Stock and imported profiles share family headings and keep their own identities. */
 export function modelGroups(profiles) {
   const groups = new Map();
@@ -64,7 +73,7 @@ export function modelGroups(profiles) {
   return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([label, rows]) => ({
     id: `family:${label}`,
     label,
-    rows: rows.sort((a, b) => (a.displayName || a.label || '').localeCompare(b.displayName || b.label || '')),
+    rows: rows.sort(compareModelNames),
   }));
 }
 

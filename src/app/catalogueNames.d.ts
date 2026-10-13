@@ -8,3 +8,4 @@ export function loraCompatibility(info: { families: string[] } | undefined, prof
 export function workflowSpeed(workflow: WorkflowSummary, profile?: Profile): 'standard' | 'flash';
 export function workflowPurpose(workflow: WorkflowSummary): { generate: boolean; edit: boolean };
 export function profileMatchesFilters(profile: Profile, filters: import('./CatalogueFilters').CatalogueFilter, favourites?: string[]): boolean;
+export function compareModelNames(a: Partial<Profile> | Partial<WorkflowSummary>, b: Partial<Profile> | Partial<WorkflowSummary>): number;

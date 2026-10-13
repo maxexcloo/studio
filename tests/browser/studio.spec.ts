@@ -229,6 +229,8 @@ test('model speed and reference filters combine and All clears them', async ({ p
   const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
   const filters = menu.getByRole('group', { name: 'Filter Models' });
   await expect(rows).toHaveCount(4);
+  await expect(rows.first()).toContainText('Flash Edit');
+  await expect(rows.last()).toContainText('Standard Generate');
   await filters.getByRole('button', { name: 'Flash', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(rows).toHaveCount(2);
