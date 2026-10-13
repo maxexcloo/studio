@@ -64,19 +64,39 @@ function CrashScreen({ error, componentStack }: { error: Error; componentStack: 
   );
 }
 
-/** Catches a render error anywhere below it and shows the crash screen instead of a blank page. */
-export class CrashBoundary extends React.Component<React.PropsWithChildren, { error: Error | null; componentStack: string }> {
-  state = { error: null as Error | null, componentStack: '' };
+/** How soon a second DOM-tampering error counts as "it keeps happening" rather than a one-off. */
+const RETRY_WINDOW_MS = 5000;
+
+type BoundaryState = { error: Error | null; componentStack: string; gaveUp: boolean; generation: number };
+
+/**
+ * Catches a render error anywhere below it and shows the crash screen instead of a blank page.
+ * An error from something outside the studio editing the page gets one quiet remount first: the
+ * fresh tree rebuilds its elements, and only a repeat within a few seconds shows the crash screen.
+ */
+export class CrashBoundary extends React.Component<React.PropsWithChildren, BoundaryState> {
+  state: BoundaryState = { error: null, componentStack: '', gaveUp: false, generation: 0 };
+  private lastRetry = -Infinity;
 
   static getDerivedStateFromError(error: unknown) {
     return { error: error instanceof Error ? error : new Error(String(error)) };
   }
 
-  componentDidCatch(_error: unknown, info: React.ErrorInfo) {
-    this.setState({ componentStack: info.componentStack || '' });
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    const tampering = error instanceof Error && DOM_TAMPERING.test(`${error.name} ${error.message}`);
+    const now = performance.now();
+    if (tampering && now - this.lastRetry > RETRY_WINDOW_MS) {
+      this.lastRetry = now;
+      console.warn('Remounted the studio after something outside it edited the page', error);
+      this.setState((s) => ({ error: null, componentStack: '', generation: s.generation + 1 }));
+      return;
+    }
+    this.setState({ componentStack: info.componentStack || '', gaveUp: true });
   }
 
   render() {
-    return this.state.error ? <CrashScreen error={this.state.error} componentStack={this.state.componentStack} /> : this.props.children;
+    const { error, gaveUp, generation } = this.state;
+    if (error) return gaveUp ? <CrashScreen error={error} componentStack={this.state.componentStack} /> : null;
+    return <React.Fragment key={generation}>{this.props.children}</React.Fragment>;
   }
 }
