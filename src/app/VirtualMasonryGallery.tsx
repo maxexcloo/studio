@@ -276,13 +276,23 @@ export function VirtualMasonryGallery({
     const container = containerRef.current;
     if (!element || !container) return;
     let frame = 0;
+    let origin = 0;
+    let view = 0;
+    let lastBand = -1;
+    let geometryChanged = true;
     const measure = () => {
       frame = 0;
-      const offset = container.getBoundingClientRect().top - element.getBoundingClientRect().top;
-      const view = element.clientHeight || window.innerHeight;
-      const step = Math.max(200, Math.round(view / 2));
+      let step = Math.max(200, Math.round(view / 2));
+      let band = Math.floor(Math.max(0, element.scrollTop - origin) / step);
+      if (!geometryChanged && band === lastBand) return;
+      // Read layout only when tiles enter/leave, rather than on every scroll frame.
+      origin = container.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+      view = element.clientHeight || window.innerHeight;
+      geometryChanged = false;
+      step = Math.max(200, Math.round(view / 2));
+      band = Math.floor(Math.max(0, element.scrollTop - origin) / step);
+      lastBand = band;
       const overscan = Math.max(600, view);
-      const band = Math.floor(Math.max(0, -offset) / step);
       const start = band * step - overscan;
       const end = (band + 1) * step + view + overscan;
       setRange((current) => (current.start === start && current.end === end ? current : { start, end }));
@@ -290,8 +300,9 @@ export function VirtualMasonryGallery({
     const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
     measure();
     element.addEventListener("scroll", schedule, { passive: true });
-    const observer = new ResizeObserver(schedule);
+    const observer = new ResizeObserver(() => { geometryChanged = true; schedule(); });
     observer.observe(element);
+    observer.observe(container);
     return () => {
       element.removeEventListener("scroll", schedule);
       observer.disconnect();

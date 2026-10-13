@@ -110,28 +110,42 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
     setPages((current) => ({ ...current, upload: { ...current.upload, items: [dropped.asset, ...current.upload.items.filter((item) => item.id !== dropped.asset.id)] } }));
   }, [dropped]);
 
+  const requests = React.useRef(new Map<PickerTab, AbortController>());
+  React.useEffect(() => () => { requests.current.forEach((request) => request.abort()); requests.current.clear(); }, []);
   const load = React.useCallback(async (target: PickerTab, cursor = "") => {
+    if (requests.current.has(target)) return;
+    const controller = new AbortController();
+    requests.current.set(target, controller);
+    // Safari before 17.4 has no AbortSignal.any; a timer covers the same ground.
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     setPages((current) => ({ ...current, [target]: { ...current[target], loading: true, error: "" } }));
     try {
-      const page = await listReferenceAssets(target, cursor);
+      const page = await listReferenceAssets(target, cursor, 30, controller.signal);
+      if (requests.current.get(target) !== controller) return;
       setPages((current) => ({
         ...current,
         [target]: {
-          items: cursor ? [...current[target].items, ...(page.items || [])] : (page.items || []),
+          // A page arriving twice (a retry, a cursor that has not moved) must not repeat a tile.
+          items: [...new Map([...(cursor ? current[target].items : []), ...(page.items || [])].map((item) => [item.id, item])).values()],
           cursor: page.nextCursor || "",
-          hasMore: Boolean(page.hasMore || page.nextCursor),
+          hasMore: Boolean(page.nextCursor && page.nextCursor !== cursor),
           loading: false,
           loaded: true,
           error: ""
         }
       }));
     } catch (error) {
-      setPages((current) => ({ ...current, [target]: { ...current[target], loading: false, loaded: true, error: error instanceof Error ? error.message : "Couldn’t load images" } }));
+      if (requests.current.get(target) !== controller) return;
+      const aborted = error instanceof Error && error.name === "AbortError";
+      setPages((current) => ({ ...current, [target]: { ...current[target], loading: false, loaded: true, error: aborted ? "The list took too long to load. Try again." : error instanceof Error ? error.message : "Couldn’t load images" } }));
+    } finally {
+      window.clearTimeout(timeout);
+      if (requests.current.get(target) === controller) requests.current.delete(target);
     }
   }, []);
 
   // Locking empties the shelf; unlocking fills it afresh.
-  React.useEffect(() => { setPages((current) => ({ ...current, hidden: emptyPage() })); }, [hiddenOpen]);
+  React.useEffect(() => { requests.current.get("hidden")?.abort(); requests.current.delete("hidden"); setPages((current) => ({ ...current, hidden: emptyPage() })); }, [hiddenOpen]);
   React.useEffect(() => { if (tab === "hidden" && !hiddenShelf) setTab("generation"); }, [hiddenShelf, tab]);
 
   React.useEffect(() => {

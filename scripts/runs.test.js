@@ -63,8 +63,8 @@ test("interleaved ideas still find their own runs", () => {
   for (const run of runs) assert.equal(run.items.length, 3);
 });
 
-test("one batch is a run even without a prompt in common", () => {
-  const items = newestFirst([1, 2, 3].map((index) => item(10 - index, index === 2 ? "" : `x${index}`, { jobId: "job-1" })));
+test("one batch is a run even when a member's prompt is concealed", () => {
+  const items = newestFirst([1, 2, 3].map((index) => item(10 - index, index === 2 ? "" : `x${index}`, { jobId: "job-1", promptProtected: index === 2 })));
   assert.equal(groupGallery(items, { now: NOW }).runs.length, 1);
 });
 

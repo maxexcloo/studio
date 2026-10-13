@@ -23,6 +23,8 @@
 // subject for a lot. The model nudges it up or down; LoRAs barely do, since a
 // stack often stays loaded while the subject changes.
 
+import { galleryBucket } from '../../server/gallery-order.js';
+
 /** A pause longer than this between two outputs starts a new moment. */
 export const MOMENT_GAP_MS = 3 * 60 * 60 * 1000;
 /** A run with nothing new for longer than this is closed; the same prompt later starts another. */
@@ -219,13 +221,15 @@ export function groupGallery(items, { now = Date.now(), runs: findRuns = true } 
   const moments = [];
   let current = null;
   let previousTime = 0;
+  let previousBucket = null;
   const times = new Map();
   for (const item of items) {
     const parsed = timeOf(item);
     times.set(item, parsed);
     const time = parsed || previousTime || now;
+    const bucket = galleryBucket(item);
     // Newest first: a gap opens when this one is much older than the last.
-    if (!current || (previousTime - time) > MOMENT_GAP_MS) {
+    if (!current || bucket !== previousBucket || (previousTime - time) > MOMENT_GAP_MS) {
       current = { items: [], start: time, end: time };
       moments.push(current);
     }
@@ -233,6 +237,7 @@ export function groupGallery(items, { now = Date.now(), runs: findRuns = true } 
     current.start = Math.min(current.start, time);
     current.end = Math.max(current.end, time);
     previousTime = time;
+    previousBucket = bucket;
   }
 
   const { weightOf } = findRuns ? wordWeights(items) : { weightOf: () => 1 };
@@ -274,8 +279,12 @@ export function groupGallery(items, { now = Date.now(), runs: findRuns = true } 
   result.forEach((moment) => { for (const item of moment.items) momentOf.set(item.id, moment.id); });
   const open = [];
   const made = [];
+  previousBucket = null;
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
+    const bucket = galleryBucket(item);
+    if (bucket !== previousBucket) open.length = 0;
+    previousBucket = bucket;
     if (item.status !== "done" && item.status !== "pending") continue;
     const entry = prepare(item);
     for (let position = open.length - 1; position >= 0; position -= 1) {

@@ -93,10 +93,12 @@ function galleryAsset(item) {
   };
 }
 
-function paginate(items, cursor = "", limit = 60) {
+// The page is mapped, not the whole shelf: a large gallery would otherwise
+// build an asset object for every image before returning thirty of them.
+function paginate(items, cursor = "", limit = 60, map = (item) => item) {
   const safeLimit = Math.max(1, Math.min(200, Number(limit || 60)));
   const start = Math.max(0, Number(cursor || 0) || 0);
-  const page = items.slice(start, start + safeLimit);
+  const page = items.slice(start, start + safeLimit).map(map);
   const next = start + safeLimit;
   return { items: page, nextCursor: next < items.length ? String(next) : "", hasMore: next < items.length };
 }
@@ -110,17 +112,16 @@ const newestFirst = (a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.create
  */
 export function listReferenceAssets(req, { source = "upload", cursor = "", limit = 60 } = {}) {
   if (source === "generation") {
-    return paginate(filterVisibleGallery(gallery).filter((item) => finishedImage(item) && !item.library).sort(newestFirst).map(galleryAsset), cursor, limit);
+    return paginate(filterVisibleGallery(gallery).filter((item) => finishedImage(item) && !item.library).sort(newestFirst), cursor, limit, galleryAsset);
   }
   if (source === "hidden") {
     if (!encryptionKeyFromRequest(req)) return { items: [], nextCursor: "", hasMore: false, locked: true };
-    return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter(finishedImage).sort(newestFirst).map(galleryAsset), cursor, limit);
+    return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter(finishedImage).sort(newestFirst), cursor, limit, galleryAsset);
   }
   const items = loadManifest()
     .filter((item) => item.source === "upload")
-    .sort(newestFirst)
-    .map(publicUploadAsset);
-  return paginate(items, cursor, limit);
+    .sort(newestFirst);
+  return paginate(items, cursor, limit, publicUploadAsset);
 }
 
 export function readMultipartImage(req) {
