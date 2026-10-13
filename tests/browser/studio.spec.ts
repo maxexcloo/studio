@@ -280,12 +280,12 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await expect(rows.first()).toContainText('Animate Image');
 });
 
-test('model picker keeps controls visible, avoids duplicate recents and supports keyboard selection', async ({ page, isMobile }) => {
+test('model picker keeps shortcuts in the normal list and supports keyboard selection', async ({ page, isMobile }) => {
   await page.route('**/api/models', async (route) => {
     const result = await (await route.fetch()).json();
     const base = result.profiles.find((profile: any) => profile.kind === 'image');
-    result.profiles = Array.from({ length: 28 }, (_, index) => ({ ...base, id: `picker-${index}`, displayName: `Model ${String(index + 1).padStart(2, '0')} · Generate`, label: `Model ${index + 1}`, family: index < 14 ? 'flux' : 'sdxl', variant: index === 27 ? 'raw' : base.variant }));
-    result.defaults = { ...result.defaults, imageModel: 'picker-0' };
+    result.profiles = Array.from({ length: 28 }, (_, index) => ({ ...base, id: `picker-${isMobile ? 'phone' : 'desktop'}-${index}`, displayName: `Model ${String(index + 1).padStart(2, '0')} · Generate`, label: `Model ${index + 1}`, family: index < 14 ? 'flux' : 'sdxl', variant: index === 27 ? 'raw' : base.variant }));
+    result.defaults = { ...result.defaults, imageModel: `picker-${isMobile ? 'phone' : 'desktop'}-0` };
     await route.fulfill({ json: result });
   });
   if (!isMobile) await page.setViewportSize({ width: 900, height: 650 });
@@ -301,8 +301,12 @@ test('model picker keeps controls visible, avoids duplicate recents and supports
   await expect(rows).toHaveCount(28);
   await rows.filter({ hasText: 'Model 02' }).click();
   await open();
-  await expect(rows).toHaveCount(28);
-  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(1);
+  await expect(rows).toHaveCount(29);
+  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
+  const shortcut = rows.filter({ hasText: 'Model 02' }).first();
+  await shortcut.locator('..').getByRole('button', { name: /Add .*favorites/ }).click();
+  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
+  await expect(menu.locator(isMobile ? '.phone-section' : '.model-menu-label').filter({ hasText: 'Favourites' })).toBeVisible();
   const search = menu.getByRole(isMobile ? 'textbox' : 'combobox', { name: 'Search models', exact: true });
   await expect(search).toBeVisible();
   if (isMobile) {
@@ -323,13 +327,13 @@ test('model picker keeps controls visible, avoids duplicate recents and supports
   await expect(menu).toHaveCount(0);
   await open();
   await menu.getByRole('button', { name: 'All', exact: true }).click();
-  await expect(rows).toHaveCount(28);
-  await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(1);
+  await expect(rows).toHaveCount(30);
+  await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(2);
   await menu.getByRole('button', { name: 'Standard', exact: true }).click();
-  await expect(rows).toHaveCount(1);
+  await expect(rows).toHaveCount(2);
   await expect(menu.getByText('No Models Match These Filters.')).toHaveCount(0);
   if (!isMobile) {
-    await expect(rows.filter({ hasText: 'Model 28' })).toHaveAttribute('aria-selected', 'true');
+    await expect(rows.filter({ hasText: 'Model 28' }).first()).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Escape');
     await expect(page.locator('.model-trigger').first()).toBeFocused();
   }
