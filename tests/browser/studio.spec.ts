@@ -208,3 +208,40 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
 });
+
+test('model speed and reference filters combine and All clears them', async ({ page, isMobile }) => {
+  await page.route('**/api/models', async (route) => {
+    const result = await (await route.fetch()).json();
+    const base = result.profiles.find((profile: any) => profile.kind === 'image');
+    result.profiles = [
+      { name: 'Standard Generate', steps: 25, edit: false },
+      { name: 'Flash Generate', steps: 4, edit: false },
+      { name: 'Standard Edit', steps: 25, edit: true },
+      { name: 'Flash Edit', steps: 4, edit: true },
+    ].map((recipe, index) => ({ ...base, id: `filter-${index}`, label: recipe.name, displayName: recipe.name, variant: undefined, variantLabel: undefined, defaults: { ...base.defaults, steps: recipe.steps }, capabilities: { ...base.capabilities, startImage: recipe.edit, startImageRequired: recipe.edit }, mediaInputs: recipe.edit ? [{ id: 'reference', kind: 'image', required: true }] : [] }));
+    await route.fulfill({ json: result });
+  });
+  await page.goto('/');
+  await openComposer(page, isMobile);
+  if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
+  else await page.locator('.model-trigger').first().click();
+  const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
+  const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
+  const filters = menu.getByRole('group', { name: 'Filter Models' });
+  await expect(rows).toHaveCount(4);
+  await filters.getByRole('button', { name: 'Flash', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(rows).toHaveCount(2);
+  await filters.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Flash Edit');
+  await filters.getByRole('button', { name: 'Standard', exact: true }).click();
+  await expect(rows.first()).toContainText('Standard Edit');
+  await filters.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(rows.first()).toContainText('Standard Generate');
+  await filters.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(rows).toHaveCount(4);
+  await filters.getByRole('button', { name: 'Favourites', exact: true }).click();
+  await expect(rows).toHaveCount(0);
+  await expect(menu.getByText('No Models Match These Filters.')).toBeVisible();
+});

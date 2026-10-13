@@ -6,6 +6,7 @@ import { apiJson, copyText } from './api';
 import { cn } from './format';
 import { BetaTag, Field, StudioSelect as Select } from './components';
 import { Segmented } from './SettingsControls';
+import { workflowPurpose, workflowSpeed } from './catalogueNames';
 import { workflowState } from './workflowStatus';
 import { ModelSetup } from './ModelSetup';
 import { peekDownloadReveal } from './useModelDownloads';
@@ -201,6 +202,8 @@ export function WorkflowGallery({ view }: { view: any }) {
   });
   const [kind, setKind] = useState<Mode>(revealed?.kind || mode);
   const [filter, setFilter] = useState<Filter>("all");
+  const [speed, setSpeed] = useState<'' | 'standard' | 'flash'>('');
+  const [purpose, setPurpose] = useState<'' | 'generate' | 'edit'>('');
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(revealed?.id || model || workflows.find((item) => item.kind === mode)?.id || "");
   const [importOpen, setImportOpen] = useState(false);
@@ -222,10 +225,12 @@ export function WorkflowGallery({ view }: { view: any }) {
     return ofKind.filter((item) => {
       if (filter === "favorites" && !item.favorite) return false;
       if (filter === "attention" && item.validation.ok) return false;
+      if (speed && workflowSpeed(item, models?.profiles.find((profile) => profile.id === item.profileId)) !== speed) return false;
+      if (purpose && !workflowPurpose(item)[purpose]) return false;
       if (!q) return true;
       return [item.name, item.description, item.family, ...(item.tags || [])].join(" ").toLowerCase().includes(q);
     });
-  }, [filter, ofKind, query]);
+  }, [filter, models, ofKind, purpose, query, speed]);
   const selected = filtered.find((item) => item.id === selectedId) || filtered[0] || null;
   const selectedStatus = selected ? workflowState(selected.validation, comfyRestarting) : null;
   // An import's family, from the ones installed here: it shares their LoRA stacks. "Its own" keeps it apart.
@@ -421,12 +426,16 @@ export function WorkflowGallery({ view }: { view: any }) {
             <input className="is-framed" aria-label="Search workflows" value={query} placeholder="Search workflows" onChange={(event) => setQuery(event.target.value)} />
             {query ? <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={13} /></button> : null}
           </label>
-          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); }} options={[{ value: "image", label: "Image" }, { value: "video", label: <>Video<BetaTag /></> }]} />
+          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Image" }, { value: "video", label: <>Video<BetaTag /></> }]} />
         </div>
-        <div ref={filtersWheelRef} className="wf-filters" role="radiogroup" aria-label="Filter workflows">
-          {([["all", `All ${ofKind.length}`], ["favorites", "Favorites"], ...(attentionCount ? [["attention", `Needs attention ${attentionCount}`]] : [])] as Array<[Filter, string]>).map(([value, label]) => (
-            <button key={value} type="button" role="radio" aria-checked={filter === value} className={cn(filter === value && "active")} onClick={() => setFilter(value)}>{label}</button>
+        <div ref={filtersWheelRef} className="wf-filters" role="group" aria-label="Filter Workflows">
+          {([["all", `All ${ofKind.length}`], ["favorites", "Favourites"], ...(attentionCount ? [["attention", `Needs Attention ${attentionCount}`]] : [])] as Array<[Filter, string]>).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={filter === value && (value !== "all" || !speed && !purpose)} className={cn(filter === value && (value !== "all" || !speed && !purpose) && "active")} onClick={() => { setFilter(value); if (value === 'all') { setSpeed(''); setPurpose(''); } }}>{label}</button>
           ))}
+          <span className="wf-filter-divider" aria-hidden="true" />
+          {(['standard', 'flash'] as const).map((value) => <button key={value} type="button" aria-pressed={speed === value} className={cn(speed === value && 'active')} onClick={() => setSpeed(speed === value ? '' : value)}>{value === 'standard' ? 'Standard' : 'Flash'}</button>)}
+          <span className="wf-filter-divider" aria-hidden="true" />
+          {(['generate', 'edit'] as const).map((value) => <button key={value} type="button" aria-pressed={purpose === value} className={cn(purpose === value && 'active')} title={value === 'generate' ? 'Generate without a reference image' : 'Use a reference image'} onClick={() => setPurpose(purpose === value ? '' : value)}>{value === 'generate' ? 'Generate' : 'Edit'}</button>)}
         </div>
         {filtered.length ? (
           <div className="wf-grid">

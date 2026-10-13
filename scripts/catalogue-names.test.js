@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loraCompatibility, loraName, modelGroups, modelLoras, modelName } from '../src/app/catalogueNames.js';
+import { loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowPurpose, workflowSpeed } from '../src/app/catalogueNames.js';
 
 test('imported workflows share stock family headings, including aliases and cloud models', () => {
   const profiles = [
@@ -54,4 +54,25 @@ test('explicit family metadata supports imported workflows and identifier aliase
   assert.equal(loraCompatibility({ families: ['flux1'] }, { family: 'minimax-h3' }), 'other');
   assert.equal(loraCompatibility({ families: ['flux1'] }, { family: 'custom' }), 'unknown');
   assert.equal(loraCompatibility(undefined, { family: 'flux1' }), 'unknown');
+});
+
+test('speed filters use variant metadata and recognise accelerated imported recipes', () => {
+  assert.equal(workflowSpeed({ name: 'Krea Turbo', defaults: { steps: 4 } }, { variant: 'raw' }), 'standard');
+  for (const name of ['Qwen Turbo', 'Flux Schnell', 'SDXL Lightning', 'H3 Sol & PDD', 'Klein Distilled']) assert.equal(workflowSpeed({ name, defaults: { steps: 10 } }), 'flash');
+  assert.equal(workflowSpeed({ name: 'Flux De-distilled', defaults: { steps: 28 } }), 'standard');
+  assert.equal(workflowSpeed({ name: 'Custom Recipe', defaults: { steps: 4 } }), 'flash');
+  assert.equal(workflowSpeed({ name: 'Grok Imagine', family: 'grok', defaults: { steps: 4 } }), 'standard');
+});
+
+test('purpose filters distinguish required references and keep optional references in both groups', () => {
+  assert.deepEqual(workflowPurpose({}), { generate: true, edit: false });
+  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', required: true }] }), { generate: false, edit: true });
+  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', min: 1 }] }), { generate: false, edit: true });
+  assert.deepEqual(workflowPurpose({ capabilities: { startImage: true } }), { generate: true, edit: true });
+  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'audio', required: true }] }), { generate: true, edit: false });
+  const filters = { favourites: true, speed: 'flash', purpose: 'edit' };
+  const profile = { id: 'quick-edit', label: 'Quick Edit', defaults: { steps: 4 }, capabilities: { startImageRequired: true, startImage: true } };
+  assert.equal(profileMatchesFilters(profile, filters, ['quick-edit']), true);
+  assert.equal(profileMatchesFilters(profile, filters, []), false);
+  assert.equal(profileMatchesFilters(profile, { ...filters, purpose: 'generate' }, ['quick-edit']), false);
 });

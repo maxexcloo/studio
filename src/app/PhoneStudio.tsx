@@ -1,5 +1,6 @@
+import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import React from 'react';
-import { modelGroups, modelName } from './catalogueNames';
+import { modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
@@ -736,14 +737,15 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
 function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
   const { modelProfiles, model, pickModel, modelMenu } = view as { modelProfiles: Profile[]; model: string; pickModel: (id: string) => void; modelMenu?: { favorites: string[]; recents: string[]; toggleFavorite: (id: string) => void } };
   const [query, setQuery] = React.useState('');
+  const [filters, setFilters] = React.useState(emptyCatalogueFilter);
   React.useEffect(() => { if (!open) setQuery(''); }, [open]);
   const profiles = modelProfiles || [];
   const favorites = new Set(modelMenu?.favorites || []);
   const needle = query.trim().toLowerCase();
-  const matches = (profile: Profile) => !needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle);
+  const matches = (profile: Profile) => profileMatchesFilters(profile, filters, modelMenu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
-  const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, 4);
+  const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4);
   const shown = new Set(starred.map((profile) => profile.id));
   const rest = profiles.filter((profile) => !shown.has(profile.id) && matches(profile));
   const row = (profile: Profile) => (
@@ -761,6 +763,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   );
   return (
     <Sheet open={open} onClose={onClose} title="Model" full>
+      {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
       {profiles.length > 8 ? (
         <label className="phone-search">
           <Search size={17} aria-hidden="true" />
@@ -768,10 +771,10 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         </label>
       ) : null}
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Get one on the computer running HEISS UI.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
-      {starred.length ? <><h3 className="phone-section">Favorites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
+      {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
       {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
       {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}
-      {needle && !starred.length && !rest.length ? <p className="phone-empty">Nothing matches “{query.trim()}”.</p> : null}
+      {!starred.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
     </Sheet>
   );
 }

@@ -1,4 +1,5 @@
-import { modelFamily, modelGroups, modelName } from './catalogueNames';
+import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
+import { modelFamily, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
@@ -553,6 +554,7 @@ function ModelAbilities({ profile, showInpaint = true, onHover }: { profile: Pro
 }
 
 export function ModelPicker({ value, profiles, showInpaint = true, onChange, compact = false, badges = {}, density = "full", emptyHint = "", onFindModels, onGetModels, strayCount = 0, menu }: { value: string; profiles: Profile[]; showInpaint?: boolean; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string>; density?: ControlDensity; emptyHint?: string; onFindModels?: () => void; onGetModels?: () => void; strayCount?: number; menu?: ModelMenuState }) {
+  const [filters, setFilters] = useState(emptyCatalogueFilter);
   const hardware = useHardware();
   const [abilityRow, setAbilityRow] = React.useState("");
   const [open, setOpen] = useState(false);
@@ -571,25 +573,26 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const menuId = React.useId();
 
   const sections = React.useMemo(() => {
+    const matching = profiles.filter((profile) => profileMatchesFilters(profile, filters, menu?.favorites));
     const needle = query.trim().toLowerCase();
     if (needle) {
       const words = needle.split(/\s+/);
-      return [{ id: "results", label: "", rows: profiles.filter((profile) => words.every((word) => profileText(profile).includes(word))) }];
+      return [{ id: "results", label: "", rows: matching.filter((profile) => words.every((word) => profileText(profile).includes(word))) }];
     }
-    if (!menu) return [{ id: "all", label: "", rows: profiles }];
+    if (!menu) return [{ id: "all", label: "", rows: matching }];
     const favorites = new Set(menu.favorites);
-    const byId = new Map(profiles.map((profile) => [profile.id, profile]));
-    const starred = profiles.filter((profile) => favorites.has(profile.id));
+    const byId = new Map(matching.map((profile) => [profile.id, profile]));
+    const starred = matching.filter((profile) => favorites.has(profile.id));
     const recent = menu.recents.filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, menuRecentLimit);
     const shown = new Set(starred.map((profile) => profile.id));
     // The rest by family, so seven Sana variants sit together instead of scattering.
-    const rest = profiles.filter((profile) => !shown.has(profile.id));
+    const rest = matching.filter((profile) => !shown.has(profile.id));
     return [
-      { id: "favorites", label: "Favorites", rows: starred },
+      { id: "favorites", label: "Favourites", rows: starred },
       { id: "recent", label: "Recent", rows: recent },
       ...modelGroups(rest)
     ].filter((section) => section.rows.length);
-  }, [menu, profiles, query]);
+  }, [filters, menu, profiles, query]);
   const flat = React.useMemo(() => sections.flatMap((section) => section.rows), [sections]);
 
   // Opening scrolls the current model into view; a search starts on its first hit.
@@ -612,7 +615,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     }
     wasOpen.current = open;
   }, [open]);
-  useEffect(() => { setCursor(query ? 0 : -1); }, [query]);
+  useEffect(() => { setCursor(query || filters.speed || filters.purpose || filters.favourites ? 0 : -1); listRef.current?.scrollTo({ top: 0 }); }, [filters, query]);
   useEffect(() => {
     if (cursor < 0) return;
     listRef.current?.querySelector<HTMLElement>(`[data-row="${cursor}"]`)?.scrollIntoView({ block: "nearest" });
@@ -620,7 +623,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
 
   const pick = (id: string) => { onChange(id); close(); };
   const onMenuKey = (event: React.KeyboardEvent) => {
-    if (event.nativeEvent.isComposing) return;
+    if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest('.model-filters')) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!flat.length) return;
@@ -661,6 +664,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                 : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find models"}</button> : null}
             </div>
           )}
+          {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
           {searchable ? (
             <label className="model-menu-search">
               <Search size={14} aria-hidden="true" />
@@ -709,7 +713,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                   })}
                 </div>
               ))}
-              {query && !flat.length ? <div className="model-menu-none">Nothing matches “{query.trim()}”.</div> : null}
+              {!flat.length ? <div className="model-menu-none">{query ? `Nothing matches “${query.trim()}”.` : "No Models Match These Filters."}</div> : null}
             </div>
           ) : null}
           {onFindModels && profiles.length ? (
