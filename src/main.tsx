@@ -4,7 +4,7 @@ import { showToastTone as showToast, toast } from "./app/toast";
 import "./styles.css";
 
 import { useModelFolders } from './app/useModelFolders';
-import type { AutoUpscale, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
+import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -825,6 +825,19 @@ function App() {
       .catch(() => null);
   }
 
+  /** How the last run stopped, when nobody meant it to: told once per stop, on this computer. */
+  function tellPreviousExit(exit: PreviousExit) {
+    const key = `heiss-ui:exit-told:${exit.at}`;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { /* told this session at most */ }
+    const when = new Date(exit.lastSeen || exit.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    const details = [`HEISS UI stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
+    showToast("HEISS UI stopped unexpectedly last time", "warning", {
+      description: `${exit.reason.replace(/\.?$/, ".")} Last seen running ${when}.`,
+      duration: 20_000,
+      action: { label: "Copy details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
+    });
+  }
+
   function refreshHealth() {
     // 503 only means ComfyUI isn't answering: its body still says whether
     // this is the computer that looks after HEISS UI, so read it either way.
@@ -835,6 +848,7 @@ function App() {
         setHealth(data);
         if (typeof data.thisComputer === "boolean") setThisComputer(data.thisComputer);
         if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
+        if (data.previousExit) tellPreviousExit(data.previousExit);
       })
       .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach HEISS UI. Make sure it’s running." }));
   }

@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listensBeyondThisComputer, readEnvFile, resolveLan } from "../server/lan.js";
 import { RESTART_CODE } from "../server/release-swap.js";
+import { recordExit, tailKeeper } from "../server/exit-record.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -31,14 +32,25 @@ let vite = null;
 let viteOn = "";
 let server = null;
 let stopping = false;
+// The last lines each child printed to stderr, so a stop nobody asked for says why (exit-record.js).
+const viteTail = tailKeeper();
+const serverTail = tailKeeper();
+function teeStderr(child, tail) {
+  child.stderr?.on("data", (chunk) => { tail.push(chunk); process.stderr.write(chunk); });
+}
+const exitWords = (code, signal) => signal ? `was ended (${signal})` : `exited with code ${code}`;
 
 function startVite(host) {
   viteOn = host;
-  const child = spawn(process.execPath, [path.join(root, "node_modules", "vite", "bin", "vite.js"), "--host", host, "--port", "5173"], { cwd: root, stdio: "inherit" });
+  const child = spawn(process.execPath, [path.join(root, "node_modules", "vite", "bin", "vite.js"), "--host", host, "--port", "5173"], { cwd: root, stdio: ["inherit", "inherit", "pipe"] });
+  teeStderr(child, viteTail);
   vite = child;
-  child.on("exit", (code) => {
+  child.on("exit", (code, signal) => {
     // Swapped out on purpose, or the whole thing is stopping.
     if (stopping || vite !== child) return;
+    // The page server stopping takes the studio with it: say so before stopping the rest.
+    recordExit({ who: "vite", code, signal, reason: `The page server (Vite) ${exitWords(code, signal)}, so HEISS UI stopped with it`, detail: viteTail.text() });
+    console.error(`\n  HEISS UI stopped: the page server (Vite) ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
     shutdown(code ?? 1);
   });
 }
@@ -55,9 +67,18 @@ function stopVite() {
 
 function runServer() {
   return new Promise((resolve) => {
-    server = fork(path.join(root, "server", "index.js"), args, { cwd: root, stdio: "inherit" });
+    server = fork(path.join(root, "server", "index.js"), args, { cwd: root, stdio: ["inherit", "inherit", "pipe", "ipc"] });
+    teeStderr(server, serverTail);
     server.on("error", () => resolve(1));
-    server.on("exit", (code) => { server = null; resolve(code); });
+    server.on("exit", (code, signal) => {
+      server = null;
+      // The server writes its own crash down; this catches what it couldn't (killed from outside).
+      if (!stopping && code !== 0 && code !== RESTART_CODE) {
+        recordExit({ who: "server", code, signal, reason: `The server ${exitWords(code, signal)}`, detail: serverTail.text() });
+        console.error(`\n  HEISS UI stopped: the server ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
+      }
+      resolve(code);
+    });
   });
 }
 
@@ -67,7 +88,14 @@ function shutdown(code = 0) {
   vite?.kill("SIGTERM");
   process.exit(code);
 }
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => shutdown(130));
+// Stops someone meant: Ctrl+C, the launcher's stop, and on Windows the window closing or Ctrl+Break.
+const meant = { SIGINT: "Stopped with Ctrl+C", SIGTERM: "Stopped", SIGHUP: "Its window was closed", SIGBREAK: "Stopped with Ctrl+Break" };
+for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    recordExit({ who: "launcher", clean: true, signal, reason: meant[signal] });
+    shutdown(130);
+  });
+}
 
 for (;;) {
   const host = viteHost();

@@ -2,7 +2,8 @@
 import { dropSnapshots } from "./data-snapshot.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
-import { addProbe, logDir } from "./crash-log.js";
+import { addProbe, logDir, logWarning } from "./crash-log.js";
+import { noteAlive, startSession } from "./exit-record.js";
 import express from "express";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -658,6 +659,10 @@ app.get("/api/diagnostics", async (_req, res) => {
 
 // When this server process started, so the app can tell a restart (e.g. after an update) happened.
 const serverStartedAt = Date.now();
+// How the last run ended, when it went wrong (exit-record.js): told once in the studio, via /api/health.
+const previousExit = startSession({ now: serverStartedAt });
+if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
+setInterval(() => noteAlive(), 60_000).unref();
 
 // The latest lines of today's log (crash-log.js), for the crash kit and bug reports. This computer only.
 app.get("/api/logs", (req, res) => {
@@ -675,9 +680,9 @@ app.get("/api/health", async (req, res) => {
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
-    res.json({ ok: true, comfyUrl, comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer });
+    res.json({ ok: true, comfyUrl, comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   } catch (error) {
-    res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt });
+    res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   }
 });
 

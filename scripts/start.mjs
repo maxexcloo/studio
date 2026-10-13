@@ -81,15 +81,29 @@ function openOnce(url) {
 }
 
 let child = null;
-// Ctrl+C reaches the server too; wait for it instead of leaving it behind.
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { if (child) child.kill(signal); else process.exit(130); });
+// Why HEISS stopped, for its next start (server/exit-record.js). Optional: an older copy has none.
+let exitRecord = { recordExit: () => {}, tailKeeper: () => ({ push() {}, text: () => "" }) };
+try { exitRecord = await import("../server/exit-record.js"); } catch { /* keep starting */ }
+const serverTail = exitRecord.tailKeeper();
+
+// Ctrl+C reaches the server too; wait for it instead of leaving it behind. Each is a stop someone
+// meant, written down first: on Windows, kill() ends the server before it can say so itself.
+const meant = { SIGINT: "Stopped with Ctrl+C", SIGTERM: "Stopped", SIGHUP: "Its window was closed", SIGBREAK: "Stopped with Ctrl+Break" };
+for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"] : ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    exitRecord.recordExit({ who: "launcher", clean: true, signal, reason: meant[signal] });
+    if (child) child.kill(signal === "SIGINT" ? "SIGINT" : "SIGTERM"); else process.exit(130);
+  });
+}
 
 /** Runs the server until it exits; `ready` says whether it ever started listening. */
 function runServer(onReady) {
   return new Promise((resolve) => {
     let ready = false;
     // Flags given to the launcher (npm start -- --lan) reach every server it starts.
-    child = fork(path.join(root, "server", "index.js"), process.argv.slice(2), { cwd: root, stdio: "inherit" });
+    child = fork(path.join(root, "server", "index.js"), process.argv.slice(2), { cwd: root, stdio: ["inherit", "inherit", "pipe", "ipc"] });
+    // Shown as before, and its last lines kept for the exit record.
+    child.stderr?.on("data", (chunk) => { serverTail.push(chunk); process.stderr.write(chunk); });
     child.on("message", (message) => {
       // Started twice: the first copy is still running, so show that one.
       if (message?.type === "already-running") openOnce(message.url);
@@ -98,7 +112,14 @@ function runServer(onReady) {
       onReady(message);
     });
     child.on("error", () => resolve({ code: 1, ready }));
-    child.on("exit", (code, signal) => { child = null; resolve({ code, signal, ready }); });
+    child.on("exit", (code, signal) => {
+      child = null;
+      // The server writes its own crash down; this catches what it couldn't (killed from outside).
+      if (code !== 0 && code !== RESTART_CODE && code !== PORT_IN_USE_CODE) {
+        exitRecord.recordExit({ who: "server", code, signal, reason: signal ? `The server was ended (${signal})` : `The server stopped with exit code ${code}`, detail: serverTail.text() });
+      }
+      resolve({ code, signal, ready });
+    });
   });
 }
 
