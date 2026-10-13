@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, Circle
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
-import { autoUpscaleTiers, canUpscaleItem, sizePlan, sizePlanLine, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { canUpscaleItem, sizePlan, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -16,7 +16,9 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
-import type { AspectPreset, AutoUpscale, GalleryItem, Profile } from './types';
+import type { AspectPreset, GalleryItem, Profile } from './types';
+import { LinkedSizeFields, type SizeTier } from './SizeMenu';
+import { parseSize } from './sizing';
 import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
@@ -534,7 +536,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    prefs, chooseAutoUpscale
+    prefs, customSize, sizeTier, sizeMax, customLimits, chooseSizeTier, setCustomDimensions
   } = view;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'aspect' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
@@ -545,11 +547,15 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const maxCount = Math.max(1, Math.min(4, Number(countMeta?.max || 4)));
   const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
   const aspect = (aspectOptions as AspectPreset[] || []).find((option) => option.value === aspectPickerValue);
-  // Smart upscale, as in the desktop size menu: images only, and only while it is on in Settings.
-  const smartUpscale = mode === 'image' && prefs?.smartUpscale !== false && typeof chooseAutoUpscale === 'function';
-  const autoUpscale: AutoUpscale = prefs?.autoUpscale || 'none';
-  const [pickedWidth, pickedHeight] = String(aspectValue || '').split('x').map(Number);
-  const sizeLine = sizePlanLine(sizePlan(autoUpscale, pickedWidth, pickedHeight, currentProfile?.native));
+  // The size tabs, as in the desktop size menu: Default · 2K · Custom (2K for images only).
+  const sizeTabs = typeof chooseSizeTier === 'function' && !aspectLocked;
+  const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
+  const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
+  const picked = parseSize(aspectValue);
+  const sizePlanned = sizePlan(tier === '2k' ? '2k' : 'none', picked.width, picked.height, currentProfile?.native, sizeMax);
+  const sizeLine = tier === 'custom' ? '' : tier === '2k'
+    ? `Drawn at ${sizePlanned.final.width} × ${sizePlanned.final.height}.${sizePlanned.untested ? ' This model isn’t known for 2K; some pictures may repeat or warp.' : ''}`
+    : `The model’s own size, ${picked.width} × ${picked.height}.`;
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -652,18 +658,15 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         ) : null}
       </div>
 
-      {smartUpscale ? (
+      {sizeTabs ? (
         <div className="phone-control">
-          <span className="phone-control-label" id="phone-upscale-label">Resolution</span>
-          <div className="phone-seg" role="radiogroup" aria-labelledby="phone-upscale-label">
-            {autoUpscaleTiers.map((tier) => {
-              const picked = upscaleSize(autoUpscale) === tier.value;
-              // As on desktop: ↑ where the model draws smaller and SeedVR2 takes it the rest of the way.
-              const upscaled = Boolean(sizePlan(tier.value, pickedWidth, pickedHeight, currentProfile?.native).quality);
-              return <button key={tier.value} type="button" role="radio" aria-checked={picked} aria-label={upscaled ? `${tier.label}, upscaled` : undefined} className={cn(picked && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.native)}>{tier.label}{upscaled ? <ArrowUp className="aspect-upscale-arrow" size={12} strokeWidth={2.6} aria-hidden="true" /> : null}</button>;
-            })}
+          <span className="phone-control-label" id="phone-size-label">Size</span>
+          <div className="phone-seg" role="radiogroup" aria-labelledby="phone-size-label">
+            {tiers.map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={tier === value} className={cn(tier === value && 'active')} onClick={() => chooseSizeTier(value)}>{value === 'none' ? 'Default' : value === '2k' ? '2K' : 'Custom'}</button>
+            ))}
           </div>
-          <p className="phone-control-note">{sizeLine || 'The model’s own size.'}</p>
+          {tier === 'custom' && customLimits ? <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} /> : <p className="phone-control-note">{sizeLine}</p>}
         </div>
       ) : null}
 

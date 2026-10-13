@@ -1,13 +1,15 @@
 import React from 'react';
-import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, History, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, History, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import type { AspectPreset, AutoUpscale, MediaInput, NativeSupport, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
+import type { AspectPreset, MediaInput, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
+import type { SizeTier } from './SizeMenu';
+import type { SideLimits } from './sizing';
 
 /* ---------------------------------------------------------------------------
    The density ladder
@@ -18,25 +20,22 @@ import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGener
    Priority (largest kept longest): model > private > aspect > images > steps.
 --------------------------------------------------------------------------- */
 
-type ControlId = "workflow" | "private" | "negative" | "aspect" | "size" | "steps" | "variants" | "lora";
+type ControlId = "workflow" | "private" | "negative" | "aspect" | "steps" | "variants" | "lora";
 type Demotion = ControlDensity | "drawer";
 
 const LADDER: Array<[ControlId, Demotion]> = [
   ["lora", "compact"],
   ["steps", "compact"],
   ["variants", "compact"],
-  ["size", "compact"],
   ["negative", "compact"],
   ["aspect", "compact"],
   ["steps", "mini"],
   ["variants", "mini"],
-  ["size", "mini"],
   ["aspect", "mini"],
   ["private", "compact"],
   ["workflow", "compact"],
   ["steps", "drawer"],
   ["lora", "drawer"],
-  ["size", "drawer"],
   ["variants", "drawer"],
   ["aspect", "drawer"],
   ["workflow", "mini"],
@@ -49,7 +48,7 @@ type Plan = Record<ControlId, { density: ControlDensity; drawer: boolean }>;
 
 function planForLevel(level: number): Plan {
   const plan = {} as Plan;
-  (["workflow", "private", "negative", "aspect", "size", "steps", "variants", "lora"] as ControlId[])
+  (["workflow", "private", "negative", "aspect", "steps", "variants", "lora"] as ControlId[])
     .forEach((id) => { plan[id] = { density: "full", drawer: false }; });
   for (let index = 0; index < Math.min(level, LADDER.length); index += 1) {
     const [id, to] = LADDER[index];
@@ -218,9 +217,13 @@ export type ComposerBarProps = {
   aspectValue: string;
   defaultAspectSize: string;
   applyAspect: (value: string) => void;
-  /** Smart upscale's tabs on top of the size menu; left out where it doesn't apply (video). */
-  autoUpscale?: AutoUpscale;
-  onAutoUpscaleChange?: (value: AutoUpscale, native?: NativeSupport) => void;
+  /** The size menu's tab (Default · 2K · Custom), and what Custom may be. */
+  sizeTier?: SizeTier;
+  sizeMax?: number;
+  customLimits?: { width: SideLimits; height: SideLimits };
+  chooseSizeTier?: (tier: SizeTier) => void;
+  applyCustomRatio?: (ratio: number) => void;
+  setCustomDimensions?: (size: { width: number; height: number }) => void;
   customSize: boolean;
   aspectLocked?: boolean;
   width: number;
@@ -272,7 +275,7 @@ export type ComposerBarProps = {
 export function ComposerBar(props: ComposerBarProps) {
   const {
     models, model, modelProfiles, showInpaint = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
-    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, autoUpscale = "none", onAutoUpscaleChange,
+    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
@@ -304,18 +307,16 @@ export function ComposerBar(props: ComposerBarProps) {
       currentSize={aspectValue}
       defaultSize={defaultAspectSize}
       density={density}
-      upscale={autoUpscale}
+      tier={sizeTier}
+      tiers={mode === "image" ? ["none", "2k", "custom"] : ["none", "custom"]}
       native={currentProfile?.native}
-      onUpscaleChange={onAutoUpscaleChange ? (value) => onAutoUpscaleChange(value, currentProfile?.native) : undefined}
+      sizeMax={sizeMax}
+      limits={customLimits}
+      onTierChange={chooseSizeTier}
+      onCustomRatio={applyCustomRatio}
+      onCustomSize={setCustomDimensions}
     />
   );
-
-  const sizePickers = (density: ControlDensity) => customSize && !aspectLocked ? (
-    <>
-      <NumberPicker label="Width" icon={<MoveHorizontal size={13} />} density={density} value={width} onChange={setWidth} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
-      <NumberPicker label="Height" icon={<MoveVertical size={13} />} density={density} value={height} onChange={setHeight} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
-    </>
-  ) : null;
 
   const stepsPicker = (density: ControlDensity) => (
     <NumberPicker label="Steps" icon={<CircleDotDashed size={14} />} density={density} value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
@@ -342,7 +343,6 @@ export function ComposerBar(props: ComposerBarProps) {
     ["workflow", "Model", workflowPicker],
     ["private", "Hidden", privateToggle],
     ["aspect", "Aspect ratio", aspectPicker],
-    ["size", "Size", sizePickers],
     ["steps", "Steps", stepsPicker],
     ["variants", "Images", variantsPicker],
     ["lora", "LoRA", loraPill]
@@ -432,7 +432,6 @@ export function ComposerBar(props: ComposerBarProps) {
         <div className="zen-inline-settings" data-fluid-group>
           {inline("workflow", workflowPicker)}
           {inline("aspect", aspectPicker)}
-          {inline("size", sizePickers)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
           {inline("lora", loraPill)}

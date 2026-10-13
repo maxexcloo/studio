@@ -21,7 +21,7 @@ export function useGenerationActions(view: any) {
     frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode,
     model, negative, prefs, hiddenSpace, hidden, prompt, sampler, scheduler, seed, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
-    referenceAssets, inpaint, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
+    referenceAssets, inpaint, sizeTier, sizeMax, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
   const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
   const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
@@ -135,10 +135,10 @@ export function useGenerationActions(view: any) {
 
       // A reference frames the output only when it is the image being edited (a painted mask always is).
       const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
-      // 2K/4K: drawn at that size where the model does it well, else drawn at its best and upscaled the rest (useUpscale sizePlan).
-      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native) : null;
+      // 2K: the picked aspect drawn with its long side at 2048 (useUpscale sizePlan). Not
+      // where the output's size isn't the model's to pick: a reference that frames it, or a mask.
+      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax) : null;
       const native = plan?.draw || null;
-      const upscaleQuality = plan?.quality || null;
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
         prompt,
@@ -172,16 +172,7 @@ export function useGenerationActions(view: any) {
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",
         startImageName,
-        privateVault: Boolean(hiddenSpace),
-        // Smart upscale: the upscale is part of the run itself, one job in ComfyUI.
-        // Off whenever the output's size isn't the model's own to pick: a reference
-        // that dictates the framing (aspectPolicy "reference"), or a painted mask,
-        // which keeps the original image's size. The size tabs hide in both cases,
-        // but a persisted 2K/4K choice from before must not sneak an upscale in too.
-        // A native pick on a model that doesn't draw that size goes through SeedVR2 instead.
-        autoUpscale: mode === "image" && !inpaint && !framedByReference && prefs.smartUpscale !== false && upscaleQuality
-          ? { quality: upscaleQuality, target: plan!.target, faceDetail: Boolean(prefs.upscaleFaceDetail) }
-          : null
+        privateVault: Boolean(hiddenSpace)
       };
       const queuedJobs: string[] = [];
       // One tile per job, so a failure can open straight onto its report.

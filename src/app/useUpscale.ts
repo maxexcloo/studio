@@ -84,31 +84,15 @@ export const upscaleEfforts = [
   { value: "high", label: "High", scale: "3×", model: "SeedVR2 7B fp16", detail: "3× with the 7B fp16 model. Slowest, and uses the most graphics memory.", downloadBytes: 16_980_659_238 }
 ] as const;
 
-/** The size menu's tabs, each upscaling (where it has to) at one of the efforts above. */
-export const autoUpscaleTiers: { value: AutoUpscale; label: string; quality?: UpscaleQuality }[] = [
+/** The size menu's preset tabs; Custom is the size menu's own (customSize). */
+export const autoUpscaleTiers: { value: AutoUpscale; label: string }[] = [
   { value: "none", label: "Default" },
-  { value: "2k", label: "2K", quality: "balanced" },
-  { value: "4k", label: "4K", quality: "high" }
+  { value: "2k", label: "2K" }
 ];
 
-/** A tab's size from a saved pick, including the old switch's "2k-native"/"4k-upscale". */
-export function upscaleSize(tier: AutoUpscale | undefined): "none" | NativeSize {
-  return tier?.startsWith("2k") ? "2k" : tier?.startsWith("4k") ? "4k" : "none";
-}
-
-/** The long side each tab reaches; server/upscale.js upscaleTargets. */
-const sizeTargets: Record<NativeSize, number> = { "2k": 2048, "4k": 4096 };
-
-/** The effort a tab upscales at, wherever it does. */
-export function autoUpscaleQuality(tier: AutoUpscale | undefined) {
-  const size = upscaleSize(tier);
-  return autoUpscaleTiers.find((item) => item.value === size)?.quality || null;
-}
-
-/** The effort a tab upscales at on this model, or null where the model draws that size itself. */
-export function upscaleQualityFor(tier: AutoUpscale | undefined, native: NativeSupport = {}) {
-  const size = upscaleSize(tier);
-  return size === "none" || native[size] === "yes" ? null : autoUpscaleQuality(size);
+/** A tab's size from a saved pick: an older "4k" (or "2k-native"…) reads as 2K. */
+export function upscaleSize(tier: AutoUpscale | undefined): "none" | "2k" {
+  return tier && tier !== "none" ? "2k" : "none";
 }
 
 type Size = { width: number; height: number };
@@ -120,59 +104,29 @@ function drawnAt({ width, height }: Size, long: number, max: number): Size {
   return { width: snap(width), height: snap(height) };
 }
 
-/** Where SeedVR2 lands from `from` aiming at a long side; mirrors upscalePlan in server/upscale.js. */
-function upscaledTo({ width, height }: Size, long: number): Size {
-  const round = (value: number) => Math.max(16, Math.round(value / 16) * 16);
-  const short = Math.min(width, height);
-  const resolution = Math.max(round(short * long / Math.max(width, height)), round(short));
-  const other = Math.round(resolution * Math.max(width, height) / short);
-  return width >= height ? { width: other, height: resolution } : { width: resolution, height: other };
-}
-
 export type SizePlan = {
-  size: "none" | NativeSize;
-  /** The long side the run reaches, 0 for Default. */
-  target: number;
+  size: "none" | "2k";
   /** The size the model draws at, when it isn't the picked one. */
   draw: Size | null;
-  /** SeedVR2 takes it the rest of the way, at this effort. */
-  quality: UpscaleQuality | null;
-  /** What it's drawn at before the upscale: the model's 2K, or the picked size. */
-  from: "2k" | "picked" | null;
-  /** The size the run's picture ends at. */
+  /** The size the run's picture comes out at. */
   final: Size;
+  /** The model isn't known to draw this size well ("maybe" or nothing in its catalog entry). */
+  untested: boolean;
+  /** The model's max side kept it under 2K. */
+  capped: boolean;
 };
 
 /**
- * How a run reaches its tab on this model. Where the model is known to draw
- * that size ("yes"), it draws it. Otherwise it draws at the largest size it does
- * draw well (2K for 4K on a model that draws 2K, else the picked size) and
- * SeedVR2 upscales the rest of the way to the true 2048/4096 long side.
+ * How a run reaches its tab: Default is the picked preset as it is; 2K draws
+ * that aspect with its long side at 2048, the model itself, no upscale after.
  */
 export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192): SizePlan {
   const size = upscaleSize(tier);
   const picked = { width, height };
-  const none: SizePlan = { size, target: 0, draw: null, quality: null, from: null, final: picked };
-  if (size === "none" || !(width > 0) || !(height > 0)) return none;
-  const target = sizeTargets[size];
-  const long = Math.max(width, height);
-  if (long >= target) return { ...none, target };
-  if (native[size] === "yes") {
-    const draw = drawnAt(picked, target, max);
-    return { size, target, draw, quality: null, from: null, final: draw };
-  }
-  const draw = size === "4k" && native["2k"] === "yes" && long < sizeTargets["2k"] ? drawnAt(picked, sizeTargets["2k"], max) : null;
-  return { size, target, draw, quality: upscaleQualityFor(size, native), from: draw ? "2k" : "picked", final: upscaledTo(draw || picked, target) };
-}
-
-/** The line under the size tabs: how the picture gets to its size. */
-export function sizePlanLine(plan: SizePlan) {
-  const { width, height } = plan.final;
-  const pixels = `${width} × ${height}`;
-  if (plan.size === "none") return "";
-  if (!plan.quality && !plan.draw) return `Already this size · ${pixels}`;
-  if (!plan.quality) return `Drawn at this size by the model · ${pixels}`;
-  return `${plan.from === "2k" ? "Drawn at 2K, then upscaled" : "Upscaled after drawing"} · ${pixels}`;
+  const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false };
+  if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
+  const draw = drawnAt(picked, 2048, max);
+  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048 };
 }
 
 export function upscaleQualityLabel(quality = "balanced") {
@@ -259,11 +213,7 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
   const [lastChecked, setLastChecked] = useState(0);
   // The image whose click opened setup; it upscales on its own once setup is done.
   const [pending, setPending] = useState<GalleryItem | null>(null);
-  // Setup opened from Smart upscale's tabs: it sets up that tab's effort, not the one in Settings.
-  const [setupAuto, setSetupAuto] = useState<AutoUpscale | null>(null);
-  const setupQuality: UpscaleQuality = autoUpscaleQuality(setupAuto ?? undefined) || prefs.upscaleQuality || "balanced";
-  // What Smart upscale was on before a tab opened setup, to go back to if setup is left unfinished.
-  const autoBefore = useRef<AutoUpscale>("none");
+  const setupQuality: UpscaleQuality = prefs.upscaleQuality || "balanced";
   const startingRef = useRef(false);
   // Callers need the reason in the same tick they call refreshStatus.
   const reasonRef = useRef("");
@@ -381,14 +331,12 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     });
   }, []);
 
-  const openSetup = useCallback((item: GalleryItem | null = null, options: { download?: boolean; auto?: AutoUpscale } = {}) => {
+  const openSetup = useCallback((item: GalleryItem | null = null, options: { download?: boolean } = {}) => {
     if (item) setPending(item);
-    const auto = options.auto && options.auto !== "none" ? options.auto : null;
-    setSetupAuto(auto);
     setWantsOwnModel(Boolean(options.download));
     setStartError("");
     setSetupOpen(true);
-    refreshStatus(autoUpscaleQuality(auto ?? undefined) || prefs.upscaleQuality, { fresh: true });
+    refreshStatus(prefs.upscaleQuality, { fresh: true });
   }, [prefs.upscaleQuality, refreshStatus]);
 
   // Hiding the dialog mid-download keeps the waiting image; it still upscales when the download lands.
@@ -398,10 +346,7 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     setWantsOwnModel(false);
     if (inFlight) return;
     setPending(null);
-    // Smart upscale stays on only if it can run; left unfinished, the tab goes back.
-    if (setupAuto && stage !== "ready") setPrefs({ autoUpscale: autoBefore.current });
-    setSetupAuto(null);
-  }, [inFlight, setupAuto, stage, setPrefs]);
+  }, [inFlight]);
 
   /** Nothing downloads without an explicit yes in the setup dialog, which names the files and size. */
   const startDownload = useCallback(async () => {
@@ -495,22 +440,11 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     openSetup(item);
   }, [markBusy, openSetup, prefs.upscaleQuality, refreshStatus, runUpscale, status?.ready]);
 
-  /**
-   * A size tab. One the model draws itself is on at once; one that upscales is
-   * on at once when its effort can run, otherwise it goes through setup first.
-   */
-  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, native: NativeSupport = {}) => {
-    const before = prefs.autoUpscale || "none";
+  /** A preset size tab: Default or 2K. Both draw directly, so nothing needs setting up. */
+  const chooseAutoUpscale = useCallback((picked: AutoUpscale) => {
     const tier = upscaleSize(picked);
-    if (tier === before) return;
-    setPrefs({ autoUpscale: tier });
-    const quality = upscaleQualityFor(tier, native);
-    if (!quality) return;
-    const current = await refreshStatus(quality);
-    if (current?.ready) return;
-    autoBefore.current = before;
-    openSetup(null, { auto: tier });
-  }, [openSetup, prefs.autoUpscale, refreshStatus, setPrefs]);
+    if (tier !== (prefs.autoUpscale || "none")) setPrefs({ autoUpscale: tier });
+  }, [prefs.autoUpscale, setPrefs]);
 
   const toggleUpscale = useCallback(async (item: GalleryItem, active?: boolean) => {
     if (!item.upscale?.url) return;
@@ -570,7 +504,6 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
       downloadOwnModel: () => setWantsOwnModel(true),
       startDownload,
       cancelInstall,
-      auto: setupAuto,
       quality: setupQuality,
       recheck: () => refreshStatus(setupQuality, { fresh: true })
     },

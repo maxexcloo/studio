@@ -1,0 +1,195 @@
+/* ---------------------------------------------------------------------------
+   The size menu (SizeMenu.tsx, components.tsx AspectPicker): a live frame on
+   the left, the tabs, Custom's linked fields and the shapes on the right.
+   Same well, pill and ember as the rest of the composer's menus.
+--------------------------------------------------------------------------- */
+
+.aspect-menu.size-menu {
+  width: min(452px, calc(100vw - 24px));
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 8px;
+}
+.size-menu-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.size-menu .aspect-list { gap: 2px; }
+.size-menu .aspect-option { min-height: 32px; }
+
+/* The frame: guides from its edges run across the stage and glide with it. */
+.size-preview { display: grid; gap: 9px; align-content: start; }
+.size-preview-stage {
+  position: relative;
+  width: var(--stage);
+  height: var(--stage);
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .04);
+}
+.size-guide {
+  position: absolute;
+  background: rgb(255 255 255 / .06);
+  transition: top 300ms var(--size-spring), left 300ms var(--size-spring);
+}
+.size-guide.is-x { left: 0; right: 0; height: 1px; }
+.size-guide.is-y { top: 0; bottom: 0; width: 1px; }
+.size-preview { --size-spring: cubic-bezier(.3, 1.5, .45, 1); }
+.size-frame {
+  position: absolute;
+  border-radius: 3px;
+  background: rgb(255 255 255 / .05);
+  transition: left 300ms var(--size-spring), top 300ms var(--size-spring), width 300ms var(--size-spring), height 300ms var(--size-spring);
+}
+/* Thirds inside the frame, for a feel of the composition. */
+.size-frame::before,
+.size-frame::after { content: ""; position: absolute; border: 0 solid rgb(255 255 255 / .07); pointer-events: none; }
+.size-frame::before { top: 0; bottom: 0; left: 33.333%; right: 33.333%; border-left-width: 1px; border-right-width: 1px; }
+.size-frame::after { left: 0; right: 0; top: 33.333%; bottom: 33.333%; border-top-width: 1px; border-bottom-width: 1px; }
+.size-frame b {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 0 solid rgb(255 255 255 / .9);
+  transition: border-color 200ms var(--ease-out);
+}
+.size-frame .is-tl { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 5px; }
+.size-frame .is-tr { top: -1px; right: -1px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 5px; }
+.size-frame .is-bl { bottom: -1px; left: -1px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 5px; }
+.size-frame .is-br { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 5px; }
+/* 2K or Custom: the corners take the ember, like the tag on the trigger. */
+.size-preview.is-accent .size-frame b { border-color: var(--ember); }
+
+.size-preview-caption { display: grid; gap: 2px; padding: 0 4px; min-height: 34px; }
+.size-preview-caption strong {
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.size-preview-caption span {
+  color: hsl(var(--muted-foreground));
+  font: 500 11px/1.3 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Custom: width and height. Linked, one field with the link in its middle;
+   unlinked, two fields that step apart. */
+.size-custom { overflow: hidden; }
+.size-custom-body { display: grid; gap: 6px; padding: 2px 0 0; }
+.size-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-pill);
+  transition: gap 260ms var(--ease-out), background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+.size-fields.is-linked { gap: 0; background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
+.size-fields.is-linked:focus-within { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .16); }
+.size-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+  transition: background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+.size-field:focus-within { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .16); }
+.size-fields.is-linked .size-field,
+.size-fields.is-linked .size-field:focus-within { background: transparent; box-shadow: none; }
+/* The W/H label is the drag handle. */
+.size-field-key {
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  color: hsl(var(--muted-foreground));
+  font: 600 11.5px/1 var(--font-mono);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  transition: color 160ms var(--ease-out);
+}
+.size-field-key:hover,
+.size-field.is-dragging .size-field-key { color: var(--ember); }
+.size-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px 0 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: 500 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.size-link {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--spring);
+}
+.size-link:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.size-link:active { transform: scale(.9); }
+.size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
+.size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+html.is-size-scrubbing,
+html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !important; }
+
+.size-custom-note,
+.size-menu-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.size-custom-note .is-limit { color: var(--ember); }
+.size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
+
+/* Phone: the same fields under the size tabs. */
+.phone-control .size-custom-body { padding-top: 4px; }
+.phone-control .size-field,
+.phone-control .size-fields { min-height: 44px; }
+.phone-control .size-field input { font-size: 16px; }
+
+/* The narrow sheet: the frame on top, centred. */
+@media (max-width: 760px) {
+  .aspect-menu.size-menu { grid-template-columns: minmax(0, 1fr); }
+  .size-menu .size-preview { justify-items: center; }
+  .size-menu .size-preview-caption { text-align: center; }
+}
+
+/* Every composer menu leaves the way it came. */
+@keyframes surfaceOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+[data-open-surface]:is(.aspect-menu, .model-menu).is-closing {
+  animation: surfaceOut 150ms var(--motion-ease) both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .size-guide, .size-frame, .size-fields, .size-field { transition: none; }
+  [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
+}

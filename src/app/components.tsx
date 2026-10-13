@@ -2,12 +2,16 @@ import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState }
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
-import { ArrowUp, Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } from 'lucide-react';
+import { Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { AspectPreset, AutoUpscale, NativeSupport, Output, Profile } from './types';
-import { autoUpscaleTiers, sizePlan, sizePlanLine } from './useUpscale';
+import type { AspectPreset, NativeSupport, Output, Profile } from './types';
+import { sizePlan } from './useUpscale';
+import { fitRatio, megapixels, parseSize, presetRatio, ratioName, sameRatio, type SideLimits } from './sizing';
+import { LinkedSizeFields, SizePreview, SizeTabs, type SizeTier } from './SizeMenu';
+import { usePresence } from './usePresence';
+import { AnimatePresence, motion } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
 import { wheelPixels } from './wheel';
 import { formatDownload, modelFits, useHardware } from './hardware';
@@ -303,66 +307,77 @@ export function NumberPicker({
   );
 }
 
-/**
- * Default · 2K · 4K on top of the size menu. A tab the model draws itself is
- * plain; one that gets there with SeedVR2 carries a small up arrow, and the
- * line under the tabs says how this one is made and what size it ends at.
- */
-function SmartUpscaleTabs({ value: picked, native = {}, width, height, onChange }: { value: AutoUpscale; native?: NativeSupport; width: number; height: number; onChange: (value: AutoUpscale) => void }) {
-  const plan = sizePlan(picked, width, height, native);
-  const value = plan.size;
-  const tabs = autoUpscaleTiers.map((tab) => ({ ...tab, upscaled: Boolean(sizePlan(tab.value, width, height, native).quality) }));
-  const index = Math.max(0, tabs.findIndex((tab) => tab.value === value));
-  const line = sizePlanLine(plan);
-  return (
-    <div className="aspect-upscale">
-      <div className="aspect-upscale-head">
-        <span id="aspect-upscale-label">Resolution</span>
-        <InfoTip side="top" content="How big new images come out. ↑ means upscaled by SeedVR2 after drawing." />
-      </div>
-      <div className="aspect-upscale-tabs" role="radiogroup" aria-labelledby="aspect-upscale-label" style={{ "--tab-index": index } as React.CSSProperties} onKeyDown={(event) => {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-        event.preventDefault();
-        event.stopPropagation();
-        const next = tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
-        onChange(next.value);
-        requestAnimationFrame(() => event.currentTarget.querySelector<HTMLButtonElement>(`[data-tier="${next.value}"]`)?.focus());
-      }}>
-        <i aria-hidden="true" />
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            role="radio"
-            data-tier={tab.value}
-            aria-checked={tab.value === value}
-            tabIndex={tab.value === value ? 0 : -1}
-            aria-label={tab.upscaled ? `${tab.label}, upscaled` : undefined}
-            className={cn(tab.value === value && "is-active")}
-            onClick={() => onChange(tab.value)}
-          >{tab.label}{tab.upscaled ? <ArrowUp className="aspect-upscale-arrow" size={11} strokeWidth={2.6} aria-hidden="true" /> : null}</button>
-        ))}
-      </div>
-      <p className="aspect-upscale-line" aria-live="polite">{line || "The model’s own size"}</p>
-    </div>
-  );
-}
+type SizeRow = { key: string; value: string; label: string; small?: string; shape: AspectPreset; size: { width: number; height: number } };
 
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", upscale = "none", native = {}, onUpscaleChange }: { value: string; options: AspectPreset[]; onChange: (value: string) => void; currentSize: string; defaultSize: string; density?: ControlDensity; upscale?: AutoUpscale; native?: NativeSupport; onUpscaleChange?: (value: AutoUpscale) => void }) {
+/**
+ * The size menu. A live frame on the left shows the shape and size a picture
+ * will come out at (the row under the pointer while one is); beside it,
+ * Default · 2K · Custom, Custom's linked width and height, and the shapes.
+ *
+ * Default and 2K use the model's preset shapes, 2K drawn with the long side
+ * at 2048. Custom is any width and height; a shape row there keeps the area
+ * and changes the shape. The trigger draws the real shape and says the ratio,
+ * with a tag for 2K ("2K") and Custom ("C").
+ */
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize }: {
+  value: string;
+  options: AspectPreset[];
+  onChange: (value: string) => void;
+  currentSize: string;
+  defaultSize: string;
+  density?: ControlDensity;
+  tier?: SizeTier;
+  /** Which tabs this mode offers: 2K is for images only. */
+  tiers?: SizeTier[];
+  native?: NativeSupport;
+  sizeMax?: number;
+  limits?: { width: SideLimits; height: SideLimits };
+  onTierChange?: (tier: SizeTier) => void;
+  onCustomRatio?: (ratio: number) => void;
+  onCustomSize?: (size: { width: number; height: number }) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const presence = usePresence(open);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(pickerRef, open, close);
+  const [hovered, setHovered] = useState<SizeRow | null>(null);
+  useEffect(() => { if (!open) setHovered(null); }, [open]);
+
+  const custom = tier === "custom";
+  const picked = parseSize(currentSize);
+  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax);
+  const shown = custom ? picked : plan.final;
   const selected = options.find((item) => item.value === value);
   const isDefault = value === "default";
   // The ratio the default size already is: one row ("Default 1:1"), not two with the same size.
   const defaultOption = options.find((item) => item.value === defaultSize);
   const listed = defaultOption ? options.filter((item) => item !== defaultOption) : options;
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(pickerRef, open, close);
-  const label = selected ? selected.label : isDefault ? "Default" : "Free";
-  const [pickedWidth, pickedHeight] = currentSize.split("x").map(Number);
-  const upscaleWay = sizePlan(upscale, pickedWidth, pickedHeight, native);
-  const upscaleLabel = onUpscaleChange && upscaleWay.size !== "none" ? upscaleWay.size.toUpperCase() : "";
-  const upscaleTip = upscaleLabel ? `, ${upscaleWay.quality ? "upscaled to" : "drawn at"} ${upscaleLabel}` : "";
+  const defaultShape = parseSize(defaultSize);
+  const area = picked.width * picked.height;
+  // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
+  const rowSize = (shape: AspectPreset) => custom && limits
+    ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
+    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final : { width: shape.w, height: shape.h };
+  const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
+  const rows: SizeRow[] = [
+    { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
+    ...listed.map((option) => ({ key: option.value, value: option.value, label: option.label, shape: option, size: rowSize(option) }))
+  ];
+  const isActive = (row: SizeRow) => custom ? sameRatio(row.size, shown) : row.value === value;
+
+  const ratio = ratioName(shown.width, shown.height);
+  const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
+  const badge = tier === "2k" ? "2K" : custom ? "C" : "";
+  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : ""}`;
+  const previewRow = hovered;
+  const previewSize = previewRow ? previewRow.size : shown;
+  const previewLabel = previewRow ? (previewRow.key === "default" ? `Default · ${previewRow.small}` : previewRow.label) : custom ? `Custom · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
+  const note = tier === "2k" && plan.capped ? `This model goes up to ${sizeMax} px a side.`
+    : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
+    : "";
+
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wasOpen = useRef(false);
   useEffect(() => {
@@ -370,63 +385,68 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
       const current = document.activeElement;
       if (!current || current === document.body || pickerRef.current?.contains(current)) triggerRef.current?.focus({ preventScroll: true });
     }
+    // Opening puts focus on the chosen shape, so the arrow keys work at once.
+    if (open && !wasOpen.current) requestAnimationFrame(() => (listRef.current?.querySelector<HTMLButtonElement>("button.aspect-option.active") || listRef.current?.querySelector<HTMLButtonElement>("button.aspect-option"))?.focus({ preventScroll: true }));
     wasOpen.current = open;
   }, [open]);
+
+  const pick = (row: SizeRow) => {
+    if (custom && onCustomRatio) { onCustomRatio(presetRatio(row.shape)); return; }
+    onChange(row.value);
+    setOpen(false);
+  };
+
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={`${density === "full" ? "Aspect ratio" : `Aspect ratio: ${label}`}${upscaleTip}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Aspect ratio: ${label}${upscaleTip}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
-          {/* The tag sits on the icon's corner, so turning Smart upscale on never changes the button's width. */}
+      <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
+          {/* The tag sits on the icon's corner, so 2K or Custom never changes the button's width. */}
           <span className="aspect-shape-slot">
-            {selected || (isDefault && defaultOption) ? <span className="aspect-shape" style={aspectIconStyle((selected || defaultOption)!)} /> : <span className={cn("aspect-shape", isDefault ? "default" : "custom")} />}
-            {upscaleLabel ? <b className="aspect-upscale-badge" aria-hidden="true">{upscaleLabel}</b> : null}
+            <span className="aspect-shape" style={aspectIconStyle({ label: "", value: "", w: shown.width, h: shown.height })} />
+            {badge ? <b className="aspect-upscale-badge" aria-hidden="true">{badge}</b> : null}
           </span>
           {density === "full" ? <span>{label}</span> : null}
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
-      {open ? (
-        <div className="aspect-menu" data-open-surface>
-        {onUpscaleChange ? <SmartUpscaleTabs value={upscale} native={native} width={pickedWidth} height={pickedHeight} onChange={onUpscaleChange} /> : null}
-        <div className="aspect-list" role="listbox" aria-label="Aspect ratio" onKeyDown={(event) => {
-          // Up and down move between options; the menu opens with focus on the chosen one.
-          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-          event.preventDefault();
-          const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button.aspect-option"));
-          const index = items.indexOf(document.activeElement as HTMLButtonElement);
-          items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
-        }} ref={(node) => { if (node && !node.contains(document.activeElement)) (node.querySelector<HTMLButtonElement>("button.aspect-option.active") || node.querySelector<HTMLButtonElement>("button.aspect-option"))?.focus({ preventScroll: true }); }}>
-          <button
-              type="button"
-              className={cn("aspect-option", value === "default" && "active")}
-              role="option"
-              aria-selected={value === "default"}
-              onClick={() => {
-                onChange("default");
-                setOpen(false);
-              }}
-            >
-              {defaultOption ? <span className="aspect-shape" style={aspectIconStyle(defaultOption)} /> : <span className="aspect-shape default" />}
-              <span>Default{defaultOption ? <small>{defaultOption.label}</small> : null}</span>
-              <em>{defaultSize}</em>
-            </button>
-          {listed.map((option) => (
-            <button
-                key={option.value}
-                type="button"
-                className={cn("aspect-option", option.value === value && "active")}
-                role="option"
-                aria-selected={option.value === value}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                <span className="aspect-shape" style={aspectIconStyle(option)} />
-                <span>{option.label}</span>
-                <em>{option.value}</em>
-              </button>
-          ))}
-          {value === "free" ? <div className="aspect-option active is-readonly"><span className="aspect-shape custom" /><span>Free</span><em>{currentSize}</em></div> : null}
-        </div>
+      {presence.mounted ? (
+        <div className={cn("aspect-menu size-menu", presence.closing && "is-closing")} data-open-surface role="dialog" aria-label="Size">
+          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height} · ${megapixels(previewSize)}`} accent={!previewRow && tier !== "none"} />
+          <div className="size-menu-side">
+            {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
+            <AnimatePresence initial={false}>
+              {custom && limits && onCustomSize ? (
+                <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+                  <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+            {note ? <p className="size-menu-note">{note}</p> : null}
+            <div ref={listRef} className="aspect-list" role="listbox" aria-label={custom ? "Shape, at this size" : "Shape"} onPointerLeave={() => setHovered(null)} onKeyDown={(event) => {
+              // Up and down move between shapes, previewing each on the way.
+              if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+              event.preventDefault();
+              const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button.aspect-option"));
+              const index = items.indexOf(document.activeElement as HTMLButtonElement);
+              items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+            }}>
+              {rows.map((row) => (
+                <button
+                  key={row.key}
+                  type="button"
+                  className={cn("aspect-option", isActive(row) && "active")}
+                  role="option"
+                  aria-selected={isActive(row)}
+                  onPointerEnter={(event) => { if (event.pointerType !== "touch") setHovered(row); }}
+                  onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) setHovered(row); }}
+                  onBlur={() => setHovered(null)}
+                  onClick={() => pick(row)}
+                >
+                  <span className="aspect-shape" style={aspectIconStyle(row.shape)} />
+                  <span>{row.label}{row.small ? <small>{row.small}</small> : null}</span>
+                  <em>{row.size.width}×{row.size.height}</em>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
@@ -510,7 +530,10 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const listRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const selected = profiles.find((profile) => profile.id === value) || profiles[0] || null;
-  const close = useCallback(() => { setOpen(false); setQuery(""); setCursor(-1); }, []);
+  // The search clears once the menu has finished closing, so its list doesn't jump on the way out.
+  const close = useCallback(() => setOpen(false), []);
+  const presence = usePresence(open);
+  useEffect(() => { if (!presence.mounted) { setQuery(""); setCursor(-1); } }, [presence.mounted]);
   useDismiss(pickerRef, open, close);
   const searchable = profiles.length >= menuSearchFrom;
   const menuId = React.useId();
@@ -601,8 +624,8 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
           )}
           <ChevronDown size={14} className={cn(open && "flip")} />
         </button></Tip>
-      {open ? (
-        <div className={cn("model-menu", searchable && "has-search")} data-open-surface onKeyDown={onMenuKey}>
+      {presence.mounted ? (
+        <div className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
           {profiles.length ? null : (
             <div className="model-menu-empty">
               <strong>No models yet</strong>
