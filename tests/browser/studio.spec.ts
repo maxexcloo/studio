@@ -152,6 +152,16 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
     await expect.poll(() => page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight)).toBeGreaterThan(height);
   }
   expect(await page.locator('[data-reference-index]').count()).toBeLessThan(80);
+  await body.evaluate((element) => { element.scrollTop = 900; });
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.reference-popover')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add start image', exact: true }).click();
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
+  await page.getByRole('tab', { name: 'Uploads', exact: true }).click();
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0);
+  await page.getByRole('tab', { name: 'Generations', exact: true }).click();
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await body.evaluate((element) => { element.scrollTop = 0; });
   await expect(page.locator('[data-reference-index="0"]')).toBeVisible();
   await page.locator('[data-reference-index="0"]').focus();
