@@ -407,7 +407,6 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
             <div className="aspect-upscale">
               <div className="aspect-upscale-head">
                 <span>Resolution</span>
-                <InfoTip side="top" content="How big new images come out. Hover a shape to see it." />
               </div>
               {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
               {/* Its space above is its own padding, so it folds with it and closing ends without a jump. */}
