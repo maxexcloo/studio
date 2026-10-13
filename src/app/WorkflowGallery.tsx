@@ -6,7 +6,7 @@ import { apiJson, copyText } from './api';
 import { cn } from './format';
 import { BetaTag, Field, StudioSelect as Select } from './components';
 import { Segmented } from './SettingsControls';
-import { workflowPurpose, workflowSpeed } from './catalogueNames';
+import { compareModelNames, workflowPurpose, workflowSpeed } from './catalogueNames';
 import { workflowState } from './workflowStatus';
 import { ModelSetup } from './ModelSetup';
 import { peekDownloadReveal } from './useModelDownloads';
@@ -229,7 +229,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       if (purpose && !workflowPurpose(item)[purpose]) return false;
       if (!q) return true;
       return [item.name, item.description, item.family, ...(item.tags || [])].join(" ").toLowerCase().includes(q);
-    });
+    }).sort(compareModelNames);
   }, [filter, models, ofKind, purpose, query, speed]);
   const selected = filtered.find((item) => item.id === selectedId) || filtered[0] || null;
   const selectedStatus = selected ? workflowState(selected.validation, comfyRestarting) : null;

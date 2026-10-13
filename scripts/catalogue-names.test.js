@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowPurpose, workflowSpeed } from '../src/app/catalogueNames.js';
+import { compareModelNames, loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowPurpose, workflowSpeed } from '../src/app/catalogueNames.js';
 
 test('imported workflows share stock family headings, including aliases and cloud models', () => {
   const profiles = [
@@ -75,4 +75,17 @@ test('purpose filters distinguish required references and keep optional referenc
   assert.equal(profileMatchesFilters(profile, filters, ['quick-edit']), true);
   assert.equal(profileMatchesFilters(profile, filters, []), false);
   assert.equal(profileMatchesFilters(profile, { ...filters, purpose: 'generate' }, ['quick-edit']), false);
+});
+
+test('model lists sort visible names naturally before precision and recipe details', () => {
+  const profiles = [
+    { id: 'z', label: 'Z-Image Turbo' },
+    { id: 'q10', label: 'Qwen Image 10' },
+    { id: 'f8', label: 'FLUX.2 [klein] 9B [BF16] · Edit · 8 Steps' },
+    { id: 'f4', label: 'FLUX.2 [klein] 9B [BF16] · Edit · 4 Steps' },
+    { id: 'q2', label: 'qwen Image 2' },
+    { id: 'a', name: 'Anima' },
+  ];
+  assert.deepEqual([...profiles].sort(compareModelNames).map((profile) => profile.id), ['a', 'f4', 'f8', 'q2', 'q10', 'z']);
+  assert.equal(profiles[0].id, 'z');
 });

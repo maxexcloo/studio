@@ -1,5 +1,5 @@
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
-import { modelFamily, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
+import { compareModelNames, modelFamily, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
@@ -502,7 +502,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const menuId = React.useId();
 
   const sections = React.useMemo(() => {
-    const matching = profiles.filter((profile) => profileMatchesFilters(profile, filters, menu?.favorites));
+    const matching = profiles.filter((profile) => profileMatchesFilters(profile, filters, menu?.favorites)).sort(compareModelNames);
     const needle = query.trim().toLowerCase();
     if (needle) {
       const words = needle.split(/\s+/);
@@ -512,7 +512,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     const favorites = new Set(menu.favorites);
     const byId = new Map(matching.map((profile) => [profile.id, profile]));
     const starred = matching.filter((profile) => favorites.has(profile.id));
-    const recent = menu.recents.filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, menuRecentLimit);
+    const recent = menu.recents.filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, menuRecentLimit).sort(compareModelNames);
     const shown = new Set(starred.map((profile) => profile.id));
     // The rest by family, so seven Sana variants sit together instead of scattering.
     const rest = matching.filter((profile) => !shown.has(profile.id));
