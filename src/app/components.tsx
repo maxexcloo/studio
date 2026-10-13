@@ -7,9 +7,8 @@ import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem 
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
-import { sizePlan } from './useUpscale';
-import { fitRatio, parseSize, presetRatio, ratioName, sameRatio, type SideLimits } from './sizing';
-import { LinkedSizeFields, SavedSizeRow, SizePreview, SizeTabs, type SizeTier } from './SizeMenu';
+import { presetRatio, type SideLimits } from './sizing';
+import { LinkedSizeFields, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
 import { AnimatePresence, motion } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
@@ -307,8 +306,6 @@ export function NumberPicker({
   );
 }
 
-type SizeRow = { key: string; value: string; label: string; small?: string; shape: AspectPreset; size: { width: number; height: number } };
-
 /**
  * The size menu. A live frame on the left shows the shape and size a picture
  * will come out at (the row under the pointer while one is); beside it,
@@ -354,41 +351,10 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const [peek, setPeek] = useState(false);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
-  const custom = tier === "custom";
-  const picked = parseSize(currentSize);
-  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax);
-  const shown = custom ? picked : plan.final;
-  const selected = options.find((item) => item.value === value);
-  const isDefault = value === "default";
-  // The ratio the default size already is: one row ("Default 1:1"), not two with the same size.
-  const defaultOption = options.find((item) => item.value === defaultSize);
-  const listed = defaultOption ? options.filter((item) => item !== defaultOption) : options;
-  const defaultShape = parseSize(defaultSize);
-  const area = picked.width * picked.height;
-  // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
-  const rowSize = (shape: AspectPreset) => custom && limits
-    ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
-    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final : { width: shape.w, height: shape.h };
-  const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
-  const rows: SizeRow[] = [
-    { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
-    ...listed.map((option) => ({ key: option.value, value: option.value, label: option.label, shape: option, size: rowSize(option) }))
-  ];
-  // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
-  const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
-  const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
-  const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
-
-  const ratio = ratioName(shown.width, shown.height);
-  const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
-  const badge = tier === "2k" ? "2K" : custom ? "C" : "";
-  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : ""}`;
+  const { custom, picked, shown, rows, savedMatch, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes });
   const previewRow = hovered;
   const previewSize = previewRow ? previewRow.size : shown;
-  const previewLabel = previewRow ? (previewRow.key === "default" ? `Default · ${previewRow.small}` : previewRow.label) : custom ? `Custom · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
-  const note = tier === "2k" && plan.capped ? `This model goes up to ${sizeMax} px a side.`
-    : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
-    : "";
+  const previewLabel = captionFor(previewRow);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   // While the menu is open the trigger keeps the width it opened at: its label changes as you
@@ -448,7 +414,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
               <AnimatePresence initial={false}>
                 {custom && limits && onCustomSize ? (
                   <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={onSaveSize} saved={Boolean(savedMatch)} />
+                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownShape || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
                   </motion.div>
                 ) : null}
               </AnimatePresence>
