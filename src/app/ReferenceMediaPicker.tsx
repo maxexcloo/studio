@@ -322,6 +322,44 @@ type ReferenceStack = {
   intro: boolean;
 };
 
+const foldEase = "cubic-bezier(.16, 1, .3, 1)";
+/**
+ * Something in a row that comes and goes with a state switch (Edit | Reference): it stays
+ * mounted and folds to nothing, width and the row's gap with it, so its neighbours glide
+ * instead of jumping. Folded, it can't be reached by pointer, keyboard or screen reader.
+ */
+function Fold({ shown, children, gap = 6 }: { shown: boolean; children: React.ReactNode; gap?: number }) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const was = React.useRef(shown);
+  // Its width while shown, kept up to date: once folded (width 0) its content can be squeezed.
+  const openWidth = React.useRef(0);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && shown && !el.classList.contains("is-folding")) openWidth.current = el.offsetWidth;
+  });
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.inert = !shown;
+    const before = was.current;
+    was.current = shown;
+    if (before === shown || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Unfolding, it's back at its natural width to measure; folding, the last width it had.
+    const width = `${shown ? el.offsetWidth : openWidth.current}px`;
+    if (!shown && !openWidth.current) return;
+    const open = { width, marginLeft: "0px", opacity: 1, scale: "1" };
+    const shut = { width: "0px", marginLeft: `${-gap}px`, opacity: 0, scale: ".7" };
+    // Clipped only while it moves, so a focus ring or a corner × isn't cut off at rest.
+    el.classList.add("is-folding");
+    const animation = el.animate(shown ? [shut, open] : [open, shut], { duration: 340, easing: foldEase });
+    const done = () => el.classList.remove("is-folding");
+    animation.onfinish = done;
+    animation.oncancel = done;
+    return () => animation.cancel();
+  }, [shown, gap]);
+  return <span ref={ref} className={cn("ref-fold", !shown && "is-folded")} style={{ "--fold-gap": `${-gap}px` } as React.CSSProperties} aria-hidden={!shown || undefined}>{children}</span>;
+}
+
 const fullMessage = (max: number) => `Up to ${max} references. Remove one to add another`;
 
 /** The + for another reference: greyed, with why, once every slot is used. */
@@ -474,9 +512,10 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         ) : null}
         {stack ? (
           <span className="ref-stack">
-            {role || paint ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
+            {/* The divider goes with the last thing after it: in Edit with no other pictures, nothing is. */}
+            {role || paint ? <Fold shown={stack.items.length > 0 || stack.canAdd} gap={0}><span className="ref-menu-divider" aria-hidden="true" /></Fold> : null}
             {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} guide={editing} />)}
-            {stack.canAdd ? <AddMore max={stack.max} add={stack.add} className="ref-stack-add" /> : null}
+            <Fold shown={stack.canAdd}><AddMore max={stack.max} add={stack.add} className="ref-stack-add" /></Fold>
           </span>
         ) : null}
       </div> : null}
@@ -589,7 +628,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
     const slots = slotsRef.current;
     if (!host || !slots) return;
     const measure = () => {
-      const chips = Array.from(slots.children) as HTMLElement[];
+      // A folded chip (Edit's absent +) takes no room, nor the gap before it.
+      const chips = (Array.from(slots.children) as HTMLElement[]).filter((chip) => !chip.classList.contains("is-folded"));
       const gap = parseFloat(getComputedStyle(slots).columnGap) || 0;
       const width = chips.reduce((sum, chip) => sum + chip.offsetWidth, 0) + gap * Math.max(0, chips.length - 1);
       host.style.setProperty("--ref-slots-w", `${Math.ceil(width)}px`);
@@ -612,8 +652,9 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   // Edit changes one picture: no slot for another (the ones already there stay, to draw from; Ref adds more).
   const editOnly = role?.value === "edit";
   const usable = editOnly ? inputs.filter((input) => !input.follows || assetFor(input.id)) : inputs;
+  // Every slot is laid out either way; what Edit leaves out folds away (Fold), so the switch glides.
   const chains: MediaInput[][] = [];
-  for (const input of usable) {
+  for (const input of inputs) {
     const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
     if (chain) chain.push(input); else chains.push([input]);
   }
@@ -625,6 +666,10 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   const chained = inputs.some((input) => input.follows);
   const targetSlot = () => openSlot || usable.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
   const maxReferences = Math.max(1, ...chains.map((chain) => chain.length));
+  // Switching to Edit with the picker open on a slot Edit doesn't offer: close it, so nothing lands there.
+  React.useEffect(() => {
+    if (editOnly && openSlot && !usable.some((input) => input.id === openSlot)) setOpenSlot("");
+  }, [editOnly, openSlot, usable]);
   const blockedMessage = editOnly ? "Edit changes one picture. Switch to Reference to add more" : fullMessage(maxReferences);
 
   const upload = React.useCallback(async (file: File | undefined, slot: string) => {
@@ -776,8 +821,12 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
           } : null;
           const shown = stacked ? [lead] : chain;
           // In a row, every slot of a full chain is used: a greyed + says how many it takes.
-          const full = !editOnly && !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
-          return [...shown.map((input) => renderSlot(input, input === lead ? stack : null)), ...(full ? [<AddMore key={`${lead.id}:full`} max={chain.length} add={null} className="ref-chip ref-add" />] : [])];
+          // Edit folds the row's empty slot and this + away (Fold), rather than dropping them.
+          const full = !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
+          return [
+            ...shown.map((input) => input === lead ? renderSlot(input, stack) : <Fold key={input.id} shown={!editOnly || Boolean(assetFor(input.id))}>{renderSlot(input, null)}</Fold>),
+            ...(full ? [<Fold key={`${lead.id}:full`} shown={!editOnly}><AddMore max={chain.length} add={null} className="ref-chip ref-add" /></Fold>] : [])
+          ];
         })}
       </div>
       <AnimatePresence>

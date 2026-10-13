@@ -77,7 +77,8 @@
    clip-path wipes open to the left, so nothing reflows while it animates. */
 /* Each chip stacks on its own, and the one whose menu is open sits over its
    neighbours, so their thumbnails can't cover its × (until the menu has wiped shut). */
-.ref-selected { position: relative; z-index: 0; display: block; height: 44px; transition: z-index 0s 420ms; }
+/* The deck's room (padding-left) grows and shrinks with it, rather than snapping. */
+.ref-selected { position: relative; z-index: 0; display: block; height: 44px; transition: z-index 0s 420ms, padding-left 320ms var(--ease-out); }
 .ref-selected.is-hover,
 .ref-selected.is-intro,
 .ref-selected:focus-within,
@@ -528,6 +529,7 @@
 .ref-selected .ref-menu > .ref-menu-paint-slot.is-hidden { width: 0; opacity: 0; pointer-events: none; }
 
 .ref-role-badge {
+  transform-origin: 30% 70%;
   position: absolute;
   z-index: 3;
   left: -4px;
@@ -569,7 +571,7 @@
   box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 3px 8px rgb(0 0 0 / .35);
   filter: brightness(.78);
   pointer-events: none;
-  transition: transform 360ms var(--ease-out), opacity 200ms var(--ease-out);
+  transition: transform 360ms var(--ease-out), opacity 200ms var(--ease-out), filter 320ms var(--ease-out);
 }
 .ref-deck-card.is-1 { transform: translateX(-9px) scale(.9); }
 .ref-deck-card.is-2 { z-index: 0; transform: translateX(-17px) scale(.8); filter: brightness(.55); }
@@ -660,8 +662,25 @@
    (colour back under the pointer, to see what you'd change). Ref leaves them all as they are. */
 .ref-selected.is-edit .ref-stack-thumb img,
 .ref-selected.is-edit .ref-deck-card { filter: grayscale(1) brightness(.62); }
-.ref-selected.is-edit .ref-stack-thumb img { transition: filter 200ms var(--ease-out); }
+/* On the elements themselves, not under .is-edit, so the colour fades back as well as out. */
+.ref-stack-thumb img,
+.composer-reference-slots .ref-thumb img { transition: filter 320ms var(--ease-out); }
 .ref-selected.is-edit .ref-stack-thumb:is(:hover, :focus-visible) img,
 .ref-selected.is-edit .ref-stack-item.is-open .ref-stack-thumb img { filter: none; }
 /* The same in a row (phone, touch): beside the picture being edited, the others are greyed. */
-.composer-reference-slots:has(> .ref-selected.is-edit) > .ref-selected:not(.is-edit) .ref-thumb img { filter: grayscale(1) brightness(.62); }
+.composer-reference-slots:has(> .ref-selected.is-edit) .ref-selected:not(.is-edit) .ref-thumb img { filter: grayscale(1) brightness(.62); }
+
+/* Something Edit leaves out (the +, its divider, the phone row's empty slot): it folds to
+   nothing in place, width and gap with it (Fold animates the way there). */
+.ref-fold { display: inline-flex; flex: none; align-items: center; }
+.ref-fold.is-folded { width: 0; margin-left: var(--fold-gap, -6px); opacity: 0; overflow: hidden; pointer-events: none; }
+.ref-fold.is-folding { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .ref-stack-thumb img, .composer-reference-slots .ref-thumb img, .ref-selected { transition: none; }
+}
+/* Arriving (a second picture, or the switch appearing) they ease in from the thumbnail, not pop. */
+@starting-style {
+  .ref-deck-card.is-1,
+  .ref-deck-card.is-2 { transform: none; opacity: 0; }
+  .ref-role-badge.is-on { opacity: 0; scale: .6; }
+}
