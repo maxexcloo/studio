@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { comfy, comfyModelsDir, comfyOutputDir, modelFolders, optionsFor } from "./comfy.js";
+import { comfy, comfyModelsDir, comfyOutputDir, localOutputFile, modelFolders, optionsFor } from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
@@ -75,8 +75,9 @@ const nodeRegistryNames = new Set([
 
 const presets = {
   fast: { preScale: 1, targetScale: 1.5, maxShort: 1280, blocksToSwap: 16, tileSize: 768 },
-  balanced: { preScale: 0.7, targetScale: 2, maxShort: 2048, blocksToSwap: 32, tileSize: 1024 },
-  high: { preScale: 0.7, targetScale: 3, maxShort: 2816, blocksToSwap: 36, tileSize: 1024 }
+  // Smaller VAE tiles reduce memory peaks while an image model remains loaded.
+  balanced: { preScale: 0.7, targetScale: 2, maxShort: 2048, blocksToSwap: 32, tileSize: 512 },
+  high: { preScale: 0.7, targetScale: 3, maxShort: 2816, blocksToSwap: 36, tileSize: 512 }
 };
 
 export const upscaleNodeClasses = nodePacks.seedvr2.nodes;
@@ -504,7 +505,7 @@ export function upscalePlan({ width, height, quality = "balanced", target = 0 })
     quality: normalized,
     preScale: Number(preScale.toFixed(3)),
     resolution,
-    maxResolution: resolution,
+    maxResolution: Math.ceil(resolution * aspect),
     blocksToSwap: preset.blocksToSwap,
     tileSize: preset.tileSize,
     sourceWidth,
@@ -654,7 +655,12 @@ export function upscaleGraph(body, info = {}) {
   const swap = ditDevices.offload !== "none";
   const graph = {};
   graph["1"] = { class_type: "LoadImage", inputs: { image: String(body.imageName || "") } };
-  const source = body.faceDetail ? faceDetailStack(graph, body, ["1", 0], info) : ["1", 0];
+  const video = body.mediaType === "video";
+  if (video) {
+    graph["1"] = { class_type: "LoadVideo", inputs: { file: String(body.imageName || "") } };
+    graph["6"] = { class_type: "GetVideoComponents", inputs: { video: ["1", 0] } };
+  }
+  const source = video ? ["6", 0] : body.faceDetail ? faceDetailStack(graph, body, ["1", 0], info) : ["1", 0];
   Object.assign(graph, {
     "2": { class_type: "ImageScaleBy", inputs: { image: source, upscale_method: "bicubic", scale_by: plan.preScale } },
     "3": {
@@ -694,7 +700,7 @@ export function upscaleGraph(body, info = {}) {
         seed: Number(body.seed || crypto.randomInt(1, 2 ** 31)),
         resolution: plan.resolution,
         max_resolution: plan.maxResolution,
-        batch_size: 1,
+        batch_size: video ? 5 : 1,
         uniform_batch_size: false,
         color_correction: "lab",
         temporal_overlap: 0,
@@ -706,7 +712,12 @@ export function upscaleGraph(body, info = {}) {
       }
     }
   });
-  graph["9"] = { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: "heiss-ui/upscale" } };
+  if (video) {
+    graph["7"] = { class_type: "CreateVideo", inputs: { images: ["5", 0], audio: ["6", 1], fps: ["6", 2], codec: "none" } };
+    graph["9"] = { class_type: "SaveVideo", inputs: { video: ["7", 0], filename_prefix: "heiss-ui/upscale", format: "mp4", "format.codec": "h264" } };
+  } else {
+    graph["9"] = { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: "heiss-ui/upscale" } };
+  }
   // The weight it runs on, which is what its timing is learned by (upscale-timing.js).
   return { graph, plan: { ...plan, model: dit.file } };
 }
@@ -758,4 +769,23 @@ export async function uploadUpscaleSource({ buffer, mime = "image/png", name = "
   form.append("overwrite", "false");
   const uploaded = await comfy("/upload/image", { method: "POST", body: form });
   return uploaded.name || filename || name;
+}
+
+/** Stage the original local video; the gallery keeps its audio and frame rate. */
+export async function uploadUpscaleVideoSource(item) {
+  const url = new URL(String(item.url || ""), "http://localhost");
+  if (url.pathname !== "/comfy/view") throw new Error("The original video is not a ComfyUI output.");
+  const name = url.searchParams.get("filename") || "";
+  const file = localOutputFile(name, url.searchParams.get("subfolder") || "", url.searchParams.get("type") || "output");
+  if (!file) throw new Error("The original video file is missing.");
+  const extension = path.extname(name).toLowerCase();
+  if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension)) throw new Error("Unsupported video format.");
+  const buffer = fs.readFileSync(file);
+  const filename = `heiss-ui-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
+  const form = new FormData();
+  form.append("image", new Blob([buffer]), filename);
+  form.append("type", "input");
+  form.append("overwrite", "false");
+  const uploaded = await comfy("/upload/image", { method: "POST", body: form });
+  return uploaded.name || filename;
 }

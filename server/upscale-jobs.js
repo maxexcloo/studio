@@ -198,9 +198,9 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         continue;
       }
       if (checked.state === "done") {
-        const outputs = outputsFrom(checked.entry);
-        const output = outputs.find((item) => item.type === "image");
-        if (!output) throw new Error("The upscale ended without an image.");
+        const outputs = outputsFrom({ outputs: { "9": checked.entry?.outputs?.["9"] || {} } });
+        const output = outputs.find((item) => item.type === (body.mediaType || "image"));
+        if (!output) throw new Error("The upscale ended without a saved result.");
         // Learned from, unless it is Hidden's or its start was never heard.
         const startAt = clock.startAt();
         if (startAt && !target.hidden) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
@@ -239,9 +239,10 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
   const jobId = crypto.randomUUID();
   const body = {
     galleryItemId: item.id,
+    mediaType: item.type,
     imageName,
     quality,
-    faceDetail,
+    faceDetail: item.type === "image" && faceDetail,
     width: Number(item.width || 0),
     height: Number(item.height || 0),
     prompt: item.prompt || "",

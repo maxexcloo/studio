@@ -363,7 +363,9 @@ export async function stageReferenceAssets(req, references = [], { unique = fals
       const pixels = generation && generation.autoResizeInputs !== false && !keepOriginal
         ? Number(generation.width) * Number(generation.height) : 0;
       const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
-      const bytes = await prepareInputImage(await bytesForReference(req, assetId), { pixels, step });
+      const original = await bytesForReference(req, assetId);
+      const inspected = await inspectImage(original.buffer, original.mime);
+      const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
       // Remote ComfyUI has no native input-delete endpoint. Reuse content names there
       // instead of accumulating a new public resized file on every run.
       const temporary = unique || assetId.startsWith("vault:") || Boolean(bytes.resized && comfyInputDir());
