@@ -444,7 +444,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                   aria-selected={isActive(row)}
                   onPointerEnter={(event) => { if (event.pointerType !== "touch") setHovered(row); }}
                   onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) setHovered(row); }}
-                  onBlur={() => setHovered(null)}
+                  // Only its own preview: pressing another row moves focus there, and the row that
+                  // had it (the chosen one, focused on open) mustn't snap the frame back mid-press.
+                  onBlur={() => setHovered((current) => current?.key === row.key ? null : current)}
                   onClick={() => pick(row)}
                 >
                   <span className="aspect-shape" style={aspectIconStyle(row.shape)} />
@@ -462,7 +464,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                     onPick={() => { onPickSaved(item); if (!custom) setOpen(false); }}
                     onRename={(name) => onRenameSize?.(item.id, name)}
                     onRemove={() => { setHovered(null); onRemoveSize?.(item.id); }}
-                    onPreview={(on) => setHovered(on ? savedRow(item) : null)}
+                    onPreview={(on) => setHovered((current) => on ? savedRow(item) : current?.key === savedRow(item).key ? null : current)}
                   />
                 )) : null}
               </AnimatePresence>
