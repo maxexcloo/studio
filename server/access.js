@@ -27,7 +27,7 @@ import { scryptAsync } from "./kdf.js";
 
 const dataDir = process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
-export const deviceCookieName = "heiss_device";
+export const deviceCookieName = process.env.HEISS_DEVICE_COOKIE_NAME || "heiss_device";
 const kdf = "scrypt-n32768-r8-p1";
 const maxSessions = 50;
 const seenFlushMs = 60 * 1000;
