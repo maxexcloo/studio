@@ -19,6 +19,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
+- **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
 - **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
 - **Generation reveal:** starting a run goes straight to the top, without an animated scroll being interrupted by the new tiles.

@@ -53,9 +53,23 @@ export function webglMosaicAllowed() {
       localStorage.setItem(MOSAIC_CRASH_KEY, new Date().toISOString());
       console.warn('The browser went down while the WebGL generation mosaic ran; using the 2D reveal from now on.');
     }
-    return !localStorage.getItem(MOSAIC_CRASH_KEY);
+    if (localStorage.getItem(MOSAIC_CRASH_KEY)) return false;
   } catch {
-    return true;
+    // Storage can be disabled while hardware acceleration still works.
+  }
+  // Software WebGL can compile the mosaic's shader on the UI thread for seconds.
+  // Probe once before loading img-fx; the existing 2D preview needs no WebGL.
+  let context: WebGLRenderingContext | null = null;
+  try {
+    context = document.createElement('canvas').getContext('webgl', { failIfMajorPerformanceCaveat: true });
+    if (!context) return false;
+    const info = context.getExtension('WEBGL_debug_renderer_info');
+    const renderer = info ? String(context.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+    return !/swiftshader|llvmpipe|softpipe|software|lavapipe/i.test(renderer);
+  } catch {
+    return false;
+  } finally {
+    context?.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }
 

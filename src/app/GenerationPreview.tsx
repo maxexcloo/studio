@@ -1,4 +1,4 @@
-import React, { createContext, lazy, Suspense, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Media } from './components';
 import type { GalleryItem } from './types';
@@ -86,7 +86,7 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
 export const GenerationPreviewMode = createContext<'advanced' | 'simple'>('advanced');
 const Mosaic = lazy(() => import('./GenerationMosaic'));
 
-const webglMosaic = webglMosaicAllowed();
+let cachedWebglMosaic: boolean | undefined;
 
 class EffectBoundary extends React.Component<React.PropsWithChildren, { failed: boolean }> {
   state = { failed: false };
@@ -107,6 +107,7 @@ export function GenerationPreview({ preview, fit = 'cover', aspectRatio = 1, fin
   const [pixelFailed, setPixelFailed] = useState(false);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const advanced = mode === 'advanced' && !reducedMotion;
+  const webglMosaic = useMemo(() => advanced && (cachedWebglMosaic ??= webglMosaicAllowed()), [advanced]);
   const reveal2d = advanced && !webglMosaic && Boolean(finalSource);
   // Whole device pixels, so the frame and its cells never straddle a pixel.
   const dpr = window.devicePixelRatio || 1;
