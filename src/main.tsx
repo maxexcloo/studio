@@ -740,15 +740,6 @@ function App() {
       showToast("Couldn’t save settings", "error");
     }
   }
-  /** setPrefs from the preferences as they are when it runs (an Undo, later), not as this render saw them. */
-  function setPrefsLatest(update: (current: Preferences) => Partial<Preferences>) {
-    setPrefsState((current) => {
-      const merged = { ...current, ...update(current) };
-      try { localStorage.setItem("heiss-ui-prefs", JSON.stringify(merged)); } catch { /* kept for this session */ }
-      return merged;
-    });
-  }
-
   function setZenMode(enabled: boolean) {
     if (!enabled) {
       setZenControls(false);
@@ -1175,34 +1166,73 @@ function App() {
     setWidth(size.width);
     setHeight(size.height);
   }
-  /* Saved custom sizes (the size menu's "Save size"), shared by every model.
+  /* Saved custom sizes (the size menu's "Save size"): the studio's, on the
+     server (/api/sizes), so every device and every model has the same list.
      Named Custom, Custom 2, … in turn; picking one puts it in Custom, fitted
-     to this model's limits; removing one can be undone from its toast. */
-  const savedSizes: SavedSize[] = prefs.savedSizes || [];
+     to this model's limits; removing one can be undone from its toast.
+     Changes show at once and are sent behind; another device's arrive when
+     this page comes back into view. */
+  const [savedSizes, setSavedSizesState] = useState<SavedSize[]>([]);
+  const savedSizesRef = useRef<SavedSize[]>([]);
+  function updateSavedSizes(change: (current: SavedSize[]) => SavedSize[]) {
+    const next = change(savedSizesRef.current);
+    savedSizesRef.current = next;
+    setSavedSizesState(next);
+    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next }) })
+      .catch(() => showToast("Couldn’t save your sizes", "error", { description: "They’re kept on this page until it reloads." }));
+  }
+  useEffect(() => {
+    let alive = true;
+    const load = () => apiJson<{ sizes: SavedSize[] }>("/api/sizes").then((data) => {
+      if (!alive) return;
+      const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+      // Sizes saved in this browser before they lived on the server move over, once.
+      const local = loadPrefs().savedSizes || [];
+      if (local.length) {
+        const known = new Set(sizes.map((item) => item.id));
+        savedSizesRef.current = sizes;
+        updateSavedSizes((current) => [...current, ...local.filter((item) => !known.has(item.id))]);
+        setPrefsState((current) => {
+          const { savedSizes: _moved, ...rest } = current;
+          try { localStorage.setItem("heiss-ui-prefs", JSON.stringify(rest)); } catch { /* moved either way */ }
+          return rest;
+        });
+        return;
+      }
+      savedSizesRef.current = sizes;
+      setSavedSizesState(sizes);
+    }).catch(() => null);
+    load();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { alive = false; document.removeEventListener("visibilitychange", onVisible); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function saveCustomSize() {
-    if (savedSizes.some((item) => item.width === width && item.height === height)) return;
-    const names = new Set(savedSizes.map((item) => item.name));
-    let name = "Custom";
-    for (let n = 2; names.has(name); n += 1) name = `Custom ${n}`;
-    setPrefs({ savedSizes: [...savedSizes, { id: clientJobUuid(), name, width, height }] });
+    if (savedSizesRef.current.some((item) => item.width === width && item.height === height)) return;
+    updateSavedSizes((current) => {
+      const names = new Set(current.map((item) => item.name));
+      let name = "Custom";
+      for (let n = 2; names.has(name); n += 1) name = `Custom ${n}`;
+      return [...current, { id: clientJobUuid(), name, width, height }];
+    });
   }
   function renameSavedSize(id: string, name: string) {
     const next = name.trim().slice(0, 32);
     if (!next) return;
-    setPrefs({ savedSizes: savedSizes.map((item) => item.id === id ? { ...item, name: next } : item) });
+    updateSavedSizes((current) => current.map((item) => item.id === id ? { ...item, name: next } : item));
   }
   function removeSavedSize(id: string) {
-    const index = savedSizes.findIndex((item) => item.id === id);
+    const index = savedSizesRef.current.findIndex((item) => item.id === id);
     if (index < 0) return;
-    const removed = savedSizes[index];
-    setPrefs({ savedSizes: savedSizes.filter((item) => item.id !== id) });
+    const removed = savedSizesRef.current[index];
+    updateSavedSizes((current) => current.filter((item) => item.id !== id));
     showToast(`Removed “${removed.name}”`, "removed", {
-      action: { label: "Undo", onClick: () => setPrefsLatest((current) => {
-        const list = current.savedSizes || [];
-        if (list.some((item) => item.id === removed.id)) return {};
-        const restored = [...list];
+      action: { label: "Undo", onClick: () => updateSavedSizes((current) => {
+        if (current.some((item) => item.id === removed.id)) return current;
+        const restored = [...current];
         restored.splice(Math.min(index, restored.length), 0, removed);
-        return { savedSizes: restored };
+        return restored;
       }) }
     });
   }

@@ -4,6 +4,7 @@ import { dropSnapshots } from "./data-snapshot.js";
 import "./crash-log-install.js";
 import { addProbe, logDir, logWarning } from "./crash-log.js";
 import { noteAlive, startSession } from "./exit-record.js";
+import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import express from "express";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -974,6 +975,20 @@ app.put("/api/workflows/preferences", (req, res) => {
     };
     saveWorkflowPreferences(preferences);
     res.json({ ok: true, preferences });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+// Saved sizes (saved-sizes.js): every device's size menu shows the same list.
+app.get("/api/sizes", (req, res) => {
+  res.json({ ok: true, sizes: loadSavedSizes() });
+});
+
+app.put("/api/sizes", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    res.json({ ok: true, sizes: saveSavedSizes(req.body?.sizes) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
