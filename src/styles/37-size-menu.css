@@ -192,10 +192,13 @@
   font: 600 11px/1 var(--font-mono);
   cursor: ew-resize;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   transition: color 160ms var(--ease-out);
 }
-.size-field-key:hover,
+/* Hover only where there is one: a tap leaves :hover stuck, which read as still dragging. */
+@media (hover: hover) { .size-field-key:hover { color: var(--ember); } }
 .size-field.is-dragging .size-field-key { color: var(--ember); }
 .size-field input,
 .size-field input:focus,
@@ -361,7 +364,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 @media (prefers-reduced-motion: reduce) {
   .size-guide, .size-frame, .size-fields, .size-field, .size-link, .size-peek { transition: none; }
   .size-link-icon, .size-save > span { animation: none; }
-  .size-saved-row .aspect-option em, .size-saved-actions { transition: none; }
+  .size-saved-row .aspect-option, .size-saved-actions { transition: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
 }
 /* Where the rows keep their shapes, the name's column may shrink too. */
@@ -421,3 +424,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .phone-size-mp .size-mp-reset { height: 22px; }
 .phone-size-mp .size-mp .size-mp-field { width: 116px; height: 42px; }
 .phone-size-mp .size-mp-field input { font-size: 16px; }
+.phone-size-mp .size-mp .size-mp-field .size-field-key { width: 42px; }
+/* Reset at thumb size: the hit area grows, the word doesn't. */
+.phone-size-mp .size-mp-reset { position: relative; }
+.phone-size-mp .size-mp-reset::after { content: ""; position: absolute; inset: -11px -8px; }

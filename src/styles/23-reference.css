@@ -582,7 +582,7 @@
 .ref-selected.is-open .ref-deck-card { transform: none; opacity: 0; }
 
 .ref-stack { display: inline-flex; align-items: center; gap: 6px; padding-right: 2px; }
-.ref-stack > .ref-menu-divider { margin: 0 2px 0 4px; }
+.ref-stack > .ref-fold > .ref-menu-divider { margin: 0 2px 0 4px; }
 .ref-stack-item { position: relative; flex: none; }
 .ref-stack-thumb,
 .ref-stack-add {
@@ -683,4 +683,26 @@
   .ref-deck-card.is-1,
   .ref-deck-card.is-2 { transform: none; opacity: 0; }
   .ref-role-badge.is-on { opacity: 0; scale: .6; }
+}
+
+/* A painted mask settles it as Edit: Reference stays in view, unavailable. */
+.ref-menu-role.is-locked button[aria-disabled] { opacity: .4; cursor: not-allowed; }
+.ref-menu-role.is-locked button[aria-disabled]:hover { color: hsl(var(--muted-foreground)); }
+
+/* No hover (a tablet, the full studio on a phone): the references in a row, with Edit | Reference
+   as a chip of its own at its start, so the thumbnail's menu is only the brush; with the brush
+   folded away (Reference) or absent, there's no menu to open. */
+.ref-role-chip { flex: none; align-self: center; }
+.ref-role-chip button { height: 34px; }
+.composer-reference-slots.is-inline .ref-menu > .ref-menu-role,
+.composer-reference-slots.is-inline .ref-menu-paint-slot > .ref-menu-divider { display: none; }
+.composer-reference-slots.is-inline .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
+/* Narrow: the row's first chip is its leftmost, so its menu opens rightward, on screen. */
+@media (max-width: 620px) {
+  .composer-reference-slots.is-inline .ref-menu { right: auto; left: -3px; }
+}
+/* Touch: the ×'s finger-sized hit area leans out past the corner, off the thumbnail it sits on,
+   so a tap on the picture opens the picker rather than removing it. */
+@media (pointer: coarse) {
+  .ref-thumb-remove::after { width: 34px; height: 34px; translate: -30% -70%; }
 }

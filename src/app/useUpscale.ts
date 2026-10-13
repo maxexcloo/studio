@@ -128,15 +128,29 @@ export function sizePlan(tier: AutoUpscale | undefined, width: number, height: n
   const picked = { width, height };
   const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false };
   if (size === "none" && area > 0 && width > 0 && height > 0) {
-    const side = { min: 64, max, step: Math.max(16, step) };
+    // No side past 4096, as in Custom, so taking the size into Custom never reshapes it.
+    const side = { min: 64, max: Math.min(max, 4096), step: Math.max(16, step) };
     const draw = fitRatio(width / height, area, side, side, side.step);
     if (draw.width === width && draw.height === height) return plain;
-    // Short of the area asked for because a side reached the model's max.
-    return { size, draw, final: draw, untested: false, capped: draw.width * draw.height < area * 0.97 && Math.max(draw.width, draw.height) >= max };
+    // Short of the area asked for because a side reached the max (within a step: sides snap to it).
+    const capped = draw.width * draw.height < area * 0.97 && Math.max(draw.width, draw.height) >= side.max - side.step;
+    // Past about 2.5 MP a model not made for 2K is on the same unknown ground as 2K.
+    const untested = draw.width * draw.height > 2.5 * 1024 * 1024 && native["2k"] !== "yes";
+    return { size, draw, final: draw, untested, capped };
   }
   if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
   const draw = drawnAt(picked, 2048, max);
   return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048 };
+}
+
+/**
+ * Whether a run's draw decodes in tiles: every 2K draw (a whole-frame decode at that size can
+ * outgrow VRAM and crawl in shared memory without failing), and a megapixel draw from about
+ * 2K up. Generate and its time estimate both ask here, so the estimate is learned from like runs.
+ */
+export function tiledDecodeFor(plan: SizePlan | null) {
+  if (!plan?.draw) return false;
+  return plan.size === "2k" || plan.draw.width * plan.draw.height >= 2048 * 1152;
 }
 
 export function upscaleQualityLabel(quality = "balanced") {

@@ -32,7 +32,7 @@ export type SizeRow = { key: string; value: string; label: string; small?: strin
  * at 2048. Custom is any width and height; a shape row there keeps the area
  * and changes the shape.
  */
-export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native = {}, sizeMax = 8192, limits, savedSizes = [], targetArea = 0 }: {
+export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native = {}, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
   value: string;
   options: AspectPreset[];
   currentSize: string;
@@ -44,6 +44,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   savedSizes?: SavedSize[];
   /** Megapixels in 2K's place: Default draws each shape at this many pixels (0: as the model has it). */
   targetArea?: number;
+  /** 2K is a tab here (not with Megapixels, nor for video): its sizes are already a click away. */
+  offerTwoK?: boolean;
 }) {
   const custom = tier === "custom";
   const picked = parseSize(currentSize);
@@ -71,7 +73,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
   // "Save size" is for a size of your own: any shape at any size, except one Default or 2K already
   // gives (a preset row at either tier, within a snap step a side), which is a click away as it is.
-  const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final]) : [];
+  const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, ...(offerTwoK ? [sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final] : [])]) : [];
   const near = (a: Size, b: Size) => Math.abs(a.width - b.width) <= 16 && Math.abs(a.height - b.height) <= 16;
   const ownSize = custom && !offered.some((size) => near(size, picked));
   const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
@@ -88,6 +90,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
     : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
   const note = (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${sizeMax} px a side.`
     : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
+    : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";
   return { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note };
 }
@@ -318,17 +321,25 @@ export function MegapixelField({ current, control, custom }: {
   const [draft, setDraft] = React.useState(formatMp(value));
   const [editing, setEditing] = React.useState(false);
   React.useEffect(() => { if (!editing) setDraft(formatMp(value)); }, [value, editing]);
-  const commit = () => {
+  // What the field showed when focused: leaving it unchanged sets nothing (the rounded "0.98" of
+  // a 0.984 MP shape would otherwise become a 1 MP target nobody typed).
+  const shownAtFocus = React.useRef("");
+  const typedValue = () => {
     const typed = Number(draft.replace(",", "."));
-    const next = typed > 0 ? clamp(typed) : value;
-    if (next !== value) control.onChange(next);
-    setDraft(formatMp(next));
+    return draft !== shownAtFocus.current && typed > 0 ? clamp(typed) : null;
+  };
+  const commit = () => {
+    const next = typedValue();
+    if (next !== null && next !== value) control.onChange(next);
+    setDraft(formatMp(next ?? value));
+    shownAtFocus.current = formatMp(next ?? value);
   };
   const input = React.useRef<HTMLInputElement>(null);
   const from = React.useRef(value);
   const { dragging, handlers } = useScrub({
     input,
-    onStart: () => { from.current = value; },
+    // From what's typed, if anything: the drag's press commits it, but this render's value is from before.
+    onStart: () => { from.current = (editing ? typedValue() : null) ?? value; },
     // A twentieth of a megapixel a step.
     onScrub: (steps) => { const next = clamp(from.current + steps * 0.05); if (next !== value) control.onChange(next); }
   });
@@ -344,7 +355,7 @@ export function MegapixelField({ current, control, custom }: {
           inputMode="decimal"
           aria-label="Megapixels"
           value={draft}
-          onFocus={(event) => { setEditing(true); event.currentTarget.select(); }}
+          onFocus={(event) => { shownAtFocus.current = draft; setEditing(true); event.currentTarget.select(); }}
           onBlur={() => { setEditing(false); commit(); }}
           onChange={(event) => setDraft(event.target.value.replace(/[^0-9.,]/g, "").slice(0, 5))}
           onKeyDown={(event) => {

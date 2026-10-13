@@ -37,15 +37,16 @@ version opens with a `> ` summary line, which the update pill shows.
   first reference for Edit or Reference. Edit works as before: the result
   keeps that image's size, and an EDIT tag on the thumbnail shows it.
   Reference keeps your size and aspect, and the image still guides the
-  picture, 2K/4K included. The inpainting brush belongs to Edit, so it hides
+  picture, 2K included. A painted mask settles it as Edit. The inpainting brush belongs to Edit, so it hides
   while Reference is on.
 - **Size in megapixels.** Settings › Generation › Size in megapixels puts a
   Megapixels field under the shapes in the size menu, in place of 2K. Type a
   count, step it with the arrow keys or drag its MP label, and every shape is
   drawn at that many pixels (3 MP makes 1:1 1776 × 1776); in Custom it
-  rescales the size you have, keeping its shape. Reset gives each model its
-  own size back. 1 MP is 1024 × 1024, as ComfyUI counts it, and the size
-  readouts now count the same way.
+  rescales the size you have, keeping its shape, and sets the count for
+  Default too. Reset gives each model its own size back. 1 MP is 1024 ×
+  1024, as ComfyUI counts it, and the size menu and Settings' "Pixels made"
+  now count the same way.
 - **Save any custom size.** "Save size" is back for a size of your own, a
   common shape at a size of its own included; not for one Default or 2K
   already gives.

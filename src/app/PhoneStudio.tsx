@@ -536,7 +536,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, savedSizes
+    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
   const many = (referenceAssets || []).length > 1;
@@ -550,7 +550,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
   // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes });
+  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes, targetArea: sizeArea || 0, offerTwoK: Boolean(sizeTiers?.includes('2k')) });
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -604,15 +604,17 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <AnimatePresence initial={false}>
           {referenceRole ? (
             <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref')} role="radiogroup" aria-label="What this image is">
+              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What this image is">
                 <i aria-hidden="true" />
                 {(['edit', 'reference'] as const).map((value) => (
-                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { haptic('tap'); referenceRole.onChange(value); }}>
+                  // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
+                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { haptic('warning'); return; } haptic('tap'); referenceRole.onChange(value); }}>
                     {value === 'edit' ? 'Edit' : 'Reference'}<HapticTarget />
                   </button>
                 ))}
               </div>
-              <small key={`${referenceRole.value}:${many}`}>{referenceRole.value === 'edit'
+              <small key={`${referenceRole.value}:${many}:${Boolean(referenceRole.locked)}`}>{referenceRole.locked ? 'The painted part changes this picture. Clear the paint to use it as a reference'
+                : referenceRole.value === 'edit'
                 ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
                 : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
             </motion.div>
@@ -768,7 +770,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
   const saved = (savedSizes || []) as SavedSize[];
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
-  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0 });
+  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0, offerTwoK: tiers.includes('2k') });
   const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, captionFor, note } = model;
 
   // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.

@@ -6,7 +6,7 @@ import { dedupeGalleryItems } from './gallery';
 import { clearLoraLibrary } from './lora-storage';
 import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { downloadActions } from './useModelDownloads';
-import { sizePlan } from './useUpscale';
+import { sizePlan, tiledDecodeFor } from './useUpscale';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -166,9 +166,8 @@ export function useGenerationActions(view: any) {
         loras,
         referenceAssets: (referenceAssets || []).map(({ slot, asset }: any) => ({ slot, assetId: asset.id })),
         referenceRole: framedByReference ? "edit" : "reference",
-        // Native 2K/4K: a whole-frame decode at that size can outgrow VRAM and crawl in shared memory without failing; tiles stay on the GPU.
-        // (Megapixels can draw smaller than the preset too: tiles only from about 2K up.)
-        ...(native && native.width * native.height >= 2048 * 1152 ? { tiledDecode: true } : {}),
+        // Native 2K, or a large megapixel draw: tiles stay on the GPU (tiledDecodeFor says when).
+        ...(tiledDecodeFor(plan) ? { tiledDecode: true } : {}),
         // A painted mask on the first reference: change only that part.
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",

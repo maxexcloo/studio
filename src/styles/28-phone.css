@@ -442,7 +442,7 @@
    there is no menu to open. */
 .phone-compose .ref-menu > .ref-menu-role,
 .phone-compose .ref-menu-paint-slot > .ref-menu-divider { display: none; }
-.phone-compose .ref-menu:not(:has(.ref-menu-paint-slot)) { display: none; }
+.phone-compose .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
 .phone-ref-role { order: -1; display: flex; align-items: center; gap: 12px; overflow: hidden; }
 .phone-ref-role .ref-menu-role { flex: none; padding: 4px; }
 .phone-ref-role .ref-menu-role > i { top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); }

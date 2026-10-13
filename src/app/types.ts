@@ -40,7 +40,13 @@ export type InpaintMask = { assetId: string; dataUrl: string };
 export type ReferenceInpaint = { slot: string; mask: string | null; onChange: (dataUrl: string | null) => void };
 /** What the framing reference is: the image being edited (its size is the output's) or only a reference (the picked size is). */
 export type ReferenceRole = "edit" | "reference";
-export type ReferenceRoleControl = { slot: string; value: ReferenceRole; onChange: (value: ReferenceRole) => void };
+export type ReferenceRoleControl = {
+  slot: string;
+  value: ReferenceRole;
+  onChange: (value: ReferenceRole) => void;
+  /** A painted mask settles it as Edit: shown as Edit (badge, greyed others, no +), Reference unavailable. */
+  locked?: boolean;
+};
 export type PromptComposition = { prefix?: string; suffix?: string; policy?: string; version?: number };
 export type GenerationSettings = Record<string, string | number | boolean | null | undefined | LoraSelection[]>;
 export type UpscaleQuality = "fast" | "balanced" | "high";

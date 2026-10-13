@@ -30,7 +30,7 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { sizePlan, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
+import { sizePlan, tiledDecodeFor, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
 import { closestPreset, fitRatio, MEGAPIXEL, snapSide } from './app/sizing';
 import type { MegapixelControl, SizeTier } from './app/SizeMenu';
 import { useHidden, type HiddenIntent } from './app/useHidden';
@@ -1147,8 +1147,10 @@ function App() {
     if (tier === "custom") {
       if (customSize) return;
       const shown = sizePlan(sizeTier, width, height, currentProfile?.native, sizeMax, sizeArea, customLimits.width.step).final;
-      setWidth(snapSide(shown.width, customLimits.width));
-      setHeight(snapSide(shown.height, customLimits.height));
+      // Fitted as a whole, not side by side, so a side at Custom's limit doesn't reshape it.
+      const fitted = fitRatio(shown.width / shown.height, shown.width * shown.height, customLimits.width, customLimits.height, 16);
+      setWidth(fitted.width);
+      setHeight(fitted.height);
       setCustomSize(true);
       return;
     }
@@ -1159,7 +1161,8 @@ function App() {
       if (preset) { setWidth(preset.w); setHeight(preset.h); }
       setCustomSize(false);
     }
-    chooseAutoUpscale(tier);
+    // With Megapixels in 2K's place there's no 2K to choose: leave the saved pick for when it's back.
+    if (!megapixelMode) chooseAutoUpscale(tier);
   }
   /** A ratio row while in Custom: that shape at about the same area. */
   function applyCustomRatio(ratio: number) {
@@ -1374,7 +1377,10 @@ function App() {
      at that many pixels (the presets stay what's picked, as with 2K), and the menu's field in
      Custom rescales the size you have, keeping its shape. Unset, each model keeps its own size. */
   const megapixelMode = mode === "image" && Boolean(prefs.megapixelSizing);
-  const megapixelTarget = megapixelMode && Number(prefs.megapixels) > 0 ? Number(prefs.megapixels) : null;
+  // As far as the model's sides reach (4096 at most, as in Custom), and no further than 16.
+  const megapixelMax = Math.max(1, Math.min(16, Math.floor((Math.min(Number(widthMeta.max) || 8192, Number(heightMeta.max) || 8192, 4096) ** 2) / MEGAPIXEL)));
+  // A target from a model that went further is held to this one's reach, in the field as in the run.
+  const megapixelTarget = megapixelMode && Number(prefs.megapixels) > 0 ? Math.min(Number(prefs.megapixels), megapixelMax) : null;
   const sizeArea = megapixelTarget && !customSize ? megapixelTarget * MEGAPIXEL : 0;
   const sizeTiers: SizeTier[] = mode === "image" && !megapixelMode ? ["none", "2k", "custom"] : ["none", "custom"];
   // The size menu's tab: Custom is the size as typed; Default and 2K start from a preset (2K for images only).
@@ -1383,8 +1389,7 @@ function App() {
   const customLimits = { width: customSideLimits(widthMeta), height: customSideLimits(heightMeta) };
   const megapixelControl: MegapixelControl | null = megapixelMode ? {
     target: megapixelTarget,
-    // As far as the model's sides reach, and no further than 16.
-    max: Math.max(1, Math.min(16, Math.floor((sizeMax * sizeMax) / MEGAPIXEL))),
+    max: megapixelMax,
     onChange: (value: number) => {
       setPrefs({ megapixels: value });
       if (!customSize) return;
@@ -1416,12 +1421,14 @@ function App() {
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
   // Estimated the way generate() sends it: at the size it's drawn at.
-  const estimateSize = sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, customLimits.width.step).draw || { width, height };
+  // Not where generate() skips the plan: a mask, or an edited reference that sets the size.
+  const estimatePlan = mode === "image" && !activeInpaintMask && !referenceForAspect ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, customLimits.width.step) : null;
+  const estimateSize = estimatePlan?.draw || { width, height };
   const generationEstimate = useGenerationEstimate({
     mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
     // Learned apart on the server: runs that read images, and a native size's tiled decode.
-    refs: composerReferenceAssets.length, tiled: estimateSize.width !== width || estimateSize.height !== height
+    refs: composerReferenceAssets.length, tiled: tiledDecodeFor(estimatePlan)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {
@@ -1726,11 +1733,13 @@ function App() {
     mask: activeInpaintMask?.dataUrl || null,
     onChange: (dataUrl: string | null) => setInpaintMask(dataUrl ? { assetId: referenceAsset.id, dataUrl } : null)
   } : null;
-  // The switch shows on the framing reference, once one is there; a painted mask settles it as an edit.
-  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference && !activeInpaintMask ? {
+  // The switch shows on the framing reference, once one is there. A painted mask settles it as an
+  // edit: it stays, locked on Edit, so the chips say so (EDIT, the others greyed, no +).
+  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference ? {
     slot: referenceInput.id,
     value: referenceRole,
-    onChange: (value: ReferenceRole) => setPrefs({ referenceRole: value })
+    locked: Boolean(activeInpaintMask),
+    onChange: (value: ReferenceRole) => { if (!activeInpaintMask) setPrefs({ referenceRole: value }); }
   } : null;
   const view = { ...baseView, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
