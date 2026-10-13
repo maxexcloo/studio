@@ -11,3 +11,7 @@ release
 *.log
 *.test.js
 *.tsbuildinfo
+
+playwright-report
+test-results
+tests/browser
