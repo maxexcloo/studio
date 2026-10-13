@@ -641,9 +641,9 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       />
 
       {canUseNegativePrompt ? (
-        <label className="phone-field">
-          <span>Negative Prompt{currentProfile?.capabilities?.negativePrompt === false ? " · Saved, unused by this profile" : ""}</span>
-          <textarea aria-label="Negative prompt" value={negative} rows={2} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+        <label className={cn("phone-field is-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
+          <span>Negative Prompt</span>
+          <textarea aria-label="Negative prompt" value={negative} rows={1} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
         </label>
       ) : null}
 

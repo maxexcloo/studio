@@ -15,6 +15,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Reference search:** find images by prompt, model or filename across the full library.
 
 ### Changed
+- **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
 - **Faster studio loading:** settings, workflows and the image editor load when needed.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
