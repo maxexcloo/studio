@@ -267,3 +267,55 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Animate Image');
 });
+
+test('model picker keeps controls visible, avoids duplicate recents and supports keyboard selection', async ({ page, isMobile }) => {
+  await page.route('**/api/models', async (route) => {
+    const result = await (await route.fetch()).json();
+    const base = result.profiles.find((profile: any) => profile.kind === 'image');
+    result.profiles = Array.from({ length: 28 }, (_, index) => ({ ...base, id: `picker-${index}`, displayName: `Model ${String(index + 1).padStart(2, '0')} · Generate`, label: `Model ${index + 1}`, family: index < 14 ? 'flux' : 'sdxl' }));
+    result.defaults = { ...result.defaults, imageModel: 'picker-0' };
+    await route.fulfill({ json: result });
+  });
+  if (!isMobile) await page.setViewportSize({ width: 900, height: 650 });
+  await page.goto('/');
+  await openComposer(page, isMobile);
+  const open = async () => {
+    if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: /Model \d/ }).click();
+    else await page.locator('.model-trigger').first().click();
+  };
+  await open();
+  const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
+  const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
+  await expect(rows).toHaveCount(28);
+  await rows.filter({ hasText: 'Model 02' }).click();
+  await open();
+  await expect(rows).toHaveCount(28);
+  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(1);
+  const search = menu.getByRole(isMobile ? 'textbox' : 'combobox', { name: 'Search models', exact: true });
+  await expect(search).toBeVisible();
+  if (isMobile) {
+    await menu.locator('.phone-sheet-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await expect(search).toBeInViewport();
+    await expect(menu.getByRole('button', { name: 'Flash', exact: true })).toBeInViewport();
+  } else {
+    const bounds = await menu.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(15);
+    expect(bounds!.y).toBeGreaterThanOrEqual(7);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(885);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(643);
+  }
+  await search.fill('Model 28');
+  await expect(rows).toHaveCount(1);
+  if (isMobile) await rows.first().click();
+  else await search.press('Enter');
+  await expect(menu).toHaveCount(0);
+  await open();
+  await menu.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(rows).toHaveCount(28);
+  await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(1);
+  if (!isMobile) {
+    await expect(rows.filter({ hasText: 'Model 28' })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.model-trigger').first()).toBeFocused();
+  }
+});

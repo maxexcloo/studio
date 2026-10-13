@@ -33,8 +33,11 @@
 .wf-search:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); }
 
 .wf-filters, .model-filters { flex: none; display: flex; gap: 6px; padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
-.model-filters { flex-wrap: wrap; padding: 8px 12px; }
-.model-filter-group { display: flex; gap: 6px; }
+.model-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; padding: 8px 4px 12px; overflow: visible; }
+.model-filter-group { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.model-filter-library { grid-column: 1 / -1; }
+.model-filter-label { width: 100%; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 600; }
+.model-filter-group:not(.model-filter-library) button { flex: 1; padding: 0 8px; }
 .wf-filter-divider { flex: none; width: 1px; height: 18px; align-self: center; margin: 0 2px; background: var(--surface-border); }
 .wf-filters::-webkit-scrollbar, .model-filters::-webkit-scrollbar { display: none; }
 .wf-filters button, .model-filters button {

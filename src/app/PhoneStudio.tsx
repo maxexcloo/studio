@@ -728,7 +728,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
   const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
-  const shown = new Set(starred.map((profile) => profile.id));
+  const shown = new Set([...starred, ...recent].map((profile) => profile.id));
   const rest = profiles.filter((profile) => !shown.has(profile.id) && matches(profile));
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
@@ -744,14 +744,16 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
     </div>
   );
   return (
-    <Sheet open={open} onClose={onClose} title="Model" full>
-      {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
-      {profiles.length > 8 ? (
-        <label className="phone-search">
-          <Search size={17} aria-hidden="true" />
-          <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" spellCheck={false} autoComplete="off" />
-        </label>
-      ) : null}
+    <Sheet open={open} onClose={onClose} title="Model" full className="phone-model-sheet">
+      <div className="phone-model-tools">
+        {profiles.length ? (
+          <label className="phone-search">
+            <Search size={17} aria-hidden="true" />
+            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" spellCheck={false} autoComplete="off" />
+          </label>
+        ) : null}
+        {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
+      </div>
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Get one on the computer running HEISS UI.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
       {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
       {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
