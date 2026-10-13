@@ -63,6 +63,8 @@ version opens with a `> ` summary line, which the update pill shows.
 - 4K upscales and restarts on Windows work again.
 - Smaller fixes to references and saved sizes.
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
+- **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
+- **Phone negative prompts:** the saved field has a stable accessible label, including when the current profile does not use it.
 - **Settings › Features › Inpainting says where its two dials are:** in the
   sidebar's Basics, under the image, not under Advanced.
 

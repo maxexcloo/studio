@@ -763,7 +763,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </>
       ) : (
         <>
-          <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll}>
+          <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
           {!hiddenLocked ? (
             <div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
               {(["image", "video"] as const).map((nextMode) => (
