@@ -136,10 +136,10 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await page.goto('/');
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   await openComposer(page, isMobile);
-  await page.getByRole('button', { name: 'Add start image', exact: true }).click();
-  await expect(page.getByText('Images unavailable')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await expect(page.getByText('Images Unavailable')).toBeVisible();
   fail = false;
-  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await page.getByRole('button', { name: 'Try Again', exact: true }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   const body = page.locator('.reference-popover-body');
   await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
@@ -161,7 +161,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await page.keyboard.press('Escape');
   await expect(page.locator('.reference-popover')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add start image', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await page.getByRole('tab', { name: 'Uploads', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0);
@@ -187,7 +187,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   await expect(page.locator('[data-reference-index][tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Add start image', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Add Start Image', exact: true })).toBeFocused();
 });
 
 test('secondary panels load only when opened and connections identify each generation mode', async ({ page, isMobile }) => {
@@ -316,7 +316,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await shortcut.locator('..').getByRole('button', { name: /Add .*favorites/ }).click();
   await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
   await expect(menu.locator(isMobile ? '.phone-section' : '.model-menu-label').filter({ hasText: 'Favourites' })).toBeVisible();
-  const search = menu.getByRole(isMobile ? 'textbox' : 'combobox', { name: 'Search models', exact: true });
+  const search = menu.getByRole(isMobile ? 'textbox' : 'combobox', { name: 'Search Models', exact: true });
   await expect(search).toBeVisible();
   if (isMobile) {
     await menu.locator('.phone-sheet-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });

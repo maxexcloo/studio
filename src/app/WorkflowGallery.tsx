@@ -144,7 +144,7 @@ function AgentGuide({ onCopy, copied, forWorkflow }: { onCopy: () => void; copie
           ? "Copies a prompt with this workflow and its connections. Paste it into Claude, ChatGPT or another agent, then import the JSON it returns."
           : "Copies a prompt that explains what can be connected. Paste it into Claude, ChatGPT or another agent with your workflow JSON, then import what it returns."}</span>
       </div>
-      <button type="button" className="btn" onClick={onCopy}><CopyIcon copied={copied} size={13} /> {copied ? "Copied" : forWorkflow ? "Copy for an agent" : "Copy prompt"}</button>
+      <button type="button" className="btn" onClick={onCopy}><CopyIcon copied={copied} size={13} /> {copied ? "Copied" : forWorkflow ? "Copy for an agent" : "Copy Prompt"}</button>
     </div>
   );
 }
@@ -423,8 +423,8 @@ export function WorkflowGallery({ view }: { view: any }) {
         <div className="wf-toolbar">
           <label className="wf-search picker-search">
             <Search size={14} />
-            <input className="is-framed" aria-label="Search workflows" value={query} placeholder="Search workflows" onChange={(event) => setQuery(event.target.value)} />
-            {query ? <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={13} /></button> : null}
+            <input className="is-framed" aria-label="Search Workflows" value={query} placeholder="Search Workflows" onChange={(event) => setQuery(event.target.value)} />
+            {query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery("")}><X size={13} /></button> : null}
           </label>
           <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Photo" }, { value: "video", label: "Video" }]} />
         </div>
@@ -465,9 +465,9 @@ export function WorkflowGallery({ view }: { view: any }) {
         ) : (
           <div className="wf-empty">
             <Search size={20} />
-            <h3>{query ? "Nothing matches" : filter === "favorites" ? "No favorites yet" : `No ${kind} workflows yet`}</h3>
+            <h3>{query ? "Nothing Matches" : filter === "favorites" ? "No Favourites Yet" : `No ${kind} workflows yet`}</h3>
             <p>{query ? "Try another name or clear the search." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : "Import a workflow."}</p>
-            {query ? <button className="btn" onClick={() => setQuery("")}>Clear search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show all</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import workflow</button> : null}
+            {query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import workflow</button> : null}
           </div>
         )}
       </section>
@@ -532,7 +532,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         size="form"
         busy={busy}
         className="wf-import"
-        title={<>{importStep === "choose" ? "Import workflows" : `Review ${imports.length} workflow${imports.length === 1 ? "" : "s"}`}</>}
+        title={<>{importStep === "choose" ? "Import Workflows" : `Review ${imports.length} workflow${imports.length === 1 ? "" : "s"}`}</>}
         description={importStep === "choose"
           ? "Import workflow JSON in API or visual format. Connected inputs use your generation settings; the rest stay as saved."
           : "Check what follows the studio. Everything else keeps the workflow’s saved values."}
@@ -552,7 +552,7 @@ export function WorkflowGallery({ view }: { view: any }) {
           <>
             <button type="button" className="wf-dropzone" onClick={() => fileInput.current?.click()} disabled={busy}>
               <FileJson size={22} />
-              <strong>Choose JSON files</strong>
+              <strong>Choose JSON Files</strong>
               <span>or drop them anywhere in this window</span>
             </button>
             <input ref={fileInput} hidden type="file" accept="application/json,.json" multiple onChange={(event) => { if (event.target.files?.length) readFiles(event.target.files); event.currentTarget.value = ""; }} />
@@ -570,7 +570,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                   <div className="wf-review-head">
                     <span className="wf-review-file"><FileJson size={14} /> {item.filename || "Pasted workflow"}</span>
                     <span className={cn("wf-status", `is-${status.state}`)}><i aria-hidden="true" />{status.label}</span>
-                    <button type="button" className="modal-close" aria-label="Remove from import" onClick={() => setImports((current) => current.filter((_, i) => i !== index))}><X size={14} /></button>
+                    <button type="button" className="modal-close" aria-label="Remove from Import" onClick={() => setImports((current) => current.filter((_, i) => i !== index))}><X size={14} /></button>
                   </div>
                   {status.state === "missing-nodes" ? <p className="wf-issue">Imports, but won’t run until ComfyUI has these nodes: {item.preview.validation.missingNodes?.join(", ")}</p> : null}
                   {item.preview.risks?.length ? <ImportRisks risks={item.preview.risks} /> : null}

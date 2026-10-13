@@ -209,7 +209,7 @@ export type ComposerBarProps = {
   /** Down on purpose: the button says "Restarting…" and waits instead of offering a retry. */
   comfyRestarting?: boolean;
   onFindModels?: () => void;
-  /** Opens "Get a model": the starter models, from the model menu. */
+  /** Opens "Get a Model": the starter models, from the model menu. */
   onGetModels?: () => void;
   strayModelCount?: number;
   mode: string;
@@ -362,7 +362,7 @@ export function ComposerBar(props: ComposerBarProps) {
   const CONTROLS: Array<[ControlId, string, (density: ControlDensity) => React.ReactNode]> = [
     ["workflow", "Model", workflowPicker],
     ["private", "Hidden", privateToggle],
-    ["aspect", "Aspect ratio", aspectPicker],
+    ["aspect", "Aspect Ratio", aspectPicker],
     ["steps", "Steps", stepsPicker],
     ["variants", "Images", variantsPicker],
     ["lora", "LoRA", loraPill]

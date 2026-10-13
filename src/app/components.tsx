@@ -133,7 +133,7 @@ export function BetaTag({ className }: { className?: string }) {
 export function InfoTip({ content, side = "top" }: { content: React.ReactNode; side?: "top" | "right" | "bottom" | "left" }) {
   return (
     <Tip content={content} side={side}>
-      <button type="button" className="info-tip" aria-label="More information">
+      <button type="button" className="info-tip" aria-label="More Information">
         <Info size={12} strokeWidth={2.6} />
       </button>
     </Tip>
@@ -528,8 +528,8 @@ function sizeNote(profile: Profile, hardware: ReturnType<typeof useHardware>) {
 /**
  * The model menu keeps search above Favourites (starred), Recent, and
  * the rest by family, including imported graphs, scrolling
- * inside a capped height with "Find models" pinned below. With no model at
- * all it offers "Get a model" instead. Arrow keys move, Enter picks, typing
+ * inside a capped height with "Find Models" pinned below. With no model at
+ * all it offers "Get a Model" instead. Arrow keys move, Enter picks, typing
  * searches.
  */
 /**
@@ -666,7 +666,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   let rowIndex = -1;
   return (
     <div className={cn("model-picker", compact && "is-compact", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={selected ? `${selected.displayName || selected.label}${setupNote(selected) ? ` · ${setupNote(selected)}` : ""} · choose a model` : "Choose a model"}><button ref={triggerRef} type="button" data-open-trigger className={cn("model-trigger", setupNote(selected) && "needs-setup")} aria-haspopup="listbox" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>
+      <Tip content={selected ? `${selected.displayName || selected.label}${setupNote(selected) ? ` · ${setupNote(selected)}` : ""} · choose a model` : "Choose a Model"}><button ref={triggerRef} type="button" data-open-trigger className={cn("model-trigger", setupNote(selected) && "needs-setup")} aria-haspopup="listbox" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>
           {setupNote(selected) ? <span className="model-setup-flag" aria-label={setupNote(selected)} /> : null}
           {compact ? (
             <span className="model-copy"><strong>{modelName(selected).name}</strong></span>
@@ -682,17 +682,17 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
         <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
           {profiles.length ? null : (
             <div className="model-menu-empty">
-              <strong>No models yet</strong>
+              <strong>No Models Yet</strong>
               <span>{emptyHint || "No usable models in ComfyUI yet."}</span>
-              {onGetModels && !strayCount ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a model</button>
-                : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find models"}</button> : null}
+              {onGetModels && !strayCount ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button>
+                : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find Models"}</button> : null}
             </div>
           )}
           {searchable ? (
             <label className="model-menu-search picker-search">
               <Search size={14} aria-hidden="true" />
-              <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
-              {query ? <button type="button" className="model-menu-clear" aria-label="Clear search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
+              <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search Models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
+              {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
             </label>
           ) : null}
           {profiles.length ? <CatalogueFilters kind={profiles[0]?.kind} value={filters} onChange={setFilters} /> : null}
@@ -743,7 +743,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
           {onFindModels && profiles.length ? (
             // Always one tap from where people notice a model is missing.
             <button type="button" className={cn("model-menu-find", strayCount > 0 && "has-found")} onClick={() => { close(); onFindModels(); }}>
-              <span>{strayCount ? `${strayCount} model${strayCount === 1 ? "" : "s"} found` : "Find more models"}</span>
+              <span>{strayCount ? `${strayCount} model${strayCount === 1 ? "" : "s"} found` : "Find More Models"}</span>
               <em>{strayCount ? "Add" : "Search"}</em>
             </button>
           ) : null}
