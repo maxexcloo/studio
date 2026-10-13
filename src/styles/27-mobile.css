@@ -290,12 +290,12 @@
 @media (pointer: coarse) {
   :where(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .upscale-notice-close,
     .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action,
-    .ref-menu-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close,
+    .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close,
     .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch,
     .zen-controls .number-picker-btn) { position: relative; }
   :is(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .upscale-notice-close,
     .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action,
-    .ref-menu-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close,
+    .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close,
     .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch,
     .zen-controls .number-picker-btn)::after {
     content: "";

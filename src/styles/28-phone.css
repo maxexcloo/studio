@@ -437,9 +437,12 @@
   flex-wrap: wrap;
 }
 .phone-compose .ref-chip { height: 44px; }
-/* Edit or Ref sits under the chips (below), so the chip's menu leaves it out. */
-.phone-compose .ref-menu > .ref-menu-divider:has(+ .ref-menu-role),
-.phone-compose .ref-menu > .ref-menu-role { display: none; }
+/* Edit or Ref sits under the chips (below), so the chip's menu leaves it out,
+   with the line that would set the brush apart from it; with no brush either,
+   there is no menu to open. */
+.phone-compose .ref-menu > .ref-menu-role,
+.phone-compose .ref-menu-paint-slot > .ref-menu-divider { display: none; }
+.phone-compose .ref-menu:not(:has(.ref-menu-paint-slot)) { display: none; }
 .phone-ref-role { order: -1; display: flex; align-items: center; gap: 12px; overflow: hidden; }
 .phone-ref-role .ref-menu-role { flex: none; padding: 4px; }
 .phone-ref-role .ref-menu-role > i { top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); }

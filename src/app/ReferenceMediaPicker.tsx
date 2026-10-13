@@ -10,6 +10,7 @@ import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, u
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { InpaintStudio } from "./InpaintStudio";
 import { SafeImg } from './SafeImg';
+import { showToastTone } from './toast';
 
 type PickerTab = "generation" | "hidden" | "upload";
 
@@ -386,25 +387,21 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
     );
   }
 
+  // The thumbnail is the anchor and says what the image is at rest (a ring for Edit, REF for Ref);
+  // the strip that grows out of it on hover holds only the choices: Edit | Ref and the brush.
+  const menu = Boolean(role || paint);
+  const name = `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
   return (
     <div
-      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new")}
+      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", role?.value === "edit" && "is-edit")}
       onPointerEnter={(event) => hoverTo(true, event)}
       onPointerLeave={(event) => hoverTo(false, event)}
     >
       {/* The menu reveals leftward from behind the thumbnail with a clip-path, so
           nothing reflows and the thumbnail never moves. */}
-      <div className="ref-menu">
-        <button type="button" className="ref-menu-name" onClick={onOpen} tabIndex={-1}>
-          <strong>{isStart ? "Start image" : label}</strong>
-          <small>{referenceName(selected.name)}</small>
-        </button>
-        <Tip content={`Remove ${label.toLowerCase()}`}>
-          <button type="button" className="ref-menu-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={13} /></button>
-        </Tip>
+      {menu ? <div className="ref-menu">
         {role ? (
           <>
-            <span className="ref-menu-divider" aria-hidden="true" />
             <div className={cn("ref-menu-role", role.value === "reference" && "is-ref")} role="radiogroup" aria-label="What this image is">
               {/* One thumb slides between the two, like the size menu's tabs. */}
               <i aria-hidden="true" />
@@ -420,7 +417,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         {paint ? (
           // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
           <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
-            <span className="ref-menu-divider" aria-hidden="true" />
+            {role ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
             <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
               <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
                 <Brush size={17} />
@@ -429,10 +426,16 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
             </Tip>
           </span>
         ) : null}
-      </div>
-      <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
-        {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
-      </button>
+      </div> : null}
+      <Tip content={`${name} · Click to change`}>
+        <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+          {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
+        </button>
+      </Tip>
+      {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Ref; Undo is in its toast. */}
+      <Tip content={`Remove ${label.toLowerCase()}`}>
+        <button type="button" className="ref-thumb-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={10} strokeWidth={2.8} /></button>
+      </Tip>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
       {role ? <i className={cn("ref-role-badge", role.value === "reference" && "is-on")} aria-hidden="true">REF</i> : null}
     </div>
@@ -646,7 +649,11 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
             } : null}
             role={role && role.slot === input.id && assetFor(input.id) ? role : null}
             onOpen={() => { setPainting(false); setOpenSlot((current) => current === input.id ? "" : input.id); }}
-            onRemove={() => onRemove(input.id)}
+            onRemove={() => {
+              const asset = assetFor(input.id);
+              onRemove(input.id);
+              if (asset) showToastTone(`Removed ${(input.label || "reference image").toLowerCase()}`, "removed", { action: { label: "Undo", onClick: () => onSelect(input.id, asset) } });
+            }}
           />
         ))}
       </div>

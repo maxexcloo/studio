@@ -134,34 +134,39 @@
 .ref-selected.is-intro .ref-menu > *,
 .ref-selected:focus-within .ref-menu > *,
 .ref-selected.is-open .ref-menu > * { opacity: 1; translate: 0 0; transition-delay: 70ms; }
-.ref-menu-name {
-  display: grid;
-  gap: 1px;
-  max-width: 112px;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.ref-menu-name strong { font-size: 12px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ref-menu-name small { font-size: 10.5px; color: hsl(var(--muted-foreground)); }
-.ref-menu-name:hover { background: var(--control-hover); }
-.ref-menu-remove {
-  flex: none;
-  width: 26px;
-  height: 26px;
+/* Remove sits on the thumbnail's corner: shown on hover or focus (always on
+   touch), away from Edit | Ref, and red only under the pointer. */
+.ref-thumb-remove {
+  position: absolute;
+  z-index: 4;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: 50%;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
+  background: rgb(46 46 46);
+  color: hsl(var(--foreground));
+  box-shadow: 0 0 0 2px rgb(24 24 24);
   cursor: pointer;
+  opacity: 0;
+  scale: .6;
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-out), scale 260ms var(--spring), background-color 140ms var(--ease-out), color 140ms var(--ease-out);
 }
-.ref-menu-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
+.ref-selected.is-hover .ref-thumb-remove,
+.ref-selected:focus-within .ref-thumb-remove { opacity: 1; scale: 1; pointer-events: auto; }
+.ref-thumb-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
+.ref-thumb-remove:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(24 24 24), var(--focus-ring); }
+@media (hover: none) {
+  .ref-thumb-remove { opacity: 1; scale: 1; pointer-events: auto; }
+}
+/* Edit: this very image is what changes, so the thumbnail says so at rest with a brighter ring. */
+.ref-selected.is-edit .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .55), 0 4px 12px rgb(0 0 0 / .35); }
+.ref-selected.is-edit.is-hover .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .7), 0 6px 16px rgb(0 0 0 / .4); }
 
 /* Inpaint: the brush sits right next to the thumbnail. */
 .ref-menu-divider { flex: none; width: 1px; height: 22px; margin: 0 4px; background: var(--surface-border); }
