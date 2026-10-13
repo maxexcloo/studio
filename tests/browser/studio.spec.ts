@@ -272,7 +272,7 @@ test('model picker keeps controls visible, avoids duplicate recents and supports
   await page.route('**/api/models', async (route) => {
     const result = await (await route.fetch()).json();
     const base = result.profiles.find((profile: any) => profile.kind === 'image');
-    result.profiles = Array.from({ length: 28 }, (_, index) => ({ ...base, id: `picker-${index}`, displayName: `Model ${String(index + 1).padStart(2, '0')} · Generate`, label: `Model ${index + 1}`, family: index < 14 ? 'flux' : 'sdxl' }));
+    result.profiles = Array.from({ length: 28 }, (_, index) => ({ ...base, id: `picker-${index}`, displayName: `Model ${String(index + 1).padStart(2, '0')} · Generate`, label: `Model ${index + 1}`, family: index < 14 ? 'flux' : 'sdxl', variant: index === 27 ? 'raw' : base.variant }));
     result.defaults = { ...result.defaults, imageModel: 'picker-0' };
     await route.fulfill({ json: result });
   });
@@ -313,6 +313,9 @@ test('model picker keeps controls visible, avoids duplicate recents and supports
   await menu.getByRole('button', { name: 'All', exact: true }).click();
   await expect(rows).toHaveCount(28);
   await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(1);
+  await menu.getByRole('button', { name: 'Standard', exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(menu.getByText('No Models Match These Filters.')).toHaveCount(0);
   if (!isMobile) {
     await expect(rows.filter({ hasText: 'Model 28' })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Escape');
