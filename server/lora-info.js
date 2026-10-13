@@ -36,6 +36,7 @@ const metadataFamilies = [
   [/z[-_ ]?image/, ["zimage"]],
   [/qwen[-_ ]?image[-_ ]?2[._]?1/, ["qwen_image_21"]],
   [/qwen[-_ ]?image/, ["qwen_image"]],
+  [/minimax[-_ ]?h3/, ["minimax_h3"]],
   [/wan[-_ ]?2[._]?2.*5b|ti2v/, ["wan22_5b"]],
   [/wan/, ["wan21", "wan22_14b"]],
   [/hunyuan[-_ ]?video[-_ ]?1[._]?5|hunyuan15/, ["hunyuan15"]],
@@ -231,7 +232,8 @@ function describe(header, metadata) {
   const base = label(found);
   const ids = withRefinements(found);
   const about = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).filter((value) => typeof value === "string").join(" ");
-  return { families: ids, base, triggers: triggersFromMetadata(metadata || {}), ...(about ? { about: about.slice(0, 200) } : {}) };
+  const title = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).find((value) => typeof value === "string" && value.trim())?.trim().slice(0, 200);
+  return { ...(title ? { title } : {}), families: ids, base, triggers: triggersFromMetadata(metadata || {}), ...(about ? { about: about.slice(0, 200) } : {}) };
 }
 
 /** What one LoRA file on this computer is, cached by size and date; null when out of reach. */

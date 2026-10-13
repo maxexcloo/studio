@@ -1,9 +1,10 @@
 import React from 'react';
+import { loraCompatibility } from './catalogueNames';
 import { apiJson } from './api';
 import type { Profile } from './types';
 
 /** What a LoRA was trained for and its trigger words, as the server read them from the file. */
-export type LoraInfo = { families: string[]; base: string; triggers: string[]; about?: string };
+export type LoraInfo = { families: string[]; base: string; triggers: string[]; about?: string; title?: string };
 export type LoraFit = 'fits' | 'other' | 'unknown';
 
 // One answer shared by every panel, asked again only when ComfyUI's LoRA list changes.
@@ -43,6 +44,5 @@ export function useLoraInfo(options: string[]) {
  * (an imported workflow, a LoRA that says nothing).
  */
 export function loraFit(info: LoraInfo | undefined, profile: Profile | null): LoraFit {
-  if (!info?.families?.length || !profile?.family || !profile.workflow?.startsWith('family:')) return 'unknown';
-  return info.families.includes(profile.family) ? 'fits' : 'other';
+  return loraCompatibility(info, profile);
 }

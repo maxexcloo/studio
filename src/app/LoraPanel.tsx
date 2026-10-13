@@ -1,3 +1,4 @@
+import { loraName, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, GripVertical, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
@@ -134,8 +135,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
   onMove: (to: number) => void;
 }) {
   const controls = useDragControls();
-  const folder = folderOf(item.name);
-  const label = fileName(item.name);
+  const label = loraName(item.name, info);
   return (
     <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ scale: 1.02, zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
       {count > 1 ? (
@@ -153,7 +153,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
         </button>
       ) : null}
       <div className="lora-card-top">
-        <Tip content={folder ? `${folder} · click to swap` : 'Click to swap for another LoRA'}>
+        <Tip content={`${item.name} · Click to swap`}>
           <button type="button" className="lora-name" onClick={onSwap}>{label}</button>
         </Tip>
         <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={13} /></button></Tip>
@@ -173,12 +173,13 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recents, remaining, swapping, onToggleFavorite, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, profile, fitOf, baseOf, nameOf, current, favorites, recents, remaining, swapping, onToggleFavorite, onAdd, onSwap, onClose }: {
   options: string[];
   profile: Profile | null;
   fitOf: FitOf;
   /** What a LoRA was made for, as people call it. */
   baseOf: (name: string) => string;
+  nameOf: (name: string) => string;
   current: string[];
   favorites: string[];
   recents: string[];
@@ -190,6 +191,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recen
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [highlight, setHighlight] = useState(0);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -197,25 +199,26 @@ function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recen
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const available = useMemo(() => new Set(options), [options]);
+  const filteredOptions = useMemo(() => modelLoras(options, fitOf, showAll), [options, fitOf, showAll]);
+  const available = useMemo(() => new Set(filteredOptions), [filteredOptions]);
   const sections = useMemo<PickerSection[]>(() => {
     const q = query.trim().toLowerCase();
-    if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(options, profile, q, fitOf).map((name) => ({ key: `q:${name}`, name })) }];
+    if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(filteredOptions.filter((name) => `${name} ${nameOf(name)}`.toLowerCase().includes(q)), profile, '', fitOf).map((name) => ({ key: `q:${name}`, name })) }];
     const out: PickerSection[] = [];
     const fav = favorites.filter((name) => available.has(name));
     const rec = recents.filter((name) => available.has(name) && !fav.includes(name)).slice(0, 5);
-    const suggested = recommendedLoras(options, profile, '', fitOf).filter((name) => !fav.includes(name) && !rec.includes(name)).slice(0, 6);
+    const suggested = recommendedLoras(filteredOptions, profile, '', fitOf).filter((name) => !fav.includes(name) && !rec.includes(name)).slice(0, 6);
     if (fav.length) out.push({ id: 'favorites', label: 'Favorites', rows: fav.map((name) => ({ key: `f:${name}`, name })) });
     if (rec.length) out.push({ id: 'recents', label: 'Recent', rows: rec.map((name) => ({ key: `r:${name}`, name })) });
     if (suggested.length) out.push({ id: 'suggested', label: profile?.familyName || profile?.family ? `Suggested for ${profile.familyName || profile.family}` : 'Suggested', rows: suggested.map((name) => ({ key: `s:${name}`, name })) });
-    for (const group of loraGroups(options, profile, '', fitOf)) {
+    for (const group of loraGroups(filteredOptions, profile, '', fitOf)) {
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }
     return out;
-  }, [available, favorites, fitOf, options, profile, query, recents]);
+  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents]);
 
   const visibleRows = useMemo(() => sections.flatMap((section) => collapsed.has(section.id) ? [] : section.rows), [collapsed, sections]);
-  useEffect(() => { setHighlight(0); }, [query]);
+  useEffect(() => { setHighlight(0); }, [query, showAll]);
   useEffect(() => {
     listRef.current?.querySelector('[data-highlight="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [highlight]);
@@ -259,6 +262,10 @@ function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recen
         />
         {query ? <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
       </label>
+      <div className="lora-filter">
+        <label>Model Filter<select aria-label="LoRA Model Filter" value={showAll ? 'all' : 'model'} onChange={(event) => setShowAll(event.target.value === 'all')}><option value="model">This Model & Unknown</option><option value="all">All Models</option></select></label>
+        <small>Uses file metadata. Unknown compatibility stays visible.</small>
+      </div>
       <div className="lora-picker-list" ref={listRef} role="listbox" aria-multiselectable={multi}>
         {sections.map((section) => {
           const isCollapsed = collapsed.has(section.id);
@@ -288,7 +295,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recen
                   >
                     {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={3} /> : null}</span> : null}
                     <span className="lora-option-copy">
-                      <strong>{fileName(row.name)}</strong>
+                      <strong>{nameOf(row.name)}</strong>
+                      <span title={row.name}>{row.name}</span>
                       {folderOf(row.name) && (query || !section.collapsible) ? <span>{folderOf(row.name)}</span> : null}
                     </span>
                     {added ? <em>Added</em> : fitOf(row.name) === 'other' && baseOf(row.name) ? <em className="lora-fit" title={`Made for ${baseOf(row.name)}`}>{baseOf(row.name)}</em> : null}
@@ -306,7 +314,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, current, favorites, recen
             </div>
           );
         })}
-        {!visibleRows.length && query ? <div className="lora-empty"><p>No LoRAs match “{query}”.</p></div> : null}
+        {!visibleRows.length ? <div className="lora-empty"><p>{query ? `No LoRAs match “${query}”.` : 'No compatible LoRAs found. Choose All Models to browse the rest.'}</p></div> : null}
       </div>
       {multi ? (
         <div className="lora-picker-foot">
@@ -519,6 +527,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           profile={profile}
           fitOf={fitOf}
           baseOf={baseOf}
+          nameOf={(name) => loraName(name, infos[name])}
           current={loras.map((item) => item.name)}
           favorites={library.favorites}
           recents={library.recents}

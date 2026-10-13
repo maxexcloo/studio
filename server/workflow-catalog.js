@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir, gallery } from './gallery-store.js';
+import { dataDir } from './gallery-store.js';
 import { allCustomWorkflowRecords, detectWorkflowFormat, detectWorkflowMetadata, graphFromJson, validateGraph, workflowMissingFiles, workflowOptionIssues } from './custom-workflows.js';
 import { catalogDownloadsForFile } from './family-profiles.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
@@ -59,7 +59,6 @@ export function updateWorkflowPreferencePatch(patch = {}) {
 export function markWorkflowUsed(profileId, thumbnail = "") {
   if (!profileId) return loadWorkflowPreferences();
   const patch = { lastUsed: { [profileId]: new Date().toISOString() } };
-  if (thumbnail) patch.thumbnails = { [profileId]: thumbnail };
   return updateWorkflowPreferencePatch(patch);
 }
 
@@ -135,9 +134,8 @@ function missingFileParts(workflow, info) {
 }
 
 function latestThumbnailFor(profileId, workflowId, prefs) {
-  if (prefs.thumbnails?.[profileId]) return prefs.thumbnails[profileId];
-  const match = gallery.find((item) => item.status === "done" && item.url && (item.settings?.profileId === profileId || item.settings?.workflow === workflowId || item.settings?.workflow === profileId || item.model === profileId));
-  return match?.url || "";
+  const icon = prefs.thumbnails?.[profileId];
+  return typeof icon === "string" && icon.startsWith("/workflow-icons/") ? icon : "/workflow-icons/workflow.svg";
 }
 
 function automaticTags(item, prefs) {
@@ -229,7 +227,7 @@ export function workflowSummaries({ info = {}, profiles = [], preferences = load
     summary.tags = automaticTags(summary, preferences);
     summaries.push(summary);
   }
-  return summaries.sort((a, b) => {
+  return summaries.filter((item) => item.source !== "builtin" || !online || item.validation.ok).sort((a, b) => {
     const fav = Number(b.favorite) - Number(a.favorite);
     if (fav) return fav;
     const recent = Date.parse(b.lastUsedAt || "0") - Date.parse(a.lastUsedAt || "0");
