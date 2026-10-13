@@ -421,7 +421,7 @@ export function WorkflowGallery({ view }: { view: any }) {
     >
       <section className={cn("wf-browse", mobileDetailsOpen && "is-hidden-mobile")}>
         <div className="wf-toolbar">
-          <label className="wf-search">
+          <label className="wf-search picker-search">
             <Search size={14} />
             <input className="is-framed" aria-label="Search workflows" value={query} placeholder="Search workflows" onChange={(event) => setQuery(event.target.value)} />
             {query ? <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={13} /></button> : null}

@@ -416,24 +416,7 @@
 .phone-switch.is-on { background: hsl(145 60% 42%); }
 .phone-switch.is-on i { translate: 20px 0; }
 
-.phone-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  margin-bottom: 8px;
-  padding: 0 16px;
-  border-radius: 16px;
-  background: #1f1f1f;
-  color: hsl(var(--muted-foreground));
-}
-.phone-search input {
-  flex: 1;
-  min-width: 0;
-  color: hsl(var(--foreground));
-  font-size: 16px;
-  outline: none;
-}
+.phone-search { margin-bottom: 8px; }
 
 /* The create sheet's size row: the real shape, with the 2K or C tag on its corner. */
 .phone-size-icon { flex: none; width: 20px; height: 20px; color: hsl(var(--muted-foreground)); }

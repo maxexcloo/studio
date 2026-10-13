@@ -268,7 +268,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close" onClick={onClose}><X size={15} /></button></Tip>
       </header>
 
-      <div className="reference-search">
+      <div className="reference-search picker-search">
         <Search size={15} aria-hidden="true" />
         <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}

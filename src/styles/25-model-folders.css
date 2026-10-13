@@ -295,47 +295,7 @@
   letter-spacing: .01em;
   color: rgb(255 255 255 / .6);
 }
-.model-menu-search {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  margin-bottom: 4px;
-  padding: 0 10px;
-  border-radius: calc(var(--radius) - 2px);
-  background: rgb(255 255 255 / .06);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
-  color: rgb(255 255 255 / .5);
-  cursor: text;
-}
-.model-menu-search:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); color: rgb(255 255 255 / .75); }
-.model-menu-search input {
-  flex: 1;
-  min-width: 0;
-  color: hsl(var(--foreground));
-  font: inherit;
-  font-size: 13px;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  outline: none;
-  box-shadow: none;
-  padding: 0;
-}
-.model-menu-search input::placeholder { color: rgb(255 255 255 / .4); }
-.model-menu-clear {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 999px;
-  background: rgb(255 255 255 / .1);
-  color: rgb(255 255 255 / .7);
-  cursor: pointer;
-}
-.model-menu-clear:hover { background: rgb(255 255 255 / .18); color: #fff; }
+.model-menu-search { margin-bottom: 4px; }
 .model-menu-none { padding: 14px 10px; font-size: 12.5px; color: rgb(255 255 255 / .5); }
 .model-menu .model-menu-find { flex: none; margin-top: 6px; }
 
