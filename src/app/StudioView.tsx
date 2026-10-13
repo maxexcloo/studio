@@ -120,7 +120,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // Smart upscale works on images, and only while it is on in Settings.
   const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
   const strayModelCount = modelFolders?.strayCount || 0;
-  const canUseNegativePrompt = currentProfile?.capabilities?.negativePrompt !== false;
+  const canUseNegativePrompt = true;
+  const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
@@ -366,9 +367,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       if (active) setActive(null);
       if (prefs.zenMode) { selectZenItem(item.id); return; }
       window.requestAnimationFrame(() => {
-        const tile = document.querySelector(`[data-tile-id="${CSS.escape(item.id)}"]`);
-        if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
-        else galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       });
     },
     onView: (item) => openItem(item)
@@ -477,6 +476,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <>
           {hiddenLocked || galleryCrossing ? <section className="gallery" /> : !galleryLoaded ? <section className="gallery virtual-gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}><GallerySkeleton columns={galleryColumnCount} /></section> : renderedGallery.length ? (
             <StableGallery
+              key={`${hiddenSpace ? "hidden" : "gallery"}:${mode}`}
               cancelJob={cancelJob}
               groups={galleryGroups}
               moments={features.moments && prefs.showMoments !== false}
@@ -547,7 +547,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", showNegativePrompt && canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", passageClass)}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -643,14 +643,16 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && canUseNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
-              <label className="negative-drawer-label">Negative prompt</label>
+            {canUseNegativePrompt ? <div data-open-surface className="negative-drawer open">
+              <label className="negative-drawer-label">Negative Prompt{!negativeSupported ? " · Saved, unused by this profile" : ""}</label>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" value={canUseNegativePrompt ? negative : ""} disabled={!canUseNegativePrompt} placeholder={canUseNegativePrompt ? "What to avoid…" : "This model takes no negative prompt"} onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative prompt" value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
-              <span>{canUseNegativePrompt ? characterMeta(negative, negativeLimit) : "Unavailable for this model"}</span>
-            </div>
+              {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
+            </div> : null}
             <StableComposerBar
+              hasText={Boolean(prompt || negative)}
+              onClearText={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }}
               models={models}
               model={model}
               modelProfiles={modelProfiles}
@@ -737,6 +739,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll}>
+          {!hiddenLocked ? (
+            <div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
+              {(["image", "video"] as const).map((nextMode) => (
+                <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
+                  {nextMode === "image" ? "Photo" : "Video"}
+                </button>
+              ))}
+            </div>
+          ) : null}
             {galleryBody}
             <div className="bottom-fade" />
           </main>
@@ -757,14 +768,16 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            <div data-open-surface className={cn("negative-drawer", showNegativePrompt && canUseNegativePrompt && "open", !canUseNegativePrompt && "is-unavailable")}>
-              <label className="negative-drawer-label">Negative prompt</label>
+            {canUseNegativePrompt ? <div data-open-surface className="negative-drawer open">
+              <label className="negative-drawer-label">Negative Prompt{!negativeSupported ? " · Saved, unused by this profile" : ""}</label>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" value={canUseNegativePrompt ? negative : ""} disabled={!canUseNegativePrompt} placeholder={canUseNegativePrompt ? "What to avoid…" : "This model takes no negative prompt"} onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative prompt" value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
-              <span>{canUseNegativePrompt ? characterMeta(negative, negativeLimit) : "Unavailable for this model"}</span>
-            </div>
+              {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
+            </div> : null}
             <StableComposerBar
+              hasText={Boolean(prompt || negative)}
+              onClearText={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }}
               models={models}
               model={model}
               modelProfiles={modelProfiles}
@@ -855,6 +868,19 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <HiddenUnlockSheet hidden={hidden} />
       {active ? (() => {
         const hasNeighbors = ((view.viewerGallery || []) as GalleryItem[]).length > 1;
+        // What made this output, at the top of its preview: the profile it ran
+        // through, then the settings worth seeing without opening Details.
+        const activeProfile = (models?.profiles || []).find((profile: { id: string }) => profile.id === active.settings?.profileId) || null;
+        const profileTitle = activeProfile?.displayName || activeProfile?.label || active.settings?.modelName || active.model || "Generation";
+        const profileDetail = [
+          active.width && active.height ? `${active.width} × ${active.height}` : "",
+          active.type === "video" && active.settings?.duration ? `${active.settings.duration} s` : "",
+          active.settings?.steps ? `${active.settings.steps} steps` : "",
+          active.settings?.cfg ? `CFG ${active.settings.cfg}` : "",
+          [active.settings?.sampler, active.settings?.scheduler].filter(Boolean).join(" / "),
+          active.settings?.seed && active.settings.seed !== "Random" ? `Seed ${active.settings.seed}` : "",
+          active.durationMs ? formatElapsed(active.durationMs) : ""
+        ].filter(Boolean).join(" · ");
         return (
           <div className="scrim" role="dialog" aria-modal="true" aria-label="Image viewer" data-focus-trap tabIndex={-1} onClick={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -863,6 +889,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           }} ref={setViewerNode}>
             <div className="viewer-shell" onClick={(event) => event.stopPropagation()}>
               <div className={cn("viewer-stage", showDetails && "with-side")} data-viewer-empty>
+                <header className="viewer-profile-summary">
+                  <strong>{profileTitle}</strong>
+                  {profileDetail ? <span>{profileDetail}</span> : null}
+                </header>
                 <div
                   className={cn("viewer-canvas", active.type === 'video' && 'is-video', viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging")}
                   data-open-surface
@@ -922,8 +952,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
-                        <details className="settings-disclosure" open={showGenerationSettings} onToggle={(event) => setShowGenerationSettings(event.currentTarget.open)}>
-                          <summary>Generation settings</summary>
+                        <section className="settings-disclosure">
+                          <h3>Generation Settings</h3>
                           {generationDetailEntries(active).map((section: { title: string; rows: Array<[string, string]> }) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
@@ -936,7 +966,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                               </div>
                             </div>
                           ))}
-                        </details>
+                        </section>
                       ) : null}
                     </div>
                   </aside>
@@ -977,7 +1007,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     <ViewerUpscaleButton item={active} busy={Boolean(upscaleBusyIds?.has(active.id))} onCancel={cancelUpscale} onActivate={activateUpscale} />
                     </span>
                   ) : null}
-                  {active.upscale?.url && !upscaledWithRun(active) ? (
+                  {active.type === "image" && active.upscale?.url && !upscaledWithRun(active) ? (
                     <Tip content={compareOpen ? "Hide the comparison" : "Compare with the original"}>
                       <button
                         className={cn("icon-button", compareOpen && "active")}

@@ -130,7 +130,7 @@ button:not(:disabled):active { scale: .96; }
   gap: 4px;
   padding: 8px;
 }
-.zen-prompt textarea { min-height: 48px; padding: 8px 10px 5px; font-size: 15px; line-height: 1.4; }
+.zen-prompt > textarea { min-height: 64px; padding: 8px 10px 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt textarea::placeholder { color: rgb(255 255 255 / .5); }
 .zen-prompt-actions { padding: 2px; }
 /* The density ladder in 12-composer.css keeps this on one line; it must not
@@ -190,6 +190,5 @@ button:not(:disabled):active { scale: .96; }
 @media (max-width: 760px) {
   .stage-gallery { padding-bottom: calc(var(--zen-prompt-h, 160px) + 34px); }
   .zen-prompt { width: calc(100vw - 20px); bottom: 10px; }
-  .zen-prompt textarea { min-height: 48px; font-size: 16px; }
+  .zen-prompt > textarea { min-height: 64px; font-size: 16px; }
 }
-

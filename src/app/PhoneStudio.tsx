@@ -1,4 +1,5 @@
 import React from 'react';
+import { modelGroups, modelName } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
@@ -110,7 +111,11 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_event, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}
           >
-            <div className="phone-sheet-grab" onPointerDown={(event) => drag.start(event)}>
+            <div className="phone-sheet-grab" onPointerDown={(event) => {
+              // Header actions must keep their tap, even when a finger moves slightly.
+              if (reduced || !event.isPrimary || event.button !== 0 || (event.target as Element).closest('button, a, input, select, textarea, [role="button"]')) return;
+              drag.start(event);
+            }}>
               <div className="phone-sheet-handle" aria-hidden="true" />
               <header className="phone-sheet-head">
                 <h2>{title}</h2>
@@ -312,7 +317,7 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
     <nav className="viewer-phone-bar" aria-label="Image actions">
       {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
       {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
-      {item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
+      {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
       {item.prompt ? <button type="button" onClick={() => actions.reuse(item)}><Wand2 size={21} /><span>Reuse</span></button> : null}
       {canStar(item) ? (
         <button type="button" className={cn(item.favorite && 'is-starred')} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
@@ -354,7 +359,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   setSelection: (selection: Set<string> | null) => void;
 }) {
   const {
-    prompt, currentProfile, hiddenSpace, hidden, runningCount, cancelQueue, comfyStatus, retryComfyStatus,
+    prompt, currentProfile, hiddenSpace, hidden, runningCount, cancelQueue, comfyStatus, retryComfyStatus, mode, changeMode,
     galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, deleteItems, hideItems, unhideItems, showToast
   } = view;
   const gallery = (visibleGallery || []) as GalleryItem[];
@@ -362,6 +367,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const selectedItems = selecting ? gallery.filter((item) => selection!.has(item.id)) : [];
   const selectable = gallery.filter((item) => item.status === 'done' || item.status === 'error');
   const endSelection = () => setSelection(null);
+  const reducedMotion = useReducedMotion();
+  const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
 
   // Progress of what is running, for the ring on the pill and its second line.
   const pending = gallery.filter((item) => item.status === 'pending');
@@ -421,7 +428,11 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           <span />
         </button>
         <div className="phone-title">
-          {hiddenSpace ? <><button type="button" className="phone-icon" aria-label="Back to the gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button><LockKeyhole size={16} className="phone-ember" /><span>Hidden</span></> : <span>Gallery</span>}
+          {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
+          <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
+            {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
+            <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
+          </button>
         </div>
         {!hiddenLocked ? (
           <button type="button" className={cn('phone-icon', searchActive(gallerySearch) && 'is-on')} aria-label="Search" aria-expanded={searchOpen || searchActive(gallerySearch)} onClick={() => { if (searchOpen || searchActive(gallerySearch)) { setGallerySearch(emptySearch); setSearchOpen(false); } else setSearchOpen(true); }}><Search size={21} /></button>
@@ -450,6 +461,14 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       <main ref={galleryStageRef} className="phone-gallery" onScroll={onGalleryScroll}>
+      {!hiddenLocked && !selecting ? (
+        <div className="phone-generation-mode phone-seg" role="radiogroup" aria-label="Generation Mode">
+          {(['image', 'video'] as const).map((value) => (
+            <button key={value} type="button" role="radio" aria-checked={mode === value} className={cn(mode === value && 'active')} onClick={() => changeMode(value)}>{value === 'image' ? 'Photo' : 'Video'}</button>
+          ))}
+        </div>
+      ) : null}
+
         {galleryBody}
       </main>
 
@@ -533,11 +552,10 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile, hiddenSpace,
     aspectOptions, aspectPickerValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
-    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    prefs, chooseAutoUpscale
+    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
+    prefs, chooseAutoUpscale, setShowNegativePrompt
   } = view;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'aspect' | 'advanced'>('');
-  const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const { prompts: recentPrompts } = usePromptHistory(open);
   const restarting = Boolean(comfyStatus?.restarting);
@@ -580,7 +598,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           >
             {restarting ? <><RefreshCw size={18} className="spin" /> Restarting…</>
               : comfyOffline ? <><RefreshCw size={18} className={cn(comfyRetrying && 'spin')} /> {comfyRetrying ? 'Checking…' : 'Check again'}</>
-              : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'image' && count > 1 ? `Generate ${count}` : 'Generate'}</>}
+              : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
             <HapticTarget />
           </button>
         </>
@@ -602,13 +620,17 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           placeholder={referenceInpaint?.mask ? 'Describe what the painted part becomes…' : hiddenSpace ? 'Describe what to make, privately…' : 'Describe what to make…'}
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
-          autoFocus={!prompt.trim()}
         />
-        {recentPrompts.length ? (
-          <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); setHistoryOpen(true); }}>
-            <History size={15} /> Recent
+        <div className="phone-compose-actions">
+          {recentPrompts.length ? (
+            <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); setHistoryOpen(true); }}>
+              <History size={15} /> Recent
+            </button>
+          ) : null}
+          <button type="button" className="phone-compose-recent" aria-label="Clear Prompt & Negative" disabled={!prompt && !negative} onClick={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }}>
+            <X size={15} /> Clear Text
           </button>
-        ) : null}
+        </div>
       </div>
       <PromptHistorySheet
         open={historyOpen}
@@ -618,14 +640,10 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       />
 
       {canUseNegativePrompt ? (
-        showNegative ? (
-          <label className="phone-field">
-            <span>Negative prompt</span>
-            <textarea value={negative} rows={2} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-          </label>
-        ) : (
-          <button type="button" className="phone-link" onClick={() => setShowNegative(true)}>+ Negative prompt</button>
-        )
+        <label className="phone-field">
+          <span>Negative Prompt{currentProfile?.capabilities?.negativePrompt === false ? " · Saved, unused by this profile" : ""}</span>
+          <textarea value={negative} rows={2} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+        </label>
       ) : null}
 
       {String(seed || '').trim() ? (
@@ -637,9 +655,14 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       <div className="phone-group">
         <button type="button" className="phone-row" onClick={() => setSheet('workflow')}>
           <SlidersHorizontal size={20} />
-          <span>{currentProfile?.displayName || currentProfile?.label || 'Choose a model'}<small>{currentProfile ? familyLabel(currentProfile) : 'Model'}</small></span>
+          <span>{currentProfile ? modelName(currentProfile).name : 'Choose a Model'}<small>{currentProfile ? modelName(currentProfile).detail : 'Model'}</small></span>
           <ChevronRight size={18} className="phone-row-end" />
         </button>
+      </div>
+      <div className="phone-loras">{modelLoraControls}</div>
+      {grokMediaControls}
+      {phoneVideoDurationControls}
+      <div className="phone-group">
         {(aspectOptions || []).length && !aspectLocked ? (
           <button type="button" className="phone-row" onClick={() => setSheet('aspect')}>
             <span className="aspect-shape phone-aspect" style={aspect ? aspectIconStyle(aspect) : undefined} />
@@ -672,14 +695,14 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         </div>
       ) : null}
 
-      <div className="phone-control">
+      {currentProfile?.family !== 'grok' ? <div className="phone-control">
         <span className="phone-control-label">Steps <b>{steps}</b></span>
         <input className="phone-slider" type="range" min={stepMin} max={stepMax} step={1} value={steps} aria-label="Steps" onChange={(event) => setSteps(Number(event.target.value))} />
         <span className="phone-control-hint"><span>Faster</span>{stepDefault ? <button type="button" className="phone-step-default" onClick={() => setSteps(stepDefault)} disabled={steps === stepDefault}>Recommended {stepDefault}</button> : null}<span>More detail</span></span>
-      </div>
+      </div> : null}
 
       <button type="button" className="phone-link is-strong" onClick={() => setSheet('advanced')}>
-        Advanced settings{loraActiveCount ? ` · ${loraActiveCount} LoRA${loraActiveCount === 1 ? '' : 's'}` : ''} <ChevronRight size={16} />
+        Advanced Settings <ChevronRight size={16} />
       </button>
 
       <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
@@ -698,16 +721,16 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const profiles = modelProfiles || [];
   const favorites = new Set(modelMenu?.favorites || []);
   const needle = query.trim().toLowerCase();
-  const matches = (profile: Profile) => !needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)}`.toLowerCase().includes(needle);
+  const matches = (profile: Profile) => !needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle);
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
   const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, 4);
-  const shown = new Set([...starred, ...recent].map((profile) => profile.id));
+  const shown = new Set(starred.map((profile) => profile.id));
   const rest = profiles.filter((profile) => !shown.has(profile.id) && matches(profile));
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
-      <button type="button" className={cn('phone-row', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
-        <span>{profile.displayName || profile.label}<small className={cn(setupNote(profile) && 'is-setup')}>{setupNote(profile) || familyLabel(profile)}</small></span>
+      <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
+        <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelName(profile).detail, setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
         {profile.id === model ? <Check size={18} className="phone-row-end" /> : null}
       </button>
       {modelMenu ? (
@@ -728,8 +751,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Get one on the computer running HEISS UI.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
       {starred.length ? <><h3 className="phone-section">Favorites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
       {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
-      {rest.some((profile) => !profile.id.startsWith('custom:')) ? <><h3 className="phone-section">{starred.length || recent.length ? 'All models' : ''}</h3><div className="phone-group">{rest.filter((profile) => !profile.id.startsWith('custom:')).map(row)}</div></> : null}
-      {rest.some((profile) => profile.id.startsWith('custom:')) ? <><h3 className="phone-section">Your workflows</h3><div className="phone-group">{rest.filter((profile) => profile.id.startsWith('custom:')).map(row)}</div></> : null}
+      {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}
       {needle && !starred.length && !rest.length ? <p className="phone-empty">Nothing matches “{query.trim()}”.</p> : null}
     </Sheet>
   );

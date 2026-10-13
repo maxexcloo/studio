@@ -45,6 +45,7 @@ export function retryRequest(item: GalleryItem, options: RetryOptions = {}): Ret
     scheduler: String(settings.scheduler || ''),
     seed: /^\d+$/.test(seed) ? seed : '',
     count: Number(settings.count || 1),
+    variationCount: Number(settings.variationCount || settings.count || 1),
     ...(kind === 'video' ? { frames: Number(settings.frames || 0) || undefined, fps: Number(settings.fps || 0) || undefined } : {}),
     loras: normalizeLoras(settings.loras),
     autoResizeInputs: settings.autoResizeInputs !== false,

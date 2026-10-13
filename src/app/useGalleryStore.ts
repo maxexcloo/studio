@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { apiJson } from './api';
 import { sortGalleryItems } from './gallery';
 import type { GalleryItem, Mode } from './types';
@@ -234,6 +234,7 @@ function matchesSearch(item: GalleryItem, search: GallerySearch) {
 
 export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLocked, search = emptySearch }: { mode: Mode; showFailedItems: boolean; space?: GallerySpace; onLocked?: () => void; search?: GallerySearch }) {
   const [state, dispatch] = useReducer(galleryReducer, initialState);
+  const [loadedKey, setLoadedKey] = useState("");
   const includeFailed = showFailedItems ? "1" : "0";
   const hidden = space === "hidden";
   // The gallery is searched on the server, which holds all of it; the page only
@@ -248,6 +249,30 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
   };
   // A slower answer to an earlier search must not replace a newer one.
   const loadSeq = useRef(0);
+  const searchKey = hidden || !searchActive(search) ? "" : `${search.q.trim()}\n${search.favorites}`;
+  const requestKey = JSON.stringify([mode, space, includeFailed, searchKey]);
+  const requestKeyRef = useRef(requestKey);
+  const pageSnapshots = useRef(new Map<string, GalleryState>());
+  const previousPage = useRef({ key: requestKey, state });
+  const restoredPage = useRef<GalleryState | null>(null);
+  if (previousPage.current.key === requestKey) previousPage.current.state = state;
+  useLayoutEffect(() => {
+    if (previousPage.current.key === requestKey) return;
+    const previous = previousPage.current;
+    if (previous.state.loaded && JSON.parse(previous.key)[1] === "gallery" && !JSON.parse(previous.key)[3]) {
+      pageSnapshots.current.set(previous.key, previous.state);
+    }
+    const restored = space === "gallery" ? pageSnapshots.current.get(requestKey) : undefined;
+    restoredPage.current = restored || null;
+    previousPage.current = { key: requestKey, state: restored || initialState };
+    dispatch({ type: "cross", restore: restored || null });
+    setLoadedKey(restored ? requestKey : "");
+  }, [requestKey, space]);
+  // Invalidate immediately, including the debounce window and an A → B → A switch.
+  if (requestKeyRef.current !== requestKey) {
+    requestKeyRef.current = requestKey;
+    loadSeq.current += 1;
+  }
   // Moving between the gallery and Hidden swaps the list, and a page still on
   // its way from the space just left is dropped when it lands. The gallery is
   // kept aside while in Hidden so coming back shows it at once and only syncs;
@@ -255,32 +280,37 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
   const spaceRef = useRef(space);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const gallerySnapshot = useRef<GalleryState | null>(null);
-  useEffect(() => {
-    if (spaceRef.current === space) return;
-    if (spaceRef.current === "gallery" && stateRef.current.loaded) gallerySnapshot.current = stateRef.current;
-    spaceRef.current = space;
-    dispatch({ type: "cross", restore: space === "gallery" ? gallerySnapshot.current : null });
-    if (space === "gallery") gallerySnapshot.current = null;
-  }, [space]);
+  useLayoutEffect(() => { spaceRef.current = space; }, [space]);
 
   const gallery = useMemo(() => state.sortedIds.map((id) => state.itemsById[id]).filter(Boolean), [state.itemsById, state.sortedIds]);
   const hiddenSearch = hidden && searchActive(search) ? search : null;
-  const visibleGallery = useMemo(() => (hiddenSearch ? gallery.filter((item) => matchesSearch(item, hiddenSearch)) : gallery), [gallery, hiddenSearch?.q, hiddenSearch?.favorites]); // eslint-disable-line react-hooks/exhaustive-deps
+  const visibleGallery = useMemo(() => gallery.filter((item) => item.type === mode && (!hiddenSearch || matchesSearch(item, hiddenSearch))), [gallery, mode, hiddenSearch?.q, hiddenSearch?.favorites]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadGallery = useCallback(async () => {
     const seq = ++loadSeq.current;
+    const restored = restoredPage.current;
+    restoredPage.current = null;
+    if (restored && !hidden) {
+      const delta = await apiJson<GalleryDelta>(`/api/gallery/delta?since=${restored.revision}&type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}${searchQuery()}`);
+      if (seq !== loadSeq.current) return delta;
+      if (!delta.reset) {
+        if (delta.removes?.length) dispatch({ type: "remove", keys: delta.removes, revision: delta.revision });
+        dispatch({ type: "upsert", items: delta.upserts || [], revision: delta.revision });
+        setLoadedKey(requestKeyRef.current);
+        return delta;
+      }
+    }
     // Hidden is its own list; a locked session gets nothing back and shows the lock instead.
     const page = hidden
-      ? await apiJson<GalleryPage>(`/api/hidden/gallery?type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}&bundles=0`).catch(() => { onLocked?.(); return { items: [], revision: 0 }; })
+      ? await apiJson<GalleryPage>(`/api/hidden/gallery?type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}&bundles=0`).catch(() => { if (seq === loadSeq.current) onLocked?.(); return { items: [], revision: 0 }; })
       : await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&includeFailed=${includeFailed}&bundles=0${searchQuery()}`);
     if (spaceRef.current !== space || seq !== loadSeq.current) return page;
     dispatch({ type: "reset", page });
+    setLoadedKey(requestKeyRef.current);
     return page;
   }, [hidden, includeFailed, mode, onLocked, space]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A new search (or leaving one) reloads the first page; typing waits a beat.
-  const searchKey = hidden || !searchActive(search) ? "" : `${search.q.trim()}\n${search.favorites}`;
   const loadRef = useRef(loadGallery);
   loadRef.current = loadGallery;
   const lastSearchKey = useRef(searchKey);
@@ -293,30 +323,36 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
   }, [searchKey]);
 
   // Scroll fires many times near the bottom; one request per cursor at a time.
-  const loadingMoreRef = useRef("");
+  const loadingMoreRef = useRef<{ cursor: string; seq: number } | null>(null);
   const loadMoreGalleryItems = useCallback(async () => {
-    if (!state.hasMore || !state.nextCursor || loadingMoreRef.current === state.nextCursor) return;
-    loadingMoreRef.current = state.nextCursor;
+    const seq = loadSeq.current;
+    if (hidden || !state.hasMore || !state.nextCursor || (loadingMoreRef.current?.cursor === state.nextCursor && loadingMoreRef.current.seq === seq)) return;
+    const request = { cursor: state.nextCursor, seq };
+    loadingMoreRef.current = request;
     try {
       const page = await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&cursor=${encodeURIComponent(state.nextCursor)}&includeFailed=${includeFailed}&bundles=0${searchQuery()}`);
-      dispatch({ type: "append", page });
+      if (seq === loadSeq.current) dispatch({ type: "append", page });
     } catch {
       // Leave the cursor as it was, so the next scroll or the button tries again.
     } finally {
-      loadingMoreRef.current = "";
+      if (loadingMoreRef.current === request) loadingMoreRef.current = null;
     }
-  }, [includeFailed, mode, state.hasMore, state.nextCursor]);
+  }, [hidden, includeFailed, mode, state.hasMore, state.nextCursor]);
 
   const loadGalleryDelta = useCallback(async () => {
     if (!state.revision) return loadGallery();
+    const seq = loadSeq.current;
     if (hidden) {
       // Locked from another tab or device: say so here too instead of showing a stale grid.
-      const page = await apiJson<GalleryPage & { unchanged?: boolean }>(`/api/hidden/gallery?type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}&since=${state.revision}`).catch(() => { onLocked?.(); return null; });
-      if (page && !page.unchanged && spaceRef.current === space) dispatch({ type: "reset", page });
+      const page = await apiJson<GalleryPage & { unchanged?: boolean }>(`/api/hidden/gallery?type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}&since=${state.revision}`).catch(() => { if (seq === loadSeq.current) onLocked?.(); return null; });
+      if (page && !page.unchanged && seq === loadSeq.current) {
+        dispatch({ type: "reset", page });
+        setLoadedKey(requestKeyRef.current);
+      }
       return page;
     }
     const delta = await apiJson<GalleryDelta>(`/api/gallery/delta?since=${state.revision}&type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}${searchQuery()}`);
-    if (spaceRef.current !== space) return delta;
+    if (seq !== loadSeq.current) return delta;
     if (delta.reset) return loadGallery();
     if (delta.removes?.length) dispatch({ type: "remove", keys: delta.removes, revision: delta.revision });
     if (delta.upserts?.length) dispatch({ type: "upsert", items: delta.upserts, revision: delta.revision });
@@ -338,7 +374,7 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
     gallery,
     visibleGallery,
     renderedGallery: visibleGallery,
-    galleryLoaded: state.loaded,
+    galleryLoaded: state.loaded && loadedKey === requestKey,
     galleryCrossing: !state.loaded && Boolean(state.crossing),
     hasMoreGallery: state.hasMore,
     galleryTotalApprox: state.totalApprox,

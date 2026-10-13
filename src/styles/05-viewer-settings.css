@@ -234,6 +234,18 @@
   min-width: 0;
   max-width: 100%;
 }
+/* The viewer shows its settings outright, so the heading stands where the
+   old expander's summary did. */
+.settings-disclosure > h3 {
+  margin: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 600;
+}
 .settings-disclosure summary {
   min-height: 38px;
   display: flex;
@@ -369,3 +381,16 @@
   .upscale-compare-tag.is-before { left: 8px; }
   .upscale-compare-tag.is-after { right: 8px; }
 }
+
+.viewer-profile-summary {
+  position: absolute;
+  inset: 12px 72px auto 16px;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  pointer-events: none;
+  font-size: 12px;
+  text-shadow: 0 1px 3px #000;
+}
+.viewer-profile-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-profile-summary span { opacity: 0.8; }

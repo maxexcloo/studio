@@ -161,6 +161,12 @@
 }
 
 /* Phone: a chip in the prompt box, and a sheet of big rows. */
+.phone-compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.phone-compose-recent:disabled { opacity: .4; }
 .phone-compose-recent {
   justify-self: end;
   display: inline-flex;
@@ -199,12 +205,25 @@
   .app-shell .zen-control-button.gallery-search-button { left: calc(max(8px, env(safe-area-inset-left)) + var(--deck-h) + 8px); }
 }
 
-/* The field floats over the top of the gallery, where a search is looked for,
-   and the first row of tiles starts below it. */
+/* Keep mode selection above the library and its optional search field. */
+:is(.app-shell, .zen-shell):has(.gallery-generation-mode) { --gallery-mode-h: 0px; }
+.gallery-generation-mode {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  width: min(240px, calc(100vw - 2 * var(--deck-gap, 18px)));
+  margin: 0 auto 16px;
+  background: #1b1b1b;
+}
+.app-shell:has(.gallery-generation-mode) .stage-gallery {
+  padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h) + 12px);
+  scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h) + 12px);
+}
+
 .gallery-search {
   position: fixed;
   /* Under the activity pills while one shows (--islands-h), over the tiles' glass. */
-  top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px));
+  top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px));
   left: 50%;
   z-index: 12;
   width: min(480px, calc(100vw - 2 * var(--deck-gap, 18px)));
@@ -281,14 +300,16 @@
 }
 
 .app-shell:has(.gallery-search) .stage-gallery {
-  padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--dock-h) + 12px);
-  scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--dock-h) + 12px);
+  padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
+  scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
 }
 /* In Hidden the bar owns the top left; where both would touch, the field goes under it. */
 @media (max-width: 920px) {
-  .gallery-search.is-hidden-space { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px)); }
+  .is-hidden-space .gallery-generation-mode { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px)); }
+  .app-shell.is-hidden-space:has(.gallery-generation-mode) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h) + 12px); }
+  .gallery-search.is-hidden-space { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h, 0px)); }
   .app-shell.is-hidden-space:has(.gallery-search) .stage-gallery {
-    padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--dock-h) + 12px);
+    padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
   }
 }
 
@@ -307,7 +328,7 @@
 /* Phone: a row under the top bar. */
 .phone-searchbar {
   position: fixed;
-  top: calc(max(6px, env(safe-area-inset-top)) + 50px);
+  top: calc(max(6px, env(safe-area-inset-top)) + 50px + var(--phone-mode-h, 0px));
   left: max(10px, env(safe-area-inset-left));
   right: max(10px, env(safe-area-inset-right));
   z-index: 19;
@@ -318,9 +339,9 @@
 .phone-searchbar .phone-search { flex: 1; min-width: 0; min-height: 48px; margin: 0; background: #1b1b1b; box-shadow: 0 8px 24px rgb(0 0 0 / .4); }
 .phone-searchbar .phone-search-fav { color: hsl(var(--muted-foreground)); }
 .phone-searchbar .phone-search-fav.is-on { color: var(--ember); }
-.phone-shell:has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px); }
-.phone-shell:has(.phone-searchbar) .phone-running { top: calc(max(6px, env(safe-area-inset-top)) + 106px); }
-.phone-shell:has(.phone-searchbar):has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 164px); }
+.phone-shell:has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px + var(--phone-mode-h, 0px)); }
+.phone-shell:has(.phone-searchbar) .phone-running { top: calc(max(6px, env(safe-area-inset-top)) + 106px + var(--phone-mode-h, 0px)); }
+.phone-shell:has(.phone-searchbar):has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 164px + var(--phone-mode-h, 0px)); }
 
 /* ------------------------------------------------------------------ Stars */
 

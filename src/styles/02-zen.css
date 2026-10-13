@@ -166,8 +166,8 @@
 .negative-drawer.open {
   max-height: 140px;
   opacity: 1;
-  padding: 10px 4px 4px;
-  margin-top: 8px;
+  padding: 6px 4px 0;
+  margin-top: 4px;
   border-top-color: hsl(var(--border));
 }
 .negative-drawer-label {
@@ -178,7 +178,7 @@
 }
 .negative-drawer textarea {
   min-height: 0;
-  height: 56px;
+  height: 36px;
   padding: 0;
   border: 0;
   background: transparent;

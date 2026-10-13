@@ -296,3 +296,11 @@
   cursor: default;
 }
 .zen-prompt-actions:not([data-density-level="0"]) .composer-estimate { display: none; }
+
+.model-loras { min-width: 0; margin: 12px 0; }
+.model-loras > h3 { margin: 0 0 8px; font-size: 13px; }
+.lora-filter { display: grid; gap: 6px; padding: 8px 0; }
+.lora-filter label { display: grid; gap: 6px; font-size: 12px; }
+.lora-filter select { min-height: 44px; max-width: 100%; }
+.lora-filter small { color: hsl(var(--muted-foreground)); font-size: 11px; }
+.lora-option-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
