@@ -31,6 +31,8 @@ type PageState = {
 };
 
 const emptyPage = (): PageState => ({ items: [], cursor: "", hasMore: false, loading: false, loaded: false, error: "" });
+type PickerMemory = { tab?: PickerTab; query: string; pages: Record<PickerTab, PageState>; scroll: Record<PickerTab, number> };
+const pickerMemory = (): PickerMemory => ({ query: '', pages: { generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() }, scroll: { generation: 0, hidden: 0, upload: 0 } });
 const spring = { type: "spring", duration: 0.38, bounce: 0.12 } as const;
 
 function assetImage(asset: ReferenceAsset) {
@@ -43,7 +45,8 @@ function assetImage(asset: ReferenceAsset) {
  * The reference library as a popover that rises out of the composer: recent
  * generations and uploads in a grid, an upload button, drop and paste.
  */
-function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+  memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
   popRef: React.RefObject<HTMLDivElement | null>;
@@ -63,11 +66,13 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   const hidden = useHiddenActions();
   const hiddenShelf = Boolean(hidden?.enabled);
   const hiddenOpen = Boolean(hidden?.unlocked);
-  const [tab, setTab] = React.useState<PickerTab>(() => hiddenShelf && (selected?.source === "vault" || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
-  const [pages, setPages] = React.useState<Record<PickerTab, PageState>>({ generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() });
+  const [tab, setTab] = React.useState<PickerTab>(() => memory.tab && (memory.tab !== "hidden" || hiddenShelf && hiddenOpen) ? memory.tab : hiddenShelf && (selected?.source === "vault" || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
+  const [pages, setPages] = React.useState<Record<PickerTab, PageState>>(() => memory.pages);
   const [selectingId, setSelectingId] = React.useState("");
-  const [search, setSearch] = React.useState("");
-  const [query, setQuery] = React.useState("");
+  const [search, setSearch] = React.useState(memory.query);
+  const [query, setQuery] = React.useState(memory.query);
+  const previousQuery = React.useRef(query);
+  const restoreTab = React.useRef<PickerTab | null>(tab);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const pageErrorRef = React.useRef<HTMLDivElement>(null);
@@ -111,7 +116,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
 
   const requests = React.useRef(new Map<PickerTab, AbortController>());
   React.useEffect(() => () => { requests.current.forEach((request) => request.abort()); requests.current.clear(); }, []);
-  const load = React.useCallback(async (target: PickerTab, cursor = "") => {
+  const load = React.useCallback(async (target: PickerTab, cursor = "", refresh = false) => {
     if (requests.current.has(target)) return;
     const controller = new AbortController();
     requests.current.set(target, controller);
@@ -125,9 +130,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
         ...current,
         [target]: {
           // A page arriving twice (a retry, a cursor that has not moved) must not repeat a tile.
-          items: [...new Map([...(cursor ? current[target].items : []), ...(page.items || [])].map((item) => [item.id, item])).values()],
-          cursor: page.nextCursor || "",
-          hasMore: Boolean(page.nextCursor && page.nextCursor !== cursor),
+          items: [...new Map((refresh && page.nextCursor ? [...(page.items || []), ...current[target].items] : [...(cursor ? current[target].items : []), ...(page.items || [])]).map((item) => [item.id, item])).values()],
+          cursor: refresh && page.nextCursor && current[target].items.length > 60 ? current[target].cursor : page.nextCursor || "",
+          hasMore: refresh && page.nextCursor && current[target].items.length > 60 ? current[target].hasMore : Boolean(page.nextCursor && page.nextCursor !== cursor),
           loading: false,
           loaded: true,
           error: ""
@@ -144,12 +149,35 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   }, [query]);
 
   React.useEffect(() => {
+    if (previousQuery.current === query) return;
+    previousQuery.current = query;
+    memory.scroll = { generation: 0, hidden: 0, upload: 0 };
+    restoreTab.current = tab;
     requests.current.forEach((request) => request.abort());
     requests.current.clear();
     setPages({ generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() });
     bodyRef.current?.scrollTo({ top: 0 });
   }, [query]);
-  React.useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); }, [tab]);
+  React.useLayoutEffect(() => {
+    memory.tab = tab;
+    memory.query = tab === 'hidden' ? '' : query;
+    // Hidden images are never retained after the picker closes.
+    memory.pages = Object.fromEntries(Object.entries(pages).map(([source, page]) => [source, source === 'hidden' ? emptyPage() : { ...page, loading: false }])) as PickerMemory['pages'];
+  }, [memory, pages, query, tab]);
+  React.useLayoutEffect(() => {
+    if (!box || restoreTab.current !== tab) return;
+    let secondFrame = 0;
+    const frame = requestAnimationFrame(() => { secondFrame = requestAnimationFrame(() => {
+      bodyRef.current?.scrollTo({ top: memory.scroll[tab], behavior: 'instant' });
+      restoreTab.current = null;
+    }); });
+    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(secondFrame); };
+  }, [Boolean(box), memory, pages[tab].items.length, tab]);
+  const changeTab = (next: PickerTab) => { if (next === tab) return; restoreTab.current = next; setTab(next); };
+  React.useEffect(() => {
+    // Refresh the newest page when reopening, while retaining loaded rows and their position.
+    if (tab !== 'hidden' && memory.pages[tab].loaded && !memory.pages[tab].error) void load(tab, '', true);
+  }, []);
 
   // Locking empties the shelf; unlocking fills it afresh.
   React.useEffect(() => { requests.current.get("hidden")?.abort(); requests.current.delete("hidden"); setPages((current) => ({ ...current, hidden: emptyPage() })); }, [hiddenOpen]);
@@ -227,9 +255,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
     >
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference image sources">
-          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => setTab("generation")}><Images size={14} /> Generations</button>
-          {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => setTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
-          <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => setTab("upload")}><ImageIcon size={14} /> Uploads</button>
+          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Generations</button>
+          {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => changeTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
+          <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
         </div>
         <span className="reference-popover-hint">Drop or paste an image anywhere on the prompt</span>
         <button type="button" className="btn is-primary reference-upload" onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
@@ -245,7 +273,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
         <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
       </div>
-      <div ref={bodyRef} className="reference-popover-body" role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
+      <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null) memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "hidden" && !hiddenOpen ? (
           <div className="reference-empty">
             <LockKeyhole size={22} />
@@ -619,7 +647,8 @@ function StackThumb({ item, number, guide }: { item: StackItem; number: number; 
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError }: {
+export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError }: {
+  scope?: string;
   inputs: MediaInput[];
   inpaint?: ReferenceInpaint | null;
   role?: ReferenceRoleControl | null;
@@ -629,6 +658,9 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   confirmDelete?: (asset: ReferenceAsset) => Promise<boolean>;
   onError?: (message: string) => void;
 }) {
+  const memories = React.useRef(new Map<string, PickerMemory>());
+  if (!memories.current.has(scope)) memories.current.set(scope, pickerMemory());
+  const memory = memories.current.get(scope)!;
   const [openSlot, setOpenSlot] = React.useState("");
   const noHover = useNoHover();
   const [uploadSlot, setUploadSlot] = React.useState("");
@@ -651,7 +683,7 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
     });
   }, [openSlot]);
   // A drop only belongs to the popover it landed on; forget it on close so the
-  // next open starts on the default tab and fetches the full list.
+  // next open keeps its own browsing state.
   React.useEffect(() => { if (!openSlot) setDropped(null); }, [openSlot]);
   useDismiss([rootRef, popRef], Boolean(openSlot), close);
   // The inpaint studio stays open while the prompt is typed into: the whole bar counts as inside it.
@@ -917,7 +949,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       <AnimatePresence>
         {openInput ? (
           <ReferencePopover
-            key="popover"
+            key={scope}
+            memory={memory}
             input={openInput}
             selected={assetFor(openInput.id)}
             anchor={host}

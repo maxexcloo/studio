@@ -611,6 +611,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     >
       <div className="phone-compose">
         <ReferenceSlots
+          scope={mode}
           inputs={referenceInputs || []}
           inpaint={referenceInpaint}
           role={referenceRole}
