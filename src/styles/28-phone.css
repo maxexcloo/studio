@@ -521,6 +521,10 @@
   resize: none;
   outline: none;
 }
+.phone-field.is-negative { gap: 3px; padding: 8px 14px; }
+.phone-field.is-negative textarea { min-height: 0; height: 24px; padding: 0; transition: height 120ms var(--ease-out); }
+.phone-field.is-negative:focus-within textarea { height: 64px; }
+.phone-field.is-negative.is-unused { opacity: .55; }
 
 .phone-link {
   display: inline-flex;

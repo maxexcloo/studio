@@ -655,10 +655,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            {canUseNegativePrompt ? <div data-open-surface className="negative-drawer open">
-              <label className="negative-drawer-label">Negative Prompt{!negativeSupported ? " · Saved, unused by this profile" : ""}</label>
+            {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
+              <label className="negative-drawer-label">Negative Prompt</label>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative prompt" rows={1} value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
@@ -793,10 +793,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            {canUseNegativePrompt ? <div data-open-surface className="negative-drawer open">
-              <label className="negative-drawer-label">Negative Prompt{!negativeSupported ? " · Saved, unused by this profile" : ""}</label>
+            {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
+              <label className="negative-drawer-label">Negative Prompt</label>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative prompt" rows={1} value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
