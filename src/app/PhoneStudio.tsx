@@ -296,11 +296,11 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               <Star size={20} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Unstar' : 'Star'}</span><HapticTarget />
             </button>
           ) : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use these settings</span></button> : null}
-          {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as reference</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use These Settings</span></button> : null}
+          {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
           {done && !item.library ? (
             item.privateVault
-              ? <button type="button" className="phone-row" onClick={() => run(() => actions.unhide(item))}><Eye size={20} /><span>Move to gallery</span></button>
+              ? <button type="button" className="phone-row" onClick={() => run(() => actions.unhide(item))}><Eye size={20} /><span>Move to Gallery</span></button>
               : <button type="button" className="phone-row" onClick={() => run(() => actions.hide(item))}><EyeOff size={20} /><span>Move to Hidden</span></button>
           ) : null}
           {onSelect && (item.status === 'done' || item.status === 'error') ? <button type="button" className="phone-row" onClick={() => run(() => onSelect(item))}><CheckCircle2 size={20} /><span>Select several<small>Then save, hide or delete them together</small></span><HapticTarget /></button> : null}
@@ -411,15 +411,15 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
   const statusText = restarting ? `${connectionName} is restarting` : connected ? `${connectionName} connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? `${connectionName} is offline` : `Checking ${connectionName}…`;
-  const workflowName = currentProfile?.displayName || currentProfile?.label || 'Choose a model';
+  const workflowName = currentProfile?.displayName || currentProfile?.label || 'Choose a Model';
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
   return (
     <>
       {selecting ? (
         <header className="phone-bar is-selecting">
-          <button type="button" className="phone-icon" aria-label="Stop selecting" onClick={endSelection}><X size={22} /></button>
-          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select images'}</span></div>
+          <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={endSelection}><X size={22} /></button>
+          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select Images'}</span></div>
           <button type="button" className="phone-pill" onClick={() => { haptic('tap'); setSelection(new Set(selectedItems.length === selectable.length ? [] : selectable.map((item) => item.id))); }}>
             {selectedItems.length === selectable.length && selectable.length ? 'None' : 'All'}
             <HapticTarget />
@@ -431,7 +431,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           <span />
         </button>
         <div className="phone-title">
-          {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
+          {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the Gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
           <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
             {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
             <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
@@ -670,7 +670,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         {(aspectOptions || []).length && !aspectLocked ? (
           <button type="button" className="phone-row" onClick={() => setSheet('aspect')}>
             <span className="aspect-shape phone-aspect" style={aspect ? aspectIconStyle(aspect) : undefined} />
-            <span>{aspect ? aspect.label : aspectPickerValue === 'default' ? 'Default size' : 'Custom size'}<small>{aspect ? aspect.value : defaultAspectSize}</small></span>
+            <span>{aspect ? aspect.label : aspectPickerValue === 'default' ? 'Default Size' : 'Custom Size'}<small>{aspect ? aspect.value : defaultAspectSize}</small></span>
             <ChevronRight size={18} className="phone-row-end" />
           </button>
         ) : null}
@@ -750,7 +750,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         {profiles.length ? (
           <label className="phone-search picker-search">
             <Search size={17} aria-hidden="true" />
-            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" spellCheck={false} autoComplete="off" />
+            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search Models" spellCheck={false} autoComplete="off" />
           </label>
         ) : null}
         {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
@@ -768,7 +768,7 @@ function AspectSheet({ view, open, onClose }: { view: Record<string, any>; open:
   const { aspectOptions, aspectPickerValue, applyAspect, defaultAspectSize } = view as { aspectOptions: AspectPreset[]; aspectPickerValue: string; applyAspect: (value: string) => void; defaultAspectSize: string };
   const pick = (value: string) => { applyAspect(value); onClose(); };
   return (
-    <Sheet open={open} onClose={onClose} title="Aspect ratio">
+    <Sheet open={open} onClose={onClose} title="Aspect Ratio">
       <div className="phone-group phone-aspects">
         <button type="button" className={cn('phone-row', aspectPickerValue === 'default' && 'is-current')} onClick={() => pick('default')}>
           <span className="aspect-shape default phone-aspect" />

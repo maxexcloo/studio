@@ -253,7 +253,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
       transition={spring}
     >
       <header className="reference-popover-head">
-        <div className="reference-tabs" role="tablist" aria-label="Reference image sources">
+        <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
           <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Generations</button>
           {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => changeTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
@@ -281,15 +281,15 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
             <button className="btn is-primary" onClick={() => hidden?.unlock()}><LockKeyhole size={14} /> Unlock</button>
           </div>
         ) : page.loading && !page.items.length ? (
-          <div className="reference-grid is-loading" aria-label="Loading images">
+          <div className="reference-grid is-loading" aria-label="Loading Images">
             {Array.from({ length: 12 }, (_, index) => <div className="reference-skeleton" key={index} />)}
           </div>
         ) : page.error && !page.items.length ? (
-          <div className="reference-empty"><ImageIcon size={22} /><strong>Images unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(tab)}>Try again</button></div>
+          <div className="reference-empty"><ImageIcon size={22} /><strong>Images Unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(tab)}>Try Again</button></div>
         ) : !page.items.length ? (
           <div className="reference-empty">
             <ImageIcon size={22} />
-            <strong>{query ? "No Matching Images" : tab === "generation" ? "No generations yet" : tab === "hidden" ? "Nothing in Hidden yet" : "No uploads yet"}</strong>
+            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Generations Yet" : tab === "hidden" ? "Nothing in Hidden Yet" : "No Uploads Yet"}</strong>
             <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : tab === "hidden" ? "Images you hide show up here." : "Upload one, or drop it on the prompt."}</p>
             {tab === "upload" ? <button className="btn" onClick={() => uploadInput.current?.click()}><Upload size={14} /> Upload image</button> : null}
           </div>
@@ -322,7 +322,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
                   </div>
                 );
               }} />
-            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button ref={moreRef} className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
+            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button ref={moreRef} className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load More"}</button> : null}
           </>
         )}
       </div>
@@ -366,7 +366,7 @@ const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey,
 
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
- * introduces itself as "Add reference" (or "Add start image" for plain
+ * introduces itself as "Add Reference" (or "Add Start Image" for plain
  * image-to-image) and settles into a round +. With an
  * image it becomes a squircle thumbnail that opens into a small menu on hover.
  */
@@ -420,12 +420,12 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
           data-open-trigger
           data-reference-slot={input.id}
           className={cn("ref-chip ref-add", expanded && "is-expanded", required && "is-required", open && "is-open")}
-          aria-label={`Add ${label.toLowerCase()}${required ? ", required" : ""}`}
+          aria-label={`Add ${label.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}${required ? ", required" : ""}`}
           aria-expanded={open}
           onClick={onOpen}
         >
           <Plus size={15} strokeWidth={2.2} />
-          <span className="ref-add-label"><span>{isStart ? "Add start image" : "Add reference"}{required ? <em>Required</em> : null}</span></span>
+          <span className="ref-add-label"><span>{isStart ? "Add Start Image" : "Add Reference"}{required ? <em>Required</em> : null}</span></span>
         </button>
       </Tip>
     );
