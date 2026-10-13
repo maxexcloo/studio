@@ -316,6 +316,8 @@ type ReferenceStack = {
   /** The next empty slot, or null when every slot holds a picture. */
   add: { open: boolean; busy: boolean; progress: number; onOpen: () => void } | null;
   max: number;
+  /** No + in Edit: it changes one picture. */
+  canAdd: boolean;
   /** Open the strip for a moment, to show where a dropped picture went. */
   intro: boolean;
 };
@@ -429,7 +431,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
 
   // The thumbnail is the anchor and says what the image is at rest: EDIT when it's the picture
   // being changed, a deck behind it when others come with it. The strip that grows out of it on
-  // hover holds the choices (Edit | Ref, the brush) and the other references with a + for more.
+  // hover holds the choices (Edit | Reference, the brush) and the other references with a + for more.
   const menu = Boolean(role || paint || stack);
   const many = Boolean(stack?.items.length);
   const editing = role?.value === "edit";
@@ -453,7 +455,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
                 <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
               </Tip>
               <Tip content={many ? "Let them all guide a new picture, at the size you picked" : "Let it guide a new picture, at the size you picked"}>
-                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Ref</button>
+                <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Reference</button>
               </Tip>
             </div>
           </>
@@ -474,7 +476,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           <span className="ref-stack">
             {role || paint ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
             {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} guide={editing} />)}
-            <AddMore max={stack.max} add={stack.add} className="ref-stack-add" />
+            {stack.canAdd ? <AddMore max={stack.max} add={stack.add} className="ref-stack-add" /> : null}
           </span>
         ) : null}
       </div> : null}
@@ -488,7 +490,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
         </button>
       </Tip>
-      {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Ref; Undo is in its toast. */}
+      {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Reference; Undo is in its toast. */}
       <Tip content={`Remove ${label.toLowerCase()}`}>
         <button type="button" className="ref-thumb-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={10} strokeWidth={2.8} /></button>
       </Tip>
@@ -607,8 +609,11 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   const assetFor = (slot: string) => selected.find((item) => item.slot === slot)?.asset || null;
   // Slots that follow one another (a model that reads several references) form one chain: the
   // first is the chip, the rest its stack. Independent inputs (a custom workflow's) stand alone.
+  // Edit changes one picture: no slot for another (the ones already there stay, to draw from; Ref adds more).
+  const editOnly = role?.value === "edit";
+  const usable = editOnly ? inputs.filter((input) => !input.follows || assetFor(input.id)) : inputs;
   const chains: MediaInput[][] = [];
-  for (const input of inputs) {
+  for (const input of usable) {
     const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
     if (chain) chain.push(input); else chains.push([input]);
   }
@@ -618,8 +623,9 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   // references used, a new one replaces none of them (least of all the picture being edited);
   // a single slot, or a workflow's own inputs, swap the first.
   const chained = inputs.some((input) => input.follows);
-  const targetSlot = () => openSlot || inputs.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
+  const targetSlot = () => openSlot || usable.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
   const maxReferences = Math.max(1, ...chains.map((chain) => chain.length));
+  const blockedMessage = editOnly ? "Edit changes one picture. Switch to Reference to add more" : fullMessage(maxReferences);
 
   const upload = React.useCallback(async (file: File | undefined, slot: string) => {
     if (!file || !slot || uploadSlot) return null;
@@ -647,8 +653,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
    * uploads", over the prompt bar "use as reference", anywhere else nothing.
    * The indicator's spotlight tracks the pointer; a drop lands with a pulse.
    */
-  const live = React.useRef({ upload, targetSlot, openSlot, maxReferences });
-  live.current = { upload, targetSlot, openSlot, maxReferences };
+  const live = React.useRef({ upload, targetSlot, openSlot, blockedMessage });
+  live.current = { upload, targetSlot, openSlot, blockedMessage };
   React.useEffect(() => {
     if (!host || !inputs.length) return;
     // Names aren't readable mid-drag, so an untyped file counts until the drop checks it.
@@ -689,9 +695,9 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       event.preventDefault();
       setLanding(true);
       window.setTimeout(() => setLanding(false), 520);
-      const { upload: run, targetSlot: slot, openSlot: open, maxReferences: max } = live.current;
+      const { upload: run, targetSlot: slot, openSlot: open, blockedMessage: blocked } = live.current;
       const into = slot();
-      if (!into) { onError?.(fullMessage(max)); return; }
+      if (!into) { onError?.(blocked); return; }
       run(file, into).then((asset) => {
         if (!asset) return;
         if (target === "popover" && open) setDropped({ asset, nonce: Date.now() });
@@ -703,7 +709,7 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       if (!file) return;
       event.preventDefault();
       const into = live.current.targetSlot();
-      if (!into) { onError?.(fullMessage(live.current.maxReferences)); return; }
+      if (!into) { onError?.(live.current.blockedMessage); return; }
       live.current.upload(file, into);
     };
     window.addEventListener("dragover", over);
@@ -765,11 +771,12 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
             items: filled.map((input) => ({ input, asset: assetFor(input.id)!, open: openSlot === input.id, busy: uploadSlot === input.id, progress, fresh: freshSlot === input.id, onOpen: openFor(input.id), onRemove: removeFor(input) })),
             add: next ? { open: openSlot === next.id, busy: uploadSlot === next.id, progress, onOpen: openFor(next.id) } : null,
             max: chain.length,
+            canAdd: !editOnly,
             intro: rest.some((input) => freshSlot === input.id)
           } : null;
           const shown = stacked ? [lead] : chain;
           // In a row, every slot of a full chain is used: a greyed + says how many it takes.
-          const full = !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
+          const full = !editOnly && !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
           return [...shown.map((input) => renderSlot(input, input === lead ? stack : null)), ...(full ? [<AddMore key={`${lead.id}:full`} max={chain.length} add={null} className="ref-chip ref-add" />] : [])];
         })}
       </div>

@@ -600,7 +600,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
-        {/* Edit or Ref, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
+        {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
         <AnimatePresence initial={false}>
           {referenceRole ? (
             <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
@@ -608,7 +608,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
                 <i aria-hidden="true" />
                 {(['edit', 'reference'] as const).map((value) => (
                   <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { haptic('tap'); referenceRole.onChange(value); }}>
-                    {value === 'edit' ? 'Edit' : 'Ref'}<HapticTarget />
+                    {value === 'edit' ? 'Edit' : 'Reference'}<HapticTarget />
                   </button>
                 ))}
               </div>
