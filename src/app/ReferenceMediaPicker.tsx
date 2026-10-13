@@ -71,6 +71,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   const searchRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const pageErrorRef = React.useRef<HTMLDivElement>(null);
+  const moreRef = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search.trim()), 180);
     return () => window.clearTimeout(timer);
@@ -195,6 +196,14 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
 
   const page = pages[tab];
   React.useEffect(() => {
+    if (!page.hasMore || page.loading || page.error || search.trim() !== query || !moreRef.current) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) load(tab, page.cursor);
+    }, { root: bodyRef.current, rootMargin: '120px' });
+    observer.observe(moreRef.current);
+    return () => observer.disconnect();
+  }, [load, page.cursor, page.error, page.hasMore, page.loading, query, search, tab]);
+  React.useEffect(() => {
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
   if (!box) return null;
@@ -286,7 +295,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
                   </div>
                 );
               }} />
-            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
+            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button ref={moreRef} className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
           </>
         )}
       </div>

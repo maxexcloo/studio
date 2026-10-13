@@ -136,18 +136,22 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   fail = false;
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Load more', exact: true }).click();
+  const body = page.locator('.reference-popover-body');
+  await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
   await expect(page.getByRole('alert')).toContainText('Next page unavailable');
   await expect(page.locator('[data-reference-index="59"]')).toBeVisible();
+  const initialHeight = await page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight);
   await page.getByRole('button', { name: 'Try Again', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect.poll(() => page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight)).toBeGreaterThan(initialHeight);
   for (let index = 0; index < 4; index++) {
+    const height = await page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight);
     const response = page.waitForResponse('**/api/reference-assets?*');
-    await page.getByRole('button', { name: 'Load more', exact: true }).click();
+    await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await response;
+    await expect.poll(() => page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight)).toBeGreaterThan(height);
   }
   expect(await page.locator('[data-reference-index]').count()).toBeLessThan(80);
-  const body = page.locator('.reference-popover-body');
   await body.evaluate((element) => { element.scrollTop = 0; });
   await expect(page.locator('[data-reference-index="0"]')).toBeVisible();
   await page.locator('[data-reference-index="0"]').focus();

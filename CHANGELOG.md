@@ -52,6 +52,7 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ### Changed
 - **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
+- **Reference browsing:** scrolling near the end loads another page automatically; the fixed search row blends into the picker with a softer scrolling edge.
 - **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
 - **Faster studio loading:** settings, workflows and the image editor load when needed.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
