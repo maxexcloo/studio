@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import { printBanner } from './banner.js';
 import { releaseStatus, requestRestart, saveUpdatePrefs, startReleaseUpdate, warmReleaseCheck } from './updater.js';
 import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
-import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
+import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
 import { limitedCheck, registerAccessRoutes } from './access-routes.js';
 import { requestGuard } from './request-guard.js';
@@ -636,7 +636,8 @@ app.get("/api/estimate", (req, res) => {
   const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality }) : null;
   const upscale = plan ? upscaleEstimate({ quality: upscaleQuality, faceDetail: query.faceDetail === "1", work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight, count: body.count }) }) : null;
   const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
-  const clears = queueClearsAt(now);
+  const backend = process.env.COMFY_VIDEO_URL && isLocalVideoProfile(body) ? "video" : "primary";
+  const clears = queueClearsAt(now, backend);
   const queueMs = clears === null ? null : Math.max(0, clears - now);
   const upscaleMs = upscale?.totalMs || 0;
   res.json({ ok: true, ...(trusted ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) } : {}), ...(queueMs ? { queueMs } : {}) });
@@ -708,7 +709,9 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     const results = await Promise.allSettled(names.map((backend) => withComfyBackend(backend, () => comfy("/system_stats", { timeout: 1500 }))));
     const backends = Object.fromEntries(results.map((result, index) => [names[index], {
       connected: result.status === "fulfilled",
-      device: result.status === "fulfilled" ? result.value?.devices?.[0]?.name || "" : ""
+      device: result.status === "fulfilled" ? result.value?.devices?.[0]?.name || "" : "",
+      url: withComfyBackend(names[index], () => activeComfyUrl()),
+      ...(result.status === "rejected" ? { error: "Not connected" } : {})
     }]));
     return res.json({
       connected: Object.values(backends).some((backend) => backend.connected),

@@ -12,6 +12,7 @@ version opens with a `> ` summary line, which the update pill shows.
 ## [Unreleased]
 
 ### Fixed
+- **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
 - **Settings › Features › Inpainting says where its two dials are:** in the
   sidebar's Basics, under the image, not under Advanced.
 

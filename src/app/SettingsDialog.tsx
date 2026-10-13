@@ -737,7 +737,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   const inpaintOn = prefs.inpainting !== false;
   const effort = upscaleEfforts.find((item) => item.value === (prefs.upscaleQuality || 'balanced')) || upscaleEfforts[1];
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
-  const connected = Boolean(health?.ok);
+  const connected = Boolean(view.comfyStatus?.backends?.primary?.connected ?? health?.ok);
   const comfyRestarting = useComfyRestarting();
   const restartEta = useComfyRestartEta();
   // Folders, models, updates and wiping the gallery are looked after at the computer itself.
@@ -958,6 +958,15 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
         {section === 'connection' ? (
           <>
+            {view.comfyStatus?.backends ? <Group title="Generation Connections">
+              {Object.entries(view.comfyStatus.backends).map(([name, value]) => {
+                const backend = value as { connected: boolean; device: string; url?: string };
+                return <Row key={name} label={name === 'video' ? 'Video' : 'Images'} description={backend.connected ? backend.device || 'Ready to generate' : 'Not connected'}>
+                  <Status tone={backend.connected ? 'ok' : 'bad'}>{backend.connected ? 'Ready' : 'Offline'}</Status>
+                  {backend.url ? <button className="btn is-ghost" onClick={() => window.open(backend.url, '_blank', 'noopener,noreferrer')}><ExternalLink size={14} /> Open</button> : null}
+                </Row>;
+              })}
+            </Group> : null}
             <Group title="ComfyUI">
               <Row
                 label={comfyRestarting ? <Status tone="warn">Restarting</Status> : health ? <Status tone={connected ? 'ok' : 'bad'}>{connected ? 'Connected' : 'Not connected'}</Status> : <Skeleton className="skeleton-text short" />}

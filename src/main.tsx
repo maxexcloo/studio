@@ -6,6 +6,7 @@ import "./styles.css";
 import { useModelFolders } from './app/useModelFolders';
 import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
+import { statusForProfile } from "./app/backendStatus";
 import { profileImageCount, profileImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
@@ -97,7 +98,7 @@ function App() {
   const [mode, setMode] = useState<Mode>(initialDraft.mode === "video" ? "video" : "image");
   const [models, setModels] = useState<Models | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
-  const [comfyStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
+  const [backendStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -111,6 +112,8 @@ function App() {
   const [prompt, setPrompt] = useState(String(initialDraft.prompt || ""));
   const [negative, setNegative] = useState(String(initialDraft.negative || ""));
   const [model, setModel] = useState(String(initialDraft.model || ""));
+  const comfyStatus = statusForProfile(backendStatus, { kind: mode, family: models?.profiles.find((profile) => profile.id === model)?.family });
+  const primaryConnected = backendStatus.backends?.primary?.connected ?? backendStatus.connected;
   const [paths, setPaths] = useState<Paths>({});
   const [textEncoder, setTextEncoder] = useState(String(initialDraft.textEncoder || ""));
   // Built-in families can need several encoders (Flux.1 two, HiDream four), one per slot.
@@ -413,17 +416,17 @@ function App() {
   const wasConnected = useRef<boolean | null>(null);
   const [comfyReconnectedAt, setComfyReconnectedAt] = useState(0);
   useEffect(() => {
-    if (!comfyStatus.checked) return;
+    if (!backendStatus.checked) return;
     const previous = wasConnected.current;
-    wasConnected.current = comfyStatus.connected;
-    if (previous !== false || !comfyStatus.connected) return;
+    wasConnected.current = backendStatus.connected;
+    if (previous !== false || !backendStatus.connected) return;
     refreshModels(false);
     refreshWorkflows();
     refreshHealth();
     refreshHardware();
     refreshUpscaleStatus(prefs.upscaleQuality, { fresh: true });
     setComfyReconnectedAt(Date.now());
-  }, [comfyStatus.connected, comfyStatus.checked]);
+  }, [backendStatus.connected, backendStatus.checked]);
 
   // A restart HEISS asked for: every surface says "restarting", the poll speeds
   // up so ComfyUI's return shows at once, and a restart that never comes back
@@ -1350,8 +1353,8 @@ function App() {
   }, [runningCount, confirmAction]);
   // Models on this computer that ComfyUI does not read, and the one-step fix for them.
   const modelFolders = useModelFolders({
-    connected: comfyStatus.connected,
-    emptyModels: Boolean(models && comfyStatus.connected && !models.profiles.some((profile) => profile.ready !== false)),
+    connected: primaryConnected,
+    emptyModels: Boolean(models && primaryConnected && !models.profiles.some((profile) => profile.ready !== false)),
     onModelsChanged: () => { refreshModels(false); refreshWorkflows(); },
     showToast,
     hints: prefs.modelFolderHints !== false,
