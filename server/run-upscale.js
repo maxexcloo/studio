@@ -10,6 +10,7 @@ import { generationSettings, outputsFrom } from "./gallery-store.js";
  */
 
 const tierLabels = { balanced: "2K", high: "4K" };
+const targetLabels = { 2048: "2K", 4096: "4K" };
 
 /**
  * Whether a request's own 2K/4K pick should be dropped before it reaches a
@@ -29,7 +30,8 @@ export function dropsAutoUpscale({ inpaint, referencesFamily, hasReference, refe
  */
 export function planRunUpscale(graph, body, info, customWorkflow = null) {
   const quality = normalizeQuality(body.autoUpscale?.quality);
-  const label = tierLabels[quality] || "";
+  const target = Number(body.autoUpscale?.target) || 0;
+  const label = targetLabels[target] || tierLabels[quality] || "";
   const status = upscaleStatus(info, quality);
   if (!status.ready) {
     return { skipped: status.nodesInstalled ? "Smart upscale’s SeedVR2 model isn’t installed yet" : "Smart upscale needs the SeedVR2 nodes in ComfyUI", quality };
@@ -38,6 +40,7 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
     quality,
     prompt: body.prompt || "",
     seed: body.seed,
+    target,
     // An inpaint result is the whole original picture, whatever size the crop sampled at.
     width: Number(body.inpaint?.image?.width || body.width || 0),
     height: Number(body.inpaint?.image?.height || body.height || 0)

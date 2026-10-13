@@ -24,15 +24,6 @@
   letter-spacing: .01em;
 }
 
-/* What the chosen tab ends at, in pixels; the tabs carry its short name. */
-.aspect-upscale-size {
-  margin-left: auto;
-  color: hsl(var(--muted-foreground) / .8);
-  font: 500 11px/1 var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
 .aspect-upscale-tabs {
   --tab-count: 3;
   position: relative;
@@ -115,40 +106,32 @@
   text-wrap: pretty;
 }
 
-/* The switch's row folds open under the tabs instead of popping in. */
-.aspect-upscale-more {
-  display: grid;
-  grid-template-rows: 0fr;
-  margin-top: -6px;
-  opacity: 0;
-  transition: grid-template-rows 280ms var(--ease-out), margin-top 280ms var(--ease-out), opacity 180ms var(--ease-out);
-}
-.aspect-upscale-more.is-open { grid-template-rows: 1fr; margin-top: 0; opacity: 1; }
-.aspect-upscale-more > label { min-height: 0; overflow: hidden; }
-.aspect-upscale-more:not(.is-open) > label { pointer-events: none; }
-.aspect-upscale-native small { transition: opacity 160ms var(--ease-out); }
-@media (prefers-reduced-motion: reduce) {
-  .aspect-upscale-more { transition: none; }
-}
-
-/* One switch under the tabs, only where the model has another way to that size:
-   "Use upscaler" on a model that draws it, "Draw at 2K directly" on one that may. */
-.aspect-upscale-native {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 6px;
+/* An upscaled tab: a small arrow on a tag of its own, right after the size. */
+.aspect-upscale-tabs button,
+.phone-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+.aspect-upscale-arrow {
+  flex: none;
+  box-sizing: content-box;
+  padding: 1px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / .08);
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
 }
-.aspect-upscale-native:hover { color: hsl(var(--foreground)); }
-/* Height from the text's own padding: the folding row may shrink to nothing around it. */
-.aspect-upscale-native > span { display: grid; gap: 1px; padding: 6px 0; }
-.aspect-upscale-native small { font-size: 10.5px; font-weight: 450; color: hsl(var(--muted-foreground) / .75); }
-.aspect-upscale-native .switch { flex: none; }
+.aspect-upscale-tabs button.is-active .aspect-upscale-arrow { background: color-mix(in srgb, var(--ember) 18%, transparent); color: var(--ember); }
+/* The phone's chosen segment is white: the arrow takes the beta tag's darker ember. */
+.phone-seg button.active .aspect-upscale-arrow { background: rgb(214 104 30 / .14); color: #b0500f; }
+
+/* How the chosen size is made, and what it ends at. */
+.aspect-upscale-line {
+  margin: 0;
+  padding: 0 6px;
+  color: hsl(var(--muted-foreground) / .85);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
 
 /* The size list: compact rows; "Default" carries its own ratio in a quieter white. */
 .aspect-option > span:nth-child(2) small { margin-left: 7px; font-weight: 500; color: rgb(255 255 255 / .45); }

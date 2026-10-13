@@ -84,98 +84,95 @@ export const upscaleEfforts = [
   { value: "high", label: "High", scale: "3×", model: "SeedVR2 7B fp16", detail: "3× with the 7B fp16 model. Slowest, and uses the most graphics memory.", downloadBytes: 16_980_659_238 }
 ] as const;
 
-/** Smart upscale's tabs in the size menu, each riding on one of the efforts above. */
+/** The size menu's tabs, each upscaling (where it has to) at one of the efforts above. */
 export const autoUpscaleTiers: { value: AutoUpscale; label: string; quality?: UpscaleQuality }[] = [
-  { value: "none", label: "None" },
+  { value: "none", label: "Default" },
   { value: "2k", label: "2K", quality: "balanced" },
   { value: "4k", label: "4K", quality: "high" }
 ];
 
+/** A tab's size from a saved pick, including the old switch's "2k-native"/"4k-upscale". */
+export function upscaleSize(tier: AutoUpscale | undefined): "none" | NativeSize {
+  return tier?.startsWith("2k") ? "2k" : tier?.startsWith("4k") ? "4k" : "none";
+}
+
+/** The long side each tab reaches; server/upscale.js upscaleTargets. */
+const sizeTargets: Record<NativeSize, number> = { "2k": 2048, "4k": 4096 };
+
+/** The effort a tab upscales at, wherever it does. */
 export function autoUpscaleQuality(tier: AutoUpscale | undefined) {
   const size = upscaleSize(tier);
   return autoUpscaleTiers.find((item) => item.value === size)?.quality || null;
 }
 
-/** The size a tier makes, whichever way it gets there: "2k-native" → "2k". */
-export function upscaleSize(tier: AutoUpscale | undefined): "none" | NativeSize {
-  return tier?.startsWith("2k") ? "2k" : tier?.startsWith("4k") ? "4k" : "none";
-}
-
-/** A model that draws some size natively by default: its size menu reads Resolution, not Smart upscale. */
-export function drawsNatively(native: NativeSupport = {}) {
-  return Object.values(native).includes("yes");
-}
-
-/**
- * How a run reaches its tier on this model. A plain size takes the model's own
- * way (natively where it's documented, "yes"; SeedVR2 otherwise); the switch's
- * "-native"/"-upscale" picks the other, natively only where the model may ("maybe" too).
- */
-export function upscalePlan(tier: AutoUpscale | undefined, native: NativeSupport = {}) {
+/** The effort a tab upscales at on this model, or null where the model draws that size itself. */
+export function upscaleQualityFor(tier: AutoUpscale | undefined, native: NativeSupport = {}) {
   const size = upscaleSize(tier);
-  const level = size === "none" ? undefined : native[size];
-  const nativeByDefault = level === "yes";
-  const drawn = Boolean(level) && (tier?.endsWith("-native") || (nativeByDefault && !tier?.endsWith("-upscale")));
-  return { size, level, nativeByDefault, native: drawn, quality: drawn ? null : autoUpscaleQuality(size) };
+  return size === "none" || native[size] === "yes" ? null : autoUpscaleQuality(size);
 }
 
-/**
- * A natively drawn tier's size on this model: the picked aspect scaled up so its
- * long side is 2048 (2K) or 4096 (4K), in steps of 64, never past the model's max
- * and never smaller than picked. Null when the run doesn't draw natively.
- */
-export function nativeUpscaleSize(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192) {
-  const plan = upscalePlan(tier, native);
-  const target = !plan.native ? 0 : plan.size === "2k" ? 2048 : 4096;
-  const long = Math.max(width, height);
-  if (!target || !long || long >= target) return null;
-  const scale = Math.min(target, max) / long;
+type Size = { width: number; height: number };
+
+/** The picked aspect with its long side at `long`, in steps of 64, never past the model's max. */
+function drawnAt({ width, height }: Size, long: number, max: number): Size {
+  const scale = Math.min(long, max) / Math.max(width, height);
   const snap = (value: number) => Math.max(64, Math.min(max, Math.round((value * scale) / 64) * 64));
   return { width: snap(width), height: snap(height) };
 }
 
-/** SeedVR2's sizing per effort; mirrors presets and upscalePlan in server/upscale.js. */
-const seedvr2Sizing: Record<UpscaleQuality, { scale: number; maxShort: number }> = {
-  fast: { scale: 1.5, maxShort: 1280 },
-  balanced: { scale: 2, maxShort: 2048 },
-  high: { scale: 3, maxShort: 2816 }
-};
-
-/** The tier a size tab lands on: a tab keeps the switch's way from the size picked before. */
-export function tierForTab(size: "none" | NativeSize, before: AutoUpscale | undefined): AutoUpscale {
-  if (size === "none") return "none";
-  const way = before?.endsWith("-native") ? "-native" : before?.endsWith("-upscale") ? "-upscale" : "";
-  return `${size}${way}` as AutoUpscale;
-}
-
-/**
- * The size a run at this tier ends at, from the size picked: the long side at
- * 2048/4096 when drawn natively, SeedVR2's short-side target otherwise. Null
- * for no tier or no size.
- */
-export function upscaledSize(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}) {
-  const plan = upscalePlan(tier, native);
-  if (plan.size === "none" || !(width > 0) || !(height > 0)) return null;
-  if (plan.native) return nativeUpscaleSize(tier, width, height, native) || { width, height };
-  const sizing = seedvr2Sizing[plan.quality || "balanced"];
+/** Where SeedVR2 lands from `from` aiming at a long side; mirrors upscalePlan in server/upscale.js. */
+function upscaledTo({ width, height }: Size, long: number): Size {
   const round = (value: number) => Math.max(16, Math.round(value / 16) * 16);
   const short = Math.min(width, height);
-  const resolution = Math.max(Math.min(round(short * sizing.scale), sizing.maxShort), round(short));
-  const long = Math.round(resolution * Math.max(width, height) / short);
-  return width >= height ? { width: long, height: resolution } : { width: resolution, height: long };
+  const resolution = Math.max(round(short * long / Math.max(width, height)), round(short));
+  const other = Math.round(resolution * Math.max(width, height) / short);
+  return width >= height ? { width: other, height: resolution } : { width: resolution, height: other };
 }
 
-/** The names a size can go by, in K of 1024. */
-const resolutionSteps = [1, 1.5, 2, 3, 4, 5, 6, 8];
+export type SizePlan = {
+  size: "none" | NativeSize;
+  /** The long side the run reaches, 0 for Default. */
+  target: number;
+  /** The size the model draws at, when it isn't the picked one. */
+  draw: Size | null;
+  /** SeedVR2 takes it the rest of the way, at this effort. */
+  quality: UpscaleQuality | null;
+  /** What it's drawn at before the upscale: the model's 2K, or the picked size. */
+  from: "2k" | "picked" | null;
+  /** The size the run's picture ends at. */
+  final: Size;
+};
 
 /**
- * A size's name by its long side: the biggest step it reaches 88% of, so
- * 3648 and 4032 read 4K, 2816 reads 3K, and 2688 stays 2K.
+ * How a run reaches its tab on this model. Where the model is known to draw
+ * that size ("yes"), it draws it. Otherwise it draws at the largest size it does
+ * draw well (2K for 4K on a model that draws 2K, else the picked size) and
+ * SeedVR2 upscales the rest of the way to the true 2048/4096 long side.
  */
-export function resolutionName(width: number, height: number) {
+export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192): SizePlan {
+  const size = upscaleSize(tier);
+  const picked = { width, height };
+  const none: SizePlan = { size, target: 0, draw: null, quality: null, from: null, final: picked };
+  if (size === "none" || !(width > 0) || !(height > 0)) return none;
+  const target = sizeTargets[size];
   const long = Math.max(width, height);
-  const step = resolutionSteps.filter((k) => long >= k * 1024 * 0.88).pop();
-  return step ? `${step}K` : `${Number((long / 1024).toFixed(1))}K`;
+  if (long >= target) return { ...none, target };
+  if (native[size] === "yes") {
+    const draw = drawnAt(picked, target, max);
+    return { size, target, draw, quality: null, from: null, final: draw };
+  }
+  const draw = size === "4k" && native["2k"] === "yes" && long < sizeTargets["2k"] ? drawnAt(picked, sizeTargets["2k"], max) : null;
+  return { size, target, draw, quality: upscaleQualityFor(size, native), from: draw ? "2k" : "picked", final: upscaledTo(draw || picked, target) };
+}
+
+/** The line under the size tabs: how the picture gets to its size. */
+export function sizePlanLine(plan: SizePlan) {
+  const { width, height } = plan.final;
+  const pixels = `${width} × ${height}`;
+  if (plan.size === "none") return "";
+  if (!plan.quality && !plan.draw) return `Already this size · ${pixels}`;
+  if (!plan.quality) return `Drawn at this size by the model · ${pixels}`;
+  return `${plan.from === "2k" ? "Drawn at 2K, then upscaled" : "Upscaled after drawing"} · ${pixels}`;
 }
 
 export function upscaleQualityLabel(quality = "balanced") {
@@ -499,17 +496,15 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
   }, [markBusy, openSetup, prefs.upscaleQuality, refreshStatus, runUpscale, status?.ready]);
 
   /**
-   * A size tab (or the switch under them, exact). A tab keeps the switch's way
-   * from the size before; whatever uses SeedVR2 is on at once when its effort
-   * can run, otherwise it goes through setup for that effort.
+   * A size tab. One the model draws itself is on at once; one that upscales is
+   * on at once when its effort can run, otherwise it goes through setup first.
    */
-  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, native: NativeSupport = {}, exact = false) => {
+  const chooseAutoUpscale = useCallback(async (picked: AutoUpscale, native: NativeSupport = {}) => {
     const before = prefs.autoUpscale || "none";
-    const size = upscaleSize(picked);
-    const tier = !exact && picked === size ? tierForTab(size, before) : picked;
+    const tier = upscaleSize(picked);
     if (tier === before) return;
     setPrefs({ autoUpscale: tier });
-    const quality = upscalePlan(tier, native).quality;
+    const quality = upscaleQualityFor(tier, native);
     if (!quality) return;
     const current = await refreshStatus(quality);
     if (current?.ready) return;

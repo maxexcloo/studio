@@ -46,9 +46,8 @@ export type GenerationSettings = Record<string, string | number | boolean | null
 export type UpscaleQuality = "fast" | "balanced" | "high";
 /** Smart upscale in the size menu: every new image comes out at this size, upscaled as part of its run. */
 /**
- * The 2K/4K pick. A plain size takes the model's own best way there (drawn
- * natively where its makers document that size, else SeedVR2); "-native" and
- * "-upscale" are the size menu's switch picking the other way (useUpscale upscalePlan).
+ * The size menu's pick (useUpscale sizePlan says how a run gets there).
+ * "-native"/"-upscale" are an older switch's picks, still read as their size.
  */
 export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native" | "2k-upscale" | "4k-upscale";
 /** A Smart upscale size a model may also draw itself. */

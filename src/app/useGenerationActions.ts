@@ -6,7 +6,7 @@ import { dedupeGalleryItems } from './gallery';
 import { clearLoraLibrary } from './lora-storage';
 import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { downloadActions } from './useModelDownloads';
-import { nativeUpscaleSize, upscalePlan } from './useUpscale';
+import { sizePlan } from './useUpscale';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -135,10 +135,10 @@ export function useGenerationActions(view: any) {
 
       // A reference frames the output only when it is the image being edited (a painted mask always is).
       const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
-      // Native 2K/4K: the same aspect, sampled at that size instead of upscaled after (same conditions as Smart upscale).
-      const native = mode === "image" && !inpaint && !framedByReference
-        ? nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native) : null;
-      const upscaleQuality = upscalePlan(prefs.autoUpscale, currentProfile?.native).quality;
+      // 2K/4K: drawn at that size where the model does it well, else drawn at its best and upscaled the rest (useUpscale sizePlan).
+      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native) : null;
+      const native = plan?.draw || null;
+      const upscaleQuality = plan?.quality || null;
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
         prompt,
@@ -180,7 +180,7 @@ export function useGenerationActions(view: any) {
         // but a persisted 2K/4K choice from before must not sneak an upscale in too.
         // A native pick on a model that doesn't draw that size goes through SeedVR2 instead.
         autoUpscale: mode === "image" && !inpaint && !framedByReference && prefs.smartUpscale !== false && upscaleQuality
-          ? { quality: upscaleQuality, faceDetail: Boolean(prefs.upscaleFaceDetail) }
+          ? { quality: upscaleQuality, target: plan!.target, faceDetail: Boolean(prefs.upscaleFaceDetail) }
           : null
       };
       const queuedJobs: string[] = [];

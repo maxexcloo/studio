@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, Circle
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
-import { autoUpscaleTiers, canUpscaleItem, drawsNatively, resolutionName, tierForTab, upscaledSize, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { autoUpscaleTiers, canUpscaleItem, sizePlan, sizePlanLine, upscaleSize, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -16,7 +16,7 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
-import type { AspectPreset, AutoUpscale, GalleryItem, NativeSize, Profile } from './types';
+import type { AspectPreset, AutoUpscale, GalleryItem, Profile } from './types';
 import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
@@ -549,9 +549,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const smartUpscale = mode === 'image' && prefs?.smartUpscale !== false && typeof chooseAutoUpscale === 'function';
   const autoUpscale: AutoUpscale = prefs?.autoUpscale || 'none';
   const [pickedWidth, pickedHeight] = String(aspectValue || '').split('x').map(Number);
-  const upscaledTo = upscaledSize(autoUpscale, pickedWidth, pickedHeight, currentProfile?.native);
-  // A model that draws 2K/4K itself: the tiers are its resolution, not an upscale.
-  const phoneResolution = drawsNatively(currentProfile?.native);
+  const sizeLine = sizePlanLine(sizePlan(autoUpscale, pickedWidth, pickedHeight, currentProfile?.native));
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -656,17 +654,16 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
 
       {smartUpscale ? (
         <div className="phone-control">
-          <span className="phone-control-label" id="phone-upscale-label">{phoneResolution ? 'Resolution' : 'Smart upscale'}</span>
+          <span className="phone-control-label" id="phone-upscale-label">Resolution</span>
           <div className="phone-seg" role="radiogroup" aria-labelledby="phone-upscale-label">
             {autoUpscaleTiers.map((tier) => {
               const picked = upscaleSize(autoUpscale) === tier.value;
-              // As on desktop: the size this tab really ends at for the picked size.
-              const size = tier.value === 'none' ? null : upscaledSize(picked ? autoUpscale : tierForTab(tier.value as NativeSize, autoUpscale), pickedWidth, pickedHeight, currentProfile?.native);
-              const label = size ? resolutionName(size.width, size.height) : phoneResolution && tier.value === 'none' ? 'Default' : tier.label;
-              return <button key={tier.value} type="button" role="radio" aria-checked={picked} aria-label={size ? `${label}, ${size.width} × ${size.height}` : undefined} className={cn(picked && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.native)}>{label}</button>;
+              // As on desktop: ↑ where the model draws smaller and SeedVR2 takes it the rest of the way.
+              const upscaled = Boolean(sizePlan(tier.value, pickedWidth, pickedHeight, currentProfile?.native).quality);
+              return <button key={tier.value} type="button" role="radio" aria-checked={picked} aria-label={upscaled ? `${tier.label}, upscaled` : undefined} className={cn(picked && 'active')} onClick={() => chooseAutoUpscale(tier.value, currentProfile?.native)}>{tier.label}{upscaled ? <ArrowUp className="aspect-upscale-arrow" size={12} strokeWidth={2.6} aria-hidden="true" /> : null}</button>;
             })}
           </div>
-          <p className="phone-control-note">{phoneResolution ? 'This model draws 2K itself; where it can’t, SeedVR2 upscales after the run.' : 'Upscales each new image with SeedVR2, rebuilding fine detail. Takes a little longer.'}{upscaledTo ? ` Ends at ${upscaledTo.width} × ${upscaledTo.height}.` : ''}</p>
+          <p className="phone-control-note">{sizeLine || 'The model’s own size.'}</p>
         </div>
       ) : null}
 

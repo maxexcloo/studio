@@ -30,7 +30,7 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { autoUpscaleQuality, nativeUpscaleSize, upscaleDisplayThumbnail, upscaleDisplayUrl, upscalePlan, useUpscale } from './app/useUpscale';
+import { sizePlan, upscaleDisplayThumbnail, upscaleDisplayUrl, useUpscale } from './app/useUpscale';
 import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
@@ -1249,12 +1249,13 @@ function App() {
   // What Generate would take with these settings, the way generate() would send them.
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
   const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
-  // Drawn at 2K/4K directly: estimated at that size, as generate() sends it.
-  const estimateSize = (mode === "image" && nativeUpscaleSize(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native)) || { width, height };
+  // Estimated the way generate() sends it: at the size it's drawn at, plus the upscale to the tab's size.
+  const estimatePlan = mode === "image" ? sizePlan(prefs.autoUpscale, Number(width), Number(height), currentProfile?.native) : null;
+  const estimateSize = estimatePlan?.draw || { width, height };
   const generationEstimate = useGenerationEstimate({
     mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
-    upscale: mode === "image" && prefs.smartUpscale !== false ? upscalePlan(prefs.autoUpscale, currentProfile?.native).quality || '' : '', upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
+    upscale: prefs.smartUpscale !== false ? estimatePlan?.quality || '' : '', upscaleTarget: estimatePlan?.target || 0, upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {

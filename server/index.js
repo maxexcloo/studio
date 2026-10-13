@@ -66,7 +66,7 @@ import { upscaleWork } from './upscale-timing.js';
 import { comfyRootDir, packInstallPlan } from './node-install.js';
 import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-folders.js';
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
-import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus } from './upscale.js';
+import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, upscaleTargets } from './upscale.js';
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
@@ -622,7 +622,7 @@ app.get("/api/estimate", (req, res) => {
   const rest = runs > 1 ? generationEstimate(body, { now, warm: true }) : null;
   // Smart upscale is part of each run: its time, from the upscales this machine has made, is added to every one.
   const upscaleQuality = body.kind === "image" && upscaleQualities.includes(query.upscale) ? query.upscale : "";
-  const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality }) : null;
+  const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality, target: Number(query.upscaleTarget) || 0 }) : null;
   const upscale = plan ? upscaleEstimate({ quality: upscaleQuality, faceDetail: query.faceDetail === "1", work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight, count: body.count }) }) : null;
   const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
   const clears = queueClearsAt(now);
@@ -1613,7 +1613,7 @@ app.post("/api/generate", async (req, res) => {
   // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
   const autoUpscale = req.body?.autoUpscale;
   body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
-    ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail) }
+    ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
     : null;
   // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
   if (!body.privateVault) try { recordPrompt(body.prompt); } catch { /* a run matters more than its history */ }
