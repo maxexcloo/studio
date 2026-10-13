@@ -1,0 +1,14 @@
+[tools]
+actionlint = "1.7.12"
+node = "26.11.1"
+
+[tasks.check]
+run = """
+mise fmt --check
+actionlint -shellcheck="" .github/workflows/container.yaml
+npm test
+npm run build
+"""
+
+[tasks.setup]
+run = "npm ci --no-audit --no-fund"

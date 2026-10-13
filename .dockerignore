@@ -1,0 +1,13 @@
+.env*
+.git
+.github
+.update
+data
+dist
+node_modules
+outputs
+release
+
+*.log
+*.test.js
+*.tsbuildinfo

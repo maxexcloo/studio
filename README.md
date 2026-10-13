@@ -97,6 +97,24 @@ ComfyUI on another machine or port? Set its address in **Settings › Connection
 
 </details>
 
+## Containers
+
+The Dockerfile builds a Linux AMD64 image for Docker and Podman. Set `COMFY_URL` to the existing ComfyUI endpoint reachable from the container, then build and run:
+
+```sh
+docker build --tag heiss-ui:local .
+mkdir -p data
+docker run --env COMFY_URL --init --publish 127.0.0.1:8787:8787 --rm \
+  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" heiss-ui:local
+```
+
+
+Open `http://localhost:8787`. `/data` retains settings, galleries, histories and imported workflows. Mount ComfyUI inputs, outputs and model directories separately when a feature needs local file access. The image defaults to UID 1000, exposes port 8787 and includes a health check. It starts the server directly; update the container image to update the application.
+
+The Container workflow runs checks, builds the image, tests the runtime and scans for fixable high or critical vulnerabilities on every PR. Successful builds on `main` and `v*` tags publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
+
+For local verification, run `mise run setup`, then `mise run check`. Renovate maintains the tool, action, base image and npm dependencies.
+
 ## Supported models
 
 28 families run out of the box with their makers' recommended settings, and a renamed file is still recognized.

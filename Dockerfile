@@ -1,0 +1,37 @@
+FROM node:26.11.1-bookworm-slim AS build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY . .
+RUN npm run build && npm prune --no-audit --no-fund --omit=dev
+
+FROM node:26.11.1-bookworm-slim AS runtime
+
+ENV HEISS_DATA_DIR=/data \
+    HEISS_ENV_FILE=/data/.env \
+    HEISS_NO_BROWSER=1 \
+    HOST=0.0.0.0 \
+    NODE_ENV=production \
+    PORT=8787
+
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/server ./server
+COPY --from=build /app/workflows ./workflows
+
+RUN apt-get update \
+    && apt-get upgrade --no-install-recommends -y \
+    && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm /opt/yarn* \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && mkdir /data && chown node:node /data
+
+USER node
+EXPOSE 8787
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \
+    CMD node -e 'fetch("http://127.0.0.1:" + process.env.PORT + "/api/ping").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'
+CMD ["node", "server/index.js"]
