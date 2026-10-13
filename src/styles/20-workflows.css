@@ -32,9 +32,12 @@
 .wf-search button:hover { background: var(--control-hover); color: #fff; }
 .wf-search:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); }
 
-.wf-filters { flex: none; display: flex; gap: 6px; padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
-.wf-filters::-webkit-scrollbar { display: none; }
-.wf-filters button {
+.wf-filters, .model-filters { flex: none; display: flex; gap: 6px; padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
+.model-filters { flex-wrap: wrap; padding: 8px 12px; }
+.model-filter-group { display: flex; gap: 6px; }
+.wf-filter-divider { flex: none; width: 1px; height: 18px; align-self: center; margin: 0 2px; background: var(--surface-border); }
+.wf-filters::-webkit-scrollbar, .model-filters::-webkit-scrollbar { display: none; }
+.wf-filters button, .model-filters button {
   flex: none;
   height: 30px;
   padding: 0 12px;
@@ -49,8 +52,8 @@
   cursor: pointer;
   transition: background var(--dur-fast), color var(--dur-fast);
 }
-.wf-filters button:hover { color: hsl(var(--foreground)); }
-.wf-filters button.active { background: var(--selected); box-shadow: none; color: #fff; }
+.wf-filters button:hover, .model-filters button:hover { color: hsl(var(--foreground)); }
+.wf-filters button.active, .model-filters button.active { background: var(--selected); box-shadow: none; color: #fff; }
 
 .wf-grid {
   flex: 1;
@@ -291,7 +294,7 @@
   .wf-browse.is-hidden-mobile { display: none; }
   .wf-back { display: inline-flex; }
   .wf-toolbar { padding: 12px 12px 0; }
-  .wf-filters { padding: 10px 12px 12px; }
+  .wf-filters, .model-filters { padding: 10px 12px 12px; }
   .wf-grid { padding: 2px 12px 20px; }
   .wf-review-row,
   .wf-map-grid,

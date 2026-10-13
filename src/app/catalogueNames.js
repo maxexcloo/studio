@@ -85,3 +85,28 @@ export function loraCompatibility(info, profile) {
   if (!info?.families?.length || !family || family === 'custom') return 'unknown';
   return info.families.some((value) => value.replace(/-/g, '_') === family) ? 'fits' : 'other';
 }
+
+/** Prefer model variant metadata; imported recipes can identify acceleration by name or step count. */
+export function workflowSpeed(workflow, profile) {
+  const variant = String(profile?.variant || '').toLowerCase();
+  if (/^(standard|raw|base|dev|dedistilled)$/.test(variant)) return 'standard';
+  const names = [variant, profile?.variantLabel, workflow.name].filter(Boolean).join(' ').replace(/de[- ]?distilled/gi, '');
+  if (/\b(flash|turbo|distill(?:ed)?|schnell|lightning|hyper|lcm|pcm|tcd|dmd2?|pdd)\b/i.test(names)) return 'flash';
+  const steps = Number(workflow.defaults?.steps);
+  return steps > 0 && steps <= 8 && workflow.family !== 'grok' ? 'flash' : 'standard';
+}
+
+/** Optional image inputs can serve both generation and reference-based editing. */
+export function workflowPurpose(workflow) {
+  const inputs = (workflow.mediaInputs || []).filter((input) => input.kind !== 'audio');
+  const edit = inputs.length > 0 || Boolean(workflow.capabilities?.startImage || workflow.capabilities?.imageToImage);
+  const required = workflow.capabilities?.startImageRequired || inputs.some((input) => input.required || input.min > 0);
+  return { generate: !required, edit };
+}
+
+export function profileMatchesFilters(profile, filters, favourites = []) {
+  if (filters.favourites && !favourites.includes(profile.id)) return false;
+  const workflow = { ...profile, name: profile.displayName || profile.label };
+  if (filters.speed && workflowSpeed(workflow, profile) !== filters.speed) return false;
+  return !filters.purpose || workflowPurpose(workflow)[filters.purpose];
+}
