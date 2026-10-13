@@ -123,9 +123,10 @@
   height: 36px;
   transition: column-gap 340ms var(--cell-spring);
 }
-.size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; }
+/* The hover previews are for a pointer: a tap leaves :hover stuck on touch, which would hold a split preview open. */
+@media (hover: hover) { .size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; } }
 .size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); --reach: 0px; }
-.size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; }
+@media (hover: hover) { .size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; } }
 .size-field {
   display: flex;
   align-items: center;
@@ -189,7 +190,7 @@
 .size-link:hover,
 .size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
 /* The middle cell shows only in the hover preview of a split, between the drawn-back pills. */
-.size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
+@media (hover: hover) { .size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); } }
 .size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .size-link-icon { display: grid; place-items: center; animation: linkTurn 420ms var(--cell-spring) both; }
 .size-link:active .size-link-icon { scale: .86; transition: scale 80ms; }
@@ -299,11 +300,6 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   .size-saved-actions { opacity: 1; translate: 0 -50%; pointer-events: auto; }
 }
 .size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
-
-/* Phone: the same fields under the size tabs. */
-.phone-control .size-custom-body { padding-top: 4px; }
-.phone-control .size-fields { --pill: 22px; height: 44px; }
-.phone-control .size-field input { font-size: 16px; }
 
 
 /* Every composer menu leaves the way it came. */

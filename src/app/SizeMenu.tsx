@@ -91,7 +91,16 @@ const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", cust
  * across the whole window, so a change of shape reads as the lines sliding.
  * The window's size comes from the menu it sits beside, so it is measured.
  */
-export function SizePreview({ size, label, sub, accent = false, shown = true }: { size: Size; label: string; sub: string; accent?: boolean; shown?: boolean }) {
+export function SizePreview({ size, label, sub, accent = false, shown = true, inset = 26, className }: {
+  size: Size;
+  label: string;
+  sub: string;
+  accent?: boolean;
+  shown?: boolean;
+  /** The frame's margin inside the window: the phone's shorter stage keeps less. */
+  inset?: number;
+  className?: string;
+}) {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [stage, setStage] = React.useState({ width: 0, height: 0 });
   React.useLayoutEffect(() => {
@@ -104,7 +113,6 @@ export function SizePreview({ size, label, sub, accent = false, shown = true }: 
     return () => observer.disconnect();
   }, []);
   // Room for the frame: an inset all round, and the caption's line at the bottom.
-  const inset = 26;
   const caption = 30;
   const roomW = Math.max(1, stage.width - inset * 2);
   const roomH = Math.max(1, stage.height - inset * 2 - caption);
@@ -115,7 +123,7 @@ export function SizePreview({ size, label, sub, accent = false, shown = true }: 
   const top = inset + (roomH - height) / 2;
   const px = (value: number) => `${Math.round(value * 10) / 10}px`;
   return (
-    <div ref={ref} className={cn("size-peek", shown && "is-on", accent && "is-accent", stage.width > 0 && "is-measured")} aria-hidden="true">
+    <div ref={ref} className={cn("size-peek", className, shown && "is-on", accent && "is-accent", stage.width > 0 && "is-measured")} aria-hidden="true">
       {/* Lines from the frame's edges across the window: they glide with it. */}
       <i className="size-guide is-x" style={{ top: px(top) }} />
       <i className="size-guide is-x" style={{ top: px(top + height) }} />

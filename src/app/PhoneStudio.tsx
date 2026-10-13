@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, Circle
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
-import { canUpscaleItem, sizePlan, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
@@ -16,9 +16,9 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
-import type { AspectPreset, GalleryItem, Profile } from './types';
-import { LinkedSizeFields, type SizeTier } from './SizeMenu';
-import { parseSize } from './sizing';
+import type { GalleryItem, Profile, SavedSize } from './types';
+import { LinkedSizeFields, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
+import { presetRatio, ratioName } from './sizing';
 import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
@@ -536,9 +536,9 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
-    prefs, customSize, sizeTier, sizeMax, customLimits, chooseSizeTier, setCustomDimensions
+    customSize, sizeTier, sizeMax, customLimits, savedSizes
   } = view;
-  const [sheet, setSheet] = React.useState<'' | 'workflow' | 'aspect' | 'advanced'>('');
+  const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const { prompts: recentPrompts } = usePromptHistory(open);
@@ -546,16 +546,9 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const variations = mode === 'image' && currentProfile?.capabilities?.variations !== false;
   const maxCount = Math.max(1, Math.min(4, Number(countMeta?.max || 4)));
   const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
-  const aspect = (aspectOptions as AspectPreset[] || []).find((option) => option.value === aspectPickerValue);
-  // The size tabs, as in the desktop size menu: Default · 2K · Custom (2K for images only).
-  const sizeTabs = typeof chooseSizeTier === 'function' && !aspectLocked;
+  // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
-  const picked = parseSize(aspectValue);
-  const sizePlanned = sizePlan(tier === '2k' ? '2k' : 'none', picked.width, picked.height, currentProfile?.native, sizeMax);
-  const sizeLine = tier === 'custom' ? '' : tier === '2k'
-    ? `Drawn at ${sizePlanned.final.width} × ${sizePlanned.final.height}.${sizePlanned.untested ? ' This model isn’t known for 2K; some pictures may repeat or warp.' : ''}`
-    : `The model’s own size, ${picked.width} × ${picked.height}.`;
+  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes });
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
@@ -650,25 +643,17 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           <ChevronRight size={18} className="phone-row-end" />
         </button>
         {(aspectOptions || []).length && !aspectLocked ? (
-          <button type="button" className="phone-row" onClick={() => setSheet('aspect')}>
-            <span className="aspect-shape phone-aspect" style={aspect ? aspectIconStyle(aspect) : undefined} />
-            <span>{aspect ? aspect.label : aspectPickerValue === 'default' ? 'Default size' : 'Custom size'}<small>{aspect ? aspect.value : defaultAspectSize}</small></span>
+          <button type="button" className="phone-row" onClick={() => setSheet('size')}>
+            {/* The real shape, tagged 2K or C like the desktop's size button. */}
+            <span className="aspect-shape-slot phone-size-icon">
+              <span className="aspect-shape" style={aspectIconStyle({ label: '', value: '', w: size.shown.width, h: size.shown.height })} />
+              {size.badge ? <b className="aspect-upscale-badge" aria-hidden="true">{size.badge}</b> : null}
+            </span>
+            <span>{size.captionFor(null)}<small>{size.shown.width} × {size.shown.height}</small></span>
             <ChevronRight size={18} className="phone-row-end" />
           </button>
         ) : null}
       </div>
-
-      {sizeTabs ? (
-        <div className="phone-control">
-          <span className="phone-control-label" id="phone-size-label">Size</span>
-          <div className="phone-seg" role="radiogroup" aria-labelledby="phone-size-label">
-            {tiers.map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={tier === value} className={cn(tier === value && 'active')} onClick={() => chooseSizeTier(value)}>{value === 'none' ? 'Default' : value === '2k' ? '2K' : 'Custom'}</button>
-            ))}
-          </div>
-          {tier === 'custom' && customLimits ? <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} /> : <p className="phone-control-note">{sizeLine}</p>}
-        </div>
-      ) : null}
 
       {variations && maxCount > 1 ? (
         <div className="phone-control">
@@ -692,7 +677,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       </button>
 
       <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
-      <AspectSheet view={view} open={sheet === 'aspect'} onClose={() => setSheet('')} />
+      <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
       <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced" full className="phone-advanced">
         {phoneAdvancedControls}
       </Sheet>
@@ -744,26 +729,176 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   );
 }
 
-function AspectSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
-  const { aspectOptions, aspectPickerValue, applyAspect, defaultAspectSize } = view as { aspectOptions: AspectPreset[]; aspectPickerValue: string; applyAspect: (value: string) => void; defaultAspectSize: string };
-  const pick = (value: string) => { applyAspect(value); onClose(); };
+/**
+ * The size menu as a sheet: the frame the picture will fill on a stage at the
+ * top (it stays in view while the shapes scroll), Default · 2K · Custom,
+ * Custom's linked width and height, the shapes, and the sizes you saved.
+ *
+ * There is no hover on a phone, so a finger resting on a row shows its frame
+ * on the stage, and the saved sizes' Rename and Remove wait behind Edit
+ * rather than hiding under a pointer. Picking from Default or 2K closes the
+ * sheet, as the desktop menu closes; in Custom a shape keeps the area.
+ */
+function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
+  const {
+    aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
+    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize
+  } = view;
+  const saved = (savedSizes || []) as SavedSize[];
+  const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
+  const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
+  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved });
+  const { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, captionFor, note } = model;
+
+  // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.
+  const [pressed, setPressed] = React.useState<SizeRow | null>(null);
+  const pressTimer = React.useRef(0);
+  const press = (row: SizeRow | null) => {
+    window.clearTimeout(pressTimer.current);
+    if (row) pressTimer.current = window.setTimeout(() => setPressed(row), 90);
+    else setPressed(null);
+  };
+  React.useEffect(() => () => window.clearTimeout(pressTimer.current), []);
+  const [editing, setEditing] = React.useState(false);
+  React.useEffect(() => { if (!open) { press(null); setEditing(false); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!saved.length) setEditing(false); }, [saved.length]);
+
+  const pressHandlers = (row: SizeRow) => ({
+    onPointerDown: () => press(row),
+    onPointerLeave: () => press(null),
+    onPointerCancel: () => press(null)
+  });
+  const pick = (row: SizeRow) => {
+    press(null);
+    haptic('tap');
+    if (custom) { applyCustomRatio(presetRatio(row.shape)); return; }
+    applyAspect(row.value);
+    onClose();
+  };
+  const pickSaved = (item: SavedSize) => {
+    press(null);
+    haptic('tap');
+    pickSavedSize(item);
+    if (!custom) onClose();
+  };
+
+  const stage = pressed ? pressed.size : shown;
   return (
-    <Sheet open={open} onClose={onClose} title="Aspect ratio">
-      <div className="phone-group phone-aspects">
-        <button type="button" className={cn('phone-row', aspectPickerValue === 'default' && 'is-current')} onClick={() => pick('default')}>
-          <span className="aspect-shape default phone-aspect" />
-          <span>Default<small>{defaultAspectSize}</small></span>
-          {aspectPickerValue === 'default' ? <Check size={18} className="phone-row-end" /> : null}
-        </button>
-        {(aspectOptions || []).map((option) => (
-          <button key={option.value} type="button" className={cn('phone-row', option.value === aspectPickerValue && 'is-current')} onClick={() => pick(option.value)}>
-            <span className="aspect-shape phone-aspect" style={aspectIconStyle(option)} />
-            <span>{option.label}<small>{option.value}</small></span>
-            {option.value === aspectPickerValue ? <Check size={18} className="phone-row-end" /> : null}
+    <Sheet open={open} onClose={onClose} title="Size" className="phone-size">
+      <div className="phone-size-stage">
+        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && tier !== 'none'} inset={18} />
+      </div>
+      <div className="phone-size-top">
+        <SizeTabs tiers={tiers} value={tier} onChange={(next) => { haptic('tap'); chooseSizeTier(next); }} />
+        <AnimatePresence initial={false}>
+          {custom && customLimits ? (
+            <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownShape || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+        {note ? <p className="phone-control-note">{note}</p> : null}
+      </div>
+      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at this size' : 'Shape'}>
+        {rows.map((row) => (
+          <button key={row.key} type="button" role="option" aria-selected={isActive(row)} className={cn('phone-row phone-size-row', isActive(row) && 'is-current')} {...pressHandlers(row)} onClick={() => pick(row)}>
+            <span className="phone-size-shape"><span className="aspect-shape" style={aspectIconStyle(row.shape)} /></span>
+            <span>{row.label}{row.small ? <small>{row.small}</small> : null}</span>
+            <em>{row.size.width}×{row.size.height}</em>
           </button>
         ))}
       </div>
+      {saved.length ? (
+        <>
+          <div className="phone-size-saved-head">
+            <h3 className="phone-section">Saved</h3>
+            <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { haptic('tap'); setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}<HapticTarget /></button>
+          </div>
+          <div className={cn('phone-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved sizes">
+            <AnimatePresence initial={false}>
+              {saved.map((item) => (
+                <PhoneSavedSize
+                  key={item.id}
+                  saved={item}
+                  active={savedMatch?.id === item.id}
+                  editing={editing}
+                  pressHandlers={pressHandlers(savedRow(item))}
+                  onPick={() => pickSaved(item)}
+                  onRename={(name) => renameSavedSize(item.id, name)}
+                  onRemove={() => { haptic('warning'); press(null); removeSavedSize(item.id); }}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        </>
+      ) : null}
     </Sheet>
+  );
+}
+
+/**
+ * A saved size: a row like the shapes, its name with its ratio under it.
+ * Under Edit the name turns into a field where it stands (Enter or leaving
+ * keeps it, Escape puts it back) and Remove slides in beside the size, which
+ * steps aside for it; Undo is on the toast. One row throughout, so going in
+ * and out of Edit glides instead of swapping.
+ */
+function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRename, onRemove }: {
+  saved: SavedSize;
+  active: boolean;
+  editing: boolean;
+  pressHandlers: React.HTMLAttributes<HTMLElement>;
+  onPick: () => void;
+  onRename: (name: string) => void;
+  onRemove: () => void;
+}) {
+  const [draft, setDraft] = React.useState(saved.name);
+  React.useEffect(() => { setDraft(saved.name); }, [saved.name, editing]);
+  // Escape leaves the field without keeping what was typed.
+  const reverting = React.useRef(false);
+  const keep = (typed: string) => {
+    const name = typed.trim();
+    if (reverting.current || !name || name === saved.name) { reverting.current = false; setDraft(saved.name); return; }
+    onRename(name);
+  };
+  const ratio = ratioName(saved.width, saved.height);
+  return (
+    <motion.div
+      className="phone-size-saved"
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: 'auto', opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className={cn('phone-row phone-size-row is-saved', active && 'is-current', editing && 'is-editing')} {...(editing ? {} : pressHandlers)}>
+        {editing ? null : <button type="button" className="phone-size-hit" role="option" aria-selected={active} aria-label={`${saved.name}, ${ratio}, ${saved.width} × ${saved.height}`} onClick={onPick} />}
+        <span className="phone-size-shape" aria-hidden="true"><span className="aspect-shape" style={aspectIconStyle({ label: ratio, value: '', w: saved.width, h: saved.height })} /></span>
+        <span className="phone-size-text" aria-hidden={!editing || undefined}>
+          <input
+            className="phone-size-name"
+            data-own-escape
+            value={draft}
+            readOnly={!editing}
+            tabIndex={editing ? 0 : -1}
+            maxLength={32}
+            enterKeyHint="done"
+            aria-label={`Name of ${saved.name}`}
+            onFocus={(event) => { if (editing) event.currentTarget.select(); }}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={(event) => { if (editing) keep(event.currentTarget.value); }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+              if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); reverting.current = true; event.currentTarget.blur(); }
+            }}
+          />
+          <small>{ratio}</small>
+        </span>
+        <em aria-hidden="true">{saved.width}×{saved.height}</em>
+        <span className="phone-size-remove-slot">
+          <button type="button" className="phone-size-remove" tabIndex={editing ? 0 : -1} aria-hidden={!editing || undefined} aria-label={`Remove ${saved.name}`} onClick={onRemove}><Trash2 size={18} /></button>
+        </span>
+      </div>
+    </motion.div>
   );
 }
 
