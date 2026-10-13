@@ -107,3 +107,17 @@ test("failed staging removes already-uploaded temporary copies", async (t) => {
 });
 
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+
+test('search filters the full reference library before pagination and matches prompt words', async () => {
+  const { gallery } = await import('./gallery-store.js');
+  const items = Array.from({ length: 120 }, (_, index) => ({ id: `search-${index}`, type: 'image', status: 'done', url: `/images/search-${index}.png`, filename: `search-${index}.png`, prompt: index === 119 ? 'A Blue Mountain at Sunset' : 'A green forest', model: 'test-model', createdAt: new Date(1700000000000 + index).toISOString() }));
+  gallery.push(...items);
+  try {
+    const found = referenceAssets.listReferenceAssets({}, { source: 'generation', q: 'mountain BLUE', limit: 1 });
+    assert.equal(found.items.length, 1);
+    assert.equal(found.items[0].galleryItemId, 'search-119');
+    assert.equal(found.hasMore, false);
+    assert.equal(referenceAssets.listReferenceAssets({}, { source: 'generation', q: 'not found' }).items.length, 0);
+    assert.equal(referenceAssets.listReferenceAssets({}, { source: 'hidden', q: 'mountain' }).locked, true);
+  } finally { for (const item of items) gallery.splice(gallery.indexOf(item), 1); }
+});

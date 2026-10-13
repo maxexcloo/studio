@@ -706,4 +706,10 @@
 @media (pointer: coarse) {
   .ref-thumb-remove::after { width: 34px; height: 34px; translate: -30% -70%; }
 }
+.reference-grid.is-virtual { position: relative; }
+.reference-search { flex: none; display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 8px 10px; border-radius: var(--r-item); background: var(--well); color: hsl(var(--muted-foreground)); }
+.reference-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 13px; }
+.reference-search:focus-within { box-shadow: 0 0 0 1px var(--surface-border); }
+.reference-search button { display: grid; place-items: center; border: 0; padding: 4px; background: transparent; color: inherit; cursor: pointer; }
+.reference-search input::-webkit-search-cancel-button { display: none; }
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }

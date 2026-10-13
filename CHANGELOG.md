@@ -47,8 +47,12 @@ version opens with a `> ` summary line, which the update pill shows.
 - Automatic upscaling of every new picture (see above).
 - The viewer's "Vary with a new seed" button.
 
+### Added
+- **Reference search:** find images by prompt, model or filename across the full library.
+
 ### Changed
 - **Faster studio loading:** settings, workflows and the image editor load when needed.
+- **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
 - A busy ComfyUI no longer shows as offline.

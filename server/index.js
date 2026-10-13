@@ -1585,7 +1585,8 @@ app.get("/api/reference-assets", (req, res) => {
     res.json(listReferenceAssets(req, {
       source: ["generation", "hidden"].includes(req.query.source) ? req.query.source : "upload",
       cursor: String(req.query.cursor || ""),
-      limit: Number(req.query.limit || 60)
+      limit: Number(req.query.limit || 60),
+      q: String(req.query.q || "")
     }));
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });

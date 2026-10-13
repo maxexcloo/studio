@@ -121,9 +121,10 @@ export class ApiError extends Error {
 
 export type ReferenceAssetPage = { items: ReferenceAsset[]; nextCursor?: string; hasMore?: boolean; locked?: boolean };
 
-export function listReferenceAssets(source: "upload" | "generation" | "hidden", cursor = "", limit = 30, signal?: AbortSignal) {
+export function listReferenceAssets(source: "upload" | "generation" | "hidden", cursor = "", limit = 30, signal?: AbortSignal, query = "") {
   const search = new URLSearchParams({ source, limit: String(limit) });
   if (cursor) search.set("cursor", cursor);
+  if (query.trim()) search.set("q", query.trim());
   return apiJson<ReferenceAssetPage>(`/api/reference-assets?${search}`, { signal });
 }
 

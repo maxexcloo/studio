@@ -110,16 +110,22 @@ const newestFirst = (a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.create
  * Generations and Hidden are separate shelves: an unlocked Hidden never spills
  * into the gallery's list, and its own list answers "locked" until it is open.
  */
-export function listReferenceAssets(req, { source = "upload", cursor = "", limit = 60 } = {}) {
+export function listReferenceAssets(req, { source = "upload", cursor = "", limit = 60, q = "" } = {}) {
+  const words = String(q).trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (item) => {
+    if (!words.length) return true;
+    const text = [item.name, item.outputName, item.filename, item.prompt, item.model].filter(Boolean).join(" ").toLocaleLowerCase();
+    return words.every((word) => text.includes(word));
+  };
   if (source === "generation") {
-    return paginate(filterVisibleGallery(gallery).filter((item) => finishedImage(item) && !item.library).sort(newestFirst), cursor, limit, galleryAsset);
+    return paginate(filterVisibleGallery(gallery).filter((item) => finishedImage(item) && !item.library && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
   }
   if (source === "hidden") {
     if (!encryptionKeyFromRequest(req)) return { items: [], nextCursor: "", hasMore: false, locked: true };
-    return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter(finishedImage).sort(newestFirst), cursor, limit, galleryAsset);
+    return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter((item) => finishedImage(item) && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
   }
   const items = loadManifest()
-    .filter((item) => item.source === "upload")
+    .filter((item) => item.source === "upload" && matches(item))
     .sort(newestFirst);
   return paginate(items, cursor, limit, publicUploadAsset);
 }
