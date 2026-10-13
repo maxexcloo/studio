@@ -283,3 +283,32 @@ test("single-image reference jobs preserve and validate the requested variant co
   const { variationCount: _variationCount, ...legacyRequest } = request;
   assert.equal(sanitizeGenerateBody({ ...legacyRequest, count: 4 }, info).variationCount, undefined);
 });
+
+test("imported-only deployments retain user workflows and model files while hiding built-ins", async () => {
+  const { allCustomWorkflowRecords } = await import('./custom-workflows.js');
+  const folder = path.join(scratch, 'data', 'workflows');
+  fs.mkdirSync(folder, { recursive: true });
+  const file = path.join(folder, 'imported-only.json');
+  fs.writeFileSync(file, JSON.stringify({
+    graph: { '1': { class_type: 'EmptyLatentImage', inputs: { width: 512, height: 512, batch_size: 1 } } },
+    heissUi: { id: 'imported-only', name: 'Imported Only', kind: 'image', controls: {}, defaults: { width: 512, height: 512 } }
+  }));
+  const previous = process.env.HEISS_ENABLE_BUILTIN_PROFILES;
+  const info = objectInfo({ checkpoints: ['sdxl_turbo_1.0.safetensors'] });
+  try {
+    delete process.env.HEISS_ENABLE_BUILTIN_PROFILES;
+    const ordinary = inferModels(info);
+    assert(ordinary.profiles.some((profile) => !profile.id.startsWith('custom:')));
+    assert(allCustomWorkflowRecords().some((workflow) => workflow.source === 'bundled'));
+    process.env.HEISS_ENABLE_BUILTIN_PROFILES = '0';
+    const imported = inferModels(info);
+    assert.deepEqual(imported.profiles.map((profile) => profile.id), ['custom:imported-only']);
+    assert.equal(imported.defaults.imageModel, 'custom:imported-only');
+    assert.deepEqual(imported.modelFiles, ordinary.modelFiles);
+    assert(allCustomWorkflowRecords().every((workflow) => workflow.source === 'custom'));
+  } finally {
+    if (previous === undefined) delete process.env.HEISS_ENABLE_BUILTIN_PROFILES;
+    else process.env.HEISS_ENABLE_BUILTIN_PROFILES = previous;
+    fs.rmSync(file);
+  }
+});
