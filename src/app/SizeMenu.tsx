@@ -3,8 +3,9 @@ import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
-import { megapixels, ratioName, snapSide, type SideLimits, type Size } from './sizing';
-import type { SavedSize } from './types';
+import { fitRatio, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
+import { sizePlan } from './useUpscale';
+import type { AspectPreset, NativeSupport, SavedSize } from './types';
 
 /* ---------------------------------------------------------------------------
    The size menu's parts (components.tsx AspectPicker puts them together):
@@ -19,6 +20,68 @@ import type { SavedSize } from './types';
 --------------------------------------------------------------------------- */
 
 export type SizeTier = "none" | "2k" | "custom";
+
+export type SizeRow = { key: string; value: string; label: string; small?: string; shape: AspectPreset; size: Size };
+
+/**
+ * What the size menu shows, worked out once for the desktop menu and the
+ * phone's size sheet: the rows and the size each makes on this tab, which
+ * one is chosen, and how the choice reads (label, tag, caption, note).
+ *
+ * Default and 2K use the model's preset shapes, 2K drawn with the long side
+ * at 2048. Custom is any width and height; a shape row there keeps the area
+ * and changes the shape.
+ */
+export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native = {}, sizeMax = 8192, limits, savedSizes = [] }: {
+  value: string;
+  options: AspectPreset[];
+  currentSize: string;
+  defaultSize: string;
+  tier: SizeTier;
+  native?: NativeSupport;
+  sizeMax?: number;
+  limits?: { width: SideLimits; height: SideLimits };
+  savedSizes?: SavedSize[];
+}) {
+  const custom = tier === "custom";
+  const picked = parseSize(currentSize);
+  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax);
+  const shown = custom ? picked : plan.final;
+  const selected = options.find((item) => item.value === value);
+  const isDefault = value === "default";
+  // The ratio the default size already is: one row ("Default 1:1"), not two with the same size.
+  const defaultOption = options.find((item) => item.value === defaultSize);
+  const listed = defaultOption ? options.filter((item) => item !== defaultOption) : options;
+  const defaultShape = parseSize(defaultSize);
+  const area = picked.width * picked.height;
+  // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
+  const rowSize = (shape: AspectPreset) => custom && limits
+    ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
+    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final : { width: shape.w, height: shape.h };
+  const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
+  const rows: SizeRow[] = [
+    { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
+    ...listed.map((option) => ({ key: option.value, value: option.value, label: option.label, shape: option, size: rowSize(option) }))
+  ];
+  // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
+  const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
+  const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
+  // "Save size" is for a shape of your own: one no preset row has (within 0.5%), not a preset made bigger or smaller.
+  const ownShape = custom && !rows.some((row) => Math.abs(picked.width / picked.height / presetRatio(row.shape) - 1) <= 0.005);
+  const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
+  const ratio = ratioName(shown.width, shown.height);
+  const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
+  const badge = tier === "2k" ? "2K" : custom ? "C" : "";
+  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : ""}`;
+  /** The preview's caption for a row, or for the size chosen: "Name · ratio" where the name isn't the ratio itself. */
+  const captionFor = (row: SizeRow | null) => row
+    ? (row.small ? `${row.label} · ${row.small}` : row.label)
+    : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
+  const note = tier === "2k" && plan.capped ? `This model goes up to ${sizeMax} px a side.`
+    : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
+    : "";
+  return { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, label, badge, what, captionFor, note };
+}
 
 const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", custom: "Custom" };
 
