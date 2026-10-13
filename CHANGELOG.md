@@ -45,6 +45,11 @@ version opens with a `> ` summary line, which the update pill shows.
 - **A 2K/4K pick survives a reference.** It is skipped while an edited
   reference or a painted mask sets the size, and back afterwards, together
   with the aspect you had.
+- **Time estimates learn each size on its own.** A 2K or 4K draw is estimated
+  from your 2K and 4K runs once there are two, not bent from your 1K ones;
+  a stretch at 2K no longer pushes your 1K timings out, and a few misses at
+  one size no longer hide the estimate at another. Edits and image-to-image
+  runs, and the tiled decode a native size uses, are learned apart too.
 
 ### Fixed
 - **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax

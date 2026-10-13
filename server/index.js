@@ -613,7 +613,10 @@ app.get("/api/estimate", (req, res) => {
     height: Number(query.height) || 0,
     count: Number(query.count) || 1,
     steps: Number(query.steps) || 0,
-    frames: Number(query.frames) || 0
+    frames: Number(query.frames) || 0,
+    // What else changes the time: images it reads, and a native size's tiled decode.
+    refs: Number(query.refs) || 0,
+    tiledDecode: query.tiled === "1"
   };
   const now = Date.now();
   const estimate = generationEstimate(body, { now });

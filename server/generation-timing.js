@@ -7,7 +7,11 @@
  * saving). Per model, a step costs about the same for the same amount of
  * work, where work is megapixels × batch × frames; a step's cost grows a
  * little faster than the pixel count at large sizes, so the exponent is
- * learned from the sizes you actually use.
+ * learned from the sizes you actually use. Runs near a size speak for it
+ * once there are two (a native 2K draw is measured at 2K, not bent from 1K
+ * along the curve), and switching sizes keeps each size's own history.
+ * Runs that read images (references, a start image) and runs that decode in
+ * tiles are learned apart from those that don't, once there are enough.
  *
  * Estimates stay quiet until they have earned trust: three runs of the model
  * (two for a video, which takes minutes; another file of the same family
@@ -16,8 +20,13 @@
  */
 import { isSampler } from "./progress-phase.js";
 
-const RUNS_PER_KEY = 40;
-const RUNS_TOTAL = 400;
+// Kept per model, size and whether it reads images, so a week at 2K keeps the 1K runs.
+const RUNS_PER_BUCKET = 30;
+const RUNS_TOTAL = 600;
+const RUNS_PER_FAMILY = 40;
+// Runs within this factor of a size speak for it, once there are this many.
+const NEAR_SIZE = 1.5;
+const NEAR_RUNS = 2;
 const MIN_RUNS = 3;
 const MIN_VIDEO_RUNS = 2;
 const TRUSTED_ERROR = 0.3;
@@ -38,6 +47,13 @@ export function workUnits(body = {}) {
   const count = Math.max(1, Number(body.count) || 1);
   const frames = body.kind === "video" ? Math.max(1, Number(body.frames) || 1) : 1;
   return (pixels / 1e6) * count * frames;
+}
+
+/** What else shapes a run's time besides its size: the images it reads, and decoding in tiles. */
+export function runVariant(body = {}) {
+  // The start image is the first reference when there are references, so it counts once.
+  const images = Array.isArray(body.referenceAssets) ? body.referenceAssets.length : Math.max(0, Number(body.refs) || 0);
+  return { refs: Math.max(images, body.startImageId ? 1 : 0), tiled: Boolean(body.tiledDecode) };
 }
 
 const median = (values) => {
@@ -163,14 +179,18 @@ export function estimateRun(history = [], body = {}, { now = Date.now(), warm: k
   if (!key || !w) return null;
   // A video takes minutes, so two runs already say more than nothing; images need three.
   const need = body.kind === "video" ? MIN_VIDEO_RUNS : MIN_RUNS;
-  let runs = history.filter((run) => run.key === key).slice(-RUNS_PER_KEY);
+  const variant = runVariant(body);
+  let runs = history.filter((run) => run.key === key);
   // Too few runs of this file: other files of the same family here (an fp8 and an fp16 build) run alike.
   if (runs.length < need && body.family) {
     const kind = key.slice(0, key.indexOf(":") + 1);
-    const family = history.filter((run) => run.fam === body.family && run.key.startsWith(kind)).slice(-RUNS_PER_KEY);
+    const family = history.filter((run) => run.fam === body.family && run.key.startsWith(kind)).slice(-RUNS_PER_FAMILY);
     if (family.length >= need) runs = family;
   }
   if (runs.length < need) return null;
+  // Reading images costs time (encoding, longer sequences) and a start image samples fewer steps: alike runs speak once there are enough.
+  const sameImages = runs.filter((run) => (run.refs || 0) === variant.refs);
+  if (sameImages.length >= need) runs = sameImages;
   // Far outside the sizes this model has run at, the curve is a guess.
   const sizes = runs.map((run) => run.w);
   if (w > Math.max(...sizes) * 3 || w < Math.min(...sizes) / 3) return null;
@@ -178,24 +198,34 @@ export function estimateRun(history = [], body = {}, { now = Date.now(), warm: k
   const warm = knownWarm ?? isWarm(history, key, now);
   const alike = runs.filter((run) => Boolean(run.warm) === warm);
   const setupPool = alike.length >= 2 ? alike : runs;
-  const errors = runs.map((run) => run.error).filter(Number.isFinite).slice(-5);
+  // Runs near this size, when there are enough; else all of them, along the curve.
+  const near = (pool) => {
+    const close = pool.filter((run) => Math.abs(Math.log(run.w / w)) <= Math.log(NEAR_SIZE));
+    return close.length >= NEAR_RUNS ? close : pool;
+  };
+  // Misses at another size say little about this one: a few bad 2K guesses don't silence 1K.
+  const errorsOf = (pool) => pool.map((run) => run.error).filter(Number.isFinite).slice(-5);
+  const nearErrors = errorsOf(near(runs));
+  const errors = nearErrors.length >= 2 ? nearErrors : errorsOf(runs);
   const trusted = errors.length < 2 || median(errors) <= TRUSTED_ERROR;
 
   const stepped = runs.filter((run) => run.stepMs > 0);
   if (stepped.length >= need) {
     const k = workExponent(stepped);
-    const stepMs = median(stepped.map((run) => run.stepMs / run.w ** k)) * w ** k;
+    const stepMs = median(near(stepped).map((run) => run.stepMs / run.w ** k)) * w ** k;
     // A two-pass workflow samples more steps than the steps setting; keep its ratio.
     const asked = Number(body.steps) || 0;
     const ratio = median(stepped.filter((run) => run.asked > 0).map((run) => run.steps / run.asked));
     const steps = asked ? Math.round(asked * (ratio || 1)) : Math.round(median(stepped.map((run) => run.steps)));
     const setupMs = median(setupPool.map((run) => run.setupMs).filter((ms) => ms !== null && ms !== undefined)) ?? 0;
-    const tailMs = (median(stepped.map((run) => run.tailMs / run.w)) ?? 0) * w;
+    // Decoding in tiles (native 2K/4K) costs differently from one whole-frame decode.
+    const decoded = stepped.filter((run) => Boolean(run.tiled) === variant.tiled);
+    const tailMs = (median(near(decoded.length >= NEAR_RUNS ? decoded : stepped).map((run) => run.tailMs / run.w)) ?? 0) * w;
     const totalMs = setupMs + steps * stepMs + tailMs;
     return { totalMs: Math.round(totalMs), setupMs: Math.round(setupMs), stepMs, steps, tailMs: Math.round(tailMs), trusted, warm };
   }
   // No step reports from this workflow: scale whole runs by work instead.
-  const perWork = median(setupPool.map((run) => run.runMs / run.w));
+  const perWork = median(near(setupPool).map((run) => run.runMs / run.w));
   return perWork ? { totalMs: Math.round(perWork * w), setupMs: null, stepMs: null, steps: 0, tailMs: null, trusted, warm } : null;
 }
 
@@ -210,16 +240,21 @@ export function addRun(history = [], { body, result, predicted = null, warm = fa
   const run = { key, at, w, asked: Number(body.steps) || 0, warm: Boolean(warm), runMs: Math.round(result.runMs) };
   // The family, so another file of it can borrow these timings until it has its own.
   if (body.family) run.fam = String(body.family);
+  const variant = runVariant(body);
+  if (variant.refs) run.refs = variant.refs;
+  if (variant.tiled) run.tiled = 1;
   if (result.stepMs) Object.assign(run, { stepMs: Math.round(result.stepMs * 10) / 10, steps: result.steps, setupMs: Math.round(result.setupMs), tailMs: Math.round(result.tailMs) });
   if (predicted?.totalMs) run.error = Math.round((Math.abs(result.runMs - predicted.totalMs) / result.runMs) * 100) / 100;
   const next = [...history, run];
-  // Keep each model's latest runs, and the whole file small.
+  // Keep each model's latest runs at each size (and with or without images), and the whole file small.
   const counts = new Map();
   const kept = [];
   for (let index = next.length - 1; index >= 0; index -= 1) {
-    const count = counts.get(next[index].key) || 0;
-    if (count >= RUNS_PER_KEY || kept.length >= RUNS_TOTAL) continue;
-    counts.set(next[index].key, count + 1);
+    const item = next[index];
+    const bucket = `${item.key}|${Math.round(Math.log2(item.w))}|${item.refs ? 1 : 0}`;
+    const count = counts.get(bucket) || 0;
+    if (count >= RUNS_PER_BUCKET || kept.length >= RUNS_TOTAL) continue;
+    counts.set(bucket, count + 1);
     kept.push(next[index]);
   }
   return kept.reverse();

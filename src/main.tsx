@@ -1255,7 +1255,9 @@ function App() {
   const generationEstimate = useGenerationEstimate({
     mode, model: currentProfile?.model || model, profileId: currentProfile?.id || model, family: currentProfile?.family || '', width: estimateSize.width, height: estimateSize.height, steps,
     count: separateRuns ? 1 : estimateCount, runs: separateRuns ? estimateCount : 1, frames: mode === "video" ? frames : 0, revision: runningCount,
-    upscale: prefs.smartUpscale !== false ? estimatePlan?.quality || '' : '', upscaleTarget: estimatePlan?.target || 0, upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail)
+    upscale: prefs.smartUpscale !== false ? estimatePlan?.quality || '' : '', upscaleTarget: estimatePlan?.target || 0, upscaleFaceDetail: Boolean(prefs.upscaleFaceDetail),
+    // Learned apart on the server: runs that read images, and a native size's tiled decode.
+    refs: composerReferenceAssets.length, tiled: Boolean(estimatePlan?.draw)
   });
   // Every Restart ComfyUI button asks first when it would stop running work.
   useEffect(() => {
