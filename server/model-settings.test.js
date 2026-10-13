@@ -126,6 +126,34 @@ test("files distilled for a step count start at that count; the rest at their va
   assert.equal(profileFor(info, "minimax_h3_fl2va_pruned_int8_convrot.safetensors").defaults.frames, 124, "5 seconds, H3's shortest trained length");
 });
 
+test("MiniMax H3 starts on its 16:9 canvas and does not repeat its family in the label", () => {
+  const info = objectInfo({ unets: ["minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimax_h3_turbo_8step.safetensors"] });
+  const standard = profileFor(info, "minimax_h3_fl2va_pruned_int8_convrot.safetensors");
+  assert.deepEqual([standard.defaults.width, standard.defaults.height, standard.aspectDefault], [1344, 768, "16:9"]);
+  assert.equal(standard.aspectPresets.find((aspect) => aspect.label === "16:9").default, true);
+  assert.equal(standard.label, "MiniMax H3 Video (INT8)");
+  assert.equal(profileFor(info, "minimax_h3_turbo_8step.safetensors").label, "MiniMax H3 Turbo 8-Step");
+});
+
+test("custom MiniMax H3 profiles use the family's starting aspect", async () => {
+  const { profileImageSize } = await import("../src/app/generationOptions.js");
+  const workflows = path.join(scratch, "data", "workflows");
+  fs.mkdirSync(workflows, { recursive: true });
+  const file = path.join(workflows, "h3-aspect.json");
+  fs.writeFileSync(file, JSON.stringify({
+    graph: { "1": { class_type: "EmptyLatentImage", inputs: { width: 1344, height: 768 } } },
+    heissUi: { id: "h3-aspect", name: "H3 Aspect", kind: "video", family: "minimax-h3", controls: { width: { node: "1", input: "width" }, height: { node: "1", input: "height" } }, defaults: { width: 1344, height: 768 } }
+  }));
+  try {
+    const profile = inferModels(objectInfo({})).profiles.find((item) => item.id === "custom:h3-aspect");
+    assert.equal(profile.aspectDefault, "16:9");
+    const size = profileImageSize(profile);
+    assert.ok(size.width > size.height, "an imported H3 workflow must not start square");
+  } finally {
+    fs.rmSync(file);
+  }
+});
+
 test("HunyuanVideo 1.5 takes Tencent's shift per resolution and task, and 50 steps when CFG-distilled", async () => {
   const { families, variantFor } = await import("./family-catalog.js");
   const settings = (name) => {
@@ -217,4 +245,41 @@ test("HiDream takes only its own CLIPs, and says so when they are missing", () =
 test("HiDream Dev and Fast hide the negative prompt: at CFG 1 it has no effect; Full keeps it", () => {
   const info = objectInfo({ unets: ["hidream_i1_dev_fp8.safetensors", "hidream_i1_fast_fp8.safetensors", "hidream_i1_full_fp8.safetensors"] });
   assert.deepEqual(["dev", "fast", "full"].map((name) => profileFor(info, `hidream_i1_${name}_fp8.safetensors`).capabilities.negativePrompt), [false, false, true]);
+});
+
+
+test("custom batch counts reach the UI and configured ready profiles become instance defaults", () => {
+  const workflows = path.join(scratch, "data", "workflows");
+  fs.mkdirSync(workflows, { recursive: true });
+  const file = path.join(workflows, "batch-profile.json");
+  fs.writeFileSync(file, JSON.stringify({
+    graph: { "1": { class_type: "EmptyLatentImage", inputs: { width: 864, height: 1152, batch_size: 4 } } },
+    heissUi: { id: "batch-profile", name: "Batch Profile", kind: "image", controls: { count: { node: "1", input: "batch_size" } }, defaults: { count: 4, width: 864, height: 1152 } }
+  }));
+  const previous = process.env.HEISS_DEFAULT_IMAGE_PROFILE;
+  try {
+    process.env.HEISS_DEFAULT_IMAGE_PROFILE = "custom:batch-profile";
+    const info = objectInfo({ checkpoints: ["sdxl_turbo_1.0.safetensors"] });
+    const models = inferModels(info);
+    assert.equal(models.defaults.imageModel, "custom:batch-profile");
+    assert.equal(models.profiles.find((profile) => profile.id === "custom:batch-profile").defaults.count, 4);
+    process.env.HEISS_DEFAULT_IMAGE_PROFILE = "custom:missing";
+    assert.notEqual(inferModels(info).defaults.imageModel, "custom:missing");
+  } finally {
+    if (previous === undefined) delete process.env.HEISS_DEFAULT_IMAGE_PROFILE;
+    else process.env.HEISS_DEFAULT_IMAGE_PROFILE = previous;
+    fs.rmSync(file);
+  }
+});
+
+test("single-image reference jobs preserve and validate the requested variant count", () => {
+  const info = objectInfo({ checkpoints: ["sdxl_turbo_1.0.safetensors"] });
+  const profile = inferModels(info).profiles.find((item) => item.model === "sdxl_turbo_1.0.safetensors");
+  const request = { kind: "image", workflow: profile.workflow, profileId: profile.id, model: profile.model, prompt: "a heron", count: 1, variationCount: 4 };
+  const checked = sanitizeGenerateBody(request, info);
+  assert.equal(checked.count, 1);
+  assert.equal(checked.variationCount, 4);
+  assert.equal(sanitizeGenerateBody({ ...request, variationCount: 1000 }, info).variationCount, 8);
+  const { variationCount: _variationCount, ...legacyRequest } = request;
+  assert.equal(sanitizeGenerateBody({ ...legacyRequest, count: 4 }, info).variationCount, undefined);
 });

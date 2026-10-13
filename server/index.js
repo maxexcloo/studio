@@ -1584,6 +1584,7 @@ app.post("/api/generate", async (req, res) => {
       steps: Number(req.body?.steps || 4),
       cfg: Number(req.body?.cfg || 1),
       count: Number(req.body?.count || 1),
+      ...(req.body?.variationCount !== undefined ? { variationCount: Math.max(1, Math.min(8, Math.round(Number(req.body.variationCount) || 1))) } : {}),
       sampler: String(req.body?.sampler || "euler"),
       scheduler: String(req.body?.scheduler || "simple"),
       seed: String(req.body?.seed || ""),

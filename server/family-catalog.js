@@ -376,7 +376,10 @@ export const families = {
     requiredNodes: ["TextEncodeQwenImage21"],
     // Edits: its text encoder reads reference images (up to 16; the composer offers three).
     references: 3, referenceVia: "encoder",
-    variants: [{ id: "standard", label: "Qwen-Image 2.1", defaults: { steps: 25, cfg: 1, sampler: "euler", scheduler: "simple" } }],
+    variants: [
+      { id: "turbo", label: "Qwen-Image 2.1 Turbo", match: (name) => /turbo/i.test(name), sigmas: [1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0], requiredNodes: ["ManualSigmas", "QwenImage21Cache", "BasicGuider", "RandomNoise", "KSamplerSelect", "SamplerCustomAdvanced"], defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" } },
+      { id: "standard", label: "Qwen-Image 2.1", defaults: { steps: 25, cfg: 1, sampler: "euler", scheduler: "simple" } }
+    ],
     size: [1024, 1024]
   },
   zimage: {
@@ -538,14 +541,18 @@ export const families = {
   minimax_h3: {
     label: "MiniMax H3", kind: "video", sources: ["unet", "checkpoint"], audio: true,
     slots: [{ slot: "encoder", label: "Qwen3-VL 32B", kinds: ["qwen3vl_32b"] }], clipType: "minimax",
-    vae: ["h3_video"], audioVae: ["h3_audio"], latent: "MiniMaxH3ImageToVideo", sizeStep: 32, negative: "none", sampling: "h3", aspects: wide,
-    requiredNodes: ["MiniMaxH3ImageToVideo", "SamplerCustomAdvanced", "BasicGuider", "VAEDecodeAudio", "CreateVideo"],
+    vae: ["h3_video"], audioVae: ["h3_audio"], latent: "MiniMaxH3ImageToVideo", sizeStep: 32, negative: "none", sampling: "h3", aspects: wide, aspectDefault: "16:9",
+    references: 3, referenceVia: "encoder",
+    requiredNodes: ["MiniMaxH3ImageToVideo", "SamplerCustomAdvanced", "BasicGuider", "VAEDecodeAudio", "CreateVideo", "LoadImage"],
     variants: [
+      { id: "reference", label: "MiniMax H3 Reference", match: (name) => /ref2va/i.test(name), references: 3, referenceRequired: true, requiredNodes: ["MiniMaxH3ReferenceToVideo"], defaults: { steps: 20, cfg: 1, sampler: "res_multistep", scheduler: "simple" } },
       // Turbo is distilled for 4 or 8 steps (lightx2v's LoRAs); Comfy-Org's template runs the 8-step one.
-      { id: "fast", label: "Turbo", match: (name) => speedName.test(name), stepsFromName: true, defaults: { steps: 8, cfg: 1, sampler: "res_multistep", scheduler: "simple" } },
-      { id: "standard", label: "MiniMax H3", defaults: { steps: 20, cfg: 1, sampler: "res_multistep", scheduler: "simple" } }
+      { id: "fast", label: "Turbo", match: (name) => speedName.test(name), references: 1, stepsFromName: true, defaults: { steps: 8, cfg: 1, sampler: "res_multistep", scheduler: "simple" } },
+      { id: "standard", label: "MiniMax H3", references: 1, defaults: { steps: 20, cfg: 1, sampler: "res_multistep", scheduler: "simple" } }
     ],
-    // 5 seconds, as the template and the node's own default: H3 is trained on 5 to 15 s.
+    // The Comfy-Org template's 16:9 canvas, and the aspect its presets scale
+    // around: H3's own example is 1344×768, not a square. 5 seconds, as the
+    // template and the node's own default: H3 is trained on 5 to 15 s.
     size: [1344, 768], frames: 124, fps: 24
   },
   // Lumina Image 2.0 and its fine-tunes (Neta Lumina, NetaYume). Gemma reads a

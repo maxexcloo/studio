@@ -280,6 +280,13 @@ export function classifyModel(source, name) {
   const chosen = parseChoice(loadModelChoices()[choiceKey(source, name)], source);
   if (chosen) return finish(chosen.family, "choice", null, chosen.variant);
 
+  // Tessera is a Krea 2 fine-tune. Its quantisations use tensor names outside the
+  // stock header layout, and its non-turbo base must not fall to the Turbo
+  // profile, so the name decides the family and the variant together.
+  if (/(?:^|[\\/])tessera(?:[-_.]|$)/i.test(base) && families.krea2.sources.includes(source)) {
+    return finish("krea2", "name", null, /turbo|distill|tdm/i.test(base) ? "turbo" : "raw");
+  }
+
   if (header) {
     const { family, detail } = familyFromHeader(header);
     if (family && family !== "other") return finish(family, "file", detail);

@@ -145,7 +145,7 @@ export function catalogDownloadsForFile(file = "", folder = "") {
 
 /** The core nodes a family needs; a ComfyUI without one of them gets "Newer ComfyUI" instead of a failed run. */
 export function nodesFor(family, variant, needsEncoderLoader, needsVaeLoader) {
-  const nodes = new Set(family.requiredNodes || []);
+  const nodes = new Set([...(family.requiredNodes || []), ...(variant.requiredNodes || [])]);
   if (family.sampling !== "h3") nodes.add(family.latent);
   if (needsEncoderLoader) nodes.add(clipLoaderClass[family.slots.length]);
   if (needsVaeLoader || family.audioVae) nodes.add("VAELoader");
@@ -294,9 +294,15 @@ export function familyProfiles(info, helpers) {
       : source === "checkpoint" ? info2.bundled : { encoder: false, vae: false, known: true };
     const encoderBuiltIn = bundled.encoder && !family.neverBundledEncoder;
     const missing = [];
+    // H3's smaller encoder needs this learned projection; never substitute it alone.
+    const h3Projection = family.sampling === "h3"
+      && optionsFor(info, "CLIPLoader", "type").includes("krea2")
+      && optionsFor(info, "ClipProjApply", "projection").includes("mmh3-4b-ClipProj-v3.1.safetensors")
+      ? "mmh3-4b-ClipProj-v3.1.safetensors" : "";
+    const projectedEncoders = h3Projection ? rankEncoders(encoderFiles, { kinds: ["qwen3vl_4b"] }).filter((name) => !isGguf(name)) : [];
 
     const encoderSlots = encoderBuiltIn ? [] : family.slots.map((slot) => {
-      const options = rankEncoders(encoderFiles, slot);
+      const options = [...projectedEncoders, ...rankEncoders(encoderFiles, slot)];
       if (!options.length) {
         const key = slot.download || slot.kinds[0];
         missing.push({
@@ -305,7 +311,7 @@ export function familyProfiles(info, helpers) {
           downloads: downloadsFor(encoderDownloads[key], "text_encoders", `encoder:${key}`, device)
         });
       }
-      return { slot: slot.slot, label: slot.label, options, default: options[0] || "" };
+      return { slot: slot.slot, label: projectedEncoders.length ? "Qwen3-VL 4B / 32B" : slot.label, options, default: options[0] || "" };
     });
 
     const vaeOptions = rankVaes(vaeFiles, family.vae);
@@ -369,6 +375,7 @@ export function familyProfiles(info, helpers) {
     countRange.max = Math.min(MAX_BATCH, Number(countRange.max) || MAX_BATCH);
     const frameRange = family.kind === "video" ? nodeRange(info, latentNode, "length", { default: family.frames, min: 1, max: 1000, step: family.frameStep || 1 }) : {};
     if (family.kind === "video") frameRange.default = family.frames;
+    if (family.sampling === "h3") frameRange.offset = 5;
     const fpsRange = family.kind === "video" ? { ...nodeRange(info, "CreateVideo", "fps", { default: family.fps, min: 1, max: 120, step: 1 }), default: family.fps } : {};
     const negativeMode = variant.negative || family.negative || "text";
     const vpredPatch = Boolean(variant.vpred && !(info2.header && "v_pred" in info2.header));
@@ -380,18 +387,21 @@ export function familyProfiles(info, helpers) {
     const pick = (options, preferred, fallback) => (options.includes(preferred) ? preferred : fallback || options[0] || "");
     // A runner that samples in its own way (ComfyUI-SANA) sets its own steps and CFG.
     const settings = { ...variantDefaults(variant, name, device), ...(variant.id !== "sprint" ? runner?.defaults : null) };
-    const references = canReference(family, info) ? family.references : 0;
+    // "MiniMax H3 Video (INT8)", not "MiniMax H3 Video (INT8) · MiniMax H3".
+    const pretty = prettyModelName(name);
+    const prettyLabel = pretty.toLowerCase().includes(family.label.toLowerCase()) ? pretty : `${pretty} · ${family.label}`;
+    const references = canReference(family, info) ? (variant.references ?? family.references) : 0;
     // Image-to-video runs from a picture: one start image, and no run without it.
     const startSlot = family.startImage === "required"
       ? [{ id: "reference", kind: "image", required: true, min: 1, max: 1, label: "Start image", role: "start" }]
       : null;
     const profile = buildProfile({
-      mediaInputs: startSlot || referenceSlots(references),
-      aspectPolicy: references ? "reference" : "manual",
+      mediaInputs: startSlot || referenceSlots(references).map((slot, index) => family.sampling === "h3" && index === 0 ? { ...slot, label: variant.referenceRequired ? "Reference Image" : "First Frame", required: Boolean(variant.referenceRequired), min: variant.referenceRequired ? 1 : 0 } : slot),
+      aspectPolicy: references && family.sampling !== "h3" ? "reference" : "manual",
       id: legacyProfileId(info2.family, source, name) || `${family.kind}:${info2.family}:${source}:${name}`,
       kind: family.kind,
-      label: sanaLabel(name) && runner ? sanaLabel(name) : `${prettyModelName(name)} · ${family.label}`,
-      displayName: (runner && sanaLabel(name)) || prettyModelName(name),
+      label: sanaLabel(name) && runner ? sanaLabel(name) : prettyLabel,
+      displayName: (runner && sanaLabel(name)) || pretty,
       description: preset ? `NVIDIA ${preset.label}, downloaded by ComfyUI on first use`
         : diffusersRunner ? `${family.label}${variant.id === "sprint" ? " Sprint" : ""} through ComfyUI-SANA`
         : `${family.variants.length > 1 && !variant.label.includes(family.label) ? `${family.label} ${variant.label}` : family.variants.length > 1 ? variant.label : family.label}${source === "checkpoint" ? " checkpoint" : ""}`,
@@ -413,24 +423,26 @@ export function familyProfiles(info, helpers) {
         ...(family.kind === "video" ? { frames: family.frames, fps: family.fps } : {})
       },
       aspects: aspectSet({ width, height }, family.aspects, { width: widthRange, height: heightRange }),
+      aspectDefault: family.aspectDefault || "",
       options: { vaes: vaeOptions, samplers, schedulers, loras, weightDtypes },
       constraints: {
         prompt: textMeta, negative: textMeta, width: widthRange, height: heightRange, count: countRange,
         ...(family.kind === "video" ? { frames: frameRange, fps: fpsRange } : {}),
-        ...samplerRange
+        ...samplerRange,
+        ...(variant.sigmas ? { steps: { default: 8, min: 8, max: 8, step: 1 }, cfg: { default: 1, min: 1, max: 1, step: 1 } } : {})
       },
       capabilities: {
-        negativePrompt: negativeMode === "text" || negativeMode === "qwen21",
+        negativePrompt: !variant.sigmas && (negativeMode === "text" || negativeMode === "qwen21"),
         variations: family.kind === "image" && family.sampling !== "pair",
         textEncoder: encoderSlots.length > 0,
         vae: !family.ownLoaders,
         weightDtype: source === "unet" && !isGguf(name),
         // ComfyUI-SANA runs the whole diffusers pipeline in one node, with its own scheduler.
-        ...(diffusersRunner ? { sampler: false, scheduler: false } : {}),
+        ...(diffusersRunner || variant.sigmas ? { sampler: false, scheduler: false } : {}),
         // ComfyUI's LoRA loader cannot patch a model it did not build.
         lora: canUseLoras && !family.ownLoaders,
-        startImage: Boolean(family.img2img || family.startImage),
-        startImageRequired: family.startImage === "required",
+        startImage: Boolean(family.img2img || family.startImage || family.sampling === "h3"),
+        startImageRequired: family.startImage === "required" || Boolean(variant.referenceRequired),
         denoise: Boolean(family.img2img),
         inpaint: canInpaint(family, info, references),
         frames: family.kind === "video",
@@ -443,6 +455,7 @@ export function familyProfiles(info, helpers) {
       variant: variant.id,
       variantLabel: variant.label,
       encoderSlots,
+      encoderProjections: Object.fromEntries(projectedEncoders.map((name) => [name, h3Projection])),
       vaeBuiltIn: Boolean(bundled.vae),
       encoderBuiltIn,
       bundledKnown: bundled.known !== false,
