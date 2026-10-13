@@ -3,7 +3,7 @@ import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, settingsText } from './format';
+import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { PromptIdeas } from './PromptIdeas';
 import { useHorizontalWheel, useWheelRef } from './wheel';
@@ -917,25 +917,48 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       ) : null}
                       <ViewerActions
                         item={active}
-                        copied={viewerCopy.copied === "settings"}
                         onUseSettings={() => applyAllSettings(active)}
-                        onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <details className="settings-disclosure" open={showGenerationSettings} onToggle={(event) => setShowGenerationSettings(event.currentTarget.open)}>
-                          <summary>Generation settings</summary>
-                          {generationDetailEntries(active).map((section: { title: string; rows: Array<[string, string]> }) => (
+                          <summary>
+                            <span>Generation details</span>
+                            {/* Everything here, as text to paste into a note or a chat; it never opens or closes the panel. */}
+                            {active.library ? null : (
+                              <Tip content="Copy the prompt, model, LoRAs and settings as text">
+                                <button type="button" className={cn("detail-copy", viewerCopy.copied === "settings" && "is-copied")} onClick={(event) => { event.preventDefault(); event.stopPropagation(); viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings"); }}>
+                                  <CopyIcon copied={viewerCopy.copied === "settings"} size={13} />
+                                  <span>{viewerCopy.copied === "settings" ? "Copied" : "Copy as text"}</span>
+                                </button>
+                              </Tip>
+                            )}
+                            <span className="sr-only" role="status">{viewerCopy.copied === "settings" ? "Details copied" : ""}</span>
+                          </summary>
+                          {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
-                              <div className="detail-grid">
-                                {section.rows.map(([key, value], index) => (
-                                  <React.Fragment key={`${key}-${index}`}>
-                                    <span>{key}</span><strong>{value}</strong>
-                                  </React.Fragment>
-                                ))}
-                              </div>
+                              {section.rows.length ? (
+                                <div className="detail-grid">
+                                  {section.rows.map(([key, value], index) => (
+                                    <React.Fragment key={`${key}-${index}`}>
+                                      <span>{key}</span><strong>{value}</strong>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {section.loras?.length ? (
+                                <ul className="detail-loras" aria-label="LoRAs">
+                                  {section.loras.map((lora, index) => (
+                                    <li key={`${lora.name}-${index}`} className="detail-lora">
+                                      <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
+                                      <i aria-hidden="true" />
+                                      <span className="detail-lora-strength" aria-label={`strength ${lora.strength}`}>{lora.strength}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
                             </div>
                           ))}
                         </details>
