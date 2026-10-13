@@ -35,6 +35,14 @@
   pointer-events: none;
 }
 .phone-bar > * { pointer-events: auto; }
+.phone-shell:has(.phone-generation-mode) { --phone-mode-h: 0px; }
+.phone-generation-mode {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  margin: 0 0 16px;
+  background: #1b1b1b;
+}
 .phone-title {
   flex: 1;
   min-width: 0;
@@ -47,6 +55,20 @@
   letter-spacing: -.01em;
 }
 .phone-title .phone-icon { margin-left: -6px; }
+.phone-scroll-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.phone-scroll-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phone-ember { color: var(--ember, #ff9a6a); }
 .phone-title-inline { display: inline-flex; align-items: center; gap: 8px; }
 
@@ -115,7 +137,7 @@
 
 .phone-running {
   position: fixed;
-  top: calc(max(6px, env(safe-area-inset-top)) + 50px);
+  top: calc(max(6px, env(safe-area-inset-top)) + 50px + var(--phone-mode-h, 0px));
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
   z-index: 19;
@@ -137,16 +159,18 @@
 .phone-gallery {
   position: absolute;
   inset: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
   -webkit-overflow-scrolling: touch;
   padding:
-    calc(max(6px, env(safe-area-inset-top)) + 56px)
+    calc(max(6px, env(safe-area-inset-top)) + 56px + var(--phone-mode-h, 0px))
     max(6px, env(safe-area-inset-right))
     calc(max(12px, env(safe-area-inset-bottom)) + 96px)
     max(6px, env(safe-area-inset-left));
 }
-.phone-shell:has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px); }
+.phone-shell:has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px + var(--phone-mode-h, 0px)); }
 .phone-gallery .empty.stage-empty { min-height: calc(100dvh - 200px); }
 /* The phone bar carries the way back; the lock screen's own button would sit under it. */
 .phone-shell .hidden-lockscreen-back { display: none; }
@@ -280,6 +304,7 @@
 .phone-sheet-body {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 16px 20px;
@@ -341,6 +366,7 @@
   text-overflow: ellipsis;
 }
 .phone-row small.is-setup { color: var(--ember); }
+.phone-model-option small { overflow: visible; white-space: normal; }
 .phone-row .phone-row-end { margin-left: auto; }
 .phone-row.is-current { color: #fff; }
 .phone-row.is-current .phone-row-end { color: #fff; }
@@ -458,6 +484,22 @@
 @keyframes phoneRoleNote { from { opacity: 0; transform: translateY(3px); } }
 @media (prefers-reduced-motion: reduce) { .phone-ref-role small { animation: none; } }
 .phone-compose .ref-menu { max-width: calc(100vw - 72px); }
+/* The desktop menu opens leftwards on hover; touch controls stay in the row. */
+.phone-compose .ref-selected { display: inline-flex; max-width: 100%; }
+.phone-compose .ref-thumb { flex: none; order: -1; }
+.phone-compose .ref-menu {
+  position: static;
+  min-width: 0;
+  max-width: calc(100vw - 120px);
+  height: 44px;
+  padding: 0 4px;
+  opacity: 1;
+  pointer-events: auto;
+  clip-path: none;
+}
+.phone-compose .ref-selected .ref-menu > * { opacity: 1; translate: none; }
+.phone-compose .ref-menu-name { min-width: 0; }
+.phone-compose .ref-menu-remove { width: 44px; height: 44px; }
 
 .phone-field {
   display: grid;
@@ -849,7 +891,6 @@
 /* ------------------------------------------------------------ Advanced */
 
 .phone-advanced-controls { display: grid; }
-.phone-mode { margin-bottom: 6px; }
 .phone-advanced-controls .phone-section { margin-top: 20px; }
 .phone-advanced-controls .phone-control { margin-bottom: 10px; }
 

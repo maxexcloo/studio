@@ -37,7 +37,8 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
-  .model-copy em { -webkit-line-clamp: 1; }
+  .model-option .model-copy strong,
+  .model-option .model-copy em { display: block; }
   .model-badge { display: none !important; }
   .aspect-option { min-height: 44px; }
   /* Phone placement for the deck lives in 17-deck.css, and the later

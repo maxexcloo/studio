@@ -8,6 +8,7 @@ import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { downloadActions } from './useModelDownloads';
 import { referenceRoleFor } from './referenceSlots';
 import { sizePlan, tiledDecodeFor } from './useUpscale';
+import { generationPlan } from './generationOptions';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -19,11 +20,16 @@ function payloadItems(data: GalleryPayload | null | undefined) {
 export function useGenerationActions(view: any) {
   const {
     active, canUseStartImage, confirmAction, count, currentProfile, denoise,
-    frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode,
+    frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loras, missingRequiredReference, mode,
     model, negative, prefs, hiddenSpace, hidden, prompt, sampler, scheduler, seed, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
     referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
+  // Callbacks must follow the studio as it changes under a run: a generation
+  // started in one mode finishes while another is on screen (see the delta sync
+  // at the end of runGeneration).
+  const latest = useRef(view);
+  latest.current = view;
   const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
   const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
   const galleryRemoveWhere = removeGalleryItemsWhere || ((predicate: (item: GalleryItem) => boolean) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !predicate(item))));
@@ -122,10 +128,13 @@ export function useGenerationActions(view: any) {
     generatePostingRef.current = true;
     const optimisticJobIds: string[] = [];
     try {
-      const effectiveCount = retry ? Math.max(1, Number(retry.body.count) || 1) : mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
-      const separate = !retry && runMode === "image" && prefs.variationQueueMode === "separate";
-      const imageRuns = separate ? effectiveCount : 1;
-      const requestCount = separate ? 1 : effectiveCount;
+      const { effectiveCount, separate, imageRuns, requestCount } = generationPlan({
+        count: retry ? Number(retry.body.count || 1) : count,
+        kind: runMode,
+        profile: retry ? { family: retry.body.workflow, model: retry.body.model } : currentProfile,
+        references: retry ? (Array.isArray(retry.body.referenceAssets) && retry.body.referenceAssets.length ? retry.body.referenceAssets : retry.body.startImageId ? [retry.body.startImageId] : []) : (referenceAssets?.length ? referenceAssets : canUseStartImage && (startImageId || startImage) ? [startImageId || startImage] : []),
+        queueMode: retry ? "batch" : prefs.variationQueueMode
+      });
       const startMessage = retry ? retry.label
         : runMode === "image"
         ? separate && effectiveCount > 1
@@ -143,7 +152,7 @@ export function useGenerationActions(view: any) {
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
         prompt,
-        negative,
+        ...(currentProfile?.capabilities?.negativePrompt !== false ? { negative } : {}),
         profileId: currentProfile?.id || model,
         model: currentProfile?.model || model,
         workflow: currentProfile?.workflow || "",
@@ -161,8 +170,11 @@ export function useGenerationActions(view: any) {
         scheduler,
         seed,
         count: effectiveCount,
+        variationCount: effectiveCount,
         frames,
         fps,
+        duration,
+        resolution,
         autoResizeInputs: prefs.autoResizeInputs !== false,
         loras,
         referenceAssets: (referenceAssets || []).map(({ slot, asset }: any) => ({ slot, assetId: asset.id })),
@@ -189,6 +201,7 @@ export function useGenerationActions(view: any) {
         const optimisticBody = { ...requestBody, ...(paintedOn?.width && paintedOn?.height ? { width: paintedOn.width, height: paintedOn.height } : {}), seed: runSeed, count: requestCount, startImageId: retry ? requestBody.startImageId : canUseStartImage ? startImageId : "" };
         const optimisticItems = pendingItemsFor(clientJobId, optimisticBody);
         galleryUpsert(optimisticItems);
+        if (index === 0 && runMode === latest.current.mode && toHidden === Boolean(latest.current.hiddenSpace)) latest.current.revealGeneration?.();
         if (prefs.zenMode) setZenSelectedId(optimisticItems[0].id);
         await nextPaint();
         const { jobId, items, hidden: wentHidden, notice } = await apiJson<{ jobId: string; items: GalleryItem[]; hidden?: boolean; revision?: number; notice?: string }>("/api/generate", {
@@ -270,14 +283,14 @@ export function useGenerationActions(view: any) {
           }
         }
       }));
-      await (loadGalleryDelta ? loadGalleryDelta() : loadGallery());
-      if (prefs.zenMode && prefs.followLatest && !toHidden) {
+      await (latest.current.loadGalleryDelta ? latest.current.loadGalleryDelta() : latest.current.loadGallery());
+      if (latest.current.prefs.zenMode && latest.current.prefs.followLatest && !toHidden && !latest.current.hiddenSpace && latest.current.mode === runMode) {
         const data = await apiJson<GalleryPayload>(`/api/gallery?type=${encodeURIComponent(runMode)}&limit=80`).catch(() => null);
         const outputs = payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled");
-        const latest = outputs.find((item: GalleryItem) => item.type === runMode && item.status === "done");
-        if (latest) {
+        const newest = outputs.find((item: GalleryItem) => item.type === runMode && item.status === "done");
+        if (newest && latest.current.prefs.zenMode && latest.current.prefs.followLatest && !latest.current.hiddenSpace && latest.current.mode === runMode) {
           galleryUpsert(outputs);
-          setZenSelectedId(latest.id);
+          setZenSelectedId(newest.id);
         }
       }
       setStatus(runMode === "image" ? "Finished. The images are in the gallery." : "Finished. The video is in the gallery.");

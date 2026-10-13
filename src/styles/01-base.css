@@ -280,6 +280,8 @@ input.is-framed:focus-visible {
 }
 /* A model that still needs files or nodes: said in the menu, flagged on the trigger. */
 .model-copy em.is-setup { color: var(--ember); }
+.model-option .model-copy strong,
+.model-option .model-copy em { overflow: visible; white-space: normal; }
 .model-trigger.needs-setup { position: relative; }
 .model-setup-flag {
   position: absolute; top: 6px; right: 6px;

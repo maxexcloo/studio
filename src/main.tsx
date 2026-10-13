@@ -8,6 +8,8 @@ import "./styles.css";
 import { useModelFolders } from './app/useModelFolders';
 import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
+import { profileImageCount, profileImageSize } from './app/generationOptions';
+import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
@@ -20,7 +22,10 @@ import { DeviceGate } from './app/DeviceGate';
 import { CrashBoundary } from './app/CrashScreen';
 import { TooltipProvider } from './components/ui/tooltip';
 import { setShareSettings } from './app/shareSettings';
-import { PhoneAdvancedControls, SidebarControls } from './app/SidebarControls';
+import { validVideoFrames } from './app/videoDuration';
+import { GrokMediaControls } from './app/GrokMediaControls';
+import { VideoDurationControls } from './app/VideoDurationControls';
+import { ModelLoraControls, PhoneAdvancedControls, SidebarControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
 import { loraFit, useLoraInfo } from './app/useLoraInfo';
 import type { LoraMismatch } from './app/LoraMismatchChip';
@@ -51,6 +56,7 @@ import type { StarterPick } from './app/StarterModels';
 
 // Rebuilt from scratch on every App render (each keystroke in the prompt); skips unless its data changed.
 const StableSidebarControls = memoLatest(SidebarControls);
+const StableModelLoraControls = memoLatest(ModelLoraControls);
 const StablePhoneAdvancedControls = memoLatest(PhoneAdvancedControls);
 
 /** Snap a raw pixel dimension to something ComfyUI will accept: a multiple of the
@@ -127,17 +133,19 @@ function App() {
   const [width, setWidth] = useState(Number(initialDraft.width || 1024));
   const [height, setHeight] = useState(Number(initialDraft.height || 1024));
   const [steps, setSteps] = useState(Number(initialDraft.steps || prefs.defaultImageSteps));
-  const [cfg, setCfg] = useState(Number(initialDraft.cfg || 1));
-  const [denoise, setDenoise] = useState(Number(initialDraft.denoise || 0.65));
+  const [cfg, setCfg] = useState(Number(initialDraft.cfg ?? 1));
+  const [denoise, setDenoise] = useState(Number(initialDraft.denoise ?? 0.65));
   // Inpainting: a mask painted on the first reference (never saved with the draft or a run),
   // how much the painted part may change, and how softly it blends back in.
   const [inpaintMask, setInpaintMask] = useState<InpaintMask | null>(null);
-  const [inpaintStrength, setInpaintStrength] = useState(Number(initialDraft.inpaintStrength || 1));
+  const [inpaintStrength, setInpaintStrength] = useState(Number(initialDraft.inpaintStrength ?? 1));
   const [inpaintFeather, setInpaintFeather] = useState(Number(initialDraft.inpaintFeather ?? 0.4));
   const [seed, setSeed] = useState(String(initialDraft.seed || ""));
   const [count, setCount] = useState(Number(initialDraft.count || prefs.defaultImageCount));
   const [frames, setFrames] = useState(Number(initialDraft.frames || prefs.defaultVideoFrames));
   const [fps, setFps] = useState(Number(initialDraft.fps || prefs.defaultFps));
+  const [duration, setDuration] = useState(Number(initialDraft.duration || 6));
+  const [resolution, setResolution] = useState(String(initialDraft.resolution || ""));
   const [sampler, setSampler] = useState(String(initialDraft.sampler || "euler_ancestral"));
   const [scheduler, setScheduler] = useState(String(initialDraft.scheduler || "beta"));
   const [loras, setLoras] = useState<LoraSelection[]>(() => normalizeLoras(initialDraft.loras));
@@ -173,13 +181,23 @@ function App() {
   const [isDraggingViewer, setIsDraggingViewer] = useState(false);
   const zenPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const galleryStageRef = useRef<HTMLElement | null>(null);
+  const galleryScroll = useRef<Record<string, number>>({});
+  const pendingScroll = useRef<string | null>(null);
   const zenStripRef = useRef<HTMLDivElement | null>(null);
   const zenStripDragRef = useRef<{ id: number; x: number; scrollLeft: number; moved: boolean } | null>(null);
   const latestZenIdRef = useRef("");
   // Set when LoRAs are applied for a workflow we're about to switch to (e.g. "Copy
   // all settings"), so the switch doesn't load that workflow's saved stack over them.
-  const explicitLorasFor = useRef("");
+  const explicitLorasFor = useRef(Array.isArray(initialDraft.loras) ? String(initialDraft.model || "") : "");
+  const loraEditRevision = useRef(0);
+  const composerByMode = useRef(modeSettings(initialDraft));
+  const selectedModelRef = useRef(model);
+  selectedModelRef.current = model;
+  const selectedModeRef = useRef(mode);
+  selectedModeRef.current = mode;
+  composerByMode.current[mode] = composerSettings({ model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, duration, resolution, sampler, scheduler, loras, customSize });
   const comfyStatusRequestRef = useRef<Promise<void> | null>(null);
+  const backendAvailabilityRef = useRef("");
   const [comfyRetrying, setComfyRetrying] = useState(false);
   const touchGestureRef = useRef<TouchGesture | null>(null);
   // The gallery search: words and the Favourites filter. Lives in memory only, never saved.
@@ -419,8 +437,9 @@ function App() {
     }
     if (previous) setLoras([]);
     let current = true;
+    const revision = loraEditRevision.current;
     apiJson<{ found: boolean; loras: LoraSelection[] }>(`/api/loras/${encodeURIComponent(model)}`)
-      .then((data) => { if (current && data.found) setLoras(normalizeLoras(data.loras)); })
+      .then((data) => { if (current && canRestoreLoras(revision, loraEditRevision.current, data.found)) setLoras(normalizeLoras(data.loras)); })
       .catch(() => null);
     return () => { current = false; };
   }, [model]);
@@ -611,25 +630,66 @@ function App() {
 
   // Each space keeps its own prompt. Hidden's lives in memory only: it never
   // reaches the saved draft, never follows you out, and goes when Hidden locks.
-  const spacePrompts = useRef({ gallery: { prompt, negative }, hidden: { prompt: "", negative: "" } });
-  const promptSpace = useRef(hidden.space);
-  if (promptSpace.current === hidden.space) spacePrompts.current[hidden.space] = { prompt, negative };
+  const spacePrompts = useRef({ gallery: modePrompts(initialDraft), hidden: modePrompts() });
+  const promptSelection = useRef({ space: hidden.space, mode });
+  if (promptSelection.current.space === hidden.space && promptSelection.current.mode === mode) spacePrompts.current[hidden.space][mode] = { prompt, negative };
   useEffect(() => {
-    if (promptSpace.current === hidden.space) return;
-    promptSpace.current = hidden.space;
-    const next = spacePrompts.current[hidden.space];
+    if (promptSelection.current.space === hidden.space && promptSelection.current.mode === mode) return;
+    promptSelection.current = { space: hidden.space, mode };
+    const next = spacePrompts.current[hidden.space][mode];
     setPrompt(next.prompt);
     setNegative(next.negative);
-  }, [hidden.space]);
+  }, [hidden.space, mode]);
   useEffect(() => {
     if (hidden.unlocked) return;
-    spacePrompts.current.hidden = { prompt: "", negative: "" };
+    spacePrompts.current.hidden = modePrompts();
     if (hiddenSpace) { setPrompt(""); setNegative(""); }
   }, [hidden.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
-  const draftPrompt = { current: spacePrompts.current.gallery };
+  const emptyReferences = () => ({ assets: [] as SelectedReferenceAsset[], image: "", id: "", name: "" });
+  type ModeReference = { assets: SelectedReferenceAsset[]; image: string; id: string; name: string };
+  const spaceReferences = useRef<Record<"gallery" | "hidden", Record<Mode, ModeReference>>>({
+    gallery: modeReferences(initialDraft),
+    hidden: { image: emptyReferences(), video: emptyReferences() }
+  });
+  const referenceSelection = useRef({ space: hidden.space, mode });
+  if (referenceSelection.current.space === hidden.space && referenceSelection.current.mode === mode) {
+    spaceReferences.current[hidden.space][mode] = { assets: referenceAssets, image: startImage, id: startImageId, name: startImageName };
+  }
+  useEffect(() => {
+    if (referenceSelection.current.space === hidden.space && referenceSelection.current.mode === mode) return;
+    referenceSelection.current = { space: hidden.space, mode };
+    const next = spaceReferences.current[hidden.space][mode];
+    setReferenceAssets(next.assets);
+    setStartImage(next.image);
+    setStartImageId(next.id);
+    setStartImageName(next.name);
+  }, [hidden.space, mode]);
+  useEffect(() => {
+    if (hidden.unlocked) return;
+    spaceReferences.current.hidden = { image: emptyReferences(), video: emptyReferences() };
+  }, [hidden.unlocked]);
+  // Each mode keeps its own place in the gallery. The grid measures itself
+  // after mount, so the saved position goes back once it has a height to
+  // scroll to (two frames, the second after that measurement has landed).
+  useEffect(() => {
+    if (!galleryLoaded || !pendingScroll.current) return;
+    const key = pendingScroll.current;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        if (pendingScroll.current !== key) return;
+        pendingScroll.current = null;
+        galleryStageRef.current?.scrollTo({ top: galleryScroll.current[key] || 0, behavior: "instant" });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [galleryLoaded, mode]);
+  const draftPrompt = { current: spacePrompts.current.gallery[mode] };
   useEffect(() => {
     const draft = {
       mode,
+      modePrompts: { ...spacePrompts.current.gallery },
+      modeSettings: { ...composerByMode.current },
+      modeReferences: savedModeReferences(spaceReferences.current.gallery),
       prompt: draftPrompt.current.prompt,
       negative: draftPrompt.current.negative,
       model,
@@ -647,6 +707,8 @@ function App() {
       count,
       frames,
       fps,
+      duration,
+      resolution,
       sampler,
       scheduler,
       loras,
@@ -683,7 +745,7 @@ function App() {
       window.clearTimeout(timer);
       window.removeEventListener("pagehide", save);
     };
-  }, [mode, prompt, negative, model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, sampler, scheduler, loras, customSize, startImageId, startImageName, referenceAssets, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId, hiddenSpace]);
+  }, [mode, prompt, negative, model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, duration, resolution, sampler, scheduler, loras, customSize, startImageId, startImageName, referenceAssets, advanced, showDetails, showGenerationSettings, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId, hiddenSpace]);
 
   useEffect(() => {
     if (!active) return;
@@ -824,9 +886,10 @@ function App() {
     const request = apiJson<Models>("/api/models")
       .then((data: Models) => {
         setModels(data);
-        const profileId = model || "";
+        const profileId = selectedModelRef.current || "";
         if (!profileId && !notify) {
-          const defaultProfile = data.profiles.find((item) => item.id === data.defaults.imageModel) || data.profiles[0];
+          const nextMode = selectedModeRef.current;
+          const defaultProfile = data.profiles.find((item) => item.id === data.defaults[nextMode === "video" ? "videoModel" : "imageModel"]) || data.profiles.find((item) => item.kind === nextMode);
           if (defaultProfile) applyProfile(defaultProfile);
         }
         if (notify) setStatus("Ready");
@@ -893,6 +956,11 @@ function App() {
     setComfyStatus((current) => (current.checked ? current : { ...current, checking: true }));
     const request = apiJson<ComfyStatus>("/api/comfy/status")
       .then((data) => {
+        const availability = JSON.stringify(data.backends || {});
+        if (availability !== backendAvailabilityRef.current) {
+          backendAvailabilityRef.current = availability;
+          refreshModels();
+        }
         // Not at the saved address, but on ComfyUI Desktop's port (or the other way round): now saved.
         if (data.found) {
           showToast(`Found ComfyUI at ${data.found.replace(/^https?:\/\//, "")}`, "success");
@@ -1073,11 +1141,13 @@ function App() {
   const restartForUpdate = () => restartHeiss({ update: true });
 
   function applyProfile(profile: Profile, setModelId = true) {
-    const nextReferenceInput = imageInputsForProfile(profile)[0];
     if (setModelId) setModel(profile.id);
     // A custom size is yours, so it stays across models of the same kind, fitted to the new one's limits.
     const keepCustom = customSize && profile.kind === mode;
     if (!keepCustom) setCustomSize(false);
+    if (profile.capabilities.duration) setDuration(Number(profile.defaults.duration || 6));
+    if (profile.capabilities.resolution) setResolution(String(profile.defaults.resolution || ""));
+    setCount(profileImageCount(profile, prefs.defaultImageCount));
     setTextEncoder(String(profile.defaults.textEncoder || ""));
     setTextEncoders((profile.encoderSlots || []).map((slot) => slot.default));
     setVae(String(profile.defaults.vae || ""));
@@ -1091,8 +1161,9 @@ function App() {
         showToast(`Custom size fitted to ${profile.displayName || profile.label || "this model"}: ${fitted.width} × ${fitted.height}`, "default", { description: `${width} × ${height} is past what it takes.` });
       }
     } else {
-      setWidth(Number(profile.defaults.width || 1024));
-      setHeight(Number(profile.defaults.height || 1024));
+      const size = profileImageSize(profile);
+      setWidth(size.width);
+      setHeight(size.height);
     }
     setSteps(Number(profile.defaults.steps || profile.constraints?.steps?.default || (profile.kind === "video" ? prefs.defaultVideoSteps : prefs.defaultImageSteps)));
     setCfg(Number(profile.defaults.cfg || profile.constraints?.cfg?.default || 1));
@@ -1104,7 +1175,11 @@ function App() {
       setFrames(Number(profile.defaults.frames || prefs.defaultVideoFrames));
       setFps(Number(profile.defaults.fps || profile.constraints?.fps?.default || prefs.defaultFps));
     }
-    if (!nextReferenceInput) {
+    if (profile.kind === selectedModeRef.current) applyProfileReferences(profile);
+  }
+
+  function applyProfileReferences(profile: Profile) {
+    if (!imageInputsForProfile(profile).length) {
       setReferenceAssets([]);
       setStartImage("");
       setStartImageId("");
@@ -1121,6 +1196,7 @@ function App() {
   /** Updates the LoRA stack and remembers it for a workflow: the current one by
    *  default, or the one being switched to when settings are applied together. */
   function setLorasWithMemory(update: React.SetStateAction<LoraSelection[]>, workflowId: string = model) {
+    loraEditRevision.current += 1;
     if (workflowId && workflowId !== model) explicitLorasFor.current = workflowId;
     setLoras((current) => {
       const next = normalizeLoras(typeof update === 'function' ? update(current) : update);
@@ -1148,7 +1224,28 @@ function App() {
   const loraStrengthForCurrentWorkflow = (name: string, fallback: number) => rememberedLoraStrength(model, name, fallback);
 
   function changeMode(next: Mode) {
+    if (next === mode) return;
+    galleryScroll.current[`${hidden.space}:${mode}`] = galleryStageRef.current?.scrollTop || 0;
+    pendingScroll.current = `${hidden.space}:${next}`;
+    const nextReferences = spaceReferences.current[hidden.space][next];
+    referenceSelection.current = { space: hidden.space, mode: next };
+    setReferenceAssets(nextReferences.assets);
+    setStartImage(nextReferences.image);
+    setStartImageId(nextReferences.id);
+    setStartImageName(nextReferences.name);
+    const nextPrompt = spacePrompts.current[hidden.space][next];
+    promptSelection.current = { space: hidden.space, mode: next };
+    setPrompt(nextPrompt.prompt);
+    setNegative(nextPrompt.negative);
     setMode(next);
+    const saved = composerByMode.current[next];
+    if (saved?.model && (!models || models.profiles.some((profile) => profile.id === saved.model && profile.kind === next))) {
+      const setters: Record<string, (value: any) => void> = { cfg: setCfg, clipType: setClipType, count: setCount, customSize: setCustomSize, denoise: setDenoise, duration: setDuration, fps: setFps, frames: setFrames, height: setHeight, inpaintFeather: setInpaintFeather, inpaintStrength: setInpaintStrength, model: setModel, resolution: setResolution, sampler: setSampler, scheduler: setScheduler, seed: setSeed, steps: setSteps, textEncoder: setTextEncoder, textEncoders: setTextEncoders, vae: setVae, weightDtype: setWeightDtype, width: setWidth };
+      for (const [key, value] of Object.entries(saved)) setters[key]?.(value);
+      setLorasWithMemory(normalizeLoras(saved.loras), saved.model);
+      const profile = models?.profiles.find((item) => item.id === saved.model);
+      return;
+    }
     if (!models) return;
     if (next === "image") {
       const profile = models.profiles.find((item) => item.id === models.defaults.imageModel);
@@ -1161,10 +1258,10 @@ function App() {
 
   function applyAspect(value: string, targetMode = mode) {
     if (value === "default") {
-      const defaults = currentProfile?.defaults || {};
+      const size = profileImageSize(currentProfile, targetMode);
       setCustomSize(false);
-      setWidth(Number(defaults.width || (targetMode === "video" ? 512 : 1024)));
-      setHeight(Number(defaults.height || (targetMode === "video" ? 288 : 1024)));
+      setWidth(size.width);
+      setHeight(size.height);
       return;
     }
     if (value === "free" || value === "custom") {
@@ -1413,6 +1510,16 @@ function App() {
   /* A reference that dictates the framing, or a painted mask, takes the size
      tabs off the composer and the run skips 2K/4K (useGenerationActions). The
      saved pick stays, so it is back once the reference is gone or only guides. */
+  useEffect(() => {
+    if (mode === "video" && currentProfile?.capabilities.frames) setFrames((value) => validVideoFrames(currentProfile, value));
+  }, [mode, currentProfile, frames]);
+  useEffect(() => {
+    if (currentProfile?.capabilities.resolution && !(currentProfile.options?.resolutions || []).includes(resolution)) setResolution(String(currentProfile.defaults.resolution || ""));
+    if (currentProfile?.capabilities.duration) {
+      const range = currentProfile.constraints?.duration || {};
+      setDuration((value) => Math.round(Math.max(range.min ?? 1, Math.min(range.max ?? 15, Number.isFinite(value) ? value : Number(currentProfile.defaults.duration || 6)))));
+    }
+  }, [currentProfile, duration, resolution]);
   const frameMeta = currentProfile?.constraints?.frames || {};
   const countMeta = currentProfile?.constraints?.count || {};
   const stepsMeta = currentProfile?.constraints?.steps || {};
@@ -1450,7 +1557,8 @@ function App() {
     },
     onReset: () => setPrefs({ megapixels: null })
   } : null;
-  const defaultAspectSize = `${Number(currentProfile?.defaults.width || (mode === "video" ? 512 : 1024))}x${Number(currentProfile?.defaults.height || (mode === "video" ? 288 : 1024))}`;
+  const defaultSize = profileImageSize(currentProfile, mode);
+  const defaultAspectSize = `${defaultSize.width}x${defaultSize.height}`;
   const aspectPickerValue = aspectValue === defaultAspectSize ? "default" : customSize || !aspectOptions.some((item) => item.value === aspectValue) ? "free" : aspectValue;
   const galleryColumnCount = useGalleryColumnCount();
   // Upscales count too, so Stop shows (and stops them) while only an upscale is running.
@@ -1470,7 +1578,7 @@ function App() {
 
   // What Generate would take with these settings, the way generate() would send them.
   const estimateCount = mode === "image" && currentProfile?.capabilities?.variations === false ? 1 : count;
-  const separateRuns = mode === "image" && prefs.variationQueueMode === "separate";
+  const separateRuns = mode === "image" && (prefs.variationQueueMode === "separate" || (estimateCount > 1 && referenceAssets.length > 0));
   // Estimated the way generate() sends it: at the size it's drawn at.
   // Not where generate() skips the plan: a mask, or an edited reference that sets the size.
   const estimatePlan = mode === "image" && !activeInpaintMask && !referenceForAspect ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, customLimits.width.step) : null;
@@ -1576,7 +1684,7 @@ function App() {
   function selectWorkflow(profileId: string) {
     // Picking a video workflow from the image gallery (or the reverse) switches mode with it.
     const profile = models?.profiles.find((item) => item.id === profileId);
-    if (profile && profile.kind !== mode) setMode(profile.kind);
+    if (profile && profile.kind !== mode) changeMode(profile.kind);
     chooseModel(profileId);
     apiJson<{ preferences: WorkflowPreferences }>("/api/workflows/preferences", {
       method: "PUT",
@@ -1637,7 +1745,7 @@ function App() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ galleryItemId: item.id })
       });
-      setMode("image");
+      changeMode("image");
       selectReferenceAsset(referenceInput!.id, data.asset);
       setActive(null);
     } catch (error) {
@@ -1673,15 +1781,23 @@ function App() {
 
 
   const generationActions = useGenerationActions({
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
-    refreshModels
+    refreshModels,
+    // A new run lands at the top of the gallery; show it instead of leaving the
+    // tiles below the fold while the picture renders out of sight.
+    revealGeneration: () => {
+      if (prefs.zenMode) return;
+      pendingScroll.current = null;
+      galleryScroll.current[`${hidden.space}:${mode}`] = 0;
+      galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
   });
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem, deleteItems } = generationActions;
 
   const viewerActions = useViewerControls({
-    draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, loras }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
+    negativeForMode: (next: Mode) => spacePrompts.current[hidden.space][next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
   });
   const { resetViewer, openItem, applyAllSettings, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
@@ -1705,7 +1821,7 @@ function App() {
   function selectStarterModel(file: string) {
     const profile = profileForFile(file);
     if (!profile) { rememberStarter({ family: "", file, title: file }); refreshModels(false); return; }
-    if (profile.kind !== mode) setMode(profile.kind);
+    if (profile.kind !== mode) changeMode(profile.kind);
     pickModel(profile.id);
   }
   useEffect(() => {
@@ -1713,7 +1829,7 @@ function App() {
     const profile = profileForFile(starterPick.file);
     if (!profile || profile.ready === false) return;
     rememberStarter(null);
-    if (profile.kind !== mode) setMode(profile.kind);
+    if (profile.kind !== mode) changeMode(profile.kind);
     pickModel(profile.id);
     const first = !prompt.trim();
     if (first) setPrompt(starterPromptsFor(profile.family, profile.kind)[0]);
@@ -1771,12 +1887,15 @@ function App() {
   };
   // The first reference, shown at the top of the sidebar's Basics with how much it may change.
   const sidebarReference = referenceInput && referenceAsset ? { asset: referenceAsset, label: referenceInput.role === "start" ? "Start image" : referenceInput.label || "Reference image", remove: () => removeReferenceAsset(referenceInput.id) } : null;
-  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, height, heightMeta, loras, loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, sidebarTab, setSidebarTab, recommended };
+  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, sidebarTab, setSidebarTab, recommended };
   const sidebarControls = <StableSidebarControls view={sidebarView} />;
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
+  const modelLoraControls = <StableModelLoraControls view={sidebarView} />;
+  const grokMediaControls = <GrokMediaControls view={sidebarView} phone />;
+  const phoneVideoDurationControls = <VideoDurationControls view={sidebarView} phone />;
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {

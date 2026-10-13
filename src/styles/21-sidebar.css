@@ -7,6 +7,9 @@
 --------------------------------------------------------------------------- */
 
 .zen-controls { width: var(--sidebar-w); }
+.sidebar-scroll { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.sidebar-scroll > * { flex-shrink: 0; }
+.sidebar-scroll .sidebar-body { flex: none; overflow: visible; }
 .zen-zoom-dock.with-side { left: calc(var(--sidebar-w) + 28px); }
 
 /* ---------------------------------------------------------- Workflow card */

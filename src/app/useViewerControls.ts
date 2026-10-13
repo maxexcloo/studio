@@ -1,7 +1,10 @@
 import { fallbackAspectPresets } from './constants';
+import { outputProfile } from './generationOptions';
+import { reusedNegative } from './composerSettings';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
 import { normalizeLoras } from './loras';
+import { useEffect, useRef } from 'react';
 import type React from 'react';
 import { flushSync } from 'react-dom';
 import { toast } from './toast';
@@ -25,12 +28,23 @@ export function useViewerControls(view: any) {
   const {
     active, doneGallery, generate, generateDisabled, height, lastTapRef,
     models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps,
-    setFrames, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
-    setSampler, setScheduler, setSeed, setShowDetails, setStartImage, setStartImageId, setStartImageName, setSteps,
+    setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
+    setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps,
     setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth,
     setZenSelectedId, showToast, viewerDragEndRef, viewerDragRef, viewerPan,
     viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
   } = view;
+  const swipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swiping = useRef(false);
+  const latestView = useRef(view);
+  latestView.current = view;
+  // A swipe in flight is only abandoned when the viewer itself goes away. An
+  // arrow key or a close mid-slide is handled by the timeout itself, which
+  // puts the picture back instead of leaving it painted off screen.
+  useEffect(() => () => {
+    if (swipeTimer.current) clearTimeout(swipeTimer.current);
+    swiping.current = false;
+  }, []);
   const lastTouchRef = view.lastTouchRef as React.MutableRefObject<number>;
   const touchGestureRef = view.touchGestureRef as React.MutableRefObject<TouchGesture | null>;
   function resetViewer() {
@@ -54,12 +68,15 @@ export function useViewerControls(view: any) {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       setPrompt(before.prompt);
       setNegative(before.negative);
+      setShowNegativePrompt(before.showNegativePrompt);
       setSeed(before.seed);
       setWidth(before.width);
       setHeight(before.height);
       setSteps(before.steps);
       setCfg(before.cfg);
       setCount(before.count);
+      setDuration(before.duration);
+      setResolution(before.resolution);
       setLoras(before.loras);
     }));
   }
@@ -73,21 +90,28 @@ export function useViewerControls(view: any) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const nextMode = item.type;
-    const matchingProfile = models?.profiles.find((profile: Profile) => profile.kind === nextMode && profile.model === item.model);
+    const matchingProfile = outputProfile(models?.profiles || [], item);
     const matchingAspects = matchingProfile?.aspectPresets?.length ? matchingProfile.aspectPresets : fallbackAspectPresets[nextMode];
     setMode(nextMode);
     if (matchingProfile) setModel(matchingProfile.id);
     const nextPromptLimit = settingMax(matchingProfile?.constraints?.prompt);
     const nextNegativeLimit = settingMax(matchingProfile?.constraints?.negative);
     setPrompt(clampText(item.prompt || "", nextPromptLimit));
-    setNegative(clampText(item.negative || "", nextNegativeLimit));
+    const currentNegative = view.negativeForMode?.(nextMode) ?? view.draft?.negative ?? "";
+    const nextNegative = reusedNegative(clampText(item.negative || "", nextNegativeLimit), currentNegative);
+    setNegative(nextNegative);
+    setShowNegativePrompt(true);
     setWidth(Number(item.width || itemSettings.width || width));
     setHeight(Number(item.height || itemSettings.height || height));
     if (itemSettings.steps) setSteps(Number(itemSettings.steps));
     if (itemSettings.cfg) setCfg(Number(itemSettings.cfg));
     if (itemSettings.denoise) setDenoise(Number(itemSettings.denoise));
-    if (itemSettings.count) setCount(Number(itemSettings.count));
+    if (itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
+    else setSeed("");
+    if (itemSettings.variationCount || itemSettings.count) setCount(Number(itemSettings.variationCount || itemSettings.count));
     if (itemSettings.frames) setFrames(Number(itemSettings.frames));
+    if (itemSettings.duration) setDuration(Number(itemSettings.duration));
+    if (itemSettings.resolution) setResolution(String(itemSettings.resolution));
     if (itemSettings.fps) setFps(Number(itemSettings.fps));
     if (itemSettings.sampler) setSampler(String(itemSettings.sampler));
     if (itemSettings.scheduler) setScheduler(String(itemSettings.scheduler));
@@ -122,9 +146,11 @@ export function useViewerControls(view: any) {
   }
 
   function moveZen(direction: 1 | -1) {
-    if (!doneGallery.length) return;
-    const currentIndex = Math.max(0, doneGallery.findIndex((item: GalleryItem) => item.id === zenItem?.id));
-    setZenSelectedId(doneGallery[(currentIndex + direction + doneGallery.length) % doneGallery.length].id);
+    const current = latestView.current;
+    const items: GalleryItem[] = current.doneGallery || [];
+    if (!items.length) return;
+    const currentIndex = Math.max(0, items.findIndex((item: GalleryItem) => item.id === current.zenItem?.id));
+    setZenSelectedId(items[(currentIndex + direction + items.length) % items.length].id);
   }
 
   /** What the viewer steps through: the gallery in the order it is laid out (main.tsx viewerGallery). */
@@ -133,9 +159,13 @@ export function useViewerControls(view: any) {
   }
 
   function moveViewer(direction: 1 | -1) {
-    if (!active) return;
-    const doneItems = viewerItems();
-    const currentIndex = doneItems.findIndex((item: GalleryItem) => item.id === active.id);
+    // The latest view, not the render this closure came from: a swipe settles a
+    // beat after the fingers lift, and the gallery may have moved on by then.
+    const current = latestView.current;
+    const activeItem: GalleryItem | null = current.active || null;
+    if (!activeItem) return;
+    const doneItems: GalleryItem[] = current.viewerGallery || viewerItems();
+    const currentIndex = doneItems.findIndex((item: GalleryItem) => item.id === activeItem.id);
     if (currentIndex < 0 || doneItems.length < 2) return;
     resetViewer();
     setActive(doneItems[(currentIndex + direction + doneItems.length) % doneItems.length]);
@@ -298,6 +328,7 @@ export function useViewerControls(view: any) {
   }
 
   function startViewerTouch(event: React.TouchEvent) {
+    if (swiping.current) return;
     // A video swipes like a picture, except from its controls (the timeline
     // scrubs), and never pinches or pans: it has no zoom.
     const target = event.target as Element;
@@ -396,15 +427,35 @@ export function useViewerControls(view: any) {
 
   /** The next picture slides in from the side the finger was heading away from. */
   function swipeTo(canvas: HTMLElement, direction: 1 | -1) {
+    if (swiping.current) return;
+    swiping.current = true;
     const width = canvas.clientWidth || window.innerWidth;
+    const itemId = () => (latestView.current.active || latestView.current.zenItem)?.id || "";
+    const fromId = itemId();
     paint(canvas, 1, { x: -direction * width, y: 0 }, "slide");
-    window.setTimeout(() => {
+    swipeTimer.current = setTimeout(() => {
+      swipeTimer.current = null;
+      if (!canvas.isConnected) { swiping.current = false; return; }
+      const current = latestView.current;
+      // Something else moved the open item on while this one slid out (an
+      // arrow key, a close, another device): put it back instead of sliding
+      // a second picture in behind it.
+      if (fromId && itemId() !== fromId) {
+        swiping.current = false;
+        settleViewer(canvas, 1, { x: 0, y: 0 }, false);
+        return;
+      }
       // Rendered now, so the next picture is in place before it slides in.
       flushSync(() => {
-        if (active) moveViewer(direction);
+        if (current.active) moveViewer(direction);
         else moveZen(direction);
       });
+      const moved = Boolean(itemId() && itemId() !== fromId);
       requestAnimationFrame(() => {
+        swiping.current = false;
+        if (!canvas.isConnected) return;
+        // Nowhere to go (the gallery shrank under the swipe): settle back.
+        if (!moved) { settleViewer(canvas, 1, { x: 0, y: 0 }, false); return; }
         paint(canvas, 1, { x: direction * width * 0.3, y: 0 });
         void canvas.offsetWidth;
         settleViewer(canvas, 1, { x: 0, y: 0 });
@@ -424,6 +475,11 @@ export function useViewerControls(view: any) {
     lastTouchRef.current = Date.now();
     if (!gesture) return;
     const canvas = viewerCanvas(event);
+    if (event.type === "touchcancel") {
+      touchGestureRef.current = null;
+      settleViewer(canvas, viewerZoom, viewerPan);
+      return;
+    }
     if (gesture.mode !== "done" && gesture.moved) viewerDragEndRef.current = Date.now();
     // One finger of a pinch lifts: the pinch is over, and the finger left
     // behind does nothing until it lifts too, so nothing lurches.

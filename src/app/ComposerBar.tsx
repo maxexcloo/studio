@@ -279,6 +279,8 @@ export type ComposerBarProps = {
   /** Recent prompts: the clock beside Negative, shown once there is a history. */
   onToggleHistory?: () => void;
   historyOpen?: boolean;
+  hasText?: boolean;
+  onClearText?: () => void;
 };
 
 export function ComposerBar(props: ComposerBarProps) {
@@ -288,10 +290,10 @@ export function ComposerBar(props: ComposerBarProps) {
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
-    showNegativePrompt, setShowNegativePrompt, canUseNegativePrompt,
+    canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false, hasText = false, onClearText
   } = props;
 
   const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
@@ -334,9 +336,9 @@ export function ComposerBar(props: ComposerBarProps) {
     />
   );
 
-  const stepsPicker = (density: ControlDensity) => (
+  const stepsPicker = (density: ControlDensity) => currentProfile?.family !== 'grok' ? (
     <NumberPicker label="Steps" icon={<CircleDotDashed size={14} />} density={density} value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
-  );
+  ) : null;
 
   const variantsPicker = (density: ControlDensity) => showVariants ? (
     <NumberPicker label="Images" icon={<Images size={14} />} density={density} value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" />
@@ -400,19 +402,13 @@ export function ComposerBar(props: ComposerBarProps) {
       </AnimatePresence>
       <div className="zen-prompt-actions" ref={rowRef} data-density-level={level}>
         <div className="prompt-left-actions" data-fluid-group>
-          <Tip content={!canUseNegativePrompt ? "This model doesn’t use a negative prompt" : showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}>
-            <button
-              data-open-trigger
-              type="button"
-              className={cn("negative-toggle", showNegativePrompt && "active", !canUseNegativePrompt && "is-unavailable", plan.negative.density !== "full" && `is-density-${plan.negative.density}`)}
-              aria-label={!canUseNegativePrompt ? "Negative prompt unavailable for this model" : showNegativePrompt ? "Hide negative prompt" : "Show negative prompt"}
-              aria-disabled={!canUseNegativePrompt || undefined}
-              onClick={() => { if (canUseNegativePrompt) setShowNegativePrompt((value: boolean) => !value); }}
-            >
-              <ChevronUp size={13} className={cn(!showNegativePrompt && "flip")} />
-              {plan.negative.density === "full" ? "Negative" : null}
-            </button>
-          </Tip>
+          {onClearText ? (
+            <Tip content="Clear the prompt & negative prompt">
+              <button type="button" className="negative-toggle" aria-label="Clear Prompt & Negative" disabled={!hasText} onClick={onClearText}>
+                <X size={13} /> Clear Text
+              </button>
+            </Tip>
+          ) : null}
           {onToggleHistory ? (
             // Styled as the Negative toggle at its icon-only size: one family of composer controls.
             <Tip content="Recent prompts (↑ in an empty prompt)">
