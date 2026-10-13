@@ -128,7 +128,7 @@ function ImportRisks({ risks }: { risks: WorkflowRisk[] }) {
           </li>
         ))}
       </ul>
-      <p>Its nodes run with the same access to this computer as ComfyUI. Import it only if you trust the source.</p>
+      <p>Its nodes have access to the computer running ComfyUI. Import it only if you trust the source.</p>
     </div>
   );
 }
@@ -410,7 +410,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       className="workflow-gallery"
       bodyClassName="wf-layout"
       title="Workflows"
-      description="Choose what the next generation runs on, or import a ComfyUI workflow."
+      description="Choose a model or import a ComfyUI workflow."
       headerActions={thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={15} /><span>Import</span></button> : undefined}
       contentProps={{
         onDragEnter: (event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } },
