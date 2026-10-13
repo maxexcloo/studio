@@ -6,7 +6,7 @@ import { loadCustomWorkflows, workflowOptionIssues } from './custom-workflows.js
 import { modelTypeChoices } from './model-families.js';
 import { familyProfiles } from './family-profiles.js';
 import { families } from './family-catalog.js';
-import { inpaintingEnabled, lorasEnabled, modelFamilyEnabled } from './features.js';
+import { builtInProfilesEnabled, inpaintingEnabled, lorasEnabled, modelFamilyEnabled } from './features.js';
 
 export function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
@@ -181,7 +181,7 @@ export function inferModels(info, stats = {}) {
     cuda: (stats?.devices || []).some((device) => device?.type === "cuda"),
     apple: (stats?.devices || []).some((device) => device?.type === "mps")
   });
-  const profiles = detectedProfiles.filter((profile) => modelFamilyEnabled(profile.family, profile.model));
+  const profiles = builtInProfilesEnabled() ? detectedProfiles.filter((profile) => modelFamilyEnabled(profile.family, profile.model)) : [];
   const modelFiles = detectedFiles.filter((file) => modelFamilyEnabled(file.family, file.name));
 
   for (const workflow of loadCustomWorkflows()) {

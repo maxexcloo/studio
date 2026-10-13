@@ -2,6 +2,8 @@
 
 Copy `.env.example` to `.env` when you need different ports or paths.
 
+Set `HEISS_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hides detected model profiles and bundled workflow templates from the generation catalogue; their definitions and model files remain intact. Built-in profiles are enabled by default.
+
 ```bash
 COMFY_URL=http://127.0.0.1:8188
 HOST=127.0.0.1

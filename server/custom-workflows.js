@@ -5,7 +5,7 @@ import { dataDir } from './gallery-store.js';
 import { root } from './comfy.js';
 import { workflowIds } from './workflow-registry.js';
 import { writeJsonFile } from './json-store.js';
-import { grokEnabled, modelFamilyEnabled } from './features.js';
+import { builtInProfilesEnabled, grokEnabled, modelFamilyEnabled } from './features.js';
 
 export const bundledWorkflowsDir = path.join(root, "workflows");
 export const userWorkflowsDir = path.join(dataDir, "workflows");
@@ -277,6 +277,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
   ];
   const items = [];
   for (const { dir, source } of dirs) {
+    if (source === "bundled" && !builtInProfilesEnabled()) continue;
     if (!fs.existsSync(dir)) continue;
     for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".json"))) {
       const fullPath = path.join(dir, file);
