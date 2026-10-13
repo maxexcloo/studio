@@ -745,8 +745,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
   const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
-  const shown = new Set([...starred, ...recent].map((profile) => profile.id));
-  const rest = profiles.filter((profile) => !shown.has(profile.id) && matches(profile));
+  const rest = profiles.filter(matches);
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
       <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
