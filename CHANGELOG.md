@@ -11,8 +11,12 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+### Added
+- **Reference search:** find images by prompt, model or filename across the full library.
+
 ### Changed
 - **Faster studio loading:** settings, workflows and the image editor load when needed.
+- **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.

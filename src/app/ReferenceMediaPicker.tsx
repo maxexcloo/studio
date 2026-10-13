@@ -1,14 +1,14 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Plus, Trash2, Upload, X } from "lucide-react";
+import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
 import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset } from "./types";
-
+import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
@@ -34,23 +34,6 @@ const spring = { type: "spring", duration: 0.38, bounce: 0.12 } as const;
 
 function assetImage(asset: ReferenceAsset) {
   return asset.thumbnailUrl || asset.url || "";
-}
-
-function moveGridFocus(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
-  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-  const grid = event.currentTarget.closest<HTMLElement>("[data-reference-grid]");
-  if (!grid) return;
-  const buttons = Array.from(grid.querySelectorAll<HTMLButtonElement>("[data-reference-index]"));
-  if (!buttons.length) return;
-  const columnWidth = buttons[0].getBoundingClientRect().width;
-  const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-  const columns = Math.max(1, Math.round((grid.clientWidth + gap) / (columnWidth + gap)));
-  const offset = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" ? -columns : columns;
-  const target = buttons[Math.max(0, Math.min(buttons.length - 1, index + offset))];
-  if (target && target !== event.currentTarget) {
-    event.preventDefault();
-    target.focus();
-  }
 }
 
 /* --------------------------------------------------------------- Popover */
@@ -82,6 +65,13 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   const [tab, setTab] = React.useState<PickerTab>(() => hiddenShelf && (selected?.source === "vault" || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
   const [pages, setPages] = React.useState<Record<PickerTab, PageState>>({ generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() });
   const [selectingId, setSelectingId] = React.useState("");
+  const [search, setSearch] = React.useState("");
+  const [query, setQuery] = React.useState("");
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search.trim()), 180);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const uploadInput = React.useRef<HTMLInputElement>(null);
   const label = (input.label || "Reference image").toLowerCase();
   const [newId, setNewId] = React.useState("");
@@ -122,7 +112,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
     const timeout = window.setTimeout(() => controller.abort(), 15000);
     setPages((current) => ({ ...current, [target]: { ...current[target], loading: true, error: "" } }));
     try {
-      const page = await listReferenceAssets(target, cursor, 30, controller.signal);
+      const page = await listReferenceAssets(target, cursor, 60, controller.signal, query);
       if (requests.current.get(target) !== controller) return;
       setPages((current) => ({
         ...current,
@@ -144,7 +134,15 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
       window.clearTimeout(timeout);
       if (requests.current.get(target) === controller) requests.current.delete(target);
     }
-  }, []);
+  }, [query]);
+
+  React.useEffect(() => {
+    requests.current.forEach((request) => request.abort());
+    requests.current.clear();
+    setPages({ generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() });
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [query]);
+  React.useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); }, [tab]);
 
   // Locking empties the shelf; unlocking fills it afresh.
   React.useEffect(() => { requests.current.get("hidden")?.abort(); requests.current.delete("hidden"); setPages((current) => ({ ...current, hidden: emptyPage() })); }, [hiddenOpen]);
@@ -223,7 +221,12 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close" onClick={onClose}><X size={15} /></button></Tip>
       </header>
 
-      <div className="reference-popover-body" role="tabpanel">
+      <div className="reference-search">
+        <Search size={15} aria-hidden="true" />
+        <input type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
+        {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => setSearch('')}><X size={14} /></button> : null}
+      </div>
+      <div ref={bodyRef} className="reference-popover-body" role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "hidden" && !hiddenOpen ? (
           <div className="reference-empty">
             <LockKeyhole size={22} />
@@ -240,23 +243,20 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
         ) : !page.items.length ? (
           <div className="reference-empty">
             <ImageIcon size={22} />
-            <strong>{tab === "generation" ? "No generations yet" : tab === "hidden" ? "Nothing in Hidden yet" : "No uploads yet"}</strong>
-            <p>{tab === "generation" ? "Finished images show up here." : tab === "hidden" ? "Images you hide show up here." : "Upload one, or drop it on the prompt."}</p>
+            <strong>{query ? "No Matching Images" : tab === "generation" ? "No generations yet" : tab === "hidden" ? "Nothing in Hidden yet" : "No uploads yet"}</strong>
+            <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : tab === "hidden" ? "Images you hide show up here." : "Upload one, or drop it on the prompt."}</p>
             {tab === "upload" ? <button className="btn" onClick={() => uploadInput.current?.click()}><Upload size={14} /> Upload image</button> : null}
           </div>
         ) : (
           <>
             {tab === "hidden" && hidden?.space !== "hidden" ? <p className="reference-shelf-note"><LockKeyhole size={12} /> What you make from a hidden image goes to Hidden too.</p> : null}
-            <div className="reference-grid" data-reference-grid>
-              {page.items.map((asset, index) => {
+            <ReferenceGrid items={page.items} render={(asset, index, style) => {
                 const isSelected = selected?.id === asset.id;
                 return (
-                  <motion.div
+                  <div
                     key={asset.id}
+                    style={style}
                     className={cn("reference-tile", isSelected && "is-selected", asset.id === newId && "is-new")}
-                    initial={{ opacity: 0, scale: 0.94 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ ...spring, delay: Math.min(index, 18) * 0.012 }}
                   >
                     <button
                       type="button"
@@ -264,7 +264,6 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
                       className="reference-tile-select"
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? "Selected: " : ""}${asset.name}`}
-                      onKeyDown={(event) => moveGridFocus(event, index)}
                       onClick={() => choose(asset)}
                       disabled={Boolean(selectingId || upload.busy)}
                     >
@@ -273,10 +272,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
                     </button>
                     {asset.source === "upload" ? <button type="button" className="reference-tile-delete" aria-label={`Delete ${asset.name}`} onClick={(event) => removeUpload(event, asset)}><Trash2 size={13} /></button> : null}
                     {selectingId === asset.id ? <span className="reference-tile-busy"><LoaderCircle className="spin" size={16} /></span> : null}
-                  </motion.div>
+                  </div>
                 );
-              })}
-            </div>
+              }} />
             {page.hasMore ? <button className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
           </>
         )}
