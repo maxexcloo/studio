@@ -166,7 +166,7 @@
 .negative-drawer.open {
   max-height: 140px;
   opacity: 1;
-  padding: 6px 4px 0;
+  padding: 6px var(--prompt-text-inset, 10px) 0;
   margin-top: 4px;
   border-top-color: hsl(var(--border));
 }

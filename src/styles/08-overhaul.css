@@ -124,13 +124,14 @@ button:not(:disabled):active { scale: .96; }
 .mode-tabs button.active { background: #303030; color: white; box-shadow: inset 0 1px 0 rgb(255 255 255 / .08); }
 
 .zen-prompt {
+  --prompt-text-inset: 10px;
   bottom: 18px;
   /* Reserve a fixed lane for the bottom docks on each side. */
   width: max(340px, min(920px, calc(100vw - 480px)));
   gap: 4px;
   padding: 8px;
 }
-.zen-prompt > textarea { min-height: 64px; padding: 8px 10px 5px; font-size: 15px; line-height: 1.4; }
+.zen-prompt > textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt textarea::placeholder { color: rgb(255 255 255 / .5); }
 .zen-prompt-actions { padding: 2px; }
 /* The density ladder in 12-composer.css keeps this on one line; it must not
