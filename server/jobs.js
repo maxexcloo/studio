@@ -186,26 +186,28 @@ function withEta(id, progress, now = Date.now()) {
  * (a model or upscale without a trusted estimate), since everything behind it
  * would be a guess.
  */
-function refreshQueueEstimates(now = Date.now(), { apply = true } = {}) {
-  let cursor = now;
-  let known = true;
+function refreshQueueEstimates(now = Date.now(), { apply = true, backend = "primary" } = {}) {
+  const queues = new Map();
   for (const [id, job] of jobs) {
     if (!["queued", "running", "canceling"].includes(job.status)) continue;
+    const key = job.comfyBackend || "primary";
+    if (!queues.has(key)) queues.set(key, { cursor: now, known: true });
+    const queue = queues.get(key);
     const timing = runTimings.get(id);
     if (!timing) {
-      known = false;
+      queue.known = false;
       continue;
     }
     const left = leftMsFor(timing, now);
     if (startedAt(timing) !== null || timing.upscale?.startAt) {
-      if (left === null) known = false;
-      else cursor = Math.max(cursor, now + left);
+      if (left === null) queue.known = false;
+      else queue.cursor = Math.max(queue.cursor, now + left);
       if (apply && timing.kind === "upscale") timing.onEta?.(left === null ? null : Math.round(now + left));
       continue;
     }
-    const endsAt = known && left !== null ? Math.round(cursor + left) : null;
-    if (endsAt) cursor = endsAt;
-    else known = false;
+    const endsAt = queue.known && left !== null ? Math.round(queue.cursor + left) : null;
+    if (endsAt) queue.cursor = endsAt;
+    else queue.known = false;
     if (!apply) continue;
     if (timing.kind === "upscale") {
       timing.onEta?.(endsAt);
@@ -218,7 +220,8 @@ function refreshQueueEstimates(now = Date.now(), { apply = true } = {}) {
     jobs.set(id, { ...job, progress });
     updateGalleryJob(id, { progress }, { persist: false });
   }
-  return known ? cursor : null;
+  const queue = queues.get(backend);
+  return !queue || queue.known ? queue?.cursor ?? now : null;
 }
 
 /**
@@ -259,8 +262,8 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
 }
 
 /** When HEISS's own queue should be clear (now, when empty), or null when a job in it has no known length. */
-export function queueClearsAt(now = Date.now()) {
-  return refreshQueueEstimates(now, { apply: false });
+export function queueClearsAt(now = Date.now(), backend = "primary") {
+  return refreshQueueEstimates(now, { apply: false, backend });
 }
 
 function openProgressSocket(id) {

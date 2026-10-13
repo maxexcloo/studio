@@ -55,6 +55,8 @@ test("health keeps the studio connected while either configured backend is avail
     assert.equal(status.connected, true);
     assert.equal(status.backends.primary.connected, true);
     assert.equal(status.backends.video.connected, true);
+    assert.equal(status.backends.primary.url, primary.url);
+    assert.equal(status.backends.video.url, video.url);
     primary.setDown(true);
     status = (await api("/api/comfy/status")).body;
     assert.equal(status.connected, true);

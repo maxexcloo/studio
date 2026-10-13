@@ -55,6 +55,9 @@ version opens with a `> ` summary line, which the update pill shows.
   model.
 - 4K upscales and restarts on Windows work again.
 - Smaller fixes to references and saved sizes.
+- **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
+- **Settings › Features › Inpainting says where its two dials are:** in the
+  sidebar's Basics, under the image, not under Advanced.
 
 ## [0.17.0] - 2026-10-09
 
