@@ -330,16 +330,20 @@ function SmartUpscaleTabs({ value: picked, native = {}, width, height, onChange 
   // The switch is the other way to this size: SeedVR2 where drawing is the default, drawing where it isn't.
   const other = value !== "none" && plan.level ? (plan.nativeByDefault ? "upscale" : "native") : null;
   const switchOn = other === "upscale" ? !plan.native : plan.native;
-  const switchLabel = other === "upscale" ? "Use upscaler" : `Draw at ${value.toUpperCase()} directly`;
-  const switchNote = other === "upscale" ? "SeedVR2 rebuilds detail after the run. Slower." : plan.level === "maybe" ? "Results vary with this model." : "";
+  // Named for what it does instead, with what that brings: "Upscale to 2K instead" / "Draw at 4K instead".
+  const upscaledTo = other === "upscale" ? upscaledSize(`${value}-upscale` as AutoUpscale, width, height, native) : null;
+  const switchLabel = other === "upscale"
+    ? `Upscale to ${upscaledTo ? resolutionName(upscaledTo.width, upscaledTo.height) : value.toUpperCase()} instead`
+    : `Draw at ${value.toUpperCase()} instead`;
+  const switchNote = other === "upscale"
+    ? "Draws at normal size, then SeedVR2 sharpens it. Slower."
+    : plan.level === "maybe" ? "Skips the upscaler. This model may warp things at this size." : "Skips the upscaler.";
   const lastShown = useRef({ label: switchLabel, note: switchNote });
   if (other) lastShown.current = { label: switchLabel, note: switchNote };
   const shown = lastShown.current;
   const index = Math.max(0, tabs.findIndex((tab) => tab.value === value));
   const label = resolution ? "Resolution" : "Smart upscale";
-  const tip = resolution
-    ? "How big every new image comes out. Default is this model’s own size. Larger sizes are drawn at that size by the model itself where it’s known to do that well, otherwise SeedVR2 upscales them after the run. The switch picks the other way. Each tab shows the size it ends at for the size you picked."
-    : `Makes every new image larger. SeedVR2 upscales each one as it finishes, rebuilding fine detail. Each tab shows the size it ends at for the size you picked.${Object.keys(native).length ? " This model can also try drawing at 2K or 4K itself." : ""}`;
+  const tip = resolution ? "How big new images come out. Each tab shows the final size." : "SeedVR2 enlarges each new image. Each tab shows the final size.";
   return (
     <div className="aspect-upscale">
       <div className="aspect-upscale-head">
