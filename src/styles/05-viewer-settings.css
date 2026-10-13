@@ -442,9 +442,19 @@
   z-index: 5;
   display: grid;
   gap: 4px;
-  pointer-events: none;
+  width: fit-content;
+  max-width: calc(100% - 88px);
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / .12);
+  border-radius: 10px;
+  background: rgb(0 0 0 / .72);
+  color: #fff;
+  cursor: text;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
   font-size: 12px;
-  text-shadow: 0 1px 3px #000;
+  line-height: 1.5;
 }
-.viewer-profile-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.viewer-profile-summary span { opacity: 0.8; }
+.viewer-profile-summary strong { white-space: normal; overflow-wrap: anywhere; }
+.viewer-profile-summary span { color: rgb(255 255 255 / .85); overflow-wrap: anywhere; }

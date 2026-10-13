@@ -40,6 +40,11 @@ test('swipes move through previews and generation settings stay visible', async 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await page.locator('[data-tile-id]').first().click();
+  const summary = page.locator('.viewer-profile-summary');
+  await expect(summary).toBeVisible();
+  expect(await summary.evaluate((element) => getComputedStyle(element).userSelect)).toBe('text');
+  await summary.locator('strong').dblclick();
+  expect(await page.evaluate(() => window.getSelection()?.toString().length || 0)).toBeGreaterThan(0);
   const canvas = page.locator('.viewer-canvas');
   await expect(canvas).toBeVisible();
   for (const delta of [-200, 200, -200, 200]) {
@@ -55,7 +60,7 @@ test('swipes move through previews and generation settings stay visible', async 
     await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--pan-x'))).toBe('0px');
   }
   if (isMobile) await page.getByRole('button', { name: 'Details', exact: true }).click();
-  else await page.keyboard.press('i');
+  else if (!await page.getByRole('heading', { name: 'Generation Settings', exact: true }).isVisible()) await page.keyboard.press('i');
   await expect(page.getByRole('heading', { name: 'Generation Settings', exact: true })).toBeVisible();
   await expect(page.locator('details').filter({ hasText: 'Generation Settings' })).toHaveCount(0);
   expect(errors).toEqual([]);

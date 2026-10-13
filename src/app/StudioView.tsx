@@ -937,7 +937,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           }} ref={setViewerNode}>
             <div className="viewer-shell" onClick={(event) => event.stopPropagation()}>
               <div className={cn("viewer-stage", showDetails && "with-side")} data-viewer-empty>
-                <header className="viewer-profile-summary">
+                <header className="viewer-profile-summary" data-open-surface>
                   <strong>{profileTitle}</strong>
                   {profileDetail ? <span>{profileDetail}</span> : null}
                 </header>
