@@ -1,6 +1,6 @@
 # HEISS model search
 
-A standalone demo is at `/model-search-demo/`. The site’s existing `npm run site` preview serves it. No build step or dependencies are required.
+The landing page carries it; `npm run site` previews it. No build step or dependencies are required.
 
 ## Drop into a website page
 
@@ -17,7 +17,7 @@ For a catalog at another URL:
 <heiss-model-search catalog-url="/your-model-catalog.json"></heiss-model-search>
 ```
 
-The component uses Shadow DOM to scope its styles. It inherits HEISS tokens `--sans`, `--mono`, `--pixel`, `--text`, `--text-2`, `--text-3`, `--surface*`, `--line*`, `--action*` and `--ember`, with fallback fonts/colors. The demo uses the website’s self-hosted fonts via `styles.css`. Give its parent a width and section spacing; the component caps itself at 720px. The landing page places it under the hero (`#models`).
+The component uses Shadow DOM to scope its styles. It inherits HEISS tokens `--sans`, `--mono`, `--pixel`, `--text`, `--text-2`, `--text-3`, `--surface*`, `--line*`, `--action*` and `--ember`, with fallback fonts/colors. Give its parent a width and section spacing; the component caps itself at 720px. The landing page places it under the hero (`#models`).
 
 ## Behavior
 
