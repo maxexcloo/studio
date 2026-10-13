@@ -55,6 +55,13 @@ test("metadata names the base model where the keys cannot", () => {
   assert.deepEqual(familiesFromMetadata({}), []);
 });
 
+test("MiniMax H3 compatibility comes from explicit trainer metadata", () => {
+  for (const name of ["minimax_h3", "MiniMax-H3", "MiniMax H3"]) {
+    assert.deepEqual(familiesFromMetadata({ base_model: name }), ["minimax_h3"]);
+  }
+  assert.deepEqual(familiesFromMetadata({ "modelspec.title": "MiniMax H3 Style" }), [], "a title alone does not establish compatibility");
+});
+
 test("trigger words come from the trainer's note, else the tags on every image", () => {
   assert.deepEqual(triggersFromMetadata({ "modelspec.trigger_phrase": "ohwx person, portrait" }), ["ohwx person", "portrait"]);
   const frequency = JSON.stringify({ "10_ohwx": { ohwx: 20, "1girl": 20, smile: 4 } });
@@ -70,8 +77,14 @@ test("a LoRA file is read once, with the keys winning and metadata narrowing", (
   const info = loraInfo(name);
   assert.deepEqual(info.families, ["sdxl"]);
   assert.equal(info.base, "SDXL");
+  assert.equal(info.title, "detail slider");
   assert.deepEqual(info.triggers, ["detailed"]);
   assert.equal(cachedLoraAbout(name), "detail slider");
   assert.equal(loraInfo("../escape.safetensors"), null);
   assert.equal(loraInfo("missing.safetensors"), null);
+});
+
+test("metadata uses the readable title before training output names", () => {
+  const name = put("sdxl/numeric-123.safetensors", { __metadata__: { "modelspec.title": "Watercolour Portrait", ss_output_name: "training_run_123" } });
+  assert.equal(loraInfo(name).title, "Watercolour Portrait");
 });

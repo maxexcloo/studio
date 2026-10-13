@@ -148,6 +148,16 @@ function AgentGuide({ onCopy, copied, forWorkflow }: { onCopy: () => void; copie
   );
 }
 
+
+function workflowCardText(workflow: WorkflowSummary) {
+  const timing = workflow.name.match(/\s*\((≈[^)]*)\)$/);
+  const parts = workflow.name.replace(/\s*\(≈[^)]*\)$/, "").split(" · ");
+  const name = parts.shift() || workflow.name;
+  const recipe = parts.join(" · ") || (workflow.defaults?.steps ? `${workflow.defaults?.steps} Steps` : "");
+  const acceptsImage = workflow.mediaInputs?.length || workflow.capabilities?.startImage || workflow.capabilities?.imageToImage;
+  return { name, recipe, time: timing?.[1] || "", input: workflow.capabilities?.startImageRequired ? "Image Required" : acceptsImage ? "Image Input" : "" };
+}
+
 function WorkflowThumbnail({ src }: { src?: string }) {
   const [failed, setFailed] = useState(false);
   return src && !failed
@@ -429,12 +439,15 @@ export function WorkflowGallery({ view }: { view: any }) {
                 onClick={() => { setSelectedId(workflow.id); setMobileDetailsOpen(true); }}
                 onDoubleClick={() => useWorkflow(workflow)}
               >
-                <span className="wf-thumb"><WorkflowThumbnail key={workflow.thumbnail} src={workflow.thumbnail} /></span>
-                {workflow.favorite ? <span className="wf-fav" aria-label="Favorite"><Heart size={12} fill="currentColor" /></span> : null}
-                {workflow.profileId === model ? <span className="wf-current">In use</span> : null}
-                <span className="wf-card-copy">
-                  <strong>{workflow.name}</strong>
-                  <span><em className={cn("wf-origin", workflow.source === "builtin" && "is-builtin")}>{workflow.source === "builtin" ? "Built in" : "Imported"}</em>{workflow.familyName || workflow.family}</span>
+                <span className="wf-card-heading">
+                  <span className="wf-thumb"><WorkflowThumbnail key={workflow.thumbnail} src={workflow.thumbnail} /></span>
+                  <strong>{workflowCardText(workflow).name}</strong>
+                  {workflow.favorite ? <span className="wf-fav" aria-label="Favourite"><Heart size={12} fill="currentColor" /></span> : null}
+                </span>
+                {workflowCardText(workflow).recipe ? <span className="wf-card-recipe">{workflowCardText(workflow).recipe}</span> : null}
+                <span className="wf-card-footer">
+                  <span className="wf-card-time">{workflowCardText(workflow).time}</span>
+                  {workflow.profileId === model ? <span className="wf-current">In Use</span> : workflowCardText(workflow).input ? <span className="wf-input">{workflowCardText(workflow).input}</span> : null}
                 </span>
                 {workflow.validation.ok && !workflow.validation.unverified ? null : <StatusBadge validation={workflow.validation} />}
               </button>
@@ -454,13 +467,14 @@ export function WorkflowGallery({ view }: { view: any }) {
         {selected && selectedStatus ? (
           <>
             <button type="button" className="btn is-ghost wf-back" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft size={15} /> All workflows</button>
-            <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
             <div className="wf-detail-head">
-              <h3>{selected.name}</h3>
+              <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
+              <h3>{workflowCardText(selected).name}</h3>
               <button type="button" className={cn("wf-heart", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from favorites" : "Add to favorites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favorites", "error"))}>
                 <Heart size={16} fill={selected.favorite ? "currentColor" : "none"} />
               </button>
             </div>
+            {workflowCardText(selected).recipe || workflowCardText(selected).time ? <p className="wf-detail-recipe">{[workflowCardText(selected).recipe, workflowCardText(selected).time].filter(Boolean).join(" · ")}</p> : null}
             {selected.description ? <p className="wf-detail-desc">{selected.description}</p> : null}
 
             <div className={cn("wf-health", `is-${selectedStatus.state}`)}>

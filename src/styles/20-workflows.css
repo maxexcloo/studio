@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
    Workflow gallery (src/app/WorkflowGallery.tsx)
 
-   A wide Modal: a thumbnail grid to browse on the left, a detail panel for
+   A wide Modal: compact model cards on the left, a detail panel for
    the selected workflow on the right. Status always uses the same four words
    from workflowStatus.ts, shown as a square dot plus a label.
 --------------------------------------------------------------------------- */
@@ -55,7 +55,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   align-content: start;
   gap: 14px;
   padding: 2px 20px 24px;
@@ -69,9 +69,9 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 6px 6px 12px;
-  border: 0;
-  border-radius: calc(var(--r-media) + 6px);
+  padding: 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--r-item);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -81,56 +81,23 @@
 .wf-card:hover { background: rgb(255 255 255 / .035); }
 .wf-card.active { background: rgb(255 255 255 / .06); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1); }
 .wf-card:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-
-.wf-thumb {
-  position: relative;
-  display: block;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: var(--r-media);
-  background: var(--well);
-}
+.wf-card-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wf-card-heading > strong { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.wf-thumb { position: relative; flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 10px; background: var(--well); }
 .wf-thumb img,
-.wf-detail-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 400ms var(--ease-out); }
-.wf-card:hover .wf-thumb img { transform: scale(1.03); }
-
-/* No output yet: a quiet 2x2 mosaic, echoing the generation preview. */
-.wf-thumb-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
-  color: hsl(var(--muted-foreground) / .7);
-}
-.wf-thumb-empty i { background: rgb(255 255 255 / .025); }
-.wf-thumb-empty i:nth-child(1),
-.wf-thumb-empty i:nth-child(4) { background: rgb(255 255 255 / .045); }
-.wf-thumb-empty svg { position: absolute; inset: 0; margin: auto; }
-
-.wf-fav,
-.wf-current {
-  position: absolute;
-  top: 12px;
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  border-radius: var(--r-pill);
-  background: var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  font-size: 10.5px;
-  font-weight: 600;
-}
-.wf-fav { right: 12px; width: 22px; justify-content: center; color: #ff9f8f; }
-.wf-current { left: 12px; gap: 6px; padding: 0 9px 0 8px; color: hsl(var(--foreground)); }
-.wf-current::before { content: ""; width: 6px; height: 6px; background: var(--ember); box-shadow: var(--ember-glow); }
-
-.wf-card-copy { display: grid; gap: 2px; min-width: 0; padding: 0 4px; }
-.wf-card-copy strong { font-size: 13px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wf-card-copy span { font-size: 11.5px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wf-card > .wf-status { margin: -2px 4px 0; }
+.wf-detail-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.wf-thumb-empty { position: absolute; inset: 0; display: grid; place-items: center; color: hsl(var(--muted-foreground)); }
+.wf-thumb-empty i { display: none; }
+.wf-thumb-empty svg { grid-area: 1 / 1; }
+.wf-fav { flex: none; display: inline-flex; color: #ff9f8f; }
+.wf-card-recipe { font-size: 12px; line-height: 1.5; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+.wf-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; min-height: 20px; margin-top: auto; }
+.wf-card-time { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.wf-current,
+.wf-input { display: inline-flex; align-items: center; gap: 6px; padding: 3px 7px; border-radius: var(--r-pill); background: var(--well); font-size: 10.5px; color: hsl(var(--muted-foreground)); }
+.wf-current { color: hsl(var(--foreground)); }
+.wf-current::before { content: ""; width: 6px; height: 6px; background: var(--ember); }
+.wf-card > .wf-status { margin: 0; }
 
 /* ---------------------------------------------------------------- Status */
 
@@ -163,8 +130,9 @@
   background: rgb(255 255 255 / .015);
 }
 .wf-back { display: none; align-self: flex-start; }
-.wf-detail-thumb { position: relative; flex: none; aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--r-item); background: var(--well); }
-.wf-detail-head { display: flex; align-items: flex-start; gap: 10px; }
+.wf-detail-thumb { position: relative; flex: none; width: 48px; height: 48px; overflow: hidden; border-radius: 12px; background: var(--well); }
+.wf-detail-head { display: flex; align-items: center; gap: 10px; }
+.wf-detail-recipe { margin: 0; font-size: 13px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
 .wf-detail-head h3 { flex: 1; min-width: 0; margin: 0; font-size: 19px; font-weight: 600; line-height: 1.25; letter-spacing: -.025em; overflow-wrap: anywhere; }
 .wf-heart {
   flex: none;
