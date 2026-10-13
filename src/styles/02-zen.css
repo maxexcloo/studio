@@ -191,6 +191,7 @@
   min-width: 0;
 }
 .negative-unavailable-frame textarea {
+  display: block;
   width: 100%;
 }
 .negative-drawer .negative-unavailable-frame textarea {
