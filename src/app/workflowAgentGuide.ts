@@ -33,9 +33,9 @@ export const controlLabel = (key: string) => workflowControls.find((item) => ite
 /** The LoRA picker drives exactly these nodes. */
 export const loraNodes = { "rgthree-power-v1": "Power Lora Loader (rgthree)", "rgthree-stack-v1": "Lora Loader Stack (rgthree)" } as const;
 
-const promptHead = `I use HEISS UI, a local studio that runs ComfyUI workflows behind a simple prompt box. Help me prepare a ComfyUI workflow for it.
+const promptHead = `I use HEISS UI, a frontend for ComfyUI with a simple prompt box. Help me prepare a ComfyUI workflow for it.
 
-HEISS UI runs a workflow as saved, except for the node inputs it is connected to. The connections live in a "heissUi" block at the top level of the workflow JSON, in ComfyUI's API format (the object whose keys are node ids, each with "class_type" and "inputs").
+HEISS UI sends the saved workflow to ComfyUI, updating only the node inputs connected to its controls. ComfyUI runs the workflow. The connections live in a "heissUi" block at the top level of the workflow JSON, in ComfyUI's API format (the object whose keys are node ids, each with "class_type" and "inputs").
 
 Your task:
 1. Read the workflow. If it is in ComfyUI's visual format (it has "nodes" and "links"), ask me to export it again with ComfyUI's "Export (API)", unless you are certain of every widget value.

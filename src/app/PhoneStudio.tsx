@@ -770,7 +770,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         ) : null}
         {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
       </div>
-      {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Get one on the computer running HEISS UI.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
+      {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Add a model to ComfyUI to see it here.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
       {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
       {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
       {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}

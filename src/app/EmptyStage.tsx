@@ -145,7 +145,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
           ) : copy === 'empty' && noModels ? (
             <>
               <h2>No models yet</h2>
-              <p>{thisComputer ? 'Put a checkpoint or diffusion model in ComfyUI’s models folder, or find models elsewhere on this computer.' : 'Add a checkpoint or diffusion model to ComfyUI on the computer running HEISS UI, and it shows up here.'}</p>
+              <p>{thisComputer ? 'Put a checkpoint or diffusion model in ComfyUI’s models folder, or find models elsewhere on this computer.' : 'Add a checkpoint or diffusion model to the connected ComfyUI instance, and it shows up here.'}</p>
               <div className="empty-actions">
                 {onFindModels && thisComputer ? <button className="reconnect-btn primary" onClick={onFindModels}><FolderSearch size={13} /> Find models</button> : null}
                 <a className="reconnect-btn" href={`${githubUrl}#supported-models`} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Which models work</a>
