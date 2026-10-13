@@ -410,7 +410,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       className="workflow-gallery"
       bodyClassName="wf-layout"
       title="Workflows"
-      description="Choose a model or import a ComfyUI workflow."
+      description="Choose a model or import a workflow."
       headerActions={thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={15} /><span>Import</span></button> : undefined}
       contentProps={{
         onDragEnter: (event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } },
@@ -466,7 +466,7 @@ export function WorkflowGallery({ view }: { view: any }) {
           <div className="wf-empty">
             <Search size={20} />
             <h3>{query ? "Nothing matches" : filter === "favorites" ? "No favorites yet" : `No ${kind} workflows yet`}</h3>
-            <p>{query ? "Try another name or clear the search." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : "Import a ComfyUI workflow."}</p>
+            <p>{query ? "Try another name or clear the search." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : "Import a workflow."}</p>
             {query ? <button className="btn" onClick={() => setQuery("")}>Clear search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show all</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import workflow</button> : null}
           </div>
         )}
@@ -524,7 +524,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         )}
       </aside>
 
-      {dragging ? <div className="wf-drop"><FileJson size={24} /><strong>Drop to import</strong><span>ComfyUI workflow JSON, API or visual format</span></div> : null}
+      {dragging ? <div className="wf-drop"><FileJson size={24} /><strong>Drop to import</strong><span>Workflow JSON, API or visual format</span></div> : null}
 
       <Modal
         open={importOpen}
@@ -534,7 +534,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         className="wf-import"
         title={<>{importStep === "choose" ? "Import workflows" : `Review ${imports.length} workflow${imports.length === 1 ? "" : "s"}`}</>}
         description={importStep === "choose"
-          ? "Workflows run as saved, except for the inputs connected to the studio. ComfyUI’s Export (API) JSON works best; the visual format works too."
+          ? "Import workflow JSON in API or visual format. Connected inputs use your generation settings; the rest stay as saved."
           : "Check what follows the studio. Everything else keeps the workflow’s saved values."}
         footer={importStep === "choose" ? (
           <>
