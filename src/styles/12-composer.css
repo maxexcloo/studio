@@ -7,6 +7,21 @@
 --------------------------------------------------------------------------- */
 
 .zen-prompt-actions { position: relative; }
+.composer-mode-select { position: relative; display: inline-flex; align-items: center; flex: none; }
+.composer-mode-select select {
+  appearance: none;
+  min-height: 40px;
+  padding: 0 28px 0 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.composer-mode-select svg { position: absolute; right: 10px; pointer-events: none; }
+.composer-mode-select select:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 
 /* The row never wraps any more: the ladder is what makes it fit. */
 .zen-inline-settings { flex-wrap: nowrap; }

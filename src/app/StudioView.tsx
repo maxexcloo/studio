@@ -673,6 +673,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onGetModels={thisComputer ? openGetModels : undefined}
               strayModelCount={strayModelCount}
               mode={mode}
+              onModeChange={view.changeMode}
               aspectPickerValue={aspectPickerValue}
               aspectOptions={aspectOptions}
               aspectValue={aspectValue}
@@ -797,6 +798,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onGetModels={thisComputer ? openGetModels : undefined}
               strayModelCount={strayModelCount}
               mode={mode}
+              onModeChange={view.changeMode}
               aspectPickerValue={aspectPickerValue}
               aspectOptions={aspectOptions}
               aspectValue={aspectValue}
