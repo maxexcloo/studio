@@ -1,3 +1,4 @@
+import { backendUrl, currentComfyBackend } from "./comfy-backends.js";
 import { envFileKeys, writeLocalEnvValue } from "./env.js";
 import { listensBeyondThisComputer, resolveLan } from "./lan.js";
 import { noteComfyState } from './crash-log.js';
@@ -204,18 +205,20 @@ export function comfyTimeoutFor(pathname = "") {
  * a caller's own `signal` still cancels it early. A failed answer throws with
  * `status` and the untouched `raw` text next to the friendly message.
  */
+export const activeComfyUrl = () => backendUrl(comfyUrl);
+
 export async function comfy(pathname, options = {}) {
   const { timeout, ...init } = options;
   const limit = AbortSignal.timeout(Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname));
   init.signal = init.signal ? AbortSignal.any([init.signal, limit]) : limit;
   let response;
   try {
-    response = await fetch(`${comfyUrl}${pathname}`, init);
+    response = await fetch(`${activeComfyUrl()}${pathname}`, init);
   } catch (error) {
-    noteComfyFetchError(error);
+    if (currentComfyBackend() === "primary") noteComfyFetchError(error);
     throw error;
   }
-  noteComfyReachable();
+  if (currentComfyBackend() === "primary") noteComfyReachable();
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;

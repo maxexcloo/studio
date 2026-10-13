@@ -792,6 +792,7 @@ export function recordsFromComfyHistory(history) {
   const records = [];
   for (const [promptId, item] of Object.entries(history || {})) {
     const graph = item?.prompt?.[2] || {};
+    const saved = item?.prompt?.[3]?.heiss_generation || {};
     const textNodes = Object.values(graph).filter((node) => node?.class_type === "CLIPTextEncode");
     const prompt = textNodes[0]?.inputs?.text || "";
     const negative = textNodes[1]?.inputs?.text || "";
@@ -824,17 +825,17 @@ export function recordsFromComfyHistory(history) {
       const record = {
         ...output,
         id: output.url,
-        jobId: promptId,
+        jobId: saved.jobId || promptId,
         status: "done",
-        prompt,
-        negative,
-        filename: promptTitle(prompt) || output.filename,
+        prompt: saved.prompt || prompt,
+        negative: saved.negative || negative,
+        filename: promptTitle(saved.prompt || prompt) || output.filename,
         outputName: output.filename,
-        createdAt: new Date(createdAtMs).toISOString(),
-        width: Number(latent.width || 0),
-        height: Number(latent.height || 0),
-        model,
-        settings: loras.length ? { loras } : {}
+        createdAt: saved.createdAt || new Date(createdAtMs).toISOString(),
+        width: Number(saved.width || latent.width || 0),
+        height: Number(saved.height || latent.height || 0),
+        model: saved.model || model,
+        settings: saved.settings || (loras.length ? { loras } : {})
       };
       if (hasExistingOutputFile(record)) records.push(record);
     }
@@ -932,6 +933,7 @@ export function generationSettings(body) {
   const providerModel = String(body.modelName || body.model || "");
   const grok = providerModel.startsWith("grok-imagine-");
   const settings = {
+    comfyBackend: body.comfyBackend || "primary",
     workflow: body.workflow || "",
     profileId: body.profileId || "",
     ...(body.variationCount ? { variationCount: Number(body.variationCount) } : {}),

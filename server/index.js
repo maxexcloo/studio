@@ -4,6 +4,7 @@ import { dropSnapshots } from "./data-snapshot.js";
 import "./crash-log-install.js";
 import { addProbe, logDir } from "./crash-log.js";
 import express from "express";
+import { configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -39,7 +40,7 @@ import { sendMediaBuffer } from './media-response.js';
 import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
 import { emptyTrash, restoreTrash, scheduleTrashPurge, trashGalleryItems, trashSummary } from './gallery-trash.js';
 import { jobs, queueClearsAt, runJob, runMockJob, setTerminalJob } from './jobs.js';
-import { cancelPrompt, cancelPrompts } from './comfy-queue.js';
+import { cancelPrompt } from './comfy-queue.js';
 import { loraInfos } from './lora-info.js';
 import { hfEndpoint, hfTokenStatus, saveHfToken } from './hf-access.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
@@ -106,10 +107,12 @@ function npmInvocation(args) {
   return { command: npmCommand, args: args.map(quote), shell: true };
 }
 let comfyCache = { info: null, stats: null, fetchedAt: 0 };
+let videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
 
 async function loadComfyContext({ force = false } = {}) {
-  const fresh = !force && comfyCache.info && Date.now() - comfyCache.fetchedAt < 30000;
-  if (fresh) return comfyCache;
+  const cached = currentComfyBackend() === "video" ? videoComfyCache : comfyCache;
+  const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
+  if (fresh) return cached;
   const info = await comfy("/object_info");
   const stats = await comfy("/system_stats").catch(() => ({}));
   // Where ComfyUI keeps models, extra_model_paths.yaml included, so headers can be read there too.
@@ -119,8 +122,10 @@ async function loadComfyContext({ force = false } = {}) {
     unet: optionsFor(info, "UNETLoader", "unet_name"),
     checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name")
   }).catch(() => null);
-  comfyCache = { info, stats, fetchedAt: Date.now() };
-  return comfyCache;
+  const result = { info, stats, fetchedAt: Date.now() };
+  if (currentComfyBackend() === "video") videoComfyCache = result;
+  else comfyCache = result;
+  return result;
 }
 
 function refreshComfyContextSoon() {
@@ -131,8 +136,13 @@ async function recoverGalleryFromHistory() {
   cleanupGalleryState(jobs);
   // Hidden runs HEISS UI lost track of are sealed first, and never join the gallery either way.
   await settleHiddenRuns().catch(() => null);
-  const history = withoutHiddenRuns(await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({})));
-  const recovered = recordsFromComfyHistory(history);
+  const recovered = [];
+  for (const backend of configuredBackends()) {
+    await withComfyBackend(backend, async () => {
+      const history = withoutHiddenRuns(await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({})));
+      recovered.push(...recordsFromComfyHistory(history));
+    });
+  }
   if (!recovered.length) return;
   const pending = gallery.filter((item) => item.status === "pending");
   setGallery(dedupeGallery([...pending, ...gallery, ...recovered]).slice(0, galleryLimit));
@@ -691,6 +701,22 @@ function adoptFoundComfy(found) {
 }
 
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
+  if (configuredBackends().length > 1) {
+    const started = performance.now();
+    const names = configuredBackends();
+    const results = await Promise.allSettled(names.map((backend) => withComfyBackend(backend, () => comfy("/system_stats", { timeout: 1500 }))));
+    const backends = Object.fromEntries(results.map((result, index) => [names[index], {
+      connected: result.status === "fulfilled",
+      device: result.status === "fulfilled" ? result.value?.devices?.[0]?.name || "" : ""
+    }]));
+    return res.json({
+      connected: Object.values(backends).some((backend) => backend.connected),
+      backends,
+      device: Object.entries(backends).filter(([, backend]) => backend.connected).map(([name, backend]) => `${name === "video" ? "Video" : "Images"}: ${backend.device}`).join(" · "),
+      latencyMs: Math.round(performance.now() - started),
+      url: comfyUrl
+    });
+  }
   const startedAt = performance.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -801,10 +827,34 @@ function comfyDownMessage(detail = "") {
   return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
 }
 
+async function backendModels(backend, force = false) {
+  return withComfyBackend(backend, async () => {
+    try {
+      const context = await loadComfyContext({ force });
+      return { ...context, models: inferModels(context.info, context.stats) };
+    } catch (error) {
+      if (backend === "video") videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+      else comfyCache = { info: null, stats: null, fetchedAt: 0 };
+      throw error;
+    }
+  });
+}
+
+async function mediaModels(force = false) {
+  if (configuredBackends().length === 1) {
+    const primary = await backendModels("primary", force);
+    return { models: primary.models, primary };
+  }
+  const [main, secondary] = await Promise.allSettled([backendModels("primary", force), backendModels("video", force)]);
+  const primary = main.status === "fulfilled" ? main.value : null;
+  const video = secondary.status === "fulfilled" ? secondary.value : null;
+  if (!primary && !video) throw new Error("Neither ComfyUI backend is available.");
+  return { primary, video, models: mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})) };
+}
+
 app.get("/api/models", async (_req, res) => {
   try {
-    const { info, stats } = await loadComfyContext({ force: true });
-    res.json(inferModels(info, stats));
+    res.json((await mediaModels(true)).models);
   } catch {
     res.json(demoMode ? mockModelResult() : offlineModelResult(comfyUrl));
   }
@@ -1537,6 +1587,20 @@ app.post("/api/comfy-url", async (req, res) => {
 });
 
 app.post("/api/generate", async (req, res) => {
+  if (configuredBackends().length === 1) return generateOnBackend(req, res);
+  try {
+    const available = await mediaModels();
+    const profile = available.models.profiles.find((item) => item.id === req.body?.profileId)
+      || available.models.profiles.find((item) => item.workflow === req.body?.workflow && item.model === req.body?.model);
+    if (!profile) return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
+    const backend = isLocalVideoProfile(profile) ? "video" : "primary";
+    return await withComfyBackend(backend, () => generateOnBackend(req, res));
+  } catch (error) {
+    if (!res.headersSent) res.status(503).json({ ok: false, error: error.message });
+  }
+});
+
+async function generateOnBackend(req, res) {
   const requestKey = encryptionKeyFromRequest(req);
   const hidden = Boolean(req.body?.privateVault);
   // Checked before anything reaches ComfyUI, so a Hidden prompt never runs in the open.
@@ -1598,6 +1662,7 @@ app.post("/api/generate", async (req, res) => {
     res.status(401).json({ ok: false, locked: true, reason: "locked", error: "That reference is in Hidden. Unlock Hidden to use it." });
     return;
   }
+  body.comfyBackend = currentComfyBackend();
   body.privateVault = hidden || fromHidden;
   // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
   const autoUpscale = req.body?.autoUpscale;
@@ -1685,14 +1750,14 @@ app.post("/api/generate", async (req, res) => {
   const items = makePendingItems(id, body);
   markWorkflowUsed(body.profileId || body.model || body.workflow || "");
   setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-  jobs.set(id, { status: "queued", kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
+  jobs.set(id, { status: "queued", comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
   res.json({ jobId: id, items, hidden: body.privateVault, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
   if (isMockJob) {
     setTimeout(() => runMockJob(id, body), 0);
   } else {
     setTimeout(() => runJob(id, body, { prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null }).catch(() => null), 0);
   }
-});
+}
 
 /** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
 async function upscaleContext(res, { force = false } = {}) {
@@ -1847,7 +1912,7 @@ app.post("/api/upscale/cancel", async (req, res) => {
   }
   const [jobId, job] = entry;
   setTerminalJob(jobId, { status: "canceled" });
-  if (job.promptId) await cancelPrompt(job.promptId).catch(() => null);
+  if (job.promptId) await withComfyBackend(job.comfyBackend, () => cancelPrompt(job.promptId)).catch(() => null);
   res.json({ ok: true });
 });
 
@@ -1898,7 +1963,7 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
   // Its pictures are saved and only Smart upscale is left: they stay, and runJob delivers them.
   if (!job.keepsPicture) updateGalleryJob(req.params.id, { status: "canceled" });
   // Without a prompt id yet, runJob takes it back out of ComfyUI as soon as /prompt answers.
-  if (job.promptId) await cancelPrompt(job.promptId).catch(() => null);
+  if (job.promptId) await withComfyBackend(job.comfyBackend, () => cancelPrompt(job.promptId)).catch(() => null);
   res.json({ ok: true });
 });
 
@@ -1907,7 +1972,7 @@ app.post("/api/queue/cancel", async (_req, res) => {
   setGallery(gallery.map((item) => (item.status === "pending" && !jobs.get(item.jobId)?.keepsPicture ? { ...item, status: "canceled" } : item)));
   saveGallery();
   // Only HEISS's own prompts: ComfyUI's queue also holds runs from its own UI and other apps.
-  await cancelPrompts(promptIds);
+  await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
   res.json({ ok: true });
 });
 
@@ -1966,7 +2031,7 @@ app.post("/api/cache/clear", async (req, res) => {
   const promptIds = cancelOwnJobs();
   setGallery(gallery.filter((item) => item.status === "done").map(({ preview, progress, ...item }) => item).slice(0, galleryLimit));
   saveGallery();
-  await cancelPrompts(promptIds);
+  await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
   await freeComfyMemory().catch(() => null);
   res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
 });
@@ -1987,7 +2052,7 @@ function cancelOwnJobs() {
   const promptIds = [];
   for (const [id, job] of jobs) {
     if (job.status === "queued" || job.status === "running" || job.status === "canceling") {
-      if (job.promptId) promptIds.push(job.promptId);
+      if (job.promptId) promptIds.push({ promptId: job.promptId, backend: job.comfyBackend });
       // Only upscaling now: its pictures stay, and runJob delivers them once ComfyUI lets go.
       if (job.keepsPicture) {
         jobs.set(id, { ...job, status: "canceling" });
