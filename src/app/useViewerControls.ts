@@ -65,11 +65,10 @@ export function useViewerControls(view: any) {
   }
 
   /**
-   * Loads an output's prompt and settings into the composer. `vary` is for
-   * "Vary this": a new seed and no toast, since a new image follows at once.
+   * Loads an output's prompt and settings into the composer.
    * Returns whether its model is installed.
    */
-  function applyAllSettings(item: GalleryItem, { vary = false }: { vary?: boolean } = {}) {
+  function applyAllSettings(item: GalleryItem) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const nextMode = item.type;
@@ -86,7 +85,7 @@ export function useViewerControls(view: any) {
     if (itemSettings.steps) setSteps(Number(itemSettings.steps));
     if (itemSettings.cfg) setCfg(Number(itemSettings.cfg));
     if (itemSettings.denoise) setDenoise(Number(itemSettings.denoise));
-    if (itemSettings.seed && itemSettings.seed !== "Random" && !vary) setSeed(String(itemSettings.seed));
+    if (itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
     else setSeed("");
     if (itemSettings.count) setCount(Number(itemSettings.count));
     if (itemSettings.frames) setFrames(Number(itemSettings.frames));
@@ -105,7 +104,6 @@ export function useViewerControls(view: any) {
     if (setStartImageId) setStartImageId(item.startImageId || item.referenceImage || "");
     setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));
-    if (vary) return Boolean(matchingProfile);
     const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
     const message = matchingProfile
       ? `Settings applied.${seedNote}`
