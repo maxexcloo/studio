@@ -7,8 +7,9 @@ import { megapixels, ratioName, snapSide, type SideLimits, type Size } from './s
 /* ---------------------------------------------------------------------------
    The size menu's parts (components.tsx AspectPicker puts them together):
 
-   - SizePreview: the frame the picture will fill, gliding between shapes. It
-     shows the size chosen, or the row under the pointer while one is.
+   - SizePreview: a window of its own beside the menu, shown while the menu
+     is hovered, with the frame the picture will fill gliding between shapes:
+     the size chosen, or the row under the pointer while one is.
    - SizeTabs: Default · 2K · Custom, one sliding thumb.
    - LinkedSizeFields: Custom's width and height. Linked they read as one
      field and keep the shape; the link in the middle splits them. Each takes
@@ -19,34 +20,44 @@ export type SizeTier = "none" | "2k" | "custom";
 
 const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", custom: "Custom" };
 
-/** The frame inside a square stage, with room around it for its corners. */
-function frameIn(size: Size, stage: number, inset: number) {
-  const room = stage - inset * 2;
-  const scale = room / Math.max(size.width, size.height, 1);
+/**
+ * The frame on its own window beside the menu. The window is the stage: the
+ * frame sits in it at the shape it stands for, and lines from its edges run
+ * across the whole window, so a change of shape reads as the lines sliding.
+ * The window's size comes from the menu it sits beside, so it is measured.
+ */
+export function SizePreview({ size, label, sub, accent = false, shown = true }: { size: Size; label: string; sub: string; accent?: boolean; shown?: boolean }) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [stage, setStage] = React.useState({ width: 0, height: 0 });
+  React.useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const measure = () => setStage({ width: node.clientWidth, height: node.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  // Room for the frame: an inset all round, and the caption's line at the bottom.
+  const inset = 26;
+  const caption = 30;
+  const roomW = Math.max(1, stage.width - inset * 2);
+  const roomH = Math.max(1, stage.height - inset * 2 - caption);
+  const scale = Math.min(roomW / Math.max(1, size.width), roomH / Math.max(1, size.height));
   const width = Math.max(3, size.width * scale);
   const height = Math.max(3, size.height * scale);
-  return { left: (stage - width) / 2, top: (stage - height) / 2, width, height };
-}
-
-export function SizePreview({ size, label, sub, accent = false, stage = 168 }: { size: Size; label: string; sub: string; accent?: boolean; stage?: number }) {
-  const frame = frameIn(size, stage, 18);
+  const left = (stage.width - width) / 2;
+  const top = inset + (roomH - height) / 2;
   const px = (value: number) => `${Math.round(value * 10) / 10}px`;
   return (
-    <div className={cn("size-preview", accent && "is-accent")} aria-hidden="true">
-      <div className="size-preview-stage" style={{ "--stage": px(stage) } as React.CSSProperties}>
-        {/* Guides from the frame's edges across the stage: they glide with it. */}
-        <i className="size-guide is-x" style={{ top: px(frame.top) }} />
-        <i className="size-guide is-x" style={{ top: px(frame.top + frame.height) }} />
-        <i className="size-guide is-y" style={{ left: px(frame.left) }} />
-        <i className="size-guide is-y" style={{ left: px(frame.left + frame.width) }} />
-        <div className="size-frame" style={{ left: px(frame.left), top: px(frame.top), width: px(frame.width), height: px(frame.height) }}>
-          <b className="is-tl" /><b className="is-tr" /><b className="is-bl" /><b className="is-br" />
-        </div>
-      </div>
-      <div className="size-preview-caption">
-        <strong>{label}</strong>
-        <span>{sub}</span>
-      </div>
+    <div ref={ref} className={cn("size-peek", shown && "is-on", accent && "is-accent", stage.width > 0 && "is-measured")} aria-hidden="true">
+      {/* Lines from the frame's edges across the window: they glide with it. */}
+      <i className="size-guide is-x" style={{ top: px(top) }} />
+      <i className="size-guide is-x" style={{ top: px(top + height) }} />
+      <i className="size-guide is-y" style={{ left: px(left) }} />
+      <i className="size-guide is-y" style={{ left: px(left + width) }} />
+      <div className="size-frame" style={{ left: px(left), top: px(top), width: px(width), height: px(height) }} />
+      <p className="size-peek-caption"><strong>{label}</strong><span>{sub}</span></p>
     </div>
   );
 }

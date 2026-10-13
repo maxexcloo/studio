@@ -5,74 +5,81 @@
 --------------------------------------------------------------------------- */
 
 .aspect-menu.size-menu {
-  width: min(452px, calc(100vw - 24px));
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-  padding: 8px;
+  width: min(300px, calc(100vw - 24px));
+  gap: 4px;
+  padding: 7px;
 }
-.size-menu-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.size-menu-side { display: grid; gap: 4px; align-content: start; min-width: 0; }
 .size-menu .aspect-list { gap: 2px; }
 .size-menu .aspect-option { min-height: 32px; }
 
-/* The frame: guides from its edges run across the stage and glide with it. */
-.size-preview { display: grid; gap: 9px; align-content: start; }
-.size-preview-stage {
-  position: relative;
-  width: var(--stage);
-  height: var(--stage);
+/* The preview: a window of its own to the menu's left, its full height. The
+   window is the stage; lines from the frame's edges run across all of it. */
+.size-peek {
+  --size-spring: cubic-bezier(.3, 1.5, .45, 1);
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: calc(100% + 8px);
+  width: 216px;
   overflow: hidden;
-  border-radius: 14px;
-  background: var(--well);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .04);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--r-menu);
+  /* Nearly opaque: inside the menu's own blur its backdrop would read as empty. */
+  background: var(--surface-grain), rgb(22 22 22 / .96);
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  transform: translateX(10px) scale(.98);
+  transform-origin: right center;
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-out), transform 260ms var(--spring);
 }
+.size-peek.is-on { opacity: 1; transform: none; }
+/* Until it's measured, nothing in it has a place to glide from. */
+.size-peek:not(.is-measured) * { transition: none !important; }
 .size-guide {
   position: absolute;
-  background: rgb(255 255 255 / .06);
+  background: rgb(255 255 255 / .07);
   transition: top 300ms var(--size-spring), left 300ms var(--size-spring);
 }
 .size-guide.is-x { left: 0; right: 0; height: 1px; }
 .size-guide.is-y { top: 0; bottom: 0; width: 1px; }
-.size-preview { --size-spring: cubic-bezier(.3, 1.5, .45, 1); }
 .size-frame {
   position: absolute;
-  border-radius: 3px;
-  background: rgb(255 255 255 / .05);
-  transition: left 300ms var(--size-spring), top 300ms var(--size-spring), width 300ms var(--size-spring), height 300ms var(--size-spring);
+  border: 1.5px solid rgb(255 255 255 / .92);
+  border-radius: 5px;
+  background: rgb(255 255 255 / .03);
+  transition: left 300ms var(--size-spring), top 300ms var(--size-spring), width 300ms var(--size-spring), height 300ms var(--size-spring), border-color 200ms var(--ease-out);
 }
-/* Thirds inside the frame, for a feel of the composition. */
-.size-frame::before,
-.size-frame::after { content: ""; position: absolute; border: 0 solid rgb(255 255 255 / .07); pointer-events: none; }
-.size-frame::before { top: 0; bottom: 0; left: 33.333%; right: 33.333%; border-left-width: 1px; border-right-width: 1px; }
-.size-frame::after { left: 0; right: 0; top: 33.333%; bottom: 33.333%; border-top-width: 1px; border-bottom-width: 1px; }
-.size-frame b {
+/* 2K or Custom: the frame takes the ember, like the tag on the trigger. */
+.size-peek.is-accent .size-frame { border-color: var(--ember); }
+.size-peek-caption {
   position: absolute;
-  width: 11px;
-  height: 11px;
-  border: 0 solid rgb(255 255 255 / .9);
-  transition: border-color 200ms var(--ease-out);
-}
-.size-frame .is-tl { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 5px; }
-.size-frame .is-tr { top: -1px; right: -1px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 5px; }
-.size-frame .is-bl { bottom: -1px; left: -1px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 5px; }
-.size-frame .is-br { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 5px; }
-/* 2K or Custom: the corners take the ember, like the tag on the trigger. */
-.size-preview.is-accent .size-frame b { border-color: var(--ember); }
-
-.size-preview-caption { display: grid; gap: 2px; padding: 0 4px; min-height: 34px; }
-.size-preview-caption strong {
-  overflow: hidden;
-  color: hsl(var(--foreground));
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0;
   white-space: nowrap;
 }
-.size-preview-caption span {
+.size-peek-caption strong { color: hsl(var(--foreground)); font-size: 12.5px; font-weight: 600; }
+.size-peek-caption span {
   color: hsl(var(--muted-foreground));
-  font: 500 11px/1.3 var(--font-mono);
+  font: 500 11px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+}
+
+/* With the window there, the rows don't draw their shapes: the window does. */
+@media (hover: hover) and (min-width: 761px) {
+  .size-menu .aspect-option { grid-template-columns: minmax(44px, auto) minmax(80px, 1fr); }
+  .size-menu .aspect-option > .aspect-shape { display: none; }
+}
+/* Touch, or a narrow window: no room beside the menu, so no window; the rows keep their shapes. */
+@media (hover: none), (max-width: 760px) {
+  .size-peek { display: none; }
 }
 
 /* Custom: width and height. Linked, one field with the link in its middle;
@@ -172,12 +179,6 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .phone-control .size-fields { min-height: 44px; }
 .phone-control .size-field input { font-size: 16px; }
 
-/* The narrow sheet: the frame on top, centred. */
-@media (max-width: 760px) {
-  .aspect-menu.size-menu { grid-template-columns: minmax(0, 1fr); }
-  .size-menu .size-preview { justify-items: center; }
-  .size-menu .size-preview-caption { text-align: center; }
-}
 
 /* Every composer menu leaves the way it came. */
 @keyframes surfaceOut {
@@ -190,6 +191,6 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .size-guide, .size-frame, .size-fields, .size-field { transition: none; }
+  .size-guide, .size-frame, .size-fields, .size-field, .size-peek { transition: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
 }

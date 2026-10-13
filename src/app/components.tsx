@@ -8,7 +8,7 @@ import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, NativeSupport, Output, Profile } from './types';
 import { sizePlan } from './useUpscale';
-import { fitRatio, megapixels, parseSize, presetRatio, ratioName, sameRatio, type SideLimits } from './sizing';
+import { fitRatio, parseSize, presetRatio, ratioName, sameRatio, type SideLimits } from './sizing';
 import { LinkedSizeFields, SizePreview, SizeTabs, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -343,7 +343,14 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const close = useCallback(() => setOpen(false), []);
   useDismiss(pickerRef, open, close);
   const [hovered, setHovered] = useState<SizeRow | null>(null);
-  useEffect(() => { if (!open) setHovered(null); }, [open]);
+  // The preview window shows while the menu is under the pointer or worked from the keyboard,
+  // with a short grace on the way out so crossing the gap to it doesn't flicker it.
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef(0);
+  const peekOn = () => { window.clearTimeout(peekTimer.current); setPeek(true); };
+  const peekOff = () => { window.clearTimeout(peekTimer.current); peekTimer.current = window.setTimeout(() => setPeek(false), 160); };
+  useEffect(() => () => window.clearTimeout(peekTimer.current), []);
+  useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
   const custom = tier === "custom";
   const picked = parseSize(currentSize);
@@ -408,18 +415,33 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
       {presence.mounted ? (
-        <div className={cn("aspect-menu size-menu", presence.closing && "is-closing")} data-open-surface role="dialog" aria-label="Size">
-          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height} · ${megapixels(previewSize)}`} accent={!previewRow && tier !== "none"} />
+        <div
+          className={cn("aspect-menu size-menu", presence.closing && "is-closing")}
+          data-open-surface
+          role="dialog"
+          aria-label="Size"
+          onPointerEnter={(event) => { if (event.pointerType !== "touch") peekOn(); }}
+          onPointerLeave={(event) => { if (event.pointerType !== "touch") peekOff(); }}
+          onFocusCapture={(event) => { if ((event.target as HTMLElement).matches(":focus-visible, input")) peekOn(); }}
+          onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) peekOff(); }}
+        >
+          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && tier !== "none"} shown={peek} />
           <div className="size-menu-side">
-            {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
-            <AnimatePresence initial={false}>
-              {custom && limits && onCustomSize ? (
-                <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                  <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-            {note ? <p className="size-menu-note">{note}</p> : null}
+            <div className="aspect-upscale">
+              <div className="aspect-upscale-head">
+                <span>Resolution</span>
+                <InfoTip side="top" content="How big new images come out. Hover a shape to see it." />
+              </div>
+              {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
+              <AnimatePresence initial={false}>
+                {custom && limits && onCustomSize ? (
+                  <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+              {note ? <p className="size-menu-note">{note}</p> : null}
+            </div>
             <div ref={listRef} className="aspect-list" role="listbox" aria-label={custom ? "Shape, at this size" : "Shape"} onPointerLeave={() => setHovered(null)} onKeyDown={(event) => {
               // Up and down move between shapes, previewing each on the way.
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
