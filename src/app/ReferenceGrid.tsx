@@ -61,9 +61,10 @@ export function ReferenceGrid({ items, render }: { items: ReferenceAsset[]; rend
       pendingFocus.current = next;
       setFocused(next);
       const body = grid.current!.closest<HTMLElement>('.reference-popover-body')!;
+      const inset = parseFloat(getComputedStyle(body).paddingTop) || 0;
       const top = grid.current!.getBoundingClientRect().top - body.getBoundingClientRect().top + Math.floor(next / layout.columns) * stride;
-      if (top < 0) body.scrollTop += top;
-      else if (top + layout.size > body.clientHeight) body.scrollTop += top + layout.size - body.clientHeight;
+      if (top < inset) body.scrollTop += top - inset;
+      else if (top + layout.size > body.clientHeight - inset) body.scrollTop += top + layout.size - body.clientHeight + inset;
       measure();
     }}>
     {indices.map((index) => render(items[index], index, { position: 'absolute', top: Math.floor(index / layout.columns) * stride, left: (index % layout.columns) * stride, width: layout.size, height: layout.size }, index === tabStop ? 0 : -1))}
