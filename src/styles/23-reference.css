@@ -706,3 +706,4 @@
 @media (pointer: coarse) {
   .ref-thumb-remove::after { width: 34px; height: 34px; translate: -30% -70%; }
 }
+.reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }

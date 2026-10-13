@@ -5,7 +5,7 @@ import type { ConfirmAction } from './useConfirmation';
 import { apiJson, copyText } from './api';
 import { cn } from './format';
 import { BetaTag, Field, StudioSelect as Select } from './components';
-import { Segmented } from './SettingsDialog';
+import { Segmented } from './SettingsControls';
 import { workflowState } from './workflowStatus';
 import { ModelSetup } from './ModelSetup';
 import { peekDownloadReveal } from './useModelDownloads';
