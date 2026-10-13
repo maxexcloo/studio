@@ -67,7 +67,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   const [selectingId, setSelectingId] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [query, setQuery] = React.useState("");
+  const searchRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
+  const pageErrorRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search.trim()), 180);
     return () => window.clearTimeout(timer);
@@ -79,6 +81,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
   // the bar's own backdrop blur would stop this one from blurring the gallery.
   const [box, setBox] = React.useState<{ left: number; width: number; bottom: number } | null>(null);
+  React.useEffect(() => {
+    if (box) popRef.current?.focus({ preventScroll: true });
+  }, [Boolean(box)]);
   React.useLayoutEffect(() => {
     if (!anchor) return;
     const measure = () => {
@@ -188,6 +193,9 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
   }
 
   const page = pages[tab];
+  React.useEffect(() => {
+    if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+  }, [page.error, tab]);
   if (!box) return null;
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
@@ -200,6 +208,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
       role="dialog"
       aria-label={`Choose ${label}`}
       aria-busy={upload.busy || Boolean(selectingId) || undefined}
+      tabIndex={-1}
       data-open-surface
       initial={{ opacity: 0, y: 10, scale: 0.97, filter: "blur(4px)" }}
       animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
@@ -223,8 +232,8 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
 
       <div className="reference-search">
         <Search size={15} aria-hidden="true" />
-        <input type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
-        {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => setSearch('')}><X size={14} /></button> : null}
+        <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
+        {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
       </div>
       <div ref={bodyRef} className="reference-popover-body" role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "hidden" && !hiddenOpen ? (
@@ -250,7 +259,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
         ) : (
           <>
             {tab === "hidden" && hidden?.space !== "hidden" ? <p className="reference-shelf-note"><LockKeyhole size={12} /> What you make from a hidden image goes to Hidden too.</p> : null}
-            <ReferenceGrid items={page.items} render={(asset, index, style) => {
+            <ReferenceGrid items={page.items} render={(asset, index, style, tabIndex) => {
                 const isSelected = selected?.id === asset.id;
                 return (
                   <div
@@ -261,6 +270,7 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
                     <button
                       type="button"
                       data-reference-index={index}
+                      tabIndex={tabIndex}
                       className="reference-tile-select"
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? "Selected: " : ""}${asset.name}`}
@@ -270,12 +280,12 @@ function ReferencePopover({ input, selected, anchor, popRef, dropActive, dropped
                       <SafeImg src={assetImage(asset)} loading="lazy" draggable={false} fallback={<ImageIcon size={16} />} />
                       {isSelected ? <i className="reference-tile-check"><Check size={12} strokeWidth={3} /></i> : null}
                     </button>
-                    {asset.source === "upload" ? <button type="button" className="reference-tile-delete" aria-label={`Delete ${asset.name}`} onClick={(event) => removeUpload(event, asset)}><Trash2 size={13} /></button> : null}
+                    {asset.source === "upload" ? <button type="button" tabIndex={tabIndex} className="reference-tile-delete" aria-label={`Delete ${asset.name}`} onClick={(event) => removeUpload(event, asset)}><Trash2 size={13} /></button> : null}
                     {selectingId === asset.id ? <span className="reference-tile-busy"><LoaderCircle className="spin" size={16} /></span> : null}
                   </div>
                 );
               }} />
-            {page.hasMore ? <button className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
+            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load more"}</button> : null}
           </>
         )}
       </div>
@@ -371,6 +381,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
         <button
           type="button"
           data-open-trigger
+          data-reference-slot={input.id}
           className={cn("ref-chip ref-add", expanded && "is-expanded", required && "is-required", open && "is-open")}
           aria-label={`Add ${label.toLowerCase()}${required ? ", required" : ""}`}
           aria-expanded={open}
@@ -411,7 +422,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
           </>
         ) : null}
       </div>
-      <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+      <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
         {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
       </button>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
@@ -445,7 +456,15 @@ export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onR
   const rootRef = React.useRef<HTMLDivElement>(null);
   const popRef = React.useRef<HTMLDivElement>(null);
   const overlayRef = React.useRef<HTMLDivElement>(null);
-  const close = React.useCallback(() => setOpenSlot(""), []);
+  const close = React.useCallback(() => {
+    const restore = popRef.current?.contains(document.activeElement);
+    const slot = openSlot;
+    setOpenSlot("");
+    if (restore) requestAnimationFrame(() => {
+      if (document.activeElement !== document.body && !popRef.current?.contains(document.activeElement)) return;
+      rootRef.current?.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(slot)}"]`)?.focus({ preventScroll: true });
+    });
+  }, [openSlot]);
   // A drop only belongs to the popover it landed on; forget it on close so the
   // next open starts on the default tab and fetches the full list.
   React.useEffect(() => { if (!openSlot) setDropped(null); }, [openSlot]);
