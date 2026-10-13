@@ -337,6 +337,21 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   const [hover, setHover] = React.useState(false);
   const hoverTimer = React.useRef(0);
   React.useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  // The brush folds by its measured width: the menu sizes to its content, where CSS can't tween to "auto".
+  const paintSlot = React.useRef<HTMLSpanElement>(null);
+  const paintWidth = React.useRef(0);
+  const paintHidden = Boolean(paint?.hidden);
+  const paintWasHidden = React.useRef(paintHidden);
+  React.useLayoutEffect(() => {
+    const slot = paintSlot.current;
+    if (!slot) return;
+    const was = paintWasHidden.current;
+    paintWasHidden.current = paintHidden;
+    if (!paintHidden) paintWidth.current = slot.scrollWidth;
+    if (was === paintHidden || !paintWidth.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const open = `${paintWidth.current}px`;
+    slot.animate({ width: paintHidden ? [open, "0px"] : ["0px", open] }, { duration: 320, easing: "cubic-bezier(.16, 1, .3, 1)" });
+  });
   const hoverTo = (next: boolean, event: React.PointerEvent) => {
     if (event.pointerType === "touch") return;
     window.clearTimeout(hoverTimer.current);
@@ -404,8 +419,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         ) : null}
         {paint ? (
           // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
-          <span className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
-            <span className="ref-menu-paint-fold">
+          <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
             <span className="ref-menu-divider" aria-hidden="true" />
             <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
               <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
@@ -413,7 +427,6 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
                 <span className="ref-menu-paint-label"><span>{coarsePointer() ? "Tap" : "Click"} to inpaint</span></span>
               </button>
             </Tip>
-            </span>
           </span>
         ) : null}
       </div>
