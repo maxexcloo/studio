@@ -288,8 +288,13 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .size-saved { overflow: hidden; }
 .size-saved-row { position: relative; }
 .size-saved-row .aspect-option { width: 100%; }
-.size-saved-row .aspect-option em { transition: transform 280ms var(--spring); }
-.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option em { transform: translateX(-58px); }
+/* Room for Rename and Remove comes from the row's own padding, so the size moves left and the
+   name, which can be long, shortens with "…" instead of running under it. */
+.size-saved-row .aspect-option { transition: padding-right 280ms var(--ease-out); }
+.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option { padding-right: 70px; }
+.aspect-option > .size-saved-label { display: flex; align-items: baseline; min-width: 0; overflow: hidden; }
+.size-saved-label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.size-saved-label > small { flex: none; }
 .size-saved-actions {
   position: absolute;
   top: 50%;
@@ -358,4 +363,8 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   .size-link-icon, .size-save > span { animation: none; }
   .size-saved-row .aspect-option em, .size-saved-actions { transition: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
+}
+/* Where the rows keep their shapes, the name's column may shrink too. */
+@media (hover: none), (max-width: 760px) {
+  .size-menu .size-saved-row .aspect-option { grid-template-columns: 30px minmax(0, 1fr) auto; }
 }

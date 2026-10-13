@@ -365,7 +365,8 @@ export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPrev
             onClick={onPick}
           >
             <span className="aspect-shape" style={aspectIconStyle(shape)} />
-            <span>{saved.name}<small>{ratio}</small></span>
+            {/* The name gives way ("…"), the ratio stays: a long name never runs under the size. */}
+            <span className="size-saved-label" title={saved.name}><span>{saved.name}</span><small>{ratio}</small></span>
             <em>{saved.width}×{saved.height}</em>
           </button>
         )}
