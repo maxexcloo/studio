@@ -932,11 +932,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           </div>
                         </div>
                       ) : null}
+                      {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        onUseSettings={() => applyAllSettings(active)}
-                        onUseLoras={() => applyLoras(active)}
-                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
+                        onUseSettings={() => (phone ? phoneItemActions.reuse(active) : applyAllSettings(active))}
+                        onUseLoras={() => { applyLoras(active); if (phone) { setActive(null); setPhoneCreate(true); } }}
+                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => (phone ? phoneItemActions.useAsReference!(active) : useOutputAsStartImage(active)) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <details className="settings-disclosure" open={showGenerationSettings} onToggle={(event) => setShowGenerationSettings(event.currentTarget.open)}>
