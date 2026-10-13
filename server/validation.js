@@ -22,7 +22,8 @@ export function snapNumber(value, fallback, range = {}) {
   const min = Number.isFinite(Number(range.min)) ? Number(range.min) : -Number.MAX_SAFE_INTEGER;
   const max = Number.isFinite(Number(range.max)) ? Number(range.max) : Number.MAX_SAFE_INTEGER;
   const base = clampNumber(value, fallback, min, max);
-  const snapped = Math.round(base / step) * step;
+  const offset = Number(range.offset || 0);
+  const snapped = Math.round((base - offset) / step) * step + offset;
   return Math.max(min, Math.min(max, snapped));
 }
 
@@ -129,6 +130,7 @@ function sanitizeFamilyBody(input, info, stats) {
     // A quantized checkpoint (NF4) loads through its format's node, with the same inputs.
     checkpointLoader: profile.checkpointLoader || "",
     encoders,
+    encoderProjection: profile.encoderProjections?.[encoders[0]] || "",
     textEncoder: encoders[0] || "",
     clipType: profile.defaults.clipType || "",
     vae: resolvedVae,
@@ -153,6 +155,7 @@ function sanitizeFamilyBody(input, info, stats) {
     scheduler: String(input.scheduler || profile.defaults.scheduler || ""),
     seed: String(input.seed || ""),
     count: profile.capabilities.variations === false ? 1 : snapInteger(input.count, 1, c.count),
+    ...(input.variationCount !== undefined ? { variationCount: kind === "image" && profile.capabilities.variations !== false ? clampInteger(input.variationCount, 1, 1, 8) : 1 } : {}),
     frames: kind === "video" ? snapInteger(input.frames, c.frames?.default, c.frames) : 0,
     fps: kind === "video" ? snapInteger(input.fps, c.fps?.default, c.fps) : 0,
     startImage: profile.capabilities.startImage ? String(input.startImage || "") : "",
@@ -228,12 +231,16 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const widthRange = nodeRange(info, latentNode, "width", { default: kind === "video" ? 512 : 1024, min: 16, max: 16384 });
   const heightRange = nodeRange(info, latentNode, "height", { default: kind === "video" ? 288 : 1024, min: 16, max: 16384 });
   const countRange = nodeRange(info, latentNode, "batch_size", { default: 1, min: 1, max: 8 });
-  const frameRange = nodeRange(info, latentNode, "length", { default: 33, min: 1, max: 16384 });
-  const fpsRange = nodeRange(info, "CreateVideo", "fps", { default: 16, min: 1, max: 120 });
+  // Imported workflows can bind these controls to different nodes or fix their frame rate.
+  const frameRange = customWorkflow ? profile.constraints.frames : nodeRange(info, latentNode, "length", { default: 33, min: 1, max: 16384 });
+  const fpsRange = customWorkflow ? { default: profile.defaults.fps || 16, ...profile.constraints.fps } : nodeRange(info, "CreateVideo", "fps", { default: 16, min: 1, max: 120 });
   const stepsRange = nodeRange(info, "KSampler", "steps", { default: kind === "video" ? 12 : 8, min: 1, max: 10000 });
   const cfgRange = nodeRange(info, "KSampler", "cfg", { default: kind === "video" ? 5 : 1, min: 0, max: 100 });
   const denoiseRange = nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1 });
 
+  const resolutions = profile.options.resolutions || [];
+  const resolution = profile.capabilities.resolution ? String(input.resolution || profile.defaults.resolution || "") : "";
+  if (profile.capabilities.resolution && !resolutions.includes(resolution)) throw new Error("Choose a supported resolution for this model.");
   const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max || 8);
   return {
     ...input,
@@ -256,6 +263,9 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     scheduler: String(input.scheduler || ""),
     seed: String(input.seed || ""),
     count: workflowInfo.capabilities?.variations === false ? 1 : snapInteger(input.count, countRange.default, countRange),
+    ...(input.variationCount !== undefined ? { variationCount: kind === "image" && workflowInfo.capabilities?.variations !== false ? clampInteger(input.variationCount, 1, 1, 8) : 1 } : {}),
+    duration: profile.capabilities.duration ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration) : 0,
+    resolution,
     frames: snapInteger(input.frames, frameRange.default, frameRange),
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
     startImage: String(input.startImage || ""),

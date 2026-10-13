@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -12,7 +14,51 @@ const { galleryDelta, galleryRevisionValue, hideGalleryItems, makePendingItems, 
 
 const url = (filename) => `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "output" })}`;
 
-test("a run that reuses a deleted image's file name still shows when it finishes", () => {
+test("completed videos use their encoded dimensions instead of requested aspect or resolution", async (context) => {
+  let encoder;
+  try { encoder = createRequire(import.meta.url)("ffmpeg-static"); } catch { encoder = "ffmpeg"; }
+  try { execFileSync(encoder, ["-version"], { stdio: "ignore" }); } catch { context.skip("Video encoder unavailable"); return; }
+  const filename = "portrait-video.mp4";
+  execFileSync(encoder, ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:size=96x160:rate=24", "-t", "0.25", "-c:v", "libx264", "-threads", "1", path.join(outputDir, filename)]);
+  const body = { kind: "video", prompt: "A hot-air balloon", width: 1280, height: 720, model: "custom:grok-video-standard", modelName: "grok-imagine-video", duration: 6, resolution: "720p", steps: 20, cfg: 8, sampler: "euler", scheduler: "simple" };
+  setGallery(makePendingItems("actual-video-size", body));
+  const since = galleryRevisionValue();
+  const [completed] = await replaceGalleryJob("actual-video-size", [{ url: url(filename), filename, type: "video" }], body, new Map());
+  assert.equal(completed.width, 96);
+  assert.equal(completed.height, 160);
+  assert.equal(completed.settings.duration, 6);
+  assert.equal(completed.settings.resolution, "720p");
+  for (const field of ["steps", "cfg", "sampler", "scheduler"]) assert.equal(completed.settings[field], undefined);
+  assert.deepEqual(galleryDelta({ since }).upserts.map(({ width, height }) => ({ width, height })), [{ width: 96, height: 160 }]);
+  assert.equal(pageGallery({}).items[0].height, 160);
+});
+
+test("a video that cannot be probed still completes with its requested dimensions", async () => {
+  const filename = "unreadable-video.mp4";
+  fs.writeFileSync(path.join(outputDir, filename), "not a video");
+  const body = { kind: "video", prompt: "A heron", width: 720, height: 1280, steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" };
+  setGallery(makePendingItems("fallback-video-size", body));
+  const [completed] = await replaceGalleryJob("fallback-video-size", [{ url: url(filename), filename, type: "video" }], body, new Map());
+  assert.equal(completed.status, "done");
+  assert.equal(completed.width, 720);
+  assert.equal(completed.height, 1280);
+  assert.equal(completed.settings.steps, 8);
+});
+
+test("separate variants keep their requested composer count without retrying the whole group", async () => {
+  const body = { kind: "image", prompt: "a heron", count: 1, variationCount: 4, profileId: "custom:reference", createdAt: new Date().toISOString() };
+  const pending = makePendingItems("separate-variant", body);
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].settings.count, 1);
+  assert.equal(pending[0].settings.variationCount, 4);
+  setGallery(pending);
+  const completed = await replaceGalleryJob("separate-variant", [{ url: url("variant.png"), filename: "variant.png", type: "image" }], body, new Map());
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].settings.count, 1);
+  assert.equal(completed[0].settings.variationCount, 4);
+});
+
+test("a run that reuses a deleted image's file name still shows when it finishes", async () => {
   // The newest image, HEISS_00042_.png, exists; a run starts; then that image is deleted.
   fs.writeFileSync(path.join(outputDir, "HEISS_00042_.png"), "old");
   const old = { id: url("HEISS_00042_.png"), url: url("HEISS_00042_.png"), status: "done", type: "image", createdAt: new Date(Date.now() - 60_000).toISOString() };
@@ -26,7 +72,7 @@ test("a run that reuses a deleted image's file name still shows when it finishes
 
   // ComfyUI saves the run under the freed name.
   fs.writeFileSync(path.join(outputDir, "HEISS_00042_.png"), "new");
-  replaceGalleryJob("job-1", [{ url: url("HEISS_00042_.png"), filename: "HEISS_00042_.png", type: "image" }], body, new Map());
+  await replaceGalleryJob("job-1", [{ url: url("HEISS_00042_.png"), filename: "HEISS_00042_.png", type: "image" }], body, new Map());
 
   const delta = galleryDelta({ since });
   assert.deepEqual(delta.upserts.map((item) => item.url), [url("HEISS_00042_.png")]);
@@ -43,7 +89,7 @@ test("a finished image is listed at once, before the folder listing catches up",
   setGallery([...makePendingItems("job-2", body), ...pageGallery({}).items]);
   assert.equal(listReferenceAssets({ headers: {} }, { source: "generation" }).items.length, 1);
   fs.writeFileSync(path.join(outputDir, "fresh.png"), "y");
-  replaceGalleryJob("job-2", [{ url: url("fresh.png"), filename: "fresh.png", type: "image" }], body, new Map());
+  await replaceGalleryJob("job-2", [{ url: url("fresh.png"), filename: "fresh.png", type: "image" }], body, new Map());
   assert.equal(listReferenceAssets({ headers: {} }, { source: "generation" }).items.length, 2);
   assert.ok(pageGallery({}).items.some((item) => item.url === url("fresh.png")));
 });

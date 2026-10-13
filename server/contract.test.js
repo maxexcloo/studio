@@ -180,9 +180,9 @@ function* cases(info) {
       for (const source of family.sources) {
         const name = `${familyId}/${variant.id} from ${source}`;
         // A video made from a picture has no run without one; it is checked below with its start image.
-        if (family.startImage !== "required") yield { name, family, variant, source, body: requestFor(familyId, family, variant, source, info) };
+        if (family.startImage !== "required" && !variant.referenceRequired) yield { name, family, variant, source, body: requestFor(familyId, family, variant, source, info) };
         if (family.references) yield { name: `${name}, with references`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { referenceImages: ["ref-1.png", "ref-2.png"] }) };
-        if (family.img2img || family.startImage) yield { name: `${name}, from a start image`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { startImageComfy: "start.png", denoise: 0.6 }) };
+        if (family.img2img || family.startImage || family.sampling === "h3") yield { name: `${name}, from a start image`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { startImageComfy: "start.png", denoise: 0.6 }) };
       }
     }
   }

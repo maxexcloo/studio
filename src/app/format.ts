@@ -82,6 +82,7 @@ function formatLoraStack(value: unknown) {
 
 export function fullGenerationText(item: GalleryItem) {
   const settings = item.settings || {};
+  const grok = String(settings.modelName || "").startsWith("grok-imagine-");
   const lines = [
     `Prompt: ${item.prompt || ""}`,
     `Negative prompt: ${item.negative || ""}`,
@@ -92,6 +93,7 @@ export function fullGenerationText(item: GalleryItem) {
     `Generated: ${formatGeneratedAt(item.createdAt)}`
   ];
   for (const [key, value] of Object.entries(settings)) {
+    if (grok && ["steps", "cfg", "sampler", "scheduler"].includes(key)) continue;
     if (value !== "" && value !== undefined && value !== null && value !== 0) {
       lines.push(`${key}: ${key === "loras" ? formatLoraStack(value) : value}`);
     }
@@ -109,14 +111,15 @@ function fileStem(name: unknown) {
  */
 export function settingsText(item: GalleryItem) {
   const settings = item.settings || {};
+  const grok = String(settings.modelName || "").startsWith("grok-imagine-");
   const lines = [String(item.prompt || "").trim()];
   if (String(item.negative || "").trim()) lines.push(`Negative prompt: ${String(item.negative).trim()}`);
   const model = settings.modelName || (String(item.model || "").startsWith("custom:") ? "" : item.model);
   const parts = [
     model ? `Model: ${fileStem(model)}` : "",
-    Number(settings.steps) ? `Steps: ${settings.steps}` : "",
-    Number(settings.cfg) ? `CFG: ${settings.cfg}` : "",
-    settings.sampler ? `Sampler: ${settings.sampler}${settings.scheduler ? ` (${settings.scheduler})` : ""}` : "",
+    !grok && Number(settings.steps) ? `Steps: ${settings.steps}` : "",
+    !grok && Number(settings.cfg) ? `CFG: ${settings.cfg}` : "",
+    !grok && settings.sampler ? `Sampler: ${settings.sampler}${settings.scheduler ? ` (${settings.scheduler})` : ""}` : "",
     /^\d+$/.test(String(settings.seed ?? "")) ? `Seed: ${settings.seed}` : "",
     item.width && item.height ? `Size: ${item.width}×${item.height}` : "",
     settings.denoise && (item.referenceImage || settings.referenceImageName) ? `Denoise: ${settings.denoise}` : ""
@@ -136,6 +139,7 @@ export type GenerationDetailSection = { title: string; rows: Array<[string, stri
  */
 export function generationDetailEntries(item: GalleryItem): GenerationDetailSection[] {
   const settings = item.settings || {};
+  const grok = String(settings.modelName || "").startsWith("grok-imagine-");
   const sections: GenerationDetailSection[] = [];
   const section = (title: string, build: (add: (label: string, value: unknown) => void) => void) => {
     const rows: Array<[string, string]> = [];
@@ -157,10 +161,12 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     else sections.push({ title: "Model", rows: [], loras });
   }
   section("Sampling", (add) => {
-    add("Steps", settings.steps);
-    add("CFG", settings.cfg);
-    add("Sampler", settings.sampler);
-    add("Scheduler", settings.scheduler);
+    if (!grok) {
+      add("Steps", settings.steps);
+      add("CFG", settings.cfg);
+      add("Sampler", settings.sampler);
+      add("Scheduler", settings.scheduler);
+    }
     add("Seed", settings.seed);
     if (item.type === "image" && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
@@ -169,6 +175,7 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     const upscaled = item.upscaleActive && item.upscale?.status === "done" && item.upscale.width && item.upscale.height ? item.upscale : null;
     add("Size", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
     if (upscaled) add("Drawn at", `${item.width || "?"} × ${item.height || "?"}`);
+    if (settings.duration) add("Duration", `${settings.duration} Seconds`);
     if (item.type === "image") {
       const count = Number(settings.count || 0);
       if (count > 1) add("Images", count);

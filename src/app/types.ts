@@ -126,6 +126,8 @@ export type Profile = {
   setupGuide?: string;
   defaults: Record<string, string | number>;
   aspectPresets: AspectPreset[];
+  /** The preset label the profile starts on where its own size is not square (MiniMax H3's "16:9"). */
+  aspectDefault?: string;
   constraints?: Record<string, { min?: number; max?: number; step?: number; default?: number }>;
   options?: {
     textEncoders?: string[];
@@ -135,6 +137,7 @@ export type Profile = {
     samplers?: string[];
     schedulers?: string[];
     loras?: string[];
+    resolutions?: string[];
   };
   capabilities: Record<string, boolean>;
   mediaInputs?: MediaInput[];

@@ -99,6 +99,11 @@ function setMappedInput(graph, mapping, value) {
 async function applyMappedInputs(graph, workflow, body) {
   const controls = workflow.controls || {};
   const defaults = workflow.defaults || {};
+  if (String(workflow.family || "").replaceAll("-", "_") === "minimax_h3") {
+    const requested = Number(body.frames || defaults.frames || 124);
+    body.frames = Math.max(124, Math.min(362, Math.round((requested - 5) / 17) * 17 + 5));
+    body.fps = 24;
+  }
   const values = {
     prompt: composeWorkflowPrompt(workflow, body.prompt),
     negative: body.negative || "",
@@ -117,10 +122,23 @@ async function applyMappedInputs(graph, workflow, body) {
     seed: Number(body.seed || crypto.randomInt(1, 2 ** 31)),
     count: Number(body.count || 1),
     frames: Number(body.frames || 0),
-    fps: Number(body.fps || 0)
+    fps: Number(body.fps || 0),
+    duration: Number(body.duration || 0),
+    resolution: body.resolution || ""
   };
   for (const [key, value] of Object.entries(values)) {
     if (value !== "" && value !== undefined && value !== null) setMappedInput(graph, controls[key], value);
+  }
+  // Flux 2's schedule depends on the dimensions of the latent being sampled.
+  for (const sampler of Object.values(graph)) {
+    if (sampler.class_type !== "SamplerCustomAdvanced") continue;
+    const scheduler = graph[sampler.inputs.sigmas?.[0]];
+    const latentId = sampler.inputs.latent_image?.[0];
+    const latent = graph[latentId];
+    if (scheduler?.class_type !== "Flux2Scheduler" || latent?.class_type !== "EmptyFlux2LatentImage") continue;
+    for (const dimension of ["width", "height"]) {
+      if (controls[dimension]?.node === latentId && controls[dimension]?.input === dimension) scheduler.inputs[dimension] = latent.inputs[dimension];
+    }
   }
   let mappedReference = false;
   for (const mediaInput of workflow.mediaInputs || []) {
@@ -128,6 +146,12 @@ async function applyMappedInputs(graph, workflow, body) {
     if (reference?.comfyName && mediaInput.control) {
       setMappedInput(graph, mediaInput.control, reference.comfyName);
       mappedReference = true;
+    }
+  }
+  if (String(workflow.family || "").replaceAll("-", "_") === "minimax_h3" && !mappedReference && !body.startImage && !body.startImageId) {
+    if (workflow.capabilities?.startImageRequired) throw new Error("This H3 reference preset requires an image.");
+    for (const node of Object.values(graph)) {
+      if (node.class_type === "MiniMaxH3ImageToVideo") delete node.inputs.first_frame;
     }
   }
   if (!mappedReference && (body.startImage || body.startImageId) && controls.startImage) {
