@@ -230,10 +230,21 @@ test('model speed and reference filters combine and All clears them', async ({ p
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
   const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
   const filters = menu.getByRole('group', { name: 'Filter Models' });
+  const expectSingleRow = async () => {
+    if (isMobile) return;
+    const layout = await filters.evaluate((element) => ({
+      tops: [...element.querySelectorAll('button')].map((button) => Math.round(button.getBoundingClientRect().top)),
+      width: element.clientWidth,
+      contentWidth: element.scrollWidth,
+    }));
+    expect(new Set(layout.tops).size).toBe(1);
+    expect(layout.contentWidth).toBeLessThanOrEqual(layout.width);
+  };
   await expect(rows).toHaveCount(4);
+  await expectSingleRow();
   await expect(rows.first()).toContainText('Flash Edit');
   await expect(rows.last()).toContainText('Standard Generate');
-  await filters.getByRole('button', { name: 'Flash', exact: true }).focus();
+  await filters.getByRole('button', { name: 'Fast', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(rows).toHaveCount(2);
   await filters.getByRole('button', { name: 'Edit', exact: true }).click();
@@ -260,6 +271,7 @@ test('model speed and reference filters combine and All clears them', async ({ p
   else await page.locator('.model-trigger').first().click();
   await expect(rows).toHaveCount(2);
   await expect(filters.getByRole('button', { name: 'Generate', exact: true })).toHaveCount(0);
+  await expectSingleRow();
   await filters.getByRole('button', { name: 'Non-Reference', exact: true }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Generate');
@@ -296,7 +308,7 @@ test('model picker keeps controls visible, avoids duplicate recents and supports
   if (isMobile) {
     await menu.locator('.phone-sheet-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(search).toBeInViewport();
-    await expect(menu.getByRole('button', { name: 'Flash', exact: true })).toBeInViewport();
+    await expect(menu.getByRole('button', { name: 'Fast', exact: true })).toBeInViewport();
   } else {
     const bounds = await menu.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(15);
