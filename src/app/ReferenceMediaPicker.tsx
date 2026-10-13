@@ -304,13 +304,51 @@ const inpaintIntroduced = () => { try { return localStorage.getItem(inpaintIntro
 const coarsePointer = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey, "1"); } catch { /* shown again next time, which is fine */ } };
 
+/** One of the other references in a stack: what it holds, and how to change or remove it. */
+type StackItem = { input: MediaInput; asset: ReferenceAsset; open: boolean; busy: boolean; progress: number; fresh: boolean; onOpen: () => void; onRemove: () => void };
+/**
+ * The references that follow the first one (a model that reads several): the
+ * first stays the chip in the corner, the others sit behind it as a deck and
+ * fan out into its strip, with a + for the next one (greyed once all are used).
+ */
+type ReferenceStack = {
+  items: StackItem[];
+  /** The next empty slot, or null when every slot holds a picture. */
+  add: { open: boolean; busy: boolean; progress: number; onOpen: () => void } | null;
+  max: number;
+  /** Open the strip for a moment, to show where a dropped picture went. */
+  intro: boolean;
+};
+
+const fullMessage = (max: number) => `Up to ${max} references. Remove one to add another`;
+
+/** The + for another reference: greyed, with why, once every slot is used. */
+function AddMore({ max, add, className, size = 15 }: { max: number; add: ReferenceStack["add"]; className: string; size?: number }) {
+  if (add?.busy) return <span className={cn(className, "is-busy")} aria-live="polite"><LoaderCircle className="spin" size={size} /></span>;
+  return (
+    <Tip content={add ? "Add another reference, or drop one on the prompt" : fullMessage(max)}>
+      <button
+        type="button"
+        data-open-trigger={add ? true : undefined}
+        className={cn(className, add?.open && "is-open", !add && "is-full")}
+        aria-label={add ? "Add another reference" : fullMessage(max)}
+        aria-disabled={!add || undefined}
+        aria-expanded={add ? add.open : undefined}
+        onClick={() => add ? add.onOpen() : showToastTone(fullMessage(max), "default")}
+      >
+        <Plus size={size} strokeWidth={2.2} />
+      </button>
+    </Tip>
+  );
+}
+
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
  * introduces itself as "Add reference" (or "Add start image" for plain
  * image-to-image) and settles into a round +. With an
  * image it becomes a squircle thumbnail that opens into a small menu on hover.
  */
-function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, onOpen, onRemove }: {
+function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, stack = null, onOpen, onRemove }: {
   input: MediaInput;
   selected: ReferenceAsset | null;
   open: boolean;
@@ -321,6 +359,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   paint?: { masked: boolean; open: boolean; intro: boolean; hidden?: boolean; onOpen: () => void } | null;
   /** For a reference that can frame the output: edit this image, or only use it as a reference. */
   role?: ReferenceRoleControl | null;
+  /** The references after this one, folded behind it (desktop only; a phone lays them out in a row). */
+  stack?: ReferenceStack | null;
   onOpen: () => void;
   onRemove: () => void;
 }) {
@@ -387,13 +427,17 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
     );
   }
 
-  // The thumbnail is the anchor and says what the image is at rest (a ring for Edit, REF for Ref);
-  // the strip that grows out of it on hover holds only the choices: Edit | Ref and the brush.
-  const menu = Boolean(role || paint);
-  const name = `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
+  // The thumbnail is the anchor and says what the image is at rest: EDIT when it's the picture
+  // being changed, a deck behind it when others come with it. The strip that grows out of it on
+  // hover holds the choices (Edit | Ref, the brush) and the other references with a + for more.
+  const menu = Boolean(role || paint || stack);
+  const many = Boolean(stack?.items.length);
+  const editing = role?.value === "edit";
+  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
+  const stackOpen = Boolean(stack && (stack.add?.open || stack.items.some((item) => item.open)));
   return (
     <div
-      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", role?.value === "edit" && "is-edit")}
+      className={cn("ref-chip ref-selected", (open || paint?.open || stackOpen) && "is-open", hover && "is-hover", (paint?.intro || stack?.intro) && "is-intro", fresh && "is-new", editing && "is-edit", many && "has-deck")}
       onPointerEnter={(event) => hoverTo(true, event)}
       onPointerLeave={(event) => hoverTo(false, event)}
     >
@@ -405,10 +449,10 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
             <div className={cn("ref-menu-role", role.value === "reference" && "is-ref")} role="radiogroup" aria-label="What this image is">
               {/* One thumb slides between the two, like the size menu's tabs. */}
               <i aria-hidden="true" />
-              <Tip content="Change this picture: the result keeps its size and framing">
+              <Tip content={many ? "Change the first picture, at its size and framing. The others are what it can draw from" : "Change this picture: the result keeps its size and framing"}>
                 <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
               </Tip>
-              <Tip content="Let it guide a new picture, at the size you picked">
+              <Tip content={many ? "Let them all guide a new picture, at the size you picked" : "Let it guide a new picture, at the size you picked"}>
                 <button type="button" role="radio" aria-checked={role.value === "reference"} className={cn(role.value === "reference" && "is-active")} onClick={() => role.onChange("reference")}>Ref</button>
               </Tip>
             </div>
@@ -426,7 +470,19 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
             </Tip>
           </span>
         ) : null}
+        {stack ? (
+          <span className="ref-stack">
+            {role || paint ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
+            {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} />)}
+            <AddMore max={stack.max} add={stack.add} className="ref-stack-add" />
+          </span>
+        ) : null}
       </div> : null}
+      {/* The others peek out from behind the thumbnail, so it says "and more" at rest. */}
+      {stack?.items.slice(0, 2).map((item, index) => {
+        const src = assetImage(item.asset);
+        return <i key={item.input.id} className={cn("ref-deck-card", `is-${index + 1}`)} aria-hidden="true" style={src ? { backgroundImage: `url("${src.replace(/"/g, "%22")}")` } : undefined} />;
+      })}
       <Tip content={`${name} · Click to change`}>
         <button type="button" data-open-trigger className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
           {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
@@ -437,8 +493,29 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         <button type="button" className="ref-thumb-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={10} strokeWidth={2.8} /></button>
       </Tip>
       {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
-      {role ? <i className={cn("ref-role-badge", role.value === "reference" && "is-on")} aria-hidden="true">REF</i> : null}
+      {/* The picture being edited is the one that's different from the rest: Ref leaves every image a plain reference. */}
+      {role ? <i className={cn("ref-role-badge", editing && "is-on")} aria-hidden="true">EDIT</i> : null}
     </div>
+  );
+}
+
+/** Another reference in the stack's strip: click to change it, × to take it off. */
+function StackThumb({ item, number }: { item: StackItem; number: number }) {
+  const src = assetImage(item.asset);
+  const [broken, setBroken] = React.useState(false);
+  React.useEffect(() => { setBroken(false); }, [src]);
+  const label = (item.input.label || "Reference image").toLowerCase();
+  return (
+    <span className={cn("ref-stack-item", item.open && "is-open", item.fresh && "is-new")}>
+      <Tip content={`Reference ${number}: ${referenceName(item.asset.name)} · Click to change`}>
+        <button type="button" data-open-trigger className="ref-stack-thumb" aria-label={`Change reference ${number}, currently ${item.asset.name}`} aria-expanded={item.open} onClick={item.onOpen}>
+          {item.busy ? <LoaderCircle className="spin" size={14} /> : src && !broken ? <img src={src} alt="" draggable={false} onError={() => setBroken(true)} /> : item.asset.source === "vault" ? <LockKeyhole size={13} /> : <ImageIcon size={14} />}
+        </button>
+      </Tip>
+      <Tip content={`Remove reference ${number}`}>
+        <button type="button" className="ref-stack-remove" aria-label={`Remove ${label} ${number}`} onClick={item.onRemove}><X size={9} strokeWidth={2.8} /></button>
+      </Tip>
+    </span>
   );
 }
 
@@ -528,8 +605,21 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
   });
 
   const assetFor = (slot: string) => selected.find((item) => item.slot === slot)?.asset || null;
-  // New images go to the slot that's open, else the first empty one, else the first.
-  const targetSlot = () => openSlot || inputs.find((input) => !assetFor(input.id))?.id || inputs[0]?.id || "";
+  // Slots that follow one another (a model that reads several references) form one chain: the
+  // first is the chip, the rest its stack. Independent inputs (a custom workflow's) stand alone.
+  const chains: MediaInput[][] = [];
+  for (const input of inputs) {
+    const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
+    if (chain) chain.push(input); else chains.push([input]);
+  }
+  // A phone, or a screen without hover, lays the stack out in a row: there's nothing to hover open.
+  const inline = Boolean(host?.classList.contains("phone-compose")) || coarsePointer();
+  // New images go to the slot that's open, else the first empty one. With every one of several
+  // references used, a new one replaces none of them (least of all the picture being edited);
+  // a single slot, or a workflow's own inputs, swap the first.
+  const chained = inputs.some((input) => input.follows);
+  const targetSlot = () => openSlot || inputs.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
+  const maxReferences = Math.max(1, ...chains.map((chain) => chain.length));
 
   const upload = React.useCallback(async (file: File | undefined, slot: string) => {
     if (!file || !slot || uploadSlot) return null;
@@ -540,7 +630,8 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       const asset = await uploadReferenceAsset(file, setProgress);
       onSelect(slot, asset);
       setFreshSlot(slot);
-      window.setTimeout(() => setFreshSlot(""), 700);
+      // A picture that lands in the stack opens it a moment, so you see where it went.
+      window.setTimeout(() => setFreshSlot(""), inputs.find((input) => input.id === slot)?.follows ? 1600 : 700);
       return asset;
     } catch (error) {
       onError?.(error instanceof Error ? error.message : "Couldn’t upload the image");
@@ -549,15 +640,15 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       setUploadSlot("");
       setProgress(0);
     }
-  }, [onError, onSelect, uploadSlot]);
+  }, [inputs, onError, onSelect, uploadSlot]);
 
   /*
    * Drag and drop follows the pointer: over the open popover it offers "add to
    * uploads", over the prompt bar "use as reference", anywhere else nothing.
    * The indicator's spotlight tracks the pointer; a drop lands with a pulse.
    */
-  const live = React.useRef({ upload, targetSlot, openSlot });
-  live.current = { upload, targetSlot, openSlot };
+  const live = React.useRef({ upload, targetSlot, openSlot, maxReferences });
+  live.current = { upload, targetSlot, openSlot, maxReferences };
   React.useEffect(() => {
     if (!host || !inputs.length) return;
     // Names aren't readable mid-drag, so an untyped file counts until the drop checks it.
@@ -598,8 +689,10 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       event.preventDefault();
       setLanding(true);
       window.setTimeout(() => setLanding(false), 520);
-      const { upload: run, targetSlot: slot, openSlot: open } = live.current;
-      run(file, slot()).then((asset) => {
+      const { upload: run, targetSlot: slot, openSlot: open, maxReferences: max } = live.current;
+      const into = slot();
+      if (!into) { onError?.(fullMessage(max)); return; }
+      run(file, into).then((asset) => {
         if (!asset) return;
         if (target === "popover" && open) setDropped({ asset, nonce: Date.now() });
         else setOpenSlot("");
@@ -609,7 +702,9 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       const file = Array.from(event.clipboardData?.files || []).find(isImageFile);
       if (!file) return;
       event.preventDefault();
-      live.current.upload(file, live.current.targetSlot());
+      const into = live.current.targetSlot();
+      if (!into) { onError?.(fullMessage(live.current.maxReferences)); return; }
+      live.current.upload(file, into);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("dragleave", leave);
@@ -622,40 +717,61 @@ export function ReferenceSlots({ inputs, inpaint = null, role = null, selected, 
       window.removeEventListener("drop", drop);
       host.removeEventListener("paste", paste);
     };
-  }, [host, inputs.length]);
+  }, [host, inputs.length, onError]);
 
   if (!inputs.length) return null;
   const openInput = inputs.find((input) => input.id === openSlot) || null;
+  const openFor = (id: string) => () => { setPainting(false); setOpenSlot((current) => current === id ? "" : id); };
+  // Undo puts every picture back where it was: the ones after it closed up into its slot.
+  const removeFor = (input: MediaInput) => () => {
+    const asset = assetFor(input.id);
+    const before = selected.slice();
+    onRemove(input.id);
+    if (asset) showToastTone(`Removed ${(input.label || "reference image").toLowerCase()}`, "removed", { action: { label: "Undo", onClick: () => before.forEach((item) => onSelect(item.slot, item.asset)) } });
+  };
+  const renderSlot = (input: MediaInput, stack: ReferenceStack | null) => (
+    <ReferenceSlot
+      key={input.id}
+      input={input}
+      selected={assetFor(input.id)}
+      open={openSlot === input.id}
+      busy={uploadSlot === input.id}
+      progress={progress}
+      fresh={freshSlot === input.id}
+      stack={stack}
+      // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
+      paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+        hidden: role?.slot === input.id && role.value === "reference",
+        masked: Boolean(inpaint.mask),
+        open: painting,
+        intro: introSlot === input.id,
+        onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
+      } : null}
+      role={role && role.slot === input.id && assetFor(input.id) ? role : null}
+      onOpen={openFor(input.id)}
+      onRemove={removeFor(input)}
+    />
+  );
 
   return (
     <div className="composer-reference" ref={rootRef}>
       <div className="composer-reference-slots" ref={slotsRef}>
-        {inputs.map((input) => (
-          <ReferenceSlot
-            key={input.id}
-            input={input}
-            selected={assetFor(input.id)}
-            open={openSlot === input.id}
-            busy={uploadSlot === input.id}
-            progress={progress}
-            fresh={freshSlot === input.id}
-            // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
-            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
-              hidden: role?.slot === input.id && role.value === "reference",
-              masked: Boolean(inpaint.mask),
-              open: painting,
-              intro: introSlot === input.id,
-              onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
-            } : null}
-            role={role && role.slot === input.id && assetFor(input.id) ? role : null}
-            onOpen={() => { setPainting(false); setOpenSlot((current) => current === input.id ? "" : input.id); }}
-            onRemove={() => {
-              const asset = assetFor(input.id);
-              onRemove(input.id);
-              if (asset) showToastTone(`Removed ${(input.label || "reference image").toLowerCase()}`, "removed", { action: { label: "Undo", onClick: () => onSelect(input.id, asset) } });
-            }}
-          />
-        ))}
+        {chains.flatMap((chain) => {
+          const [lead, ...rest] = chain;
+          const stacked = !inline && rest.length > 0 && Boolean(assetFor(lead.id));
+          const filled = rest.filter((input) => assetFor(input.id));
+          const next = rest.find((input) => !assetFor(input.id)) || null;
+          const stack: ReferenceStack | null = stacked ? {
+            items: filled.map((input) => ({ input, asset: assetFor(input.id)!, open: openSlot === input.id, busy: uploadSlot === input.id, progress, fresh: freshSlot === input.id, onOpen: openFor(input.id), onRemove: removeFor(input) })),
+            add: next ? { open: openSlot === next.id, busy: uploadSlot === next.id, progress, onOpen: openFor(next.id) } : null,
+            max: chain.length,
+            intro: rest.some((input) => freshSlot === input.id)
+          } : null;
+          const shown = stacked ? [lead] : chain;
+          // In a row, every slot of a full chain is used: a greyed + says how many it takes.
+          const full = !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
+          return [...shown.map((input) => renderSlot(input, input === lead ? stack : null)), ...(full ? [<AddMore key={`${lead.id}:full`} max={chain.length} add={null} className="ref-chip ref-add" />] : [])];
+        })}
       </div>
       <AnimatePresence>
         {openInput ? (

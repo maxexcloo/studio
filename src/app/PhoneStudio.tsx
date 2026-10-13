@@ -538,6 +538,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, phoneAdvancedControls, generationEstimate,
     customSize, sizeTier, sizeMax, customLimits, savedSizes
   } = view;
+  // Several references: Edit and Ref say what happens to all of them, not only the first.
+  const many = (referenceAssets || []).length > 1;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -610,7 +612,9 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
                   </button>
                 ))}
               </div>
-              <small key={referenceRole.value}>{referenceRole.value === 'edit' ? 'Changes this picture, at its size and framing' : 'Guides a new picture, at the size you pick'}</small>
+              <small key={`${referenceRole.value}:${many}`}>{referenceRole.value === 'edit'
+                ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
+                : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
             </motion.div>
           ) : null}
         </AnimatePresence>

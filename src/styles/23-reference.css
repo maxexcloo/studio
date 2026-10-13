@@ -159,12 +159,13 @@
 }
 .ref-selected.is-hover .ref-thumb-remove,
 .ref-selected:focus-within .ref-thumb-remove { opacity: 1; scale: 1; pointer-events: auto; }
-.ref-thumb-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
+/* Solid red under the pointer: the tint alone let the thumbnail show through the ×. */
+.ref-thumb-remove:hover { background: rgb(150 58 44); color: #fff; }
 .ref-thumb-remove:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(24 24 24), var(--focus-ring); }
 @media (hover: none) {
   .ref-thumb-remove { opacity: 1; scale: 1; pointer-events: auto; }
 }
-/* Edit: this very image is what changes, so the thumbnail says so at rest with a brighter ring. */
+/* Edit: this very image is what changes, so the thumbnail says so at rest with a brighter ring and EDIT. */
 .ref-selected.is-edit .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .55), 0 4px 12px rgb(0 0 0 / .35); }
 .ref-selected.is-edit.is-hover .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .7), 0 6px 16px rgb(0 0 0 / .4); }
 
@@ -549,3 +550,109 @@
 @media (prefers-reduced-motion: reduce) {
   .ref-menu-role > i, .ref-menu-paint-slot, .ref-role-badge { transition: none; }
 }
+
+/* ------------------------------------------------------------------ Stack
+   Several references (a model that reads more than one): the first stays the
+   chip in the corner, the others are a deck behind it that fans out into its
+   strip on hover, followed by a + for the next (greyed once all are used). */
+
+.ref-selected.has-deck { padding-left: 16px; }
+.ref-deck-card {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--well) center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 3px 8px rgb(0 0 0 / .35);
+  filter: brightness(.78);
+  pointer-events: none;
+  transition: transform 360ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+.ref-deck-card.is-1 { transform: translateX(-9px) scale(.9); }
+.ref-deck-card.is-2 { z-index: 0; transform: translateX(-17px) scale(.8); filter: brightness(.55); }
+/* Fanned out: the strip shows them, so the deck tucks in behind the thumbnail. */
+.ref-selected.is-hover .ref-deck-card,
+.ref-selected.is-intro .ref-deck-card,
+.ref-selected:focus-within .ref-deck-card,
+.ref-selected.is-open .ref-deck-card { transform: none; opacity: 0; }
+
+.ref-stack { display: inline-flex; align-items: center; gap: 6px; padding-right: 2px; }
+.ref-stack > .ref-menu-divider { margin: 0 2px 0 4px; }
+.ref-stack-item { position: relative; flex: none; }
+.ref-stack-thumb,
+.ref-stack-add {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+.ref-stack-thumb {
+  background: var(--well);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .14);
+  transition: box-shadow var(--dur-fast), scale 100ms;
+}
+.ref-stack-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ref-stack-thumb:hover { box-shadow: 0 0 0 1px rgb(255 255 255 / .36); }
+.ref-stack-thumb:active { scale: .95; }
+.ref-stack-item.is-open .ref-stack-thumb { box-shadow: 0 0 0 2px #fff; }
+.ref-stack-item.is-new .ref-stack-thumb { animation: ref-pop 620ms var(--ease-out); }
+.ref-stack-thumb:focus-visible,
+.ref-stack-add:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Inside the strip's clip, so it sits on the thumbnail's own corner. */
+.ref-stack-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(40 40 40);
+  color: hsl(var(--foreground));
+  box-shadow: 0 0 0 1.5px rgb(24 24 24);
+  cursor: pointer;
+  opacity: 0;
+  scale: .6;
+  transition: opacity 160ms var(--ease-out), scale 260ms var(--spring), background-color 140ms var(--ease-out);
+}
+.ref-stack-item:hover .ref-stack-remove,
+.ref-stack-item:focus-within .ref-stack-remove { opacity: 1; scale: 1; }
+.ref-stack-remove:hover { background: rgb(150 58 44); color: #fff; }
+.ref-stack-remove:focus-visible { outline: none; box-shadow: 0 0 0 1.5px rgb(24 24 24), var(--focus-ring); }
+.ref-stack-add {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18);
+  transition: background var(--dur-fast), color var(--dur-fast), scale 100ms;
+}
+.ref-stack-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-stack-add:active { scale: .95; }
+.ref-stack-add.is-open { background: var(--action); color: var(--action-ink); box-shadow: none; }
+.ref-stack-add.is-busy { cursor: default; }
+/* Every slot used: still there, greyed, and its tooltip says why. */
+.ref-stack-add.is-full,
+.ref-add.is-full { opacity: .38; cursor: default; }
+.ref-stack-add.is-full:hover { background: transparent; color: hsl(var(--muted-foreground)); }
+.ref-add.is-full:hover { background: rgb(34 34 34 / .55); }
+.ref-add.is-full:active,
+.ref-stack-add.is-full:active { scale: 1; }
+
+@media (hover: none) {
+  .ref-stack-remove { opacity: 1; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ref-deck-card { transition: none; }
+}
+/* The deck's room sits left of the thumbnail: EDIT stays on the thumbnail's corner. */
+.ref-selected.has-deck .ref-role-badge { left: 12px; }
