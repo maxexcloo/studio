@@ -109,6 +109,7 @@ docker run --env COMFY_URL --init --publish 127.0.0.1:8787:8787 --rm \
   --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" heiss-ui:local
 ```
 
+Set `COMFY_VIDEO_URL` to a separate ComfyUI HTTP(S) endpoint to route local video workflows there. Images and provider-backed Grok workflows stay on `COMFY_URL`. Job progress, uploads and cancellation follow the selected backend; an unavailable video server never falls back to the primary server. Both backends must share input and output storage for local gallery access. On phones, select **Video** on the **Create** sheet, then choose a video model; duration controls are under **Advanced Settings**.
 
 Open `http://localhost:8787`. `/data` retains settings, galleries, histories and imported workflows. Mount ComfyUI inputs, outputs and model directories separately when a feature needs local file access. The image defaults to UID 1000, exposes port 8787 and includes a health check. It starts the server directly; update the container image to update the application.
 

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { currentComfyBackend, withComfyBackend } from "./comfy-backends.js";
 import fs from "node:fs";
 import path from "node:path";
 import { comfy, comfyInputDir } from "./comfy.js";
@@ -116,6 +117,7 @@ export function rememberHiddenRun(key, promptId, { kind = "run", body = null, it
   runs.push({
     id,
     at: Date.now(),
+    comfyBackend: currentComfyBackend(),
     publicKey: key ? b64(pair.publicKey.export({ format: "der", type: "spki" })) : "",
     sealed: key ? aesSeal(Buffer.from(JSON.stringify(note)), key, noteLabel) : "",
     inputs: inputNames.filter(Boolean).map((name) => inputDigest(String(name))),
@@ -266,8 +268,13 @@ function findEntry(history, id) {
 }
 
 async function sweep() {
+  const backends = new Set(runs.map((run) => run.comfyBackend || "primary"));
+  for (const backend of backends) await withComfyBackend(backend, sweepBackend);
+}
+
+async function sweepBackend() {
   const following = new Set([...live].map(runDigest));
-  const open = runs.filter((run) => !run.settled && !following.has(run.id));
+  const open = runs.filter((run) => (run.comfyBackend || "primary") === currentComfyBackend() && !run.settled && !following.has(run.id));
   if (!open.length) return;
   let queued;
   let history;

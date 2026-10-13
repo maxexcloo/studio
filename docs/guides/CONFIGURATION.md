@@ -14,6 +14,10 @@ COMFY_OUTPUT_DIR=
 
 For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `HEISS_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `HEISS_TLS_CERT`, `HEISS_TLS_KEY` and `HEISS_HTTPS_PORT` for HTTPS. See [Connect over LAN](#connect-over-lan), [On your phone](#on-your-phone) and [SECURITY.md](./SECURITY.md).
 
+`COMFY_VIDEO_URL` optionally routes local video workflows to a second ComfyUI endpoint. Images and provider-backed Grok workflows continue to use `COMFY_URL`; if the video endpoint is unavailable, video work does not fall back to the image server. Both backends must share input and output storage for local gallery access.
+
+
+
 `HEISS_DEFAULT_IMAGE_PROFILE` and `HEISS_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
 Also optional: `HEISS_COMFY_SEARCH=0` keeps HEISS on `COMFY_URL` (the **Find ComfyUI on its own** switch under Settings › Connection › Change address; by default, when that doesn't answer, HEISS looks on 8188 and 8000 and switches to whatever ComfyUI answers there), `HEISS_NO_BROWSER=1` keeps the launcher from opening the browser, and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).

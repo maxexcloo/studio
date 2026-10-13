@@ -1,12 +1,13 @@
 import crypto from 'node:crypto';
-import { comfy, comfyUrl, normalizeComfyError, noteComfyReachable } from './comfy.js';
+import { withComfyBackend } from './comfy-backends.js';
+import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
 import { describeFailure } from './failures.js';
 import { withFixes } from './failure-fixes.js';
 import { nextProgress } from './progress-phase.js';
 import { rememberMissingParts } from './model-families.js';
 import { imageGraph, videoGraph } from './graphs.js';
-import { gallery, hideGalleryItems, outputsFrom, removeGalleryJob, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
+import { gallery, generationSettings, hideGalleryItems, outputsFrom, removeGalleryJob, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
 import { forgetComfyRun } from './hidden-traces.js';
 import { releaseHiddenRun, rememberHiddenRun } from './hidden-runs.js';
 import { attachVaultUpscale, patchVaultItem, storeHiddenOutputs } from './vault.js';
@@ -263,7 +264,7 @@ export function queueClearsAt(now = Date.now()) {
 }
 
 function openProgressSocket(id) {
-  const wsUrl = comfyUrl.replace(/^http/i, "ws");
+  const wsUrl = activeComfyUrl().replace(/^http/i, "ws");
   let socket;
   try {
     socket = new WebSocket(`${wsUrl}/ws?clientId=${encodeURIComponent(id)}`);
@@ -449,7 +450,11 @@ function showReconnecting(id, run, on) {
  * upscale (run-upscale.js) returns the graph with its upscale and which save
  * node each upscale belongs to, or `{ skipped }` saying why there is none.
  */
-async function runJob(id, body, { prepare = null } = {}) {
+function runJob(id, body, options = {}) {
+  return withComfyBackend(body.comfyBackend, () => runJobOnBackend(id, body, options));
+}
+
+async function runJobOnBackend(id, body, { prepare = null } = {}) {
   jobBodies.set(id, body);
   const timing = { timer: null, estimate: generationEstimate(body), warm: false };
   runTimings.set(id, timing);
@@ -486,7 +491,7 @@ async function runJob(id, body, { prepare = null } = {}) {
       method: "POST",
       headers: { "content-type": "application/json" },
       // heiss_hidden stays with the run in ComfyUI's history, so no recovery ever takes it for a gallery image.
-      body: JSON.stringify({ prompt, client_id: id, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "auto", ...(hiddenPromptId ? { heiss_hidden: true } : {}) } })
+      body: JSON.stringify({ prompt, client_id: id, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "auto", ...(hiddenPromptId ? { heiss_hidden: true } : { heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body) } }) } })
     });
     // An older ComfyUI names the run itself.
     if (hiddenPromptId && queued.prompt_id && queued.prompt_id !== hiddenPromptId) {
