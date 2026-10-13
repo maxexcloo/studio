@@ -65,6 +65,7 @@ version opens with a `> ` summary line, which the update pill shows.
   model.
 - 4K upscales and restarts on Windows work again.
 - Smaller fixes to references and saved sizes.
+- **Reliable AMD upscales:** use wavelet colour correction for manual and automatic SeedVR2 upscales, avoiding the red bands and black regions produced by LAB on Radeon GPUs.
 - **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
 - **Reference library recovery:** failed pages keep the loaded images and show an inline retry; keyboard navigation uses one thumbnail Tab stop, Home/End and focus restoration.
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.

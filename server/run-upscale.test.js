@@ -40,6 +40,7 @@ test("Smart upscale goes into the run's own graph, fed by the picture the run sa
   assert.equal(graph["9"].class_type, "SaveImage");
   assert.deepEqual(graph.heiss_up0_2.inputs.image, ["8", 0]);
   assert.deepEqual(graph.heiss_up0_5.inputs.image, ["heiss_up0_2", 0]);
+  assert.equal(graph.heiss_up0_5.inputs.color_correction, "wavelet", "automatic upscale uses the same colour correction as manual upscale");
   assert.deepEqual(graph.heiss_up0_9.inputs.images, ["heiss_up0_5", 0]);
   assert.equal(graph.heiss_up0_1, undefined, "no LoadImage: nothing is staged");
   assert.equal(graph.heiss_up0_5._meta.heissPhase, "Upscaling to 4K");

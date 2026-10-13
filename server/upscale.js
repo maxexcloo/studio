@@ -702,7 +702,8 @@ export function upscaleGraph(body, info = {}) {
         max_resolution: plan.maxResolution,
         batch_size: video ? 5 : 1,
         uniform_batch_size: false,
-        color_correction: "lab",
+        // LAB can corrupt SeedVR2 output on AMD GPUs despite a successful run.
+        color_correction: "wavelet",
         temporal_overlap: 0,
         prepend_frames: 0,
         input_noise_scale: 0,

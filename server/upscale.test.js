@@ -241,3 +241,15 @@ test("balanced and high upscales decode in smaller tiles without changing the re
     assert.equal(vae.inputs.decode_tiled, true);
   }
 });
+
+test("image and video upscales use wavelet colour correction across quality tiers", () => {
+  clearDir();
+  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
+  placeModel("ema_vae_fp16.safetensors");
+  for (const mediaType of ["image", "video"]) {
+    for (const quality of ["fast", "balanced", "high"]) {
+      const { graph } = upscaleGraph({ mediaType, quality, width: 640, height: 640 }, infoWith(registryListing));
+      assert.equal(graph["5"].inputs.color_correction, "wavelet", `${mediaType}: ${quality}`);
+    }
+  }
+});
