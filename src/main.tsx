@@ -1550,7 +1550,7 @@ function App() {
       if (prefs.zenMode) return;
       pendingScroll.current = null;
       galleryScroll.current[`${hidden.space}:${mode}`] = 0;
-      galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      galleryStageRef.current?.scrollTo({ top: 0, behavior: "instant" });
     }
   });
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem, deleteItems } = generationActions;

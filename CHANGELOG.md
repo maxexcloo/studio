@@ -21,6 +21,7 @@ version opens with a `> ` summary line, which the update pill shows.
 ### Fixed
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
 - **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
+- **Generation reveal:** starting a run goes straight to the top, without an animated scroll being interrupted by the new tiles.
 - **Phone negative prompts:** the saved field has a stable accessible label, including when the current profile does not use it.
 - **Settings › Features › Inpainting says where its two dials are:** in the
   sidebar's Basics, under the image, not under Advanced.

@@ -66,6 +66,8 @@ async function openComposer(page: Page, phone: boolean) {
 }
 
 test('generation completion stays in its mode and unsupported negatives remain saved', async ({ page, isMobile }) => {
+  // Keep generation state checks independent of software-rendered GPU effects in CI.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/api/models', async (route) => {
     const response = await route.fetch();
     const models = await response.json();
