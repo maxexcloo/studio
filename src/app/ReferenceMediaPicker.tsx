@@ -8,8 +8,10 @@ import { useDismiss } from "./useDismiss";
 import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset } from "./types";
-import { InpaintStudio } from "./InpaintStudio";
+
 import { SafeImg } from './SafeImg';
+
+const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
 type PickerTab = "generation" | "hidden" | "upload";
 
@@ -646,7 +648,7 @@ export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onR
       </AnimatePresence>
       <AnimatePresence>
         {painting && inpaint && paintedAsset && host ? (
-          <InpaintStudio
+          <React.Suspense fallback={<p className="reference-opening" role="status">Opening image editor…</p>}><InpaintStudio
             key={paintedAsset.id}
             anchor={host}
             asset={paintedAsset}
@@ -654,7 +656,7 @@ export function ReferenceSlots({ inputs, inpaint = null, selected, onSelect, onR
             popRef={studioRef}
             onChange={inpaint.onChange}
             onClose={stopPainting}
-          />
+          /></React.Suspense>
         ) : null}
       </AnimatePresence>
       <div ref={overlayRef} className={cn("composer-drop", dropTarget === "prompt" && "is-active", landing && "is-landing")} aria-hidden={dropTarget !== "prompt"}>

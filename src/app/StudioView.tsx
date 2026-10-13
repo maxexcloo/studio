@@ -31,7 +31,7 @@ import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { ViewerActions } from './ViewerActions';
-import { WorkflowGallery } from './WorkflowGallery';
+
 import { HiddenLockScreen, HiddenUnlockSheet } from './HiddenLock';
 import { HiddenSetupDialog } from './HiddenSetup';
 import { HiddenActionsContext } from './hiddenContext';
@@ -43,7 +43,8 @@ import { haptic } from './phoneControls';
 import { ConnectedCard } from './ConnectedCard';
 import { Toaster } from './Toaster';
 import { EmptyStage } from './EmptyStage';
-import { SettingsDialog, type SettingsSection } from './SettingsDialog';
+import type { SettingsSection } from './SettingsDialog';
+import { Modal } from './Modal';
 import { GetModelsSheet, StarterModels } from './StarterModels';
 import { NoComfySheet } from './NoComfySheet';
 import { FeedbackHost } from './FeedbackDialog';
@@ -104,6 +105,11 @@ function comfyStatusLabel(status: any) {
   }
   return `${name} offline${status?.url ? ` · ${status.url}` : ""}${status?.error ? ` · ${status.error}` : ""}`;
 }
+
+const loadSettings = () => import('./SettingsDialog');
+const SettingsDialog = React.lazy(() => loadSettings().then((module) => ({ default: module.SettingsDialog })));
+const loadWorkflows = () => import('./WorkflowGallery');
+const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ default: module.WorkflowGallery })));
 
 function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retrying: boolean; onClick: () => void }) {
   const state = status?.restarting ? "restarting" : status?.checking || retrying ? "checking" : status?.connected ? "connected" : "disconnected";
@@ -445,8 +451,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <LockKeyhole size={16} />
         </button>
       </Tip>
-      <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={16} /></button></Tip>
-      <Tip content="Settings"><button className="icon-button" aria-label="Settings" onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
+      <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onFocus={() => { void loadWorkflows().catch(() => undefined); }} onPointerEnter={() => { void loadWorkflows().catch(() => undefined); }} onPointerDown={() => { void loadWorkflows().catch(() => undefined); }} onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={16} /></button></Tip>
+      <Tip content="Settings"><button className="icon-button" aria-label="Settings" onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {prefs.zenMode ? (
         <Tip content="Exit zen (Esc)"><button className="icon-button" aria-label="Exit zen" onClick={() => setZenMode(false)}><Minimize2 size={16} /></button></Tip>
       ) : (
@@ -847,7 +853,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </section>
         </>
       )}
-      <SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} />
+      {settings ? <React.Suspense fallback={<Modal open title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
@@ -1039,7 +1045,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </div>
         );
       })() : null}
-      {workflowGalleryOpen ? <WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /> : null}
+      {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>
       {/* Portaled to <body>: inside the fixed shell it would sit under every dialog's scrim. */}
