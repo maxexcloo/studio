@@ -386,6 +386,13 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     : "";
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // While the menu is open the trigger keeps the width it opened at: its label changes as you
+  // type a size ("1:1" → "1.6:1"), and a wider button would shift the bar, and the menu with it.
+  const [heldWidth, setHeldWidth] = useState<number | null>(null);
+  React.useLayoutEffect(() => {
+    if (open) setHeldWidth((held) => held ?? triggerRef.current?.offsetWidth ?? null);
+    else if (!presence.mounted) setHeldWidth(null);
+  }, [open, presence.mounted]);
   const wasOpen = useRef(false);
   useEffect(() => {
     if (wasOpen.current && !open) {
@@ -405,13 +412,13 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
 
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className="aspect-trigger" aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
+      <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { width: heldWidth } : undefined} aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The tag sits on the icon's corner, so 2K or Custom never changes the button's width. */}
           <span className="aspect-shape-slot">
             <span className="aspect-shape" style={aspectIconStyle({ label: "", value: "", w: shown.width, h: shown.height })} />
             {badge ? <b className="aspect-upscale-badge" aria-hidden="true">{badge}</b> : null}
           </span>
-          {density === "full" ? <span>{label}</span> : null}
+          {density === "full" ? <span className="aspect-trigger-label">{label}</span> : null}
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
       {presence.mounted ? (

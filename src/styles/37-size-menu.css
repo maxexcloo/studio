@@ -11,7 +11,21 @@
 }
 .size-menu-side { display: grid; gap: 4px; align-content: start; min-width: 0; }
 .size-menu .aspect-list { gap: 2px; }
-.size-menu .aspect-option { min-height: 32px; }
+.size-menu .aspect-option { min-height: 32px; align-items: center; }
+/* The sizes: one mono column, right-aligned, so their digits line up row to row. */
+.size-menu .aspect-option em {
+  justify-self: end;
+  padding-right: 4px;
+  color: hsl(var(--muted-foreground) / .85);
+  font: 500 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Held at its opening width while the menu is open (AspectPicker): a longer
+   label shortens rather than widening the button and shifting the bar. */
+.aspect-trigger.is-held { min-width: 0; }
+.aspect-trigger.is-held .aspect-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The preview: a window of its own to the menu's left, its full height. The
    window is the stage; lines from the frame's edges run across all of it. */
@@ -74,7 +88,7 @@
 
 /* With the window there, the rows don't draw their shapes: the window does. */
 @media (hover: hover) and (min-width: 761px) {
-  .size-menu .aspect-option { grid-template-columns: minmax(44px, auto) minmax(80px, 1fr); }
+  .size-menu .aspect-option { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-left: 12px; }
   .size-menu .aspect-option > .aspect-shape { display: none; }
 }
 /* Touch, or a narrow window: no room beside the menu, so no window; the rows keep their shapes. */
@@ -82,42 +96,53 @@
   .size-peek { display: none; }
 }
 
-/* Custom: width and height. Linked, one field with the link in its middle;
-   unlinked, two fields that step apart. */
+/* Custom: width and height, as three cells on one line: W, the link, H.
+   Linked, they close up into one pill; apart, they're two pills with the
+   link floating between. Hovering the link previews the click: linked cells
+   ease a hair apart, apart ones lean in. The click finishes it on a spring. */
 .size-custom { overflow: hidden; }
 .size-custom-body { display: grid; gap: 6px; padding: 2px 0 0; }
 .size-fields {
+  --cell-spring: cubic-bezier(.3, 1.45, .45, 1);
+  --seam: 0px;
+  --inner: 0px;
+  --pill: 18px; /* half the cells' height: a full round end */
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
-  border-radius: var(--r-pill);
-  transition: gap 260ms var(--ease-out), background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+  align-items: stretch;
+  column-gap: var(--seam);
+  height: 36px;
+  transition: column-gap 340ms var(--cell-spring);
 }
-.size-fields.is-linked { gap: 0; background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
-.size-fields.is-linked:focus-within { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .16); }
+/* Linked, hovering the link: a sliver opens at each seam. */
+.size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; }
+/* Apart: two pills. Hovering the link draws them in. */
+.size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); }
+.size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; }
+.size-field,
+.size-link {
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+  transition: border-radius 340ms var(--cell-spring), background-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), color 160ms var(--ease-out);
+}
 .size-field {
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 36px;
-  border-radius: var(--r-pill);
-  background: var(--well);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
-  transition: background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
 }
-.size-field:focus-within { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .16); }
-.size-fields.is-linked .size-field,
-.size-fields.is-linked .size-field:focus-within { background: transparent; box-shadow: none; }
+.size-field:first-child { border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
+.size-field:last-child { border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
+/* Focus lifts the cell a shade; no ring around a borderless field. */
+.size-field:focus-within { background: linear-gradient(rgb(255 255 255 / .045), rgb(255 255 255 / .045)), var(--well); }
 /* The W/H label is the drag handle. */
 .size-field-key {
   flex: none;
   align-self: stretch;
   display: grid;
   place-items: center;
-  width: 30px;
-  color: hsl(var(--muted-foreground));
-  font: 600 11.5px/1 var(--font-mono);
+  width: 32px;
+  color: hsl(var(--muted-foreground) / .8);
+  font: 600 11px/1 var(--font-mono);
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
@@ -125,35 +150,46 @@
 }
 .size-field-key:hover,
 .size-field.is-dragging .size-field-key { color: var(--ember); }
-.size-field input {
+.size-field input,
+.size-field input:focus,
+.size-field input:focus-visible {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 10px 0 0;
+  padding: 0 12px 0 0;
   border: 0;
+  border-radius: 0;
   outline: 0;
+  box-shadow: none;
   background: transparent;
   color: hsl(var(--foreground));
   font: 500 13px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
 }
+.size-field input::selection { background: rgb(255 154 82 / .32); color: #fff; }
 .size-link {
   flex: none;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: transparent;
+  border-radius: var(--inner);
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--spring);
 }
-.size-link:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.size-link:active { transform: scale(.9); }
+.size-link:hover { color: hsl(var(--foreground)); }
 .size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
+/* Apart, the link floats free between the pills. */
+.size-fields:not(.is-linked) .size-link { background: transparent; box-shadow: none; }
 .size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-link-icon { display: grid; place-items: center; animation: linkTurn 420ms var(--cell-spring) both; }
+.size-link:active .size-link-icon { scale: .86; transition: scale 80ms; }
+@keyframes linkTurn {
+  from { opacity: 0; transform: rotate(-80deg) scale(.5); }
+  to { opacity: 1; transform: none; }
+}
 html.is-size-scrubbing,
 html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !important; }
 
@@ -175,8 +211,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 
 /* Phone: the same fields under the size tabs. */
 .phone-control .size-custom-body { padding-top: 4px; }
-.phone-control .size-field,
-.phone-control .size-fields { min-height: 44px; }
+.phone-control .size-fields { --pill: 22px; height: 44px; }
 .phone-control .size-field input { font-size: 16px; }
 
 
@@ -191,6 +226,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .size-guide, .size-frame, .size-fields, .size-field, .size-peek { transition: none; }
+  .size-guide, .size-frame, .size-fields, .size-field, .size-link, .size-peek { transition: none; }
+  .size-link-icon { animation: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
 }

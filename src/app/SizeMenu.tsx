@@ -176,6 +176,8 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
  */
 export function LinkedSizeFields({ size, limits, onChange }: { size: Size; limits: { width: SideLimits; height: SideLimits }; onChange: (size: Size) => void }) {
   const [linked, setLinked] = React.useState(true);
+  // Just clicked: the hover lean waits until the pointer leaves the link, so the click's move plays in full.
+  const [fresh, setFresh] = React.useState(false);
   const shape = React.useRef(size.width / size.height);
   const begin = () => { shape.current = size.width / size.height; };
   const maxW = limits.width.max ?? 4096;
@@ -195,11 +197,12 @@ export function LinkedSizeFields({ size, limits, onChange }: { size: Size; limit
   const atLimit = size.width >= maxW || size.height >= maxH;
   return (
     <div className="size-custom-body">
-      <div className={cn("size-fields", linked && "is-linked")}>
+      <div className={cn("size-fields", linked && "is-linked", fresh && "is-fresh")}>
         <SizeField axis="W" value={size.width} limits={limits.width} onStart={begin} onChange={setWidth} />
         <Tip content={linked ? "Linked: the shape stays as you resize. Click to unlink" : "Unlinked: width and height change on their own. Click to link"}>
-          <button type="button" className="size-link" aria-pressed={linked} aria-label={linked ? "Unlink width and height" : "Link width and height"} onClick={() => { begin(); setLinked((value) => !value); }}>
-            {linked ? <Link2 size={14} strokeWidth={2.2} /> : <Unlink2 size={14} strokeWidth={2.2} />}
+          <button type="button" className="size-link" aria-pressed={linked} aria-label={linked ? "Unlink width and height" : "Link width and height"} onClick={() => { begin(); setFresh(true); setLinked((value) => !value); }} onPointerLeave={() => setFresh(false)}>
+            {/* Keyed, so each change plays the icon's turn (37-size-menu.css). */}
+            <span key={linked ? "linked" : "apart"} className="size-link-icon">{linked ? <Link2 size={14} strokeWidth={2.2} /> : <Unlink2 size={14} strokeWidth={2.2} />}</span>
           </button>
         </Tip>
         <SizeField axis="H" value={size.height} limits={limits.height} onStart={begin} onChange={setHeight} />
