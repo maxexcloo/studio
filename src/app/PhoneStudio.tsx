@@ -762,7 +762,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   );
   return (
     <Sheet open={open} onClose={onClose} title="Model" full>
-      {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
+      {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
       {profiles.length > 8 ? (
         <label className="phone-search">
           <Search size={17} aria-hidden="true" />

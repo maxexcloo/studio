@@ -62,13 +62,17 @@ test('speed filters use variant metadata and recognise accelerated imported reci
   assert.equal(workflowSpeed({ name: 'Flux De-distilled', defaults: { steps: 28 } }), 'standard');
   assert.equal(workflowSpeed({ name: 'Custom Recipe', defaults: { steps: 4 } }), 'flash');
   assert.equal(workflowSpeed({ name: 'Grok Imagine', family: 'grok', defaults: { steps: 4 } }), 'standard');
+  assert.equal(workflowSpeed({ name: 'MiniMax H3 · Non-Reference · PDD · 8 Steps', defaults: { steps: 20 } }, { variant: 'standard' }), 'flash');
 });
 
-test('purpose filters distinguish required references and keep optional references in both groups', () => {
+test('purpose filters distinguish reference recipes from optional generation inputs', () => {
   assert.deepEqual(workflowPurpose({}), { generate: true, edit: false });
   assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', required: true }] }), { generate: false, edit: true });
   assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', min: 1 }] }), { generate: false, edit: true });
-  assert.deepEqual(workflowPurpose({ capabilities: { startImage: true } }), { generate: true, edit: true });
+  assert.deepEqual(workflowPurpose({ capabilities: { startImage: true } }), { generate: true, edit: false });
+  assert.deepEqual(workflowPurpose({ name: 'MiniMax H3 · Non-Reference · PDD', mediaInputs: [{ kind: 'image', required: false }], capabilities: { startImage: true } }), { generate: true, edit: false });
+  assert.deepEqual(workflowPurpose({ name: 'Klein · Reference', mediaInputs: [{ kind: 'image', required: false }] }), { generate: false, edit: true });
+  assert.deepEqual(workflowPurpose({ name: 'Grok Image Edit' }), { generate: false, edit: true });
   assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'audio', required: true }] }), { generate: true, edit: false });
   const filters = { favourites: true, speed: 'flash', purpose: 'edit' };
   const profile = { id: 'quick-edit', label: 'Quick Edit', defaults: { steps: 4 }, capabilities: { startImageRequired: true, startImage: true } };
