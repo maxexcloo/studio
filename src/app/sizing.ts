@@ -34,9 +34,20 @@ export function ratioName(width: number, height: number) {
   return ratio >= 1 ? `${Number(ratio.toFixed(1))}:1` : `1:${Number((1 / ratio).toFixed(1))}`;
 }
 
+/**
+ * One megapixel as ComfyUI counts it (ImageScaleToTotalPixels): 1024 × 1024, so a model's
+ * usual 1024² is exactly 1 MP and the size menu's Megapixels field agrees with every readout.
+ */
+export const MEGAPIXEL = 1024 * 1024;
+
+/** A megapixel count as typed and shown: up to two decimals, no trailing zeros (1, 1.5, 2.25). */
+export function formatMp(value: number) {
+  return String(Math.round(value * 100) / 100);
+}
+
 /** "1.0 MP", "2.4 MP": an area people can compare at a glance. */
 export function megapixels({ width, height }: Size) {
-  const value = (width * height) / 1_000_000;
+  const value = (width * height) / MEGAPIXEL;
   return `${value >= 10 ? Math.round(value) : value.toFixed(1)} MP`;
 }
 

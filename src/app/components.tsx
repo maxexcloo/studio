@@ -7,8 +7,8 @@ import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem 
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
-import { presetRatio, type SideLimits } from './sizing';
-import { LinkedSizeFields, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
+import { MEGAPIXEL, presetRatio, type SideLimits } from './sizing';
+import { LinkedSizeFields, MegapixelField, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type MegapixelControl, type SizeRow, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
 import { AnimatePresence, motion } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
@@ -322,7 +322,7 @@ function triggerShapeStyle(width: number, height: number): React.CSSProperties {
  * and changes the shape. The trigger draws the real shape and says the ratio,
  * with a tag for 2K ("2K") and Custom ("C").
  */
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved }: {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved, targetArea = 0, megapixel = null }: {
   value: string;
   options: AspectPreset[];
   onChange: (value: string) => void;
@@ -344,6 +344,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   onRenameSize?: (id: string, name: string) => void;
   onRemoveSize?: (id: string) => void;
   onPickSaved?: (saved: SavedSize) => void;
+  /** Megapixels in 2K's place (Settings › Generation): Default draws every shape at this area. */
+  targetArea?: number;
+  megapixel?: MegapixelControl | null;
 }) {
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
@@ -357,7 +360,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const [peek, setPeek] = useState(false);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
-  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes });
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes, targetArea });
   const previewRow = hovered;
   const previewSize = previewRow ? previewRow.size : shown;
   const previewLabel = captionFor(previewRow);
@@ -370,7 +373,14 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     // The exact width, rounded up: offsetWidth rounds down, and a label a fraction too wide would show "…".
     if (open) setHeldWidth((held) => held ?? (triggerRef.current ? Math.ceil(triggerRef.current.getBoundingClientRect().width) : null));
     else if (!presence.mounted) setHeldWidth(null);
-  }, [open, presence.mounted]);
+  }, [open, presence.mounted, heldWidth]);
+  // A tag coming or going while it's open (2K, MP, C) is measured afresh, once, so the label isn't cut to "D…".
+  const lastBadge = useRef(badge);
+  React.useLayoutEffect(() => {
+    if (lastBadge.current === badge) return;
+    lastBadge.current = badge;
+    if (open) setHeldWidth(null);
+  }, [badge, open]);
   const wasOpen = useRef(false);
   useEffect(() => {
     if (wasOpen.current && !open) {
@@ -410,7 +420,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           onPointerEnter={(event) => { if (event.pointerType !== "touch") setPeek(true); }}
           onFocusCapture={(event) => { if ((event.target as HTMLElement).matches(":focus-visible, input")) setPeek(true); }}
         >
-          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && tier !== "none"} shown={peek} />
+          <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && (tier !== "none" || targetArea > 0)} shown={peek} />
           <div className="size-menu-side">
             <div className="aspect-upscale">
               <div className="aspect-upscale-head">
@@ -469,6 +479,8 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                 )) : null}
               </AnimatePresence>
             </div>
+            {/* Under every shape: how big they're all drawn. */}
+            {megapixel ? <MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixel} custom={custom} /> : null}
           </div>
         </div>
       ) : null}

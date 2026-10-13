@@ -17,8 +17,8 @@ import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
-import { LinkedSizeFields, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
-import { presetRatio, ratioName } from './sizing';
+import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
+import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
 import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
@@ -762,12 +762,13 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
 function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
   const {
     aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
-    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize
+    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
+    sizeTiers, sizeArea, megapixelControl
   } = view;
   const saved = (savedSizes || []) as SavedSize[];
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
-  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved });
+  const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
+  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0 });
   const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, captionFor, note } = model;
 
   // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.
@@ -806,7 +807,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
   return (
     <Sheet open={open} onClose={onClose} title="Size" className="phone-size">
       <div className="phone-size-stage">
-        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && tier !== 'none'} inset={18} />
+        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && (tier !== 'none' || sizeArea > 0)} inset={18} />
       </div>
       <div className="phone-size-top">
         <SizeTabs tiers={tiers} value={tier} onChange={(next) => { haptic('tap'); chooseSizeTier(next); }} />
@@ -828,6 +829,8 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
           </button>
         ))}
       </div>
+      {/* Under the shapes, as on the desktop: how big they're all drawn. */}
+      {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
       {saved.length ? (
         <>
           <div className="phone-size-saved-head">

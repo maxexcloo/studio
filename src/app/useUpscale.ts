@@ -3,6 +3,7 @@ import { ApiError, apiJson } from './api';
 import type { AutoUpscale, GalleryItem, NativeSize, NativeSupport, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
+import { fitRatio } from './sizing';
 import { formatLeft, useRunClock } from './GenerationProgress';
 
 /** The gallery keeps the original as the record; only the view swaps. */
@@ -119,11 +120,20 @@ export type SizePlan = {
 /**
  * How a run reaches its tab: Default is the picked preset as it is; 2K draws
  * that aspect with its long side at 2048, the model itself, no upscale after.
+ * With `area` (Settings › Generation › Megapixels, which takes 2K's place),
+ * Default draws the picked aspect at that many pixels instead, in the model's steps (16 at least).
  */
-export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192): SizePlan {
+export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192, area = 0, step = 16): SizePlan {
   const size = upscaleSize(tier);
   const picked = { width, height };
   const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false };
+  if (size === "none" && area > 0 && width > 0 && height > 0) {
+    const side = { min: 64, max, step: Math.max(16, step) };
+    const draw = fitRatio(width / height, area, side, side, side.step);
+    if (draw.width === width && draw.height === height) return plain;
+    // Short of the area asked for because a side reached the model's max.
+    return { size, draw, final: draw, untested: false, capped: draw.width * draw.height < area * 0.97 && Math.max(draw.width, draw.height) >= max };
+  }
   if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
   const draw = drawnAt(picked, 2048, max);
   return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048 };

@@ -34,12 +34,29 @@ version opens with a `> ` summary line, which the update pill shows.
   [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
   without SeedVR2 still opens its setup.
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference for Edit or Ref. Edit works as before: the result keeps
-  that image's size. Ref keeps your size and aspect, and the image still
-  guides the picture, 2K/4K included. A REF tag on the thumbnail shows it.
-  The inpainting brush belongs to Edit, so it hides while Ref is on.
+  first reference for Edit or Reference. Edit works as before: the result
+  keeps that image's size, and an EDIT tag on the thumbnail shows it.
+  Reference keeps your size and aspect, and the image still guides the
+  picture, 2K/4K included. The inpainting brush belongs to Edit, so it hides
+  while Reference is on.
+- **Size in megapixels.** Settings › Generation › Size in megapixels puts a
+  Megapixels field under the shapes in the size menu, in place of 2K. Type a
+  count, step it with the arrow keys or drag its MP label, and every shape is
+  drawn at that many pixels (3 MP makes 1:1 1776 × 1776); in Custom it
+  rescales the size you have, keeping its shape. Reset gives each model its
+  own size back. 1 MP is 1024 × 1024, as ComfyUI counts it, and the size
+  readouts now count the same way.
+- **Save any custom size.** "Save size" is back for a size of your own, a
+  common shape at a size of its own included; not for one Default or 2K
+  already gives.
 
 ### Changed
+- **Several references are one chip.** The first image stays in the corner;
+  the others sit behind it and fan out on hover, with a + for the next one
+  (greyed, saying how many it takes, once all are used). In Edit the others
+  are greyed, since only the first changes, and no more can be added; in
+  Reference they all guide. Switching glides instead of jumping, and the
+  phone lays them out in a row.
 - **A tighter size menu.** Default and the ratio it already is share one
   row, rows are more compact, and 2.35:1 is gone.
 - **A 2K/4K pick survives a reference.** It is skipped while an edited
@@ -52,6 +69,14 @@ version opens with a `> ` summary line, which the update pill shows.
   runs, and the tiled decode a native size uses, are learned apart too.
 
 ### Fixed
+- **Size menu:** pressing a shape no longer snaps the preview back to the
+  chosen one; dragging W, H or MP changes the number and lets go, without
+  dropping you into the field or leaving the drag cursor behind; a long
+  saved-size name shortens with "…" instead of running under its size; a
+  2K or MP tag added with the menu open no longer cuts the label to "D…".
+- **References:** a drop or paste with every slot used no longer replaces
+  the picture being edited; Undo after removing one puts all of them back
+  where they were; the remove × is solid red under the pointer.
 - **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax
   Music's encoder looks like Qwen3 8B from outside and could become the
   default, failing every run with "mat1 and mat2 shapes cannot be

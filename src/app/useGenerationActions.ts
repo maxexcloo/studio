@@ -21,7 +21,7 @@ export function useGenerationActions(view: any) {
     frames, fps, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode,
     model, negative, prefs, hiddenSpace, hidden, prompt, sampler, scheduler, seed, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
-    referenceAssets, inpaint, sizeTier, sizeMax, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
+    referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
   const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
   const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
@@ -137,7 +137,7 @@ export function useGenerationActions(view: any) {
       const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
       // 2K: the picked aspect drawn with its long side at 2048 (useUpscale sizePlan). Not
       // where the output's size isn't the model's to pick: a reference that frames it, or a mask.
-      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax) : null;
+      const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, sizeStep) : null;
       const native = plan?.draw || null;
       const requestBody: Record<string, any> = retry ? retry.body : {
         kind: mode,
@@ -167,7 +167,8 @@ export function useGenerationActions(view: any) {
         referenceAssets: (referenceAssets || []).map(({ slot, asset }: any) => ({ slot, assetId: asset.id })),
         referenceRole: framedByReference ? "edit" : "reference",
         // Native 2K/4K: a whole-frame decode at that size can outgrow VRAM and crawl in shared memory without failing; tiles stay on the GPU.
-        ...(native ? { tiledDecode: true } : {}),
+        // (Megapixels can draw smaller than the preset too: tiles only from about 2K up.)
+        ...(native && native.width * native.height >= 2048 * 1152 ? { tiledDecode: true } : {}),
         // A painted mask on the first reference: change only that part.
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",

@@ -670,6 +670,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
               sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
               sizeMax={view.sizeMax}
               customLimits={view.customLimits}
               chooseSizeTier={view.chooseSizeTier}
@@ -794,6 +797,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
               sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
               sizeMax={view.sizeMax}
               customLimits={view.customLimits}
               chooseSizeTier={view.chooseSizeTier}

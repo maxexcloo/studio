@@ -852,6 +852,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 <Segmented label="Run variants as" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One batch' }, { value: 'separate', label: 'Separate jobs' }]} />
               </Row>
               <PromptHistoryRow Row={Row} Switch={Switch} showToast={showToast} confirmAction={confirmAction} />
+              <SwitchRow label="Size in megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
             </Group>
             <Group title="Previews">
               <Row label="While generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
