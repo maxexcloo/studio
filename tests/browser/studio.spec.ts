@@ -118,12 +118,13 @@ test('generation completion stays in its mode and unsupported negatives remain s
 
 test('reference failures can retry and searching reaches beyond loaded pages', async ({ page, isMobile }) => {
   const assets = Array.from({ length: 1000 }, (_, index) => ({ id: `asset-${index}`, source: 'upload', name: `Reference ${index}`, thumbnailUrl: picture, mime: 'image/png', width: 512, height: 512, size: 1, createdAt: '', privacyDomain: 'gallery' }));
-  let fail = true;
+  let fail = true, failNextPage = true;
   await page.route('**/api/reference-assets?*', async (route) => {
     if (fail) { await route.fulfill({ status: 500, json: { error: 'Temporary failure' } }); return; }
     const query = new URL(route.request().url()).searchParams;
     const filtered = query.get('q') ? assets.filter((asset) => asset.name.includes(query.get('q')!)) : assets;
     const cursor = Number(query.get('cursor') || 0);
+    if (cursor && failNextPage) { failNextPage = false; await route.fulfill({ status: 500, json: { error: 'Next page unavailable' } }); return; }
     const next = cursor + 60;
     await route.fulfill({ json: { items: filtered.slice(cursor, next), nextCursor: next < filtered.length ? String(next) : '', hasMore: next < filtered.length } });
   });
@@ -135,7 +136,12 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   fail = false;
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
-  for (let index = 0; index < 5; index++) {
+  await page.getByRole('button', { name: 'Load more', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Next page unavailable');
+  await expect(page.locator('[data-reference-index="59"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Try Again', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  for (let index = 0; index < 4; index++) {
     const response = page.waitForResponse('**/api/reference-assets?*');
     await page.getByRole('button', { name: 'Load more', exact: true }).click();
     await response;
@@ -148,6 +154,11 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   for (let index = 0; index < 12; index++) await page.keyboard.press('ArrowDown');
   const focused = await page.evaluate(() => (document.activeElement as HTMLElement)?.dataset.referenceIndex);
   expect(Number(focused)).toBeGreaterThan(20);
+  await page.keyboard.press('End');
+  await expect(page.locator('[data-reference-index="359"]')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(page.locator('[data-reference-index="0"]')).toBeFocused();
+  expect(await page.locator('[data-reference-index][tabindex="0"]').count()).toBe(1);
   await page.getByRole('searchbox', { name: 'Search Reference Images' }).fill('Reference 999');
   await expect(page.getByRole('button', { name: 'Reference 999', exact: true })).toBeVisible();
   await expect(page.locator('[data-reference-index]')).toHaveCount(1);
@@ -155,6 +166,9 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.getByText('No Matching Images')).toBeVisible();
   await page.getByRole('button', { name: 'Clear Reference Search' }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
+  await expect(page.locator('[data-reference-index][tabindex="0"]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Add start image', exact: true })).toBeFocused();
 });
 
 test('secondary panels load only when opened and connections identify each generation mode', async ({ page, isMobile }) => {

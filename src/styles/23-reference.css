@@ -356,6 +356,8 @@
 .reference-empty strong { margin-top: 4px; font-size: 13.5px; font-weight: 550; color: hsl(var(--foreground)); }
 .reference-empty p { margin: 0 0 8px; font-size: 12.5px; }
 .reference-more { display: flex; margin: 12px auto 0; }
+.reference-page-error { display: grid; justify-items: center; gap: 8px; margin: 12px 0; text-align: center; }
+.reference-page-error p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
 
 /* ------------------------------------------------------------------ Drop
    Where the file will land lights up: the prompt bar for "use as reference",
