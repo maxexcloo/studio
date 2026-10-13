@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { GalleryItem } from './types';
-import { compareGalleryItems } from '../../server/gallery-order.js';
-export { galleryTime } from '../../server/gallery-order.js';
+export { galleryTime, sortGalleryItems } from '../../server/gallery-order.js';
 
 export type GalleryPhoto = {
   src: string;
@@ -21,10 +20,6 @@ export function dedupeGalleryItems(items: GalleryItem[]) {
     seen.add(key);
     return true;
   });
-}
-
-export function sortGalleryItems(items: GalleryItem[]) {
-  return [...items].sort(compareGalleryItems);
 }
 
 export function galleryColumnTarget() {
