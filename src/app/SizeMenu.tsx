@@ -7,8 +7,8 @@ import { megapixels, ratioName, snapSide, type SideLimits, type Size } from './s
 /* ---------------------------------------------------------------------------
    The size menu's parts (components.tsx AspectPicker puts them together):
 
-   - SizePreview: a window of its own beside the menu, shown while the menu
-     is hovered, with the frame the picture will fill gliding between shapes:
+   - SizePreview: a window of its own beside the menu, there from the first
+     hover until the menu closes, with the frame the picture will fill gliding between shapes:
      the size chosen, or the row under the pointer while one is.
    - SizeTabs: Default · 2K · Custom, one sliding thumb.
    - LinkedSizeFields: Custom's width and height. Linked they read as one

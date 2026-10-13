@@ -343,13 +343,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const close = useCallback(() => setOpen(false), []);
   useDismiss(pickerRef, open, close);
   const [hovered, setHovered] = useState<SizeRow | null>(null);
-  // The preview window shows while the menu is under the pointer or worked from the keyboard,
-  // with a short grace on the way out so crossing the gap to it doesn't flicker it.
+  // The preview window opens the first time the menu is hovered or worked from the keyboard,
+  // then stays like the menu itself: it goes when the menu closes (picking a size closes it).
   const [peek, setPeek] = useState(false);
-  const peekTimer = useRef(0);
-  const peekOn = () => { window.clearTimeout(peekTimer.current); setPeek(true); };
-  const peekOff = () => { window.clearTimeout(peekTimer.current); peekTimer.current = window.setTimeout(() => setPeek(false), 160); };
-  useEffect(() => () => window.clearTimeout(peekTimer.current), []);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
   const custom = tier === "custom";
@@ -427,10 +423,8 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           data-open-surface
           role="dialog"
           aria-label="Size"
-          onPointerEnter={(event) => { if (event.pointerType !== "touch") peekOn(); }}
-          onPointerLeave={(event) => { if (event.pointerType !== "touch") peekOff(); }}
-          onFocusCapture={(event) => { if ((event.target as HTMLElement).matches(":focus-visible, input")) peekOn(); }}
-          onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) peekOff(); }}
+          onPointerEnter={(event) => { if (event.pointerType !== "touch") setPeek(true); }}
+          onFocusCapture={(event) => { if ((event.target as HTMLElement).matches(":focus-visible, input")) setPeek(true); }}
         >
           <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && tier !== "none"} shown={peek} />
           <div className="size-menu-side">
