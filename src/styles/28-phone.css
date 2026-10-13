@@ -522,8 +522,8 @@
   outline: none;
 }
 .phone-field.is-negative { gap: 3px; padding: 8px 16px; }
-.phone-field.is-negative textarea { min-height: 0; height: 24px; padding: 0; transition: height 120ms var(--ease-out); }
-.phone-field.is-negative:focus-within textarea { height: 64px; }
+.phone-field.is-negative textarea { min-height: 0; height: 1lh; padding: 0; transition: height 120ms var(--ease-out); }
+.phone-field.is-negative:focus-within textarea { height: 2lh; }
 .phone-field.is-negative.is-unused { opacity: .55; }
 
 .phone-link {

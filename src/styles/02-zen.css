@@ -194,13 +194,13 @@
   width: 100%;
 }
 .negative-drawer .negative-unavailable-frame textarea {
-  min-height: 22px;
-  height: 22px;
+  min-height: 0;
+  height: 1lh;
   max-height: none;
   padding: 0;
   transition: height 120ms var(--ease-out);
 }
-.negative-drawer .negative-unavailable-frame textarea:focus { height: 60px; }
+.negative-drawer .negative-unavailable-frame textarea:focus { height: 2lh; }
 .negative-drawer.open:focus-within { max-height: 140px; }
 .negative-drawer.open.is-unused { opacity: .55; }
 .negative-drawer textarea::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
