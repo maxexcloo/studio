@@ -6,10 +6,10 @@ import { Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } fro
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { AspectPreset, NativeSupport, Output, Profile } from './types';
+import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
 import { sizePlan } from './useUpscale';
 import { fitRatio, parseSize, presetRatio, ratioName, sameRatio, type SideLimits } from './sizing';
-import { LinkedSizeFields, SizePreview, SizeTabs, type SizeTier } from './SizeMenu';
+import { LinkedSizeFields, SavedSizeRow, SizePreview, SizeTabs, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
 import { AnimatePresence, motion } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
@@ -319,7 +319,7 @@ type SizeRow = { key: string; value: string; label: string; small?: string; shap
  * and changes the shape. The trigger draws the real shape and says the ratio,
  * with a tag for 2K ("2K") and Custom ("C").
  */
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize }: {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native = {}, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved }: {
   value: string;
   options: AspectPreset[];
   onChange: (value: string) => void;
@@ -335,6 +335,12 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   onTierChange?: (tier: SizeTier) => void;
   onCustomRatio?: (ratio: number) => void;
   onCustomSize?: (size: { width: number; height: number }) => void;
+  /** Custom sizes kept with "Save size", listed under the shapes on every tab. */
+  savedSizes?: SavedSize[];
+  onSaveSize?: () => void;
+  onRenameSize?: (id: string, name: string) => void;
+  onRemoveSize?: (id: string) => void;
+  onPickSaved?: (saved: SavedSize) => void;
 }) {
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
@@ -368,7 +374,10 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
     ...listed.map((option) => ({ key: option.value, value: option.value, label: option.label, shape: option, size: rowSize(option) }))
   ];
-  const isActive = (row: SizeRow) => custom ? sameRatio(row.size, shown) : row.value === value;
+  // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
+  const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
+  const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
+  const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
 
   const ratio = ratioName(shown.width, shown.height);
   const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
@@ -386,7 +395,8 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   // type a size ("1:1" → "1.6:1"), and a wider button would shift the bar, and the menu with it.
   const [heldWidth, setHeldWidth] = useState<number | null>(null);
   React.useLayoutEffect(() => {
-    if (open) setHeldWidth((held) => held ?? triggerRef.current?.offsetWidth ?? null);
+    // The exact width, rounded up: offsetWidth rounds down, and a label a fraction too wide would show "…".
+    if (open) setHeldWidth((held) => held ?? (triggerRef.current ? Math.ceil(triggerRef.current.getBoundingClientRect().width) : null));
     else if (!presence.mounted) setHeldWidth(null);
   }, [open, presence.mounted]);
   const wasOpen = useRef(false);
@@ -438,7 +448,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
               <AnimatePresence initial={false}>
                 {custom && limits && onCustomSize ? (
                   <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} />
+                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={onSaveSize} saved={Boolean(savedMatch)} />
                   </motion.div>
                 ) : null}
               </AnimatePresence>
@@ -469,6 +479,20 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                   <em>{row.size.width}×{row.size.height}</em>
                 </button>
               ))}
+              <AnimatePresence initial={false}>
+                {onPickSaved ? savedSizes.map((item) => (
+                  <SavedSizeRow
+                    key={item.id}
+                    saved={item}
+                    active={savedMatch?.id === item.id}
+                    // From Default or 2K it switches to Custom and closes, like any pick there; in Custom it stays open.
+                    onPick={() => { onPickSaved(item); if (!custom) setOpen(false); }}
+                    onRename={(name) => onRenameSize?.(item.id, name)}
+                    onRemove={() => { setHovered(null); onRemoveSize?.(item.id); }}
+                    onPreview={(on) => setHovered(on ? savedRow(item) : null)}
+                  />
+                )) : null}
+              </AnimatePresence>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { cn } from './format';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import type { AspectPreset, MediaInput, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
+import type { AspectPreset, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
 import type { SizeTier } from './SizeMenu';
 import type { SideLimits } from './sizing';
@@ -224,6 +224,11 @@ export type ComposerBarProps = {
   chooseSizeTier?: (tier: SizeTier) => void;
   applyCustomRatio?: (ratio: number) => void;
   setCustomDimensions?: (size: { width: number; height: number }) => void;
+  savedSizes?: SavedSize[];
+  saveCustomSize?: () => void;
+  renameSavedSize?: (id: string, name: string) => void;
+  removeSavedSize?: (id: string) => void;
+  pickSavedSize?: (saved: SavedSize) => void;
   customSize: boolean;
   aspectLocked?: boolean;
   width: number;
@@ -275,7 +280,7 @@ export type ComposerBarProps = {
 export function ComposerBar(props: ComposerBarProps) {
   const {
     models, model, modelProfiles, showInpaint = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
-    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions,
+    aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
     hiddenSpace, onOpenLoras,
@@ -315,6 +320,11 @@ export function ComposerBar(props: ComposerBarProps) {
       onTierChange={chooseSizeTier}
       onCustomRatio={applyCustomRatio}
       onCustomSize={setCustomDimensions}
+      savedSizes={savedSizes}
+      onSaveSize={saveCustomSize}
+      onRenameSize={renameSavedSize}
+      onRemoveSize={removeSavedSize}
+      onPickSaved={pickSavedSize}
     />
   );
 

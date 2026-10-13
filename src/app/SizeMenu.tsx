@@ -1,8 +1,10 @@
 import React from 'react';
-import { Link2, Unlink2 } from 'lucide-react';
-import { cn } from './format';
+import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
 import { megapixels, ratioName, snapSide, type SideLimits, type Size } from './sizing';
+import type { SavedSize } from './types';
 
 /* ---------------------------------------------------------------------------
    The size menu's parts (components.tsx AspectPicker puts them together):
@@ -174,7 +176,15 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
  * at the shape it had when the change began (so snapping never drifts it);
  * a side that would pass its limit holds the pair at the limit instead.
  */
-export function LinkedSizeFields({ size, limits, onChange }: { size: Size; limits: { width: SideLimits; height: SideLimits }; onChange: (size: Size) => void }) {
+export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false }: {
+  size: Size;
+  limits: { width: SideLimits; height: SideLimits };
+  onChange: (size: Size) => void;
+  /** "Save size": keep this size in the menu's list. Left out where there's no list to keep it in. */
+  onSave?: () => void;
+  /** This exact size is saved already. */
+  saved?: boolean;
+}) {
   const [linked, setLinked] = React.useState(true);
   // Just clicked: the hover lean waits until the pointer leaves the link, so the click's move plays in full.
   const [fresh, setFresh] = React.useState(false);
@@ -207,10 +217,94 @@ export function LinkedSizeFields({ size, limits, onChange }: { size: Size; limit
         </Tip>
         <SizeField axis="H" value={size.height} limits={limits.height} onStart={begin} onChange={setHeight} />
       </div>
-      <p className="size-custom-note">
-        <span>{megapixels(size)} · {ratioName(size.width, size.height)}</span>
-        {atLimit ? <span className="is-limit">Up to {Math.min(maxW, maxH)} px a side</span> : null}
-      </p>
+      <div className="size-custom-note">
+        <span>{megapixels(size)} · {ratioName(size.width, size.height)}{atLimit ? <span className="is-limit"> · up to {Math.min(maxW, maxH)} px</span> : null}</span>
+        {onSave ? (
+          <button type="button" className={cn("size-save", saved && "is-saved")} disabled={saved} onClick={onSave}>
+            {/* Keyed, so the word changes with a small lift rather than a jump. */}
+            <span key={saved ? "saved" : "save"}>{saved ? <><Check size={12} strokeWidth={2.6} /> Saved</> : "Save size"}</span>
+          </button>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/**
+ * A saved size in the shape list. It reads like any other row: its name with
+ * its ratio beside it, its size on the right. Hovered (or focused), the size
+ * steps left for Rename and Remove; renaming edits the name in place, Enter
+ * or leaving keeps it, Escape puts it back without closing the menu.
+ */
+export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPreview }: {
+  saved: SavedSize;
+  active: boolean;
+  onPick: () => void;
+  onRename: (name: string) => void;
+  onRemove: () => void;
+  /** The row is under the pointer or focused (true), or not any more (false). */
+  onPreview: (on: boolean) => void;
+}) {
+  const [renaming, setRenaming] = React.useState(false);
+  const [draft, setDraft] = React.useState(saved.name);
+  const ratio = ratioName(saved.width, saved.height);
+  const shape = { label: ratio, value: `${saved.width}x${saved.height}`, w: saved.width, h: saved.height };
+  const finish = (keep: boolean) => {
+    const name = draft.trim();
+    if (keep && name && name !== saved.name) onRename(name);
+    setRenaming(false);
+  };
+  return (
+    <motion.div
+      className="size-saved"
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className={cn("size-saved-row", renaming && "is-renaming")} onPointerEnter={(event) => { if (event.pointerType !== "touch") onPreview(true); }}>
+        {renaming ? (
+          <div className={cn("aspect-option is-saved", active && "active")}>
+            <span className="aspect-shape" style={aspectIconStyle(shape)} />
+            <input
+              className="size-saved-name"
+              data-own-escape
+              autoFocus
+              value={draft}
+              maxLength={32}
+              aria-label="Name of this size"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={() => finish(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") { event.preventDefault(); finish(true); }
+                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); finish(false); }
+              }}
+            />
+            <em>{saved.width}×{saved.height}</em>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={cn("aspect-option is-saved", active && "active")}
+            role="option"
+            aria-selected={active}
+            onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) onPreview(true); }}
+            onBlur={() => onPreview(false)}
+            onClick={onPick}
+          >
+            <span className="aspect-shape" style={aspectIconStyle(shape)} />
+            <span>{saved.name}<small>{ratio}</small></span>
+            <em>{saved.width}×{saved.height}</em>
+          </button>
+        )}
+        {renaming ? null : (
+          <span className="size-saved-actions">
+            <Tip content="Rename"><button type="button" aria-label={`Rename ${saved.name}`} onClick={() => { setDraft(saved.name); setRenaming(true); }}><Pencil size={13} /></button></Tip>
+            <Tip content="Remove"><button type="button" className="is-remove" aria-label={`Remove ${saved.name}`} onClick={onRemove}><Trash2 size={13} /></button></Tip>
+          </span>
+        )}
+      </div>
+    </motion.div>
   );
 }

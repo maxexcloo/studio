@@ -50,6 +50,8 @@ export type UpscaleQuality = "fast" | "balanced" | "high";
  * "-native"/"-upscale" are an older switch's picks, still read as their size.
  */
 export type AutoUpscale = "none" | "2k" | "4k" | "2k-native" | "4k-native" | "2k-upscale" | "4k-upscale";
+/** A custom size kept in the size menu, under a name you can change. */
+export type SavedSize = { id: string; name: string; width: number; height: number };
 /** A Smart upscale size a model may also draw itself. */
 export type NativeSize = "2k" | "4k";
 /** "yes": documented, drawn natively by default. "maybe": mixed reports, SeedVR2 by default. */
@@ -290,6 +292,8 @@ export type Preferences = {
   inpainting: boolean;
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
+  /** Custom sizes kept from the size menu ("Save size"), for every model. */
+  savedSizes?: SavedSize[];
   /** Models whose first reference frames the output: edit that image, or only take it as a reference. */
   referenceRole?: ReferenceRole;
   upscaleFaceDetail: boolean;
