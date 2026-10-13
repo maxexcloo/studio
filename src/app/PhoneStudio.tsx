@@ -768,7 +768,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const tiers: SizeTier[] = mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom'];
   const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved });
-  const { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, captionFor, note } = model;
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, captionFor, note } = model;
 
   // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.
   const [pressed, setPressed] = React.useState<SizeRow | null>(null);
@@ -813,7 +813,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
         <AnimatePresence initial={false}>
           {custom && customLimits ? (
             <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownShape || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
+              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
             </motion.div>
           ) : null}
         </AnimatePresence>

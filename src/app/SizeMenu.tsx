@@ -66,8 +66,11 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
   const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
   const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
-  // "Save size" is for a shape of your own: one no preset row has (within 0.5%), not a preset made bigger or smaller.
-  const ownShape = custom && !rows.some((row) => Math.abs(picked.width / picked.height / presetRatio(row.shape) - 1) <= 0.005);
+  // "Save size" is for a size of your own: any shape at any size, except one Default or 2K already
+  // gives (a preset row at either tier, within a snap step a side), which is a click away as it is.
+  const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final]) : [];
+  const near = (a: Size, b: Size) => Math.abs(a.width - b.width) <= 16 && Math.abs(a.height - b.height) <= 16;
+  const ownSize = custom && !offered.some((size) => near(size, picked));
   const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
   const ratio = ratioName(shown.width, shown.height);
   const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
@@ -80,7 +83,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   const note = tier === "2k" && plan.capped ? `This model goes up to ${sizeMax} px a side.`
     : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
     : "";
-  return { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, label, badge, what, captionFor, note };
+  return { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note };
 }
 
 const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", custom: "Custom" };
@@ -185,36 +188,57 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
     setDraft(String(next));
   };
 
-  const drag = React.useRef<{ x: number; value: number } | null>(null);
+  /*
+   * Dragging the W/H label scrubs the value and leaves it there: letting go doesn't put you in
+   * the field. A press that doesn't move is a click, which does. The drag ends however the
+   * pointer goes (up, cancel, capture lost, unmount), so the scrub cursor can't outlive it.
+   */
+  const input = React.useRef<HTMLInputElement>(null);
+  const drag = React.useRef<{ x: number; value: number; moved: boolean } | null>(null);
+  const stopScrub = () => document.documentElement.classList.remove("is-size-scrubbing");
+  React.useEffect(() => () => { if (drag.current) stopScrub(); }, []);
   const onPointerDown = (event: React.PointerEvent<HTMLSpanElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    // A field being typed in settles first, so the drag starts from what it shows.
+    if (document.activeElement instanceof HTMLElement && document.activeElement.closest(".size-fields")) document.activeElement.blur();
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { x: event.clientX, value };
+    drag.current = { x: event.clientX, value, moved: false };
     onStart();
-    setDragging(true);
-    document.documentElement.classList.add("is-size-scrubbing");
   };
   const onPointerMove = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (!drag.current) return;
+    const current = drag.current;
+    if (!current) return;
+    // A few pixels of wobble is still a click.
+    if (!current.moved) {
+      if (Math.abs(event.clientX - current.x) < 3) return;
+      current.moved = true;
+      setDragging(true);
+      document.documentElement.classList.add("is-size-scrubbing");
+    }
     // One step every 3px; Shift moves four times as fast.
-    const steps = Math.round((event.clientX - drag.current.x) / 3) * (event.shiftKey ? 4 : 1);
-    const next = snap(drag.current.value + steps * step);
+    const steps = Math.round((event.clientX - current.x) / 3) * (event.shiftKey ? 4 : 1);
+    const next = snap(current.value + steps * step);
     if (next !== value) onChange(next);
   };
-  const endDrag = () => {
+  const endDrag = (click: boolean) => {
+    const current = drag.current;
+    if (!current) return;
     drag.current = null;
     setDragging(false);
-    document.documentElement.classList.remove("is-size-scrubbing");
+    stopScrub();
+    if (click && !current.moved) input.current?.focus();
   };
 
   const label = axis === "W" ? "Width" : "Height";
   return (
-    <label className={cn("size-field", dragging && "is-dragging")}>
+    // Not a <label>: a label's click would focus the field at the end of every drag.
+    <div className={cn("size-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
       <Tip content={`Drag to change the ${label.toLowerCase()}`}>
-        <span className="size-field-key" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} aria-hidden="true">{axis}</span>
+        <span className="size-field-key" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={() => endDrag(true)} onPointerCancel={() => endDrag(false)} onLostPointerCapture={() => endDrag(false)} aria-hidden="true">{axis}</span>
       </Tip>
       <input
+        ref={input}
         inputMode="numeric"
         aria-label={`${label} in pixels`}
         value={draft}
@@ -238,7 +262,7 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
           }
         }}
       />
-    </label>
+    </div>
   );
 }
 

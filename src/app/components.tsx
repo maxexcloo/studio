@@ -357,7 +357,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const [peek, setPeek] = useState(false);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
-  const { custom, picked, shown, rows, savedMatch, ownShape, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes });
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes });
   const previewRow = hovered;
   const previewSize = previewRow ? previewRow.size : shown;
   const previewLabel = captionFor(previewRow);
@@ -421,7 +421,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
               <AnimatePresence initial={false}>
                 {custom && limits && onCustomSize ? (
                   <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownShape || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
+                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownSize || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
                   </motion.div>
                 ) : null}
               </AnimatePresence>
