@@ -435,7 +435,7 @@ export function WorkflowGallery({ view }: { view: any }) {
           <span className="wf-filter-divider" aria-hidden="true" />
           {(['standard', 'flash'] as const).map((value) => <button key={value} type="button" aria-pressed={speed === value} className={cn(speed === value && 'active')} onClick={() => setSpeed(speed === value ? '' : value)}>{value === 'standard' ? 'Standard' : 'Flash'}</button>)}
           <span className="wf-filter-divider" aria-hidden="true" />
-          {(['generate', 'edit'] as const).map((value) => <button key={value} type="button" aria-pressed={purpose === value} className={cn(purpose === value && 'active')} title={value === 'generate' ? 'Generate without a reference image' : 'Use a reference image'} onClick={() => setPurpose(purpose === value ? '' : value)}>{value === 'generate' ? 'Generate' : 'Edit'}</button>)}
+          {(['generate', 'edit'] as const).map((value) => <button key={value} type="button" aria-pressed={purpose === value} className={cn(purpose === value && 'active')} title={value === 'generate' ? 'Generate without a reference image' : 'Use a reference image'} onClick={() => setPurpose(purpose === value ? '' : value)}>{kind === 'video' ? value === 'generate' ? 'Non-Reference' : 'Reference' : value === 'generate' ? 'Generate' : 'Edit'}</button>)}
         </div>
         {filtered.length ? (
           <div className="wf-grid">

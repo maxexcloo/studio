@@ -593,7 +593,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                 : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find models"}</button> : null}
             </div>
           )}
-          {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
+          {profiles.length ? <CatalogueFilters kind={profiles[0]?.kind} value={filters} onChange={setFilters} /> : null}
           {searchable ? (
             <label className="model-menu-search">
               <Search size={14} aria-hidden="true" />

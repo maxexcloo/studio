@@ -219,6 +219,8 @@ test('model speed and reference filters combine and All clears them', async ({ p
       { name: 'Standard Edit', steps: 25, edit: true },
       { name: 'Flash Edit', steps: 4, edit: true },
     ].map((recipe, index) => ({ ...base, id: `filter-${index}`, label: recipe.name, displayName: recipe.name, variant: undefined, variantLabel: undefined, defaults: { ...base.defaults, steps: recipe.steps }, capabilities: { ...base.capabilities, startImage: recipe.edit, startImageRequired: recipe.edit }, mediaInputs: recipe.edit ? [{ id: 'reference', kind: 'image', required: true }] : [] }));
+    result.profiles.push(...[false, true].map((reference, index) => ({ ...base, id: `video-filter-${index}`, kind: 'video', family: 'minimax_h3', label: `MiniMax H3 · ${reference ? 'Reference' : 'Non-Reference'}`, displayName: '', capabilities: { ...base.capabilities, startImage: true, startImageRequired: reference }, mediaInputs: [{ id: 'reference', kind: 'image', required: reference }] })));
+    result.defaults = { ...result.defaults, imageModel: 'filter-0', videoModel: 'video-filter-0' };
     await route.fulfill({ json: result });
   });
   await page.goto('/');
@@ -246,4 +248,22 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await filters.getByRole('button', { name: 'Favourites', exact: true }).click();
   await expect(rows).toHaveCount(0);
   await expect(menu.getByText('No Models Match These Filters.')).toBeVisible();
+  await filters.getByRole('button', { name: 'All', exact: true }).click();
+  if (isMobile) {
+    await menu.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.locator('.phone-create')).toHaveCount(0);
+  } else await page.locator('.model-trigger').first().click();
+  await controls(page, isMobile).mode.getByText('Video', { exact: true }).click();
+  await openComposer(page, isMobile);
+  if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'MiniMax H3' }).click();
+  else await page.locator('.model-trigger').first().click();
+  await expect(rows).toHaveCount(2);
+  await expect(filters.getByRole('button', { name: 'Generate', exact: true })).toHaveCount(0);
+  await filters.getByRole('button', { name: 'Non-Reference', exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Generate');
+  await filters.getByRole('button', { name: 'Reference', exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Animate Image');
 });
