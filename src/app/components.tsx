@@ -440,6 +440,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                 <InfoTip side="top" content="How big new images come out. Hover a shape to see it." />
               </div>
               {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
+              {/* Its space above is its own padding, so it folds with it and closing ends without a jump. */}
               <AnimatePresence initial={false}>
                 {custom && limits && onCustomSize ? (
                   <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>

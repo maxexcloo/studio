@@ -10,6 +10,11 @@
   padding: 7px;
 }
 .size-menu-side { display: grid; gap: 4px; align-content: start; min-width: 0; }
+/* The top block spaces its rows with padding, not a grid gap: a gap would stay
+   behind Custom's fold until it's gone, and the menu would drop 6px at the end. */
+.aspect-menu.size-menu .aspect-upscale { gap: 0; }
+.aspect-menu.size-menu .aspect-upscale-head { padding-bottom: 6px; }
+.aspect-menu.size-menu .size-menu-note { padding-top: 6px; }
 .size-menu .aspect-list { gap: 2px; }
 .size-menu .aspect-option { min-height: 32px; align-items: center; }
 /* The sizes: one mono column, right-aligned, so their digits line up row to row. */
@@ -96,42 +101,42 @@
   .size-peek { display: none; }
 }
 
-/* Custom: width and height, as three cells on one line: W, the link, H.
-   Linked, they close up into one pill; apart, they're two pills with the
-   link floating between. Hovering the link previews the click: linked cells
-   ease a hair apart, apart ones lean in. The click finishes it on a spring. */
+/* Custom: width and height on one line: W, the link, H.
+   Linked, the two pills reach under the link from each side and overlap
+   there, so they read as one pill with no seam. Hovering the link draws
+   them back a little and shows the link's own middle cell between them,
+   a preview of the split. Apart, two pills with the link floating free;
+   hovering it draws them in, and linking slides them together under it.
+   The link itself never grows a shape of its own. */
 .size-custom { overflow: hidden; }
-.size-custom-body { display: grid; gap: 6px; padding: 2px 0 0; }
+.size-custom-body { display: grid; gap: 6px; padding: 8px 0 0; }
 .size-fields {
   --cell-spring: cubic-bezier(.3, 1.45, .45, 1);
+  --pill: 18px; /* half the cells' height: a full round end */
   --seam: 0px;
   --inner: 0px;
-  --pill: 18px; /* half the cells' height: a full round end */
+  --reach: -16px; /* how far each pill reaches under the 30px link: past its middle, so they overlap */
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
   align-items: stretch;
   column-gap: var(--seam);
   height: 36px;
   transition: column-gap 340ms var(--cell-spring);
 }
-/* Linked, hovering the link: a sliver opens at each seam. */
-.size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; }
-/* Apart: two pills. Hovering the link draws them in. */
-.size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); }
+.size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; }
+.size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); --reach: 0px; }
 .size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; }
-.size-field,
-.size-link {
-  background: var(--well);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
-  transition: border-radius 340ms var(--cell-spring), background-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), color 160ms var(--ease-out);
-}
 .size-field {
   display: flex;
   align-items: center;
   min-width: 0;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+  transition: border-radius 340ms var(--cell-spring), margin 340ms var(--cell-spring), padding 340ms var(--cell-spring), background-color 180ms var(--ease-out);
 }
-.size-field:first-child { border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
-.size-field:last-child { border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
+/* Each pill pads by as much as it reaches, so its W/H and digits stay put while it slides. */
+.size-field:first-child { margin-right: var(--reach); padding-right: calc(var(--reach) * -1); border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
+.size-field:last-child { margin-left: var(--reach); padding-left: calc(var(--reach) * -1); border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
 /* Focus lifts the cell a shade; no ring around a borderless field. */
 .size-field:focus-within { background: linear-gradient(rgb(255 255 255 / .045), rgb(255 255 255 / .045)), var(--well); }
 /* The W/H label is the drag handle. */
@@ -169,20 +174,22 @@
 }
 .size-field input::selection { background: rgb(255 154 82 / .32); color: #fff; }
 .size-link {
-  flex: none;
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 30px;
   padding: 0;
   border: 0;
-  border-radius: var(--inner);
+  border-radius: 9px;
+  background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
+  transition: background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), color 160ms var(--ease-out);
 }
-.size-link:hover { color: hsl(var(--foreground)); }
+.size-link:hover,
 .size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
-/* Apart, the link floats free between the pills. */
-.size-fields:not(.is-linked) .size-link { background: transparent; box-shadow: none; }
+/* The middle cell shows only in the hover preview of a split, between the drawn-back pills. */
+.size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
 .size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .size-link-icon { display: grid; place-items: center; animation: linkTurn 420ms var(--cell-spring) both; }
 .size-link:active .size-link-icon { scale: .86; transition: scale 80ms; }
