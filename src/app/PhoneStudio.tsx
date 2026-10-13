@@ -758,7 +758,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
       {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
       {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
       {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}
-      {!starred.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
+      {!starred.length && !recent.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
     </Sheet>
   );
 }
