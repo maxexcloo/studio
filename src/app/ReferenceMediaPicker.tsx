@@ -473,7 +473,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
         {stack ? (
           <span className="ref-stack">
             {role || paint ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
-            {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} />)}
+            {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} guide={editing} />)}
             <AddMore max={stack.max} add={stack.add} className="ref-stack-add" />
           </span>
         ) : null}
@@ -500,14 +500,14 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
 }
 
 /** Another reference in the stack's strip: click to change it, × to take it off. */
-function StackThumb({ item, number }: { item: StackItem; number: number }) {
+function StackThumb({ item, number, guide }: { item: StackItem; number: number; /** Edit: it isn't changed, only drawn from. */ guide: boolean }) {
   const src = assetImage(item.asset);
   const [broken, setBroken] = React.useState(false);
   React.useEffect(() => { setBroken(false); }, [src]);
   const label = (item.input.label || "Reference image").toLowerCase();
   return (
     <span className={cn("ref-stack-item", item.open && "is-open", item.fresh && "is-new")}>
-      <Tip content={`Reference ${number}: ${referenceName(item.asset.name)} · Click to change`}>
+      <Tip content={`Reference ${number}: ${referenceName(item.asset.name)}${guide ? " · Not edited, only drawn from" : ""} · Click to change`}>
         <button type="button" data-open-trigger className="ref-stack-thumb" aria-label={`Change reference ${number}, currently ${item.asset.name}`} aria-expanded={item.open} onClick={item.onOpen}>
           {item.busy ? <LoaderCircle className="spin" size={14} /> : src && !broken ? <img src={src} alt="" draggable={false} onError={() => setBroken(true)} /> : item.asset.source === "vault" ? <LockKeyhole size={13} /> : <ImageIcon size={14} />}
         </button>

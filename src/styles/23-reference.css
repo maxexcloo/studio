@@ -656,3 +656,12 @@
 }
 /* The deck's room sits left of the thumbnail: EDIT stays on the thumbnail's corner. */
 .ref-selected.has-deck .ref-role-badge { left: 12px; }
+/* In Edit only the first picture changes: the others, which it only draws from, are greyed
+   (colour back under the pointer, to see what you'd change). Ref leaves them all as they are. */
+.ref-selected.is-edit .ref-stack-thumb img,
+.ref-selected.is-edit .ref-deck-card { filter: grayscale(1) brightness(.62); }
+.ref-selected.is-edit .ref-stack-thumb img { transition: filter 200ms var(--ease-out); }
+.ref-selected.is-edit .ref-stack-thumb:is(:hover, :focus-visible) img,
+.ref-selected.is-edit .ref-stack-item.is-open .ref-stack-thumb img { filter: none; }
+/* The same in a row (phone, touch): beside the picture being edited, the others are greyed. */
+.composer-reference-slots:has(> .ref-selected.is-edit) > .ref-selected:not(.is-edit) .ref-thumb img { filter: grayscale(1) brightness(.62); }
