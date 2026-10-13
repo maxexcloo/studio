@@ -14,7 +14,11 @@ Before opening a pull request, run:
 ```bash
 npm test
 npm run build
+npx playwright install chromium
+npm run test:browser
 ```
+
+The browser checks run the built studio on desktop and phone viewports with temporary demo data. They cover navigation, generation completions, reference search and deferred panels without needing ComfyUI or a GPU. CI installs Chromium automatically. To use an existing Chromium locally, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable.
 
 ## Missing packages and demo mode
 
