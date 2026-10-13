@@ -29,7 +29,8 @@ export function ratioName(width: number, height: number) {
   const divisor = gcd(Math.round(width), Math.round(height));
   const w = Math.round(width) / divisor;
   const h = Math.round(height) / divisor;
-  if (w <= 32 && h <= 32) return `${w}:${h}`;
+  // Exact while it stays readable ("13:9"); past 20 a side, "32:21" reads better as "1.5:1".
+  if (w <= 20 && h <= 20) return `${w}:${h}`;
   return ratio >= 1 ? `${Number(ratio.toFixed(1))}:1` : `1:${Number((1 / ratio).toFixed(1))}`;
 }
 

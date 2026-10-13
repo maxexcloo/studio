@@ -306,6 +306,12 @@ export function NumberPicker({
   );
 }
 
+/** The trigger's shape: a ratio fitted to an 18 × 14 box, never thinner than 5px a side. */
+function triggerShapeStyle(width: number, height: number): React.CSSProperties {
+  const scale = Math.min(18 / Math.max(1, width), 14 / Math.max(1, height));
+  return { width: Math.max(5, Math.round(width * scale)), height: Math.max(5, Math.round(height * scale)) };
+}
+
 /**
  * The size menu. A live frame on the left shows the shape and size a picture
  * will come out at (the row under the pointer while one is); beside it,
@@ -385,12 +391,14 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
       <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { width: heldWidth } : undefined} aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
-          {/* The tag sits on the icon's corner, so 2K or Custom never changes the button's width. */}
+          {/* The shape drawn to fit an 18 × 14 box, so every ratio sits in the same slot. */}
           <span className="aspect-shape-slot">
-            <span className="aspect-shape" style={aspectIconStyle({ label: "", value: "", w: shown.width, h: shown.height })} />
-            {badge ? <b className="aspect-upscale-badge" aria-hidden="true">{badge}</b> : null}
+            <span className="aspect-shape" style={triggerShapeStyle(shown.width, shown.height)} />
+            {badge && density !== "full" ? <b className="aspect-tag is-corner" aria-hidden="true">{badge}</b> : null}
           </span>
           {density === "full" ? <span className="aspect-trigger-label">{label}</span> : null}
+          {/* 2K or Custom: a small tag after the ratio; with no label to follow (narrow bars), on the shape's corner. */}
+          {badge && density === "full" ? <b className="aspect-tag" aria-hidden="true">{badge}</b> : null}
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
       {presence.mounted ? (
