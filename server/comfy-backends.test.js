@@ -44,7 +44,7 @@ function queue(id, body) {
   jobs.set(id, { status: "queued", comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items });
 }
 
-test("concurrent image/video submissions, sockets and completion stay on their own backends", async () => {
+test("concurrent image/video submissions, progress and completion stay on their own backends", { timeout: 10000 }, async () => {
   const imageBody = request("primary");
   const videoBody = request("video");
   queue("image-one", imageBody);
@@ -56,12 +56,15 @@ test("concurrent image/video submissions, sockets and completion stay on their o
   const [imagePrompt, videoPrompt] = await Promise.all([imageQueued, videoQueued]);
   assert.equal(imagePrompt.client_id, "image-one");
   assert.equal(videoPrompt.client_id, "video-one");
-  await Promise.all([primary.socketFor("image-one"), video.socketFor("video-one")]);
-  assert.equal(primary.connected("video-one"), false);
-  assert.equal(video.connected("image-one"), false);
-  video.send("video-one", { type: "progress", data: { value: 2, max: 4, prompt_id: videoPrompt.id, node: "1" } });
-  await waitFor(() => jobs.get("video-one").progress?.value === 2);
-  assert.notEqual(jobs.get("image-one").progress?.value, 2);
+  // Node 20 follows history without a built-in WebSocket; newer runtimes also report live progress.
+  if (typeof WebSocket === "function") {
+    await Promise.all([primary.socketFor("image-one"), video.socketFor("video-one")]);
+    assert.equal(primary.connected("video-one"), false);
+    assert.equal(video.connected("image-one"), false);
+    video.send("video-one", { type: "progress", data: { value: 2, max: 4, prompt_id: videoPrompt.id, node: "1" } });
+    await waitFor(() => jobs.get("video-one").progress?.value === 2);
+    assert.notEqual(jobs.get("image-one").progress?.value, 2);
+  }
   primary.finish(imagePrompt.id, { outputs: { saved: { images: [{ filename: "image.png", type: "output" }] } } });
   video.finish(videoPrompt.id, { outputs: { saved: { videos: [{ filename: "video.mp4", type: "output" }] } } });
   await Promise.all([imageRunning, videoRunning]);

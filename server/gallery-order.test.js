@@ -3,8 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { compareGalleryItems, galleryBucket } from "./gallery-order.js";
-import { sortGalleryItems } from "../src/app/gallery.ts";
+import { compareGalleryItems, galleryBucket, sortGalleryItems } from "./gallery-order.js";
 import { groupGallery } from "../src/app/runs.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-gallery-order-"));
