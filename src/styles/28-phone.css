@@ -367,6 +367,18 @@
 }
 .phone-row small.is-setup { color: var(--ember); }
 .phone-model-option small { overflow: visible; white-space: normal; }
+.phone-model-tools {
+  position: sticky;
+  top: -4px;
+  z-index: 2;
+  margin: -4px -16px 8px;
+  padding: 4px 16px 0;
+  border-bottom: 1px solid var(--surface-border);
+  background: #141414;
+}
+.phone-model-tools .phone-search { margin: 0 0 6px; }
+.phone-model-tools .model-filters { padding: 8px 4px 12px; }
+.phone-model-tools .model-filter-group:not(.model-filter-library) button { padding: 0 5px; font-size: 11px; }
 .phone-row .phone-row-end { margin-left: auto; }
 .phone-row.is-current { color: #fff; }
 .phone-row.is-current .phone-row-end { color: #fff; }

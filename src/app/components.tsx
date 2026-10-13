@@ -4,7 +4,7 @@ import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState }
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
-import { Brush, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } from 'lucide-react';
+import { Brush, Check, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -513,7 +513,6 @@ export type ModelMenuState = {
   toggleFavorite: (id: string) => void;
 };
 
-const menuSearchFrom = 9;
 const menuRecentLimit = 4;
 
 function profileText(profile: Profile) {
@@ -527,8 +526,7 @@ function sizeNote(profile: Profile, hardware: ReturnType<typeof useHardware>) {
 }
 
 /**
- * The model menu. With a handful of models it is a plain list; past that it
- * gets a search field, and it always splits into Favorites (starred), Recent,
+ * The model menu keeps search above Favourites (starred), Recent, and
  * the rest by family, including imported graphs, scrolling
  * inside a capped height with "Find models" pinned below. With no model at
  * all it offers "Get a model" instead. Arrow keys move, Enter picks, typing
@@ -561,6 +559,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(-1);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const selected = profiles.find((profile) => profile.id === value) || profiles[0] || null;
@@ -569,7 +568,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const presence = usePresence(open);
   useEffect(() => { if (!presence.mounted) { setQuery(""); setCursor(-1); } }, [presence.mounted]);
   useDismiss(pickerRef, open, close);
-  const searchable = profiles.length >= menuSearchFrom;
+  const searchable = profiles.length > 0;
   const menuId = React.useId();
 
   const sections = React.useMemo(() => {
@@ -584,7 +583,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     const byId = new Map(matching.map((profile) => [profile.id, profile]));
     const starred = matching.filter((profile) => favorites.has(profile.id));
     const recent = menu.recents.filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, menuRecentLimit).sort(compareModelNames);
-    const shown = new Set(starred.map((profile) => profile.id));
+    const shown = new Set([...starred, ...recent].map((profile) => profile.id));
     // The rest by family, so seven Sana variants sit together instead of scattering.
     const rest = matching.filter((profile) => !shown.has(profile.id));
     return [
@@ -594,6 +593,32 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     ].filter((section) => section.rows.length);
   }, [filters, menu, profiles, query]);
   const flat = React.useMemo(() => sections.flatMap((section) => section.rows), [sections]);
+
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const anchor = pickerRef.current?.getBoundingClientRect();
+      const surface = menuRef.current;
+      if (!anchor || !surface) return;
+      const width = Math.min(440, window.innerWidth - 32);
+      const above = anchor.top - 16;
+      const below = window.innerHeight - anchor.bottom - 16;
+      const upward = compact ? above >= Math.min(320, below) : below < Math.min(320, above);
+      Object.assign(surface.style, {
+        position: 'absolute',
+        width: `${width}px`,
+        minWidth: '0',
+        left: `${Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16)) - anchor.left}px`,
+        right: 'auto',
+        top: upward ? 'auto' : 'calc(100% + 8px)',
+        bottom: upward ? 'calc(100% + 8px)' : 'auto',
+        maxHeight: `${Math.min(560, Math.max(0, upward ? above : below))}px`,
+      });
+    };
+    position();
+    window.addEventListener('resize', position);
+    return () => window.removeEventListener('resize', position);
+  }, [compact, open]);
 
   // Opening scrolls the current model into view; a search starts on its first hit.
   useEffect(() => {
@@ -655,7 +680,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
           <ChevronDown size={14} className={cn(open && "flip")} />
         </button></Tip>
       {presence.mounted ? (
-        <div className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
+        <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
           {profiles.length ? null : (
             <div className="model-menu-empty">
               <strong>No models yet</strong>
@@ -664,16 +689,16 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                 : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find models"}</button> : null}
             </div>
           )}
-          {profiles.length ? <CatalogueFilters kind={profiles[0]?.kind} value={filters} onChange={setFilters} /> : null}
           {searchable ? (
             <label className="model-menu-search">
               <Search size={14} aria-hidden="true" />
-              <input ref={searchRef} className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
+              <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
             </label>
           ) : null}
+          {profiles.length ? <CatalogueFilters kind={profiles[0]?.kind} value={filters} onChange={setFilters} /> : null}
           {profiles.length ? (
-            <div className="model-menu-list" ref={listRef} role="listbox" aria-label="Models" tabIndex={-1} aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined}>
+            <div id={menuId} className="model-menu-list" ref={listRef} role="listbox" aria-label="Models" tabIndex={-1} aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined}>
               {sections.map((section) => (
                 <div key={section.id} className="model-menu-section" role="group" aria-label={section.label || undefined}>
                   {section.label ? <div className="model-menu-label">{section.label}</div> : null}
@@ -701,7 +726,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                                 <em>{modelName(profile).detail}{size ? <span className="model-size"> · {size}</span> : null}</em>
                               )}
                             </span>
-                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
+                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}{profile.id === value ? <Check size={15} aria-hidden="true" /> : null}</span>
                           </button></Tip>
                         {menu ? (
                           <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from favorites` : `Add ${profile.displayName || profile.label} to favorites`} onClick={() => menu.toggleFavorite(profile.id)}>

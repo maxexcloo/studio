@@ -266,6 +266,8 @@
   flex-direction: column;
   max-height: min(480px, calc(100vh - 160px));
   overflow: hidden;
+  gap: 0;
+  padding: 8px;
 }
 .model-menu-list {
   flex: 1 1 auto;
@@ -276,16 +278,16 @@
   gap: 6px;
   align-content: start;
   /* Room for the scrollbar without it touching the rows. */
-  margin-right: -3px;
-  padding-right: 3px;
+  scrollbar-gutter: stable;
+  border-top: 1px solid var(--surface-border);
+  padding-top: 4px;
 }
 .model-menu-section { display: grid; gap: 2px; }
 .model-menu-label {
   padding: 6px 10px 2px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
+  letter-spacing: .01em;
   color: rgb(255 255 255 / .6);
 }
 .model-menu-search {
@@ -293,8 +295,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  margin-bottom: 6px;
+  height: 40px;
+  margin-bottom: 4px;
   padding: 0 10px;
   border-radius: calc(var(--radius) - 2px);
   background: rgb(255 255 255 / .06);
@@ -309,6 +311,12 @@
   color: hsl(var(--foreground));
   font: inherit;
   font-size: 13px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  padding: 0;
 }
 .model-menu-search input::placeholder { color: rgb(255 255 255 / .4); }
 .model-menu-clear {
@@ -327,6 +335,7 @@
 .model-menu .model-menu-find { flex: none; margin-top: 6px; }
 
 .model-row { position: relative; }
+.model-menu .model-option { min-height: 58px; }
 .model-row .model-option { padding-right: 36px; }
 .model-option.is-cursor { background: var(--brand-surface-hover); }
 .model-star {
@@ -342,7 +351,7 @@
   background: transparent;
   color: rgb(255 255 255 / .45);
   cursor: pointer;
-  opacity: 0;
+  opacity: .55;
   transform: translateY(-50%);
   transition: opacity 140ms var(--ease-out), color 140ms var(--ease-out), background 140ms var(--ease-out);
 }
