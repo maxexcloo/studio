@@ -296,3 +296,6 @@
   cursor: default;
 }
 .zen-prompt-actions:not([data-density-level="0"]) .composer-estimate { display: none; }
+
+/* "2 LoRAs": the count, then the word. */
+.lora-pill-word { margin-left: 4px; }

@@ -328,8 +328,10 @@ export function ComposerBar(props: ComposerBarProps) {
   const loraPill = (density: ControlDensity) => loraActiveCount ? (
     <Tip content={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit`}>
       <button type="button" className={cn("lora-pill", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} aria-label={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active, edit LoRAs`}>
-        {density === "full" ? "LoRA" : <Layers size={13} />}
+        {/* "2 LoRAs" where there's room; the icon and the count where there isn't. */}
+        {density === "full" ? null : <Layers size={13} />}
         <AnimatedNumber value={loraActiveCount} />
+        {density === "full" ? <span className="lora-pill-word">{loraActiveCount === 1 ? "LoRA" : "LoRAs"}</span> : null}
       </button>
     </Tip>
   ) : null;
