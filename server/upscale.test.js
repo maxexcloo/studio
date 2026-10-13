@@ -202,3 +202,31 @@ test("face detail on an imported workflow's image loads the workflow's model fil
   assert.equal(graph["17"].inputs.force_inpaint, false, "a face already past guide_size is left alone, not sampled at full size");
   assert.throws(() => upscaleGraph({ ...body, sourceModel: "custom:flux2-real-dream-image-edit" }, info), /custom:flux2-real-dream-image-edit, and ComfyUI doesn’t have it/);
 });
+
+test("video upscale saves restored frames with the original audio and frame rate", () => {
+  clearDir();
+  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
+  placeModel("ema_vae_fp16.safetensors");
+  const { graph, plan } = upscaleGraph({ mediaType: "video", imageName: "clip.mp4", width: 864, height: 480, quality: "fast" }, infoWith(registryListing));
+  assert.equal(graph["1"].class_type, "LoadVideo");
+  assert.deepEqual(graph["7"].inputs.audio, ["6", 1]);
+  assert.deepEqual(graph["7"].inputs.fps, ["6", 2]);
+  assert.equal(graph["9"].class_type, "SaveVideo");
+  assert.equal(graph["5"].inputs.batch_size, 5);
+  assert.ok(plan.maxResolution >= plan.estimatedWidth);
+  assert.ok(plan.maxResolution > plan.resolution);
+});
+
+test("balanced and high upscales decode in smaller tiles without changing the requested scale", () => {
+  clearDir();
+  placeModel("seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors");
+  placeModel("ema_vae_fp16.safetensors");
+  const info = infoWith({ dit: ["seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors"], vae: ["ema_vae_fp16.safetensors"] });
+  for (const quality of ["balanced", "high"]) {
+    const graph = upscaleGraph({ image: "input.png", width: 880, height: 1184, quality }, info).graph;
+    const vae = Object.values(graph).find((node) => node.class_type === "SeedVR2LoadVAEModel");
+    assert.equal(vae.inputs.encode_tile_size, 512);
+    assert.equal(vae.inputs.decode_tile_size, 512);
+    assert.equal(vae.inputs.decode_tiled, true);
+  }
+});

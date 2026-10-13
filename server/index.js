@@ -66,7 +66,7 @@ import { upscaleWork } from './upscale-timing.js';
 import { comfyRootDir, packInstallPlan } from './node-install.js';
 import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-folders.js';
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
-import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus } from './upscale.js';
+import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, uploadUpscaleVideoSource } from './upscale.js';
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
@@ -1759,7 +1759,7 @@ app.post("/api/upscale", async (req, res) => {
   const info = await upscaleContext(res);
   if (!info) return;
   const quality = normalizeQuality(req.body?.quality);
-  const faceDetail = Boolean(req.body?.faceDetail);
+  const faceDetail = Boolean(req.body?.faceDetail) && findUpscaleTarget(String(req.body?.galleryItemId || ""))?.type !== "video";
   const status = upscaleStatus(info, quality);
   if (!status.ready) {
     res.status(400).json({ ok: false, error: status.nodesInstalled ? "The SeedVR2 models aren’t installed yet." : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`, status });
@@ -1779,8 +1779,8 @@ app.post("/api/upscale", async (req, res) => {
     res.status(404).json({ ok: false, reason: "missing", error: "This image is no longer in the gallery. It may have been deleted on another device. Reload the page." });
     return;
   }
-  if (item.type !== "image") {
-    res.status(400).json({ ok: false, reason: "video", error: "Only images can be upscaled." });
+  if (!["image", "video"].includes(item.type) || (hiddenItem && item.type === "video")) {
+    res.status(400).json({ ok: false, reason: "video", error: "Upscale supports gallery images and videos. Hidden videos are not supported." });
     return;
   }
   if (item.library) {
@@ -1796,10 +1796,19 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   let imageName = "";
+  let upscaleItem = item;
   try {
-    const asset = referenceAssetFromGallery(req, item.id);
-    const [staged] = await stageReferenceAssets(req, [{ assetId: asset.id, slot: "upscale", source: asset.source }]);
-    imageName = staged?.comfyName || "";
+    if (item.type === "video") {
+      imageName = await uploadUpscaleVideoSource(item);
+    } else {
+      const asset = referenceAssetFromGallery(req, item.id);
+      const [staged] = await stageReferenceAssets(req, [{ assetId: asset.id, slot: "upscale", source: asset.source }]);
+      imageName = staged?.comfyName || "";
+      if (staged) {
+        if (!(Number.isFinite(staged.width) && staged.width > 0 && Number.isFinite(staged.height) && staged.height > 0)) throw new Error("The source image dimensions could not be read.");
+        upscaleItem = { ...item, width: staged.width, height: staged.height };
+      }
+    }
   } catch (error) {
     res.status(400).json({ ok: false, reason: "source", error: `Couldn’t read the original image: ${error.message}` });
     return;
@@ -1809,7 +1818,7 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   const customWorkflow = String(item.model || "").startsWith("custom:") ? getCustomWorkflow(item.model) : null;
-  const { jobId, plan } = startUpscale({ item, imageName, quality, faceDetail, info, customWorkflow, hiddenKey: hiddenItem ? hiddenKey : null });
+  const { jobId, plan } = startUpscale({ item: upscaleItem, imageName, quality, faceDetail, info, customWorkflow, hiddenKey: hiddenItem ? hiddenKey : null });
   res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
 });
 

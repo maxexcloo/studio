@@ -25,7 +25,7 @@ export function upscaledWithRun(item: GalleryItem) {
 
 export function canUpscaleItem(item: GalleryItem) {
   // Images added from another folder stay where they are, so there is nothing to upscale into.
-  return item.status === "done" && item.type === "image" && !item.vaultLocked && !item.library && Boolean(item.url) && !upscaledWithRun(item);
+  return item.status === "done" && (item.type === "image" || (item.type === "video" && !item.privateVault)) && !item.vaultLocked && !item.library && Boolean(item.url) && !upscaledWithRun(item);
 }
 
 /**
