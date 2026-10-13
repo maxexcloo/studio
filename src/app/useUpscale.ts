@@ -165,15 +165,17 @@ export function upscaledSize(tier: AutoUpscale | undefined, width: number, heigh
   return width >= height ? { width: long, height: resolution } : { width: resolution, height: long };
 }
 
+/** The names a size can go by, in K of 1024. */
+const resolutionSteps = [1, 1.5, 2, 3, 4, 5, 6, 8];
+
 /**
- * A size's name by its long side, in K of 1024: a whole K within 7% reads as
- * that ("4K" for 3840 or 4032), anything else to one decimal ("2.8K", "1.5K").
+ * A size's name by its long side: the biggest step it reaches 88% of, so
+ * 3648 and 4032 read 4K, 2816 reads 3K, and 2688 stays 2K.
  */
 export function resolutionName(width: number, height: number) {
-  const k = Math.max(width, height) / 1024;
-  const whole = Math.round(k);
-  if (whole >= 1 && Math.abs(k - whole) / whole <= 0.07) return `${whole}K`;
-  return `${Number(k.toFixed(1))}K`;
+  const long = Math.max(width, height);
+  const step = resolutionSteps.filter((k) => long >= k * 1024 * 0.88).pop();
+  return step ? `${step}K` : `${Number((long / 1024).toFixed(1))}K`;
 }
 
 export function upscaleQualityLabel(quality = "balanced") {
