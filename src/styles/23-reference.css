@@ -467,9 +467,5 @@
 .sidebar-reference-remove { color: hsl(var(--muted-foreground)); }
 
 .reference-grid.is-virtual { position: relative; }
-.reference-search { flex: none; display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--surface-border); background: transparent; color: hsl(var(--muted-foreground)); }
-.reference-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 13px; }
-.reference-search:focus-within { border-bottom-color: hsl(var(--muted-foreground)); color: hsl(var(--foreground)); }
-.reference-search button { display: grid; place-items: center; border: 0; padding: 4px; background: transparent; color: inherit; cursor: pointer; }
-.reference-search input::-webkit-search-cancel-button { display: none; }
+.reference-search { margin: 10px 16px; }
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }

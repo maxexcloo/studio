@@ -247,6 +247,54 @@ input.is-framed:focus-visible {
 
 .aspect-picker, .model-picker { position: relative; min-width: 0; }
 
+.picker-search {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  background: var(--well);
+  color: hsl(var(--muted-foreground));
+  cursor: text;
+}
+.picker-search:focus-within { border-color: hsl(var(--ring)); color: hsl(var(--foreground)); }
+.picker-search input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 13px;
+}
+.picker-search input::placeholder { color: hsl(var(--muted-foreground)); }
+.picker-search input::-webkit-search-cancel-button { display: none; }
+.picker-search button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.picker-search button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+@media (pointer: coarse) { .picker-search input { font-size: 16px; } }
+
 .model-trigger, .model-option {
   width: 100%;
   min-height: 50px;

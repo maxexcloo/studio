@@ -748,7 +748,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
     <Sheet open={open} onClose={onClose} title="Model" full className="phone-model-sheet">
       <div className="phone-model-tools">
         {profiles.length ? (
-          <label className="phone-search">
+          <label className="phone-search picker-search">
             <Search size={17} aria-hidden="true" />
             <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search models" spellCheck={false} autoComplete="off" />
           </label>
