@@ -66,8 +66,16 @@ async function openComposer(page: Page, phone: boolean) {
 }
 
 test('generation completion stays in its mode and unsupported negatives remain saved', async ({ page, isMobile }) => {
-  // Keep generation state checks independent of software-rendered GPU effects in CI.
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  // A software GPU uses the lightweight preview without requiring reduced motion.
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type: any, ...args: any[]) {
+      if (type === 'webgl' || type === 'webgl2') return null;
+      return (getContext as any).call(this, type, ...args);
+    } as any;
+  });
+  const effectRequests: string[] = [];
+  page.on('request', (request) => { if (/\/assets\/generation-fx-/.test(request.url())) effectRequests.push(request.url()); });
   await page.route('**/api/models', async (route) => {
     const response = await route.fetch();
     const models = await response.json();
@@ -105,6 +113,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
   await mode.getByText('Photo', { exact: true }).click();
   await openComposer(page, isMobile);
   await expect(page.getByRole('textbox', { name: 'Negative prompt', exact: true })).toHaveValue('Saved image negative');
+  expect(effectRequests).toEqual([]);
 });
 
 test('reference failures can retry and searching reaches beyond loaded pages', async ({ page, isMobile }) => {

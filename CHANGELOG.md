@@ -62,6 +62,7 @@ version opens with a `> ` summary line, which the update pill shows.
   model.
 - 4K upscales and restarts on Windows work again.
 - Smaller fixes to references and saved sizes.
+- **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
 - **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
 - **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
 - **Generation reveal:** starting a run goes straight to the top, without an animated scroll being interrupted by the new tiles.
