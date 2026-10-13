@@ -27,6 +27,7 @@ import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
 import { envFileKeys, writeLocalEnvValue } from './env.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
+import { lorasEnabled } from './features.js';
 import { families } from './family-catalog.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { catalogDownload } from './family-profiles.js';
@@ -1361,7 +1362,7 @@ app.delete("/api/loras", (req, res) => {
 });
 
 app.get("/api/loras/library", (_req, res) => {
-  const library = loadLoraLibrary();
+  const library = lorasEnabled ? loadLoraLibrary() : null;
   res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
 });
 
@@ -1384,6 +1385,7 @@ app.post("/api/loras/library/ops", (req, res) => {
 
 // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
 app.get("/api/loras/info", async (_req, res) => {
+  if (!lorasEnabled) return res.json({ ok: true, loras: {} });
   try {
     const { info } = await loadComfyContext();
     res.json({ ok: true, loras: await loraInfos(optionsFor(info, "LoraLoader", "lora_name")) });
@@ -1393,7 +1395,7 @@ app.get("/api/loras/info", async (_req, res) => {
 });
 
 app.get("/api/loras/:workflowId", (req, res) => {
-  const loras = loadLoraStack(req.params.workflowId);
+  const loras = lorasEnabled ? loadLoraStack(req.params.workflowId) : null;
   res.json({ found: loras !== null, loras: loras || [] });
 });
 

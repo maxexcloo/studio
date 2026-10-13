@@ -6,7 +6,7 @@ import { loadCustomWorkflows, workflowOptionIssues } from './custom-workflows.js
 import { modelTypeChoices } from './model-families.js';
 import { familyProfiles } from './family-profiles.js';
 import { families } from './family-catalog.js';
-import { inpaintingEnabled } from './features.js';
+import { inpaintingEnabled, lorasEnabled, modelFamilyEnabled } from './features.js';
 
 export function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
@@ -166,7 +166,7 @@ export function inferModels(info, stats = {}) {
   const samplers = optionsFor(info, "KSampler", "sampler_name");
   const schedulers = optionsFor(info, "KSampler", "scheduler");
   const weightDtypes = optionsFor(info, "UNETLoader", "weight_dtype");
-  const loras = optionsFor(info, "LoraLoader", "lora_name");
+  const loras = lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [];
   const canUseLoras = Boolean(info.LoraLoader && loras.length);
   const incompatibleModels = unets.filter((name) => isNvfp4Model(name) && !torchSupportsNvfp4(stats));
   const textMeta = textRange(info, "CLIPTextEncode", "text");
@@ -175,12 +175,14 @@ export function inferModels(info, stats = {}) {
     cfg: nodeRange(info, "KSampler", "cfg", { default: 8, min: 0, max: 100, step: 0.1 }),
     denoise: nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1, step: 0.01 })
   };
-  const { profiles, modelFiles } = familyProfiles(info, {
+  const { profiles: detectedProfiles, modelFiles: detectedFiles } = familyProfiles(info, {
     prettyModelName, buildProfile, aspectSet, textMeta, samplerRange, samplers, schedulers, weightDtypes, loras, canUseLoras,
     incompatible: (name) => incompatibleModels.includes(name),
     cuda: (stats?.devices || []).some((device) => device?.type === "cuda"),
     apple: (stats?.devices || []).some((device) => device?.type === "mps")
   });
+  const profiles = detectedProfiles.filter((profile) => modelFamilyEnabled(profile.family, profile.model));
+  const modelFiles = detectedFiles.filter((file) => modelFamilyEnabled(file.family, file.name));
 
   for (const workflow of loadCustomWorkflows()) {
     const missing = missingNodes(info, workflow.requiredNodes);
@@ -257,6 +259,10 @@ export function inferModels(info, stats = {}) {
     // A fresh installation has no saved profile catalogue yet.
   }
 
+  if (!lorasEnabled) for (const profile of profiles) {
+    profile.capabilities.lora = false;
+    if (profile.options.loras) profile.options.loras = [];
+  }
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");
   const videoProfiles = profiles.filter((profile) => profile.kind === "video");
   const unsupportedModels = modelFiles.filter((file) => !file.supported).map((file) => file.name);
@@ -268,7 +274,7 @@ export function inferModels(info, stats = {}) {
     profiles,
     unsupportedModels,
     modelFiles,
-    modelTypeChoices: modelTypeChoices(),
+    modelTypeChoices: Object.fromEntries(Object.entries(modelTypeChoices()).map(([source, choices]) => [source, choices.filter((choice) => modelFamilyEnabled(choice.value.split("/")[0]))])),
     // Release switches the studio needs to know about (features.js).
     features: { inpainting: inpaintingEnabled },
     textEncoders: clips,

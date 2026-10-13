@@ -150,3 +150,36 @@ test("an instance without video configuration cannot be redirected by request fi
   primary.drop(prompt.id);
 });
 
+test("SFW instances hide restricted models and LoRAs and reject saved Grok requests on either backend configuration", { timeout: 10000 }, async () => {
+  const grok = (await api("/api/models")).body.profiles.find((profile) => profile.id === "custom:grok-video");
+  assert.ok(grok);
+  const before = (await api("/api/models")).body;
+  assert.ok(before.modelFiles.some((file) => file.name.startsWith("tessera-")));
+  assert.ok(before.loras.includes("private-lora.safetensors"));
+  fs.writeFileSync(path.join(dataDir, "workflows/renamed-provider.json"), JSON.stringify({ heissUi: { id: "renamed-provider", family: "custom" }, "1": { class_type: "GrokMedia", inputs: { prompt: "" } } }));
+  try {
+    for (const useVideo of [true, false]) {
+      await stop();
+      await start(useVideo, false, true);
+      const models = (await api("/api/models")).body;
+      assert.equal(models.profiles.some((profile) => profile.family === "grok" || profile.id === "custom:renamed-provider"), false);
+      assert.equal(models.profiles.some((profile) => profile.model.startsWith("tessera-")), false);
+      assert.equal(models.modelFiles.some((file) => file.name.startsWith("tessera-")), false);
+      assert.deepEqual(models.loras, []);
+      assert.ok(models.profiles.every((profile) => !profile.capabilities.lora));
+      assert.deepEqual((await api("/api/loras/info")).body.loras, {});
+      assert.equal((await api("/api/loras/library")).body.found, false);
+      assert.deepEqual((await api("/api/loras/saved-profile")).body.loras, []);
+      assert.doesNotMatch(JSON.stringify((await api("/api/workflows")).body), /custom:grok-video|custom:renamed-provider/);
+      const count = primary.prompts.length;
+      const response = await api("/api/generate", generation(grok));
+      assert.equal(response.status, 400);
+      assert.equal(primary.prompts.length, count);
+    }
+  } finally {
+    fs.rmSync(path.join(dataDir, "workflows/renamed-provider.json"));
+    await stop();
+    await start();
+  }
+  assert.ok((await api("/api/models")).body.profiles.some((profile) => profile.id === grok.id));
+});
