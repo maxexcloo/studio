@@ -27,7 +27,8 @@ test("secondary Hidden runs survive restart/outage and cleanup never uses primar
     hidden.rememberHiddenRun(null, promptId, { body: { prompt: "private reference", comfyBackend: "video" } });
     await comfy("/prompt", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt_id: promptId, prompt: {}, extra_data: { heiss_hidden: true } }) });
   });
-  hidden.releaseHiddenRun(promptId);
+  // A restart loses the old job follower; do not also schedule cleanup in the
+  // original module, which would race the restarted module for the same history.
   const persisted = fs.readFileSync(path.join(temporary, "data/hidden-runs.json"), "utf8");
   assert.match(persisted, /"comfyBackend":\s*"video"/);
   assert.equal(persisted.includes("private reference"), false);
