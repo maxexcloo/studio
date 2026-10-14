@@ -17,7 +17,6 @@
   },
   "scripts": {
     "build": "tsc -b && vite build",
-    "check": "updatecli manifest validate --config .updatecli.d --disable-templating --strict && mise fmt --check && actionlint -shellcheck=\"\" && npm run typecheck && npm test",
     "check:updates": "npm outdated",
     "crash-kit": "node scripts/crash-kit.mjs",
     "dev": "node scripts/dev.mjs",
@@ -34,8 +33,7 @@
     "site": "node scripts/site-preview.mjs",
     "start": "node scripts/start.mjs",
     "test": "node --test server/*.test.js scripts/*.test.js",
-    "test:browser": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "busboy": "^1.6.0",

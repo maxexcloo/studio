@@ -4,8 +4,8 @@
 
 - This is a fork of HEISS UI. Preserve upstream application, updater, launcher and release behaviour.
 - Keep upstream documentation layout, workflow filenames and externally defined identifiers to simplify synchronisation.
-- Local container delivery and shared verification use the pinned Mise tools.
-- The Unix and Windows packaging jobs intentionally test Node 22 compatibility. Primary CI and release checks use the Mise Node version; packaged downloads retain upstream LTS selection.
+- Mise owns local task orchestration; npm installs dependencies and retains commands required by upstream packaging and container builds.
+- The Unix and Windows packaging jobs intentionally test Node 22 compatibility. Primary CI and release checks use the globally configured Mise Node version; packaged downloads retain upstream LTS selection.
 
 ## Verification
 
