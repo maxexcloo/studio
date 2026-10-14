@@ -8,14 +8,5 @@ autodiscovery:
       ignoreversionconstraints: true
       age:
         minimum: 1d
-      ignore:
-        - path: node_modules/*
-        - path: dist/*
-      versionfilter:
-        kind: semver
-        pattern: "*"
-      only:
-        - path: docs/package.json
-        - path: package.json
 labels:
   group: standard
