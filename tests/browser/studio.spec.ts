@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
-const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Photo ${index}`, model: 'flux1-schnell.safetensors', createdAt: new Date(Date.now() - index * 60000).toISOString(), width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '0' } }));
+const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Image ${index}`, model: 'flux1-schnell.safetensors', createdAt: new Date(Date.now() - index * 60000).toISOString(), width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '0' } }));
 const videos = images.map((item, index) => ({ ...item, id: `video-${index}`, type: 'video' }));
 
 function controls(page: Page, phone: boolean) {
@@ -13,14 +13,14 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
 });
 
-test('photo and video keep their own scroll positions through repeated switches', async ({ page, isMobile }) => {
+test('image and video keep their own scroll positions through repeated switches', async ({ page, isMobile }) => {
   await page.goto('/');
   const { mode, scroller } = controls(page, isMobile);
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   expect(await mode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
   await scroller.evaluate((element) => { element.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1700 })); element.scrollTo({ top: 1700, behavior: 'instant' }); });
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(1600);
-  const photoTop = await scroller.evaluate((element) => element.scrollTop);
+  const imageTop = await scroller.evaluate((element) => element.scrollTop);
   await mode.getByText('Video', { exact: true }).click();
   await expect(page.locator('[data-tile-id^="video-"]').first()).toBeVisible();
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
@@ -28,8 +28,8 @@ test('photo and video keep their own scroll positions through repeated switches'
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(800);
   const videoTop = await scroller.evaluate((element) => element.scrollTop);
   for (let index = 0; index < 3; index++) {
-    await mode.getByText('Photo', { exact: true }).click();
-    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(photoTop, 0);
+    await mode.getByText('Image', { exact: true }).click();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(imageTop, 0);
     await mode.getByText('Video', { exact: true }).click();
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(videoTop, 0);
   }
@@ -97,7 +97,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
   const { mode, scroller } = controls(page, isMobile);
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   for (const kind of ['image', 'video']) {
-    await mode.getByText(kind === 'image' ? 'Photo' : 'Video', { exact: true }).click();
+    await mode.getByText(kind === 'image' ? 'Image' : 'Video', { exact: true }).click();
     await openComposer(page, isMobile);
     await page.getByRole('textbox', { name: 'Negative prompt', exact: true }).fill(`Saved ${kind} negative`);
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A verification generation');
@@ -109,13 +109,13 @@ test('generation completion stays in its mode and unsupported negatives remain s
     await posted;
     expect(body).not.toHaveProperty('negative');
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
-    await mode.getByText(kind === 'image' ? 'Video' : 'Photo', { exact: true }).click();
+    await mode.getByText(kind === 'image' ? 'Video' : 'Image', { exact: true }).click();
     const completion = page.waitForResponse('**/api/jobs/browser-job');
     done = true;
     await completion;
     await expect(page.locator('[data-tile-id="completed-browser-job"]')).toHaveCount(0);
   }
-  await mode.getByText('Photo', { exact: true }).click();
+  await mode.getByText('Image', { exact: true }).click();
   await openComposer(page, isMobile);
   await expect(page.getByRole('textbox', { name: 'Negative prompt', exact: true })).toHaveValue('Saved image negative');
   expect(effectRequests).toEqual([]);
@@ -200,7 +200,7 @@ test('secondary panels load only when opened and connections identify each gener
   const { mode } = controls(page, isMobile);
   await mode.getByText('Video', { exact: true }).click();
   await expect(page.getByRole('button', { name: /Video (offline|is offline)/ })).toBeVisible();
-  await mode.getByText('Photo', { exact: true }).click();
+  await mode.getByText('Image', { exact: true }).click();
   if (isMobile) {
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: /Use the full studio/ }).click();
@@ -241,7 +241,7 @@ test('model speed and reference filters combine and All clears them', async ({ p
   const composerMode = page.locator('.composer-mode-select');
   await composerMode.getByRole('button', { name: 'Video', exact: true }).click();
   await expect(controls(page, isMobile).mode.getByText('Video', { exact: true })).toHaveAttribute(isMobile ? 'aria-checked' : 'aria-pressed', 'true');
-  await composerMode.getByRole('button', { name: 'Photo', exact: true }).click();
+  await composerMode.getByRole('button', { name: 'Image', exact: true }).click();
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
   else await page.locator('.model-trigger').first().click();
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
@@ -377,13 +377,16 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   const promptBox = page.getByRole('textbox', { name: 'Prompt', exact: true });
   const actionBox = await tools.boundingBox();
   const textBox = await promptBox.boundingBox();
-  expect(actionBox!.x).toBeGreaterThan(textBox!.x);
-  expect(Math.abs(actionBox!.y - textBox!.y)).toBeLessThan(12);
+  expect(actionBox!.y).toBeGreaterThanOrEqual(textBox!.y + textBox!.height);
+  const fieldBox = await page.locator('.composer-prompt-field').boundingBox();
+  expect(textBox!.width).toBeCloseTo(fieldBox!.width, 0);
+  const clearBox = await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).boundingBox();
+  expect(Math.abs(clearBox!.x + clearBox!.width - textBox!.x - textBox!.width)).toBeLessThan(16);
   const negativeBox = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
   await expect(page.locator('.composer-mode-select')).toBeVisible();
   await page.waitForTimeout(300);
   const initial = await negativeBox.boundingBox();
-  for (const mode of ['Video', 'Photo', 'Video', 'Photo']) {
+  for (const mode of ['Video', 'Image', 'Video', 'Image']) {
     await page.locator('.composer-mode-select').getByRole('button', { name: mode, exact: true }).click();
     await page.waitForTimeout(300);
     const next = await negativeBox.boundingBox();
