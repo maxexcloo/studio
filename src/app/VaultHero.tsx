@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { field, hash, heatColor } from './UpscaleHero';
 import { trackCanvasSize } from './canvasSize';
 

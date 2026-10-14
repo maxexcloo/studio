@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Container, Controls, PlayButton, Time, TimeSlider, MuteButton, FullscreenButton } from '@videojs/react';
 import { Video, VideoPlayer, VideoSkin } from '@videojs/react/video';
 import '@videojs/react/video/skin.css';

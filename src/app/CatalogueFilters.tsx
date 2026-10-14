@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Mode } from './types';
 import { cn } from './format';
 import { scrollSideways, useWheelRef } from './wheel';

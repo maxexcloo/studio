@@ -1,4 +1,3 @@
-import React from 'react';
 import { ExternalLink, Plug } from 'lucide-react';
 import { Modal } from './Modal';
 import { cn } from './format';

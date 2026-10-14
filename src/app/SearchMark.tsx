@@ -1,4 +1,3 @@
-import React from 'react';
 import { SCENE_CELL, ease, useCellScene } from './cellScene';
 import { OFFLINE_GRID } from './OfflineMark';
 
