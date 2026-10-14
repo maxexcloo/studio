@@ -10,11 +10,11 @@
 .composer-mode-select { flex: none; padding: 3px; gap: 2px; border: 0; border-radius: var(--r-pill); background: var(--well); }
 .composer-mode-select button { min-height: 34px; padding: 0 12px; border-radius: var(--r-pill); font-size: 12px; }
 .composer-submit-actions { display: flex; align-items: center; gap: 6px; flex: none; }
-.composer-prompt-field { display: flex; align-items: flex-start; min-width: 0; }
-.composer-prompt-field textarea { display: block; flex: 1; min-width: 0; width: 100%; }
+.composer-prompt-field { min-width: 0; }
+.composer-prompt-field textarea { display: block; width: 100%; }
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
-.composer-prompt-tools { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 6px; padding: 8px var(--prompt-text-inset, 4px) 0 4px; }
+.composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 44px; padding: 2px var(--prompt-text-inset, 4px); }
 .composer-reference-tools:empty { display: none; }
 .prompt-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--muted-foreground)); font-size: 12.5px; font-weight: 550; white-space: nowrap; cursor: pointer; }
 .prompt-action:hover, .prompt-action.active { background: var(--control-hover); color: hsl(var(--foreground)); }
@@ -303,8 +303,6 @@
 .lora-option-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 620px) {
-  .composer-prompt-tools { padding: 4px 0 0 4px; }
+  .composer-prompt-tools { padding: 2px 4px; }
   .composer-prompt-tools .prompt-action { width: 40px; padding: 0; gap: 0; font-size: 0; }
-  .composer-prompt-tools .ref-add-label { display: none; }
-  .composer-prompt-tools .ref-add { width: 40px; }
 }

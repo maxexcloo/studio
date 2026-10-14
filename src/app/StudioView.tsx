@@ -651,8 +651,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             </div>
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">
@@ -748,7 +748,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             <div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
               {(["image", "video"] as const).map((nextMode) => (
                 <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
-                  {nextMode === "image" ? "Photo" : "Video"}
+                  {nextMode === "image" ? "Image" : "Video"}
                 </button>
               ))}
             </div>
@@ -773,8 +773,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <section className="zen-prompt">
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             </div>
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">

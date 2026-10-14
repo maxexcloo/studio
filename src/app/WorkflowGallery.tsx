@@ -426,7 +426,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             <input className="is-framed" aria-label="Search Workflows" value={query} placeholder="Search Workflows" onChange={(event) => setQuery(event.target.value)} />
             {query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery("")}><X size={13} /></button> : null}
           </label>
-          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Photo" }, { value: "video", label: "Video" }]} />
+          <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); setPurpose(''); }} options={[{ value: "image", label: "Image" }, { value: "video", label: "Video" }]} />
         </div>
         <div ref={filtersWheelRef} className="wf-filters" role="group" aria-label="Filter Workflows">
           {([["all", `All ${ofKind.length}`], ["favorites", "Favourites"], ...(attentionCount ? [["attention", `Needs Attention ${attentionCount}`]] : [])] as Array<[Filter, string]>).map(([value, label]) => (

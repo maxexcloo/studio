@@ -468,7 +468,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {!hiddenLocked && !selecting ? (
         <div className="phone-generation-mode phone-seg" role="radiogroup" aria-label="Generation Mode">
           {(['image', 'video'] as const).map((value) => (
-            <button key={value} type="button" role="radio" aria-checked={mode === value} className={cn(mode === value && 'active')} onClick={() => changeMode(value)}>{value === 'image' ? 'Photo' : 'Video'}</button>
+            <button key={value} type="button" role="radio" aria-checked={mode === value} className={cn(mode === value && 'active')} onClick={() => changeMode(value)}>{value === 'image' ? 'Image' : 'Video'}</button>
           ))}
         </div>
       ) : null}
@@ -629,8 +629,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
-        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
         </div>
+        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
       {canUseNegativePrompt ? (
         <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
           <textarea aria-label="Negative prompt" value={negative} rows={1} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
