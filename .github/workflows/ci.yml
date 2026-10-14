@@ -13,13 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - name: Set Up Tools
+        uses: jdx/mise-action@v5
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+          version: 2026.10.7
+      - name: Install Dependencies
+        run: mise run setup
+      - name: Run Checks
+        run: mise run check
       - name: Install Browser
         run: npx playwright install --with-deps chromium
       - name: Check Studio Interactions
@@ -32,6 +33,7 @@ jobs:
           path: test-results
           retention-days: 7
 
+  # Node 22 checks the supported compatibility runtime; primary checks use Mise.
   # The macOS (Apple Silicon) and Linux downloads, the same way as Windows
   # below: package, unpack into a path with spaces, & and parentheses, and
   # start it through its launcher with no Node.js on PATH, so it has to run on
