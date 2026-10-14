@@ -7,19 +7,19 @@
 --------------------------------------------------------------------------- */
 
 .zen-prompt-actions { position: relative; }
-.composer-mode-select { position: relative; display: inline-flex; align-items: center; flex: none; }
-.composer-mode-select .fluid-select-trigger { width: 88px; min-height: 40px; height: 40px; padding: 0 10px !important; border: 0 !important; border-radius: var(--r-pill) !important; font-size: 12px !important; background: var(--well) !important; }
+.composer-mode-select { flex: none; padding: 3px; gap: 2px; border: 0; border-radius: var(--r-pill); background: var(--well); }
+.composer-mode-select button { min-height: 34px; padding: 0 12px; border-radius: var(--r-pill); font-size: 12px; }
 .composer-submit-actions { display: flex; align-items: center; gap: 6px; flex: none; }
-.composer-prompt-field { position: relative; min-width: 0; }
+.composer-prompt-field { min-width: 0; }
 .composer-prompt-field textarea { display: block; width: 100%; }
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
-.prompt-history-trigger { position: absolute; right: 8px; bottom: 6px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
-.prompt-history-trigger:hover, .prompt-history-trigger.active { background: var(--control-hover); color: hsl(var(--foreground)); }
-.composer-prompt-field:has(.prompt-history-trigger) textarea { padding-right: 48px; }
-.zen-prompt .prompt-history-trigger { top: 8px; bottom: auto; }
-.zen-prompt:has(.prompt-history-trigger) .composer-reference-slots { right: 52px; }
-
+.composer-prompt-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 2px var(--prompt-text-inset, 4px); }
+.composer-reference-tools:empty { display: none; }
+.prompt-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--muted-foreground)); font-size: 12.5px; font-weight: 550; white-space: nowrap; cursor: pointer; }
+.prompt-action:hover, .prompt-action.active { background: var(--control-hover); color: hsl(var(--foreground)); }
+.prompt-action:disabled { opacity: .4; cursor: default; }
+.prompt-action:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 @media (pointer: coarse) { .zen-prompt .composer-prompt-field textarea, .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 16px; } }
 
 /* The row never wraps any more: the ladder is what makes it fit. */
@@ -86,23 +86,6 @@
 .zen-prompt-actions .model-picker.is-compact .model-trigger .model-copy strong { max-width: 210px; }
 .zen-prompt-actions .model-picker.is-density-compact .model-trigger .model-copy strong { max-width: 96px; }
 .zen-prompt-actions .model-picker.is-density-mini .model-trigger .model-copy strong { max-width: 58px; }
-
-/* --- Negative: icon-only fallback ----------------------------- */
-
-.negative-toggle.is-density-compact,
-.negative-toggle.is-density-mini {
-  width: 40px;
-  min-width: 40px;
-  gap: 0;
-  padding: 0;
-}
-.negative-toggle.is-density-compact.is-unavailable::after,
-.negative-toggle.is-density-mini.is-unavailable::after {
-  position: absolute;
-  margin: -18px 0 0 22px;
-}
-.negative-toggle.is-density-compact,
-.negative-toggle.is-density-mini { position: relative; }
 
 .lora-pill.is-density-compact,
 .lora-pill.is-density-mini {

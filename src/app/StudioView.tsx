@@ -1,7 +1,8 @@
+import { PromptActions } from './PromptActions';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, History, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -123,7 +124,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowGenerationSettings, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showGenerationSettings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
   const strayModelCount = modelFolders?.strayCount || 0;
@@ -648,9 +649,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-              {hasPromptHistory ? <Tip content="Recent Prompts"><button type="button" data-history-trigger className={cn("prompt-history-trigger", historyOpen && "active")} aria-label="Recent Prompts" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={toggleHistory}><History size={16} /></button></Tip> : null}
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
@@ -660,8 +661,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
             <StableComposerBar
-              hasText={Boolean(prompt || negative)}
-              onClearText={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }}
               models={models}
               model={model}
               modelProfiles={modelProfiles}
@@ -701,8 +700,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               loraActiveCount={loraActiveCount}
               hiddenSpace={Boolean(hiddenSpace)}
               onOpenLoras={view.openLoras}
-              showNegativePrompt={showNegativePrompt}
-              setShowNegativePrompt={setShowNegativePrompt}
               canUseNegativePrompt={canUseNegativePrompt}
               runningCount={runningCount}
               generateDisabled={Boolean(generateDisabled)}
@@ -774,9 +771,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-              {hasPromptHistory ? <Tip content="Recent Prompts"><button type="button" data-history-trigger className={cn("prompt-history-trigger", historyOpen && "active")} aria-label="Recent Prompts" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={toggleHistory}><History size={16} /></button></Tip> : null}
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
@@ -786,8 +783,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
             <StableComposerBar
-              hasText={Boolean(prompt || negative)}
-              onClearText={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }}
               models={models}
               model={model}
               modelProfiles={modelProfiles}
@@ -827,8 +822,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               loraActiveCount={loraActiveCount}
               hiddenSpace={Boolean(hiddenSpace)}
               onOpenLoras={view.openLoras}
-              showNegativePrompt={showNegativePrompt}
-              setShowNegativePrompt={setShowNegativePrompt}
               canUseNegativePrompt={canUseNegativePrompt}
               runningCount={runningCount}
               generateDisabled={Boolean(generateDisabled)}

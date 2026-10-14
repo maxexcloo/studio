@@ -238,12 +238,10 @@ test('model speed and reference filters combine and All clears them', async ({ p
   });
   await page.goto('/');
   await openComposer(page, isMobile);
-  const composerMode = page.getByRole('combobox', { name: 'Generation Mode', exact: true });
-  await composerMode.click();
-  await page.getByRole('option', { name: 'Video', exact: true }).click();
+  const composerMode = page.locator('.composer-mode-select');
+  await composerMode.getByRole('button', { name: 'Video', exact: true }).click();
   await expect(controls(page, isMobile).mode.getByText('Video', { exact: true })).toHaveAttribute(isMobile ? 'aria-checked' : 'aria-pressed', 'true');
-  await composerMode.click();
-  await page.getByRole('option', { name: 'Photo', exact: true }).click();
+  await composerMode.getByRole('button', { name: 'Photo', exact: true }).click();
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
   else await page.locator('.model-trigger').first().click();
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
@@ -361,4 +359,26 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
     await page.keyboard.press('Escape');
     await expect(page.locator('.model-trigger').first()).toBeFocused();
   }
+});
+
+
+test('composer actions share a row and Clear clears both prompt fields', async ({ page, isMobile }) => {
+  await page.route('**/api/prompts', (route) => route.fulfill({ json: { prompts: [{ text: 'Recent prompt', at: new Date().toISOString(), uses: 1 }], enabled: true } }));
+  await page.goto('/');
+  await openComposer(page, isMobile);
+  const tools = page.locator('.composer-prompt-tools');
+  await expect(tools.getByRole('button', { name: 'Recent Prompts' })).toBeVisible();
+  await expect(tools.getByRole('button', { name: 'Add Start Image', exact: true })).toBeVisible();
+  const layout = await tools.evaluate((element) => [...element.querySelectorAll('button')].map((button) => ({ top: Math.round(button.getBoundingClientRect().top), height: button.getBoundingClientRect().height, background: getComputedStyle(button).backgroundColor })));
+  expect(new Set(layout.map((item) => item.top)).size).toBe(1);
+  expect(new Set(layout.map((item) => item.height)).size).toBe(1);
+  expect(new Set(layout.map((item) => item.background)).size).toBe(1);
+  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
+  const negative = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
+  await prompt.fill('A photo');
+  await negative.fill('Blur');
+  await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).click();
+  await expect(prompt).toHaveValue('');
+  await expect(negative).toHaveValue('');
+  await expect(tools.getByRole('button', { name: 'Clear Prompt & Negative' })).toBeDisabled();
 });

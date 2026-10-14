@@ -1,3 +1,4 @@
+import { PromptActions } from './PromptActions';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
@@ -5,7 +6,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, History, ImagePlus, Info, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, ImagePlus, Info, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -594,7 +595,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
           <div className="composer-submit-actions">
-            <button type="button" className="phone-compose-recent" aria-label="Clear Prompt & Negative" disabled={!prompt && !negative} onClick={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }}><X size={15} /> Clear</button>
           <button
             type="button"
             className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')}
@@ -611,6 +611,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       }
     >
       <div className="phone-compose">
+        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
         <ReferenceSlots
           scope={mode}
           inputs={referenceInputs || []}
@@ -629,7 +630,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
-          {recentPrompts.length ? <button type="button" className="prompt-history-trigger" aria-label="Recent Prompts" onClick={() => { haptic('tap'); setHistoryOpen(true); }}><History size={16} /></button> : null}
         </div>
       {canUseNegativePrompt ? (
         <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>

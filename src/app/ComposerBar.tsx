@@ -238,8 +238,6 @@ export type ComposerBarProps = {
   loraActiveCount: number;
   hiddenSpace: boolean;
   onOpenLoras?: () => void;
-  showNegativePrompt: boolean;
-  setShowNegativePrompt: (updater: (value: boolean) => boolean) => void;
   canUseNegativePrompt: boolean;
   runningCount: number;
   generateDisabled: boolean;
@@ -263,8 +261,6 @@ export type ComposerBarProps = {
   onRandomSeed?: () => void;
   /** The key that sends the prompt, shown in Generate's tooltip. */
   generateKey?: string;
-  hasText?: boolean;
-  onClearText?: () => void;
   onModeChange?: (mode: 'image' | 'video') => void;
 };
 
@@ -278,7 +274,7 @@ export function ComposerBar(props: ComposerBarProps) {
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", hasText = false, onClearText, onModeChange
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange
   } = props;
 
   const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
@@ -421,7 +417,6 @@ export function ComposerBar(props: ComposerBarProps) {
           ) : null}
         </div>
         <div className="composer-submit-actions" data-fluid-group>
-          {onClearText ? <Tip content="Clear the prompt & negative prompt"><button type="button" className="negative-toggle" aria-label="Clear Prompt & Negative" disabled={!hasText} onClick={onClearText}><X size={13} /> Clear</button></Tip> : null}
         <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `${mode === "image" ? `Generate ${displayCount} image${displayCount === 1 ? "" : "s"}` : "Generate video"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
           <GenerateButton
             className={cn("generate", Boolean(runningCount) && !comfyOffline && !comfyRestarting && "is-working", comfyRestarting ? "is-restarting" : comfyOffline && "is-offline")}
