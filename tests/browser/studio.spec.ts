@@ -369,10 +369,28 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   const tools = page.locator('.composer-prompt-tools');
   await expect(tools.getByRole('button', { name: 'Recent Prompts' })).toBeVisible();
   await expect(tools.getByRole('button', { name: 'Add Start Image', exact: true })).toBeVisible();
+  await page.waitForTimeout(600);
   const layout = await tools.evaluate((element) => [...element.querySelectorAll('button')].map((button) => ({ top: Math.round(button.getBoundingClientRect().top), height: button.getBoundingClientRect().height, background: getComputedStyle(button).backgroundColor })));
   expect(new Set(layout.map((item) => item.top)).size).toBe(1);
   expect(new Set(layout.map((item) => item.height)).size).toBe(1);
   expect(new Set(layout.map((item) => item.background)).size).toBe(1);
+  const promptBox = page.getByRole('textbox', { name: 'Prompt', exact: true });
+  const actionBox = await tools.boundingBox();
+  const textBox = await promptBox.boundingBox();
+  expect(actionBox!.x).toBeGreaterThan(textBox!.x);
+  expect(Math.abs(actionBox!.y - textBox!.y)).toBeLessThan(12);
+  const negativeBox = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
+  await expect(page.locator('.composer-mode-select')).toBeVisible();
+  await page.waitForTimeout(300);
+  const initial = await negativeBox.boundingBox();
+  for (const mode of ['Video', 'Photo', 'Video', 'Photo']) {
+    await page.locator('.composer-mode-select').getByRole('button', { name: mode, exact: true }).click();
+    await page.waitForTimeout(300);
+    const next = await negativeBox.boundingBox();
+    expect(next!.height).toBeCloseTo(initial!.height, 0);
+    expect(next!.y).toBeCloseTo(initial!.y, 0);
+  }
+
   const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
   const negative = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
   await prompt.fill('A photo');

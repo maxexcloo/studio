@@ -5,11 +5,13 @@
    composer to pick one, and a drop target over the whole prompt bar.
 --------------------------------------------------------------------------- */
 
+.composer-reference { display: contents; }
+
 .composer-reference-slots {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 /* ------------------------------------------------------------------ Chip */

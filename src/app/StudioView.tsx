@@ -654,9 +654,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
@@ -789,9 +789,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
