@@ -650,16 +650,18 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </aside>
           <section className="zen-prompt">
             <div className="composer-prompt-field">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             </div>
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
+            <div className="composer-secondary-row">
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" rows={1} value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative Prompt" rows={1} value={negative} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
+            </div>
             <StableComposerBar
               models={models}
               model={model}
@@ -772,16 +774,18 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </aside>
           <section className="zen-prompt">
             <div className="composer-prompt-field">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
             </div>
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
+            <div className="composer-secondary-row">
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative prompt" rows={1} value={negative} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+                <textarea aria-label="Negative Prompt" rows={1} value={negative} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
               </div>
               {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
+            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
+            </div>
             <StableComposerBar
               models={models}
               model={model}

@@ -428,7 +428,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         </header>
       ) : null}
       <header className={cn('phone-bar', selecting && 'is-behind')}>
-        <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check again`} onClick={retryComfyStatus}>
+        <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} onClick={retryComfyStatus}>
           <span />
         </button>
         <div className="phone-title">
@@ -489,7 +489,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {!hiddenLocked && !selecting ? (
         <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
           <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
-            <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() ? truncate(prompt, 90) : view.referenceInpaint?.mask ? 'Describe what the painted part becomes…' : hiddenSpace ? 'Describe what to make, privately…' : 'Describe what to make…'}</strong>
+            <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() ? truncate(prompt, 90) : 'Prompt'}</strong>
             <small>{stepLine ? <span className="phone-step-line">{pending.length > 1 ? `Generating ${pending.length} · ` : 'Generating · '}{stepLine}{pending.length === 1 && pending[0].progress?.endsAt ? <> · <RunLeft progress={pending[0].progress} /></> : null}</span> : workflowName}</small>
           </button>
           <button
@@ -602,7 +602,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             onClick={go}
           >
             {restarting ? <><RefreshCw size={18} className="spin" /> Restarting…</>
-              : comfyOffline ? <><RefreshCw size={18} className={cn(comfyRetrying && 'spin')} /> {comfyRetrying ? 'Checking…' : 'Check again'}</>
+              : comfyOffline ? <><RefreshCw size={18} className={cn(comfyRetrying && 'spin')} /> {comfyRetrying ? 'Checking…' : 'Check Again'}</>
               : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
             <HapticTarget />
           </button>
@@ -625,17 +625,19 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <textarea
           aria-label={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'}
           value={prompt}
-          placeholder={referenceInpaint?.mask ? 'Describe what the painted part becomes…' : hiddenSpace ? 'Describe what to make, privately…' : 'Describe what to make…'}
+          placeholder="Prompt"
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
         </div>
-        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
+      <div className="composer-secondary-row">
       {canUseNegativePrompt ? (
         <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
-          <textarea aria-label="Negative prompt" value={negative} rows={1} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+          <textarea aria-label="Negative Prompt" value={negative} rows={1} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
         </label>
       ) : null}
+        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
+      </div>
         <div className="phone-compose-actions">
           <ComposerModeSelect mode={view.mode} onChange={view.changeMode} />
         </div>
@@ -747,7 +749,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         {profiles.length ? (
           <label className="phone-search picker-search">
             <Search size={17} aria-hidden="true" />
-            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${profiles.length} models`} aria-label="Search Models" spellCheck={false} autoComplete="off" />
+            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
           </label>
         ) : null}
         {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
