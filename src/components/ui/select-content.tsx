@@ -12,10 +12,11 @@ import { SelectContentContext, useSelectContext } from "./select";
 export interface SelectContentProps {
   className?: string;
   children: ReactNode;
+  side?: 'top' | 'bottom';
 }
 
 export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
-  ({ className, children }, ref) => {
+  ({ className, children, side = 'bottom' }, ref) => {
     const { open, setOpen, value, triggerRef } = useSelectContext();
     const shape = useShape();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -176,7 +177,8 @@ export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
           data-open-surface
           style={{
             position: "fixed",
-            top: triggerRect.bottom + 6,
+            top: side === 'bottom' ? triggerRect.bottom + 6 : undefined,
+            bottom: side === 'top' ? window.innerHeight - triggerRect.top + 6 : undefined,
             left: triggerRect.left,
             minWidth: triggerRect.width,
             zIndex: "var(--z-popover)" as unknown as number,
@@ -186,7 +188,7 @@ export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
             initial={{ opacity: 0, y: -4, scaleY: 0.96 }}
             animate={{ opacity: 1, y: 0, scaleY: 1 }}
             transition={springs.fast}
-            style={{ transformOrigin: "top center" }}
+            style={{ transformOrigin: side === 'top' ? "bottom center" : "top center" }}
           >
           <div
             ref={(node) => {

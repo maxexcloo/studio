@@ -1,6 +1,6 @@
 import React from 'react';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, EyeOff, CircleDotDashed, History, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, CircleDotDashed, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
@@ -263,9 +263,6 @@ export type ComposerBarProps = {
   onRandomSeed?: () => void;
   /** The key that sends the prompt, shown in Generate's tooltip. */
   generateKey?: string;
-  /** Recent prompts: the clock beside Negative, shown once there is a history. */
-  onToggleHistory?: () => void;
-  historyOpen?: boolean;
   hasText?: boolean;
   onClearText?: () => void;
   onModeChange?: (mode: 'image' | 'video') => void;
@@ -281,13 +278,13 @@ export function ComposerBar(props: ComposerBarProps) {
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onToggleHistory, historyOpen = false, hasText = false, onClearText, onModeChange
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", hasText = false, onClearText, onModeChange
   } = props;
 
   const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
   const displayCount = showVariants ? count : 1;
   const workflowName = currentProfile?.displayName || currentProfile?.label || "";
-  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim(), Boolean(onToggleHistory)].join("|");
+  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim()].join("|");
   const { rowRef, plan, level } = useDensityLevel(contentKey);
   useComposerHeightVar(rowRef);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -383,30 +380,7 @@ export function ComposerBar(props: ComposerBarProps) {
       </AnimatePresence>
       <div className="zen-prompt-actions" ref={rowRef} data-density-level={level}>
         <div className="prompt-left-actions" data-fluid-group>
-          {onClearText ? (
-            <Tip content="Clear the prompt & negative prompt">
-              <button type="button" className="negative-toggle" aria-label="Clear Prompt & Negative" disabled={!hasText} onClick={onClearText}>
-                <X size={13} /> Clear Text
-              </button>
-            </Tip>
-          ) : null}
           {onModeChange ? <ComposerModeSelect mode={mode} onChange={onModeChange} /> : null}
-          {onToggleHistory ? (
-            // Styled as the Negative toggle at its icon-only size: one family of composer controls.
-            <Tip content="Recent prompts (↑ in an empty prompt)">
-              <button
-                data-history-trigger
-                type="button"
-                className={cn("negative-toggle is-density-mini history-toggle", historyOpen && "active")}
-                aria-label="Recent prompts"
-                aria-expanded={historyOpen}
-                aria-haspopup="dialog"
-                onClick={onToggleHistory}
-              >
-                <History size={14} />
-              </button>
-            </Tip>
-          ) : null}
           {inline("private", privateToggle)}
           {pinnedSeed.trim() && onRandomSeed ? (
             <Tip content={`Every run uses seed ${pinnedSeed.trim()}. Click for a random seed.`}>
@@ -446,6 +420,8 @@ export function ComposerBar(props: ComposerBarProps) {
             </Tip>
           ) : null}
         </div>
+        <div className="composer-submit-actions" data-fluid-group>
+          {onClearText ? <Tip content="Clear the prompt & negative prompt"><button type="button" className="negative-toggle" aria-label="Clear Prompt & Negative" disabled={!hasText} onClick={onClearText}><X size={13} /> Clear</button></Tip> : null}
         <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `${mode === "image" ? `Generate ${displayCount} image${displayCount === 1 ? "" : "s"}` : "Generate video"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
           <GenerateButton
             className={cn("generate", Boolean(runningCount) && !comfyOffline && !comfyRestarting && "is-working", comfyRestarting ? "is-restarting" : comfyOffline && "is-offline")}
@@ -460,6 +436,7 @@ export function ComposerBar(props: ComposerBarProps) {
               : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <ArrowUp size={18} strokeWidth={2.4} />}
           </GenerateButton>
         </Tip>
+        </div>
       </div>
     </>
   );

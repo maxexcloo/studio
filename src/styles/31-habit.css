@@ -12,7 +12,7 @@
 .zen-prompt:has(.prompt-history) { z-index: 14; }
 .prompt-history {
   position: absolute;
-  left: 0;
+  right: 0;
   bottom: calc(100% + 8px);
   z-index: 16;
   width: min(560px, 100%);
@@ -163,7 +163,7 @@
 /* Phone: a chip in the prompt box, and a sheet of big rows. */
 .phone-compose-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
 }
 .phone-compose-recent:disabled { opacity: .4; }
