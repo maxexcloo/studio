@@ -3,14 +3,7 @@ actionlint = "1.7.12"
 node = "26.11.1"
 updatecli = "0.122.1"
 
-[tasks.check]
-run = """
-updatecli manifest validate --config .updatecli.d --disable-templating --strict
-mise fmt --check
-actionlint -shellcheck=""
-npm test
-npm run build
-"""
+# Dependency Updates
 
 [tasks."dependencies:check"]
 description = "Preview Local Dependency Updates"
@@ -32,6 +25,19 @@ if [ -n "${usage_labels:-}" ]; then
 fi
 updatecli pipeline apply --config .updatecli.d --disable-changelog --disable-udash-report --unique-tmp-dir "$@"
 """
+
+# Development
+
+[tasks.check]
+run = """
+updatecli manifest validate --config .updatecli.d --disable-templating --strict
+mise fmt --check
+actionlint -shellcheck=""
+npm test
+npm run build
+"""
+
+# Setup
 
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"
