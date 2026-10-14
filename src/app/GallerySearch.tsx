@@ -179,7 +179,7 @@ export function PhoneSearchBar({ search, setSearch, open, setOpen, hiddenSpace =
   if (!shown) return null;
   return (
     <div className="phone-searchbar" role="search">
-      <label className="phone-search">
+      <label className="phone-search picker-search">
         <Search size={17} aria-hidden="true" />
         <input
           ref={inputRef}

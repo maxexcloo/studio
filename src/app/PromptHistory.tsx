@@ -157,7 +157,7 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
   let rowIndex = -1;
   return (
     <div ref={panelRef} className="prompt-history-panel" role="dialog" aria-label="Recent Prompts" onKeyDown={onKeyDown}>
-      <label className="model-menu-search">
+      <label className="model-menu-search picker-search">
         <Search size={14} aria-hidden="true" />
         <input
           ref={searchRef}
@@ -225,7 +225,7 @@ export function PromptHistorySheet({ open, onClose, onPick, onError }: { open: b
   return (
     <Sheet open={open} onClose={onClose} title="Recent Prompts" full className="phone-prompt-history">
       {prompts.length > 6 ? (
-        <label className="phone-search">
+        <label className="phone-search picker-search">
           <Search size={17} aria-hidden="true" />
           <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Prompts" aria-label="Search Prompts" spellCheck={false} autoComplete="off" />
         </label>
