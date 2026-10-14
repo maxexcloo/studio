@@ -49,6 +49,7 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 - **On your phone and every device.** A phone layout made for one thumb, and the full studio on any laptop or tablet on your network. Your PC renders, and every device shares the same models and gallery. [Set it up ↓](#on-your-phone)
 - **Hidden.** A locked place for images you keep to yourself, opened with Touch ID, Windows Hello or a password. Generate into it, or hide anything later.
 - **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Library.
+- **Civitai presets & model downloads.** Open **Presets & Models**, paste a Civitai image link, review its settings and resources, then save or apply it. Missing supported models can be downloaded; **Get Models** also accepts Civitai model and Hugging Face file links.
 - **Zen mode.** Just the prompt and the picture, fullscreen.
 
 LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [website](https://heiss-ui.vercel.app/#features).

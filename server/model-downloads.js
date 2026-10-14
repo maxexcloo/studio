@@ -8,11 +8,12 @@ import { renameWithRetry } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
+import { civitaiFetch } from './civitai-access.js';
 
 /**
- * Fetches text encoders and VAEs a model needs into ComfyUI's own folders. Only
- * files from HEISS's catalog can be requested (the caller passes an entry it
- * looked up by id), so a request can never point the server at an arbitrary URL
+ * Fetches catalogue files and verified provider files into ComfyUI's folders.
+ * Callers resolve each file on the server and look it up by ID, so a browser
+ * request can never point the server at an arbitrary URL
  * or path. One file downloads at a time; the rest wait in order. A stopped
  * download keeps its .part file plus a small .part.json note, so it resumes
  * where it left off, even after HEISS restarts.
@@ -25,7 +26,7 @@ import { hfFetch as fetch } from "./hf-access.js";
  */
 
 const allowedFolders = new Set(["text_encoders", "vae", "diffusion_models", "checkpoints", "loras", "clip_vision"]);
-const allowedHosts = new Set(["huggingface.co"]);
+const allowedHosts = new Set(["civitai.com", "huggingface.co"]);
 
 let queue = [];
 let active = null;
@@ -38,7 +39,7 @@ export function setDownloadTransport(fn) {
 
 function snapshot(entry) {
   if (!entry) return null;
-  const { controller, alternatives, ...rest } = entry;
+  const { controller, alternatives, url, dir, ...rest } = entry;
   return rest;
 }
 
@@ -93,7 +94,7 @@ function targetFor(spec) {
   const name = path.basename(String(spec.file || ""));
   if (!name || name !== spec.file || !/\.(safetensors|gguf)$/i.test(name)) throw new Error("That isn’t a downloadable model file.");
   const url = new URL(spec.url);
-  if (url.protocol !== "https:" || !allowedHosts.has(url.hostname)) throw new Error("Only Hugging Face downloads are supported.");
+  if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password || (url.port && url.port !== '443')) throw new Error("Only Civitai and Hugging Face downloads are supported.");
   // Land it where ComfyUI itself reads that kind from, so it shows up without a restart.
   const dirs = folderDirs(spec.folder);
   const dir = dirs.find((item) => path.basename(item) === spec.folder) || dirs[0] || path.join(modelsDir, spec.folder);
@@ -319,6 +320,8 @@ export function downloadSpace() {
 }
 
 async function fetchInto(entry, signal) {
+  const request = new URL(entry.url).hostname === 'civitai.com' ? civitaiFetch : fetch;
+  const provider = new URL(entry.url).hostname === 'civitai.com' ? 'Civitai' : 'Hugging Face';
   const { dir, target, partial, note } = targetFor(entry);
   fs.mkdirSync(dir, { recursive: true });
   let offset = fileSize(partial);
@@ -333,14 +336,14 @@ async function fetchInto(entry, signal) {
   }
   const validator = resumeValidator(saved);
   const rangeHeaders = () => (offset ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) } : {});
-  let response = await fetch(entry.url, { redirect: "follow", signal, headers: rangeHeaders() });
+  let response = await request(entry.url, { redirect: "follow", signal, headers: rangeHeaders() });
   if (offset && response.status === 416) {
     // Nothing left past the end: complete if the server's size matches, else the part is not this file.
     const total = Number(/\/(\d+)\s*$/.exec(response.headers.get("content-range") || "")?.[1] || 0);
     if (total && total === offset && sameFile(saved, response)) return verifyAndFinish(entry, partial, target, note);
     await response.body?.cancel().catch(() => {});
     offset = 0;
-    response = await fetch(entry.url, { redirect: "follow", signal });
+    response = await request(entry.url, { redirect: "follow", signal });
   }
   // Range ignored, or the file changed since the part was saved (If-Range answered with all of it): start over.
   if (offset && response.status === 200) offset = 0;
@@ -348,19 +351,19 @@ async function fetchInto(entry, signal) {
   if (offset && response.status === 206 && !sameFile(saved, response)) {
     await response.body?.cancel().catch(() => {});
     offset = 0;
-    response = await fetch(entry.url, { redirect: "follow", signal });
+    response = await request(entry.url, { redirect: "follow", signal });
   }
   if (!response.ok || !response.body) {
     await response.body?.cancel().catch(() => {});
     if (response.status === 401 || response.status === 403) {
-      throw finalError(`${entry.file} needs a Hugging Face sign-in or an accepted license (HTTP ${response.status}). Download it in your browser and put it in ComfyUI’s ${entry.folder} folder.`, { browser: true });
+      throw finalError(`${entry.file} needs a ${provider} sign-in or an accepted licence (HTTP ${response.status}). Download it in your browser and put it in ComfyUI’s ${entry.folder} folder.`, { browser: true });
     }
     if (response.status === 404) {
       // The catalog in this version is out of date; a newer one usually knows where the file went.
       const page = repositoryPage(entry.url);
       throw finalError(`${entry.file} is no longer at its download address (HTTP 404). Update HEISS UI in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`);
     }
-    throw new Error(`Hugging Face answered ${response.status} for ${entry.file}.`);
+    throw new Error(`${provider} answered ${response.status} for ${entry.file}.`);
   }
   // Catalog sizes are approximate; only the server's own length is a check.
   const length = Number(response.headers.get("content-length") || 0);

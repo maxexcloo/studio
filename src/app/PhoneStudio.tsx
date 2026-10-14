@@ -6,7 +6,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, ImagePlus, Info, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -454,6 +454,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         ) : hidden.unlocked ? (
           <button type="button" className="phone-pill" onClick={() => hidden.lock()}><LockKeyhole size={15} /> Lock</button>
         ) : null}
+        {view.models?.features?.presets === true ? <button type="button" className="phone-icon" aria-label="Presets & Models" onClick={() => view.setPresetLibraryOpen(true)}><Library size={20} /></button> : null}
         <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
       </header>
       {!hiddenLocked && !selecting ? <PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} /> : null}

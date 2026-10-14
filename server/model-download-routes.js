@@ -5,17 +5,18 @@ import { hfEndpoint, hfTokenStatus, saveHfToken } from './hf-access.js';
 import { describeHardware } from './hardware.js';
 import { starterPlan } from './starter-models.js';
 import { requireAdmin } from "./route-access.js";
+import { libraryDownload } from './library-downloads.js';
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   app.get("/api/models/downloads", (_req, res) => {
     res.json({ ok: true, ...downloadState() });
   });
 
-  // Fetches a missing text encoder or VAE. Only ids from HEISS's own catalog are
-  // accepted, so the server never downloads from a URL a request supplies.
+  // Catalogue files and provider previews resolved on the server are accepted
+  // by ID; this route never accepts a browser-supplied download address.
   app.post("/api/models/downloads", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    const spec = catalogDownload(req.body?.id);
+    const spec = catalogDownload(req.body?.id) || libraryDownload(String(req.body?.id || ''));
     if (!spec) {
       res.status(400).json({ ok: false, error: "Unknown file." });
       return;
@@ -41,7 +42,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   app.post("/api/models/downloads/cancel", (req, res) => {
     if (!requireAdmin(req, res)) return;
     const id = String(req.body?.id || "");
-    const spec = req.body?.discard ? catalogDownload(id) : null;
+    const spec = req.body?.discard ? catalogDownload(id) || libraryDownload(id) : null;
     if (spec) discardDownload(spec);
     else cancelDownload(id);
     res.json({ ok: true, ...downloadState() });

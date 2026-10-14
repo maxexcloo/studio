@@ -8,6 +8,7 @@ import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
+import { registerPresetRoutes } from './preset-routes.js';
 import { registerPrivacyStatusRoute, registerPrivacyRoutes, registerVaultBundleRoutes, registerVaultMediaRoutes, registerHiddenFavoriteRoute } from "./privacy-routes.js";
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
@@ -647,6 +648,10 @@ app.put("/api/models/recommendations/:key", (req, res) => {
   }
 });
 
+registerPresetRoutes(app, { models: async () => {
+  const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
+  return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
+} });
 
 app.get("/api/paths", async (_req, res) => {
   await autoDetectOutputDir();
