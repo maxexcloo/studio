@@ -60,8 +60,8 @@ LoRA stacks, live previews, video previews, recent prompts and gallery search ar
 
 **1. Download** the zip for your system from the [latest release](https://github.com/tristmeister/HEISS-UI/releases/latest):
 
-| Windows | macOS (Apple Silicon) | Linux |
-| --- | --- | --- |
+| Windows                                                                                  | macOS (Apple Silicon)                                                                    | Linux                                                                                  |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [`heiss-ui-*-windows-x64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) | [`heiss-ui-*-macos-arm64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) | [`heiss-ui-*-linux-x64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) |
 
 The plain `heiss-ui-*.zip` (no system in its name) is for in-app updates; you can skip it.
@@ -114,7 +114,7 @@ Open `http://localhost:8787`. `/data` retains settings, galleries, histories and
 
 The Container workflow runs checks, builds the image, tests the runtime and scans for fixable high or critical vulnerabilities on every PR. Successful builds on `main` and `v*` tags publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
 
-For local verification, run `mise run setup`, then `mise run check`. Renovate maintains the tool, action, base image and npm dependencies.
+For local verification, run `mise run setup`, then `mise run check`. Updatecli previews local tool, action, base image and npm dependency updates.
 
 ## Supported models
 
@@ -136,20 +136,17 @@ The built-in models cover the everyday loop. For anything custom, bring your gra
 
 The workflow shows up in the model menu under **Your workflows** once the nodes it needs are installed.
 
-
 The usual inputs (prompt, size, seed, steps and the like) are connected for you, and only those change; everything else runs as exported. The review marks anything it guessed, warns about nodes that run code, touch files or go online, and tells you where a missing model file belongs, with a Download button when it knows the file. To ship a workflow with its connections fixed, see the [workflow guide](./workflows/README.md).
 
 ## Auto-downloads
 
 Getting a new model running in ComfyUI usually means hunting for the right text encoder, the right VAE and a custom node pack or two. Here each part gets a button, and **Get all** fetches the lot. Nothing downloads until you press the button. [What's covered](./docs/guides/DOWNLOADS.md).
 
-
 ## Reference and start images
 
 - **Reference images for edit models.** Flux.2 (Klein 4B, Klein 9B and Dev) and Qwen-Image 2.1 edit from reference images.
 - **Start images for everything else.** Every other built-in image model (Krea 2, SDXL, Flux, Z-Image and the rest) offers **Add start image**. The image then sits in the sidebar's Basics with **Change from the reference** right under it, for how far the result may move from it.
 - **Paint on either one.** Hover a reference or start image and press the brush to [inpaint](#inpainting) just part of it.
-
 
 <details>
 <summary><b>Reference slots, the library and your workflows</b></summary>
@@ -184,7 +181,6 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 - **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
 
-
 <details>
 <summary><b>Effort, faces and when it's skipped</b></summary>
 
@@ -203,13 +199,11 @@ Making ten takes of one idea fills a gallery fast. With auto-grouping on, pictur
 
 Turn it on with the stack button next to gallery search, or under **Settings › Library › Auto-grouping**, where you also pick the photo or cover-flow look.
 
-
 ## On your phone
 
 On a phone the studio switches to its own layout. Prompt, browse, share and upscale while your PC renders.
 
 Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **Settings › Connection** with your phone and sign in. Both devices need to be on the same trusted network.
-
 
 <details>
 <summary><b>The phone layout</b></summary>
@@ -242,7 +236,6 @@ Signing in, admin rights, HTTPS and proxies are covered in [SECURITY.md](./docs/
 ## Hidden
 
 Hidden is a place for the images you'd rather keep to yourself. Open it from the lock in the dock. The first time, it walks you through a password and, where the browser supports it, Touch ID or Windows Hello.
-
 
 - **Generate straight into it.** Anything made while Hidden is open renders there, with the same live previews, and stays out of the gallery.
 - **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out. Upscale, compare, remix and video all work inside it.
@@ -294,7 +287,7 @@ The [website FAQ](https://heiss-ui.vercel.app/#faq) answers the common questions
 <details>
 <summary><b>Why "HEISS"?</b></summary>
 
-*Heiß* is German for hot. Hence the steaming cup.
+_Heiß_ is German for hot. Hence the steaming cup.
 
 </details>
 
@@ -318,3 +311,20 @@ Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 [MIT](./LICENSE). The original J-AI Studio copyright notice is kept alongside HEISS UI's, as the license asks.
 
 The downloads include an [FFmpeg](https://ffmpeg.org) build (via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)) for video previews. It's licensed separately under the GPL, with its license and source at those links.
+
+## Dependency Updates
+
+Mise installs the pinned Updatecli CLI. Run `mise run dependencies:check` locally
+to preview updates from `.updatecli.d/`. GitHub authentication uses the existing
+`gh` login; credentials stay in the command process.
+
+Accept releases only after they are at least one day old. Review compatibility
+and major upgrades separately, then apply a selected group:
+
+```sh
+mise run dependencies:update --labels group:tools
+```
+
+Use the groups declared in the policy, review the Git diff and run the project
+checks before committing or deploying. Updatecli changes local files; it does
+not create issues, pull requests, commits or deployments. Hosted Renovate is disabled.

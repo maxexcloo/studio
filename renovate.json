@@ -1,18 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "forkProcessing": "enabled",
-  "minimumReleaseAge": "1 day",
-  "packageRules": [
-    {
-      "description": "Group non-major dependency updates",
-      "groupName": "non-major dependencies",
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"]
-    },
-    {
-      "description": "Keep major updates separate",
-      "groupName": null,
-      "matchUpdateTypes": ["major"]
-    }
-  ]
+  "enabled": false
 }
