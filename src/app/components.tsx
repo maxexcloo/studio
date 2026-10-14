@@ -96,12 +96,12 @@ export function GallerySkeleton({ columns }: { columns: number }) {
   ));
 }
 
-export function StudioSelect({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<string | { label: string; value: string }> }) {
+export function StudioSelect({ value, onChange, options, ariaLabel, side }: { value: string; onChange: (value: string) => void; options: Array<string | { label: string; value: string }>; ariaLabel?: string; side?: 'top' | 'bottom' }) {
   const normalized = options.map((option) => typeof option === "string" ? { label: option, value: option } : option);
   return (
     <FluidSelect value={value} onValueChange={onChange}>
-      <FluidSelectTrigger className="fluid-select-trigger" placeholder="Select" />
-      <FluidSelectContent className="fluid-select-content">
+      <FluidSelectTrigger className="fluid-select-trigger" placeholder="Select" aria-label={ariaLabel} />
+      <FluidSelectContent className="fluid-select-content" side={side}>
         {normalized.map((item, index) => (
           <FluidSelectItem key={item.value} index={index} value={item.value}>
             {item.label}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, History, ImagePlus, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plug, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -653,7 +653,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
+            <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+              {hasPromptHistory ? <Tip content="Recent Prompts"><button type="button" data-history-trigger className={cn("prompt-history-trigger", historyOpen && "active")} aria-label="Recent Prompts" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={toggleHistory}><History size={16} /></button></Tip> : null}
+            </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">
@@ -738,8 +741,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onRandomSeed={() => view.setSeed("")}
               generationEstimate={view.generationEstimate}
               generateKey={view.generateKey}
-              onToggleHistory={hasPromptHistory ? toggleHistory : undefined}
-              historyOpen={historyOpen}
             />
             {historyPopover}
             {promptIdeas}
@@ -791,7 +792,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
+            <div className="composer-prompt-field">
             <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder={referenceInpaint?.mask ? "Describe what the painted part becomes…" : hiddenSpace ? "Describe what to make, privately…" : "Describe what to make…"} onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+              {hasPromptHistory ? <Tip content="Recent Prompts"><button type="button" data-history-trigger className={cn("prompt-history-trigger", historyOpen && "active")} aria-label="Recent Prompts" aria-expanded={historyOpen} aria-haspopup="dialog" onClick={toggleHistory}><History size={16} /></button></Tip> : null}
+            </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
               <div className="negative-unavailable-frame">
@@ -876,8 +880,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onRandomSeed={() => view.setSeed("")}
               generationEstimate={view.generationEstimate}
               generateKey={view.generateKey}
-              onToggleHistory={hasPromptHistory ? toggleHistory : undefined}
-              historyOpen={historyOpen}
             />
             {historyPopover}
             {promptIdeas}

@@ -597,6 +597,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       footer={
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
+          <div className="composer-submit-actions">
+            <button type="button" className="phone-compose-recent" aria-label="Clear Prompt & Negative" disabled={!prompt && !negative} onClick={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }}><X size={15} /> Clear</button>
           <button
             type="button"
             className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')}
@@ -608,6 +610,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
               : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
             <HapticTarget />
           </button>
+          </div>
         </>
       }
     >
@@ -643,6 +646,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             </motion.div>
           ) : null}
         </AnimatePresence>
+        <div className="composer-prompt-field">
         <textarea
           aria-label={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'}
           value={prompt}
@@ -650,15 +654,14 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
+          {recentPrompts.length ? <button type="button" className="prompt-history-trigger" aria-label="Recent Prompts" onClick={() => { haptic('tap'); setHistoryOpen(true); }}><History size={16} /></button> : null}
+        </div>
+      {canUseNegativePrompt ? (
+        <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
+          <textarea aria-label="Negative prompt" value={negative} rows={1} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
+        </label>
+      ) : null}
         <div className="phone-compose-actions">
-          {recentPrompts.length ? (
-            <button type="button" className="phone-compose-recent" onClick={() => { haptic('tap'); setHistoryOpen(true); }}>
-              <History size={15} /> Recent
-            </button>
-          ) : null}
-          <button type="button" className="phone-compose-recent" aria-label="Clear Prompt & Negative" disabled={!prompt && !negative} onClick={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }}>
-            <X size={15} /> Clear Text
-          </button>
           <ComposerModeSelect mode={view.mode} onChange={view.changeMode} />
         </div>
       </div>
@@ -668,12 +671,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         onPick={(text) => { setPrompt(clampText(text, promptLimit)); setHistoryOpen(false); }}
         onError={(message) => showToast(message, 'error')}
       />
-
-      {canUseNegativePrompt ? (
-        <label className={cn("phone-field is-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
-          <textarea aria-label="Negative prompt" value={negative} rows={1} placeholder="What to avoid…" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-        </label>
-      ) : null}
 
       {String(seed || '').trim() ? (
         <button type="button" className="phone-row phone-seed" onClick={() => setSeed('')}>

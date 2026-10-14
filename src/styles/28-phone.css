@@ -516,10 +516,13 @@
   resize: none;
   outline: none;
 }
-.phone-field.is-negative { gap: 3px; padding: 8px 16px; }
-.phone-field.is-negative textarea { min-height: 0; height: 1lh; padding: 0; transition: height 120ms var(--ease-out); }
-.phone-field.is-negative:focus-within textarea { height: 2lh; }
-.phone-field.is-negative.is-unused { opacity: .55; }
+.phone-negative { display: block; border-top: 1px solid var(--surface-border); padding-top: 6px; }
+.phone-compose .phone-negative textarea { min-height: 0; height: calc(1lh + 8px); padding: 4px; transition: height 120ms var(--ease-out); }
+.phone-compose .phone-negative textarea:focus { height: calc(2lh + 8px); }
+.phone-negative.is-unused { opacity: .55; }
+.phone-create .composer-submit-actions .phone-generate { flex: 1; min-width: 0; }
+.phone-create .composer-submit-actions .phone-compose-recent { min-height: 44px; }
+
 
 .phone-link {
   display: inline-flex;
