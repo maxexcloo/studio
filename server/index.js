@@ -1,10 +1,15 @@
 // First: keeps a copy of data/ before a new version's stores load and migrate it.
-import { dropSnapshots } from "./data-snapshot.js";
+import "./data-snapshot.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
 import { addProbe, logDir, logWarning } from "./crash-log.js";
 import { noteAlive, startSession } from "./exit-record.js";
 import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
+import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
+import { registerGenerationRoutes } from "./generation-routes.js";
+import { registerModelDownloadRoutes } from "./model-download-routes.js";
+import { registerPrivacyStatusRoute, registerPrivacyRoutes, registerVaultBundleRoutes, registerVaultMediaRoutes, registerHiddenFavoriteRoute } from "./privacy-routes.js";
+import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
 import { configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
 import crypto from "node:crypto";
@@ -28,26 +33,18 @@ import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './t
 import { envFileKeys, writeLocalEnvValue } from './env.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
 import { lorasEnabled } from './features.js';
-import { families } from './family-catalog.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
-import { catalogDownload } from './family-profiles.js';
-import { cancelDownload, discardDownload, downloadState, replaceDownload, startDownload } from './model-downloads.js';
-import { sanitizeGenerateBody } from './validation.js';
-import { addGalleryItems, dedupeGallery, deleteGalleryFiles, writeGalleryNow, filterVisibleGallery, gallery, galleryKey, galleryLimit, dataDir, hideGalleryItems, makePendingItems, migrateLegacyPrompts, recordsFromComfyHistory, removeGalleryItems, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, pageGallery, galleryDelta, galleryRevisionValue, sortGallery } from './gallery-store.js';
-import { galleryFilter, setGalleryFavorites } from './gallery-store.js';
-import { buildStats, forgetItemThumbnails, forgetLegacyHiddenThumbnails, getFileThumbnail, getThumbnail, resizeInMemory } from './thumbnails.js';
-import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, promptKey, recordPrompt, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
+import { dedupeGallery, filterVisibleGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
+import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
+import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
-import { forgetItemVideoPreviews, forgetPrivateVideoPreviews, getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, getPrivateVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
-import { sendMediaBuffer } from './media-response.js';
+import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
 import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
-import { emptyTrash, restoreTrash, scheduleTrashPurge, trashGalleryItems, trashSummary } from './gallery-trash.js';
-import { jobs, queueClearsAt, runJob, runMockJob, setTerminalJob } from './jobs.js';
+import { scheduleTrashPurge } from './gallery-trash.js';
+import { jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
 import { loraInfos } from './lora-info.js';
-import { hfEndpoint, hfTokenStatus, saveHfToken } from './hf-access.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
-import { applyBundles, createBundles, DEFAULT_COOLDOWN_MINUTES, dissolveBundle, listBundles, pendingSummary, setBundleCover } from './gallery-bundles.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
 import { starterPlan } from './starter-models.js';
@@ -56,13 +53,10 @@ import { setDismissed } from './dismissals.js';
 import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
-import { addDevicePasskey, addPasskey, changePassword, issueChallenge, unlockWithDevicePasskey, clearUnlockCookie, encryptionKeyFromRequest, erasePrivacy, isPrivacyEnabled, passkeyUnlockOptions, privacyStatusFor, removePasskey, revealGalleryItemsForRequest, setupPrivacy, setUnlockCookie, unlockWithPasskey, unlockWithPassword } from './privacy.js';
-import { compactVaultBundles, deleteVaultItems, dissolveVaultBundle, eraseVault, retireVault, exportVaultBackup, findVaultItem, hideItems, patchVaultItem, readVaultAsset, setVaultBundleCover, unhideItems, vaultAssetsForExport, vaultBundlePendingSummary, vaultConfigured, vaultItems, vaultRevision } from './vault.js';
-import { forgetComfyRun } from './hidden-traces.js';
-import { adoptHiddenRuns, forgetHiddenRunKeys, settleHiddenRuns, withoutHiddenRuns } from './hidden-runs.js';
-import { sendGalleryExport } from './gallery-export.js';
+import { encryptionKeyFromRequest, isPrivacyEnabled, revealGalleryItemsForRequest } from './privacy.js';
+import { findVaultItem, patchVaultItem } from './vault.js';
+import { settleHiddenRuns, withoutHiddenRuns } from './hidden-runs.js';
 import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary, saveLoraStack } from './lora-stacks.js';
-import { inpaintInputNames, prepareInpaint } from './inpaint.js';
 import { deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets } from './reference-assets.js';
 import { nodePack, nodePacks } from './node-packs.js';
 import { beginComfyRestart, comfyRestartStartedAt, comfyRestarting, finishComfyRestart, lastComfyRestart, noteComfyRestart } from './comfy-restart.js';
@@ -74,7 +68,6 @@ import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
 import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, upscaleTargets, uploadUpscaleVideoSource } from './upscale.js';
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
-import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
@@ -153,14 +146,6 @@ async function recoverGalleryFromHistory() {
   setGallery(dedupeGallery([...pending, ...gallery, ...recovered]).slice(0, galleryLimit));
 }
 
-/** This computer, or another device that signed in (the gate below has already checked). */
-function requireLocal(req, res) {
-  const client = clientOf(req);
-  if (client.thisComputer || (client.network && deviceSession(req))) return true;
-  res.status(403).json({ ok: false, error: "Only this computer or a signed-in device can do this." });
-  return false;
-}
-
 /**
  * The gate for other devices. This computer goes straight through. Anyone
  * else is answered only in LAN mode, from a private network address (or
@@ -223,52 +208,7 @@ function openFolder(folder) {
   return execFile("xdg-open", [folder]);
 }
 
-/** What Hidden needs from this computer before it can keep anything: where ComfyUI saves. */
-async function hiddenReadiness() {
-  const outputDir = comfyOutputDir || await autoDetectOutputDir().catch(() => "");
-  return { outputDir: Boolean(outputDir), outputPath: outputDir || "" };
-}
-
-/**
- * Images hidden before hiding cleaned up after itself left cached thumbnails
- * behind; the first unlock after the update finds and removes them, once.
- */
-let oldHiddenThumbnailsChecked = false;
-function forgetOldHiddenThumbnails(key) {
-  if (oldHiddenThumbnailsChecked) return;
-  oldHiddenThumbnailsChecked = true;
-  try {
-    const names = vaultItems(key, { bundles: false }).flatMap((item) => [item.outputName, item.upscale?.outputName]);
-    const removed = forgetLegacyHiddenThumbnails(names);
-    if (removed) console.log(`[HEISS] Removed ${removed} thumbnail${removed === 1 ? "" : "s"} left behind by images hidden before.`);
-  } catch {
-    oldHiddenThumbnailsChecked = false;
-  }
-}
-
-async function privacyPayload(req, key = encryptionKeyFromRequest(req)) {
-  const status = privacyStatusFor(req);
-  const unlocked = Boolean(key);
-  if (unlocked) {
-    migrateLegacyPrompts(key);
-    forgetOldHiddenThumbnails(key);
-    // What Hidden runs made after HEISS UI lost track of them joins Hidden now.
-    try { adoptHiddenRuns(key); } catch { /* the next unlocked request tries again */ }
-  }
-  return {
-    ...status,
-    unlocked,
-    // Nothing about what Hidden holds is shared with a locked browser, not even whether it is empty.
-    vault: { unlocked, revision: unlocked ? vaultRevision() : 0 },
-    readiness: await hiddenReadiness(),
-    // Another device, signed in with the studio password; Hidden itself still opens with its own.
-    remote: !clientOf(req).thisComputer
-  };
-}
-
-app.get("/api/privacy/status", async (req, res) => {
-  res.json(await privacyPayload(req));
-});
+registerPrivacyStatusRoute(app);
 
 app.get("/api/network", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -337,239 +277,7 @@ app.post("/api/network/lan", (req, res) => {
   res.json({ ok: true, saved: enabled, restartNeeded: lan.source === "setting" && enabled !== lanListening });
 });
 
-function sessionSeconds(req) {
-  const value = Number(req.body?.sessionSeconds || 0);
-  return Number.isFinite(value) && value > 0 ? value : undefined;
-}
-
-/**
- * Looking after the computer (model folders and downloads, node installs,
- * ComfyUI's address and restarts, the output folder, updates, workflow files,
- * clearing the gallery) happens at that computer. A signed-in device may too
- * when the owner turned on "Trust other devices with admin" (access.js).
- * Anywhere else the server refuses them and the app hides them.
- */
-function requireAdmin(req, res) {
-  if (canAdmin(req)) return true;
-  res.status(403).json({ ok: false, reason: "computer-only", error: "Do this on the computer running HEISS UI. Other devices can be allowed in Settings › Connection." });
-  return false;
-}
-
-/** Creating, erasing or re-keying Hidden happens at the computer it runs on, never from the network. */
-function requireThisComputer(req, res) {
-  if (clientOf(req).thisComputer) return true;
-  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running HEISS UI can do this." });
-  return false;
-}
-
-app.post("/api/privacy/setup", async (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  try {
-    // Creating the password does not need ComfyUI; hiding images later does, to
-    // remove its copies, and says so then.
-    // A Hidden left without its key ring can never be opened again; keep it aside rather than build on it.
-    if (!isPrivacyEnabled() && vaultConfigured()) { retireVault(); forgetPrivateVideoPreviews(); }
-    const key = await setupPrivacy(req.body?.password || "");
-    setUnlockCookie(res, key, sessionSeconds(req), req);
-    res.json({ ok: true, ...(await privacyPayload(req, key)), enabled: true, unlocked: true });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/privacy/unlock", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = await limitedCheck(req, res, () => unlockWithPassword(req.body?.password || ""), "That password is incorrect.");
-  if (!key) return;
-  setUnlockCookie(res, key, sessionSeconds(req), req);
-  res.json({ ok: true, ...(await privacyPayload(req, key)), enabled: true, unlocked: true });
-});
-
-app.get("/api/privacy/passkeys/options", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  res.json({ ok: true, passkeys: passkeyUnlockOptions(), challenge: issueChallenge() });
-});
-
-app.post("/api/privacy/passkeys/unlock", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = await limitedCheck(req, res, async () => (req.body?.secret
-    ? unlockWithDevicePasskey(req.body, String(req.headers.origin || ""))
-    : unlockWithPasskey(String(req.body?.id || ""), String(req.body?.prf || ""))), "This passkey isn’t set up for Hidden. Use your password.");
-  if (!key) return;
-  setUnlockCookie(res, key, sessionSeconds(req), req);
-  res.json({ ok: true, ...(await privacyPayload(req, key)), enabled: true, unlocked: true });
-});
-
-function requireHiddenKey(req, res) {
-  const key = encryptionKeyFromRequest(req);
-  if (!key) res.status(401).json({ ok: false, locked: true, error: "Hidden is locked." });
-  return key;
-}
-
-app.post("/api/privacy/passkeys", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  try {
-    if (req.body?.mode === "device") {
-      const { passkey, secret } = addDevicePasskey(key, req.body || {});
-      res.json({ ok: true, passkey, secret, ...(await privacyPayload(req, key)) });
-      return;
-    }
-    const passkey = addPasskey(key, req.body || {});
-    res.json({ ok: true, passkey, ...(await privacyPayload(req, key)) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.delete("/api/privacy/passkeys/:id", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  removePasskey(String(req.params.id || ""));
-  res.json({ ok: true, ...(await privacyPayload(req, key)) });
-});
-
-app.post("/api/privacy/password", async (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  try {
-    await changePassword(key, req.body?.password || "");
-    res.json({ ok: true, ...(await privacyPayload(req, key)) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/privacy/lock", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  clearUnlockCookie(res);
-  res.json({ ok: true, enabled: isPrivacyEnabled(), unlocked: false, passkeys: privacyStatusFor({ headers: {} }).passkeys, vault: { unlocked: false, revision: 0 } });
-});
-
-/** Forgot the password: the only way back is to start over, and everything in Hidden goes. */
-app.post("/api/privacy/erase", (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  if (req.body?.confirm !== "erase") {
-    res.status(400).json({ ok: false, error: "Confirm erasing Hidden first." });
-    return;
-  }
-  // Runs still rendering would otherwise seal their results with a key that no longer exists.
-  for (const [id, job] of jobs) {
-    if (!job.privateVault || job.terminalAt) continue;
-    jobs.set(id, { ...job, status: "canceling", vaultKey: null });
-  }
-  eraseVault();
-  erasePrivacy();
-  forgetPrivateVideoPreviews();
-  forgetHiddenRunKeys();
-  // Copies taken before an update may still hold Hidden's older records.
-  try { dropSnapshots(); } catch { /* held open (Windows); they go within 14 days anyway */ }
-  clearUnlockCookie(res);
-  res.json({ ok: true, enabled: false, unlocked: false, passkeys: [], vault: { unlocked: false, revision: 0 } });
-});
-
-/* ---------------------------------------------------------------- Hidden */
-
-function hiddenPage(req, key) {
-  const type = String(req.query.type || "");
-  const includeFailed = req.query.includeFailed !== "0";
-  const bundlesEnabled = req.query.bundles !== "0";
-  // Runs that ComfyUI is still rendering live in memory until they are sealed.
-  const running = gallery.filter((item) => item.privateVault && item.status !== "canceled");
-  const items = sortGallery([...running, ...vaultItems(key, { bundles: bundlesEnabled })]).filter((item) => {
-    if (type && item.type !== type) return false;
-    if (!includeFailed && item.status === "error") return false;
-    return true;
-  });
-  return { items, revision: Math.max(vaultRevision(), running.length ? galleryRevisionValue() : 0), totalApprox: items.length, hasMore: false, nextCursor: "" };
-}
-
-app.get("/api/hidden/gallery", (req, res) => {
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  cleanupGalleryState(jobs);
-  try { adoptHiddenRuns(key); } catch { /* tried again with the next page */ }
-  try {
-    const page = hiddenPage(req, key);
-    if (Number(req.query.since || 0) && Number(req.query.since) === page.revision) {
-      res.json({ unchanged: true, revision: page.revision });
-      return;
-    }
-    res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    res.json(page);
-  } catch {
-    res.status(500).json({ ok: false, error: "Can’t open Hidden with this key." });
-  }
-});
-
-app.post("/api/hidden/hide", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  const ids = new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(String));
-  const items = filterVisibleGallery(gallery).filter((item) => item.status === "done" && (ids.has(item.id) || ids.has(item.url)));
-  if (items.some((item) => item.library)) {
-    res.status(400).json({ ok: false, error: "Images from an added folder stay in that folder, so they can’t move into Hidden." });
-    return;
-  }
-  if (!items.length) {
-    res.status(404).json({ ok: false, error: "Those images are no longer in the gallery." });
-    return;
-  }
-  if (items.some((item) => item.upscale?.status === "running")) {
-    res.status(409).json({ ok: false, error: "Wait for the upscale to finish, then hide it." });
-    return;
-  }
-  try {
-    const result = await hideItems(key, items);
-    // A marker keeps them from coming back out of ComfyUI's history if a copy stayed behind.
-    hideGalleryItems(result.movedFrom || []);
-    removeGalleryItems(result.movedFrom || []);
-    // Nothing of them stays in the open: the gallery's copy of their prompts (and its
-    // backup), their cached thumbnails, the prompt history, and what ComfyUI kept of them.
-    writeGalleryNow();
-    writeGalleryNow();
-    // A prompt that now only belongs to Hidden leaves the prompt history too.
-    const stillShown = new Set(filterVisibleGallery(gallery).map((item) => promptKey(item.prompt)));
-    forgetPrompts((result.movedFrom || []).map((item) => item.prompt || ""), stillShown);
-    for (const item of result.movedFrom || []) {
-      await forgetItemThumbnails(item).catch(() => 0);
-      await forgetItemVideoPreviews(item).catch(() => 0);
-    }
-    await forgetComfyRun({ promptIds: result.promptIds, inputNames: result.inputNames });
-    res.json({ ok: true, moved: result.moved.length, ids: (result.movedFrom || []).map((item) => item.id), hiddenIds: result.moved.map((item) => item.id), failed: result.failed, leftBehind: result.leftBehind, revision: galleryRevisionValue() });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/hidden/unhide", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  try {
-    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String);
-    const restored = await unhideItems(key, ids);
-    for (const id of ids) forgetPrivateVideoPreviews(id);
-    addGalleryItems(restored);
-    res.json({ ok: true, restored: restored.length, revision: galleryRevisionValue() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.get("/api/hidden/export", (req, res) => {
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  const date = new Date().toISOString().slice(0, 10);
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-hidden-${date}.zip"`);
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  sendGalleryExport(res, vaultAssetsForExport(key), { gallery: false });
-});
+registerPrivacyRoutes(app);
 
 const appVersion = (() => {
   try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
@@ -910,37 +618,7 @@ app.put("/api/models/types", async (req, res) => {
   }
 });
 
-app.get("/api/models/downloads", (_req, res) => {
-  res.json({ ok: true, ...downloadState() });
-});
-
-// Fetches a missing text encoder or VAE. Only ids from HEISS's own catalog are
-// accepted, so the server never downloads from a URL a request supplies.
-app.post("/api/models/downloads", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const spec = catalogDownload(req.body?.id);
-  if (!spec) {
-    res.status(400).json({ ok: false, error: "Unknown file." });
-    return;
-  }
-  try {
-    const download = startDownload(spec);
-    // Already on disk: rescan now so the model page catches up without another click.
-    if (download?.already) await loadComfyContext({ force: true }).catch(() => null);
-    res.json({ ok: true, download, ...downloadState() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-// First models for an empty studio, sized for this hardware. Their files are
-// ordinary catalog downloads, fetched through the route above.
-app.get("/api/starter-models", async (_req, res) => {
-  const context = await loadComfyContext().catch(() => null);
-  const hardware = await describeHardware({ stats: context?.stats, comfyUrl });
-  res.json({ ok: true, hardware, local: downloadState().local, families: starterPlan({ hardware, info: context?.info }) });
-});
-
+registerModelDownloadRoutes(app, { loadComfyContext });
 // Guided setup for a model already in ComfyUI that can run more than one way
 // (family-setup.js): how it runs and what that still needs, read fresh while the dialog watches.
 let setupContextAt = 0;
@@ -969,43 +647,6 @@ app.put("/api/models/recommendations/:key", (req, res) => {
   }
 });
 
-app.post("/api/models/downloads/cancel", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const id = String(req.body?.id || "");
-  const spec = req.body?.discard ? catalogDownload(id) : null;
-  if (spec) discardDownload(spec);
-  else cancelDownload(id);
-  res.json({ ok: true, ...downloadState() });
-});
-
-// A Hugging Face token for gated downloads: kept in .env, only ever sent to huggingface.co, never shown back.
-app.get("/api/settings/hf-token", (_req, res) => {
-  res.json({ ok: true, ...hfTokenStatus(), mirror: hfEndpoint()?.origin || "" });
-});
-
-app.post("/api/settings/hf-token", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    res.json({ ok: true, ...saveHfToken(req.body?.token), mirror: hfEndpoint()?.origin || "" });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-// "Download again" for a catalog file a run found damaged: the broken copy goes first.
-app.post("/api/models/downloads/replace", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const spec = catalogDownload(req.body?.id);
-  if (!spec) {
-    res.status(400).json({ ok: false, error: "Unknown file." });
-    return;
-  }
-  try {
-    res.json({ ok: true, download: replaceDownload(spec), ...downloadState() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
 
 app.get("/api/paths", async (_req, res) => {
   await autoDetectOutputDir();
@@ -1131,96 +772,11 @@ app.post("/api/workflows/import", async (req, res) => {
   }
 });
 
-function bundleOptions(source = {}) {
-  return {
-    mode: source.mode === "job" ? "job" : "smart",
-    cooldownMinutes: Math.max(0, Math.min(1440, Number(source.cooldownMinutes ?? DEFAULT_COOLDOWN_MINUTES)))
-  };
-}
+registerGalleryBundleRoutes(app);
 
-function bundleSourceItems() {
-  // Hidden items group only with each other, inside Hidden.
-  return revealGalleryItemsForRequest(filterVisibleGallery(gallery).filter((item) => item.status !== "canceled"));
-}
+registerVaultBundleRoutes(app);
 
-app.get("/api/gallery/bundles", (req, res) => {
-  const options = bundleOptions(req.query);
-  res.json({ bundles: listBundles(), pending: pendingSummary(bundleSourceItems(req), options), ...options });
-});
-
-app.post("/api/gallery/bundles/compact", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const options = bundleOptions(req.body || {});
-  const created = createBundles(bundleSourceItems(req), options);
-  res.json({
-    ok: true,
-    created: created.length,
-    items: created.reduce((total, bundle) => total + bundle.itemIds.length, 0),
-    // The browser plays the settle animation on just these, so scrolling an
-    // existing stack back into view does not replay it.
-    ids: created.map((bundle) => bundle.id)
-  });
-});
-
-function vaultBundleOptions(source = {}) {
-  return {
-    mode: source.mode === "job" ? "job" : "smart",
-    cooldownMinutes: Math.max(0, Math.min(1440, Number(source.cooldownMinutes ?? DEFAULT_COOLDOWN_MINUTES)))
-  };
-}
-
-app.get("/api/vault/bundles", (req, res) => {
-  // Locked means no info at all - not even a run count - so there is nothing
-  // else to compute here without the key.
-  const result = vaultBundlePendingSummary(req, vaultBundleOptions(req.query));
-  if (result.locked) return res.json({ locked: true, pending: { runs: 0, items: 0, itemIds: [] } });
-  res.json({ locked: false, pending: result.pending, ...vaultBundleOptions(req.query) });
-});
-
-app.post("/api/vault/bundles/compact", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json({ ok: true, ...compactVaultBundles(req, vaultBundleOptions(req.body || {})) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/vault/bundles/:id/cover", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json(setVaultBundleCover(req, String(req.params.id), String(req.body?.itemId || "")));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.delete("/api/vault/bundles/:id", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json(dissolveVaultBundle(req, String(req.params.id)));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/gallery/bundles/:id/cover", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json(setBundleCover(String(req.params.id), String(req.body?.itemId || "")));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.delete("/api/gallery/bundles/:id", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json(dissolveBundle(String(req.params.id)));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
+registerGalleryBundleActions(app);
 
 app.delete("/api/workflows/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -1237,126 +793,9 @@ app.delete("/api/workflows/:id", (req, res) => {
   }
 });
 
-/** A gallery search from the query string (q, favorites=1), or null. Search results are never stacked. */
-function searchFilter(req) {
-  return galleryFilter({ q: String(req.query.q || "").slice(0, 200), favorites: req.query.favorites === "1" });
-}
+registerGalleryReadRoutes(app);
 
-/** The gallery with its runs collapsed; a run can straddle a page, so it collapses first. */
-function bundledPage(req) {
-  const type = String(req.query.type || "");
-  const limit = Math.max(1, Math.min(500, Number(req.query.limit || 200)));
-  const cursor = String(req.query.cursor || "");
-  const includeFailed = req.query.includeFailed !== "0";
-  const filter = searchFilter(req);
-  const merged = sortGallery(filterVisibleGallery(gallery)).filter((item) => {
-    if (type && item.type !== type) return false;
-    if (!includeFailed && item.status === "error") return false;
-    if (filter && !filter(item)) return false;
-    return item.status !== "canceled";
-  });
-  const collapsed = applyBundles(merged, { enabled: req.query.bundles !== "0" && !filter });
-  const start = cursor ? Math.max(0, collapsed.findIndex((item) => String(item.id) === cursor) + 1) : 0;
-  const items = collapsed.slice(start, start + limit);
-  const nextCursor = start + limit < collapsed.length ? String(items.at(-1)?.id || "") : "";
-  return { items, nextCursor, hasMore: Boolean(nextCursor), revision: galleryRevisionValue(), totalApprox: collapsed.length };
-}
-
-app.get("/api/gallery", (req, res) => {
-  cleanupGalleryState(jobs);
-  const type = String(req.query.type || "");
-  const limit = Number(req.query.limit || 0);
-  const cursor = String(req.query.cursor || "");
-  const includeFailed = req.query.includeFailed !== "0";
-  const page = listBundles().length
-    ? bundledPage(req)
-    : pageGallery({ type, limit: limit || 200, cursor, includeFailed, filter: searchFilter(req) });
-  res.json({
-    ...page,
-    items: revealGalleryItemsForRequest(page.items).map((item) => item.bundle
-      ? { ...item, bundle: { ...item.bundle, items: revealGalleryItemsForRequest(item.bundle.items || []) } }
-      : item),
-    // The whole list, for callers from before paging. A page is in `items` already.
-    ...(cursor || limit ? {} : { outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) })
-  });
-});
-
-app.get("/api/gallery/delta", (req, res) => {
-  const since = Number(req.query.since || 0);
-  // Collapsed runs only come out of a full page, so with any run grouped the
-  // browser reloads rather than patching tiles in and out of their stacks -
-  // but only when something actually changed since its last page.
-  if (listBundles().length) {
-    const revision = galleryRevisionValue();
-    res.json({ revision, reset: since !== revision, upserts: [], removes: [] });
-    return;
-  }
-  const type = String(req.query.type || "");
-  const includeFailed = req.query.includeFailed !== "0";
-  const delta = galleryDelta({ since, type, includeFailed, filter: searchFilter(req) });
-  res.json({ ...delta, upserts: revealGalleryItemsForRequest(delta.upserts || []) });
-});
-
-function hiddenDownloadName(asset, variant) {
-  const ext = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "video/mp4": ".mp4", "video/webm": ".webm" }[asset.mime] || "";
-  const stem = String(asset.item.prompt || asset.name || "hidden").replace(/\s+/g, " ").trim().slice(0, 48).replace(/[^\w .-]+/g, "").trim() || "hidden";
-  return `${stem}${variant === "upscale" ? " upscaled" : ""}${ext}`;
-}
-
-app.get("/api/vault/media/:id", (req, res) => {
-  const variant = req.query.variant === "upscale" ? "upscale" : "original";
-  const asset = readVaultAsset(req, req.params.id, variant);
-  if (!asset) {
-    res.status(404).json({ ok: false, error: "Hidden is locked, or this item is gone." });
-    return;
-  }
-  res.setHeader("Content-Type", asset.mime || "application/octet-stream");
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  const name = encodeURIComponent(hiddenDownloadName(asset, variant));
-  res.setHeader("Content-Disposition", `${req.query.download === "1" ? "attachment" : "inline"}; filename*=UTF-8''${name}`);
-  // Shared without its settings: the prompt and workflow inside the file stay in Hidden.
-  const bytes = req.query.clean === "1" ? stripMetadata(asset.buffer).buffer : asset.buffer;
-  if (asset.mime?.startsWith('video/')) sendMediaBuffer(req, res, bytes, asset.mime);
-  else res.send(bytes);
-});
-
-app.get('/api/vault/video-preview/:id', async (req, res) => {
-  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  const asset = readVaultAsset(req, req.params.id, 'original');
-  if (!asset || asset.item.type !== 'video') { res.status(404).end(); return; }
-  try {
-    const preview = await getPrivateVideoPreview(asset.buffer, req.params.id);
-    if (req.query.poster === '1') await sendVideoPoster(req, res, preview);
-    else sendMediaBuffer(req, res, preview);
-  }
-  catch { if (!res.headersSent) res.status(503).end(); }
-});
-
-app.get("/api/vault/thumbnail/:id", async (req, res) => {
-  const asset = readVaultAsset(req, req.params.id, req.query.variant === "upscale" ? "upscale" : "original");
-  if (!asset) {
-    res.status(404).end();
-    return;
-  }
-  // Resized in memory only, from the already-decrypted buffer this request holds —
-  // never written to disk, so no plaintext derivative of a vault item persists.
-  const resized = await resizeInMemory(asset.buffer, asset.mime);
-  res.setHeader("Content-Type", resized ? "image/webp" : (asset.mime || "application/octet-stream"));
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.send(resized || asset.buffer);
-});
-
-app.get("/api/vault/export", (req, res) => {
-  const backup = exportVaultBackup(encryptionKeyFromRequest(req));
-  if (!backup) {
-    res.status(401).json({ ok: false, error: "Unlock Hidden before backing it up." });
-    return;
-  }
-  res.setHeader("Content-Type", "application/octet-stream");
-  res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-hidden-${new Date().toISOString().slice(0, 10)}.backup"`);
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.send(backup);
-});
+registerVaultMediaRoutes(app);
 
 app.delete("/api/loras", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -1410,39 +849,9 @@ app.put("/api/loras/:workflowId", (req, res) => {
   }
 });
 
-app.get("/api/gallery/export", (req, res) => {
-  const date = new Date().toISOString().slice(0, 10);
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-gallery-${date}.zip"`);
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  sendGalleryExport(res, []);
-});
+registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory });
 
-app.post("/api/gallery/recover", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  await recoverGalleryFromHistory();
-  res.json({ ok: true, revision: galleryRevisionValue() });
-});
-
-/* ------------------------------------------ Favourites, prompts, earlier work */
-
-app.post("/api/gallery/favorite", (req, res) => {
-  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500);
-  const changed = setGalleryFavorites(ids, Boolean(req.body?.favorite));
-  res.json({ ok: true, items: revealGalleryItemsForRequest(changed), revision: galleryRevisionValue() });
-});
-
-// A Hidden image keeps its star inside Hidden's encrypted list.
-app.post("/api/hidden/favorite", (req, res) => {
-  const key = requireHiddenKey(req, res);
-  if (!key) return;
-  const favorite = Boolean(req.body?.favorite);
-  const items = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500)
-    .map((id) => patchVaultItem(key, id, (item) => (favorite ? { favorite: true } : { favorite: undefined })))
-    .filter(Boolean);
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.json({ ok: true, items, revision: vaultRevision() });
-});
+registerHiddenFavoriteRoute(app);
 
 app.get("/api/prompts", (_req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
@@ -1681,178 +1090,7 @@ app.post("/api/comfy-search", (req, res) => {
   res.json({ ok: true, enabled: comfySearchEnabled() });
 });
 
-app.post("/api/generate", async (req, res) => {
-  if (configuredBackends().length === 1) return generateOnBackend(req, res);
-  try {
-    const available = await mediaModels();
-    const profile = available.models.profiles.find((item) => item.id === req.body?.profileId)
-      || available.models.profiles.find((item) => item.workflow === req.body?.workflow && item.model === req.body?.model);
-    if (!profile) return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
-    const backend = isLocalVideoProfile(profile) ? "video" : "primary";
-    return await withComfyBackend(backend, () => generateOnBackend(req, res));
-  } catch (error) {
-    if (!res.headersSent) res.status(503).json({ ok: false, error: error.message });
-  }
-});
-
-async function generateOnBackend(req, res) {
-  const requestKey = encryptionKeyFromRequest(req);
-  const hidden = Boolean(req.body?.privateVault);
-  // Checked before anything reaches ComfyUI, so a Hidden prompt never runs in the open.
-  if (hidden && !isPrivacyEnabled()) {
-    res.status(400).json({ ok: false, reason: "setup", error: "Set up Hidden before generating into it." });
-    return;
-  }
-  if (hidden && !requestKey) {
-    res.status(401).json({ ok: false, locked: true, reason: "locked", error: "Hidden is locked. Unlock it to generate." });
-    return;
-  }
-  let body;
-  let isMockJob = false;
-  let context = null;
-  try {
-    context = await loadComfyContext();
-  } catch (error) {
-    // Placeholder generations are only for agent and UI testing without a GPU.
-    if (!demoMode) {
-      res.status(503).json({ ok: false, restarting: comfyRestarting(), error: comfyDownMessage(error?.message) });
-      return;
-    }
-  }
-  if (context) {
-    try {
-      body = sanitizeGenerateBody(req.body, context.info, context.stats);
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-      return;
-    }
-  } else {
-    const prompt = String(req.body?.prompt || "").trim();
-    if (!prompt) {
-      res.status(400).json({ error: "Enter a prompt." });
-      return;
-    }
-    isMockJob = true;
-    body = {
-      kind: req.body?.kind === "video" ? "video" : "image",
-      prompt,
-      negative: String(req.body?.negative || ""),
-      model: String(req.body?.model || "flux1-schnell.safetensors"),
-      width: Number(req.body?.width || 1024),
-      height: Number(req.body?.height || 1024),
-      steps: Number(req.body?.steps || 4),
-      cfg: Number(req.body?.cfg || 1),
-      count: Number(req.body?.count || 1),
-      ...(req.body?.variationCount !== undefined ? { variationCount: Math.max(1, Math.min(8, Math.round(Number(req.body.variationCount) || 1))) } : {}),
-      sampler: String(req.body?.sampler || "euler"),
-      scheduler: String(req.body?.scheduler || "simple"),
-      seed: String(req.body?.seed || ""),
-      startImageId: String(req.body?.startImageId || ""),
-      startImageName: String(req.body?.startImageName || "")
-    };
-  }
-  // What is made from a Hidden image stays hidden, wherever it was asked for.
-  const fromHidden = [...(req.body?.referenceAssets || []).map((item) => item?.assetId), req.body?.startImageId].some((id) => String(id || "").startsWith("vault:"));
-  if (fromHidden && !requestKey) {
-    res.status(401).json({ ok: false, locked: true, reason: "locked", error: "That reference is in Hidden. Unlock Hidden to use it." });
-    return;
-  }
-  body.comfyBackend = currentComfyBackend();
-  body.privateVault = hidden || fromHidden;
-  // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
-  const autoUpscale = req.body?.autoUpscale;
-  body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
-    ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
-    : null;
-  // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
-  if (!body.privateVault) try { recordPrompt(body.prompt); } catch { /* a run matters more than its history */ }
-  // An older page (or a draft restored from before the reference library) can
-  // send only the image's id; treat it as the reference instead of losing it.
-  if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
-    // Not a library id (an old start-image upload): keep the legacy path for it.
-    body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: body.privateVault, generation: body }).catch(() => []);
-  }
-  if (!isMockJob && body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
-    try {
-      body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: body.privateVault, generation: body });
-      body.startImageId ||= body.referenceAssets[0]?.assetId || "";
-      body.startImageName ||= body.referenceAssets[0]?.name || "";
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-      return;
-    }
-  }
-  // A painted mask becomes a crop, its masks and where to stitch them back (inpaint.js).
-  // The mask itself goes no further: it is never stored with the run.
-  if (body.inpaint) {
-    try {
-      body.inpaint = isMockJob ? null : await prepareInpaint(req, body);
-    } catch (error) {
-      await forgetComfyRun({ inputNames: (body.referenceAssets || []).filter((item) => item.temporary).map((item) => item.comfyName) });
-      res.status(400).json({ ok: false, error: error.message });
-      return;
-    }
-  }
-  // An empty painted mask falls back to a normal run, so apply normal sizing too.
-  if (body.inpaint?.box) {
-    const { box, image, work } = body.inpaint;
-    console.log(`[HEISS] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`);
-  }
-  // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
-  const inpaintSkipped = Boolean(!isMockJob && req.body?.inpaint?.mask && !body.inpaint);
-  if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
-    try {
-      const [first, ...others] = body.referenceAssets;
-      const [replacement] = await stageReferenceAssets(req, [first], { unique: body.privateVault, generation: body });
-      if (first.temporary) await forgetComfyRun({ inputNames: [first.comfyName] });
-      body.referenceAssets = [replacement, ...others];
-    } catch (error) {
-      await forgetComfyRun({ inputNames: (body.referenceAssets || []).filter((item) => item.temporary).map((item) => item.comfyName) });
-      res.status(400).json({ ok: false, error: error.message });
-      return;
-    }
-  }
-  // Plain img2img samples at the staged image's size, irrespective of the empty latent controls.
-  const startSize = body.referenceAssets?.[0];
-  const inputFamily = families[body.family];
-  if (!body.inpaint && inputFamily?.img2img && !inputFamily.references && startSize?.width) {
-    body.requestedSize = { width: body.width, height: body.height };
-    body.width = startSize.width;
-    body.height = startSize.height;
-  }
-  if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize), referenceRole: body.referenceRole })) body.autoUpscale = null;
-  // Every image this run handed ComfyUI: all of them go after a Hidden run, and
-  // after a normal one, temporary resized copies and any Hidden references.
-  const staged = (body.referenceAssets || []).filter((item) => item.comfyName);
-  const inpaintNames = inpaintInputNames(body.inpaint);
-  body.stagedInputNames = [...staged.map((item) => item.comfyName), ...inpaintNames];
-  const fromHiddenImage = String(body.referenceAssets?.[0]?.assetId || "").startsWith("vault:");
-  body.hiddenInputNames = [
-    ...staged.filter((item) => item.temporary || String(item.assetId || "").startsWith("vault:")).map((item) => item.comfyName),
-    ...(fromHiddenImage ? inpaintNames : [])
-  ];
-  // A random seed is drawn here rather than inside the graph, so the gallery
-  // records the number that actually ran and the image can be made again.
-  if (!/^\d+$/.test(String(body.seed ?? "").trim())) {
-    body.seed = String(crypto.randomInt(1, 2 ** 31));
-    body.seedRandom = true;
-  }
-  const clientJobId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
-  const id = clientJobId || crypto.randomUUID();
-  body.clientJobId = id;
-  body.createdAt = new Date().toISOString();
-  body.startedAt = Date.now();
-  const items = makePendingItems(id, body);
-  markWorkflowUsed(body.profileId || body.model || body.workflow || "");
-  setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-  jobs.set(id, { status: "queued", comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
-  res.json({ jobId: id, items, hidden: body.privateVault, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
-  if (isMockJob) {
-    setTimeout(() => runMockJob(id, body), 0);
-  } else {
-    setTimeout(() => runJob(id, body, { prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null }).catch(() => null), 0);
-  }
-}
+registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage });
 
 /** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
 async function upscaleContext(res, { force = false } = {}) {
@@ -1982,18 +1220,6 @@ app.post("/api/upscale", async (req, res) => {
   res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
 });
 
-/**
- * Smart upscale (2K / 4K in the size menu) goes into the run's own graph, so
- * a run and its upscale are one ComfyUI job (run-upscale.js). When ComfyUI's
- * node list is out of reach the run still goes ahead, without the upscale.
- */
-async function smartUpscalePrepare(graph, body) {
-  const { info } = await loadComfyContext().catch(() => ({ info: null }));
-  if (!info) return { skipped: "Smart upscale couldn’t check ComfyUI’s nodes", quality: body.autoUpscale?.quality };
-  const customWorkflow = String(body.model || "").startsWith("custom:") ? getCustomWorkflow(body.model) : null;
-  return planRunUpscale(graph, body, info, customWorkflow);
-}
-
 // Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
 app.post("/api/upscale/cancel", async (req, res) => {
   const itemId = String(req.body?.galleryItemId || "");
@@ -2071,55 +1297,7 @@ app.post("/api/queue/cancel", async (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/gallery/clear", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  // Clearing the gallery never touches Hidden; that has its own erase. Nor images
-  // shown from another folder (library.js): their files are not in the output
-  // folder, so no trash could bring them back; Settings › Library removes those.
-  const clears = (item) => item.status === "done" && !item.privateVault && !item.library;
-  const cleared = gallery.filter(clears);
-  // Into the trash, not deleted: it can be put back until the trash empties itself (gallery-trash.js).
-  const trash = trashGalleryItems(cleared);
-  hideGalleryItems(cleared);
-  setGallery(gallery.filter((item) => !clears(item)));
-  saveGallery();
-  res.json({ ok: true, files: { deleted: trash.moved, skipped: trash.skipped }, trash: { batch: trash.batch, moved: trash.moved, days: trashSummary().days }, outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
-});
-
-app.get("/api/gallery/trash", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true, ...trashSummary() });
-});
-
-// Undo for a clear, or Settings' Restore: the newest batch unless one is named.
-app.post("/api/gallery/trash/restore", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const { restored, missing } = restoreTrash(String(req.body?.batch || ""));
-    if (restored.length) addGalleryItems(restored);
-    res.json({ ok: true, restored: restored.length, missing, revision: galleryRevisionValue(), trash: trashSummary(), outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/gallery/trash/empty", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const removed = await emptyTrash();
-    res.json({ ok: true, removed, trash: trashSummary() });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/gallery/errors/clear", (_req, res) => {
-  const cleared = gallery.filter((item) => item.status === "error" || item.status === "canceled");
-  hideGalleryItems(cleared);
-  setGallery(gallery.filter((item) => item.status !== "error" && item.status !== "canceled"));
-  saveGallery();
-  res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
-});
+registerGalleryTrashRoutes(app);
 
 app.post("/api/cache/clear", async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -2275,28 +1453,7 @@ app.post("/api/comfy/restart", async (req, res) => {
   res.status(501).json({ ok: false, error: sawManager ? "ComfyUI-Manager couldn’t restart ComfyUI." : "Restarting needs ComfyUI-Manager, which newer ComfyUI versions turn off. Start ComfyUI with --enable-manager." });
 });
 
-app.delete("/api/gallery/:id", (req, res) => {
-  const id = decodeURIComponent(req.params.id);
-  const inGallery = gallery.some((item) => item.id === id || item.url === id);
-  // Only an id the gallery does not know can be a Hidden one, and only then is a key needed.
-  let vault = { removed: 0 };
-  if (!inGallery && vaultConfigured()) {
-    const key = encryptionKeyFromRequest(req);
-    if (!key) {
-      res.status(401).json({ ok: false, locked: true, error: "Unlock Hidden to delete from it." });
-      return;
-    }
-    vault = deleteVaultItems(key, [id]);
-    forgetPrivateVideoPreviews(id);
-  }
-  const before = gallery.length;
-  const removed = gallery.filter((item) => item.id === id || item.url === id);
-  const files = deleteGalleryFiles(removed);
-  hideGalleryItems(removed);
-  setGallery(gallery.filter((item) => item.id !== id && item.url !== id));
-  if (gallery.length !== before) saveGallery();
-  res.json({ ok: true, files, vault, removed: before - gallery.length + vault.removed, outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
-});
+registerGalleryDeleteRoute(app);
 
 app.post("/api/open-output-folder", (req, res) => {
   if (!requireAdmin(req, res)) return;
