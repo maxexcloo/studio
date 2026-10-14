@@ -166,7 +166,7 @@ export function HiddenSetupDialog({ hidden, comfyOnline, comfyUrl, onRecheck, on
     footer = (
       <>
         <button className="btn is-ghost" onClick={close}>Not now</button>
-        <button className="btn" onClick={() => { onRecheck(); setLastChecked(Date.now()); }}>Check again</button>
+        <button className="btn" onClick={() => { onRecheck(); setLastChecked(Date.now()); }}>Check Again</button>
         <button className="btn is-primary" onClick={() => { setOfflineOk(true); setStep("intro"); }}>Set up anyway</button>
       </>
     );

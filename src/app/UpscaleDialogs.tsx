@@ -129,7 +129,7 @@ export function UpscaleSetupDialog({
   const { title, description } = copyFor(stage, quality, Boolean(pending), fallback);
   const close = setup.closeSetup;
   const later = <button className="btn is-ghost" onClick={close}>{stage === "downloading" ? "Continue in background" : "Not now"}</button>;
-  const recheck = <button className="btn" onClick={() => setup.recheck()}><RefreshCw size={13} /> Check again</button>;
+  const recheck = <button className="btn" onClick={() => setup.recheck()}><RefreshCw size={13} /> Check Again</button>;
 
   const missingModels = (status?.models || []).filter((model) => !model.present);
   const remaining = missingModels.reduce((sum, model) => sum + model.bytes - (model.partialBytes || 0), 0);

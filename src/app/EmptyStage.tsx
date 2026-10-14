@@ -124,7 +124,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
               <h2>{retrying ? 'Looking for ComfyUI…' : 'ComfyUI is offline'}</h2>
               <p>Start ComfyUI and it connects.{where ? <> Checking <code className="stage-code">{where}</code>{ports.length ? <> and port {ports.join(', ')}</> : null}.</> : null}</p>
               <div className="empty-actions">
-                <button className="reconnect-btn primary" onClick={onRetry} disabled={retrying} aria-busy={retrying || undefined}><RefreshCw size={13} className={cn(retrying && 'spin')} /> {retrying ? 'Checking…' : 'Check again'}</button>
+                <button className="reconnect-btn primary" onClick={onRetry} disabled={retrying} aria-busy={retrying || undefined}><RefreshCw size={13} className={cn(retrying && 'spin')} /> {retrying ? 'Checking…' : 'Check Again'}</button>
                 {thisComputer ? <button className="reconnect-btn" onClick={onOpenConnection}><Plug size={13} /> Change address</button> : null}
               </div>
               {onNoComfy

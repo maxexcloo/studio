@@ -321,13 +321,13 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         </div>
       ) : null}
       {optional && missing.some((item) => item.dismissKey) && !moving ? (
-        <button type="button" className="btn is-ghost model-setup-recheck" onClick={() => dismissRecommended(missing.filter((item) => item.dismissKey).map((item) => item.dismissKey!))}>Don’t show again</button>
+        <button type="button" className="btn is-ghost model-setup-recheck" onClick={() => dismissRecommended(missing.filter((item) => item.dismissKey).map((item) => item.dismissKey!))}>Don’t Show Again</button>
       ) : null}
       {waitingOnComfy ? (
         <div className="model-setup-watch"><Watcher lastChecked={lookedAt}>{outdated ? 'Watching for the ComfyUI update…' : 'Watching for the nodes…'}</Watcher></div>
       ) : null}
       {manual && !moving && !waitingOnComfy ? (
-        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check again</button>
+        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check Again</button>
       ) : null}
       {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running HEISS UI.'}</p> : null}
     </section>

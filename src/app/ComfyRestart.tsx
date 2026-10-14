@@ -270,7 +270,7 @@ export function ComfyManagerNote({ info, refresh, className }: { info: ManagerIn
         ? <>Needs ComfyUI-Manager. Start ComfyUI with <code>--enable-manager</code>, or restart it yourself.</>
         : info?.error ? <>Couldn’t check ComfyUI: {info.error}</>
         : <>ComfyUI is offline.</>}{' '}
-      <button type="button" className="comfy-restart-link" onClick={() => refresh()}>Check again</button>
+      <button type="button" className="comfy-restart-link" onClick={() => refresh()}>Check Again</button>
     </p>
   );
 }

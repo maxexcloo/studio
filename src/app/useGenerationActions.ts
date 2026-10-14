@@ -100,7 +100,7 @@ export function useGenerationActions(view: any) {
       return;
     }
     if (comfyOffline) {
-      showToast("ComfyUI is offline, so nothing was sent. Start it, then try again.", "error", retryComfyStatus ? { action: { label: "Check again", onClick: retryComfyStatus } } : undefined);
+      showToast("ComfyUI is offline, so nothing was sent. Start it, then try again.", "error", retryComfyStatus ? { action: { label: "Check Again", onClick: retryComfyStatus } } : undefined);
       return;
     }
     if (!retry && !prompt.trim()) {

@@ -156,7 +156,7 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
 
   let rowIndex = -1;
   return (
-    <div ref={panelRef} className="prompt-history-panel" role="dialog" aria-label="Recent prompts" onKeyDown={onKeyDown}>
+    <div ref={panelRef} className="prompt-history-panel" role="dialog" aria-label="Recent Prompts" onKeyDown={onKeyDown}>
       <label className="model-menu-search">
         <Search size={14} aria-hidden="true" />
         <input
@@ -164,16 +164,16 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
           className="is-framed"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={prompts.length ? `Search ${prompts.length === 1 ? '1 prompt' : `${prompts.length} prompts`}` : 'Recent prompts'}
-          aria-label="Search recent prompts"
+          placeholder="Search Prompts"
+          aria-label="Search Prompts"
           aria-controls={`${id}-list`}
           aria-activedescendant={cursor >= 0 ? `${id}-row-${cursor}` : undefined}
           spellCheck={false}
           autoComplete="off"
         />
-        {query ? <button type="button" className="model-menu-clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><X size={12} /></button> : null}
+        {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><X size={12} /></button> : null}
       </label>
-      <div ref={listRef} id={`${id}-list`} className="prompt-history-list" role="listbox" aria-label="Recent prompts">
+      <div ref={listRef} id={`${id}-list`} className="prompt-history-list" role="listbox" aria-label="Recent Prompts">
         {sections.map((section) => (
           <div key={section.id} className="prompt-history-section" role="group" aria-label={section.label || undefined}>
             {section.label ? <div className="prompt-history-label">{section.label}</div> : null}
@@ -223,11 +223,11 @@ export function PromptHistorySheet({ open, onClose, onPick, onError }: { open: b
   const count = sections.reduce((sum, section) => sum + section.rows.length, 0);
   const { pin, forget } = useRowActions(onError);
   return (
-    <Sheet open={open} onClose={onClose} title="Recent prompts" full className="phone-prompt-history">
+    <Sheet open={open} onClose={onClose} title="Recent Prompts" full className="phone-prompt-history">
       {prompts.length > 6 ? (
         <label className="phone-search">
           <Search size={17} aria-hidden="true" />
-          <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${prompts.length} prompts`} aria-label="Search recent prompts" spellCheck={false} autoComplete="off" />
+          <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Prompts" aria-label="Search Prompts" spellCheck={false} autoComplete="off" />
         </label>
       ) : null}
       {sections.map((section) => (
