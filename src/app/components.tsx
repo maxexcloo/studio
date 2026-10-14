@@ -648,6 +648,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
   const pick = (id: string) => { onChange(id); close(); };
   const onMenuKey = (event: React.KeyboardEvent) => {
     if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest('.model-filters')) return;
+    if (event.key === "Enter" && (event.target as HTMLElement).closest('button')) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!flat.length) return;
