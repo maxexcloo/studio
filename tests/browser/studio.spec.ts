@@ -212,6 +212,14 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.getByRole('heading', { name: 'Generation Connections' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
+  await page.locator('.settings-modal').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Workflow Gallery', exact: true }).click();
+  const workflows = page.locator('.workflow-gallery');
+  await expect(workflows).toBeVisible();
+  await workflows.locator('.wf-card').filter({ hasText: 'In Use' }).dblclick();
+  await expect(workflows).toBeVisible();
+  if (!isMobile) expect((await workflows.boundingBox())!.height).toBeGreaterThan(650);
+
 });
 
 test('model speed and reference filters combine and All clears them', async ({ page, isMobile }) => {
@@ -331,6 +339,11 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   }
   await search.fill('Model 28');
   await expect(rows).toHaveCount(1);
+  const favourite = rows.first().locator('..').getByRole('button', { name: /Add .*favorites/ });
+  await favourite.focus();
+  await favourite.press('Enter');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('button', { name: /Remove .*favorites/ }).last()).toHaveAttribute('aria-pressed', 'true');
   if (isMobile) await rows.first().click();
   else await search.press('Enter');
   await expect(menu).toHaveCount(0);

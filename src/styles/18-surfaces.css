@@ -29,7 +29,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(520px, 100%);
+  width: min(640px, 100%);
   max-height: calc(100dvh - 48px);
   overflow: hidden;
   border: 1px solid var(--surface-border);
@@ -42,8 +42,8 @@
   animation: modal-in var(--dur-base) var(--ease-out);
 }
 .modal-alert { width: min(420px, 100%); }
-.modal-wide { width: min(1040px, 100%); height: min(720px, calc(100dvh - 48px)); }
-.modal-sheet { width: min(960px, 100%); height: min(664px, calc(100dvh - 48px)); }
+.modal-wide { width: min(1280px, 100%); height: min(840px, calc(100dvh - 48px)); }
+.modal-sheet { width: min(1200px, 100%); height: min(800px, calc(100dvh - 48px)); }
 
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(6px) scale(.985); } }

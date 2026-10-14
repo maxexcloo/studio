@@ -8,7 +8,7 @@
 
 .wf-layout { position: relative; grid-template-columns: minmax(0, 1fr) 340px; }
 @media (min-width: 761px) {
-  .workflow-gallery.modal-wide { width: min(1200px, calc(100vw - 32px)); height: min(600px, calc(100dvh - 48px)); }
+  .workflow-gallery.modal-wide { width: min(1440px, calc(100vw - 48px)); height: min(800px, calc(100dvh - 48px)); }
 }
 
 /* ---------------------------------------------------------------- Browse */

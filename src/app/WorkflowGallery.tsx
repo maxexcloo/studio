@@ -433,7 +433,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             <button key={value} type="button" aria-pressed={filter === value && (value !== "all" || !speed && !purpose)} className={cn(filter === value && (value !== "all" || !speed && !purpose) && "active")} onClick={() => { setFilter(value); if (value === 'all') { setSpeed(''); setPurpose(''); } }}>{label}</button>
           ))}
           <span className="wf-filter-divider" aria-hidden="true" />
-          {(['standard', 'flash'] as const).map((value) => <button key={value} type="button" aria-pressed={speed === value} className={cn(speed === value && 'active')} onClick={() => setSpeed(speed === value ? '' : value)}>{value === 'standard' ? 'Standard' : 'Flash'}</button>)}
+          {(['standard', 'flash'] as const).map((value) => <button key={value} type="button" aria-pressed={speed === value} className={cn(speed === value && 'active')} onClick={() => setSpeed(speed === value ? '' : value)}>{value === 'standard' ? 'Standard' : 'Fast'}</button>)}
           <span className="wf-filter-divider" aria-hidden="true" />
           {(['generate', 'edit'] as const).map((value) => <button key={value} type="button" aria-pressed={purpose === value} className={cn(purpose === value && 'active')} title={value === 'generate' ? 'Generate without a reference image' : 'Use a reference image'} onClick={() => setPurpose(purpose === value ? '' : value)}>{kind === 'video' ? value === 'generate' ? 'Non-Reference' : 'Reference' : value === 'generate' ? 'Generate' : 'Edit'}</button>)}
         </div>
@@ -446,7 +446,6 @@ export function WorkflowGallery({ view }: { view: any }) {
                 aria-pressed={workflow.id === selected?.id}
                 className={cn("wf-card", workflow.id === selected?.id && "active")}
                 onClick={() => { setSelectedId(workflow.id); setMobileDetailsOpen(true); }}
-                onDoubleClick={() => useWorkflow(workflow)}
               >
                 <span className="wf-card-heading">
                   <span className="wf-thumb"><WorkflowThumbnail key={workflow.thumbnail} src={workflow.thumbnail} /></span>
