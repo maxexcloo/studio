@@ -269,7 +269,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
 
       <div className="reference-search picker-search">
         <Search size={15} aria-hidden="true" />
-        <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder={tab === 'upload' ? 'Search uploads by name…' : 'Search images by prompt or name…'} value={search} onChange={(event) => setSearch(event.target.value)} />
+        <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder="Search Reference Images" value={search} onChange={(event) => setSearch(event.target.value)} />
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
       </div>
       <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null) memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>

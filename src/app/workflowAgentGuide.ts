@@ -8,7 +8,7 @@ import type { WorkflowImportPreview } from './types';
  */
 export const workflowControls: Array<{ key: string; label: string; hint: string; editable?: boolean }> = [
   { key: "prompt", label: "Prompt", hint: "the positive prompt text, e.g. CLIPTextEncode.text", editable: true },
-  { key: "negative", label: "Negative prompt", hint: "the negative prompt text", editable: true },
+  { key: "negative", label: "Negative Prompt", hint: "the negative prompt text", editable: true },
   { key: "seed", label: "Seed", hint: "the sampler's seed (or noise_seed)", editable: true },
   { key: "steps", label: "Steps", hint: "the sampler's steps", editable: true },
   { key: "cfg", label: "CFG", hint: "the sampler's cfg", editable: true },

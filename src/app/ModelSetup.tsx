@@ -276,7 +276,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         </div>
       ) : null}
       {manual && !moving ? (
-        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check again</button>
+        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check Again</button>
       ) : null}
       {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running HEISS UI.'}</p> : null}
     </section>

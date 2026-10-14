@@ -183,7 +183,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
     footer = <button className="btn is-primary" onClick={state.close}>Done</button>;
   } else if (stage === 'offline') {
     body = <Watcher>Waiting for ComfyUI…</Watcher>;
-    footer = <>{later}<button className="btn" onClick={() => state.scan()}><RefreshCw size={13} /> Check again</button></>;
+    footer = <>{later}<button className="btn" onClick={() => state.scan()}><RefreshCw size={13} /> Check Again</button></>;
   } else if (stage === 'adding') {
     body = <Watcher>Adding folders…</Watcher>;
   } else if (stage === 'restarting' || stage === 'waiting') {
