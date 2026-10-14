@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import { showToastTone as showToast, toast } from "./app/toast";
 import "./styles.css";
 
+import { useAppUpdates } from "./app/useAppUpdates";
+import { useComposerState } from "./app/useComposerState";
 import { useModelFolders } from './app/useModelFolders';
-import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, UpdatePrefs, UpdateStatus, WorkflowPreferences, WorkflowSummary } from './app/types';
+import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
 import { profileImageCount, profileImageSize } from './app/generationOptions';
@@ -41,7 +43,7 @@ import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
 import { useKeyboardInset } from './hooks/use-keyboard-inset';
-import { setAtComputer, setThisComputer, usePhone, useThisComputer } from './app/device';
+import { setAtComputer, setThisComputer, usePhone } from './app/device';
 import { useArrowKeyGroups } from './hooks/use-arrow-key-groups';
 import { useGenerationEstimate } from './app/useGenerationEstimate';
 import { listNames, registerRestartConfirm, setComfyRestartClock, setComfyRestartResult, setComfyRestarting } from './app/ComfyRestart';
@@ -83,9 +85,6 @@ function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[
 }
 
 
-const updateInstalledKey = "heiss-ui:update-installed";
-const formatUpdateBytes = (bytes = 0) => `${(bytes / 1024 ** 2).toFixed(bytes > 100 * 1024 ** 2 ? 0 : 1)} MB`;
-
 // Another dialog on top owns the keyboard. The viewer is a dialog too, but it is
 // the surface these shortcuts drive, so it does not count (data-focus-trap).
 const OPEN_DIALOG = '[role="dialog"]:not([data-focus-trap]), [role="alertdialog"]';
@@ -95,51 +94,50 @@ function App() {
   useArrowKeyGroups();
   const now = Date.now();
   const initialDraft = useMemo(() => loadDraft(), []);
-  const [mode, setMode] = useState<Mode>(initialDraft.mode === "video" ? "video" : "image");
+  const [prefs, setPrefsState] = useState<Preferences>(() => loadPrefs());
+  const {
+    mode, setMode,
+    prompt, setPrompt,
+    negative, setNegative,
+    model, setModel,
+    textEncoder, setTextEncoder,
+    textEncoders, setTextEncoders,
+    vae, setVae,
+    clipType, setClipType,
+    weightDtype, setWeightDtype,
+    width, setWidth,
+    height, setHeight,
+    steps, setSteps,
+    cfg, setCfg,
+    denoise, setDenoise,
+    inpaintMask, setInpaintMask,
+    inpaintStrength, setInpaintStrength,
+    inpaintFeather, setInpaintFeather,
+    seed, setSeed,
+    count, setCount,
+    frames, setFrames,
+    fps, setFps,
+    duration, setDuration,
+    resolution, setResolution,
+    sampler, setSampler,
+    scheduler, setScheduler,
+    loras, setLoras,
+    customSize, setCustomSize,
+    startImage, setStartImage,
+    startImageId, setStartImageId,
+    startImageName, setStartImageName,
+    referenceAssets, setReferenceAssets,
+  } = useComposerState(initialDraft, prefs);
   const [models, setModels] = useState<Models | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [backendStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
-  const [updateBusy, setUpdateBusy] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  // The version this page just came back on after an update, for the "Updated" pill.
-  const [justUpdated, setJustUpdated] = useState("");
-  const [prefs, setPrefsState] = useState<Preferences>(() => loadPrefs());
   // Read by every download link and share as it is made (shareSettings.ts); kept in step here.
   setShareSettings(prefs);
   const hidden = useHidden({ autoLockMinutes: prefs.hiddenAutoLockMinutes ?? 15, showToast });
   const hiddenSpace = hidden.space === "hidden";
-  const [prompt, setPrompt] = useState(String(initialDraft.prompt || ""));
-  const [negative, setNegative] = useState(String(initialDraft.negative || ""));
-  const [model, setModel] = useState(String(initialDraft.model || ""));
   const comfyStatus = statusForProfile(backendStatus, { kind: mode, family: models?.profiles.find((profile) => profile.id === model)?.family });
   const primaryConnected = backendStatus.backends?.primary?.connected ?? backendStatus.connected;
   const [paths, setPaths] = useState<Paths>({});
-  const [textEncoder, setTextEncoder] = useState(String(initialDraft.textEncoder || ""));
-  // Built-in families can need several encoders (Flux.1 two, HiDream four), one per slot.
-  const [textEncoders, setTextEncoders] = useState<string[]>(Array.isArray(initialDraft.textEncoders) ? initialDraft.textEncoders.map(String) : []);
-  const [vae, setVae] = useState(String(initialDraft.vae || ""));
-  const [clipType, setClipType] = useState(String(initialDraft.clipType || ""));
-  const [weightDtype, setWeightDtype] = useState(String(initialDraft.weightDtype || "default"));
-  const [width, setWidth] = useState(Number(initialDraft.width || 1024));
-  const [height, setHeight] = useState(Number(initialDraft.height || 1024));
-  const [steps, setSteps] = useState(Number(initialDraft.steps || prefs.defaultImageSteps));
-  const [cfg, setCfg] = useState(Number(initialDraft.cfg ?? 1));
-  const [denoise, setDenoise] = useState(Number(initialDraft.denoise ?? 0.65));
-  // Inpainting: a mask painted on the first reference (never saved with the draft or a run),
-  // how much the painted part may change, and how softly it blends back in.
-  const [inpaintMask, setInpaintMask] = useState<InpaintMask | null>(null);
-  const [inpaintStrength, setInpaintStrength] = useState(Number(initialDraft.inpaintStrength ?? 1));
-  const [inpaintFeather, setInpaintFeather] = useState(Number(initialDraft.inpaintFeather ?? 0.4));
-  const [seed, setSeed] = useState(String(initialDraft.seed || ""));
-  const [count, setCount] = useState(Number(initialDraft.count || prefs.defaultImageCount));
-  const [frames, setFrames] = useState(Number(initialDraft.frames || prefs.defaultVideoFrames));
-  const [fps, setFps] = useState(Number(initialDraft.fps || prefs.defaultFps));
-  const [duration, setDuration] = useState(Number(initialDraft.duration || 6));
-  const [resolution, setResolution] = useState(String(initialDraft.resolution || ""));
-  const [sampler, setSampler] = useState(String(initialDraft.sampler || "euler_ancestral"));
-  const [scheduler, setScheduler] = useState(String(initialDraft.scheduler || "beta"));
-  const [loras, setLoras] = useState<LoraSelection[]>(() => normalizeLoras(initialDraft.loras));
   const [loraSnapshotRevision, setLoraSnapshotRevision] = useState(0);
   const advanced = true;
   const [settings, setSettings] = useState(false);
@@ -160,11 +158,6 @@ function App() {
   const [viewerZoom, setViewerZoom] = useState(1);
   const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
   const [showDetails, setShowDetails] = useState(Boolean(initialDraft.showDetails));
-  const [customSize, setCustomSize] = useState(Boolean(initialDraft.customSize));
-  const [startImage, setStartImage] = useState("");
-  const [startImageId, setStartImageId] = useState(String(initialDraft.startImageId || ""));
-  const [startImageName, setStartImageName] = useState(String(initialDraft.startImageName || ""));
-  const [referenceAssets, setReferenceAssets] = useState<SelectedReferenceAsset[]>(() => Array.isArray(initialDraft.referenceAssets) ? initialDraft.referenceAssets : []);
   const generatePostingRef = useRef(false);
   const viewerDragRef = useRef<{ id: number; x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
   const viewerDragEndRef = useRef<number>(0);
@@ -293,77 +286,6 @@ function App() {
   useEffect(() => {
     setActive(null);
   }, [hidden.space]);
-
-  // After "Install update" the server has to restart; once this page sees a server
-  // that started after the install, say the update landed (or that it was undone).
-  useEffect(() => {
-    let pending: { at: number } | null = null;
-    try { pending = JSON.parse(localStorage.getItem(updateInstalledKey) || "null"); } catch { pending = null; }
-    if (!pending?.at) return;
-    fetch("/api/health").then((response) => response.json()).then(async (data: { startedAt?: number }) => {
-      if (!data?.startedAt || data.startedAt < pending!.at) return;
-      try { localStorage.removeItem(updateInstalledKey); } catch { /* nothing to clear */ }
-      const status = await apiJson<UpdateStatus>("/api/update/status").catch(() => null);
-      if (status) setUpdateStatus(status);
-      const result = status?.result;
-      if (result && !result.ok) showToast(result.rolledBack ? `HEISS UI ${result.to} didn’t start. Back on ${result.from}${result.error ? ` (${result.error})` : ""}.` : result.error || "The update didn’t install", "error");
-      else if (status?.release) setJustUpdated(result?.to || status.current || "");
-      else showToast("HEISS UI updated", "success");
-    }).catch(() => null);
-  }, []);
-
-  // A release download runs on the server; follow it while it is in flight.
-  const downloadStage = updateStatus?.download?.status;
-  useEffect(() => {
-    if (downloadStage !== "downloading" && downloadStage !== "verifying" && downloadStage !== "unpacking") return;
-    const timer = window.setInterval(() => {
-      // The update pill (or Settings › About) shows how it ends.
-      apiJson<UpdateStatus>("/api/update/status").then(setUpdateStatus).catch(() => null);
-    }, 800);
-    return () => window.clearInterval(timer);
-  }, [downloadStage]);
-
-  // Looks for a new release on its own, on the computer that can install it:
-  // shortly after opening, then every six hours while the page is open (the
-  // server keeps GitHub's answer, so every device and tab share one ask). It
-  // stays silent when offline or switched off in Settings › About.
-  // Not tied to ComfyUI: the address says "this computer" before /api/health
-  // does, and the server refuses anyone else anyway.
-  const canManage = useThisComputer();
-  const lastUpdateCheck = useRef(0);
-  const refreshUpdateStatus = () => {
-    lastUpdateCheck.current = Date.now();
-    fetch("/api/update/status?auto=1", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<UpdateStatus> : null)
-      // Only a release copy has an answer here; a checkout keeps what About found.
-      .then((data) => { if (data?.ok && data.release) setUpdateStatus(data); })
-      .catch(() => null);
-  };
-  useEffect(() => {
-    if (!canManage) return;
-    const check = () => {
-      if (document.hidden || Date.now() - lastUpdateCheck.current < 6 * 60 * 60 * 1000) return;
-      refreshUpdateStatus();
-    };
-    // The server asked GitHub when it started, so this is usually instant.
-    const first = window.setTimeout(check, 1500);
-    const timer = window.setInterval(check, 30 * 60 * 1000);
-    document.addEventListener("visibilitychange", check);
-    return () => { window.clearTimeout(first); window.clearInterval(timer); document.removeEventListener("visibilitychange", check); };
-  }, [canManage]);
-
-  /** "Later" on the update pill, or the automatic-check switch: shared by every device. */
-  async function setUpdatePrefs(next: Partial<UpdatePrefs>) {
-    setUpdateStatus((current) => current?.prefs ? { ...current, prefs: { ...current.prefs, ...next } } : current);
-    try {
-      const data = await apiJson<{ prefs: UpdatePrefs }>("/api/update/prefs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
-      setUpdateStatus((current) => current ? { ...current, prefs: data.prefs } : current);
-      // Switched back on: look now rather than in six hours.
-      if (next.autoCheck) apiJson<UpdateStatus>("/api/update/status?auto=1").then((status) => { if (status.ok && status.release) setUpdateStatus(status); }).catch(() => null);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Couldn’t save that", "error");
-    }
-  }
 
   // The LoRA library lives on the server and syncs edit by edit. Speak up only
   // when edits are actually stuck (a server restart with nothing to sync is not
@@ -808,6 +730,7 @@ function App() {
   }
 
   const { confirmAction, confirmationDialog } = useConfirmation(prefs.confirmActions);
+  const { updateStatus, updateBusy, restarting, justUpdated, setJustUpdated, refreshUpdateStatus, setUpdatePrefs, checkForUpdates, installUpdate, restartHeiss, restartForUpdate } = useAppUpdates(confirmAction);
 
   const { upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, toggleUpscale, cancelUpscale, chooseAutoUpscale } = useUpscale({
     gallery,
@@ -1007,80 +930,6 @@ function App() {
     if (intent?.kind === "enter") hidden.setSpace("hidden");
     if (intent?.kind === "generate") window.setTimeout(() => generate(), 0);
   }, [hidden.unlocked, hidden.setupOpen, hidden.unlockOpen, hidden.intent]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function checkForUpdates(notify = true) {
-    try {
-      setUpdateBusy(true);
-      // The check the person asks for always goes to GitHub; polling uses the server's cache.
-      const data = await apiJson<UpdateStatus>("/api/update/status?fresh=1");
-      setUpdateStatus(data);
-      if (notify) showToast(data.available ? "Update available" : data.ok ? "Up to date" : data.error || "Couldn’t check for updates", data.ok ? "success" : "error");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Couldn’t check for updates";
-      setUpdateStatus({ ok: false, error: message });
-      if (notify) showToast(message, "error");
-    } finally {
-      setUpdateBusy(false);
-    }
-  }
-
-  async function installUpdate({ confirm = true }: { confirm?: boolean } = {}) {
-    const release = Boolean(updateStatus?.release);
-    if (confirm && !await confirmAction(release
-      ? { title: `Update to HEISS UI ${updateStatus?.latest}?`, description: `Downloads${updateStatus?.size ? ` ${formatUpdateBytes(updateStatus.size)}` : " the update"} and installs it when HEISS UI restarts.`, action: "Download" }
-      : { title: "Update HEISS UI?", description: "Pulls the latest code, installs packages and rebuilds.", action: "Update" })) return;
-    try {
-      setUpdateBusy(true);
-      const data = await apiJson<UpdateStatus>("/api/update/install", { method: "POST" });
-      setUpdateStatus(data);
-      if (release) {
-        if (data.message) showToast(data.message, "default");
-        return;
-      }
-      if (data.updated) {
-        try { localStorage.setItem(updateInstalledKey, JSON.stringify({ at: Date.now() })); } catch { /* the success toast just won't show */ }
-      }
-      showToast(data.updated ? "Update installed. Restart HEISS UI to use it." : data.message || "Up to date", data.updated ? "success" : "default");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Couldn’t update", "error", { action: { label: "Try again", onClick: () => installUpdate({ confirm: false }) } });
-    } finally {
-      setUpdateBusy(false);
-    }
-  }
-
-  /**
-   * Restarts HEISS UI through its launcher (which also swaps in a downloaded
-   * update), then reloads the page once the new server answers.
-   */
-  async function restartHeiss({ update = false } = {}) {
-    const at = Date.now();
-    try {
-      await apiJson("/api/update/restart", { method: "POST" });
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Couldn’t restart HEISS UI", "error", { action: { label: "Try again", onClick: () => restartHeiss({ update }) } });
-      return false;
-    }
-    // A downloaded update goes in with any restart, so say so when the page comes back.
-    if (update || updateStatus?.download?.status === "ready") {
-      try { localStorage.setItem(updateInstalledKey, JSON.stringify({ at })); } catch { /* the toast just won't show */ }
-    }
-    setRestarting(true);
-    // Wait for a server that started after the restart, then load its new page.
-    const deadline = at + 3 * 60 * 1000;
-    const poll = async () => {
-      const data = await fetch("/api/health", { cache: "no-store" }).then((response) => response.json()).catch(() => null);
-      if (data?.startedAt && data.startedAt >= at) { window.location.reload(); return; }
-      if (Date.now() > deadline) {
-        setRestarting(false);
-        showToast("HEISS UI didn’t come back. Start it again with its launcher.", "error", { duration: Infinity, action: { label: "Reload", onClick: () => window.location.reload() } });
-        return;
-      }
-      window.setTimeout(poll, 1000);
-    };
-    window.setTimeout(poll, 1500);
-    return true;
-  }
-  const restartForUpdate = () => restartHeiss({ update: true });
 
   function applyProfile(profile: Profile, setModelId = true) {
     if (setModelId) setModel(profile.id);
