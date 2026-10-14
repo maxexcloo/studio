@@ -33,7 +33,7 @@
   height: 28px;
   padding: 0 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
@@ -43,9 +43,10 @@
 .ref-add.is-open > svg { rotate: 45deg; }
 .ref-add-label, .ref-add-label > span { display: inline-flex; align-items: center; gap: 4px; }
 .ref-add-label em { color: var(--ember); font-size: 15px; line-height: 1; font-style: normal; }
-.ref-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-add:hover { color: hsl(var(--foreground)); }
 .ref-add:active { scale: .96; }
-.ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-add.is-open { color: hsl(var(--foreground)); }
+.ref-add:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 
 /* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
    clip-path wipes open to the left, so nothing reflows while it animates. */

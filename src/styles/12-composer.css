@@ -15,6 +15,10 @@
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
 .composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 28px; padding: 0 var(--prompt-text-inset, 4px); }
+.composer-secondary-row { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--surface-border); padding-top: 4px; }
+.composer-secondary-row .negative-drawer.open { flex: 1; min-width: 0; border: 0; margin: 0; padding: 0 var(--prompt-text-inset, 10px); }
+.composer-secondary-row .phone-negative { flex: 1; min-width: 0; border: 0; padding: 0; }
+.composer-secondary-row .composer-prompt-tools { flex: none; padding-left: 0; }
 .composer-reference-tools:empty { display: none; }
 .prompt-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .prompt-action:hover, .prompt-action.active { background: var(--control-hover); color: hsl(var(--foreground)); }
@@ -323,4 +327,9 @@
   .composer-prompt-tools { min-height: 40px; }
   .composer-prompt-tools .prompt-action, .composer-prompt-tools .ref-add { min-height: 40px; }
   .composer-prompt-tools .prompt-action { width: 40px; }
+}
+
+@media (max-width: 620px) {
+  .composer-prompt-tools .ref-add { width: 40px; padding: 0; }
+  .composer-prompt-tools .ref-add-label, .composer-prompt-tools .ref-add-label > span { gap: 0; font-size: 0; }
 }

@@ -99,7 +99,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
   for (const kind of ['image', 'video']) {
     await mode.getByText(kind === 'image' ? 'Image' : 'Video', { exact: true }).click();
     await openComposer(page, isMobile);
-    await page.getByRole('textbox', { name: 'Negative prompt', exact: true }).fill(`Saved ${kind} negative`);
+    await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill(`Saved ${kind} negative`);
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A verification generation');
     await scroller.evaluate((element) => element.scrollTo({ top: 1200, behavior: 'instant' }));
     done = false;
@@ -117,7 +117,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
   }
   await mode.getByText('Image', { exact: true }).click();
   await openComposer(page, isMobile);
-  await expect(page.getByRole('textbox', { name: 'Negative prompt', exact: true })).toHaveValue('Saved image negative');
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue('Saved image negative');
   expect(effectRequests).toEqual([]);
 });
 
@@ -380,11 +380,16 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   const actionBox = await tools.boundingBox();
   const textBox = await promptBox.boundingBox();
   expect(actionBox!.y).toBeGreaterThanOrEqual(textBox!.y + textBox!.height);
+  const negativeRowBox = await page.locator('.composer-secondary-row').boundingBox();
+  expect(actionBox!.y).toBeGreaterThanOrEqual(negativeRowBox!.y);
+  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(negativeRowBox!.y + negativeRowBox!.height);
+  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveAttribute('placeholder', 'Prompt');
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveAttribute('placeholder', 'Negative Prompt');
   const fieldBox = await page.locator('.composer-prompt-field').boundingBox();
   expect(textBox!.width).toBeCloseTo(fieldBox!.width, 0);
   const clearBox = await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).boundingBox();
   expect(Math.abs(clearBox!.x + clearBox!.width - textBox!.x - textBox!.width)).toBeLessThan(16);
-  const negativeBox = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
+  const negativeBox = page.getByRole('textbox', { name: 'Negative Prompt', exact: true });
   await expect(page.locator('.composer-mode-select')).toBeVisible();
   await page.waitForTimeout(300);
   const initial = await negativeBox.boundingBox();
@@ -403,7 +408,7 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   expect(withReference!.y).toBeCloseTo(initial!.y, 0);
 
   const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
-  const negative = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
+  const negative = page.getByRole('textbox', { name: 'Negative Prompt', exact: true });
   await prompt.fill('A photo');
   await negative.fill('Blur');
   await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).click();
