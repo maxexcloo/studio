@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { SCENE_CELL, ease, fillRects, useCellScene } from './cellScene';
 import { OFFLINE_GRID } from './OfflineMark';
 

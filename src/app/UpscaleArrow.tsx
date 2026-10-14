@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * The solid arrow from the setup hero, reused for every upscale affordance so

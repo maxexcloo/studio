@@ -1,4 +1,3 @@
-import React from 'react';
 import { SCENE_CELL, ease, fillRects, useCellScene, type CellRect } from './cellScene';
 
 /**

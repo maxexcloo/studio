@@ -1,4 +1,3 @@
-import React from 'react';
 import { ImagePlus, Layers, Wand2 } from 'lucide-react';
 import { Tip } from './components';
 import { normalizeLoras } from './loras';

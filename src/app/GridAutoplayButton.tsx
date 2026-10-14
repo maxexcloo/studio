@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { Tip } from './components';
 import { gridAutoplayEnabled, subscribeGridAutoplay, toggleGridAutoplay } from './videoPreviewScheduler';

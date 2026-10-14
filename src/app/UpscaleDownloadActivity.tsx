@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ARROW, heatColor } from './UpscaleHero';
 import { cn } from './format';
