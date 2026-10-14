@@ -611,7 +611,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       }
     >
       <div className="phone-compose">
-        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
         <ReferenceSlots
           scope={mode}
           inputs={referenceInputs || []}
@@ -630,6 +629,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
+        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
         </div>
       {canUseNegativePrompt ? (
         <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
