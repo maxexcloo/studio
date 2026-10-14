@@ -871,7 +871,33 @@
   .viewer-phone-upscale.is-indeterminate .viewer-phone-upscale-ring { animation: none; opacity: .5; }
 }
 .viewer-phone-bar button.is-danger { color: #ff9c8a; }
-.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-canvas { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+.scrim .viewer-stage:has(.viewer-phone-bar) { grid-template-rows: auto minmax(0, 1fr); }
+/* Keep the summary between the corner actions, in its own row above the image. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary {
+  position: relative;
+  inset: auto;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  min-height: var(--dock-h);
+  margin:
+    max(10px, env(safe-area-inset-top))
+    calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px)
+    8px
+    calc(max(10px, env(safe-area-inset-left)) + var(--dock-h) + 8px);
+  padding: 0 4px;
+  align-content: center;
+  border: 0;
+  background: transparent;
+}
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary strong,
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-canvas { grid-row: 2; padding-top: 0; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-arrow { display: none; } /* swipe steps through */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side { bottom: calc(96px + env(safe-area-inset-bottom)); }
 
