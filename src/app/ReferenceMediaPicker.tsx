@@ -460,7 +460,7 @@ function AddMore({ max, add, className, size = 15 }: { max: number; add: Referen
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
  * introduces itself as "Add Reference" (or "Add Start Image" for plain
- * image-to-image) and settles into a round +. With an
+ * image-to-image). With an
  * image it becomes a squircle thumbnail that opens into a small menu on hover.
  */
 function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, stack = null, guide = false, onOpen, onRemove }: {
@@ -487,13 +487,6 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   const required = Boolean(input.required || (input.min || 0) > 0);
   const label = input.label || "Reference image";
   const isStart = input.role === "start";
-  // Only the first slot introduces itself: a later one appears after each picture, and spelling
-  // it out every time would make the row jump.
-  const [introduced, setIntroduced] = React.useState(Boolean(input.follows));
-  React.useEffect(() => {
-    const id = window.setTimeout(() => setIntroduced(true), 2600);
-    return () => window.clearTimeout(id);
-  }, []);
   const [hover, setHover] = React.useState(false);
   const hoverTimer = React.useRef(0);
   React.useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
@@ -527,15 +520,13 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   }
 
   if (!selected) {
-    // The label is always rendered; a grid track animates it open and shut.
-    const expanded = !introduced || required || open;
     return (
-      <Tip content={expanded ? `Choose a ${label.toLowerCase()}, or drop one on the prompt` : `Add ${label.toLowerCase()}`}>
+      <Tip content={`Choose a ${label.toLowerCase()}, or drop one on the prompt`}>
         <button
           type="button"
           data-open-trigger
           data-reference-slot={input.id}
-          className={cn("ref-chip ref-add", expanded && "is-expanded", required && "is-required", open && "is-open")}
+          className={cn("ref-chip ref-add", required && "is-required", open && "is-open")}
           aria-label={`Add ${label.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}${required ? ", required" : ""}`}
           aria-expanded={open}
           onClick={onOpen}
@@ -671,6 +662,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   const [dropped, setDropped] = React.useState<{ asset: ReferenceAsset; nonce: number } | null>(null);
   const [host, setHost] = React.useState<HTMLElement | null>(null);
   const rootRef = React.useRef<HTMLDivElement>(null);
+  const slotsRef = React.useRef<HTMLDivElement>(null);
   const popRef = React.useRef<HTMLDivElement>(null);
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const close = React.useCallback(() => {
@@ -679,13 +671,13 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     setOpenSlot("");
     if (restore) requestAnimationFrame(() => {
       if (document.activeElement !== document.body && !popRef.current?.contains(document.activeElement)) return;
-      rootRef.current?.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(slot)}"]`)?.focus({ preventScroll: true });
+      slotsRef.current?.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(slot)}"]`)?.focus({ preventScroll: true });
     });
   }, [openSlot]);
   // A drop only belongs to the popover it landed on; forget it on close so the
   // next open keeps its own browsing state.
   React.useEffect(() => { if (!openSlot) setDropped(null); }, [openSlot]);
-  useDismiss([rootRef, popRef], Boolean(openSlot), close);
+  useDismiss([rootRef, slotsRef, popRef], Boolean(openSlot), close);
   // The inpaint studio stays open while the prompt is typed into: the whole bar counts as inside it.
   const [painting, setPainting] = React.useState(false);
   const studioRef = React.useRef<HTMLDivElement>(null);
@@ -713,32 +705,6 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     const next = rootRef.current?.closest<HTMLElement>(".zen-prompt, .phone-compose") || null;
     hostRef.current = next;
     setHost((current) => current === next ? current : next);
-  });
-
-  // Publish the chips' width to the prompt bar, so the prompt text wraps before
-  // them; past ~40% of the bar they move onto a row of their own.
-  const slotsRef = React.useRef<HTMLDivElement>(null);
-  React.useLayoutEffect(() => {
-    const slots = slotsRef.current;
-    if (!host || !slots) return;
-    const measure = () => {
-      // A folded chip (Edit's absent +) takes no room, nor the gap before it.
-      const chips = (Array.from(slots.children) as HTMLElement[]).filter((chip) => !chip.classList.contains("is-folded"));
-      const gap = parseFloat(getComputedStyle(slots).columnGap) || 0;
-      const width = chips.reduce((sum, chip) => sum + chip.offsetWidth, 0) + gap * Math.max(0, chips.length - 1);
-      host.style.setProperty("--ref-slots-w", `${Math.ceil(width)}px`);
-      host.classList.toggle("has-wide-refs", width > host.clientWidth * 0.4);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(host);
-    // Border box: the deck's room is padding, which animates, and a content box wouldn't see it.
-    Array.from(slots.children).forEach((chip) => observer.observe(chip, { box: "border-box" }));
-    return () => {
-      observer.disconnect();
-      host.style.removeProperty("--ref-slots-w");
-      host.classList.remove("has-wide-refs");
-    };
   });
 
   const assetFor = (slot: string) => selected.find((item) => item.slot === slot)?.asset || null;
@@ -917,8 +883,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     />
   );
 
-  return (
-    <div className="composer-reference" ref={rootRef}>
+  const tools = host?.querySelector(".composer-reference-tools");
+  const slots = (
       <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef}>
         {/* No hover to open the strip (a tablet, the full studio on a phone): Edit | Reference in plain
             sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
@@ -946,6 +912,10 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
           ];
         })}
       </div>
+  );
+  return (
+    <div className="composer-reference" ref={rootRef}>
+      {tools ? createPortal(slots, tools) : slots}
       <AnimatePresence>
         {openInput ? (
           <ReferencePopover

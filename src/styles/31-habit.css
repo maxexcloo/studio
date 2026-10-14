@@ -166,22 +166,6 @@
   justify-content: flex-start;
   gap: 8px;
 }
-.phone-compose-recent:disabled { opacity: .4; }
-.phone-compose-recent {
-  justify-self: end;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 13px 0 11px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: rgb(255 255 255 / .07);
-  color: hsl(var(--muted-foreground));
-  font-size: 14px;
-  font-weight: 550;
-}
-.phone-compose-recent:active { background: rgb(255 255 255 / .12); }
 .phone-history-row .phone-row > span { gap: 4px; }
 .phone-history-text {
   display: -webkit-box;

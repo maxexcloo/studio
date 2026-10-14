@@ -448,16 +448,6 @@
   outline: none;
 }
 .phone-compose textarea::placeholder { color: rgb(255 255 255 / .45); }
-/* Reference chips get their own row above the text instead of floating over it. */
-.phone-compose .composer-reference { order: -1; }
-.phone-compose .composer-reference-slots {
-  position: relative;
-  top: auto;
-  right: auto;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-.phone-compose .ref-chip { height: 44px; }
 /* Edit or Ref sits under the chips (below), so the chip's menu leaves it out,
    with the line that would set the brush apart from it; with no brush either,
    there is no menu to open. */
@@ -521,7 +511,6 @@
 .phone-compose .phone-negative textarea:focus { height: calc(2lh + 8px); }
 .phone-negative.is-unused { opacity: .55; }
 .phone-create .composer-submit-actions .phone-generate { flex: 1; min-width: 0; }
-.phone-create .composer-submit-actions .phone-compose-recent { min-height: 44px; }
 
 
 .phone-link {

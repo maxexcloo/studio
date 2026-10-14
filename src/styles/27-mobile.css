@@ -25,19 +25,6 @@
   pointer-events: none;
 }
 
-/* Reference chips share the prompt's top row. ReferenceSlots publishes the
-   row's width, so the text wraps before it instead of running underneath. */
-.zen-prompt:has(.composer-reference-slots) textarea { padding-right: calc(var(--ref-slots-w, 44px) + 16px); }
-/* When the chips would take too much of that row, they get a row of their own. */
-.zen-prompt.has-wide-refs .composer-reference { order: -1; }
-.zen-prompt.has-wide-refs .composer-reference-slots {
-  position: relative;
-  top: auto;
-  right: auto;
-  justify-content: flex-end;
-}
-.zen-prompt.has-wide-refs:has(.composer-reference-slots) textarea { padding-right: 10px; }
-
 /* A start image's menu opens leftward from its thumbnail, which runs off a
    phone's left edge; there it drops below the chip instead, inside the bar. */
 @media (max-width: 620px) {
