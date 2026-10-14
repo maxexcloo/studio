@@ -29,34 +29,29 @@
 
 /* Empty slots keep a visible label so the action does not change after mounting. */
 .ref-add {
-  padding: 0;
+  gap: 5px;
+  height: 28px;
+  padding: 0 6px;
   border: 0;
-  background: var(--well);
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
   cursor: pointer;
   transition: background var(--dur-fast), color var(--dur-fast), scale 100ms;
 }
-.ref-add > svg { flex: none; margin: 0 12.5px; transition: rotate 320ms var(--ease-out); }
+.ref-add > svg { flex: none; transition: rotate 320ms var(--ease-out); }
 .ref-add.is-open > svg { rotate: 45deg; }
-.ref-add-label { display: inline-flex; margin-left: -4px; }
-.ref-add-label > span { display: inline-flex; align-items: center; gap: 8px; padding-right: 14px; }
-.ref-add-label em {
-  padding: 2px 7px;
-  border-radius: var(--r-pill);
-  background: var(--ember-soft);
-  color: var(--ember);
-  font-size: 10.5px;
-  font-style: normal;
-  font-weight: 600;
-}
-.ref-add:hover { background: rgb(52 52 52 / .6); }
+.ref-add-label, .ref-add-label > span { display: inline-flex; align-items: center; gap: 4px; }
+.ref-add-label em { color: var(--ember); font-size: 15px; line-height: 1; font-style: normal; }
+.ref-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .ref-add:active { scale: .96; }
-.ref-add.is-open { background: var(--action); color: var(--action-ink); box-shadow: none; }
+.ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
 
 /* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
    clip-path wipes open to the left, so nothing reflows while it animates. */
 /* Each chip stacks on its own, and the one whose menu is open sits over its
    neighbours, so their thumbnails can't cover its × (until the menu has wiped shut). */
-.ref-selected { position: relative; z-index: 0; display: block; height: 44px; transition: z-index 0s 420ms; }
+.ref-selected { position: relative; z-index: 0; display: block; height: 28px; transition: z-index 0s 420ms; }
 .ref-selected.is-hover,
 .ref-selected.is-intro,
 .ref-selected:focus-within,
@@ -64,14 +59,14 @@
 .ref-thumb {
   position: relative;
   z-index: 2;
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 14px;
+  border-radius: 9px;
   background: var(--well);
   box-shadow: 0 0 0 1px rgb(255 255 255 / .16), 0 4px 12px rgb(0 0 0 / .35);
   color: hsl(var(--muted-foreground));
@@ -84,19 +79,19 @@
   position: absolute;
   top: -3px;
   right: -3px;
-  width: max-content; /* its parent is only the 44px thumbnail */
-  height: 50px;
+  width: max-content; /* its parent is only the thumbnail */
+  height: 34px;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 54px 0 6px;
+  padding: 0 38px 0 6px;
   border-radius: 18px;
   background: var(--surface-grain), rgb(30 30 30 / .9);
   box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  clip-path: inset(0 0 0 calc(100% - 50px) round 18px);
+  clip-path: inset(0 0 0 calc(100% - 34px) round 18px);
   transition: clip-path 420ms var(--ease-out), opacity 160ms var(--ease-out);
 }
 /* Hover is set from script with a short delay each way (ReferenceSlot), so the
@@ -429,7 +424,7 @@
   align-items: center;
   gap: 10px;
   padding: 6px 6px 6px 6px;
-  border-radius: 14px;
+  border-radius: 9px;
   background: var(--well);
 }
 .sidebar-reference-thumb {
@@ -448,3 +443,8 @@
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }
+
+@media (pointer: coarse) {
+  .composer-prompt-tools .ref-selected { height: 40px; }
+  .composer-prompt-tools .ref-thumb { width: 40px; height: 40px; border-radius: 12px; }
+}

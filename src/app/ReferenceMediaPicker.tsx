@@ -418,7 +418,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
           onClick={onOpen}
         >
           <Plus size={15} strokeWidth={2.2} />
-          <span className="ref-add-label"><span>{isStart ? "Add Start Image" : "Add Reference"}{required ? <em>Required</em> : null}</span></span>
+          <span className="ref-add-label"><span>{isStart ? "Add Start Image" : "Add Reference"}{required ? <em aria-hidden="true">*</em> : null}</span></span>
         </button>
       </Tip>
     );

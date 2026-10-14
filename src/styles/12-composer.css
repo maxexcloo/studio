@@ -14,9 +14,9 @@
 .composer-prompt-field textarea { display: block; width: 100%; }
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
-.composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 44px; padding: 2px var(--prompt-text-inset, 4px); }
+.composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 28px; padding: 0 var(--prompt-text-inset, 4px); }
 .composer-reference-tools:empty { display: none; }
-.prompt-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--muted-foreground)); font-size: 12.5px; font-weight: 550; white-space: nowrap; cursor: pointer; }
+.prompt-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .prompt-action:hover, .prompt-action.active { background: var(--control-hover); color: hsl(var(--foreground)); }
 .prompt-action:disabled { opacity: .4; cursor: default; }
 .prompt-action:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
@@ -302,7 +302,8 @@
 .lora-filter small { color: hsl(var(--muted-foreground)); font-size: 11px; }
 .lora-option-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-@media (max-width: 620px) {
-  .composer-prompt-tools { padding: 2px 4px; }
-  .composer-prompt-tools .prompt-action { width: 40px; padding: 0; gap: 0; font-size: 0; }
+@media (pointer: coarse) {
+  .composer-prompt-tools { min-height: 40px; }
+  .composer-prompt-tools .prompt-action, .composer-prompt-tools .ref-add { min-height: 40px; }
+  .composer-prompt-tools .prompt-action { width: 40px; }
 }

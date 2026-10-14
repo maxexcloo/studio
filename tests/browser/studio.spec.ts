@@ -363,6 +363,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
 
 
 test('composer actions share a row and Clear clears both prompt fields', async ({ page, isMobile }) => {
+  await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [{ id: 'toolbar-reference', source: 'upload', name: 'Test Reference', thumbnailUrl: picture, url: picture, mime: 'image/png', width: 512, height: 512, size: 1, createdAt: '', privacyDomain: 'gallery' }], hasMore: false, nextCursor: '' } }));
   await page.route('**/api/prompts', (route) => route.fulfill({ json: { prompts: [{ text: 'Recent prompt', at: new Date().toISOString(), uses: 1 }], enabled: true } }));
   await page.goto('/');
   await openComposer(page, isMobile);
@@ -370,6 +371,7 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   await expect(tools.getByRole('button', { name: 'Recent Prompts' })).toBeVisible();
   await expect(tools.getByRole('button', { name: 'Add Start Image', exact: true })).toBeVisible();
   await page.waitForTimeout(600);
+  await page.mouse.move(0, 0);
   const layout = await tools.evaluate((element) => [...element.querySelectorAll('button')].map((button) => ({ top: Math.round(button.getBoundingClientRect().top), height: button.getBoundingClientRect().height, background: getComputedStyle(button).backgroundColor })));
   expect(new Set(layout.map((item) => item.top)).size).toBe(1);
   expect(new Set(layout.map((item) => item.height)).size).toBe(1);
@@ -393,6 +395,12 @@ test('composer actions share a row and Clear clears both prompt fields', async (
     expect(next!.height).toBeCloseTo(initial!.height, 0);
     expect(next!.y).toBeCloseTo(initial!.y, 0);
   }
+
+  await tools.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Test Reference', exact: true }).click();
+  await expect(tools.locator('.ref-thumb')).toBeVisible();
+  const withReference = await negativeBox.boundingBox();
+  expect(withReference!.y).toBeCloseTo(initial!.y, 0);
 
   const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
   const negative = page.getByRole('textbox', { name: 'Negative prompt', exact: true });
