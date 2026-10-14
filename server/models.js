@@ -6,7 +6,7 @@ import { loadCustomWorkflows, workflowOptionIssues } from './custom-workflows.js
 import { modelTypeChoices } from './model-families.js';
 import { familyProfiles } from './family-profiles.js';
 import { families } from './family-catalog.js';
-import { builtInProfilesEnabled, inpaintingEnabled, lorasEnabled, modelFamilyEnabled } from './features.js';
+import { builtInProfilesEnabled, inpaintingEnabled, lorasEnabled, modelFamilyEnabled, presetsEnabled } from './features.js';
 
 export function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
@@ -274,7 +274,7 @@ export function inferModels(info, stats = {}) {
     modelFiles,
     modelTypeChoices: Object.fromEntries(Object.entries(modelTypeChoices()).map(([source, choices]) => [source, choices.filter((choice) => modelFamilyEnabled(choice.value.split("/")[0]))])),
     // Release switches the studio needs to know about (features.js).
-    features: { inpainting: inpaintingEnabled },
+    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
     textEncoders: clips,
     vaes,
     clipTypes,
@@ -363,6 +363,7 @@ export function mockModelResult() {
 
   return {
     isMock: true,
+    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
     imageModels: imageProfiles.map((p) => ({ label: p.label, value: p.id })),
     videoModels: videoProfiles.map((p) => ({ label: p.label, value: p.id })),
     profiles: [...imageProfiles, ...videoProfiles],
@@ -388,6 +389,7 @@ export function mockModelResult() {
 
 function emptyModelResult(extra = {}) {
   return {
+    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
     imageModels: [],
     videoModels: [],
     profiles: [],

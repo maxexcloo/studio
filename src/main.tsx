@@ -52,6 +52,7 @@ import { refreshHardware } from './app/hardware';
 import { starterPromptsFor, surprisePrompt } from './app/starterPrompts';
 import { generateShortcut } from './app/shortcuts';
 import type { StarterPick } from './app/StarterModels';
+import { presetFit, type ImagePreset } from './app/presets';
 
 // Rebuilt from scratch on every App render (each keystroke in the prompt); skips unless its data changed.
 const StableSidebarControls = memoLatest(SidebarControls);
@@ -153,6 +154,7 @@ function App() {
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowPreferences, setWorkflowPreferences] = useState<WorkflowPreferences>({ favorites: [], lastUsed: {}, thumbnails: {} });
   const [workflowGalleryOpen, setWorkflowGalleryOpen] = useState(false);
+  const [presetLibraryOpen, setPresetLibraryOpen] = useState(false);
   const modelsRefreshRef = useRef<Promise<unknown> | null>(null);
   const [active, setActive] = useState<GalleryItem | null>(null);
   const [viewerZoom, setViewerZoom] = useState(1);
@@ -1253,6 +1255,38 @@ function App() {
     else setModel(profileId);
   }
 
+  function applyPresetPrompt(preset: ImagePreset) {
+    const target = mode === 'image' ? currentProfile : models?.profiles.find((item) => item.id === (composerByMode.current.image?.model || models.defaults.imageModel));
+    changeMode('image');
+    setPrompt(clampText(preset.prompt, settingMax(target?.constraints?.prompt)));
+    setNegative(clampText(preset.negative, settingMax(target?.constraints?.negative)));
+    setShowNegativePrompt(Boolean(preset.negative));
+    showToast('Prompt applied', 'success');
+  }
+
+  function applyImagePreset(preset: ImagePreset, profile: Profile) {
+    const fit = presetFit(preset, profile);
+    if (fit.blockers.length) { showToast(fit.blockers[0], 'error'); return; }
+    changeMode('image');
+    applyProfile(profile);
+    setPrompt(clampText(preset.prompt, settingMax(profile.constraints?.prompt)));
+    setNegative(clampText(preset.negative, settingMax(profile.constraints?.negative)));
+    setShowNegativePrompt(Boolean(preset.negative));
+    setSeed(fit.settings.seed ?? '');
+    if (fit.settings.width !== undefined) setWidth(fit.settings.width);
+    if (fit.settings.height !== undefined) setHeight(fit.settings.height);
+    setCustomSize(true);
+    if (fit.settings.steps !== undefined) setSteps(fit.settings.steps);
+    if (fit.settings.cfg !== undefined) setCfg(fit.settings.cfg);
+    if (fit.settings.sampler) setSampler(fit.settings.sampler);
+    if (fit.settings.scheduler) setScheduler(fit.settings.scheduler);
+    const vae = preset.resources.find((item) => item.folder === 'vae' && item.localName);
+    if (vae?.localName) setVae(vae.localName);
+    setLorasWithMemory(fit.loras.map((item) => ({ name: item.localName!, strength: item.weight!, enabled: true })), profile.id);
+    setReferenceAssets([]); setStartImage(''); setStartImageId(''); setStartImageName('');
+    showToast(preset.settings.seed !== undefined ? 'Preset applied. Its seed is fixed until you change it.' : 'Preset applied', 'success');
+  }
+
   // Picking in the composer counts as using it, so the menu's Recent follows what you pick.
   function pickModel(profileId: string) {
     const next = models?.profiles.find((item) => item.id === profileId);
@@ -1517,7 +1551,7 @@ function App() {
   const phoneVideoDurationControls = <VideoDurationControls view={sidebarView} phone />;
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showNegativePrompt, showToast, sidebarControls, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, varyItem, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { presetLibraryOpen, setPresetLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, checkForUpdates, restartForUpdate, restartHeiss, restarting, justUpdated, clearJustUpdated: () => setJustUpdated(""), setUpdatePrefs, refreshUpdateStatus, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, installUpdate, isDraggingViewer, isMobile, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetAllSettings, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showNegativePrompt, showToast, sidebarControls, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, updateBusy, updateStatus, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, varyItem, fillPrompt, surprise: () => fillPrompt(surprisePrompt(prompt, mode)), starterPrompts, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {

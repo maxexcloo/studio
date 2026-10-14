@@ -1,0 +1,69 @@
+.preset-library .modal-body { display: flex; flex-direction: column; gap: 18px; padding: 20px 24px; }
+.preset-library label, .preset-library h3 { font-size: 13px; font-weight: 600; }
+.preset-library h3, .preset-library p { margin: 0; }
+.preset-library input, .preset-library select { width: 100%; min-width: 0; min-height: 40px; padding: 9px 12px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 13px; }
+.preset-library input:focus-visible, .preset-library select:focus-visible, .preset-card:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.preset-library .btn { min-height: 38px; }
+.preset-library .btn:disabled { opacity: .45; cursor: default; }
+.preset-library p, .preset-library li, .preset-library summary { font-size: 13px; line-height: 1.6; }
+.preset-library summary { cursor: pointer; font-weight: 550; }
+.preset-library details p { margin-top: 8px; }
+.preset-import { display: flex; flex-direction: column; gap: 10px; }
+.preset-import > .btn { align-self: flex-start; }
+.preset-import > p, .preset-note, .preset-byline, .preset-card small, .preset-resource small { color: hsl(var(--muted-foreground)); }
+.preset-input-row { display: flex; gap: 8px; align-items: center; }
+.preset-input-row .btn { flex: none; }
+.preset-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 38px 22px; border: 1px dashed var(--surface-border); border-radius: var(--r-item); text-align: center; color: hsl(var(--muted-foreground)); }
+.preset-empty strong { color: hsl(var(--foreground)); font-size: 15px; }
+.preset-empty p { max-width: 360px; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.preset-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; padding: 0 0 12px; overflow: hidden; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: transparent; color: inherit; text-align: left; cursor: pointer; transition: border-color 120ms; }
+.preset-card:hover { border-color: hsl(var(--foreground) / .35); }
+.preset-card strong, .preset-card small { padding: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-card strong { font-size: 13px; }
+.preset-card small { font-size: 11px; }
+.preset-card-image { display: grid; place-items: center; aspect-ratio: 4 / 3; margin-bottom: 5px; overflow: hidden; background: hsl(var(--muted) / .35); color: hsl(var(--muted-foreground)); }
+.preset-card-image img { width: 100%; height: 100%; object-fit: cover; }
+.preset-review-head, .preset-section-head, .preset-save-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.preset-review-head a { text-decoration: none; }
+.preset-review { display: grid; grid-template-columns: minmax(140px, .65fr) minmax(0, 1fr); gap: 20px; }
+.preset-preview { display: grid; place-items: center; min-height: 180px; max-height: 360px; border-radius: var(--r-item); overflow: hidden; background: hsl(var(--muted) / .35); color: hsl(var(--muted-foreground)); }
+.preset-preview img { display: block; width: 100%; height: 100%; max-height: 360px; object-fit: contain; }
+.preset-recipe { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.preset-prompt { margin: 5px 0; }
+.preset-prompt strong { font-size: 12px; }
+.preset-prompt p, .preset-negative { max-height: 160px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.preset-settings { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 0; }
+.preset-settings dt { font-size: 10px; color: hsl(var(--muted-foreground)); }
+.preset-settings dd { margin: 2px 0 0; font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.preset-resources { border: 1px solid var(--surface-border); border-radius: var(--r-item); }
+.preset-resource { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 12px; }
+.preset-resource + .preset-resource { border-top: 1px solid var(--surface-border); }
+.preset-resource > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.preset-resource strong { font-size: 12px; }
+.preset-resource small { font-size: 11px; }
+.preset-resource-status { display: inline-flex; gap: 4px; align-items: center; flex: none; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.preset-resource-status.is-installed { color: hsl(var(--foreground)); }
+.preset-message { padding: 12px 16px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: hsl(var(--muted) / .25); }
+ul.preset-message, ul.preset-note { padding-left: 28px; margin: 0; }
+.preset-message.is-error { color: hsl(var(--destructive)); }
+.preset-note { font-size: 12px; line-height: 1.6; }
+.preset-model-label { margin-bottom: -10px; }
+.preset-save-row { justify-content: flex-start; }
+.preset-access, .preset-downloads { border-top: 1px solid var(--surface-border); padding-top: 14px; }
+.preset-access form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.preset-file { padding: 16px; border: 1px solid var(--surface-border); border-radius: var(--r-item); overflow-wrap: anywhere; }
+.preset-file p { margin: 8px 0 12px; }
+.preset-download { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--surface-border); }
+.preset-download strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.preset-download span { font-size: 12px; color: hsl(var(--muted-foreground)); }
+.preset-download p { flex-basis: 100%; }
+@media (max-width: 600px) {
+  .preset-library .modal-body { padding: 16px; }
+  .preset-review { grid-template-columns: 1fr; }
+  .preset-preview { min-height: 120px; max-height: 220px; }
+  .preset-preview img { max-height: 220px; }
+  .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .preset-resource { align-items: flex-start; }
+  .preset-resource-status { max-width: 100px; }
+}
