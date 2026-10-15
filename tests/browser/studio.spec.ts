@@ -35,29 +35,30 @@ test('image and video keep their own scroll positions through repeated switches'
   }
 });
 
-test('swipes move through previews and generation settings stay visible', async ({ page, isMobile }) => {
+test('swipes move through previews and generation details stay accessible', async ({ page, isMobile }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await page.locator('[data-tile-id]').first().click();
   const summary = page.locator('.viewer-profile-summary');
-  await expect(summary).toBeVisible();
-  expect(await summary.evaluate((element) => getComputedStyle(element).userSelect)).toBe('text');
-  await summary.locator('strong').dblclick();
-  expect(await page.evaluate(() => window.getSelection()?.toString().length || 0)).toBeGreaterThan(0);
+  if (!isMobile) {
+    await expect(summary).toBeVisible();
+    expect(await summary.evaluate((element) => getComputedStyle(element).userSelect)).toBe('text');
+    await summary.locator('strong').dblclick();
+    expect(await page.evaluate(() => window.getSelection()?.toString().length || 0)).toBeGreaterThan(0);
+  }
   const canvas = page.locator('.viewer-canvas');
   await expect(canvas).toBeVisible();
   if (isMobile) {
-    await summary.locator('strong').evaluate((element) => { element.textContent = 'An exceptionally long model and workflow name that must stay between the viewer controls'; });
     for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(viewport);
-      const header = await summary.boundingBox();
+      await expect(summary).toBeHidden();
       const info = await page.getByRole('button', { name: 'Details', exact: true }).boundingBox();
       const close = await page.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
-      const media = await canvas.boundingBox();
-      expect(header!.x).toBeGreaterThanOrEqual(info!.x + info!.width);
-      expect(header!.x + header!.width).toBeLessThanOrEqual(close!.x);
-      expect(header!.y + header!.height).toBeLessThanOrEqual(media!.y);
+      expect(info!.x).toBeGreaterThan(viewport.width / 2);
+      expect(close!.x - info!.x - info!.width).toBeCloseTo(8, 0);
+      expect(info!.y).toBeCloseTo(close!.y, 0);
+      expect(info!.height).toBeCloseTo(close!.height, 0);
     }
     await page.setViewportSize({ width: 390, height: 844 });
   }
