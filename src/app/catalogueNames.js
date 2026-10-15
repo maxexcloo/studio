@@ -50,6 +50,8 @@ const familyNames = {
 export function modelFamily(profile) {
   if (!profile) return '';
   const family = String(profile.family || '').replace(/-/g, '_');
+  // Fine-tunes can have their own heading while retaining H3 controls and LoRA compatibility.
+  if (family === 'minimax_h3' && /singularity/i.test([profile.baseModel, profile.displayName, profile.label].filter(Boolean).join(' '))) return 'Singularity';
   return familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
 }
 
