@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { selectImageMode } from "./workflow-modes.js";
 import { comfy } from './comfy.js';
 import { getCustomWorkflow } from './custom-workflows.js';
 import { startImageDataUrl } from './start-images.js';
@@ -224,7 +225,8 @@ export function saveIntoHeissFolder(graph) {
 }
 
 export async function customWorkflowGraph(body) {
-  const workflow = getCustomWorkflow(body.workflow);
+  const installed = getCustomWorkflow(body.workflow);
+  const workflow = installed && selectImageMode(installed, body);
   if (!workflow) throw new Error("This workflow isn’t installed.");
   const graph = cloneGraph(workflow.graph);
   await applyMappedInputs(graph, workflow, body);

@@ -1234,7 +1234,13 @@ function App() {
     });
   }, [mode, models, workflowPreferences]);
 
-  const currentProfile = useMemo(() => models?.profiles.find((profile) => profile.id === model) || null, [model, models]);
+  const currentProfile = useMemo(() => {
+    const profile = models?.profiles.find((item) => item.id === model);
+    if (!profile) return null;
+    const selected = profile.imageModes?.[referenceAssets.length || startImage || startImageId ? 'reference' : 'generate'];
+    // Keep reference slots available while the text-only mode is active.
+    return selected ? { ...profile, ...selected } : profile;
+  }, [model, models, referenceAssets.length, startImage, startImageId]);
   /* A text encoder saved with the draft can stop fitting its slot (a rescan, a sharper
      file check): fall back to the slot's default instead of sending a pick the server rejects. */
   useEffect(() => {

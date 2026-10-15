@@ -107,7 +107,7 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, native = {} }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {} }) {
   return {
     id,
     kind,
@@ -119,12 +119,13 @@ export function buildProfile({ id, kind, label, displayName, description, model,
     baseModel: baseModel ?? modelBasename(model),
     workflow,
     family,
-    defaults,
+    defaults: { ...defaults, ...imageModes.generate?.defaults },
     aspectPresets: aspects,
     // A preset the family starts on where its own size is not square (MiniMax H3's 16:9).
     ...(aspectDefault ? { aspectDefault } : null),
     options,
     constraints,
+    ...(Object.keys(imageModes).length ? { imageModes } : {}),
     mediaInputs,
     aspectPolicy: aspectPolicy === "reference" ? "reference" : "manual",
     // Whether the model draws 2K/4K itself, per size: "yes" or "maybe" (family catalog); {} for anything else.
@@ -148,7 +149,8 @@ export function buildProfile({ id, kind, label, displayName, description, model,
       weightDtype: false,
       startImage: false,
       denoise: false,
-      ...capabilities
+      ...capabilities,
+      ...imageModes.generate?.capabilities
     }
   };
 }
@@ -236,8 +238,12 @@ export function inferModels(info, stats = {}) {
       },
       aspects: customAspectSet({ width: detectedDefault(widthRange, Number(defaults.width || 1024)), height: detectedDefault(heightRange, Number(defaults.height || 1024)) }, workflow.aspectRatios, { width: widthRange, height: heightRange }),
       aspectDefault: families[String(workflow.family || "").replaceAll("-", "_")]?.aspectDefault || "",
-      options: { textEncoders: clips, vaes, clipTypes, weightDtypes, samplers, schedulers, resolutions },
+      options: { textEncoders: clips, vaes, clipTypes, weightDtypes, samplers, schedulers, resolutions, loras: workflow.capabilities.lora ? loras : [] },
       constraints: { prompt: textMeta, negative: textMeta, width: widthRange, height: heightRange, count: countRange, frames: frameRange, fps: fpsRange, duration: durationRange, ...samplerRange },
+      imageModes: Object.fromEntries(Object.entries(workflow.imageModes || {}).map(([name, mode]) => [name, {
+        capabilities: mode.capabilities,
+        defaults: mode.defaults
+      }])),
       capabilities: workflow.capabilities,
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,

@@ -132,11 +132,10 @@ test('image downloads follow Civitai blob redirects without forwarding credentia
   });
   assert.deepEqual(hosts, ['image.civitai.com', 'blobs-b2.civitai.com']);
   assert.equal(await response.text(), 'image');
-  assert.equal(imagePreset({ ...image, url: 'https://another-cdn.example/image.jpeg' }).previewUrl, 'https://another-cdn.example/image.jpeg');
-  const external = await civitaiFetch('https://another-cdn.example/image.jpeg', {}, {
-    media: true, transport: async () => new Response('image')
-  });
-  assert.equal(await external.text(), 'image');
+  assert.equal(imagePreset({ ...image, url: 'https://another-cdn.example/image.jpeg' }).previewUrl, '');
+  await assert.rejects(civitaiFetch('https://another-cdn.example/image.jpeg', {}, {
+    media: true, transport: async () => { throw new Error('Unexpected network request'); }
+  }), /Unsupported/);
 });
 
 test('custom Civitai DNS keeps the original HTTPS hostname and streams the response', async () => {
@@ -187,4 +186,23 @@ test('custom Civitai DNS failure rejects the request', async () => {
       return outgoing;
     }
   }), /DNS unavailable/);
+});
+
+
+test('Civitai sources and redirects reject private addresses and unrelated hosts before transport', async () => {
+  for (const destination of ['https://127.0.0.1/private', 'https://2130706433/private', 'https://[::1]/private', 'https://10.0.0.1/private', 'https://localhost/private', 'https://civitai.com.evil.example/private']) {
+    let calls = 0;
+    const transport = async () => { calls++; return new Response(null, { status: 302, headers: { location: destination } }); };
+    await assert.rejects(civitaiFetch(destination, {}, { media: true, transport }), /Unsupported/);
+    assert.equal(calls, 0);
+    await assert.rejects(civitaiFetch('https://image.civitai.com/image', {}, { media: true, transport }), /Unsupported/);
+    assert.equal(calls, 1);
+    assert.equal(imagePreset({ ...image, url: destination }).previewUrl, '');
+  }
+  const response = await civitaiFetch('https://files.civitai.com/model', {}, {
+    transport: async (url) => url.hostname === 'files.civitai.com'
+      ? new Response(null, { status: 302, headers: { location: 'https://models.r2.cloudflarestorage.com/file' } })
+      : new Response('weights')
+  });
+  assert.equal(await response.text(), 'weights');
 });
