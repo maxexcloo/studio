@@ -46,7 +46,7 @@ export function retryRequest(item: GalleryItem, options: RetryOptions = {}): Ret
     seed: /^\d+$/.test(seed) ? seed : '',
     count: Number(settings.count || 1),
     variationCount: Number(settings.variationCount || settings.count || 1),
-    ...(kind === 'video' ? { frames: Number(settings.frames || 0) || undefined, fps: Number(settings.fps || 0) || undefined } : {}),
+    ...(kind === 'video' ? { duration: Number(settings.duration || 0) || undefined, frames: Number(settings.frames || 0) || undefined, fps: Number(settings.fps || 0) || undefined, resolution: String(settings.resolution || '') } : {}),
     loras: normalizeLoras(settings.loras),
     autoResizeInputs: settings.autoResizeInputs !== false,
     referenceAssets: references.filter((ref) => ref?.assetId).map((ref) => ({ slot: ref.slot || 'reference', assetId: ref.assetId })),

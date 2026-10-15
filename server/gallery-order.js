@@ -2,7 +2,7 @@ const parsedTimes = new WeakMap();
 
 /** A concealed prompt is unknown, so it must keep its chronological position. */
 export function galleryBucket(item) {
-  if (item?.status !== "done" || item.privateVault || item.vaultLocked || item.promptProtected || item.promptEncrypted || item.negativeEncrypted) return 0;
+  if (item?.status !== "done" || item.civitai?.imageId || item.privateVault || item.vaultLocked || item.promptProtected || item.promptEncrypted || item.negativeEncrypted) return 0;
   return String(item.prompt || "").trim() ? 0 : 1;
 }
 

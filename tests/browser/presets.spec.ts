@@ -21,14 +21,19 @@ const preset = {
 test('import, reopen and apply image settings on desktop and phone', async ({ page, isMobile }, testInfo) => {
   const models = await (await page.request.get('/api/models')).json();
   for (const profile of models.profiles) if (profile.kind === 'video') profile.mediaInputs = [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', required: false, min: 0, max: 1 }];
+  const originalModel = models.profiles.find((profile: any) => profile.id === 'mock-flux-schnell');
+  originalModel.displayName = 'Original Test Model';
+  models.profiles.push({ ...originalModel, id: 'alternate-test-model', baseModel: 'different-model.safetensors', displayName: 'Alternate Test Model', label: 'Alternate Test Model' });
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
   await page.route('**/api/reference-assets/from-gallery', async (route) => {
     expect(route.request().postDataJSON()).toEqual({ galleryItemId: preset.galleryItemId });
     await route.fulfill({ json: { asset: { id: 'imported-reference', source: 'generation', name: preset.name, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 768, height: 1024, size: 1, createdAt: '', privacyDomain: 'gallery' } } });
   });
   let saved: typeof preset[] = [];
+  let finishImport!: () => void;
+  const importing = new Promise<void>((resolve) => { finishImport = resolve; });
   await page.route('**/api/presets', (route) => route.fulfill({ json: { ok: true, presets: saved, downloads: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } }));
-  await page.route('**/api/presets/import', async (route) => { saved = [preset]; await route.fulfill({ json: { ok: true, preset } }); });
+  await page.route('**/api/presets/import', async (route) => { await importing; saved = [preset]; await route.fulfill({ json: { ok: true, preset } }); });
   await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { ok: true, preset: saved[0] || preset } }));
   await page.route('**/api/library/downloads', (route) => route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } }));
   await page.goto('/');
@@ -36,7 +41,10 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   let dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
   await dialog.getByLabel('Image Link').fill('https://civitai.com/images/42');
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(dialog.getByRole('status').filter({ hasText: 'Importing image:' })).toBeVisible();
+  finishImport();
   await expect(dialog.getByText('A watercolour landscape at dawn', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('status').filter({ hasText: 'Image Saved' })).toContainText('Ready To Use');
   await expect(dialog.getByText('Installed', { exact: true })).toHaveCount(2);
   await expect(dialog.getByLabel('Preset Name')).toHaveCount(0);
   await expect(dialog.getByLabel('Use With Model')).toHaveCount(0);
@@ -62,6 +70,18 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   expect(String(generated!.seed)).toBe('0');
   expect(generated!.width).toBe(768);
   expect(generated!.height).toBe(1024);
+  expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
+  if (isMobile) {
+    await page.locator('.phone-create-open').click();
+    await page.locator('.phone-create .phone-row').filter({ hasText: 'Original Test Model' }).click();
+  } else await page.locator('.model-trigger').first().click();
+  const modelMenu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
+  await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).click();
+  generated = null;
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
+  else await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect.poll(() => generated).not.toBeNull();
+  expect(generated!.profileId).toBe('alternate-test-model');
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
   if (isMobile) {
     await expect(page.locator('.phone-create')).toHaveCount(0);

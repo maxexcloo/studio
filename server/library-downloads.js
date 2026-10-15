@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { comfyModelsDir } from './comfy.js';
-import { civitaiJson, limitedBody } from './civitai-access.js';
+import { civitaiJson, isCivitaiHost, limitedBody } from './civitai-access.js';
 import { civitaiLink, versionResource } from './civitai-import.js';
 import { dataDir } from './gallery-store.js';
 import { presetsEnabled } from './features.js';
@@ -27,7 +27,7 @@ const directories = new Set(['checkpoints', 'clip_vision', 'diffusion_models', '
 export async function resolveModelLink(value, directory = 'loras', { json = civitaiJson, request = hfFetch } = {}) {
   let url;
   try { url = new URL(String(value || '').trim()); } catch { throw new Error('Paste a Civitai model or Hugging Face file link.'); }
-  if (url.hostname === 'civitai.com') {
+  if (isCivitaiHost(url.hostname)) {
     const { id, versionId } = civitaiLink(value, 'models');
     let version;
     if (versionId) version = await json(`model-versions/${versionId}`);

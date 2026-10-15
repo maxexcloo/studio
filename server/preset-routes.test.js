@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,15 +24,18 @@ const queued = [];
 const store = await import('./gallery-store.js');
 const references = await import('./reference-assets.js');
 let validImage = true;
+let sourcePrompt = 'a landscape';
+let sourceType = 'image';
+let videoBytes;
 const app = express();
 app.use(express.json());
 registerPresetRoutes(app, {
   models: async () => ({ profiles: [], loras: [] }),
-  imageRequest: async () => new Response(validImage ? image : Buffer.from('not an image')),
+  imageRequest: async () => new Response(validImage ? sourceType === 'video' ? videoBytes : image : Buffer.from('not an image')),
   download: async (spec) => { queued.push(spec); return { status: 'queued' }; },
   json: async (url) => {
     if (!online) throw new Error('offline');
-    if (url.startsWith('images?')) return { items: [{ id: 42, url: 'https://image.civitai.com/example.png', type: 'image', meta: { prompt: 'a landscape', seed: 0, civitaiResources: [{ modelVersionId: 17, weight: 0.6 }] } }] };
+    if (url.startsWith('images?')) return { items: [{ id: 42, url: 'https://image.civitai.com/example.png', type: sourceType, meta: { id: 42, meta: { prompt: sourcePrompt, seed: 0, civitaiResources: [{ modelVersionId: 17, weight: 0.6 }] } } }] };
     return { id: 17, modelId: 9, name: 'V1', model: { name: 'Style', type: 'LORA' }, files: [{ id: 3, type: 'Model', name: 'style.safetensors', hashes: { SHA256: sha256 } }] };
   }
 });
@@ -80,7 +84,18 @@ test('the import, save, offline reuse and deletion routes retain the recipe', as
   const resolved = await api('/api/presets/resolve', { id: '42' });
   assert.equal(resolved.body.preset.prompt, 'a landscape');
   assert.equal(resolved.body.preset.resources[0].weight, 0.6);
+  online = true;
+  sourcePrompt = 'updated source landscape';
+  store.addGalleryItems([{ ...store.gallery.find((item) => item.id === 'civitai:42'), createdAt: '2025-01-01T00:00:00Z' }]);
+  const reimported = await api('/api/presets/import', { url: 'https://civitai.red/images/42' });
+  assert.equal(reimported.status, 200);
+  assert.equal(reimported.body.preset.prompt, sourcePrompt);
+  const { readPngInfo } = await import('./png-text.js');
   const current = store.gallery.find((item) => item.id === 'civitai:42');
+  assert.ok(Date.parse(current.createdAt) > Date.parse('2025-01-01T00:00:00Z'));
+  assert.equal(JSON.parse(readPngInfo(store.importedImageFile(current)).text.heiss).prompt, sourcePrompt);
+  assert.equal(current.civitai.sourceMetadata.prompt, sourcePrompt);
+  sourcePrompt = 'a landscape';
   store.removeGalleryItems([current]);
   assert.equal((await fetch(base + '/api/presets/42/media')).status, 404);
   assert.equal((await fetch(base + '/api/presets/42/thumbnail')).status, 404);
@@ -90,6 +105,33 @@ test('the import, save, offline reuse and deletion routes retain the recipe', as
   assert.equal(fs.existsSync(store.importedImageFile(current)), false);
 
   assert.equal((await api('/api/presets')).body.presets.some((item) => item.id === '42'), false);
+});
+
+test('video imports save originals, serve byte ranges and generate thumbnails', async () => {
+  const { default: encoder } = await import('ffmpeg-static');
+  videoBytes = execFileSync(encoder || 'ffmpeg', ['-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-an', '-c:v', 'libx264', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', '-loglevel', 'error', 'pipe:1']);
+  sourceType = 'video';
+  online = true;
+  try {
+    const result = await api('/api/presets/import', { url: 'https://civitai.red/images/42' });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.preset.type, 'video');
+    const item = store.gallery.find((item) => item.id === 'civitai:42');
+    assert.equal(item.type, 'video');
+    assert.equal(item.width, 64);
+    assert.match(store.importedImageFile(item), /42\.mp4$/);
+    const media = await fetch(base + item.url, { headers: { range: 'bytes=0-31' } });
+    assert.equal(media.status, 206);
+    assert.equal((await media.arrayBuffer()).byteLength, 32);
+    assert.match(media.headers.get('content-type'), /video\/mp4/);
+    const thumbnail = await fetch(base + item.thumbnailUrl);
+    assert.equal(thumbnail.status, 200);
+    assert.match(thumbnail.headers.get('content-type'), /image\/jpeg/);
+    assert.equal((await sharp(Buffer.from(await thumbnail.arrayBuffer())).metadata()).width, 64);
+  } finally {
+    await api('/api/presets/42', null, 'DELETE');
+    sourceType = 'image';
+  }
 });
 
 test('saved recipes migrate into gallery images without a duplicate recipe store', async () => {

@@ -1,14 +1,15 @@
 import type { Profile } from './types';
 
 export type PresetResource = {
-  versionId: number; weight: number | null; name: string; version?: string; type: string; baseModel?: string;
+  versionId: number | string; weight: number | null; name: string; nameOnly?: boolean; version?: string; type: string; baseModel?: string;
   sourceUrl?: string; file?: string; folder?: string; bytes?: number; supported: boolean; note?: string;
   status?: 'installed' | 'missing' | 'conflict' | 'unsupported'; localName?: string; profileId?: string;
 };
 export type ImagePreset = {
+  type?: 'image' | 'video';
   id: string; name: string; sourceUrl: string; thumbnailUrl: string; creator: string; baseModel: string;
   prompt: string; negative: string; resources: PresetResource[]; savedAt?: string; galleryItemId?: string; downloadWarnings?: string[];
-  settings: { cfg?: number; height?: number; sampler?: string; scheduler?: string; seed?: string; steps?: number; width?: number };
+  settings: { cfg?: number; fps?: number; frames?: number; height?: number; sampler?: string; scheduler?: string; seed?: string; steps?: number; width?: number };
   warnings: string[];
 };
 
@@ -16,8 +17,9 @@ export function presetFit(preset: ImagePreset, profile?: Profile) {
   const warnings = [...preset.warnings];
   const blockers: string[] = [];
   const loras = preset.resources.filter((item) => item.folder === 'loras');
-  if (!profile) blockers.push('Choose an installed image model.');
-  if (preset.resources.some((item) => item.status === 'unsupported')) blockers.push('Some resources need a separate workflow.');
+  if (!profile) blockers.push('Choose an installed model.');
+  if (preset.resources.some((item) => item.status === 'unsupported' && !item.nameOnly)) blockers.push('Some resources need a separate workflow.');
+  if (preset.resources.some((item) => item.status === 'unsupported' && item.nameOnly)) blockers.push('Some source files need a local filename match or a model link.');
   if (loras.some((item) => !item.localName)) blockers.push('Download the missing LoRAs first.');
   if (loras.some((item) => item.weight === null)) blockers.push('The source did not include all LoRA weights.');
   if (loras.length && profile && !profile.capabilities.lora) blockers.push('This workflow does not accept LoRAs.');
