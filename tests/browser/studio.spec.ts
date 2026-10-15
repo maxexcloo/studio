@@ -84,6 +84,31 @@ async function openComposer(page: Page, phone: boolean) {
   if (phone) await page.locator('.phone-create-open').click();
 }
 
+for (const kind of ['image', 'video']) {
+  test(`reference proportions reach generation in ${kind} mode`, async ({ page, isMobile }) => {
+    const models = await (await page.request.get('/api/models')).json();
+    for (const profile of models.profiles) if (profile.kind === 'video') profile.mediaInputs = [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', required: false, min: 0, max: 1 }];
+    await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+    const reference = { id: `reference-${kind}`, source: 'upload', name: 'Aspect Reference', url: picture, thumbnailUrl: picture, mime: 'image/png', width: kind === 'image' ? 900 : 1600, height: kind === 'image' ? 1600 : 900, size: 1, createdAt: '', privacyDomain: 'gallery' };
+    await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [reference], hasMore: false, nextCursor: '' } }));
+    let body: Record<string, any> | null = null;
+    await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
+    await page.goto('/');
+    await controls(page, isMobile).mode.getByText(kind === 'image' ? 'Image' : 'Video', { exact: true }).click();
+    await openComposer(page, isMobile);
+    await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+    await page.getByRole('button', { name: 'Aspect Reference', exact: true }).click();
+    await expect(page.locator('.reference-popover')).toHaveCount(0);
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Follow the reference framing');
+    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: kind === 'video' ? 'Generate Video' : 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+    await generate.click();
+    await expect.poll(() => body).not.toBeNull();
+    expect(body!.kind).toBe(kind);
+    expect(body!.width / body!.height).toBeCloseTo(reference.width / reference.height, 1);
+    expect(body!.referenceAssets[0].assetId).toBe(reference.id);
+  });
+}
+
 test('generation completion stays in its mode and unsupported negatives remain saved', async ({ page, isMobile }) => {
   // A software GPU uses the lightweight preview without requiring reduced motion.
   await page.addInitScript(() => {
