@@ -29,7 +29,7 @@ test('custom H3 duration selections reach their mapped graph input with the fixe
   for (const family of ['minimax-h3', 'minimax_h3']) {
     saveCustomWorkflow({
       heissUi: { id: 'duration-h3', kind: 'video', family, defaults: { fps: 24, steps: 8 }, controls: { prompt: { node: 'h3', input: 'prompt' }, frames: { node: 'h3', input: 'length' }, steps: { node: 'sampler', input: 'steps' } } },
-      h3: { class_type: 'MiniMaxH3ImageToVideo', inputs: { prompt: 'waves', length: 124, first_frame: ['frame', 0] } },
+      h3: { class_type: 'MiniMaxH3ImageToVideo', inputs: { prompt: 'waves', length: 192, first_frame: ['frame', 0] } },
       frame: { class_type: 'LoadImage', inputs: { image: 'optional.png' } },
       sampler: { class_type: 'KSampler', inputs: { steps: 8 } },
       video: { class_type: 'CreateVideo', inputs: { images: ['h3', 0], fps: 24 } },
@@ -37,6 +37,8 @@ test('custom H3 duration selections reach their mapped graph input with the fixe
     });
     const profile = inferModels(info).profiles.find((item) => item.id === 'custom:duration-h3');
     assert.ok(profile);
+    assert.equal(profile.defaults.frames, 192, 'the configured eight-second default survives H3 constraints');
+    assert.deepEqual(profile.constraints.frames, { default: 192, min: 124, max: 362, step: 17, offset: 5 });
     assert.notEqual(profile.constraints.steps.min, profile.constraints.steps.max, 'a mapped sampler remains editable');
     for (const option of durationOptions(profile, 141, 24)) {
       const frames = Number(option.value);
