@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { comfy, comfyOutputDir, comfyRecentlyUnreachable } from "./comfy.js";
-import { dataDir, generationSettings, outputFileCandidates, promptTitle } from "./gallery-store.js";
+import { dataDir, importedImageFile, generationSettings, outputFileCandidates, promptTitle } from "./gallery-store.js";
 import { encryptionKeyFromRequest, passwordWrapForBackup } from "./privacy.js";
 import { renameWithRetry } from "./json-store.js";
 import { isInside } from "./paths.js";
@@ -161,6 +161,8 @@ export async function sourceFromOutput(output) {
 /** Reads a finished gallery item's own file (and its upscale), wherever it lives. */
 async function galleryItemBytes(item, url) {
   if (!url) return null;
+  const imported = url === item.url && importedImageFile(item);
+  if (imported && fs.existsSync(imported)) return { buffer: fs.readFileSync(imported), sourcePath: imported, mime: "image/png" };
   const candidates = outputFileCandidates({ ...item, url, id: url, outputName: url === item.url ? item.outputName : item.upscale?.outputName });
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const file = candidates.find((candidate) => {

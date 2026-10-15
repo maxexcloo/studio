@@ -2,6 +2,13 @@
 export function outputProfile(profiles = [], item = {}) {
   const candidates = profiles.filter((profile) => profile.kind === item.type);
   const settings = item.settings || {};
+  const importedModel = item.civitai?.resources?.find((resource) => resource.folder === 'checkpoints');
+  if (item.civitai) {
+    if (!importedModel || importedModel.status === 'conflict') return undefined;
+    const name = importedModel.localName || importedModel.file;
+    return candidates.find((profile) => profile.id === settings.profileId)
+      || candidates.find((profile) => profile.ready !== false && name && [profile.model, profile.defaults?.model].includes(name));
+  }
   return candidates.find((profile) => profile.id === settings.profileId)
     || candidates.find((profile) => profile.workflow === settings.workflow)
     || candidates.find((profile) => profile.model === item.model);
