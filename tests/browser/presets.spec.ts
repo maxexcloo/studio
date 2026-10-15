@@ -76,7 +76,7 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
     await page.locator('.phone-create .phone-row').filter({ hasText: 'Original Test Model' }).click();
   } else await page.locator('.model-trigger').first().click();
   const modelMenu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
-  await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).click();
+  await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).first().click();
   generated = null;
   if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
   else await page.getByRole('button', { name: 'Generate', exact: true }).click();
