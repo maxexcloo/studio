@@ -62,6 +62,7 @@ export function useViewerControls(view: any) {
 
   /** Puts back what "Apply settings" replaced: the draft someone was halfway through. */
   function restoreDraft(before: any) {
+    view.onReuseOutput?.(null);
     setMode(before.mode);
     setModel(before.model);
     // Switching workflow resets its defaults in an effect; restore the rest after it ran.
@@ -127,6 +128,7 @@ export function useViewerControls(view: any) {
     if (setStartImageId) setStartImageId(item.startImageId || item.referenceImage || "");
     setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));
+    view.onReuseOutput?.(vary ? null : item);
     if (vary) return Boolean(matchingProfile);
     const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
     const message = matchingProfile
