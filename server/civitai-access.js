@@ -50,15 +50,17 @@ export function saveCivitaiToken(value) {
   return civitaiTokenStatus();
 }
 
-function allowedUrl(value) {
+export function civitaiAssetUrl(value) {
   const url = new URL(value);
+  const allowed = ['civitai.com', 'civitai.red', 'r2.cloudflarestorage.com'].some((domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`));
+  if (!allowed) throw new Error('Unsupported Civitai address.');
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) throw new Error('Unsupported Civitai address.');
   return url;
 }
 
 /** Follow provider redirects ourselves: credentials never go to the file CDN. */
 export async function civitaiFetch(input, init = {}, { transport = civitaiRequest, token = process.env.CIVITAI_API_TOKEN, media = false } = {}) {
-  let url = allowedUrl(input);
+  let url = civitaiAssetUrl(input);
   for (let hop = 0; hop < 6; hop += 1) {
     const headers = new Headers(init.headers);
     headers.delete('authorization');
@@ -70,7 +72,7 @@ export async function civitaiFetch(input, init = {}, { transport = civitaiReques
     const location = response.headers.get('location');
     await response.body?.cancel();
     if (!location) throw new Error('Civitai returned an incomplete redirect.');
-    url = allowedUrl(new URL(location, url));
+    url = civitaiAssetUrl(new URL(location, url));
   }
   throw new Error('Civitai redirected too many times.');
 }

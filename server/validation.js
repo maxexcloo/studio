@@ -3,6 +3,7 @@ import { inferModels } from './models.js';
 import { workflowFor, workflowIds } from './workflow-registry.js';
 import { getCustomWorkflow } from './custom-workflows.js';
 import { inpaintingEnabled } from './features.js';
+import { hasReferenceImage, resolveImageMode } from './workflow-modes.js';
 
 export function clampNumber(value, fallback, min, max) {
   const number = Number(value);
@@ -173,7 +174,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (String(input.workflow || "").startsWith("family:")) return sanitizeFamilyBody(input, info, stats);
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
-  const customWorkflow = workflow.startsWith("custom:") ? getCustomWorkflow(workflow) : null;
+  const installed = workflow.startsWith("custom:") ? getCustomWorkflow(workflow) : null;
+  const customWorkflow = installed && resolveImageMode(installed, input);
   const workflowInfo = workflowFor(workflow) || customWorkflow;
   const prompt = String(input.prompt || "").trim();
   if (!prompt) throw new Error("Enter a prompt.");
@@ -199,7 +201,9 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const missing = missingNodes(info, workflowInfo.requiredNodes);
   if (missing.length) throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
   const profiles = inferModels(info, stats).profiles || [];
-  const profile = profiles.find((item) => item.kind === kind && item.workflow === workflow && item.model === input.model);
+  const available = profiles.find((item) => item.kind === kind && item.workflow === workflow && item.model === input.model);
+  const selected = available?.imageModes?.[hasReferenceImage(input) ? "reference" : "generate"];
+  const profile = available && { ...available, ...selected };
   if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
   if ((workflowInfo.needsTextEncoder && !input.textEncoder) || (workflowInfo.needsVae && !input.vae)) {
     throw new Error("This workflow needs a text encoder and VAE.");

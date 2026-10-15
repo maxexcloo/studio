@@ -113,6 +113,7 @@ export type Profile = {
     loras?: string[];
     resolutions?: string[];
   };
+  imageModes?: Record<string, { capabilities: Record<string, boolean>; defaults: Record<string, string | number> }>;
   capabilities: Record<string, boolean>;
   mediaInputs?: MediaInput[];
   aspectPolicy?: "manual" | "reference";

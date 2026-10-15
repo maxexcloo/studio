@@ -557,3 +557,38 @@ test('composer actions share a row and Clear clears both prompt fields', async (
   await expect(negative).toHaveValue('');
   await expect(tools.getByRole('button', { name: 'Clear Prompt & Negative' })).toBeDisabled();
 });
+
+test('attaching a reference activates that mode’s controls without losing the image picker', async ({ page, isMobile }) => {
+  const models = await (await page.request.get('/api/models')).json();
+  for (const profile of models.profiles) if (profile.kind === 'image') {
+    profile.mediaInputs = [{ id: 'reference', kind: 'image', label: 'Start Image', role: 'start', required: false, min: 0, max: 1 }];
+    profile.imageModes = {
+      generate: { capabilities: { ...profile.capabilities, negativePrompt: false, denoise: false }, defaults: profile.defaults },
+      reference: { capabilities: { ...profile.capabilities, negativePrompt: true, denoise: true }, defaults: profile.defaults }
+    };
+  }
+  await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  const reference = { id: 'mode-reference', source: 'upload', name: 'Mode Reference', url: picture, thumbnailUrl: picture, mime: 'image/png', width: 1024, height: 1024, size: 1, createdAt: '', privacyDomain: 'gallery' };
+  await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [reference], hasMore: false, nextCursor: '' } }));
+  const requests: Record<string, any>[] = [];
+  await page.route('**/api/generate', async (route) => {
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({ status: 400, json: { error: 'Test request captured' } });
+  });
+  await page.goto('/');
+  await openComposer(page, isMobile);
+  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A scene');
+  await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('blur');
+  const generate = () => isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+  await generate().click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0]).not.toHaveProperty('negative');
+  await openComposer(page, isMobile);
+  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Mode Reference', exact: true }).click();
+  await expect(page.locator('.reference-popover')).toHaveCount(0);
+  await generate().click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].negative).toBe('blur');
+  expect(requests[1].referenceAssets).toEqual([{ slot: 'reference', assetId: reference.id }]);
+});

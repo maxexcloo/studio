@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { modelFolders } from './comfy.js';
-import { civitaiJson, isCivitaiHost } from './civitai-access.js';
+import { civitaiAssetUrl, civitaiJson, isCivitaiHost } from './civitai-access.js';
 
 const samplers = {
   'DPM++ 2M': 'dpmpp_2m', 'DPM++ 2M SDE': 'dpmpp_2m_sde', 'DPM++ 2S a': 'dpmpp_2s_ancestral',
@@ -96,7 +96,7 @@ export function imagePreset(image) {
   const originalPrompt = String(meta.prompt || '').slice(0, 50000);
   if (/<lora:/i.test(originalPrompt) && !resources.length) warnings.push('LoRA tags were found without exact resource versions; resolve them manually.');
   let previewUrl = '';
-  try { const url = new URL(image.url); if (url.protocol === 'https:' && !url.username && !url.password) previewUrl = url.href; } catch { /* No preview is still an importable preset. */ }
+  try { previewUrl = civitaiAssetUrl(image.url).href; } catch { /* No preview is still an importable preset. */ }
   if (meta.sampler && !settings.scheduler && !schedule) warnings.push('No sampling schedule was recorded; the selected workflow’s default will be used.');
   return {
     id: String(image.id), name: `Civitai ${image.id}`, sourceUrl: `https://civitai.com/images/${image.id}`, type: image.type || 'image',

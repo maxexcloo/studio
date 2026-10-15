@@ -153,7 +153,10 @@ export function metadataFromJson(raw, file) {
     const mapping = controls[key];
     return mapping?.node && mapping?.input ? graph?.[mapping.node]?.inputs?.[mapping.input] : undefined;
   };
-  const classes = [...new Set(Object.values(graph || {}).map((node) => node?.class_type).filter(Boolean))];
+  const imageModes = Object.fromEntries(Object.entries(meta.imageModes || {}).map(([mode, variant]) => [mode,
+    metadataFromJson({ graph: variant.graph || graph, heissUi: { ...meta, ...variant, capabilities: variant.capabilities || {}, imageModes: undefined } }, file)
+  ]));
+  const classes = [...new Set([graph, ...Object.values(imageModes).map((mode) => mode.graph)].flatMap((value) => Object.values(value || {}).map((node) => node?.class_type)).filter(Boolean))];
   return {
     id,
     profileId: `custom:${id}`,
@@ -165,6 +168,7 @@ export function metadataFromJson(raw, file) {
     controls,
     options: meta.options || {},
     loraStack,
+    imageModes,
     mediaInputs,
     promptComposition,
     requiredNodes: Array.isArray(meta.requiredNodes) && meta.requiredNodes.length ? meta.requiredNodes : classes,
@@ -191,6 +195,12 @@ export function metadataFromJson(raw, file) {
     aspectRatios: meta.aspectRatios || meta.aspects || [],
     aspectPolicy: meta.aspectPolicy === "reference" ? "reference" : "manual",
     capabilities: {
+      cfg: Boolean(controls.cfg),
+      lora: Boolean(loraStack),
+      sampler: Boolean(controls.sampler),
+      scheduler: Boolean(controls.scheduler),
+      seed: Boolean(controls.seed),
+      steps: Boolean(controls.steps),
       negativePrompt: Boolean(controls.negative),
       variations: Boolean(controls.count),
       frames: Boolean(controls.frames),

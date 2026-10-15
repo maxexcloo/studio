@@ -1070,7 +1070,13 @@ function App() {
     });
   }, [mode, models, workflowPreferences]);
 
-  const currentProfile = useMemo(() => models?.profiles.find((profile) => profile.id === model) || null, [model, models]);
+  const currentProfile = useMemo(() => {
+    const profile = models?.profiles.find((item) => item.id === model);
+    if (!profile) return null;
+    const selected = profile.imageModes?.[referenceAssets.length || startImage || startImageId ? 'reference' : 'generate'];
+    // Keep reference slots available while the text-only mode is active.
+    return selected ? { ...profile, ...selected } : profile;
+  }, [model, models, referenceAssets.length, startImage, startImageId]);
   const toggleModelFavoriteRef = useRef<(id: string) => void>(() => undefined);
   const modelMenu = useMemo(() => ({
     favorites: workflowPreferences.favorites || [],
