@@ -5,13 +5,12 @@ const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`,
 const videos = images.map((item, index) => ({ ...item, id: `video-${index}`, type: 'video' }));
 
 function controls(page: Page, phone: boolean) {
-  const mode = phone ? page.getByRole('combobox', { name: 'Generation Mode', exact: true }) : page.locator('.gallery-generation-mode');
+  const mode = page.locator(phone ? '.phone-mode-select' : '.gallery-generation-mode');
   return {
     mode,
     scroller: page.locator(phone ? '.phone-gallery' : '.stage-gallery'),
     switchMode: async (value: 'image' | 'video') => {
-      if (phone) await mode.selectOption(value);
-      else await mode.getByRole('button', { name: value === 'video' ? 'Video' : 'Image', exact: true }).click();
+      await mode.getByRole('button', { name: value === 'video' ? 'Video' : 'Image', exact: true }).click();
     },
   };
 }
@@ -27,11 +26,18 @@ test('image and video keep their own scroll positions through repeated switches'
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   if (isMobile) {
     await expect(page.locator('.phone-gallery .phone-generation-mode')).toHaveCount(0);
+    await expect(mode.locator('select')).toHaveCount(0);
+    await expect(mode.getByRole('button')).toHaveCount(2);
     for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(viewport);
       const selector = await mode.boundingBox();
       const prompt = await page.locator('.phone-create-open').boundingBox();
       const pill = await page.locator('.phone-create-pill').boundingBox();
+      for (const button of await mode.getByRole('button').all()) {
+        const box = await button.boundingBox();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
       expect(selector!.height).toBeGreaterThanOrEqual(44);
       expect(selector!.x + selector!.width).toBeLessThanOrEqual(prompt!.x);
       expect(selector!.y).toBeCloseTo(prompt!.y, 0);
@@ -41,8 +47,8 @@ test('image and video keep their own scroll positions through repeated switches'
       await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await mode.focus();
-    await expect(mode).toBeFocused();
+    await mode.getByRole('button', { name: 'Image', exact: true }).focus();
+    await expect(mode.getByRole('button', { name: 'Image', exact: true })).toBeFocused();
   } else expect(await mode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
   await scroller.evaluate((element) => { element.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1700 })); element.scrollTo({ top: 1700, behavior: 'instant' }); });
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(1600);
@@ -356,8 +362,7 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await openComposer(page, isMobile);
   const composerMode = page.locator('.composer-mode-select');
   await composerMode.getByRole('button', { name: 'Video', exact: true }).click();
-  if (isMobile) await expect(controls(page, true).mode).toHaveValue('video');
-  else await expect(controls(page, false).mode.getByText('Video', { exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(controls(page, isMobile).mode.getByRole('button', { name: 'Video', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await composerMode.getByRole('button', { name: 'Image', exact: true }).click();
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
   else await page.locator('.model-trigger').first().click();

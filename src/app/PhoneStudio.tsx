@@ -6,7 +6,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronDown, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -20,7 +20,7 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { progressLine, progressReading, RunLeft } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
-import type { GalleryItem, Mode, Profile, SavedSize } from './types';
+import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
 import type { ShowToast } from './toast';
@@ -483,15 +483,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       {!hiddenLocked && !selecting ? (
         <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
-          <label className="phone-mode-select">
-            {mode === 'video' ? <Video size={20} aria-hidden="true" /> : <ImageIcon size={20} aria-hidden="true" />}
-            <ChevronDown size={12} aria-hidden="true" />
-            <span aria-hidden="true">{mode === 'video' ? 'Video' : 'Image'}</span>
-            <select aria-label="Generation Mode" value={mode} onChange={(event) => { haptic('tap'); changeMode(event.target.value as Mode); }}>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-          </label>
+          <div className="phone-mode-select" role="group" aria-label="Generation Mode">
+            {(['image', 'video'] as const).map((value) => (
+              <button key={value} type="button" aria-label={value === 'image' ? 'Image' : 'Video'} aria-pressed={mode === value} onClick={() => { haptic('tap'); changeMode(value); }}>
+                {value === 'image' ? <ImageIcon size={20} aria-hidden="true" /> : <Video size={20} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
           <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
             <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() ? truncate(prompt, 90) : 'Prompt'}</strong>
             <small>{stepLine ? <span className="phone-step-line">{pending.length > 1 ? `Generating ${pending.length} · ` : 'Generating · '}{stepLine}{pending.length === 1 && pending[0].progress?.endsAt ? <> · <RunLeft progress={pending[0].progress} /></> : null}</span> : workflowName}</small>
