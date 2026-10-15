@@ -11,7 +11,7 @@ import { useModelFolders } from './app/useModelFolders';
 import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
-import { profileImageCount, profileImageSize } from './app/generationOptions';
+import { profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -63,19 +63,9 @@ const StableSidebarControls = memoLatest(SidebarControls);
 const StableModelLoraControls = memoLatest(ModelLoraControls);
 const StablePhoneAdvancedControls = memoLatest(PhoneAdvancedControls);
 
-/** Snap a raw pixel dimension to something ComfyUI will accept: a multiple of the
- *  workflow's step (default 8), clamped to its width/height range. */
 /** Custom's range for one side: 256 to 4096, on the model's step or 16, whichever is coarser. */
 function customSideLimits(meta: Record<string, number> = {}) {
   return { min: 256, max: Math.min(Number(meta.max) || 4096, 4096), step: Math.max(Number(meta.step) || 0, 16) };
-}
-
-function snapDimension(value: number, meta: Record<string, number> = {}): number {
-  const step = meta.step || 8;
-  const min = meta.min ?? 64;
-  const max = meta.max ?? 4096;
-  const snapped = Math.round(value / step) * step;
-  return Math.min(max, Math.max(min, snapped || step));
 }
 
 function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[] {
@@ -1322,12 +1312,10 @@ function App() {
     // Kept from before the first lock only: on another model the size is already the reference's.
     if (!sizeBeforeLock.current) sizeBeforeLock.current = { model, width, height, customSize: Boolean(customSize) };
     setCustomSize(false);
-    const pixels = Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024);
-    const scale = prefs.autoResizeInputs === false ? 1 : Math.min(1, Math.sqrt(pixels / (referenceForAspect.width * referenceForAspect.height)));
-    setWidth(snapDimension(referenceForAspect.width * scale, widthMeta));
-    setHeight(snapDimension(referenceForAspect.height * scale, heightMeta));
+    const size = referenceImageSize(currentProfile, referenceForAspect, { pixels: Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024), resize: prefs.autoResizeInputs !== false });
+    if (size) { setWidth(size.width); setHeight(size.height); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aspectLocked, referenceForAspect?.id, model, prefs.autoResizeInputs]);
+  }, [aspectLocked, referenceForAspect?.id, referenceForAspect?.width, referenceForAspect?.height, model, prefs.autoResizeInputs]);
   /* A reference that dictates the framing, or a painted mask, takes the size
      tabs off the composer and the run skips 2K/4K (useGenerationActions). The
      saved pick stays, so it is back once the reference is gone or only guides. */

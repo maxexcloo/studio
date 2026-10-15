@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generationPlan, outputProfile, profileImageCount, profileImageSize } from "../src/app/generationOptions.js";
+import { generationPlan, outputProfile, profileImageCount, profileImageSize, referenceImageSize } from "../src/app/generationOptions.js";
 
 test("settings reuse restores the saved workflow when multiple workflows share a model", () => {
   const profiles = [
@@ -54,4 +54,28 @@ test("a family's named starting aspect wins over its default canvas", () => {
 test("image selection stays within model count limits", () => {
   assert.equal(profileImageCount({ kind: "image", defaults: { count: 4 }, constraints: { count: { min: 1, max: 2 } } }, 4), 2);
   assert.equal(profileImageCount({ kind: "image", defaults: {}, constraints: { count: { default: 4, max: 8 } } }, 1), 4);
+});
+
+test('image and video references adopt portrait and landscape proportions at the canvas budget', () => {
+  for (const kind of ['image', 'video']) {
+    const profile = { kind, defaults: { width: 1024, height: 1024 } };
+    for (const reference of [{ width: 900, height: 1600 }, { width: 1600, height: 900 }]) {
+      const size = referenceImageSize(profile, reference);
+      assert.ok(Math.abs(size.width / size.height - reference.width / reference.height) < 0.015);
+      assert.ok(Math.abs(size.width * size.height / (1024 * 1024) - 1) < 0.02);
+    }
+  }
+});
+
+test('reference sizing respects joint limits, alignment and fixed canvases', () => {
+  const profile = { defaults: { width: 1024, height: 1024 }, constraints: { width: { min: 64, max: 640, step: 32 }, height: { min: 64, max: 1024, step: 32 } } };
+  assert.deepEqual(referenceImageSize(profile, { width: 1600, height: 800 }), { width: 640, height: 320 });
+  const fixed = { ...profile, constraints: { width: { min: 512, max: 512 }, height: { min: 512, max: 512 } } };
+  assert.deepEqual(referenceImageSize(fixed, { width: 1600, height: 900 }), { width: 512, height: 512 });
+  assert.deepEqual(referenceImageSize(profile, { width: 320, height: 640 }, { resize: false }), { width: 320, height: 640 });
+  assert.deepEqual(referenceImageSize(profile, { width: 4000, height: 8000 }, { resize: false }), { width: 512, height: 1024 });
+});
+
+test('missing reference dimensions leave the canvas alone', () => {
+  for (const reference of [null, {}, { width: 0, height: 512 }, { width: Infinity, height: 512 }]) assert.equal(referenceImageSize(null, reference), null);
 });
