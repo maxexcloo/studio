@@ -9,7 +9,7 @@ import { useModelFolders } from './app/useModelFolders';
 import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
-import { profileImageCount, profileImageSize } from './app/generationOptions';
+import { profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -58,16 +58,6 @@ import { presetFit, type ImagePreset } from './app/presets';
 const StableSidebarControls = memoLatest(SidebarControls);
 const StableModelLoraControls = memoLatest(ModelLoraControls);
 const StablePhoneAdvancedControls = memoLatest(PhoneAdvancedControls);
-
-/** Snap a raw pixel dimension to something ComfyUI will accept: a multiple of the
- *  workflow's step (default 8), clamped to its width/height range. */
-function snapDimension(value: number, meta: Record<string, number> = {}): number {
-  const step = meta.step || 8;
-  const min = meta.min ?? 64;
-  const max = meta.max ?? 4096;
-  const snapped = Math.round(value / step) * step;
-  return Math.min(max, Math.max(min, snapped || step));
-}
 
 function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[] {
   if (!profile) return [];
@@ -1122,22 +1112,22 @@ function App() {
     || composerReferenceAssets.some((item) => item.slot === input.follows || item.slot === input.id));
   const widthMeta = currentProfile?.constraints?.width || {};
   const heightMeta = currentProfile?.constraints?.height || {};
-  /* Workflows may declare that a reference image dictates the output framing
-     (aspectPolicy: "reference"). When one is selected we hide the manual aspect
-     and size controls and let the reference's own dimensions drive generation. */
-  const referenceForAspect = currentProfile?.aspectPolicy === "reference"
-    ? composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null
-    : null;
-  const aspectLocked = Boolean(referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);
+  // The first reference drives framing; extra context or end frames do not resize the canvas.
+  const referenceForAspect = composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null;
+  const aspectLocked = Boolean(currentProfile?.aspectPolicy === 'reference' && referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);
   useEffect(() => {
-    if (!aspectLocked || !referenceForAspect) return;
-    setCustomSize(false);
-    const pixels = Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024);
-    const scale = prefs.autoResizeInputs === false ? 1 : Math.min(1, Math.sqrt(pixels / (referenceForAspect.width * referenceForAspect.height)));
-    setWidth(snapDimension(referenceForAspect.width * scale, widthMeta));
-    setHeight(snapDimension(referenceForAspect.height * scale, heightMeta));
+    if (activeInpaintMask) return;
+    const pixels = aspectLocked
+      ? Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024)
+      : width * height;
+    const size = referenceImageSize(currentProfile, referenceForAspect, { pixels, resize: prefs.autoResizeInputs !== false });
+    if (!size) return;
+    setCustomSize(!aspectLocked && !aspectOptions.some((item) => item.w === size.width && item.h === size.height));
+    setWidth(size.width);
+    setHeight(size.height);
+    // Match on reference/workflow changes, leaving subsequent manual size choices intact.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aspectLocked, referenceForAspect?.id, model, prefs.autoResizeInputs]);
+  }, [aspectLocked, referenceForAspect?.id, referenceForAspect?.width, referenceForAspect?.height, model, prefs.autoResizeInputs]);
   /* A reference that dictates the framing, or a painted mask, takes the size
      tabs (and Smart upscale with them) off the composer: the reference's own
      size is what gets made. The saved 2K/4K pick has to go with them, not

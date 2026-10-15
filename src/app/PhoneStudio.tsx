@@ -333,7 +333,7 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
           : <button type="button" onClick={() => actions.hide(item)}><EyeOff size={21} /><span>Hide</span></button>
       ) : null}
       <button type="button" className="is-danger" onClick={() => { haptic('warning'); actions.remove(item); }}><Trash2 size={21} /><span>Delete</span><HapticTarget /></button>
-      {/* Info sits in the top corner, opposite Close, so the bar keeps room for actions. */}
+      {/* Info sits beside Close at the top right, so the bar keeps room for actions. */}
       <button type="button" className={cn('viewer-phone-info', showDetails && 'is-on')} aria-pressed={showDetails} aria-label="Details" onClick={onToggleDetails}><Info size={20} /></button>
     </nav>
   );
