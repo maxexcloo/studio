@@ -136,6 +136,56 @@ for (const kind of ['image', 'video']) {
   });
 }
 
+for (const existingReference of [false, true]) {
+  test(`reusing an image then switching to video ${existingReference ? 'preserves the chosen reference' : 'uses the output and its proportions'}`, async ({ page, isMobile }) => {
+    const models = await (await page.request.get('/api/models')).json();
+    const video = models.profiles.find((profile: any) => profile.kind === 'video');
+    const referenceVideo = { ...video, id: 'reference-video', mediaInputs: [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', min: 1, max: 1, required: true }] };
+    models.profiles.push(referenceVideo);
+    if (existingReference) models.defaults.videoModel = referenceVideo.id;
+    await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+    const reference = { id: 'reused-output', source: 'gallery', galleryItemId: images[0].id, name: 'Reused Output', url: picture, thumbnailUrl: picture, mime: 'image/png', width: 900, height: 1600, size: 1, createdAt: '', privacyDomain: 'gallery' };
+    const previous = { ...reference, id: 'previous-reference', name: 'Previous Reference', width: 1600, height: 900 };
+    let resolves = 0;
+    await page.route('**/api/reference-assets/from-gallery', async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ galleryItemId: images[0].id });
+      resolves++;
+      await route.fulfill({ json: { asset: reference } });
+    });
+    await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [previous], hasMore: false, nextCursor: '' } }));
+    let body: Record<string, any> | null = null;
+    await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
+    await page.goto('/');
+    if (existingReference) {
+      await controls(page, isMobile).switchMode('video');
+      await openComposer(page, isMobile);
+      await page.getByRole('button', { name: 'Add Start Image, required', exact: true }).click();
+      await page.getByRole('button', { name: previous.name, exact: true }).click();
+      if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+      await controls(page, isMobile).switchMode('image');
+    }
+    await page.locator(`[data-tile-id="${images[0].id}"]`).click();
+    if (isMobile) await page.getByRole('button', { name: 'Reuse', exact: true }).click();
+    else {
+      await page.getByRole('button', { name: 'Use these settings', exact: true }).click();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.viewer-stage')).toHaveCount(0);
+    }
+    await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    const expected = existingReference ? previous : reference;
+    await expect(page.getByRole('button', { name: `Change start image, currently ${expected.name}`, exact: true })).toBeVisible();
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the image');
+    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+    await generate.click();
+    await expect.poll(() => body).not.toBeNull();
+    expect(body!.kind).toBe('video');
+    expect(body!.profileId).toBe(referenceVideo.id);
+    expect(body!.referenceAssets).toEqual([{ slot: 'start', assetId: expected.id }]);
+    expect(body!.width / body!.height).toBeCloseTo(expected.width / expected.height, 1);
+    expect(resolves).toBe(existingReference ? 0 : 1);
+  });
+}
+
 test('generation completion stays in its mode and unsupported negatives remain saved', async ({ page, isMobile }) => {
   // A software GPU uses the lightweight preview without requiring reduced motion.
   await page.addInitScript(() => {

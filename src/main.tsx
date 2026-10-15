@@ -534,6 +534,7 @@ function App() {
     spacePrompts.current.hidden = modePrompts();
     if (hiddenSpace) { setPrompt(""); setNegative(""); }
   }, [hidden.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reusedImages = useRef<Record<"gallery" | "hidden", GalleryItem | null>>({ gallery: null, hidden: null });
   const emptyReferences = () => ({ assets: [] as SelectedReferenceAsset[], image: "", id: "", name: "" });
   type ModeReference = { assets: SelectedReferenceAsset[]; image: string; id: string; name: string };
   const spaceReferences = useRef<Record<"gallery" | "hidden", Record<Mode, ModeReference>>>({
@@ -556,6 +557,7 @@ function App() {
   useEffect(() => {
     if (hidden.unlocked) return;
     spaceReferences.current.hidden = { image: emptyReferences(), video: emptyReferences() };
+    reusedImages.current.hidden = null;
   }, [hidden.unlocked]);
   // Each mode keeps its own place in the gallery. The grid measures itself
   // after mount, so the saved position goes back once it has a height to
@@ -1050,6 +1052,12 @@ function App() {
     setNegative(nextPrompt.negative);
     setMode(next);
     const saved = composerByMode.current[next];
+    const savedProfile = models?.profiles.find((profile) => profile.id === (saved?.model || models.defaults[next === 'video' ? 'videoModel' : 'imageModel']) && profile.kind === next);
+    if (next === 'video' && reusedImages.current[hidden.space] && !nextReferences.assets.length && !nextReferences.image && !nextReferences.id && !imageInputsForProfile(savedProfile).length) {
+      const candidates = models?.profiles.filter((profile) => profile.kind === 'video' && profile.ready !== false && imageInputsForProfile(profile).length) || [];
+      const compatible = candidates.find((profile) => profile.family === savedProfile?.family) || candidates[0];
+      if (compatible) { applyProfile(compatible); return; }
+    }
     if (saved?.model && (!models || models.profiles.some((profile) => profile.id === saved.model && profile.kind === next))) {
       const setters: Record<string, (value: any) => void> = { cfg: setCfg, clipType: setClipType, count: setCount, customSize: setCustomSize, denoise: setDenoise, duration: setDuration, fps: setFps, frames: setFrames, height: setHeight, inpaintFeather: setInpaintFeather, inpaintStrength: setInpaintStrength, model: setModel, resolution: setResolution, sampler: setSampler, scheduler: setScheduler, seed: setSeed, steps: setSteps, textEncoder: setTextEncoder, textEncoders: setTextEncoders, vae: setVae, weightDtype: setWeightDtype, width: setWidth };
       for (const [key, value] of Object.entries(saved)) setters[key]?.(value);
@@ -1273,6 +1281,33 @@ function App() {
   const composerReferenceAssets = referenceAsset && referenceInput && !storedReferenceAsset
     ? arrangeReferences([{ slot: referenceInput.id, asset: referenceAsset }, ...arrangedReferenceAssets], referenceInputs)
     : arrangedReferenceAssets;
+  // A reused output becomes the first video reference once a compatible workflow is active.
+  useEffect(() => {
+    const space = hidden.space;
+    const item = reusedImages.current[space];
+    if (mode !== 'video' || !item || !referenceInput) return;
+    const existing = spaceReferences.current[space].video;
+    if (existing.assets.length || existing.image || existing.id) {
+      reusedImages.current[space] = null;
+      return;
+    }
+    let live = true;
+    referenceAssetFromGallery(item.id).then((asset) => {
+      if (!live || reusedImages.current[space] !== item) return;
+      reusedImages.current[space] = null;
+      const current = spaceReferences.current[space].video;
+      if (current.assets.length || current.image || current.id) return;
+      setReferenceAssets([{ slot: referenceInput.id, asset }]);
+      setStartImage('');
+      setStartImageId(asset.id);
+      setStartImageName(asset.name);
+    }).catch((error) => {
+      if (!live) return;
+      reusedImages.current[space] = null;
+      showToast(error instanceof Error ? error.message : 'Couldn’t use the reused image as a video reference', 'error');
+    });
+    return () => { live = false; };
+  }, [mode, model, hidden.space, referenceInput?.id]);
   const canUseStartImage = Boolean(referenceInput);
   // A mask belongs to the image it was painted on, for a model that can inpaint.
   // Settings › Features › Inpainting can switch it off: no brush, no mask, no inpaint settings.
@@ -1642,6 +1677,7 @@ function App() {
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem, deleteItems } = generationActions;
 
   const viewerActions = useViewerControls({
+    onReuseOutput: (item: GalleryItem | null) => { reusedImages.current[hidden.space] = item?.type === 'image' && item.status === 'done' && item.url && !item.vaultLocked && !item.library ? item : null; },
     negativeForMode: (next: Mode) => spacePrompts.current[hidden.space][next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
   });
   const { resetViewer, openItem, applyAllSettings, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
