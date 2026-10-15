@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
 import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
-import { dataDir, filterVisibleGallery, gallery, galleryKey, outputFileCandidates } from "./gallery-store.js";
+import { dataDir, importedImageFile, filterVisibleGallery, gallery, galleryKey, outputFileCandidates } from "./gallery-store.js";
 import { encryptionKeyFromRequest } from "./privacy.js";
 import { readVaultAsset, vaultGalleryItemsForRequest } from "./vault.js";
 import { renameWithRetry } from "./json-store.js";
@@ -273,6 +273,8 @@ function findGalleryItem(id = "") {
 }
 
 async function publicGalleryBuffer(item) {
+  const imported = importedImageFile(item);
+  if (imported && fs.existsSync(imported)) return { buffer: fs.readFileSync(imported), mime: "image/png", name: item.outputName };
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const file = outputFileCandidates(item).find((candidate) => {
     const resolved = path.resolve(candidate);

@@ -403,6 +403,12 @@ export function galleryDelta({ since = 0, type = "", includeFailed = true, filte
   return { revision: galleryRevision, reset: false, upserts, removes: [...removes] };
 }
 
+/** Imported image paths are derived from the provider ID, never supplied paths. */
+export function importedImageFile(item) {
+  const id = /^civitai:([1-9]\d*)$/.exec(String(item?.id || ''))?.[1];
+  return id && item.url === `/api/presets/${id}/media` ? path.join(dataDir, 'imported-images', `${id}.png`) : '';
+}
+
 export function outputFileCandidates(item, baseDir = comfyOutputDir) {
   // An image added from another folder is never in the output folder, whatever its name.
   if (!baseDir || item?.library) return [];
@@ -438,12 +444,17 @@ export function outputFileCandidates(item, baseDir = comfyOutputDir) {
 
 export function deleteGalleryFiles(items) {
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
-  if (!base) return { deleted: 0, skipped: 0 };
   let deleted = 0;
   let skipped = 0;
   for (const item of items) {
+    const imported = importedImageFile(item);
+    if (imported) {
+      try { if (fs.existsSync(imported)) { fs.unlinkSync(imported); deleted += 1; } } catch { skipped += 1; }
+      continue;
+    }
     // An image added from another folder is only shown here; its file is not ours to delete.
     if (item.library) continue;
+    if (!base) continue;
     for (const file of outputFileCandidates(item)) {
       const resolved = path.resolve(file);
       if (!isInside(base, resolved, { orSame: true })) {
