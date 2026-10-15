@@ -51,20 +51,22 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
   // The player settles its own state just after it mounts and can pause the
   // video again then, so this looks once more a moment after starting it.
   useEffect(() => {
+    const video = host.current?.querySelector('video');
+    if (!video) return;
     let timer = 0;
-    let tries = 0;
     let checked = false;
     const start = () => {
-      const v = host.current?.querySelector('video');
-      if (!v || v.readyState < 2) { if (tries++ < 100) timer = window.setTimeout(start, 100); return; }
+      const v = video;
+      if (v.readyState < 2) return;
       if (document.hidden) return;
       if (v.paused) v.play().catch(() => { v.muted = true; return v.play(); }).catch(() => { /* Blocked outright: the play button is there. */ });
       if (!checked) { checked = true; timer = window.setTimeout(start, 400); }
     };
+    video.addEventListener('canplay', start, { once: true });
     start();
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); video.removeEventListener('canplay', start); video.pause(); };
   }, [item.url, attempt]);
-  const media = <Video src={mediaUrl(item.url, item as { id?: string; createdAt?: string })} playsInline disablePictureInPicture disableRemotePlayback loop preload="auto" onLoadedMetadata={(event) => {
+  const media = <Video src={mediaUrl(item.url, item as { id?: string; createdAt?: string })} autoPlay playsInline disablePictureInPicture disableRemotePlayback loop preload="auto" onLoadedMetadata={(event) => {
     const v = event.currentTarget; if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
   }} onError={() => setError('This video couldn’t be played. Try again, or save the original using the viewer actions.')} />;
   return (

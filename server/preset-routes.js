@@ -9,6 +9,7 @@ import { stripMetadata } from './metadata-strip.js';
 import { presetsEnabled } from './features.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { libraryDownload, libraryDownloadAccess, libraryDownloads, resolveModelLink, startLibraryDownload } from './library-downloads.js';
+import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from './video-previews.js';
 import { requireAdmin, requireLocal } from './route-access.js';
 
 const presetsPath = path.join(dataDir, 'presets.json');
@@ -94,9 +95,16 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
     const file = importedImageFile(item);
     if (!file || !fs.existsSync(file)) { res.sendStatus(404); return; }
+    if (item.type === 'video') { res.type('mp4').sendFile(file); return; }
     res.type('png');
     const buffer = fs.readFileSync(file);
     res.send(req.query.clean === '1' ? stripMetadata(buffer).buffer : buffer);
+  }));
+  app.get('/api/presets/:id/video-preview', route(async (req, res) => {
+    const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
+    const file = importedImageFile(item);
+    if (item?.type !== 'video' || !file || !fs.existsSync(file)) { res.sendStatus(404); return; }
+    sendVideoPreview(req, res, await getFileVideoPreview(file));
   }));
   app.get('/api/presets/:id/thumbnail', route(async (req, res) => {
     if (!/^[1-9]\d*$/.test(req.params.id)) throw new Error('Unknown preview.');
@@ -104,6 +112,7 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
     const local = importedImageFile(item);
     if (local && fs.existsSync(local)) {
+      if (item.type === 'video') { res.type('jpeg').sendFile(await getFileVideoPoster(local), { dotfiles: 'allow' }); return; }
       const buffer = await sharp(local).resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
       res.type('webp').send(buffer); return;
     }

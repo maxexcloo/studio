@@ -1,4 +1,39 @@
+import { Resolver } from 'node:dns/promises';
+import https from 'node:https';
+import { Readable } from 'node:stream';
 import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
+
+export function isCivitaiHost(host) {
+  return host === 'civitai.com' || host === 'civitai.red';
+}
+
+/** Use the configured resolver only for Civitai requests; preserve TLS hostname checks. */
+export async function civitaiRequest(url, init = {}, { servers = process.env.CIVITAI_DNS_SERVERS, request = https.request, resolver = new Resolver() } = {}) {
+  if (!servers) return fetch(url, init);
+  resolver.setServers(servers.split(',').map((server) => server.trim()).filter(Boolean));
+  const lookup = (hostname, options, callback) => {
+    const families = options.family ? [options.family] : [4, 6];
+    Promise.allSettled(families.map(async (family) => (await (family === 4 ? resolver.resolve4(hostname) : resolver.resolve6(hostname))).map((address) => ({ address, family })))).then((results) => {
+      const addresses = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+      if (!addresses.length) return callback(results.find((result) => result.status === 'rejected')?.reason || new Error('No Civitai DNS addresses were returned.'));
+      if (options.all) callback(null, addresses);
+      else callback(null, addresses[0].address, addresses[0].family);
+    });
+  };
+  return new Promise((resolve, reject) => {
+    const outgoing = request(url, { agent: false, headers: Object.fromEntries(new Headers(init.headers)), lookup, method: init.method || 'GET', signal: init.signal }, (incoming) => {
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(incoming.headers)) {
+        for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) headers.append(key, item);
+      }
+      const empty = [204, 304].includes(incoming.statusCode);
+      if (empty) incoming.resume();
+      resolve(new Response(empty ? null : Readable.toWeb(incoming), { headers, status: incoming.statusCode, statusText: incoming.statusMessage }));
+    });
+    outgoing.once('error', reject);
+    outgoing.end(init.body);
+  });
+}
 
 export function civitaiTokenStatus() {
   return { set: Boolean(process.env.CIVITAI_API_TOKEN), editable: !process.env.CIVITAI_API_TOKEN || envFileKeys.has('CIVITAI_API_TOKEN') };
@@ -15,18 +50,15 @@ export function saveCivitaiToken(value) {
   return civitaiTokenStatus();
 }
 
-function allowedUrl(value, media) {
+function allowedUrl(value) {
   const url = new URL(value);
-  const host = url.hostname;
-  const allowed = media ? host === 'image.civitai.com'
-    : host === 'civitai.com' || host.endsWith('.civitai.com') || host.endsWith('.r2.cloudflarestorage.com');
-  if (!allowed || url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) throw new Error('Unsupported Civitai address.');
+  if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) throw new Error('Unsupported Civitai address.');
   return url;
 }
 
 /** Follow provider redirects ourselves: credentials never go to the file CDN. */
-export async function civitaiFetch(input, init = {}, { transport = fetch, token = process.env.CIVITAI_API_TOKEN, media = false } = {}) {
-  let url = allowedUrl(input, media);
+export async function civitaiFetch(input, init = {}, { transport = civitaiRequest, token = process.env.CIVITAI_API_TOKEN, media = false } = {}) {
+  let url = allowedUrl(input);
   for (let hop = 0; hop < 6; hop += 1) {
     const headers = new Headers(init.headers);
     headers.delete('authorization');
@@ -38,7 +70,7 @@ export async function civitaiFetch(input, init = {}, { transport = fetch, token 
     const location = response.headers.get('location');
     await response.body?.cancel();
     if (!location) throw new Error('Civitai returned an incomplete redirect.');
-    url = allowedUrl(new URL(location, url), media);
+    url = allowedUrl(new URL(location, url));
   }
   throw new Error('Civitai redirected too many times.');
 }

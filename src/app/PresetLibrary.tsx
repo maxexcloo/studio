@@ -4,7 +4,7 @@ import { apiJson } from './api';
 import { Modal } from './Modal';
 import { Segmented } from './SettingsControls';
 import { useHistoryDismiss } from './useHistoryDismiss';
-import { presetFit, type ImagePreset } from './presets';
+import { presetFit, type ImagePreset, type PresetResource } from './presets';
 import type { ModelDownload, Models, Profile } from './types';
 import type { ShowToast } from './toast';
 import type { ConfirmAction } from './useConfirmation';
@@ -30,6 +30,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
   const [access, setAccess] = React.useState<Access | null>(null);
   const [downloads, setDownloads] = React.useState<ModelDownload[]>([]);
   const [busy, setBusy] = React.useState(false);
+  const [importing, setImporting] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const selectedRef = React.useRef(selected);
@@ -44,7 +45,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
   };
   const select = (preset: ImagePreset) => {
     setSelected(preset);
-    setProfileId(preset.resources.find((item) => item.profileId)?.profileId || (!preset.resources.some((item) => item.folder === 'checkpoints') ? models?.defaults.imageModel : '') || '');
+    setProfileId(preset.resources.find((item) => item.profileId)?.profileId || (!preset.resources.some((item) => item.folder === 'checkpoints') ? preset.type === 'video' ? models?.defaults.videoModel : models?.defaults.imageModel : '') || '');
   };
   const resolve = async (id: string) => {
     const data = await post<{ preset: ImagePreset }>('/api/presets/resolve', { id });
@@ -86,12 +87,28 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
     return () => { mounted.current = false; window.clearTimeout(timer); };
   }, []);
 
-  const profiles = (models?.profiles || []).filter((item) => item.kind === 'image');
+  const profiles = (models?.profiles || []).filter((item) => item.kind === (selected?.type || 'image'));
   const profile = profiles.find((item) => item.id === profileId);
   const fit = selected ? presetFit(selected, profile) : null;
   const pending = downloads.filter((item) => ['queued', 'downloading'].includes(item.status));
-  const activeFor = (versionId: number) => pending.some((item) => item.id.startsWith(`civitai:${versionId}:`));
+  const activeFor = (versionId: number | string) => pending.some((item) => item.id.startsWith(`civitai:${versionId}:`));
   const missing = selected?.resources.filter((item) => item.status === 'missing' && item.supported && !activeFor(item.versionId)) || [];
+  const resourceStatus = (resource: PresetResource) => {
+    if (resource.status === 'installed') return resource.nameOnly ? 'Found By Filename' : 'Installed';
+    const download = downloads.find((item) => item.id.startsWith(`civitai:${resource.versionId}:`));
+    if (download?.status === 'queued') return 'Queued';
+    if (download?.status === 'downloading') return download.totalBytes ? `Downloading ${Math.min(100, Math.round(download.receivedBytes / download.totalBytes * 100))}%` : 'Downloading…';
+    if (download && ['error', 'paused', 'canceled'].includes(download.status)) return download.status === 'error' ? 'Download Failed' : download.status === 'paused' ? 'Paused' : 'Cancelled';
+    return resource.status === 'conflict' ? 'Filename Conflict' : resource.status === 'unsupported' ? 'Needs Review' : 'Missing';
+  };
+  const importingImage = async () => {
+    setImporting(true);
+    try {
+      const data = await post<{ preset: ImagePreset }>('/api/presets/import', { url });
+      select(data.preset); await load();
+      showToast('Image added to the gallery. Missing model files are queued automatically.', 'success');
+    } finally { if (mounted.current) setImporting(false); }
+  };
 
   return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="wide" title="Image & Model Library" icon={<Library size={20} />} description="Import an image and its settings, or download a model." className="preset-library" busy={busy}
     footer={selected && tab === 'images' ? <>
@@ -100,11 +117,12 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
     </> : undefined}>
     <Segmented value={tab} onChange={(value) => { setTab(value); setError(''); }} options={[{ value: 'images', label: 'Images' }, { value: 'models', label: 'Models' }]} label="Library View" />
     {error ? <p className="preset-message is-error" role="alert">{error}</p> : null}
+    {importing ? <p className="preset-message" role="status">Importing image: reading its settings, saving the original and checking model files. Large files can take a moment.</p> : null}
     {tab === 'images' ? <>
       {!selected ? <>
-        <form className="preset-import" onSubmit={(event) => { event.preventDefault(); void run(async () => { const data = await post<{ preset: ImagePreset }>('/api/presets/import', { url }); select(data.preset); await load(); showToast('Image added to the gallery. Missing model files are queued automatically.', 'success'); }); }}>
+        <form className="preset-import" onSubmit={(event) => { event.preventDefault(); void run(importingImage); }}>
           <label htmlFor="civitai-image-link">Image Link</label>
-          <div className="preset-input-row"><input id="civitai-image-link" type="url" placeholder="https://civitai.com/images/…" value={url} onChange={(event) => setUrl(event.target.value)} required autoComplete="off" /><button className="btn is-primary" disabled={busy}><Link size={15} />{busy ? 'Reading…' : 'Import'}</button></div>
+          <div className="preset-input-row"><input id="civitai-image-link" type="url" placeholder="https://civitai.red/images/…" value={url} onChange={(event) => setUrl(event.target.value)} required autoComplete="off" /><button className="btn is-primary" disabled={busy}><Link size={15} />{importing ? 'Importing…' : 'Import'}</button></div>
           <p>The image and its settings are added to your gallery. Missing model and LoRA files download automatically.</p>
         </form>
         <h3>Images</h3>
@@ -114,8 +132,9 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         </button>)}</div> : <div className="preset-empty"><Library size={28} /><strong>Your Starting Points, In One Place</strong><p>Paste an image link to download it into your gallery with its settings and model associations.</p></div>}
       </> : <>
         <div className="preset-review-head"><button className="btn" onClick={() => { setSelected(null); setError(''); }}><ArrowLeft size={15} />Library</button><a className="btn" href={selected.sourceUrl} target="_blank" rel="noreferrer">View On Civitai<ExternalLink size={14} /></a></div>
+        <div className="preset-message" role="status"><strong>{selected.galleryItemId ? 'Image Saved' : 'Image Not Yet Saved'} · {selected.resources.some((resource) => activeFor(resource.versionId)) ? 'Downloading Models' : fit?.blockers.length ? 'Needs Review' : 'Ready To Use'}</strong><p>{selected.resources.filter((resource) => resource.status === 'installed').length} of {selected.resources.length} model files installed. Source settings are shown below; custom workflows and additional processing may need manual setup.</p></div>
         <div className="preset-review">
-          <div className="preset-preview">{selected.thumbnailUrl ? <img src={selected.thumbnailUrl} alt="Source image" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} /> : <Image size={40} />}</div>
+          <div className="preset-preview">{selected.type === 'video' && selected.galleryItemId ? <video src={`/api/presets/${selected.id}/media`} controls autoPlay muted playsInline loop /> : selected.thumbnailUrl ? <img src={selected.thumbnailUrl} alt="Source image" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} /> : <Image size={40} />}</div>
           <div className="preset-recipe"><h3>{selected.name}</h3>
             <p className="preset-byline">{[selected.baseModel, selected.creator && `by ${selected.creator}`].filter(Boolean).join(' · ')}</p>
             <div className="preset-prompt"><strong>Prompt</strong><p>{selected.prompt || 'No prompt was included.'}</p></div>
@@ -126,7 +145,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         <div className="preset-section-head"><h3>Models & LoRAs</h3><button className="btn" disabled={busy} onClick={() => void run(async () => { await refreshModels(false); await resolve(selected.id); })}><RefreshCw size={14} />Check Again</button></div>
         {selected.resources.length ? <div className="preset-resources">{selected.resources.map((resource) => <div className="preset-resource" key={resource.versionId}>
           <div><strong>{resource.name}</strong><small>{[resource.type, resource.version, resource.weight !== null && resource.folder === 'loras' ? `Weight ${resource.weight}` : '', size(resource.bytes)].filter(Boolean).join(' · ')}</small>{resource.note ? <small>{resource.note}</small> : null}</div>
-          <span className={`preset-resource-status is-${resource.status}`}>{resource.status === 'installed' ? <><Check size={14} />Installed</> : activeFor(resource.versionId) ? 'Downloading…' : resource.status === 'conflict' ? 'Filename Conflict' : resource.status === 'unsupported' ? 'Needs Review' : 'Missing'}</span>
+          <span className={`preset-resource-status is-${resource.status}`}>{resource.status === 'installed' ? <Check size={14} /> : null}{resourceStatus(resource)}</span>
         </div>)}</div> : <p>No model versions were included with this image.</p>}
         {access ? <p className="preset-note">{access.note}</p> : null}
         {selected.downloadWarnings?.length ? <ul className="preset-message is-error">{selected.downloadWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}

@@ -406,7 +406,7 @@ export function galleryDelta({ since = 0, type = "", includeFailed = true, filte
 /** Imported image paths are derived from the provider ID, never supplied paths. */
 export function importedImageFile(item) {
   const id = /^civitai:([1-9]\d*)$/.exec(String(item?.id || ''))?.[1];
-  return id && item.url === `/api/presets/${id}/media` ? path.join(dataDir, 'imported-images', `${id}.png`) : '';
+  return id && item.url === `/api/presets/${id}/media` ? path.join(dataDir, 'imported-images', `${id}.${item.type === 'video' ? 'mp4' : 'png'}`) : '';
 }
 
 export function outputFileCandidates(item, baseDir = comfyOutputDir) {

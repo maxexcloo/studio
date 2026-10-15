@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { modelFolders } from './comfy.js';
-import { civitaiJson } from './civitai-access.js';
+import { civitaiJson, isCivitaiHost } from './civitai-access.js';
 
 const samplers = {
   'DPM++ 2M': 'dpmpp_2m', 'DPM++ 2M SDE': 'dpmpp_2m_sde', 'DPM++ 2S a': 'dpmpp_2s_ancestral',
@@ -17,8 +17,8 @@ export function civitaiLink(value, kind = 'images') {
   let url;
   try { url = new URL(String(value || '').trim()); } catch { throw new Error(`Paste a Civitai ${kind === 'images' ? 'image' : 'model'} link.`); }
   const match = url.pathname.match(new RegExp(`^/${kind}/([1-9]\\d*)(?:/[^/]*)?/?$`));
-  if (url.protocol !== 'https:' || url.hostname !== 'civitai.com' || url.username || url.password || url.port || url.hash || !match
-    || [...url.searchParams.keys()].some((key) => key !== 'modelVersionId')) throw new Error(`Use a link from civitai.com/${kind}/… without credentials.`);
+  if (url.protocol !== 'https:' || !isCivitaiHost(url.hostname) || url.username || url.password || url.port || url.hash || !match
+    || [...url.searchParams.keys()].some((key) => key !== 'modelVersionId')) throw new Error(`Use a link from civitai.com/${kind}/… or civitai.red/${kind}/… without credentials.`);
   const id = Number(match[1]);
   const versionId = url.searchParams.has('modelVersionId') ? Number(url.searchParams.get('modelVersionId')) : null;
   if (!Number.isSafeInteger(id) || (versionId !== null && (!Number.isSafeInteger(versionId) || versionId < 1))) throw new Error('The Civitai link has an invalid ID.');
@@ -32,8 +32,9 @@ function number(value, min, max) {
 }
 
 export function imagePreset(image) {
-  if (!image || !Number.isSafeInteger(image.id) || image.id < 1 || (image.type && image.type !== 'image')) throw new Error('Choose a still image on Civitai.');
-  const meta = image.meta && typeof image.meta === 'object' ? image.meta : {};
+  if (!image || !Number.isSafeInteger(image.id) || image.id < 1 || (image.type && !['image', 'video'].includes(image.type))) throw new Error('Choose an image or video on Civitai.');
+  const metadata = image.meta && typeof image.meta === 'object' ? image.meta : {};
+  const meta = Object.hasOwn(metadata, 'meta') ? metadata.meta && typeof metadata.meta === 'object' ? metadata.meta : {} : metadata;
   const warnings = [];
   const settings = {};
   for (const [key, raw, min, max] of [['cfg', meta.cfgScale ?? meta['CFG scale'], 0, 100], ['height', String(meta.Size || '').split('x')[1] ?? image.height, 64, 16384], ['steps', meta.steps ?? meta.Steps, 1, 10000], ['width', String(meta.Size || '').split('x')[0] || image.width, 64, 16384]]) {
@@ -41,6 +42,12 @@ export function imagePreset(image) {
     if (value !== undefined) settings[key] = value;
   }
   const seed = meta.seed ?? meta.Seed;
+  if (image.type === 'video') {
+    for (const [key, raw, min, max] of [['fps', meta.fps ?? meta.frameRate, 1, 240], ['frames', meta.frames ?? meta.frameCount, 1, 100000]]) {
+      const value = number(raw, min, max);
+      if (value !== undefined) settings[key] = value;
+    }
+  }
   if (/^\d{1,20}$/.test(String(seed ?? '')) && (typeof seed !== 'number' || Number.isSafeInteger(seed))) settings.seed = String(seed);
   else if (seed !== undefined) warnings.push('The source seed could not be read exactly; a random seed will be used.');
   const rawSampler = String(meta.sampler || meta.Sampler || '');
@@ -51,7 +58,7 @@ export function imagePreset(image) {
   const scheduler = Object.entries(schedules).find(([name]) => name.toLowerCase() === schedule.toLowerCase())?.[1];
   if (scheduler) settings.scheduler = scheduler;
   else if (schedule) warnings.push(`Schedule “${schedule}” needs a manual choice.`);
-  if (!image.meta) warnings.push('This image has no generation metadata. You can save its source, but its settings cannot be recovered.');
+  if (!Object.keys(meta).length) warnings.push('This image has no generation metadata. You can save its source, but its settings cannot be recovered.');
   const resources = (Array.isArray(meta.civitaiResources) ? meta.civitaiResources : []).filter((item) => Number.isSafeInteger(item?.modelVersionId) && item.modelVersionId > 0).map((item) => ({ versionId: item.modelVersionId, weight: number(item.weight, -10, 10) ?? null }));
   for (const item of Array.isArray(meta.resources) ? meta.resources : []) {
     const versionId = Number(item?.modelVersionId);
@@ -65,17 +72,37 @@ export function imagePreset(image) {
   if (resources.length > 24) throw new Error('This image references too many resources to import.');
   if (!resources.length) warnings.push('No exact model versions were supplied. Choose a model before using this preset.');
   if (meta.clipSkip && Number(meta.clipSkip) !== 1) warnings.push(`CLIP skip ${meta.clipSkip} needs a matching workflow.`);
+  if (!resources.length) {
+    const named = [
+      ...(Array.isArray(meta.models) ? meta.models : meta.Model ? [meta.Model] : []).map((name) => ({ name, type: 'Checkpoint' })),
+      ...(Array.isArray(meta.vaes) ? meta.vaes : []).map((name) => ({ name, type: 'VAE' })),
+      ...(Array.isArray(meta.additionalResources) ? meta.additionalResources : []),
+      ...String(meta.prompt || '').matchAll(/<lora:([^:>]+):([^>]+)>/gi)
+    ];
+    for (const item of named) {
+      const rawName = Array.isArray(item) ? item[1] : item?.name;
+      if (typeof rawName !== 'string' || !rawName.trim()) continue;
+      const file = path.basename(path.win32.basename(rawName.trim()));
+      const rawType = Array.isArray(item) ? 'lora' : String(item.type || '').toLowerCase();
+      const type = ['lora', 'locon'].includes(rawType) ? 'LORA' : rawType === 'vae' ? 'VAE' : rawType === 'checkpoint' || rawType === 'model' ? 'Checkpoint' : 'Unknown';
+      const folder = folders[type] || '';
+      if (!folder || resources.some((resource) => resource.folder === folder && resource.file === file)) continue;
+      resources.push({ versionId: `name:${folder}:${file}`, file, folder, name: file, nameOnly: true, supported: false, type, weight: type === 'LORA' ? number(Array.isArray(item) ? item[2] : item.strength ?? item.weight, -10, 10) ?? null : null, note: 'No exact source version or checksum was supplied. Match a local filename or supply a model link to download it.' });
+    }
+    if (resources.length) warnings.push('Some source files are identified only by name. Filename matches do not verify the exact version.');
+  }
+  if (resources.length > 24) throw new Error('This image references too many resources to import.');
   if (Object.keys(meta).some((key) => /hires|controlnet|adetailer|denois/i.test(key))) warnings.push('Additional processing was recorded. Its workflow is not included in this preset.');
   const originalPrompt = String(meta.prompt || '').slice(0, 50000);
   if (/<lora:/i.test(originalPrompt) && !resources.length) warnings.push('LoRA tags were found without exact resource versions; resolve them manually.');
   let previewUrl = '';
-  try { const url = new URL(image.url); if (url.protocol === 'https:' && url.hostname === 'image.civitai.com' && !url.username && !url.password) previewUrl = url.href; } catch { /* No preview is still an importable preset. */ }
+  try { const url = new URL(image.url); if (url.protocol === 'https:' && !url.username && !url.password) previewUrl = url.href; } catch { /* No preview is still an importable preset. */ }
   if (meta.sampler && !settings.scheduler && !schedule) warnings.push('No sampling schedule was recorded; the selected workflow’s default will be used.');
   return {
-    id: String(image.id), name: `Civitai ${image.id}`, sourceUrl: `https://civitai.com/images/${image.id}`,
+    id: String(image.id), name: `Civitai ${image.id}`, sourceUrl: `https://civitai.com/images/${image.id}`, type: image.type || 'image',
     previewUrl, creator: String(image.username || '').slice(0, 100), baseModel: String(image.baseModel || '').slice(0, 100),
     prompt: originalPrompt.replace(/<lora:[^>]+>/gi, '').trim(), negative: String(meta.negativePrompt || '').slice(0, 50000),
-    resources, settings, warnings
+    resources, settings, sourceMetadata: meta, warnings
   };
 }
 
@@ -103,13 +130,14 @@ export function versionResource(version, weight = 1) {
 
 export async function importCivitaiImage(value, { json = civitaiJson } = {}) {
   const { id } = civitaiLink(value);
-  const response = await json(`images?imageId=${id}&withMeta=true`);
+  const response = await json(`images?imageId=${id}&withMeta=true&nsfw=true`);
   const image = response.items?.find((item) => item.id === id);
   if (!image) throw new Error('That image is unavailable. Check its link and your Civitai token.');
   const preset = imagePreset(image);
   const resources = [];
   // Keep provider requests bounded and avoid bursting a large LoRA stack.
   for (const item of preset.resources) {
+    if (item.nameOnly) { resources.push(item); continue; }
     try {
       const resource = versionResource(await json(item.hash ? `model-versions/by-hash/${item.hash}` : `model-versions/${item.versionId}`), item.weight);
       if (!resources.some((entry) => entry.versionId === resource.versionId)) resources.push(resource);
@@ -143,7 +171,7 @@ export async function matchResources(preset, { profiles = [], loras = [], vaes =
     let profileId = '';
     let conflict = false;
     const candidates = resource.folder === 'loras' ? loras : resource.folder === 'vae' ? vaes
-      : profiles.filter((item) => item.kind === 'image').flatMap((item) => [item.defaults?.model, item.model, item.baseModel]).filter(Boolean);
+      : profiles.filter((item) => item.kind === (preset.type || 'image')).flatMap((item) => [item.defaults?.model, item.model, item.baseModel]).filter(Boolean);
     for (const name of [...new Set(candidates)]) {
       if (typeof name !== 'string' || path.isAbsolute(name) || name.split(/[\\/]/).includes('..')) continue;
       const modelDirs = resource.folder === 'checkpoints'
@@ -156,15 +184,16 @@ export async function matchResources(preset, { profiles = [], loras = [], vaes =
           const sameName = path.basename(name) === resource.file;
           // Civitai rounds sizeKB; use a small tolerance to find renamed files.
           if (!stat.isFile() || (!sameName && (!resource.bytes || Math.abs(stat.size - resource.bytes) > 2048))) continue;
+          if (resource.nameOnly && sameName) { localName = name; break; }
           if (resource.sha256 && await hashFile(file) === resource.sha256) { localName = name; break; }
           if (sameName) conflict = true;
         } catch { /* Try another configured model folder. */ }
       }
       if (localName) break;
     }
-    if (localName && resource.folder === 'checkpoints') profileId = profiles.find((item) => item.kind === 'image' && [item.defaults?.model, item.model, item.baseModel].includes(localName))?.id || '';
+    if (localName && resource.folder === 'checkpoints') profileId = profiles.find((item) => item.kind === (preset.type || 'image') && [item.defaults?.model, item.model, item.baseModel].includes(localName))?.id || '';
     const { spec, ...publicResource } = resource;
-    resources.push({ ...publicResource, conflict, localName, profileId, status: localName ? 'installed' : conflict ? 'conflict' : resource.supported ? 'missing' : 'unsupported' });
+    resources.push({ ...publicResource, conflict, localName, profileId, ...(resource.nameOnly && localName ? { note: 'Matched by filename only; the exact version is unverified.' } : {}), status: localName ? 'installed' : conflict ? 'conflict' : resource.supported ? 'missing' : 'unsupported' });
   }
   return { ...preset, resources };
 }

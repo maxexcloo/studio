@@ -14,7 +14,7 @@ import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeRefer
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
-import { normalizeLoras, sameBaseModel } from './app/loras';
+import { normalizeLoras } from './app/loras';
 import { arrangeReferences, withReference, withoutReferences } from './app/referenceSlots';
 import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
@@ -299,8 +299,8 @@ function App() {
     return () => { stop(); offLibrary(); offSync(); };
   }, []);
 
-  // Switching workflow on the same weights keeps the stack. A different base
-  // model starts from its own last stack, or none: LoRAs don't carry across models.
+  // Keep the selected stack across model changes. Compatibility warnings stay
+  // visible, and switching image/video modes restores that mode's own stack.
   const lorasModelRef = useRef("");
   useEffect(() => {
     const previous = lorasModelRef.current;
@@ -310,12 +310,10 @@ function App() {
       explicitLorasFor.current = "";
       return;
     }
-    const profileFor = (id: string) => models?.profiles.find((profile) => profile.id === id);
-    if (previous && sameBaseModel(profileFor(previous), profileFor(model))) {
+    if (previous) {
       setLorasWithMemory((current) => current);
       return;
     }
-    if (previous) setLoras([]);
     let current = true;
     const revision = loraEditRevision.current;
     apiJson<{ found: boolean; loras: LoraSelection[] }>(`/api/loras/${encodeURIComponent(model)}`)
@@ -1282,8 +1280,9 @@ function App() {
   }
 
   function applyPresetPrompt(preset: ImagePreset) {
-    const target = mode === 'image' ? currentProfile : models?.profiles.find((item) => item.id === (composerByMode.current.image?.model || models.defaults.imageModel));
-    changeMode('image');
+    const kind = preset.type || 'image';
+    const target = mode === kind ? currentProfile : models?.profiles.find((item) => item.id === (composerByMode.current[kind]?.model || (kind === 'video' ? models.defaults.videoModel : models.defaults.imageModel)));
+    changeMode(kind);
     setPrompt(clampText(preset.prompt, settingMax(target?.constraints?.prompt)));
     setNegative(clampText(preset.negative, settingMax(target?.constraints?.negative)));
     setShowNegativePrompt(Boolean(preset.negative));
@@ -1293,7 +1292,7 @@ function App() {
   function applyImagePreset(preset: ImagePreset, profile: Profile) {
     const fit = presetFit(preset, profile);
     if (fit.blockers.length) { showToast(fit.blockers[0], 'error'); return; }
-    changeMode('image');
+    changeMode(preset.type || 'image');
     applyProfile(profile);
     reusedImages.current[hidden.space] = preset.galleryItemId ? { id: preset.galleryItemId } : null;
     setPrompt(clampText(preset.prompt, settingMax(profile.constraints?.prompt)));
@@ -1307,6 +1306,8 @@ function App() {
     if (fit.settings.cfg !== undefined) setCfg(fit.settings.cfg);
     if (fit.settings.sampler) setSampler(fit.settings.sampler);
     if (fit.settings.scheduler) setScheduler(fit.settings.scheduler);
+    if (fit.settings.fps !== undefined) setFps(fit.settings.fps);
+    if (fit.settings.frames !== undefined) setFrames(fit.settings.frames);
     const vae = preset.resources.find((item) => item.folder === 'vae' && item.localName);
     if (vae?.localName) setVae(vae.localName);
     setLorasWithMemory(fit.loras.map((item) => ({ name: item.localName!, strength: item.weight!, enabled: true })), profile.id);

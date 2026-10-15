@@ -15,6 +15,14 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const item = (id, createdAt, extra = {}) => ({ id, createdAt, prompt: "a lantern", status: "done", type: "image", ...extra });
 const ids = (items) => items.map((item) => item.id);
 
+test("explicit Civitai imports stay newest first even without source prompts", () => {
+  const imported = item("civitai:42", "2026-01-03", { prompt: "", civitai: { imageId: "42" } });
+  const items = [item("generation", "2026-01-02"), imported, item("scan", "2026-01-04", { prompt: "" })];
+  assert.deepEqual(ids(sortGalleryItems(items)), ["civitai:42", "generation", "scan"]);
+  setGallery(items);
+  assert.equal(pageGallery({ limit: 1 }).items[0].id, "civitai:42");
+});
+
 test("server pages and client merges put blank imports last, newest first within both buckets", () => {
   const items = [
     item("import-old", "2026-01-01", { prompt: "", library: { folder: "photos", path: "old.png" } }),

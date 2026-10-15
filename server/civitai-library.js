@@ -7,6 +7,7 @@ import { matchResources } from './civitai-import.js';
 import { addGalleryItems, gallery, importedImageFile } from './gallery-store.js';
 import { startLibraryDownload } from './library-downloads.js';
 import { withPngText } from './png-text.js';
+import { probeVideo } from './video-previews.js';
 
 export function importedGalleryItem(preset, previous = {}) {
   const checkpoint = preset.resources.find((item) => item.folder === 'checkpoints');
@@ -14,8 +15,8 @@ export function importedGalleryItem(preset, previous = {}) {
   return {
     ...previous,
     id: `civitai:${preset.id}`, url: `/api/presets/${preset.id}/media`, thumbnailUrl: `/api/presets/${preset.id}/thumbnail`,
-    type: 'image', status: 'done', filename: preset.name, outputName: `civitai-${preset.id}.png`,
-    createdAt: previous.createdAt || preset.savedAt || new Date().toISOString(),
+    type: preset.type || 'image', status: 'done', filename: preset.name, outputName: `civitai-${preset.id}.${preset.type === 'video' ? 'mp4' : 'png'}`,
+    createdAt: preset.savedAt || previous.createdAt || new Date().toISOString(),
     prompt: preset.prompt, negative: preset.negative, width: preset.imageWidth || preset.settings.width, height: preset.imageHeight || preset.settings.height,
     model: checkpoint?.localName || checkpoint?.file || preset.baseModel,
     settings: {
@@ -23,7 +24,7 @@ export function importedGalleryItem(preset, previous = {}) {
       ...(vae ? { vae: vae.localName || vae.file } : {}),
       loras: preset.resources.filter((item) => item.folder === 'loras' && item.weight !== null && (item.localName || item.file)).map((item) => ({ name: item.localName || item.file, strength: item.weight, enabled: true }))
     },
-    civitai: { imageId: preset.id, sourceUrl: preset.sourceUrl, creator: preset.creator, baseModel: preset.baseModel, resources: preset.resources, settings: preset.settings, warnings: preset.warnings, previewUrl: preset.previewUrl, downloadWarnings: preset.downloadWarnings || [] }
+    civitai: { imageId: preset.id, sourceUrl: preset.sourceUrl, creator: preset.creator, baseModel: preset.baseModel, resources: preset.resources, settings: preset.settings, sourceMetadata: preset.sourceMetadata, type: preset.type || 'image', warnings: preset.warnings, previewUrl: preset.previewUrl, downloadWarnings: preset.downloadWarnings || [] }
   };
 }
 
@@ -48,12 +49,37 @@ export async function downloadPresetImage(preset, { models, imageRequest = civit
   let matched = await matchResources(preset, await models());
   const item = importedGalleryItem(matched, gallery.find((item) => item.id === `civitai:${preset.id}`));
   const file = importedImageFile(item);
-  if (!fs.existsSync(file)) {
-    if (!preset.previewUrl) throw new Error('This image has no downloadable image link.');
-    const response = await imageRequest(preset.previewUrl, { signal: AbortSignal.timeout(60000) }, { media: true });
-    if (!response.ok) { await response.body?.cancel(); throw new Error('The source image could not be downloaded. Try again.'); }
-    const { data, info } = await sharp(await limitedBody(response, 50 * 1024 * 1024), { limitInputPixels: 80000000 }).rotate().png().toBuffer({ resolveWithObject: true });
-    item.width = info.width; item.height = info.height;
+  if (item.type === 'video') {
+    if (!fs.existsSync(file)) {
+      if (!preset.previewUrl) throw new Error('This video has no downloadable link.');
+      const response = await imageRequest(preset.previewUrl, { signal: AbortSignal.timeout(120000) }, { media: true });
+      if (!response.ok) { await response.body?.cancel(); throw new Error('The source video could not be downloaded. Try again.'); }
+      const data = await limitedBody(response, 512 * 1024 * 1024);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const temporary = `${file}.tmp`;
+      try {
+        fs.writeFileSync(temporary, data, { mode: 0o600 });
+        const info = await probeVideo(temporary);
+        if (!info) throw new Error('The source video could not be read.');
+        item.width = info.width; item.height = info.height;
+        fs.renameSync(temporary, file);
+      } finally { fs.rmSync(temporary, { force: true }); }
+    }
+  } else {
+    let data;
+    if (!fs.existsSync(file)) {
+      if (!preset.previewUrl) throw new Error('This image has no downloadable image link.');
+      const response = await imageRequest(preset.previewUrl, { signal: AbortSignal.timeout(60000) }, { media: true });
+      if (!response.ok) { await response.body?.cancel(); throw new Error('The source image could not be downloaded. Try again.'); }
+      const decoded = await sharp(await limitedBody(response, 50 * 1024 * 1024), { limitInputPixels: 80000000 }).rotate().png().toBuffer({ resolveWithObject: true });
+      data = decoded.data;
+      const { info } = decoded;
+      item.width = info.width; item.height = info.height;
+    } else {
+      data = fs.readFileSync(file);
+      const info = await sharp(data).metadata();
+      item.width = info.width; item.height = info.height;
+    }
     const metadata = { prompt: item.prompt, negative: item.negative, width: item.width, height: item.height, model: item.model, settings: item.settings, civitai: item.civitai };
     const hashes = Object.fromEntries(matched.resources.filter((resource) => resource.file && resource.sha256).map((resource) => [resource.localName || resource.file, resource.sha256.slice(0, 10)]));
     const parameters = parametersText({ ...item.settings, prompt: item.prompt, negative: item.negative, model: item.model }, { width: item.width, height: item.height, hashes });
@@ -63,9 +89,6 @@ export async function downloadPresetImage(preset, { models, imageRequest = civit
     const temporary = `${file}.tmp`;
     fs.writeFileSync(temporary, buffer, { mode: 0o600 });
     fs.renameSync(temporary, file);
-  } else {
-    const info = await sharp(file).metadata();
-    item.width = info.width; item.height = info.height;
   }
   addGalleryItems([item]);
   const downloadWarnings = [];

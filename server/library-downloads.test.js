@@ -22,8 +22,8 @@ test('Hugging Face preview pins a revision and requires the published checksum',
   for (const url of ['https://huggingface.co/a/b/blob/main/file.safetensors?token=private', 'http://huggingface.co/a/b/blob/main/file.safetensors', 'https://other.example/model.safetensors']) await assert.rejects(resolveModelLink(url), /without credentials/);
 });
 
-test('Civitai model pages resolve their latest version with model type intact', async () => {
-  const result = await resolveModelLink('https://civitai.com/models/9', 'vae', { json: async () => ({ id: 9, name: 'Style', type: 'LORA', modelVersions: [{ id: 17, files: [{ id: 3, type: 'Model', name: 'style.safetensors', hashes: { SHA256: 'c'.repeat(64) } }] }] }) });
+test('Civitai alternate-domain model pages resolve their latest version with model type intact', async () => {
+  const result = await resolveModelLink('https://civitai.red/models/9', 'vae', { json: async () => ({ id: 9, name: 'Style', type: 'LORA', modelVersions: [{ id: 17, files: [{ id: 3, type: 'Model', name: 'style.safetensors', hashes: { SHA256: 'c'.repeat(64) } }] }] }) });
   assert.equal(result.folder, 'loras');
   assert.match(result.url, /models\/17\?/);
   await assert.rejects(resolveModelLink('https://civitai.com/models/9?modelVersionId=18', 'loras', { json: async () => ({ id: 18, modelId: 10 }) }), /another model/);
