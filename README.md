@@ -114,7 +114,7 @@ Set `COMFY_VIDEO_URL` to a separate ComfyUI HTTP(S) endpoint to route local vide
 
 Open `http://localhost:8787`. `/data` retains settings, galleries, histories and imported workflows. Mount ComfyUI inputs, outputs and model directories separately when a feature needs local file access. The image defaults to UID 1000, exposes port 8787 and includes a health check. It starts the server directly; update the container image to update the application.
 
-The Container workflow runs checks, builds the image, tests the runtime and scans for fixable high or critical vulnerabilities on every PR. Successful builds on `main` and `v*` tags publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
+The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities on `main` and `v*` tags. Browser and packaged launcher checks remain in CI. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
 
 For local verification, run `mise run setup`, then `mise run check`. Updatecli previews local tool, action, base image and npm dependency updates.
 
