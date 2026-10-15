@@ -9,10 +9,7 @@ _.path = ["node_modules/.bin"]
 
 # Development
 [tasks.build]
-run = """
-tsc -b
-vite build
-"""
+run = "npm run build"
 
 [tasks.check]
 run = """
@@ -20,17 +17,14 @@ updatecli manifest validate --config .updatecli.d --disable-templating --strict
 mise fmt --check
 actionlint -shellcheck=""
 tsc --noEmit
-node --test server/*.test.js scripts/*.test.js
+npm test
 """
 
 [tasks.dev]
-run = """
-node scripts/ensure-runtime-dependencies.mjs --dev
-node scripts/dev.mjs
-"""
+run = "npm run dev"
 
 [tasks.test]
-run = "node --test server/*.test.js scripts/*.test.js"
+run = "npm test"
 
 # Setup
 [tasks.setup]
