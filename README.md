@@ -155,7 +155,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 
 - **Slots as you need them.** The composer opens a new reference slot each time you fill one. Several references stack into one chip that fans out on hover.
 - **Edit or Reference.** On Flux.2 and Qwen-Image 2.1 the first reference is **Edit** (the result keeps its size and changes that picture) or **Reference** (it only guides, and the size and shape stay yours, 2K included).
-- **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; an existing video reference stays in place. An upscaled image is used upscaled.
+- **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; it replaces the primary video reference and preserves a separate end frame. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
 
 </details>

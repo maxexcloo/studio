@@ -534,7 +534,9 @@ function App() {
     spacePrompts.current.hidden = modePrompts();
     if (hiddenSpace) { setPrompt(""); setNegative(""); }
   }, [hidden.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
-  const reusedImages = useRef<Record<"gallery" | "hidden", GalleryItem | null>>({ gallery: null, hidden: null });
+  const reusedImages = useRef<Record<"gallery" | "hidden", Pick<GalleryItem, "id"> | null>>({ gallery: null, hidden: null });
+  const referenceEditRevision = useRef(0);
+  const [reuseReferencePending, setReuseReferencePending] = useState(false);
   const emptyReferences = () => ({ assets: [] as SelectedReferenceAsset[], image: "", id: "", name: "" });
   type ModeReference = { assets: SelectedReferenceAsset[]; image: string; id: string; name: string };
   const spaceReferences = useRef<Record<"gallery" | "hidden", Record<Mode, ModeReference>>>({
@@ -1053,7 +1055,7 @@ function App() {
     setMode(next);
     const saved = composerByMode.current[next];
     const savedProfile = models?.profiles.find((profile) => profile.id === (saved?.model || models.defaults[next === 'video' ? 'videoModel' : 'imageModel']) && profile.kind === next);
-    if (next === 'video' && reusedImages.current[hidden.space] && !nextReferences.assets.length && !nextReferences.image && !nextReferences.id && !imageInputsForProfile(savedProfile).length) {
+    if (next === 'video' && reusedImages.current[hidden.space] && !imageInputsForProfile(savedProfile).length) {
       const candidates = models?.profiles.filter((profile) => profile.kind === 'video' && profile.ready !== false && imageInputsForProfile(profile).length) || [];
       const compatible = candidates.find((profile) => profile.family === savedProfile?.family) || candidates[0];
       if (compatible) { applyProfile(compatible); return; }
@@ -1286,27 +1288,26 @@ function App() {
     const space = hidden.space;
     const item = reusedImages.current[space];
     if (mode !== 'video' || !item || !referenceInput) return;
-    const existing = spaceReferences.current[space].video;
-    if (existing.assets.length || existing.image || existing.id) {
-      reusedImages.current[space] = null;
-      return;
-    }
+    const revision = referenceEditRevision.current;
     let live = true;
+    setReuseReferencePending(true);
     referenceAssetFromGallery(item.id).then((asset) => {
       if (!live || reusedImages.current[space] !== item) return;
       reusedImages.current[space] = null;
-      const current = spaceReferences.current[space].video;
-      if (current.assets.length || current.image || current.id) return;
-      setReferenceAssets([{ slot: referenceInput.id, asset }]);
-      setStartImage('');
-      setStartImageId(asset.id);
-      setStartImageName(asset.name);
+      if (referenceEditRevision.current === revision) {
+        setReferenceAssets((current) => withReference(current, referenceInputs, referenceInput.id, asset));
+        setStartImage('');
+        setStartImageId(asset.id);
+        setStartImageName(asset.name);
+      }
+      setReuseReferencePending(false);
     }).catch((error) => {
       if (!live) return;
       reusedImages.current[space] = null;
+      setReuseReferencePending(false);
       showToast(error instanceof Error ? error.message : 'Couldn’t use the reused image as a video reference', 'error');
     });
-    return () => { live = false; };
+    return () => { live = false; setReuseReferencePending(false); };
   }, [mode, model, hidden.space, referenceInput?.id]);
   const canUseStartImage = Boolean(referenceInput);
   // A mask belongs to the image it was painted on, for a model that can inpaint.
@@ -1458,8 +1459,8 @@ function App() {
   const modelMissingParts = currentProfile?.missing || [];
   const modelSetupMissing = Boolean(currentProfile && (currentProfile.ready === false
     || (!currentProfile.encoderSlots && ((currentProfile.capabilities.textEncoder && !textEncoder) || (currentProfile.capabilities.vae && !vae)))));
-  const generateDisabled = !currentProfile || modelSetupMissing || missingRequiredReference;
-  const generateDisabledReason = missingRequiredReference ? `${missingReferenceInput?.label || "Reference image"} is required`
+  const generateDisabled = reuseReferencePending || !currentProfile || modelSetupMissing || missingRequiredReference;
+  const generateDisabledReason = reuseReferencePending ? 'Loading the reused image' : missingRequiredReference ? `${missingReferenceInput?.label || "Reference image"} is required`
     : modelMissingParts.length ? `Needs ${modelMissingParts.map((item) => item.label).join(", ")}`
     : modelSetupMissing ? "This model needs files first"
     : !currentProfile ? (models ? "Choose a model" : "Loading models…") : undefined;
@@ -1509,6 +1510,7 @@ function App() {
     if (fit.blockers.length) { showToast(fit.blockers[0], 'error'); return; }
     changeMode('image');
     applyProfile(profile);
+    reusedImages.current[hidden.space] = preset.galleryItemId ? { id: preset.galleryItemId } : null;
     setPrompt(clampText(preset.prompt, settingMax(profile.constraints?.prompt)));
     setNegative(clampText(preset.negative, settingMax(profile.constraints?.negative)));
     setShowNegativePrompt(Boolean(preset.negative));
@@ -1595,6 +1597,7 @@ function App() {
   }
 
   function selectReferenceAsset(slot: string, asset: ReferenceAsset) {
+    referenceEditRevision.current += 1;
     if (!referenceInputs.some((input) => input.id === slot)) return;
     setReferenceAssets((current) => withReference(current, referenceInputs, slot, asset));
     setStartImage("");
@@ -1606,6 +1609,7 @@ function App() {
 
   /** Takes the pictures in `slots` off, from what the composer shows, and closes up the rest. */
   function removeReferenceAsset(slots: string | string[]) {
+    referenceEditRevision.current += 1;
     const next = withoutReferences(composerReferenceAssets, referenceInputs, Array.isArray(slots) ? slots : [slots]);
     const first = next.find((item) => item.slot === referenceInput?.id)?.asset;
     setReferenceAssets(next);
