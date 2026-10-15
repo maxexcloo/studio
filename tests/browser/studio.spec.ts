@@ -142,30 +142,37 @@ for (const kind of ['image', 'video']) {
   });
 }
 
-for (const existingReference of [false, true]) {
-  test(`reusing an image then switching to video ${existingReference ? 'preserves the chosen reference' : 'uses the output and its proportions'}`, async ({ page, isMobile }) => {
+for (const selection of ['empty', 'previous', 'manual']) {
+  const existingReference = selection !== 'empty';
+  test(`reusing an image then switching to video ${selection === 'manual' ? 'respects a new manual selection during loading' : existingReference ? 'replaces an old primary reference' : 'uses the output and its proportions'}`, async ({ page, isMobile }) => {
     const models = await (await page.request.get('/api/models')).json();
     const video = models.profiles.find((profile: any) => profile.kind === 'video');
-    const referenceVideo = { ...video, id: 'reference-video', mediaInputs: [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', min: 1, max: 1, required: true }] };
+    const referenceVideo = { ...video, id: 'reference-video', mediaInputs: [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', min: 0, max: 1, required: false }, { id: 'end', kind: 'image', role: 'end', label: 'End Image', follows: 'start', min: 0, max: 1, required: false }] };
     models.profiles.push(referenceVideo);
     if (existingReference) models.defaults.videoModel = referenceVideo.id;
     await page.route('**/api/models', (route) => route.fulfill({ json: models }));
     const reference = { id: 'reused-output', source: 'gallery', galleryItemId: images[0].id, name: 'Reused Output', url: picture, thumbnailUrl: picture, mime: 'image/png', width: 900, height: 1600, size: 1, createdAt: '', privacyDomain: 'gallery' };
     const previous = { ...reference, id: 'previous-reference', name: 'Previous Reference', width: 1600, height: 900 };
+    const manual = { ...previous, id: 'manual-reference', name: 'Manual Replacement' };
     let resolves = 0;
+    let releaseReference!: () => void;
+    const referenceReady = new Promise<void>((resolve) => { releaseReference = resolve; });
     await page.route('**/api/reference-assets/from-gallery', async (route) => {
       expect(route.request().postDataJSON()).toEqual({ galleryItemId: images[0].id });
       resolves++;
+      await referenceReady;
       await route.fulfill({ json: { asset: reference } });
     });
-    await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [previous], hasMore: false, nextCursor: '' } }));
+    await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [previous, manual], hasMore: false, nextCursor: '' } }));
     let body: Record<string, any> | null = null;
     await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
     await page.goto('/');
     if (existingReference) {
       await controls(page, isMobile).switchMode('video');
       await openComposer(page, isMobile);
-      await page.getByRole('button', { name: 'Add Start Image, required', exact: true }).click();
+      await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+      await page.getByRole('button', { name: previous.name, exact: true }).click();
+      await page.getByRole('button', { name: 'Add End Image', exact: true }).click();
       await page.getByRole('button', { name: previous.name, exact: true }).click();
       if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
       await controls(page, isMobile).switchMode('image');
@@ -177,8 +184,20 @@ for (const existingReference of [false, true]) {
       await page.keyboard.press('Escape');
       await expect(page.locator('.viewer-stage')).toHaveCount(0);
     }
-    await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
-    const expected = existingReference ? previous : reference;
+    if (existingReference) {
+      if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+      await controls(page, isMobile).switchMode('video');
+      await openComposer(page, isMobile);
+    } else await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    await expect.poll(() => resolves).toBe(1);
+    const pendingGenerate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }) : page.getByRole('button', { name: 'Loading the reused image', exact: true });
+    await expect(pendingGenerate).toBeDisabled();
+    if (selection === 'manual') {
+      await page.getByRole('button', { name: `Change start image, currently ${previous.name}`, exact: true }).click();
+      await page.getByRole('button', { name: manual.name, exact: true }).click();
+    }
+    releaseReference();
+    const expected = selection === 'manual' ? manual : reference;
     await expect(page.getByRole('button', { name: `Change start image, currently ${expected.name}`, exact: true })).toBeVisible();
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the image');
     const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
@@ -186,9 +205,9 @@ for (const existingReference of [false, true]) {
     await expect.poll(() => body).not.toBeNull();
     expect(body!.kind).toBe('video');
     expect(body!.profileId).toBe(referenceVideo.id);
-    expect(body!.referenceAssets).toEqual([{ slot: 'start', assetId: expected.id }]);
+    expect(body!.referenceAssets).toEqual([{ slot: 'start', assetId: expected.id }, ...(existingReference ? [{ slot: 'end', assetId: previous.id }] : [])]);
     expect(body!.width / body!.height).toBeCloseTo(expected.width / expected.height, 1);
-    expect(resolves).toBe(existingReference ? 0 : 1);
+    expect(resolves).toBe(1);
   });
 }
 

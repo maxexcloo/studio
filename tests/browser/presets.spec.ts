@@ -19,6 +19,13 @@ const preset = {
 };
 
 test('import, reopen and apply image settings on desktop and phone', async ({ page, isMobile }, testInfo) => {
+  const models = await (await page.request.get('/api/models')).json();
+  for (const profile of models.profiles) if (profile.kind === 'video') profile.mediaInputs = [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', required: false, min: 0, max: 1 }];
+  await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  await page.route('**/api/reference-assets/from-gallery', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ galleryItemId: preset.galleryItemId });
+    await route.fulfill({ json: { asset: { id: 'imported-reference', source: 'generation', name: preset.name, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 768, height: 1024, size: 1, createdAt: '', privacyDomain: 'gallery' } } });
+  });
   let saved: typeof preset[] = [];
   await page.route('**/api/presets', (route) => route.fulfill({ json: { ok: true, presets: saved, downloads: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } }));
   await page.route('**/api/presets/import', async (route) => { saved = [preset]; await route.fulfill({ json: { ok: true, preset } }); });
@@ -56,6 +63,20 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   expect(generated!.width).toBe(768);
   expect(generated!.height).toBe(1024);
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
+  if (isMobile) {
+    await expect(page.locator('.phone-create')).toHaveCount(0);
+    await page.locator('.phone-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    await page.locator('.phone-create-open').click();
+  } else await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+  await expect(page.getByRole('button', { name: `Change start image, currently ${preset.name}`, exact: true })).toBeVisible();
+  generated = null;
+  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the imported image');
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }).click();
+  else await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect.poll(() => generated).not.toBeNull();
+  expect(generated!.kind).toBe('video');
+  expect(generated!.referenceAssets).toEqual([{ slot: 'start', assetId: 'imported-reference' }]);
+  expect(Number(generated!.width) / Number(generated!.height)).toBeCloseTo(768 / 1024, 1);
 });
 
 test('missing LoRAs and filename conflicts remain explicit and download errors are recoverable', async ({ page }) => {
