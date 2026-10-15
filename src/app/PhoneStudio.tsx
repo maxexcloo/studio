@@ -733,8 +733,9 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
       <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
+        {profile.id === model ? <Check size={18} className="model-selection-tick" aria-hidden="true" /> : null}
         <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelName(profile).detail, setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
-        {profile.id === model ? <Check size={18} className="phone-row-end" /> : null}
+
       </button>
       {modelMenu ? (
         <button type="button" className={cn('phone-icon', favorites.has(profile.id) && 'is-on')} aria-pressed={favorites.has(profile.id)} aria-label={favorites.has(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => modelMenu.toggleFavorite(profile.id)}>
@@ -752,7 +753,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
             <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
           </label>
         ) : null}
-        {profiles.length ? <CatalogueFilters kind={view.mode} value={filters} onChange={setFilters} /> : null}
+        {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
       </div>
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Add a model to ComfyUI to see it here.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
       {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}

@@ -363,7 +363,7 @@ test('secondary panels load only when opened and connections identify each gener
 
 });
 
-test('model speed and reference filters combine and All clears them', async ({ page, isMobile }) => {
+test('Fast and Quality filters retain all reference variants and All clears them', async ({ page, isMobile }) => {
   await page.route('**/api/models', async (route) => {
     const result = await (await route.fetch()).json();
     const base = result.profiles.find((profile: any) => profile.kind === 'image');
@@ -405,13 +405,12 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await filters.getByRole('button', { name: 'Fast', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(rows).toHaveCount(2);
-  await filters.getByRole('button', { name: 'Edit', exact: true }).click();
-  await expect(rows).toHaveCount(1);
+  await expect(filters.getByRole('group', { name: 'Use', exact: true })).toHaveCount(0);
   await expect(rows.first()).toContainText('Flash Edit');
-  await filters.getByRole('button', { name: 'Standard', exact: true }).click();
+  await filters.getByRole('button', { name: 'Quality', exact: true }).click();
+  await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText('Standard Edit');
-  await filters.getByRole('button', { name: 'Generate', exact: true }).click();
-  await expect(rows.first()).toContainText('Standard Generate');
+  await expect(rows.last()).toContainText('Standard Generate');
   await filters.getByRole('button', { name: 'All', exact: true }).click();
   await expect(rows).toHaveCount(4);
   await filters.getByRole('button', { name: 'Favourites', exact: true }).click();
@@ -430,12 +429,10 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await expect(rows).toHaveCount(2);
   await expect(filters.getByRole('button', { name: 'Generate', exact: true })).toHaveCount(0);
   await expectSingleRow();
-  await filters.getByRole('button', { name: 'Non-Reference', exact: true }).click();
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('Generate');
-  await filters.getByRole('button', { name: 'Reference', exact: true }).click();
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('Animate Image');
+  await expect(filters.getByRole('button', { name: 'Non-Reference', exact: true })).toHaveCount(0);
+  await expect(filters.getByRole('button', { name: 'Reference', exact: true })).toHaveCount(0);
+  await expect(filters.getByRole('button', { name: 'Fast', exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Quality', exact: true })).toBeVisible();
 });
 
 test('model picker keeps shortcuts in the normal list and supports keyboard selection', async ({ page, isMobile }) => {
@@ -457,6 +454,12 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
   const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
   await expect(rows).toHaveCount(28);
+  const selectedRow = rows.filter({ hasText: 'Model 01' }).first();
+  await expect(selectedRow.locator('.model-selection-tick')).toHaveCount(1);
+  expect(await selectedRow.evaluate((row) => row.firstElementChild?.classList.contains('model-selection-tick'))).toBe(true);
+  const tick = await selectedRow.locator('.model-selection-tick').boundingBox();
+  const text = await selectedRow.locator(isMobile ? ':scope > span' : '.model-copy').boundingBox();
+  expect(tick!.x + tick!.width).toBeLessThan(text!.x);
   await rows.filter({ hasText: 'Model 02' }).click();
   await open();
   await expect(rows).toHaveCount(29);
@@ -492,7 +495,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await menu.getByRole('button', { name: 'All', exact: true }).click();
   await expect(rows).toHaveCount(30);
   await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(2);
-  await menu.getByRole('button', { name: 'Standard', exact: true }).click();
+  await menu.getByRole('button', { name: 'Quality', exact: true }).click();
   await expect(rows).toHaveCount(2);
   await expect(menu.getByText('No Models Match These Filters.')).toHaveCount(0);
   if (!isMobile) {
