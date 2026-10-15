@@ -7,7 +7,7 @@ export type PresetResource = {
 };
 export type ImagePreset = {
   id: string; name: string; sourceUrl: string; thumbnailUrl: string; creator: string; baseModel: string;
-  prompt: string; negative: string; resources: PresetResource[]; savedAt?: string;
+  prompt: string; negative: string; resources: PresetResource[]; savedAt?: string; galleryItemId?: string; downloadWarnings?: string[];
   settings: { cfg?: number; height?: number; sampler?: string; scheduler?: string; seed?: string; steps?: number; width?: number };
   warnings: string[];
 };

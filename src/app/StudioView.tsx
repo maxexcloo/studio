@@ -458,7 +458,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           <LockKeyhole size={16} />
         </button>
       </Tip>
-      {models?.features?.presets === true ? <Tip content="Presets & Models"><button className="icon-button" aria-label="Presets & Models" onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
+      {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
       <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onFocus={() => { void loadWorkflows().catch(() => undefined); }} onPointerEnter={() => { void loadWorkflows().catch(() => undefined); }} onPointerDown={() => { void loadWorkflows().catch(() => undefined); }} onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={16} /></button></Tip>
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {prefs.zenMode ? (
@@ -1100,7 +1100,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </div>
         );
       })() : null}
-      {models?.features?.presets === true && view.presetLibraryOpen ? <React.Suspense fallback={<Modal open title="Presets & Models" onOpenChange={() => view.setPresetLibraryOpen(false)}><p role="status">Opening presets…</p></Modal>}><PresetLibrary onClose={() => view.setPresetLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} confirmAction={confirmAction} /></React.Suspense> : null}
+      {models?.features?.presets === true && view.presetLibraryOpen ? <React.Suspense fallback={<Modal open title="Image & Model Library" onOpenChange={() => view.setPresetLibraryOpen(false)}><p role="status">Opening presets…</p></Modal>}><PresetLibrary onClose={() => view.setPresetLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} confirmAction={confirmAction} /></React.Suspense> : null}
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>

@@ -13,6 +13,17 @@ test("settings reuse restores the saved workflow when multiple workflows share a
   assert.equal(outputProfile(profiles, { type: "video", model: "klein.safetensors" }), undefined);
 });
 
+test("Civitai reuse matches the downloaded source model rather than an unrelated default workflow", () => {
+  const profiles = [
+    { id: 'unrelated', kind: 'image', model: 'other.safetensors', defaults: {} },
+    { id: 'source-workflow', kind: 'image', model: 'custom:source', defaults: { model: 'source.safetensors' } }
+  ];
+  const item = { type: 'image', settings: { workflow: '', profileId: '' }, civitai: { resources: [{ folder: 'checkpoints', file: 'source.safetensors', status: 'missing' }] } };
+  assert.equal(outputProfile(profiles, item).id, 'source-workflow');
+  assert.equal(outputProfile(profiles.slice(0, 1), item), undefined);
+  assert.equal(outputProfile(profiles, { ...item, civitai: { resources: [{ ...item.civitai.resources[0], status: 'conflict' }] } }), undefined);
+});
+
 test("custom image count falls back to its declared constraint on older catalogues", () => {
   const profile = { kind: "image", defaults: {}, constraints: { count: { default: 4 } } };
   assert.equal(profileImageCount(profile, 1), 4);

@@ -454,7 +454,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         ) : hidden.unlocked ? (
           <button type="button" className="phone-pill" onClick={() => hidden.lock()}><LockKeyhole size={15} /> Lock</button>
         ) : null}
-        {view.models?.features?.presets === true ? <button type="button" className="phone-icon" aria-label="Presets & Models" onClick={() => view.setPresetLibraryOpen(true)}><Library size={20} /></button> : null}
+        {view.models?.features?.presets === true ? <button type="button" className="phone-icon" aria-label="Image & Model Library" onClick={() => view.setPresetLibraryOpen(true)}><Library size={20} /></button> : null}
         <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
       </header>
       {!hiddenLocked && !selecting ? <PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} /> : null}
