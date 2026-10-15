@@ -5,7 +5,15 @@ const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`,
 const videos = images.map((item, index) => ({ ...item, id: `video-${index}`, type: 'video' }));
 
 function controls(page: Page, phone: boolean) {
-  return { mode: page.locator(phone ? '.phone-generation-mode' : '.gallery-generation-mode'), scroller: page.locator(phone ? '.phone-gallery' : '.stage-gallery') };
+  const mode = phone ? page.getByRole('combobox', { name: 'Generation Mode', exact: true }) : page.locator('.gallery-generation-mode');
+  return {
+    mode,
+    scroller: page.locator(phone ? '.phone-gallery' : '.stage-gallery'),
+    switchMode: async (value: 'image' | 'video') => {
+      if (phone) await mode.selectOption(value);
+      else await mode.getByRole('button', { name: value === 'video' ? 'Video' : 'Image', exact: true }).click();
+    },
+  };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -13,24 +21,42 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
 });
 
-test('image and video keep their own scroll positions through repeated switches', async ({ page, isMobile }) => {
+test('image and video keep their own scroll positions through repeated switches', async ({ page, isMobile }, testInfo) => {
   await page.goto('/');
-  const { mode, scroller } = controls(page, isMobile);
+  const { mode, scroller, switchMode } = controls(page, isMobile);
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
-  expect(await mode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
+  if (isMobile) {
+    await expect(page.locator('.phone-gallery .phone-generation-mode')).toHaveCount(0);
+    for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
+      await page.setViewportSize(viewport);
+      const selector = await mode.boundingBox();
+      const prompt = await page.locator('.phone-create-open').boundingBox();
+      const pill = await page.locator('.phone-create-pill').boundingBox();
+      expect(selector!.height).toBeGreaterThanOrEqual(44);
+      expect(selector!.x + selector!.width).toBeLessThanOrEqual(prompt!.x);
+      expect(selector!.y).toBeCloseTo(prompt!.y, 0);
+      expect(selector!.y).toBeGreaterThan(viewport.height / 2);
+      expect(prompt!.width).toBeGreaterThan(100);
+      expect(pill!.x + pill!.width).toBeLessThanOrEqual(viewport.width);
+      await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mode.focus();
+    await expect(mode).toBeFocused();
+  } else expect(await mode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
   await scroller.evaluate((element) => { element.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1700 })); element.scrollTo({ top: 1700, behavior: 'instant' }); });
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(1600);
   const imageTop = await scroller.evaluate((element) => element.scrollTop);
-  await mode.getByText('Video', { exact: true }).click();
+  await switchMode('video');
   await expect(page.locator('[data-tile-id^="video-"]').first()).toBeVisible();
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
   await scroller.evaluate((element) => { element.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 900 })); element.scrollTo({ top: 900, behavior: 'instant' }); });
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(800);
   const videoTop = await scroller.evaluate((element) => element.scrollTop);
   for (let index = 0; index < 3; index++) {
-    await mode.getByText('Image', { exact: true }).click();
+    await switchMode('image');
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(imageTop, 0);
-    await mode.getByText('Video', { exact: true }).click();
+    await switchMode('video');
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(videoTop, 0);
   }
 });
@@ -95,7 +121,7 @@ for (const kind of ['image', 'video']) {
     let body: Record<string, any> | null = null;
     await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
     await page.goto('/');
-    await controls(page, isMobile).mode.getByText(kind === 'image' ? 'Image' : 'Video', { exact: true }).click();
+    await controls(page, isMobile).switchMode(kind as 'image' | 'video');
     await openComposer(page, isMobile);
     await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
     await page.getByRole('button', { name: 'Aspect Reference', exact: true }).click();
@@ -134,10 +160,10 @@ test('generation completion stays in its mode and unsupported negatives remain s
   });
   await page.route('**/api/jobs/browser-job', (route) => route.fulfill({ json: { status: done ? 'done' : 'running', progress: { value: 1, max: 4 }, outputs: done ? [{ ...images[0], type: body.kind, id: 'completed-browser-job' }] : [] } }));
   await page.goto('/');
-  const { mode, scroller } = controls(page, isMobile);
+  const { scroller, switchMode } = controls(page, isMobile);
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   for (const kind of ['image', 'video']) {
-    await mode.getByText(kind === 'image' ? 'Image' : 'Video', { exact: true }).click();
+    await switchMode(kind as 'image' | 'video');
     await openComposer(page, isMobile);
     await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill(`Saved ${kind} negative`);
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A verification generation');
@@ -149,13 +175,13 @@ test('generation completion stays in its mode and unsupported negatives remain s
     await posted;
     expect(body).not.toHaveProperty('negative');
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
-    await mode.getByText(kind === 'image' ? 'Video' : 'Image', { exact: true }).click();
+    await switchMode(kind === 'image' ? 'video' : 'image');
     const completion = page.waitForResponse('**/api/jobs/browser-job');
     done = true;
     await completion;
     await expect(page.locator('[data-tile-id="completed-browser-job"]')).toHaveCount(0);
   }
-  await mode.getByText('Image', { exact: true }).click();
+  await switchMode('image');
   await openComposer(page, isMobile);
   await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue('Saved image negative');
   expect(effectRequests).toEqual([]);
@@ -237,10 +263,10 @@ test('secondary panels load only when opened and connections identify each gener
   await page.goto('/');
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   expect(loaded.some((url) => /\/(SettingsDialog|WorkflowGallery|InpaintStudio)-/.test(url))).toBe(false);
-  const { mode } = controls(page, isMobile);
-  await mode.getByText('Video', { exact: true }).click();
+  const { switchMode } = controls(page, isMobile);
+  await switchMode('video');
   await expect(page.getByRole('button', { name: /Video (offline|is offline)/ })).toBeVisible();
-  await mode.getByText('Image', { exact: true }).click();
+  await switchMode('image');
   if (isMobile) {
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: /Use the full studio/ }).click();
@@ -280,7 +306,8 @@ test('model speed and reference filters combine and All clears them', async ({ p
   await openComposer(page, isMobile);
   const composerMode = page.locator('.composer-mode-select');
   await composerMode.getByRole('button', { name: 'Video', exact: true }).click();
-  await expect(controls(page, isMobile).mode.getByText('Video', { exact: true })).toHaveAttribute(isMobile ? 'aria-checked' : 'aria-pressed', 'true');
+  if (isMobile) await expect(controls(page, true).mode).toHaveValue('video');
+  else await expect(controls(page, false).mode.getByText('Video', { exact: true })).toHaveAttribute('aria-pressed', 'true');
   await composerMode.getByRole('button', { name: 'Image', exact: true }).click();
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
   else await page.locator('.model-trigger').first().click();
@@ -322,7 +349,7 @@ test('model speed and reference filters combine and All clears them', async ({ p
     await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('.phone-create')).toHaveCount(0);
   } else await page.locator('.model-trigger').first().click();
-  await controls(page, isMobile).mode.getByText('Video', { exact: true }).click();
+  await controls(page, isMobile).switchMode('video');
   await openComposer(page, isMobile);
   if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'MiniMax H3' }).click();
   else await page.locator('.model-trigger').first().click();
