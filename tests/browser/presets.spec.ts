@@ -18,7 +18,7 @@ const preset = {
   settings: { width: 768, height: 1024, steps: 4, cfg: 1, seed: '0', sampler: 'euler', scheduler: 'simple' }, warnings: []
 };
 
-test('import, save, reopen and apply a preset on desktop and phone', async ({ page, isMobile }) => {
+test('import, save, reopen and apply a preset on desktop and phone', async ({ page, isMobile }, testInfo) => {
   let saved: typeof preset[] = [];
   await page.route('**/api/presets', async (route) => {
     if (route.request().method() === 'POST') {
@@ -47,7 +47,7 @@ test('import, save, reopen and apply a preset on desktop and phone', async ({ pa
   const dimensions = await dialog.evaluate((element) => ({ width: element.getBoundingClientRect().width, viewport: innerWidth, scroll: element.scrollWidth }));
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewport);
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
-  await page.screenshot({ path: `/private/tmp/heiss-presets-${isMobile ? 'phone' : 'desktop'}.png` });
+  await page.screenshot({ path: testInfo.outputPath('preset-review.png') });
   await dialog.getByRole('button', { name: 'Use Preset', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   let generated: Record<string, unknown> | null = null;
