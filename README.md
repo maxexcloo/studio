@@ -153,7 +153,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 <summary><b>Reference slots, the library and your workflows</b></summary>
 
 - **Slots as you need them.** The composer opens a new reference slot each time you fill one. The first reference sets the starting aspect ratio in image and video mode, within the selected workflow’s size limits. Manual size controls remain available when the workflow supports them.
-- **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; an existing video reference stays in place. An upscaled image is used upscaled.
+- **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; it replaces the primary video reference and preserves a separate end frame. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
 
 </details>
