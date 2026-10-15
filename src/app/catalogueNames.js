@@ -30,7 +30,7 @@ export function modelName(profile) {
     .filter((detail) => !(String(profile?.family || '').replace(/-/g, '_') === 'minimax_h3' && detail === 'MiniMax H3'))
     .flatMap((detail) => detail.replace(/\s*\(≈([\d.]+)\s*s\)/g, ' · ~$1 s').split(' · '));
   if (profile?.family !== 'grok' && profile?.defaults?.steps && !settings.some((detail) => /\bSteps\b/i.test(detail))) settings.push(`${profile.defaults.steps} Steps`);
-  if (!action && profile?.kind) action = 'Generate';
+  if (action === 'Generate' && profile?.imageModes?.generate && profile.imageModes.reference) action = undefined;
   return { name: `${name || lead}${action ? ` · ${action}` : ''}`, detail: [...precision, ...settings].join(' · ') || profile?.familyName || profile?.family || '' };
 }
 
@@ -107,19 +107,9 @@ export function workflowSpeed(workflow, profile) {
   return steps > 0 && steps <= 8 && workflow.family !== 'grok' ? 'flash' : 'standard';
 }
 
-/** Classify the recipe's intended action; optional inputs do not turn generation into editing. */
-export function workflowPurpose(workflow) {
-  const required = workflow.capabilities?.startImageRequired || (workflow.mediaInputs || []).some((input) => input.kind !== 'audio' && (input.required || input.min > 0));
-  if (required) return { generate: false, edit: true };
-  const name = String(workflow.name || workflow.displayName || workflow.label || '');
-  const action = name.split(/\s*·\s*/).find((part) => /^(Generate|Non-Reference|Edit|Reference|Animate Image)$/i.test(part));
-  const edit = action ? /^(Edit|Reference|Animate Image)$/i.test(action) : /\b(?:Edit|Image[- ]To[- ]Video|Animate Image)\s*$/i.test(name);
-  return { generate: !edit, edit };
-}
-
 export function profileMatchesFilters(profile, filters, favourites = []) {
   if (filters.favourites && !favourites.includes(profile.id)) return false;
   const workflow = { ...profile, name: profile.displayName || profile.label };
   if (filters.speed && workflowSpeed(workflow, profile) !== filters.speed) return false;
-  return !filters.purpose || workflowPurpose(workflow)[filters.purpose];
+  return true;
 }

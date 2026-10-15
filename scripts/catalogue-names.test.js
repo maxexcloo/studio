@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareModelNames, loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowPurpose, workflowSpeed } from '../src/app/catalogueNames.js';
+import { compareModelNames, loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowSpeed } from '../src/app/catalogueNames.js';
 
 test('imported workflows share stock family headings, including aliases and cloud models', () => {
   const profiles = [
@@ -34,15 +34,15 @@ test('Singularity has its own heading without changing the H3 generation family'
 
 test('model names keep model identity separate from precision and workflow settings', () => {
   assert.deepEqual(modelName({ kind: 'video', label: 'MiniMax H3 [INT8 ConvRot] · Reference · Sol & PDD · 8 Steps · 4B Encoder (≈72 s)' }), { name: 'MiniMax H3 · Animate Image', detail: 'INT8 · Sol & PDD · 8 Steps · 4B Encoder · ~72 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B [FP8] · Distilled' }), { name: 'FLUX.2 Klein 9B · Generate', detail: 'FP8' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 [INT8 ConvRot] · Standard · 25 Steps (≈15 s)' }), { name: 'Qwen Image 2.1 · Generate', detail: 'INT8 · 25 Steps · ~15 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 Turbo [BF16] · 8 Steps (≈7 s)' }), { name: 'Qwen Image 2.1 Turbo · Generate', detail: 'BF16 · 8 Steps · ~7 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B [FP8] · Distilled' }), { name: 'FLUX.2 Klein 9B', detail: 'FP8' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 [INT8 ConvRot] · Standard · 25 Steps (≈15 s)' }), { name: 'Qwen Image 2.1', detail: 'INT8 · 25 Steps · ~15 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 Turbo [BF16] · 8 Steps (≈7 s)' }), { name: 'Qwen Image 2.1 Turbo', detail: 'BF16 · 8 Steps · ~7 s' });
   assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B KV [FP8] · Reference · 4 Steps (≈4 s)' }), { name: 'FLUX.2 Klein 9B · Edit', detail: 'FP8 · KV Cache · 4 Steps · ~4 s' });
   assert.deepEqual(modelName({ kind: 'video', label: 'Grok Imagine Video 1.5 Preview · Animate Image · Cloud · 720p · 6 Seconds' }), { name: 'Grok Imagine Video 1.5 Preview · Animate Image', detail: 'Cloud · 720p · 6 Seconds' });
   assert.deepEqual(modelName({ kind: 'image', label: 'Grok Imagine Image 2.0 · Edit · Cloud' }), { name: 'Grok Imagine Image 2.0 · Edit', detail: 'Cloud' });
   assert.deepEqual(modelName({ kind: 'image', family: 'grok', defaults: { steps: 20 }, label: 'Grok Image Edit' }), { name: 'Grok Image · Edit', detail: 'grok' });
   assert.deepEqual(modelName({ kind: 'video', family: 'grok', label: 'Grok Image To Video' }), { name: 'Grok Video · Animate Image', detail: 'grok' });
-  assert.deepEqual(modelName({ kind: 'image', defaults: { steps: 28 }, label: 'Krea 2 Center SemiRaw v1 [FP8]' }), { name: 'Krea 2 Center SemiRaw v1 · Generate', detail: 'FP8 · 28 Steps' });
+  assert.deepEqual(modelName({ kind: 'image', defaults: { steps: 28 }, label: 'Krea 2 Center SemiRaw v1 [FP8]' }), { name: 'Krea 2 Center SemiRaw v1', detail: 'FP8 · 28 Steps' });
   assert.deepEqual(modelName({ kind: 'video', family: 'minimax_h3', defaults: { steps: 20 }, label: 'Minimax H3 Singularity Ref2va Pruned V1.3 Int8 · MiniMax H3' }), { name: 'MiniMax H3 Singularity v1.3 · Animate Image', detail: 'INT8 · 20 Steps' });
   assert.deepEqual(modelName({ kind: 'video', family: 'minimax-h3', label: 'MiniMax H3 [INT8 ConvRot] · Non-Reference · Stock · 20 Steps · 4B Encoder' }), { name: 'MiniMax H3 · Generate', detail: 'INT8 · 20 Steps · 4B Encoder' });
   assert.deepEqual(modelName({ kind: 'video', family: 'grok', label: 'Grok Imagine Video 1.5 · Generate · 20 Steps · Cloud · 720p' }), { name: 'Grok Imagine Video 1.5 · Generate', detail: 'Cloud · 720p' });
@@ -78,20 +78,12 @@ test('speed filters use variant metadata and recognise accelerated imported reci
   assert.equal(workflowSpeed({ name: 'MiniMax H3 · Non-Reference · PDD · 8 Steps', defaults: { steps: 20 } }, { variant: 'standard' }), 'flash');
 });
 
-test('purpose filters distinguish reference recipes from optional generation inputs', () => {
-  assert.deepEqual(workflowPurpose({}), { generate: true, edit: false });
-  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', required: true }] }), { generate: false, edit: true });
-  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'image', min: 1 }] }), { generate: false, edit: true });
-  assert.deepEqual(workflowPurpose({ capabilities: { startImage: true } }), { generate: true, edit: false });
-  assert.deepEqual(workflowPurpose({ name: 'MiniMax H3 · Non-Reference · PDD', mediaInputs: [{ kind: 'image', required: false }], capabilities: { startImage: true } }), { generate: true, edit: false });
-  assert.deepEqual(workflowPurpose({ name: 'Klein · Reference', mediaInputs: [{ kind: 'image', required: false }] }), { generate: false, edit: true });
-  assert.deepEqual(workflowPurpose({ name: 'Grok Image Edit' }), { generate: false, edit: true });
-  assert.deepEqual(workflowPurpose({ mediaInputs: [{ kind: 'audio', required: true }] }), { generate: true, edit: false });
-  const filters = { favourites: true, speed: 'flash', purpose: 'edit' };
-  const profile = { id: 'quick-edit', label: 'Quick Edit', defaults: { steps: 4 }, capabilities: { startImageRequired: true, startImage: true } };
+test('model filters combine favourites and sampling speed', () => {
+  const filters = { favourites: true, speed: 'flash' };
+  const profile = { id: 'quick-edit', label: 'Quick Edit', defaults: { steps: 4 } };
   assert.equal(profileMatchesFilters(profile, filters, ['quick-edit']), true);
   assert.equal(profileMatchesFilters(profile, filters, []), false);
-  assert.equal(profileMatchesFilters(profile, { ...filters, purpose: 'generate' }, ['quick-edit']), false);
+  assert.equal(profileMatchesFilters(profile, { ...filters, speed: 'standard' }, ['quick-edit']), false);
 });
 
 test('model lists sort visible names naturally before precision and recipe details', () => {
@@ -105,4 +97,13 @@ test('model lists sort visible names naturally before precision and recipe detai
   ];
   assert.deepEqual([...profiles].sort(compareModelNames).map((profile) => profile.id), ['a', 'f4', 'f8', 'q2', 'q10', 'z']);
   assert.equal(profiles[0].id, 'z');
+});
+
+
+test('combined image and video profiles omit redundant generation actions', () => {
+  for (const kind of ['image', 'video']) {
+    const profile = { kind, label: 'Combined Model · Generate · 8 Steps', imageModes: { generate: {}, reference: {} } };
+    assert.deepEqual(modelName(profile), { name: 'Combined Model', detail: '8 Steps' });
+    assert.equal(modelName({ ...profile, imageModes: undefined }).name, 'Combined Model · Generate');
+  }
 });

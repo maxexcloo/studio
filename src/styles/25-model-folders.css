@@ -302,6 +302,7 @@
 .model-row { position: relative; }
 .model-menu .model-option { min-height: 58px; }
 .model-row .model-option { padding-right: 36px; }
+.model-option.active { grid-template-columns: 15px minmax(0, 1fr) auto; }
 .model-option.is-cursor { background: var(--brand-surface-hover); }
 .model-star {
   position: absolute;

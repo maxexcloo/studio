@@ -639,7 +639,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     }
     wasOpen.current = open;
   }, [open]);
-  useEffect(() => { setCursor(query || filters.speed || filters.purpose || filters.favourites ? 0 : -1); listRef.current?.scrollTo({ top: 0 }); }, [filters, query]);
+  useEffect(() => { setCursor(query || filters.speed || filters.favourites ? 0 : -1); listRef.current?.scrollTo({ top: 0 }); }, [filters, query]);
   useEffect(() => {
     if (cursor < 0) return;
     listRef.current?.querySelector<HTMLElement>(`[data-row="${cursor}"]`)?.scrollIntoView({ block: "nearest" });
@@ -696,7 +696,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
             </label>
           ) : null}
-          {profiles.length ? <CatalogueFilters kind={profiles[0]?.kind} value={filters} onChange={setFilters} /> : null}
+          {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
           {profiles.length ? (
             <div id={menuId} className="model-menu-list" ref={listRef} role="listbox" aria-label="Models" tabIndex={-1} aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined}>
               {sections.map((section) => (
@@ -719,6 +719,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                             className={cn("model-option", profile.id === value && "active", rowIndex === cursor && "is-cursor")}
                             onClick={() => pick(profile.id)}
                           >
+                            {profile.id === value ? <Check className="model-selection-tick" size={15} aria-hidden="true" /> : null}
                             <span className="model-copy">
                               <strong>{modelName(profile).name}</strong>
                               {setupNote(profile) ? <em className="is-setup">{[modelName(profile).detail, setupNote(profile)].filter(Boolean).join(" · ")}</em> : (
@@ -726,7 +727,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                                 <em>{modelName(profile).detail}{size ? <span className="model-size"> · {size}</span> : null}</em>
                               )}
                             </span>
-                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}{profile.id === value ? <Check size={15} aria-hidden="true" /> : null}</span>
+                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
                           </button></Tip>
                         {menu ? (
                           <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from favorites` : `Add ${profile.displayName || profile.label} to favorites`} onClick={() => menu.toggleFavorite(profile.id)}>
