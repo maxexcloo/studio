@@ -1,24 +1,23 @@
 [vars]
 actionlint_args = '-shellcheck=""'
-node_install_args = "--no-audit --no-fund"
 
 [env]
 _.path = ["node_modules/.bin"]
 
 # Development
 [tasks.build]
-depends = ["build:node"]
+run = "npm run build"
 
 [tasks.check]
 depends = ["check:actions", "check:mise", "check:updates"]
-run = [{ task = "check:typescript" }, { task = "test:node" }]
+run = [{ task = "check:typescript" }, { task = "test" }]
 
 [tasks.dev]
-depends = ["dev:node"]
+run = "npm run dev"
 
 [tasks.test]
-depends = ["test:node"]
+run = "npm test"
 
 # Setup
 [tasks.setup]
-depends = ["setup:node"]
+run = "npm ci --no-audit --no-fund"

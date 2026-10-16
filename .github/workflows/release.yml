@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
+        with:
+          tools: actionlint gh node python updatecli
       - name: Install Dependencies
         run: mise run setup
       - name: Run Checks
