@@ -1,18 +1,13 @@
 name: Container
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: container-${{ github.ref }}
 
 env:
@@ -45,7 +40,7 @@ jobs:
             type=sha,format=long,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - name: Build Image for Verification
+      - name: Build Image For Verification
         uses: docker/build-push-action@v7
         with:
           cache-from: type=gha
