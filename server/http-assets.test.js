@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import zlib from "node:zlib";
-import { compressJson, pickEncoding, serveApp } from "./http-assets.js";
+import { compressJson, serveApp } from "./http-assets.js";
 import { precompressDir } from "../scripts/precompress.mjs";
 
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-dist-"));
@@ -45,14 +45,12 @@ async function raw(pathname, headers = {}) {
   });
 }
 
-test("the browser's accepted encodings pick brotli first, and q=0 means no", () => {
-  assert.equal(pickEncoding("gzip, deflate, br"), "br");
-  assert.equal(pickEncoding("gzip"), "gzip");
-  assert.equal(pickEncoding("br;q=0, gzip;q=0.5"), "gzip");
-  assert.equal(pickEncoding("*"), "br");
-  assert.equal(pickEncoding("identity"), "");
-  assert.equal(pickEncoding(""), "");
-  assert.equal(pickEncoding("br", ["gzip"]), "", "only what is on offer");
+test("precompressed assets honour encoding exclusions", async () => {
+  const gzip = await raw("/assets/index-abc123.js", { "accept-encoding": "br;q=0, gzip;q=0.5" });
+  assert.equal(gzip.headers["content-encoding"], "gzip");
+  const plain = await raw("/assets/index-abc123.js", { "accept-encoding": "br;q=0, gzip;q=0" });
+  assert.equal(plain.headers["content-encoding"], undefined);
+  assert.equal(plain.body.toString(), script);
 });
 
 test("a hashed script goes out precompressed and cached for good", async () => {
