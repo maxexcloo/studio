@@ -4,19 +4,16 @@
  * Posts live in memory until you stop it. `--demo` starts with a few example
  * posts; the admin password is BOARD_ADMIN_PASSWORD, or "admin" here.
  */
-import http from "node:http";
-import fs from "node:fs";
+import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { handle } from "../docs/api/_board/core.js";
 import { memoryStore } from "../docs/api/_board/store.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "docs");
-const port = Number(process.env.PORT) || 4321;
+const port = Number(process.env.PORT || 4321);
 const env = { ...process.env, BOARD_ADMIN_PASSWORD: process.env.BOARD_ADMIN_PASSWORD || "admin" };
 const store = memoryStore();
-
-const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".woff2": "font/woff2", ".otf": "font/otf", ".mp4": "video/mp4", ".gif": "image/gif", ".xml": "application/xml", ".txt": "text/plain" };
 
 async function seed() {
   const day = 86_400_000;
@@ -64,30 +61,23 @@ async function seed() {
 
 if (process.argv.includes("--demo")) await seed();
 
-http
-  .createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    if (url.pathname === "/api/board" || url.pathname === "/api/board/") {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      const body = chunks.length ? Buffer.concat(chunks) : undefined;
-      const request = new Request(url, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : body });
-      const response = await handle(request, { store, env });
-      const headers = {};
-      response.headers.forEach((value, key) => {
-        if (key !== "set-cookie") headers[key] = value;
-      });
-      const cookies = response.headers.getSetCookie();
-      if (cookies.length) headers["set-cookie"] = cookies;
-      res.writeHead(response.status, headers);
-      res.end(Buffer.from(await response.arrayBuffer()));
-      return;
-    }
-    let file = path.join(root, decodeURIComponent(url.pathname));
-    if (!file.startsWith(root)) return res.writeHead(403).end();
-    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
-    if (!fs.existsSync(file)) return res.writeHead(404, { "content-type": "text/plain" }).end("Not found");
-    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
-    fs.createReadStream(file).pipe(res);
-  })
-  .listen(port, "127.0.0.1", () => console.log(`Website on http://127.0.0.1:${port}/  ·  board: /board/  ·  admin password: ${env.BOARD_ADMIN_PASSWORD === "admin" ? "admin" : "(BOARD_ADMIN_PASSWORD)"}`));
+const app = express();
+app.set("case sensitive routing", true);
+app.all("/api/board", async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const body = chunks.length ? Buffer.concat(chunks) : undefined;
+  const request = new Request(url, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : body });
+  const response = await handle(request, { store, env });
+  const headers = {};
+  response.headers.forEach((value, key) => {
+    if (key !== "set-cookie") headers[key] = value;
+  });
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length) headers["set-cookie"] = cookies;
+  res.writeHead(response.status, headers);
+  res.end(Buffer.from(await response.arrayBuffer()));
+});
+app.use(express.static(root));
+const server = app.listen(port, "127.0.0.1", () => console.log(`Website on http://127.0.0.1:${server.address().port}/  ·  board: /board/  ·  admin password: ${env.BOARD_ADMIN_PASSWORD === "admin" ? "admin" : "(BOARD_ADMIN_PASSWORD)"}`));
