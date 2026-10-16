@@ -47,7 +47,7 @@ test('nested Civitai metadata recovers prompts, exact seeds and model resources'
 
 test('filename-only LoRAs retain strengths, deduplicate and match local files explicitly', async () => {
   const source = { ...image, modelVersionIds: [], meta: { id: 42, meta: { prompt: 'a landscape', models: ['model.safetensors'], additionalResources: [{ name: 'style.safetensors', type: 'lora', strength: 0.35 }, { name: 'style.safetensors', type: 'lora', strength: 0.35 }] } } };
-  const preset = await importCivitaiImage('https://civitai.red/images/42', { json: async () => ({ items: [source] }) });
+  const preset = await importCivitaiImage('https://civitai.red/images/42', { generation: async () => null, json: async () => ({ items: [source] }) });
   assert.equal(preset.resources.length, 2);
   assert.equal(preset.resources[1].weight, 0.35);
   assert.equal(preset.resources[1].nameOnly, true);

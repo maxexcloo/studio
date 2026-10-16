@@ -1530,6 +1530,8 @@ function App() {
     if (fit.settings.frames !== undefined) setFrames(fit.settings.frames);
     const vae = preset.resources.find((item) => item.folder === 'vae' && item.localName);
     if (vae?.localName) setVae(vae.localName);
+    const encoders = preset.resources.filter((item) => item.folder === 'text_encoders' && item.localName).map((item) => item.localName!);
+    if (encoders.length) { setTextEncoder(encoders[0]); setTextEncoders(encoders); }
     setLorasWithMemory(fit.loras.map((item) => ({ name: item.localName!, strength: item.weight!, enabled: true })), profile.id);
     setReferenceAssets([]); setStartImage(''); setStartImageId(''); setStartImageName('');
     showToast(preset.settings.seed !== undefined ? 'Preset applied. Its seed is fixed until you change it.' : 'Preset applied', 'success');

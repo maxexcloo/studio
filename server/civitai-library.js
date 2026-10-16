@@ -10,8 +10,9 @@ import { withPngText } from './png-text.js';
 import { probeVideo } from './video-previews.js';
 
 export function importedGalleryItem(preset, previous = {}) {
-  const checkpoint = preset.resources.find((item) => item.folder === 'checkpoints');
+  const checkpoint = preset.resources.find((item) => ['checkpoints', 'diffusion_models'].includes(item.folder));
   const vae = preset.resources.find((item) => item.folder === 'vae');
+  const encoders = preset.resources.filter((item) => item.folder === 'text_encoders').map((item) => item.localName || item.file).filter(Boolean);
   return {
     ...previous,
     id: `civitai:${preset.id}`, url: `/api/presets/${preset.id}/media`, thumbnailUrl: `/api/presets/${preset.id}/thumbnail`,
@@ -22,6 +23,7 @@ export function importedGalleryItem(preset, previous = {}) {
     settings: {
       ...preset.settings, count: 1, workflow: '', profileId: checkpoint?.profileId || '',
       ...(vae ? { vae: vae.localName || vae.file } : {}),
+      ...(encoders.length ? { textEncoder: encoders[0], textEncoders: encoders } : {}),
       loras: preset.resources.filter((item) => item.folder === 'loras' && item.weight !== null && (item.localName || item.file)).map((item) => ({ name: item.localName || item.file, strength: item.weight, enabled: true }))
     },
     civitai: { imageId: preset.id, sourceUrl: preset.sourceUrl, creator: preset.creator, baseModel: preset.baseModel, resources: preset.resources, settings: preset.settings, sourceMetadata: preset.sourceMetadata, type: preset.type || 'image', warnings: preset.warnings, previewUrl: preset.previewUrl, downloadWarnings: preset.downloadWarnings || [] }
