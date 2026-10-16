@@ -30,6 +30,7 @@ export function useGenerationActions(view: any) {
   // at the end of runGeneration).
   const latest = useRef(view);
   latest.current = view;
+  const queueRevision = useRef(0);
   const galleryUpsert = upsertGalleryItems || ((items: GalleryItem[]) => setGallery((current: GalleryItem[]) => dedupeGalleryItems([...items, ...current])));
   const galleryRemove = removeGalleryItems || ((keys: string[]) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !keys.includes(item.id) && !keys.includes(item.url) && (!item.jobId || !keys.includes(item.jobId)))));
   const galleryRemoveWhere = removeGalleryItemsWhere || ((predicate: (item: GalleryItem) => boolean) => setGallery((current: GalleryItem[]) => current.filter((item: GalleryItem) => !predicate(item))));
@@ -126,6 +127,7 @@ export function useGenerationActions(view: any) {
     // Asked before anything is sent, so a Hidden prompt never runs in the open.
     if (toHidden && !hidden.ensureReady({ kind: "generate" })) return;
     generatePostingRef.current = true;
+    const postingRevision = queueRevision.current;
     const optimisticJobIds: string[] = [];
     try {
       const { effectiveCount, separate, imageRuns, requestCount } = generationPlan({
@@ -140,7 +142,7 @@ export function useGenerationActions(view: any) {
         ? separate && effectiveCount > 1
           ? `Started ${effectiveCount} separate generations`
           : `Started ${effectiveCount} image${effectiveCount === 1 ? "" : "s"}`
-        : "Started video";
+        : `Started ${effectiveCount} video${effectiveCount === 1 ? "" : "s"}`;
       setStatus(startMessage);
 
       // A reference frames the output only when it is the image being edited (a painted mask always is).
@@ -170,7 +172,7 @@ export function useGenerationActions(view: any) {
         scheduler,
         seed,
         count: effectiveCount,
-        variationCount: effectiveCount,
+        ...(runMode === "image" ? { variationCount: effectiveCount } : {}),
         frames,
         fps,
         duration,
@@ -188,9 +190,11 @@ export function useGenerationActions(view: any) {
         privateVault: Boolean(hiddenSpace)
       };
       const queuedJobs: string[] = [];
+      let postingError = "";
       // One tile per job, so a failure can open straight onto its report.
       const firstItemOf = new Map<string, GalleryItem>();
       for (let index = 0; index < imageRuns; index += 1) {
+        if (postingRevision !== queueRevision.current) break;
         const clientJobId = clientJobUuid();
         optimisticJobIds.push(clientJobId);
         // Separate runs from one pinned seed would all be the same picture; step it per run.
@@ -201,15 +205,28 @@ export function useGenerationActions(view: any) {
         const optimisticBody = { ...requestBody, ...(paintedOn?.width && paintedOn?.height ? { width: paintedOn.width, height: paintedOn.height } : {}), seed: runSeed, count: requestCount, startImageId: retry ? requestBody.startImageId : canUseStartImage ? startImageId : "" };
         const optimisticItems = pendingItemsFor(clientJobId, optimisticBody);
         galleryUpsert(optimisticItems);
-        if (index === 0 && runMode === latest.current.mode && toHidden === Boolean(latest.current.hiddenSpace)) latest.current.revealGeneration?.();
         if (prefs.zenMode) setZenSelectedId(optimisticItems[0].id);
         await nextPaint();
-        const { jobId, items, hidden: wentHidden, notice } = await apiJson<{ jobId: string; items: GalleryItem[]; hidden?: boolean; revision?: number; notice?: string }>("/api/generate", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...requestBody, seed: runSeed, clientJobId, count: requestCount, startImage: !retry && canUseStartImage && !startImageId ? startImage : "" })
-        });
+        let response: { jobId: string; items: GalleryItem[]; hidden?: boolean; revision?: number; notice?: string };
+        try {
+          response = await apiJson("/api/generate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...requestBody, seed: runSeed, clientJobId, count: requestCount, startImage: !retry && canUseStartImage && !startImageId ? startImage : "" })
+          });
+        } catch (error) {
+          postingError = error instanceof Error ? error.message : "Generation failed";
+          galleryPatch((item: GalleryItem) => item.jobId === clientJobId ? { ...item, status: "error", optimistic: false, filename: postingError } : item);
+          showToast(`${queuedJobs.length ? `${queuedJobs.length} of ${imageRuns} generations queued. ` : ""}${postingError}`, "error");
+          break;
+        }
+        const { jobId, items, hidden: wentHidden, notice } = response;
         queuedJobs.push(jobId);
+        if (postingRevision !== queueRevision.current) {
+          galleryRemove([clientJobId]);
+          await stopJob(jobId);
+          break;
+        }
         if (notice) showToast(notice, "error");
         firstItemOf.set(jobId, items?.[0] || optimisticItems[0]);
         if (wentHidden && !toHidden) {
@@ -225,7 +242,7 @@ export function useGenerationActions(view: any) {
       }
       generatePostingRef.current = false;
 
-      await Promise.all(queuedJobs.map(async (jobId) => {
+      const results = await Promise.all(queuedJobs.map(async (jobId) => {
         // A dropped Wi-Fi, a sleeping laptop or a server restart is not a failed
         // job: keep asking, slower each time, and give up only after a long gap.
         let misses = 0;
@@ -293,7 +310,11 @@ export function useGenerationActions(view: any) {
           setZenSelectedId(newest.id);
         }
       }
-      setStatus(runMode === "image" ? "Finished. The images are in the gallery." : "Finished. The video is in the gallery.");
+      if (postingError) setStatus(`${queuedJobs.length ? `${queuedJobs.length} of ${imageRuns} generations queued. ` : ""}${postingError}`);
+      else if (results.some((job) => !job)) setStatus("Lost the connection. Reload to check remaining generations.");
+      else if (results.some((job) => job?.status === "error" || job?.status === "missing")) setStatus("Some generations failed. Finished outputs are in the gallery.");
+      else if (postingRevision !== queueRevision.current || results.some((job) => job?.status === "canceled")) setStatus("Generation stopped. Finished outputs are in the gallery.");
+      else setStatus(runMode === "image" ? "Finished. The images are in the gallery." : `Finished. The video${effectiveCount === 1 ? " is" : "s are"} in the gallery.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
       galleryPatch((item: GalleryItem) => {
@@ -350,6 +371,8 @@ export function useGenerationActions(view: any) {
   }
 
   async function stopQueue() {
+    // Stop submitting this selection as well as stopping the jobs already queued.
+    queueRevision.current += 1;
     const response = await apiFetch("/api/queue/cancel", { method: "POST" }).catch(() => null);
     if (!response?.ok) {
       showToast("Couldn’t stop the queue. Generations may still be running in ComfyUI.", "error", { action: { label: "Try again", onClick: stopQueue } });

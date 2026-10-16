@@ -59,7 +59,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   onDeleted: (asset: ReferenceAsset) => void;
   confirmDelete?: (asset: ReferenceAsset) => Promise<boolean>;
   onError?: (message: string) => void;
-  upload: { busy: boolean; progress: number; start: (file: File | undefined) => Promise<ReferenceAsset | null> };
+  upload: { busy: boolean; progress: number; multiple: boolean; start: (files: File[]) => Promise<ReferenceAsset | null> };
 }) {
   // Hidden images sit on their own shelf, behind the same lock as Hidden itself.
   // It opens first when the picked image came from there, or when making in Hidden.
@@ -69,6 +69,8 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   const [tab, setTab] = React.useState<PickerTab>(() => memory.tab && (memory.tab !== "hidden" || hiddenShelf && hiddenOpen) ? memory.tab : hiddenShelf && (selected?.source === "vault" || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
   const [pages, setPages] = React.useState<Record<PickerTab, PageState>>(() => memory.pages);
   const [selectingId, setSelectingId] = React.useState("");
+  const active = React.useRef(true);
+  React.useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [search, setSearch] = React.useState(memory.query);
   const [query, setQuery] = React.useState(memory.query);
   const previousQuery = React.useRef(query);
@@ -188,8 +190,8 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
     load(tab);
   }, [hiddenOpen, load, pages, tab]);
 
-  const uploadAndUse = async (file: File | undefined) => {
-    const asset = await upload.start(file);
+  const uploadAndUse = async (files: File[]) => {
+    const asset = await upload.start(files);
     if (!asset) return;
     setPages((current) => ({ ...current, upload: { ...current.upload, items: [asset, ...current.upload.items.filter((item) => item.id !== asset.id)] } }));
     onClose();
@@ -200,6 +202,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
     setSelectingId(asset.id);
     try {
       const resolved = asset.source === "generation" && asset.galleryItemId ? await referenceAssetFromGallery(asset.galleryItemId) : asset;
+      if (!active.current) return;
       onSelect(resolved);
       onClose();
     } catch (error) {
@@ -264,7 +267,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
           <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
         </button>
-        <input ref={uploadInput} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { uploadAndUse(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+        <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close" onClick={onClose}><X size={15} /></button></Tip>
       </header>
 
@@ -461,7 +464,7 @@ function AddMore({ max, add, className, size = 15 }: { max: number; add: Referen
  * One reference input as a chip in the composer's top-right corner. Empty, it
  * introduces itself as "Add Reference" (or "Add Start Image" for plain
  * image-to-image). With an
- * image it becomes a squircle thumbnail that opens into a small menu on hover.
+ * image it becomes a large thumbnail with visible remove and paint actions.
  */
 function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, stack = null, guide = false, onOpen, onRemove }: {
   input: MediaInput;
@@ -584,7 +587,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
       })}
       <Tip content={`${name} · Click to change`}>
         <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
-          {image && !broken ? <img src={image} alt="" draggable={false} onError={() => setBroken(true)} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
+          {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
         </button>
       </Tip>
       {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Reference; Undo is in its toast. */}
@@ -649,6 +652,11 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   confirmDelete?: (asset: ReferenceAsset) => Promise<boolean>;
   onError?: (message: string) => void;
 }) {
+  // An upload may finish after changing models or closing the phone composer.
+  const context = React.useRef({ scope, revision: 0, active: true });
+  if (context.current.scope !== scope) { context.current.scope = scope; context.current.revision += 1; }
+  React.useEffect(() => { context.current.active = true; return () => { context.current.active = false; }; }, []);
+  React.useEffect(() => { setOpenSlot(""); setPainting(false); }, [scope]);
   const memories = React.useRef(new Map<string, PickerMemory>());
   if (!memories.current.has(scope)) memories.current.set(scope, pickerMemory());
   const memory = memories.current.get(scope)!;
@@ -656,6 +664,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   const noHover = useNoHover();
   const [uploadSlot, setUploadSlot] = React.useState("");
   const [progress, setProgress] = React.useState(0);
+  const uploading = React.useRef(false);
   const [dropTarget, setDropTarget] = React.useState<"" | "prompt" | "popover">("");
   const [landing, setLanding] = React.useState(false);
   const [freshSlot, setFreshSlot] = React.useState("");
@@ -739,39 +748,52 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   }, [openSlot, usableIds]);
   const blockedMessage = editOnly ? "Edit changes one picture. Switch to Reference to add more" : fullMessage(maxReferences);
 
-  // What the window's drag/paste listeners and a finishing upload read: always this render's.
-  // (Through a ref, so a parent's new onError each render doesn't re-add the listeners, which
-  // dropped the drop overlay's pending clear and left it on screen.)
-  const live = React.useRef<{ upload: (file: File | undefined, slot: string) => Promise<ReferenceAsset | null>; targetSlot: () => string; openSlot: string; blockedMessage: string; usableIds: string; onError?: (message: string) => void }>(null!);
-  const upload = React.useCallback(async (file: File | undefined, slot: string) => {
-    if (!file || !slot || uploadSlot) return null;
-    if (!isImageFile(file)) { live.current.onError?.("Choose an image file"); return null; }
-    setUploadSlot(slot);
-    setProgress(0);
+  // Explicit replacement targets win; otherwise add to the first free slot.
+  const uploadFiles = React.useCallback(async (files: File[], preferred = "") => {
+    if (uploading.current || !files.length) return null;
+    const images = files.filter(isImageFile);
+    if (!images.length) { onError?.("Choose an image file"); return null; }
+    const empty = usable.filter((input) => !selected.some((item) => item.slot === input.id)).map((input) => input.id);
+    const targets = preferred ? [preferred, ...empty.filter((id) => id !== preferred)] : empty;
+    if (!targets.length) { onError?.("All reference slots are filled. Remove an image or drop onto a thumbnail to replace it."); return null; }
+    if (images.length > targets.length) onError?.(`This model has room for ${targets.length} more reference ${targets.length === 1 ? "image" : "images"}. Extra files were skipped.`);
+    uploading.current = true;
+    const revision = context.current.revision;
+    const current = () => context.current.active && context.current.revision === revision;
+    let latest: ReferenceAsset | null = null;
     try {
-      const asset = await uploadReferenceAsset(file, setProgress);
-      // Switched to Edit (or the slot went) while it uploaded: it's in your uploads, not in the prompt.
-      if (!live.current.usableIds.split(" ").includes(slot)) { live.current.onError?.(live.current.blockedMessage); return null; }
-      onSelect(slot, asset);
-      setFreshSlot(slot);
-      // A picture that lands in the stack opens it a moment, so you see where it went.
-      window.setTimeout(() => setFreshSlot(""), inputs.find((input) => input.id === slot)?.follows ? 1600 : 700);
-      return asset;
-    } catch (error) {
-      live.current.onError?.(error instanceof Error ? error.message : "Couldn’t upload the image");
-      return null;
+      for (const [index, file] of images.slice(0, targets.length).entries()) {
+        const slot = targets[index];
+        setUploadSlot(slot);
+        setProgress(0);
+        try {
+          const asset = await uploadReferenceAsset(file, setProgress);
+          if (!current() || !usableIds.split(" ").includes(slot)) return null;
+          onSelect(slot, asset);
+          setFreshSlot(slot);
+          latest = asset;
+        } catch (error) {
+          onError?.(error instanceof Error ? error.message : "Couldn’t upload the image");
+          // Stop so a failed predecessor cannot leave a dependent slot empty.
+          break;
+        }
+      }
+      return latest;
     } finally {
+      uploading.current = false;
       setUploadSlot("");
       setProgress(0);
+      window.setTimeout(() => setFreshSlot(""), 700);
     }
-  }, [inputs, onSelect, uploadSlot]);
+  }, [inputs, onError, onSelect, selected, scope]);
 
   /*
    * Drag and drop follows the pointer: over the open popover it offers "add to
    * uploads", over the prompt bar "use as reference", anywhere else nothing.
    * The indicator's spotlight tracks the pointer; a drop lands with a pulse.
    */
-  live.current = { upload, targetSlot, openSlot, blockedMessage, usableIds, onError };
+  const live = React.useRef({ uploadFiles, openSlot });
+  live.current = { uploadFiles, openSlot };
   React.useEffect(() => {
     if (!host || !inputs.length) return;
     // Names aren't readable mid-drag, so an untyped file counts until the drop checks it.
@@ -807,27 +829,25 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
       const target = targetOf(event);
       window.clearTimeout(clearTimer);
       setDropTarget("");
-      const file = Array.from(event.dataTransfer?.files || []).find(isImageFile);
-      if (!file || !target) return;
+      const files = Array.from(event.dataTransfer?.files || []).filter(isImageFile);
+      if (!files.length || !target) return;
       event.preventDefault();
       setLanding(true);
       window.setTimeout(() => setLanding(false), 520);
-      const { upload: run, targetSlot: slot, openSlot: open, blockedMessage: blocked } = live.current;
-      const into = slot();
-      if (!into) { live.current.onError?.(blocked); return; }
-      run(file, into).then((asset) => {
+      const { uploadFiles: run, openSlot: open } = live.current;
+      const node = event.target instanceof Element ? event.target : null;
+      const explicit = node?.closest<HTMLElement>("[data-reference-slot]")?.dataset.referenceSlot || "";
+      run(files, explicit || (target === "popover" ? open : "")).then((asset) => {
         if (!asset) return;
         if (target === "popover" && open) setDropped({ asset, nonce: Date.now() });
         else setOpenSlot("");
       });
     };
     const paste = (event: ClipboardEvent) => {
-      const file = Array.from(event.clipboardData?.files || []).find(isImageFile);
-      if (!file) return;
+      const files = Array.from(event.clipboardData?.files || []).filter(isImageFile);
+      if (!files.length) return;
       event.preventDefault();
-      const into = live.current.targetSlot();
-      if (!into) { live.current.onError?.(live.current.blockedMessage); return; }
-      live.current.upload(file, into);
+      live.current.uploadFiles(files);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("dragleave", leave);
@@ -843,6 +863,9 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   }, [host, inputs.length]);
 
   if (!inputs.length) return null;
+  const visibleInputs = inputs.filter((input) => !input.follows || assetFor(input.id) || assetFor(input.follows));
+  const count = inputs.filter((input) => assetFor(input.id)).length;
+  const revision = context.current.revision;
   const openInput = inputs.find((input) => input.id === openSlot) || null;
   const openFor = (id: string) => () => { setPainting(false); setOpenSlot((current) => current === id ? "" : id); };
   // Undo puts every picture back where it was: the ones after it closed up into its slot. Only onto
@@ -885,7 +908,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
 
   const tools = host?.querySelector(".composer-reference-tools");
   const slots = (
-      <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef}>
+      <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef} role="group" aria-label="Reference Images">
         {/* No hover to open the strip (a tablet, the full studio on a phone): Edit | Reference in plain
             sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
         {inline && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
@@ -927,15 +950,15 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             popRef={popRef}
             dropActive={dropTarget === "popover"}
             dropped={dropped}
-            onClose={close}
-            onSelect={(asset) => onSelect(openInput.id, asset)}
+            onClose={() => { if (context.current.revision === revision) close(); }}
+            onSelect={(asset) => { if (context.current.active && context.current.revision === revision) onSelect(openInput.id, asset); }}
             onDeleted={(asset) => {
               const holding = selected.filter((item) => item.asset.id === asset.id).map((item) => item.slot);
               if (holding.length) onRemove(holding);
             }}
             confirmDelete={confirmDelete}
             onError={onError}
-            upload={{ busy: Boolean(uploadSlot), progress, start: (file) => upload(file, openInput.id) }}
+            upload={{ busy: Boolean(uploadSlot), progress, multiple: inputs.length > 1, start: (files) => uploadFiles(files, openInput.id) }}
           />
         ) : null}
       </AnimatePresence>

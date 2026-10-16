@@ -1,18 +1,36 @@
 /* ---------------------------------------------------------------------------
    Reference images (src/app/ReferenceMediaPicker.tsx)
 
-   Chips in the composer's action row, a popover that rises out of the
-   composer to pick one, and a drop target over the whole prompt bar.
+   Large thumbnails beside the prompt, a reference library popover, and a
+   drop target over the whole prompt bar.
 --------------------------------------------------------------------------- */
 
 .composer-reference { display: contents; }
 
-.composer-reference-slots {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
+.composer-prompt-row { display: flex; align-items: flex-start; gap: 12px; }
+.composer-prompt-row > .composer-prompt-field { flex: 1; min-width: 0; }
+.composer-reference-tools { flex: none; max-width: 42%; padding: 6px 4px 8px 0; }
+.composer-reference-tools:empty { display: none; }
+.composer-reference-slots { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.reference-slot-list { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.reference-count { color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+.ref-chip { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 12px; color: hsl(var(--foreground)); }
+.ref-add { flex-direction: column; gap: 4px; padding: 6px; border: 1px dashed var(--surface-border); background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.ref-add:hover, .ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-add-label { max-width: 100%; font-size: 10px; line-height: 1.2; text-align: center; white-space: normal; }
+.ref-add-label em { color: var(--ember); font-style: normal; }
+.ref-selected { display: block; }
+.ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--surface-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.ref-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ref-remove, .ref-paint { position: absolute; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--surface-border); border-radius: 50%; background: hsl(var(--background)); color: hsl(var(--foreground)); cursor: pointer; }
+.ref-remove { top: -5px; right: -5px; }
+.ref-paint { bottom: -5px; left: -5px; }
+.ref-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
+.ref-paint:hover, .ref-paint.is-active { background: var(--action); color: var(--action-ink); }
+.ref-paint.is-masked { color: var(--ember); }
+.ref-add:focus-visible, .ref-thumb:focus-visible, .ref-remove:focus-visible, .ref-paint:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.ref-chip.is-busy { flex-direction: column; gap: 5px; background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
+@keyframes ref-pop { from { opacity: .5; } to { opacity: 1; } }
 
 /* ------------------------------------------------------------------ Chip */
 
@@ -215,6 +233,14 @@
   box-shadow: inset 0 0 0 1px var(--surface-border);
   color: hsl(var(--muted-foreground));
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .composer-prompt-row { gap: 8px; }
+  .composer-reference-tools { max-width: 44%; }
+  .ref-chip { width: 56px; height: 56px; }
+  .ref-remove, .ref-paint { width: 28px; height: 28px; }
+  .reference-slot-list { gap: 10px; }
 }
 
 /* --------------------------------------------------------------- Popover */
@@ -686,8 +712,3 @@
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }
-
-@media (pointer: coarse) {
-  .composer-prompt-tools .ref-selected { height: 40px; }
-  .composer-prompt-tools .ref-thumb { width: 40px; height: 40px; border-radius: 12px; }
-}

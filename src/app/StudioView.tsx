@@ -3,7 +3,7 @@ import { PromptActions } from './PromptActions';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -55,7 +55,7 @@ import { ShortcutsSheet } from './shortcuts';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { useFocusTrap } from './useFocusTrap';
 import { PromptHistoryPopover } from './PromptHistory';
-import { GallerySearchBar, GallerySearchButton, SearchEmpty, useGallerySearchKeys } from './GallerySearch';
+import { GallerySearchBar, SearchEmpty, useGallerySearchKeys } from './GallerySearch';
 import { canStar, emptySearch, FavoriteContext, searchActive, type GallerySearch } from './favorites';
 import { refreshPrompts, usePromptHistory } from './recentPrompts';
 import type { GalleryItem } from './types';
@@ -128,7 +128,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
@@ -138,6 +138,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
   const searchOn = searchActive(gallerySearch);
+  const [wideStudio, setWideStudio] = React.useState(() => window.matchMedia('(min-width: 1100px)').matches);
+  React.useEffect(() => {
+    const query = window.matchMedia('(min-width: 1100px)');
+    const update = () => setWideStudio(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const hidden = view.hidden as HiddenState;
   // Hidden, locked (or mid-unlock): the lock takes the gallery's place.
@@ -178,6 +185,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // Phones get the simplified phone studio, unless someone chose the full one.
   const phoneDevice = usePhone();
   const phone = phoneDevice && !prefs.fullStudioOnPhone;
+  const controlsPinned = Boolean(prefs.controlsPinned && wideStudio && !phone);
+  const controlsOpen = Boolean(zenControls || controlsPinned);
+  const toggleControls = () => {
+    if (controlsPinned) setPrefs({ controlsPinned: false });
+    setZenControls(!controlsOpen);
+  };
+  const pinControls = <button type="button" className="sidebar-pin" aria-label={controlsPinned ? 'Unpin Controls' : 'Pin Controls'} aria-pressed={controlsPinned} onClick={() => { setPrefs({ controlsPinned: !controlsPinned }); setZenControls(true); }}>{controlsPinned ? <PinOff size={15} /> : <Pin size={15} />}{controlsPinned ? 'Unpin Controls' : 'Keep Controls Open'}</button>;
+
+
   // Recent prompts: ↑ in an empty prompt or the clock in the composer opens them.
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const hasPromptHistory = usePromptHistory(!phone).prompts.length > 0;
@@ -234,7 +250,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   }, []);
   useHistoryDismiss(Boolean(phone && phoneSelection), () => setPhoneSelection(null));
   // A change of layout, privacy domain or filtered view ends a selection.
-  React.useEffect(() => { setPhoneSelection(null); }, [phone, hiddenSpace, hiddenLocked, mode, gallerySearch.q, gallerySearch.favorites]);
+  React.useEffect(() => { setPhoneSelection(null); }, [phone, hiddenSpace, hiddenLocked, mode, gallerySearch.q, gallerySearch.favorites, gallerySearch.model, gallerySearch.workflow, gallerySearch.lora]);
   const phoneTiles = React.useMemo(() => phone ? {
     onLongPress: openTileActions,
     selecting: Boolean(phoneSelection),
@@ -273,8 +289,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     upscaleBusy: (item) => Boolean(upscaleBusyIds?.has(item.id)),
     upscale: activateUpscale,
     cancelUpscale,
-    // "Make another like this": the settings go into the composer, which opens.
-    reuse: (item) => { applyAllSettings(item); setActive(null); setPhoneCreate(true); },
+    // Reuse opens the composer above the current viewer, so closing it returns here.
+    reuse: (item) => { applyAllSettings(item); setPhoneCreate(true); },
+    promptsOnly: (item) => { applyPromptsOnly(item); setPhoneCreate(true); },
     useAsReference: canUseStartImage ? (item) => { useOutputAsStartImage(item); setActive(null); setPhoneCreate(true); } : undefined,
     hide: (item) => hideItems([item]),
     unhide: (item) => unhideItems([item]),
@@ -563,7 +580,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass, controlsPinned && "has-pinned-controls")} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -635,8 +652,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <Tip content="Next Output"><button aria-label="Next Output" onClick={() => moveZen(1)}><ChevronRight size={22} /></button></Tip>
             </div>
           ) : null}
-          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={Boolean(zenControls)} aria-controls="studio-controls" onClick={() => setZenControls((value: boolean) => !value)}>
-            <PanelLeft size={16} />
+          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={controlsOpen} aria-controls="studio-controls" onClick={toggleControls}>
+            <PanelLeft size={16} /><span>Controls</span>
           </button></Tip>
           {zenItem && !zenItem.run ? (
             <div className={cn("zen-zoom-dock", zenControls && "with-side")}>
@@ -652,13 +669,17 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           ) : null}
           {studioDock}
           {hiddenBar}
-          {zenControls ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
-          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", zenControls && "open")} inert={!zenControls} aria-label="Generation Controls">
+          {zenControls && !controlsPinned ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
+          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", controlsOpen && "open")} inert={!controlsOpen} aria-label="Generation Controls">
+            {wideStudio ? pinControls : null}
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
-            <div className="composer-prompt-field">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <div className="composer-prompt-row">
+              <div className="composer-prompt-field">
+                <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+              </div>
+              <div className="composer-reference-tools" />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             <div className="composer-secondary-row">
@@ -767,35 +788,31 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-          {!hiddenLocked ? (
-            <div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
+            <GalleryManagement items={renderedGallery} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
               {(["image", "video"] as const).map((nextMode) => (
                 <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
                   {nextMode === "image" ? "Image" : "Video"}
                 </button>
               ))}
-            </div>
-          ) : null}
-            {hiddenLocked || galleryCrossing ? galleryBody : <GalleryManagement key={`${hiddenSpace}:${mode}:${gallerySearch.q}:${gallerySearch.favorites}`} items={renderedGallery} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>}
+            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<details className="gallery-view-options" data-open-surface><summary aria-label="Gallery View Options"><MoreHorizontal size={18} /></summary><div className="gallery-view-panel"><StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} />{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}</div></details>} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
           {hiddenBar}
-          {hiddenLocked ? null : <GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} islandsHeight={islandsHeight} />}
-          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={Boolean(zenControls)} aria-controls="studio-controls" onClick={() => setZenControls((value: boolean) => !value)}>
-            <PanelLeft size={16} />
+          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={controlsOpen} aria-controls="studio-controls" onClick={toggleControls}>
+            <PanelLeft size={16} /><span>Controls</span>
           </button></Tip>
-          {hiddenLocked ? null : <GallerySearchButton search={gallerySearch} open={searchOpen} setOpen={setSearchOpen} />}
-          {/* Only a grid with videos in it has previews to pause. */}
-          {hiddenLocked || !renderedGallery.some((item: GalleryItem) => item.type === 'video') ? null : <GridAutoplayButton />}
-          {hiddenLocked ? null : <StackRunsButton on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} />}
-          {zenControls ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
-          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", zenControls && "open")} inert={!zenControls} aria-label="Generation Controls">
+          {zenControls && !controlsPinned ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
+          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", controlsOpen && "open")} inert={!controlsOpen} aria-label="Generation Controls">
+            {wideStudio ? pinControls : null}
             {sidebarControls}
           </aside>
           <section className="zen-prompt">
-            <div className="composer-prompt-field">
-            <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+            <div className="composer-prompt-row">
+              <div className="composer-prompt-field">
+                <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
+              </div>
+              <div className="composer-reference-tools" />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             <div className="composer-secondary-row">
@@ -961,7 +978,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onClick={clickViewer}
                   onDoubleClick={(event) => { event.stopPropagation(); zoomViewer(viewerZoom > 1 ? 1 : 2.5); }}
                 >
-                  {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => { applyAllSettings(active); setActive(null); }} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
+                  {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain">
                   {active.status === "pending" ? <GenerationProgress item={active} formatElapsed={formatElapsed} /> : null}
                   </GenerationMedia>
@@ -998,9 +1015,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        onUseSettings={() => (phone ? phoneItemActions.reuse(active) : applyAllSettings(active))}
-                        onUseLoras={() => { applyLoras(active); if (phone) { setActive(null); setPhoneCreate(true); } }}
-                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => (phone ? phoneItemActions.useAsReference!(active) : useOutputAsStartImage(active)) : undefined}
+                        copied={viewerCopy.copied === "settings"}
+                        onUseSettings={() => applyAllSettings(active)}
+                        onUsePrompts={() => applyPromptsOnly(active)}
+                        onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
+                        onUseLoras={() => applyLoras(active)}
+                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <section className="settings-disclosure">

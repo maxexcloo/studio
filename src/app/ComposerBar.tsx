@@ -1,6 +1,6 @@
 import React from 'react';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, Film, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
@@ -291,7 +291,8 @@ export function ComposerBar(props: ComposerBarProps) {
     pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange
   } = props;
 
-  const showVariants = mode === "image" && currentProfile?.capabilities.variations !== false;
+  const showVariants = mode === "video" || currentProfile?.capabilities.variations !== false;
+  const countLabel = mode === "video" ? "Videos" : "Images";
   const displayCount = showVariants ? count : 1;
   const workflowName = currentProfile?.displayName || currentProfile?.label || "";
   const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim()].join("|");
@@ -336,7 +337,7 @@ export function ComposerBar(props: ComposerBarProps) {
   ) : null;
 
   const variantsPicker = (density: ControlDensity) => showVariants ? (
-    <NumberPicker label="Images" icon={<Images size={14} />} density={density} value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" />
+    <NumberPicker className="composer-count-picker" label={countLabel} icon={mode === "video" ? <Film size={14} /> : <Images size={14} />} density={density} value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" />
   ) : null;
 
   const loraPill = (density: ControlDensity) => loraActiveCount ? (
@@ -357,7 +358,7 @@ export function ComposerBar(props: ComposerBarProps) {
     ["private", "Hidden", privateToggle],
     ["aspect", "Aspect Ratio", aspectPicker],
     ["steps", "Steps", stepsPicker],
-    ["variants", "Images", variantsPicker],
+    ["variants", countLabel, variantsPicker],
     ["lora", "LoRA", loraPill]
   ];
 
@@ -371,7 +372,7 @@ export function ComposerBar(props: ComposerBarProps) {
   return (
     <>
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
-      <ReferenceSlots scope={mode} inputs={referenceInputs} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
+      <ReferenceSlots scope={`${mode}:${model}:${hiddenSpace}`} inputs={referenceInputs} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
       <AnimatePresence initial={false}>
         {drawerOpen && tucked.length ? (
         <motion.div
@@ -437,7 +438,7 @@ export function ComposerBar(props: ComposerBarProps) {
           ) : null}
         </div>
         <div className="composer-submit-actions" data-fluid-group>
-        <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `${mode === "image" ? `Generate ${displayCount} image${displayCount === 1 ? "" : "s"}` : "Generate video"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
+        <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `Generate ${displayCount} ${mode === "video" ? "video" : "image"}${displayCount === 1 ? "" : "s"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
           <GenerateButton
             className={cn("generate", Boolean(runningCount) && !comfyOffline && !comfyRestarting && "is-working", comfyRestarting ? "is-restarting" : comfyOffline && "is-offline")}
             onClick={comfyRestarting ? undefined : comfyOffline ? refreshComfyStatus : generate}

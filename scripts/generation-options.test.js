@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generationPlan, outputProfile, profileImageCount, profileImageSize, referenceImageSize } from "../src/app/generationOptions.js";
+import { clampProfileCount, generationPlan, outputProfile, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from "../src/app/generationOptions.js";
 
 test("settings reuse restores the saved workflow when multiple workflows share a model", () => {
   const profiles = [
@@ -24,10 +24,11 @@ test("Civitai reuse matches the downloaded source model rather than an unrelated
   assert.equal(outputProfile(profiles, { ...item, civitai: { resources: [{ ...item.civitai.resources[0], status: 'conflict' }] } }), undefined);
 });
 
-test("custom image count falls back to its declared constraint on older catalogues", () => {
+test("image defaults use the selected preference rather than a workflow batch default", () => {
   const profile = { kind: "image", defaults: {}, constraints: { count: { default: 4 } } };
-  assert.equal(profileImageCount(profile, 1), 4);
-  assert.equal(profileImageCount({ ...profile, defaults: { count: 2 } }, 1), 2);
+  assert.equal(profileImageCount(profile), 4);
+  assert.equal(profileImageCount({ ...profile, defaults: { count: 2 } }), 4);
+  assert.equal(profileImageCount(profile, 1), 1, "an explicit preferred count is retained");
   assert.equal(profileImageCount({ ...profile, capabilities: { variations: false } }, 4), 1);
   assert.equal(profileImageCount({ ...profile, kind: "video" }, 4), 1);
 });
@@ -36,7 +37,7 @@ test("four reference variants become four single-image requests even in batch mo
   assert.deepEqual(generationPlan({ count: 4, kind: "image", references: [{ assetId: "reference" }], queueMode: "batch" }), { effectiveCount: 4, separate: true, imageRuns: 4, requestCount: 1 });
   assert.deepEqual(generationPlan({ count: 4, kind: "image", queueMode: "batch" }), { effectiveCount: 4, separate: false, imageRuns: 1, requestCount: 4 });
   assert.equal(generationPlan({ count: 4, kind: "image", queueMode: "separate" }).imageRuns, 4);
-  assert.equal(generationPlan({ count: 4, kind: "video", references: [{}], queueMode: "separate" }).requestCount, 1);
+  assert.deepEqual(generationPlan({ count: 4, kind: "video", profile: { capabilities: { variations: false }, constraints: { count: { max: 1 } } }, references: [{}], queueMode: "batch" }), { effectiveCount: 4, separate: true, imageRuns: 4, requestCount: 1 });
   assert.equal(generationPlan({ count: 4, kind: "image", profile: { capabilities: { variations: false } }, references: [{}] }).imageRuns, 1);
 });
 
@@ -64,7 +65,19 @@ test("a family's named starting aspect wins over its default canvas", () => {
 
 test("image selection stays within model count limits", () => {
   assert.equal(profileImageCount({ kind: "image", defaults: { count: 4 }, constraints: { count: { min: 1, max: 2 } } }, 4), 2);
-  assert.equal(profileImageCount({ kind: "image", defaults: {}, constraints: { count: { default: 4, max: 8 } } }, 1), 4);
+  assert.equal(profileImageCount({ kind: "image", defaults: {}, constraints: { count: { default: 1, max: 8 } } }), 4);
+});
+
+test('count controls and payload planning honour model batch limits and alignment', () => {
+  const profile = { kind: 'image', constraints: { count: { min: 2, max: 6, step: 2 } } };
+  assert.deepEqual(profileCountRange(profile), { min: 2, max: 6, step: 2, offset: 0 });
+  assert.equal(clampProfileCount(profile, 3), 4);
+  assert.equal(clampProfileCount(profile, 12), 6);
+  assert.deepEqual(generationPlan({ kind: 'image', count: 4, profile, queueMode: 'separate', references: [{}] }), { effectiveCount: 4, separate: false, imageRuns: 1, requestCount: 4 });
+  assert.equal(generationPlan({ kind: 'image', count: 4, profile: { constraints: { count: { max: 2 } } } }).requestCount, 2);
+  assert.deepEqual(profileCountRange({ kind: 'video', capabilities: { variations: false } }), { min: 1, max: 8, step: 1 });
+  assert.equal(profileImageCount({ kind: 'video' }, 4), 1);
+  assert.equal(clampProfileCount({ kind: 'video' }, Infinity), 8);
 });
 
 test('image and video references adopt portrait and landscape proportions at the canvas budget', () => {

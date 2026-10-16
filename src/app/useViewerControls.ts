@@ -1,5 +1,6 @@
 import { fallbackAspectPresets } from './constants';
-import { outputProfile } from './generationOptions';
+import { clampProfileCount, outputProfile, referenceImageSize } from './generationOptions';
+import { normaliseReusedSettings } from './outputReuse';
 import { reusedNegative } from './composerSettings';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
@@ -11,6 +12,12 @@ import { toast } from './toast';
 import { wheelPixels } from './wheel';
 import type { GalleryItem, Profile, TouchGesture } from './types';
 import { MAX_ZOOM, MIN_ZOOM, Velocity, anchoredPan as anchorPan, clampPan, liveTransform, measureViewer, paint, rubber, rubberZoom, type Pan } from './viewerGesture';
+
+const VIEWER_CONTROLS = 'button, a, input, select, textarea, [role="slider"], .heiss-video-error';
+function viewerControl(event: React.SyntheticEvent) {
+  const control = (event.target as Element).closest(VIEWER_CONTROLS);
+  return control && control !== event.currentTarget;
+}
 
 /** Where an object-fit: contain image actually draws inside its box. */
 function containedRect(media: HTMLImageElement | HTMLVideoElement) {
@@ -74,11 +81,13 @@ export function useViewerControls(view: any) {
       setWidth(before.width);
       setHeight(before.height);
       setSteps(before.steps);
-      setCfg(before.cfg);
+      if (before.cfg !== undefined) setCfg(before.cfg);
       setCount(before.count);
       setDuration(before.duration);
       setResolution(before.resolution);
       setLoras(before.loras);
+      const setters: Record<string, (value: any) => void> = { clipType: setClipType, customSize: setCustomSize, denoise: setDenoise, fps: setFps, frames: setFrames, sampler: setSampler, scheduler: setScheduler, startImage: setStartImage, startImageId: setStartImageId, startImageName: setStartImageName, textEncoder: setTextEncoder, textEncoders: setTextEncoders, vae: setVae, weightDtype: setWeightDtype };
+      for (const [key, setter] of Object.entries(setters)) if (setter && before[key] !== undefined) setter(before[key]);
     }));
   }
 
@@ -90,54 +99,71 @@ export function useViewerControls(view: any) {
   function applyAllSettings(item: GalleryItem) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
-    const nextMode = item.type;
     const matchingProfile = outputProfile(models?.profiles || [], item);
-    const matchingAspects = matchingProfile?.aspectPresets?.length ? matchingProfile.aspectPresets : fallbackAspectPresets[nextMode];
+    if (vary && !matchingProfile) return false;
+    const targetProfile: Profile | undefined = matchingProfile || models?.profiles?.find((profile: Profile) => profile.id === view.draft?.model && profile.kind === view.mode && profile.ready !== false);
+    if (!targetProfile) { applyPromptsOnly(item, true); return false; }
+    const nextMode = targetProfile.kind;
+    const matchingAspects = targetProfile.aspectPresets?.length ? targetProfile.aspectPresets : fallbackAspectPresets[nextMode];
+    const settings = normaliseReusedSettings(targetProfile, item, { available: models, fallback: !matchingProfile, current: view.draft || {} });
+    if (!matchingProfile && targetProfile.aspectPolicy === 'reference' && view.referenceForAspect) {
+      Object.assign(settings, referenceImageSize(targetProfile, view.referenceForAspect) || {});
+    }
+    if (!['width', 'height', 'steps', 'cfg'].every((name) => Number.isFinite(settings[name]))) { applyPromptsOnly(item, true); return false; }
     setMode(nextMode);
-    if (matchingProfile) setModel(matchingProfile.id);
-    const nextPromptLimit = settingMax(matchingProfile?.constraints?.prompt);
-    const nextNegativeLimit = settingMax(matchingProfile?.constraints?.negative);
+    setModel(targetProfile.id);
+    view.onReuseProfile?.(targetProfile);
+    const nextPromptLimit = settingMax(targetProfile.constraints?.prompt);
+    const nextNegativeLimit = settingMax(targetProfile.constraints?.negative);
     setPrompt(clampText(item.prompt || "", nextPromptLimit));
     const currentNegative = view.negativeForMode?.(nextMode) ?? view.draft?.negative ?? "";
     const nextNegative = reusedNegative(clampText(item.negative || "", nextNegativeLimit), currentNegative);
     setNegative(nextNegative);
     setShowNegativePrompt(true);
-    setWidth(Number(item.width || itemSettings.width || width));
-    setHeight(Number(item.height || itemSettings.height || height));
-    if (itemSettings.steps) setSteps(Number(itemSettings.steps));
-    if (itemSettings.cfg) setCfg(Number(itemSettings.cfg));
-    if (itemSettings.denoise) setDenoise(Number(itemSettings.denoise));
+    setWidth(settings.width);
+    setHeight(settings.height);
+    setSteps(settings.steps);
+    setCfg(settings.cfg);
+    setDenoise(settings.denoise);
     if (itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
     else setSeed("");
-    if (itemSettings.variationCount || itemSettings.count) setCount(Number(itemSettings.variationCount || itemSettings.count));
-    if (itemSettings.frames) setFrames(Number(itemSettings.frames));
-    if (itemSettings.duration) setDuration(Number(itemSettings.duration));
-    if (itemSettings.resolution) setResolution(String(itemSettings.resolution));
-    if (itemSettings.fps) setFps(Number(itemSettings.fps));
-    if (itemSettings.sampler) setSampler(String(itemSettings.sampler));
-    if (itemSettings.scheduler) setScheduler(String(itemSettings.scheduler));
-    if (itemSettings.textEncoder) setTextEncoder(String(itemSettings.textEncoder));
-    if (Array.isArray(itemSettings.textEncoders)) setTextEncoders?.(itemSettings.textEncoders.map(String));
-    else if (itemSettings.textEncoder) setTextEncoders?.([String(itemSettings.textEncoder)]);
-    if (itemSettings.vae) setVae(String(itemSettings.vae));
-    if (itemSettings.clipType) setClipType(String(itemSettings.clipType));
-    if (itemSettings.weightDtype) setWeightDtype(String(itemSettings.weightDtype));
+    setCount(clampProfileCount(targetProfile, itemSettings.variationCount || itemSettings.count || view.draft?.count || 1));
+    setFrames(settings.frames);
+    setDuration(settings.duration);
+    setResolution(settings.resolution);
+    setFps(settings.fps);
+    setSampler(settings.sampler);
+    setScheduler(settings.scheduler);
+    setTextEncoder(settings.textEncoder);
+    setTextEncoders?.(settings.textEncoders);
+    setVae(settings.vae);
+    setClipType(settings.clipType);
+    setWeightDtype(settings.weightDtype);
     // Save the stack under the workflow we're switching to, not the one we're leaving.
-    setLoras(normalizeLoras(itemSettings.loras), matchingProfile?.id);
-    setStartImage(item.referenceImage || "");
-    if (setStartImageId) setStartImageId(item.startImageId || item.referenceImage || "");
-    setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
-    setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));
+    setLoras(normalizeLoras(settings.loras), targetProfile.id);
+    if (matchingProfile || !settings.hasImageInput) {
+      setStartImage(settings.hasImageInput ? item.referenceImage || "" : "");
+      if (setStartImageId) setStartImageId(settings.hasImageInput ? item.startImageId || item.referenceImage || "" : "");
+      setStartImageName(settings.hasImageInput ? item.referenceImageName || String(itemSettings.referenceImageName || "") : "");
+    }
+    setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === settings.width && option.h === settings.height));
     view.onReuseOutput?.(item);
     const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
     const message = matchingProfile
       ? `Settings applied.${seedNote}`
-      : `Settings applied. Its model isn’t installed, so the current model stays.${seedNote}`;
+      : `Its model isn’t available. Settings adjusted for ${targetProfile.displayName || targetProfile.label}.${seedNote}`;
     toast(message, {
       duration: 8000,
       action: before ? { label: "Undo", onClick: () => restoreDraft(before) } : undefined
     });
     return Boolean(matchingProfile);
+  }
+
+  function applyPromptsOnly(item: GalleryItem, unavailable = false) {
+    const profile = models?.profiles?.find((candidate: Profile) => candidate.id === view.draft?.model && candidate.kind === view.mode);
+    setPrompt(clampText(item.prompt || '', settingMax(profile?.constraints?.prompt)));
+    setNegative(clampText(item.negative || '', settingMax(profile?.constraints?.negative)));
+    toast(unavailable ? 'A compatible model isn’t available. Only prompts applied.' : 'Prompts applied.');
   }
 
   function applyLoras(item: GalleryItem) {
@@ -258,13 +284,14 @@ export function useViewerControls(view: any) {
   }
 
   function clickViewer(event: React.MouseEvent) {
-    if ((event.target as Element).closest('[data-video-viewer]')) return;
+    const target = event.target as Element;
+    if (viewerControl(event)) return;
     event.stopPropagation();
     if (Date.now() - viewerDragEndRef.current < 220) return;
     if (viewerDragRef.current?.moved) return;
     const canvas = event.currentTarget as HTMLElement;
     const media = canvas.querySelector("img, video") as HTMLImageElement | HTMLVideoElement | null;
-    if (media && viewerZoom <= 1) {
+    if (media) {
       const rect = containedRect(media);
       const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
       if (!inside) {
@@ -272,6 +299,7 @@ export function useViewerControls(view: any) {
         return;
       }
     }
+    if (target.closest('[data-video-viewer]') || active?.type === "video") return;
     // On touch a single tap only closes (outside the image); zoom is a double tap
     // or a pinch, so a stray tap never jumps the picture to 200%.
     if (Date.now() - lastTouchRef.current < 700) return;
@@ -283,7 +311,9 @@ export function useViewerControls(view: any) {
   }
 
   function startViewerDrag(event: React.PointerEvent) {
-    if ((event.target as Element).closest('[data-video-viewer]')) return;
+    // Secondary/pen buttons belong to the native media context menu.
+    if (event.button !== 0) return;
+    if (viewerControl(event) || (event.target as Element).closest('[data-video-viewer]')) return;
     if (event.pointerType === "touch") return;
     event.currentTarget.setPointerCapture(event.pointerId);
     viewerDragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, panX: viewerPan.x, panY: viewerPan.y, moved: false };
@@ -337,6 +367,7 @@ export function useViewerControls(view: any) {
     // A video swipes like a picture, except from its controls (the timeline
     // scrubs), and never pinches or pans: it has no zoom.
     const target = event.target as Element;
+    if (viewerControl(event)) return;
     if (target.closest('[data-video-viewer]') && (event.touches.length !== 1 || viewerZoom > 1 || target.closest('.heiss-video-controls, .heiss-video-error'))) return;
     const canvas = viewerCanvas(event);
     // The last swipe is still carrying its picture off: let it land first.
@@ -496,6 +527,22 @@ export function useViewerControls(view: any) {
     if (event.touches.length) return;
     touchGestureRef.current = null;
     if (gesture.mode === "done") return;
+    // A backdrop tap closes before double-tap recognition can consume its click.
+    // This also works where Safari omits a synthetic click after touch gestures.
+    const endedTouch = event.changedTouches[0];
+    if (viewerControl(event)) return;
+    if (!gesture.moved && active && endedTouch) {
+      const media = canvas.querySelector("img, video") as HTMLImageElement | HTMLVideoElement | null;
+      if (media) {
+        const rect = containedRect(media);
+        if (endedTouch.clientX < rect.left || endedTouch.clientX > rect.right || endedTouch.clientY < rect.top || endedTouch.clientY > rect.bottom) {
+          lastTapRef.current = 0;
+          setActive(null);
+          return;
+        }
+      }
+    }
+    if (!gesture.moved && active?.type === "video") return;
 
     if (gesture.mode === "swipe") {
       if (gesture.moved) {
@@ -545,5 +592,5 @@ export function useViewerControls(view: any) {
     }
     settleViewer(canvas, gesture.zoom, gesture.current, false);
   }
-  return { resetViewer, openItem, applyAllSettings, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
+  return { resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
 }

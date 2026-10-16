@@ -9,15 +9,21 @@ import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 import type { ShowToast } from './toast';
 
-export function GalleryManagement({ children, items, onDelete, onCopy, showToast }: {
+export function GalleryManagement({ children, items, modeSelector, onDelete, onCopy, resetKey, search, showToast, showToolbar = true, tools }: {
   children: React.ReactNode;
   items: GalleryItem[];
+  modeSelector: React.ReactNode;
+  resetKey: string;
+  search: React.ReactNode;
+  showToolbar?: boolean;
+  tools?: React.ReactNode;
   onDelete: (items: GalleryItem[]) => Promise<unknown>;
   onCopy: (item: GalleryItem) => void;
   showToast: ShowToast;
 }) {
   const [selection, setSelection] = useState<Set<string> | null>(null);
   const [menu, setMenu] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
+  useEffect(() => { setSelection(null); setMenu(null); }, [resetKey]);
   const anchor = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuOpener = useRef<HTMLElement | null>(null);
@@ -82,10 +88,10 @@ export function GalleryManagement({ children, items, onDelete, onCopy, showToast
   const allStarred = starred.length > 0 && starred.every((item) => item.favorite);
   const act = (action: () => void) => { closeMenu(); action(); };
   const actions = (inMenu: boolean) => <>
-    <button type="button" role={inMenu ? 'menuitem' : undefined} disabled={!ready.length} onClick={() => act(() => { void downloadItems(ready, showToast); })}><Download size={16} />Download</button>
-    {star ? <button type="button" role={inMenu ? 'menuitem' : undefined} disabled={!starred.length} onClick={() => act(() => star(starred, !allStarred))}><Star size={16} />{allStarred ? 'Unstar' : 'Star'}</button> : null}
-    {hidden ? <button type="button" role={inMenu ? 'menuitem' : undefined} disabled={!movable.length} onClick={() => act(() => hidden.space === 'hidden' ? hidden.unhide(movable) : hidden.hide(movable))}>{hidden.space === 'hidden' ? <Eye size={16} /> : <EyeOff size={16} />}{hidden.space === 'hidden' ? 'Move To Gallery' : 'Move To Hidden'}</button> : null}
-    <button type="button" role={inMenu ? 'menuitem' : undefined} className="is-danger" disabled={!targets.length} onClick={() => act(() => { void onDelete(targets); })}><Trash2 size={16} />{targets.length > 0 && targets.every((item) => item.library) ? 'Remove' : 'Delete'}</button>
+    <button type="button" role={inMenu ? 'menuitem' : undefined} title="Download" disabled={!ready.length} onClick={() => act(() => { void downloadItems(ready, showToast); })}><Download size={16} />Download</button>
+    {star ? <button type="button" role={inMenu ? 'menuitem' : undefined} title={allStarred ? "Unstar" : "Star"} disabled={!starred.length} onClick={() => act(() => star(starred, !allStarred))}><Star size={16} />{allStarred ? 'Unstar' : 'Star'}</button> : null}
+    {hidden ? <button type="button" role={inMenu ? 'menuitem' : undefined} title={hidden.space === "hidden" ? "Move To Gallery" : "Move To Hidden"} disabled={!movable.length} onClick={() => act(() => hidden.space === 'hidden' ? hidden.unhide(movable) : hidden.hide(movable))}>{hidden.space === 'hidden' ? <Eye size={16} /> : <EyeOff size={16} />}{hidden.space === 'hidden' ? 'Move To Gallery' : 'Move To Hidden'}</button> : null}
+    <button type="button" role={inMenu ? 'menuitem' : undefined} className="is-danger" title={targets.length > 0 && targets.every((item) => item.library) ? "Remove" : "Delete"} disabled={!targets.length} onClick={() => act(() => { void onDelete(targets); })}><Trash2 size={16} />{targets.length > 0 && targets.every((item) => item.library) ? 'Remove' : 'Delete'}</button>
   </>;
   const context = React.useMemo<NonNullable<React.ContextType<typeof GallerySelectionContext>>>(() => ({
     selecting: selection !== null,
@@ -105,6 +111,8 @@ export function GalleryManagement({ children, items, onDelete, onCopy, showToast
       return true;
     },
     menu: (item, event) => {
+      // Shift-right-click keeps the browser’s Save/Copy Image menu available.
+      if (event.type === 'contextmenu' && event.shiftKey) return;
       if (item.status !== 'done' && item.status !== 'error') return;
       event.preventDefault();
       menuOpener.current = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
@@ -114,14 +122,14 @@ export function GalleryManagement({ children, items, onDelete, onCopy, showToast
     }
   }), [items, selection]); // eslint-disable-line react-hooks/exhaustive-deps
   return <GallerySelectionContext.Provider value={context}>
-    {selectable.length || selection ? <div className="gallery-management" role="group" aria-label="Gallery Management">
+    {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions"><div className={selection ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       {selection ? <>
         <span role="status">{selected.length} Selected</span>
-        <button type="button" onClick={() => selected.length === selectable.length ? setSelection(new Set()) : all()}>{selected.length === selectable.length && selectable.length ? 'Deselect All' : 'Select All Loaded'}</button>
+        <button type="button" title={selected.length === selectable.length && selectable.length ? "Deselect All" : "Select All Loaded"} onClick={() => selected.length === selectable.length ? setSelection(new Set()) : all()}><CheckSquare size={16} />{selected.length === selectable.length && selectable.length ? 'Deselect All' : 'Select All Loaded'}</button>
         {actions(false)}
         <button type="button" aria-label="Stop Selecting" onClick={end}><X size={16} /></button>
       </> : <button type="button" title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => setSelection(new Set())}><CheckSquare size={16} />Select</button>}
-    </div> : null}
+    </div>{tools}</div></header> : null}
     {children}
     {menu ? createPortal(<div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y }} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];

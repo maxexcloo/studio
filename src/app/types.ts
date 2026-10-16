@@ -293,6 +293,8 @@ export type Preferences = {
   generationPreviewMode: "advanced" | "simple";
   variationQueueMode: "batch" | "separate";
   zenMode: boolean;
+  controlsPinned?: boolean;
+  countDefaultsVersion?: number;
   confirmActions: boolean;
   enterToGenerate: boolean;
   followLatest: boolean;
