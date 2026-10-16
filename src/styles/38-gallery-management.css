@@ -1,0 +1,62 @@
+.gallery-management {
+  position: sticky;
+  top: 48px;
+  z-index: 13;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 12px auto;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / .12);
+  border-radius: 14px;
+  background: rgb(24 24 24 / .97);
+  box-shadow: 0 4px 20px rgb(0 0 0 / .2);
+}
+.gallery-management > span { padding: 0 8px; font-size: 12px; white-space: nowrap; }
+.gallery-management button,
+.gallery-context-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #eee;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gallery-management button:hover,
+.gallery-context-menu button:hover,
+.gallery-context-menu button:focus-visible { background: rgb(255 255 255 / .1); }
+.gallery-management button:focus-visible,
+.gallery-context-menu button:focus-visible { outline: 2px solid #eee; outline-offset: -2px; }
+.gallery-management button:disabled,
+.gallery-context-menu button:disabled { opacity: .35; cursor: default; }
+.gallery-management .is-danger,
+.gallery-context-menu .is-danger { color: #ff9c8a; }
+.gallery-context-menu {
+  position: fixed;
+  z-index: 200;
+  width: 210px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / .16);
+  border-radius: 12px;
+  background: #202020;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .5);
+}
+.gallery-context-menu button { justify-content: flex-start; width: 100%; min-height: 40px; }
+.tile-overlay.is-selecting > :not(.tile-check) { display: none; }
+@media (forced-colors: active) {
+  .gallery-management, .gallery-context-menu { border-color: CanvasText; background: Canvas; }
+  .gallery-management button, .gallery-context-menu button { color: ButtonText; }
+}

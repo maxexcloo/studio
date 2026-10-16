@@ -505,17 +505,22 @@ export function useGenerationActions(view: any) {
     });
   }
 
-  /** Several at once (the phone's selection): one question, one undo for all of them. */
+  /** Several at once: one question, one undo for all of them. */
   async function deleteItems(items: GalleryItem[]) {
     const targets = items.filter(Boolean);
     if (!targets.length) return;
     if (targets.length === 1) return deleteItem(targets[0]);
     const hiddenOnes = targets.some((item) => item.privateVault);
+    const libraryOnly = targets.every((item) => item.library);
+    const includesLibrary = targets.some((item) => item.library);
     if (!await confirmAction({
-      title: `Delete ${targets.length} images?`,
-      description: hiddenOnes ? "They and their upscales are erased. There’s no other copy." : "Their files are deleted from disk.",
-      action: `Delete ${targets.length}`,
-      destructive: true
+      title: `${libraryOnly ? "Remove" : "Delete"} ${targets.length} Items?`,
+      description: hiddenOnes ? "They and their upscales are erased. There’s no other copy."
+        : libraryOnly ? "The files stay in their folders."
+          : includesLibrary ? "Generated files are deleted from disk. Files linked from library folders stay in their folders."
+            : "Their files are deleted from disk.",
+      action: `${libraryOnly ? "Remove" : "Delete"} ${targets.length}`,
+      destructive: !libraryOnly
     })) return;
     if (active && targets.some((item) => item.id === active.id)) setActive(null);
     galleryRemove(targets.flatMap((item) => [item.id, item.url]).filter(Boolean));

@@ -595,3 +595,103 @@ test('attaching a reference activates that mode’s controls without losing the 
   expect(requests[1].negative).toBe('blur');
   expect(requests[1].referenceAssets).toEqual([{ slot: 'reference', assetId: reference.id }]);
 });
+
+test('gallery selection supports bulk stars, ranges, context actions and mode changes', async ({ page, isMobile }, testInfo) => {
+  const favourites: { ids: string[]; favorite: boolean }[] = [];
+  await page.route('**/api/gallery/favorite', async (route) => {
+    favourites.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto('/');
+  const tile = (id: number) => page.locator(`[data-tile-id="image-${id}"] .tile`);
+  await expect(tile(0)).toBeVisible();
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'Select Items', exact: true }).click();
+    await tile(0).click();
+    await tile(1).click();
+    const bar = page.getByRole('navigation', { name: 'Selected Items' });
+    await page.screenshot({ path: testInfo.outputPath('phone-selection.png') });
+    await bar.getByRole('button', { name: 'Star', exact: true }).click();
+    await expect.poll(() => favourites.length).toBe(1);
+    expect(favourites[0].ids).toEqual(['image-0', 'image-1']);
+    await page.getByRole('button', { name: 'Stop Selecting' }).click();
+    await expect(bar).toHaveCount(0);
+    return;
+  }
+  const bar = page.getByRole('group', { name: 'Gallery Management' });
+  await tile(0).click({ modifiers: ['ControlOrMeta'] });
+  await tile(3).click({ modifiers: ['Shift'] });
+  await expect(bar.getByRole('status')).toHaveText('4 Selected');
+  await expect(page.locator('.viewer-canvas')).toHaveCount(0);
+  await tile(1).click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '4 Selected Items' });
+  await expect(menu).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('desktop-selection-menu.png') });
+  await menu.getByRole('menuitem', { name: 'Star', exact: true }).click();
+  await expect.poll(() => favourites.length).toBe(1);
+  expect(favourites[0].ids).toEqual(['image-0', 'image-1', 'image-2', 'image-3']);
+  await bar.getByRole('button', { name: 'Select All Loaded' }).click();
+  await expect(bar.getByRole('status')).toHaveText('80 Selected');
+  await bar.getByRole('button', { name: 'Deselect All' }).click();
+  await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
+  await tile(0).click();
+  await tile(1).click();
+  await bar.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirmation = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Delete 2 Items?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(bar.getByRole('status')).toHaveText('2 Selected');
+  await bar.getByRole('button', { name: 'Delete', exact: true }).click();
+  await confirmation.getByRole('button', { name: 'Delete 2', exact: true }).click();
+  await expect(tile(0)).toHaveCount(0);
+  await expect(tile(1)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(tile(0)).toBeVisible();
+  await expect(tile(1)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(bar.getByRole('button', { name: 'Select', exact: true })).toBeVisible();
+  await tile(0).focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('menuitem', { name: 'Delete', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(tile(0)).toBeFocused();
+  await tile(0).click({ modifiers: ['ControlOrMeta'] });
+  await controls(page, false).switchMode('video');
+  await expect(bar.getByRole('button', { name: 'Select', exact: true })).toBeVisible();
+});
+
+test('selection excludes pending jobs and disables unsupported actions for failed or library items', async ({ page, isMobile }) => {
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: {
+    items: [{ ...images[0], library: true }, { ...images[1], status: 'error', url: '' }, { ...images[2], status: 'pending' }],
+    revision: 1, hasMore: false,
+  } }));
+  await page.goto('/');
+  await expect(page.locator('[data-tile-id="image-0"] .tile')).toBeVisible();
+  if (isMobile) {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'Select Items', exact: true }).click();
+    await page.getByRole('button', { name: 'Select All Loaded', exact: true }).click();
+  } else {
+    await page.getByRole('group', { name: 'Gallery Management' }).getByRole('button', { name: 'Select', exact: true }).click();
+    await page.getByRole('button', { name: 'Select All Loaded', exact: true }).click();
+  }
+  const bar = page.locator(isMobile ? '.phone-select-bar' : '.gallery-management');
+  await expect(page.locator('.tile.is-selected')).toHaveCount(2);
+  await expect(page.locator('[data-tile-id="image-2"] .tile-action')).toBeVisible();
+  await expect(bar.getByRole('button', { name: isMobile ? 'Hide' : 'Move To Hidden', exact: true })).toBeDisabled();
+  await page.locator('[data-tile-id="image-0"] .tile').click();
+  await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: isMobile ? /^(Save|Share)$/ : 'Download', exact: true })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
+  await page.locator('[data-tile-id="image-2"] .tile').click();
+  await expect(page.locator('.tile.is-selected')).toHaveCount(1);
+  if (!isMobile) {
+    await page.locator('[data-tile-id="image-1"] .tile').focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(page.locator('.tile.is-selected')).toHaveCount(2);
+  }
+});
