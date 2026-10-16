@@ -148,3 +148,13 @@
   .zen-controls { top: max(6px, env(safe-area-inset-top)); }
   .stage-gallery { padding-top: max(6px, env(safe-area-inset-top)); }
 }
+
+/* Reserve the actual horizontal dock width, including optional library actions.
+   The existing narrow-screen column and above-composer placements keep their lanes. */
+@media (min-width: 1041px) {
+  .app-shell:not(.has-pinned-controls) .zen-prompt,
+  .zen-shell .zen-prompt {
+    width: min(920px, calc(100vw - 2 * (var(--studio-dock-w, 258px) + var(--deck-gap) + 12px)));
+    min-width: 0;
+  }
+}

@@ -16,8 +16,8 @@
 .zen-prompt { contain: layout; }
 
 /* The composer sits under the dock (z 13). While one of its own surfaces is
-   open, it rises above, so the dock never covers the drawer or a menu. */
-.zen-prompt:has(.composer-drawer, .model-menu, .aspect-menu, .ref-chip.is-open) { z-index: 14; }
+   open, it rises above the dock and short-screen sidebar (15), below the viewer (20). */
+.zen-prompt:has(.composer-drawer, .model-menu, .aspect-menu, .ref-chip.is-open, .prompt-history) { z-index: 18; }
 
 /* Chips above the dock (Group runs, Stop) must not sit on an open sidebar. */
 :is(.app-shell, .zen-shell):has(.zen-controls.open) .dock-transients {

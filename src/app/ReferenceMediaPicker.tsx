@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { cn } from "./format";
 import { Tip } from "./components";
@@ -61,6 +61,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   onError?: (message: string) => void;
   upload: { busy: boolean; progress: number; multiple: boolean; start: (files: File[]) => Promise<ReferenceAsset | null> };
 }) {
+  const present = useIsPresent();
   // Hidden images sit on their own shelf, behind the same lock as Hidden itself.
   // It opens first when the picked image came from there, or when making in Hidden.
   const hidden = useHiddenActions();
@@ -241,12 +242,15 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
   const asSheet = Boolean(anchor?.classList.contains("phone-compose"));
+  // An exiting picker must not intercept Escape intended for the next overlay.
   return createPortal(
     <motion.div
       ref={popRef}
       className={cn("reference-popover", dropActive && "is-drop-target", asSheet && "is-sheet")}
       style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom }}
-      role="dialog"
+      role={present ? "dialog" : undefined}
+      aria-hidden={!present || undefined}
+      inert={!present}
       aria-label={`Choose ${label}`}
       aria-busy={upload.busy || Boolean(selectingId) || undefined}
       tabIndex={-1}

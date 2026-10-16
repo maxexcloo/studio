@@ -438,8 +438,20 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // One compact dock, bottom right, in both layouts. Transient actions (tidy up,
   // cancel queue) rise above it as small chips, so the dock never changes size.
   const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
+  const studioDockRef = React.useRef<HTMLDivElement>(null);
+  React.useLayoutEffect(() => {
+    const dock = studioDockRef.current;
+    const shell = dock?.closest<HTMLElement>('.app-shell, .zen-shell');
+    if (!dock || !shell) return;
+    const measure = () => shell.style.setProperty('--studio-dock-w', `${dock.offsetWidth}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(dock);
+    return () => { observer.disconnect(); shell.style.removeProperty('--studio-dock-w'); };
+  }, [phone, prefs.zenMode]);
+
   const studioDock = (
-    <div className="studio-dock">
+    <div className="studio-dock" ref={studioDockRef}>
       <div className="dock-transients">
         <AnimatePresence initial={false}>
           {phoneDevice && prefs.fullStudioOnPhone ? (
