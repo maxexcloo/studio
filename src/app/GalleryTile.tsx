@@ -16,6 +16,7 @@ import { useHiddenActions } from './hiddenContext';
 import type { UpscaleNotice } from './useUpscale';
 import { useDismiss } from './useDismiss';
 import { HapticTarget } from './phoneControls';
+import { GallerySelectionContext } from './gallerySelection';
 import { sharesWithoutSettings } from './shareSettings';
 
 /**
@@ -113,9 +114,10 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
   useDismiss(overlayRef, menuOpen, closeMenu);
   const act = (run: () => void) => { setMenuOpen(false); run(); };
   const phoneTiles = React.useContext(TileLongPressContext);
+  const selection = React.useContext(GallerySelectionContext);
   const selectable = item.status === "done" || item.status === "error";
-  const selecting = Boolean(phoneTiles?.selecting);
-  const isSelected = Boolean(selecting && phoneTiles?.selected.has(item.id));
+  const selecting = Boolean(phoneTiles?.selecting || selection?.selecting);
+  const isSelected = Boolean(selecting && (phoneTiles?.selected.has(item.id) || selection?.selected.has(item.id)));
   // While selecting, a long press toggles too, so a slow tap never gets lost.
   const onLongPress = phoneTiles ? (selecting ? (selectable ? phoneTiles.toggle : null) : phoneTiles.onLongPress) : null;
   const press = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
@@ -154,10 +156,15 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
         className={cn("tile", item.status, phoneTiles && "is-pressable", selecting && "is-selecting", isSelected && "is-selected")}
         style={{ width: "100%", height: "100%" } as React.CSSProperties}
         {...longPress}
-        onClick={() => {
+        onKeyDown={(event) => {
+          if (selection && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) selection.menu(item, event);
+        }}
+        onContextMenu={selection ? (event) => selection.menu(item, event) : longPress?.onContextMenu}
+        onClick={(event) => {
           // A long press already opened the actions; the lift that ends it is not a tap.
           if (press.current?.fired) { press.current = null; return; }
-          if (selecting) { if (selectable) phoneTiles!.toggle(item); return; }
+          if (selection?.click(item, event)) return;
+          if (selecting) { if (selectable) phoneTiles?.toggle(item); return; }
           if (item.status !== "pending") openItem(item);
         }}
         aria-pressed={selecting && selectable ? isSelected : undefined}
@@ -172,11 +179,11 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
           {/* A failed tile already says so in its middle; "Failed" again is noise. */}
           {item.status === "error" ? null : <em>{item.status === "pending" ? <ElapsedTime startedAt={item.createdAt} format={formatElapsed} /> : (item.timing?.runMs || item.durationMs) ? formatElapsed(item.timing?.runMs || item.durationMs || 0) : item.outputName || item.type}</em>}
         </span>
-        {selecting && selectable ? <HapticTarget /> : null}
+        {phoneTiles && selecting && selectable ? <HapticTarget /> : null}
       </button>
       {/* Controls are siblings of the tile's button, never inside it: a button
           inside a button is invalid and unreachable by keyboard. */}
-      <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone")}>
+      <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
         {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
         {upscaleNotice && onDismissUpscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="tile" onDismiss={() => onDismissUpscaleNotice(item.id)} /> : null}

@@ -1,3 +1,4 @@
+import { GalleryManagement } from './GalleryManagement';
 import { PromptActions } from './PromptActions';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
@@ -231,8 +232,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     });
   }, []);
   useHistoryDismiss(Boolean(phone && phoneSelection), () => setPhoneSelection(null));
-  // Leaving the phone studio or crossing into Hidden ends a selection.
-  React.useEffect(() => { setPhoneSelection(null); }, [phone, hiddenSpace]);
+  // A change of layout, privacy domain or filtered view ends a selection.
+  React.useEffect(() => { setPhoneSelection(null); }, [phone, hiddenSpace, hiddenLocked, mode, gallerySearch.q, gallerySearch.favorites]);
   const phoneTiles = React.useMemo(() => phone ? {
     onLongPress: openTileActions,
     selecting: Boolean(phoneSelection),
@@ -757,7 +758,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               ))}
             </div>
           ) : null}
-            {galleryBody}
+            {hiddenLocked || galleryCrossing ? galleryBody : <GalleryManagement key={`${hiddenSpace}:${mode}:${gallerySearch.q}:${gallerySearch.favorites}`} items={renderedGallery} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>}
             <div className="bottom-fade" />
           </main>
           {studioDock}

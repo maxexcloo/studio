@@ -6,7 +6,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -204,6 +204,12 @@ export async function shareItems(items: GalleryItem[], showToast: ShowToast) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
     }
   }
+  await downloadItems(ready, showToast);
+}
+
+export async function downloadItems(items: GalleryItem[], showToast: ShowToast) {
+  const ready = items.filter((item) => item.status === 'done' && item.url);
+  if (!ready.length) return;
   for (const item of ready) {
     const link = document.createElement('a');
     link.href = downloadUrl(item);
@@ -214,7 +220,7 @@ export async function shareItems(items: GalleryItem[], showToast: ShowToast) {
     // Browsers drop downloads fired in one burst.
     await new Promise((resolve) => setTimeout(resolve, 450));
   }
-  showToast(`Saved ${ready.length} images to downloads`, 'success');
+  showToast(`Saved ${ready.length} items to downloads`, 'success');
 }
 
 /* ------------------------------------------------------------ Item actions */
@@ -305,7 +311,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               : <button type="button" className="phone-row" onClick={() => run(() => actions.hide(item))}><EyeOff size={20} /><span>Move to Hidden</span></button>
           ) : null}
           {onSelect && (item.status === 'done' || item.status === 'error') ? <button type="button" className="phone-row" onClick={() => run(() => onSelect(item))}><CheckCircle2 size={20} /><span>Select several<small>Then save, hide or delete them together</small></span><HapticTarget /></button> : null}
-          <button type="button" className="phone-row is-danger" onClick={() => run(() => { haptic('warning'); actions.remove(item); })}><Trash2 size={20} /><span>Delete</span><HapticTarget /></button>
+          <button type="button" className="phone-row is-danger" onClick={() => run(() => { haptic('warning'); actions.remove(item); })}><Trash2 size={20} /><span>{item.library ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
         </div>
       ) : null}
     </Sheet>
@@ -332,7 +338,7 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
           ? <button type="button" onClick={() => actions.unhide(item)}><Eye size={21} /><span>Unhide</span></button>
           : <button type="button" onClick={() => actions.hide(item)}><EyeOff size={21} /><span>Hide</span></button>
       ) : null}
-      <button type="button" className="is-danger" onClick={() => { haptic('warning'); actions.remove(item); }}><Trash2 size={21} /><span>Delete</span><HapticTarget /></button>
+      <button type="button" className="is-danger" onClick={() => { haptic('warning'); actions.remove(item); }}><Trash2 size={21} /><span>{item.library ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
       {/* Info sits beside Close at the top right, so the bar keeps room for actions. */}
       <button type="button" className={cn('viewer-phone-info', showDetails && 'is-on')} aria-pressed={showDetails} aria-label="Details" onClick={onToggleDetails}><Info size={20} /></button>
     </nav>
@@ -369,6 +375,10 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const selecting = Boolean(selection);
   const selectedItems = selecting ? gallery.filter((item) => selection!.has(item.id)) : [];
   const selectable = gallery.filter((item) => item.status === 'done' || item.status === 'error');
+  const readyItems = selectedItems.filter((item) => item.status === 'done' && item.url);
+  const movableItems = readyItems.filter((item) => !item.library);
+  const starredItems = selectedItems.filter(canStar);
+  const allStarred = starredItems.length > 0 && starredItems.every((item) => item.favorite);
   const endSelection = () => setSelection(null);
   const reducedMotion = useReducedMotion();
   const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
@@ -420,8 +430,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {selecting ? (
         <header className="phone-bar is-selecting">
           <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={endSelection}><X size={22} /></button>
-          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select Images'}</span></div>
-          <button type="button" className="phone-pill" onClick={() => { haptic('tap'); setSelection(new Set(selectedItems.length === selectable.length ? [] : selectable.map((item) => item.id))); }}>
+          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select Items'}</span></div>
+          <button type="button" className="phone-pill" aria-label={selectedItems.length === selectable.length && selectable.length ? "Deselect All" : "Select All Loaded"} onClick={() => { haptic('tap'); setSelection(new Set(selectedItems.length === selectable.length ? [] : selectable.map((item) => item.id))); }}>
             {selectedItems.length === selectable.length && selectable.length ? 'None' : 'All'}
             <HapticTarget />
           </button>
@@ -470,12 +480,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       </main>
 
       {selecting ? (
-        <nav className="phone-select-bar" aria-label="Selected images">
-          <button type="button" disabled={!selectedItems.length} onClick={() => shareItems(selectedItems, showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button>
+        <nav className="phone-select-bar" aria-label="Selected Items">
+          <button type="button" disabled={!readyItems.length} onClick={() => shareItems(readyItems, showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button>
+          <button type="button" disabled={!starredItems.length} onClick={() => view.toggleFavorite(starredItems, !allStarred)}><Star size={21} /><span>{allStarred ? 'Unstar' : 'Star'}</span></button>
           {hiddenSpace
-            ? <button type="button" disabled={!selectedItems.length} onClick={() => { unhideItems(selectedItems.filter((item) => item.status === 'done')); endSelection(); }}><Eye size={21} /><span>Unhide</span></button>
-            : <button type="button" disabled={!selectedItems.length} onClick={() => { hideItems(selectedItems.filter((item) => item.status === 'done')); endSelection(); }}><EyeOff size={21} /><span>Hide</span></button>}
-          <button type="button" className="is-danger" disabled={!selectedItems.length} onClick={async () => { haptic('warning'); await deleteItems(selectedItems); endSelection(); }}><Trash2 size={21} /><span>Delete</span><HapticTarget /></button>
+            ? <button type="button" disabled={!movableItems.length} onClick={() => { unhideItems(movableItems); }}><Eye size={21} /><span>Unhide</span></button>
+            : <button type="button" disabled={!movableItems.length} onClick={() => { hideItems(movableItems); }}><EyeOff size={21} /><span>Hide</span></button>}
+          <button type="button" className="is-danger" disabled={!selectedItems.length} onClick={async () => { haptic('warning'); await deleteItems(selectedItems); }}><Trash2 size={21} /><span>{selectedItems.length > 0 && selectedItems.every((item) => item.library) ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
         </nav>
       ) : null}
 
@@ -526,7 +537,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       </AnimatePresence>
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
-      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} />
+      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => setSelection(new Set()) : undefined} />
       <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} actions={itemActions} onSelect={(item) => { haptic('press'); setSelection(new Set([item.id])); }} />
     </>
   );
@@ -789,7 +800,7 @@ function AspectSheet({ view, open, onClose }: { view: Record<string, any>; open:
 
 /* ------------------------------------------------------------ More */
 
-function MoreSheet({ view, open, onClose, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; statusText: string }) {
+function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void; statusText: string }) {
   const { prefs, setPrefs, hidden, retryComfyStatus, comfyRetrying } = view;
   const toggle = (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => (
     <button type="button" role="switch" aria-checked={checked} className="phone-row" onClick={() => onChange(!checked)}>
@@ -799,6 +810,7 @@ function MoreSheet({ view, open, onClose, statusText }: { view: Record<string, a
   );
   return (
     <Sheet open={open} onClose={onClose} title="More">
+      {onSelect ? <div className="phone-group"><button type="button" className="phone-row" aria-label="Select Items" onClick={() => { onClose(); onSelect(); }}><CheckSquare size={20} /><span>Select Items<small>Save, star, move or delete several items</small></span></button></div> : null}
       <div className="phone-group">
         <button type="button" className="phone-row" onClick={retryComfyStatus}>
           <RefreshCw size={20} className={cn(comfyRetrying && 'spin')} /><span>{statusText}<small>Tap to check again</small></span>
