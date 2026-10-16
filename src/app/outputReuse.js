@@ -6,7 +6,7 @@ const basename = (value) => value.split('/').pop();
 export function outputProfile(profiles = [], item = {}) {
   const candidates = profiles.filter((profile) => profile.kind === item.type && profile.ready !== false);
   const settings = item.settings || {};
-  const imported = item.civitai?.resources?.find((resource) => resource.folder === 'checkpoints');
+  const imported = item.civitai?.resources?.find((resource) => ['checkpoints', 'diffusion_models'].includes(resource.folder));
   if (item.civitai && (!imported || imported.status === 'conflict')) return undefined;
   const saved = candidates.find((profile) => key(profile.id) === key(settings.profileId) && key(settings.profileId));
   if (saved) return saved;

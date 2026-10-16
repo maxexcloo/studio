@@ -16,6 +16,7 @@ process.env.HEISS_ENABLE_PRESETS = '1';
 delete process.env.CIVITAI_API_TOKEN;
 fs.writeFileSync(path.join(dir, 'presets.json'), JSON.stringify([{ id: '43', name: 'Legacy Landscape', previewUrl: 'https://image.civitai.com/legacy.png', sourceUrl: 'https://civitai.com/images/43', prompt: 'an older saved landscape', negative: '', settings: { seed: '0' }, resources: [], warnings: [], savedAt: '2025-01-01T00:00:00Z' }]));
 const { registerPresetRoutes } = await import('./preset-routes.js');
+const { downloadPresetImage } = await import('./civitai-library.js');
 const bytes = Buffer.from('model');
 const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
 let online = true;
@@ -199,4 +200,24 @@ test('disabled instances refuse every preset, provider download and token route'
       }
     }
   } finally { process.env.HEISS_ENABLE_PRESETS = '1'; }
+});
+
+test('split workflow imports queue verified model, encoder, VAE and LoRA files and retain their associations', async () => {
+  const downloads = [];
+  const resources = [['diffusion_models', 'exact-int8.safetensors'], ['text_encoders', 'exact-encoder.safetensors'], ['vae', 'exact-vae.safetensors'], ['loras', 'style-slider.safetensors']].map(([folder, file]) => {
+    const id = `hf:test:${folder}:${file}`;
+    return { versionId: id, file, folder, name: file, supported: true, sha256, weight: folder === 'loras' ? 15 : null, spec: { id, file, folder, sha256, url: 'https://huggingface.co/example/model/resolve/' + 'a'.repeat(40) + '/' + file } };
+  });
+  await downloadPresetImage({ id: '143425442', name: 'Public Metadata Fixture', type: 'image', previewUrl: 'https://image.civitai.com/fixture.png', prompt: 'A landscape', negative: '', settings: {}, resources, warnings: [] }, {
+    models: async () => ({ profiles: [], textEncoders: [], vaes: [], loras: [] }),
+    imageRequest: async () => new Response(image),
+    download: async (spec) => { downloads.push(spec); return { status: 'queued' }; }
+  });
+  assert.deepEqual(downloads.map((spec) => spec.folder), ['diffusion_models', 'text_encoders', 'vae', 'loras']);
+  const item = store.gallery.find((item) => item.id === 'civitai:143425442');
+  assert.equal(item.model, 'exact-int8.safetensors');
+  assert.equal(item.settings.textEncoder, 'exact-encoder.safetensors');
+  assert.deepEqual(item.settings.textEncoders, ['exact-encoder.safetensors']);
+  assert.equal(item.settings.vae, 'exact-vae.safetensors');
+  assert.deepEqual(item.settings.loras, [{ name: 'style-slider.safetensors', strength: 15, enabled: true }]);
 });

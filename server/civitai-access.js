@@ -99,3 +99,16 @@ export async function civitaiJson(pathname, { request = civitaiFetch } = {}) {
   try { return JSON.parse((await limitedBody(response, 4 * 1024 * 1024)).toString()); }
   catch { throw new Error('Civitai returned unreadable metadata.'); }
 }
+
+/** The public page retains generation associations omitted by the REST image API. */
+export async function civitaiGenerationData(id, { request = civitaiFetch } = {}) {
+  if (!Number.isSafeInteger(id) || id < 1) throw new Error('Choose a valid Civitai image.');
+  const response = await request(`https://civitai.com/images/${id}`, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) { await response.body?.cancel(); throw new Error('The source generation associations are unavailable.'); }
+  const html = (await limitedBody(response, 8 * 1024 * 1024)).toString();
+  const script = html.match(/<script\b(?=[^>]*\bid=["']__NEXT_DATA__["'])[^>]*>([\s\S]*?)<\/script>/i);
+  if (!script) return null;
+  const state = JSON.parse(script[1])?.props?.pageProps?.trpcState;
+  const query = (state?.json?.queries || state?.queries || []).find((entry) => entry.queryKey?.[0]?.join('.') === 'image.getGenerationData' && entry.queryKey?.[1]?.input?.id === id);
+  return query?.state?.data || null;
+}

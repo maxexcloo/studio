@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { modelFolders } from './comfy.js';
-import { civitaiAssetUrl, civitaiJson, isCivitaiHost } from './civitai-access.js';
+import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from './civitai-access.js';
+import { sameResourceFilename, workflowModelSources } from './civitai-workflow.js';
 
 const samplers = {
   'DPM++ 2M': 'dpmpp_2m', 'DPM++ 2M SDE': 'dpmpp_2m_sde', 'DPM++ 2S a': 'dpmpp_2s_ancestral',
@@ -10,7 +11,7 @@ const samplers = {
   'DPM2 a': 'dpm_2_ancestral', Euler: 'euler', 'Euler a': 'euler_ancestral', Heun: 'heun', LCM: 'lcm', LMS: 'lms', UniPC: 'uni_pc'
 };
 const schedules = { Automatic: 'normal', Beta: 'beta', Exponential: 'exponential', Karras: 'karras', 'SGM Uniform': 'sgm_uniform', Simple: 'simple', Uniform: 'normal' };
-const folders = { Checkpoint: 'checkpoints', LORA: 'loras', LoCon: 'loras', VAE: 'vae' };
+const folders = { Checkpoint: 'checkpoints', 'Diffusion Model': 'diffusion_models', LORA: 'loras', LoCon: 'loras', 'Text Encoder': 'text_encoders', VAE: 'vae' };
 const hashes = new Map();
 
 export function civitaiLink(value, kind = 'images') {
@@ -59,11 +60,11 @@ export function imagePreset(image) {
   if (scheduler) settings.scheduler = scheduler;
   else if (schedule) warnings.push(`Schedule “${schedule}” needs a manual choice.`);
   if (!Object.keys(meta).length) warnings.push('This image has no generation metadata. You can save its source, but its settings cannot be recovered.');
-  const resources = (Array.isArray(meta.civitaiResources) ? meta.civitaiResources : []).filter((item) => Number.isSafeInteger(item?.modelVersionId) && item.modelVersionId > 0).map((item) => ({ versionId: item.modelVersionId, weight: number(item.weight, -10, 10) ?? null }));
+  const resources = (Array.isArray(meta.civitaiResources) ? meta.civitaiResources : []).filter((item) => Number.isSafeInteger(item?.modelVersionId) && item.modelVersionId > 0).map((item) => ({ versionId: item.modelVersionId, weight: number(item.weight, -100, 100) ?? null }));
   for (const item of Array.isArray(meta.resources) ? meta.resources : []) {
     const versionId = Number(item?.modelVersionId);
-    if (Number.isSafeInteger(versionId) && versionId > 0 && !resources.some((entry) => entry.versionId === versionId)) resources.push({ versionId, weight: number(item.weight, -10, 10) ?? null });
-    else if (/^[a-f0-9]{8,64}$/i.test(item?.hash || '')) resources.push({ hash: item.hash, weight: number(item.weight, -10, 10) ?? null });
+    if (Number.isSafeInteger(versionId) && versionId > 0 && !resources.some((entry) => entry.versionId === versionId)) resources.push({ versionId, weight: number(item.weight, -100, 100) ?? null });
+    else if (/^[a-f0-9]{8,64}$/i.test(item?.hash || '')) resources.push({ hash: item.hash, weight: number(item.weight, -100, 100) ?? null });
   }
   // Some upload tools retain only the flattened version IDs.
   for (const versionId of Array.isArray(image.modelVersionIds) ? image.modelVersionIds : []) {
@@ -87,7 +88,7 @@ export function imagePreset(image) {
       const type = ['lora', 'locon'].includes(rawType) ? 'LORA' : rawType === 'vae' ? 'VAE' : rawType === 'checkpoint' || rawType === 'model' ? 'Checkpoint' : 'Unknown';
       const folder = folders[type] || '';
       if (!folder || resources.some((resource) => resource.folder === folder && resource.file === file)) continue;
-      resources.push({ versionId: `name:${folder}:${file}`, file, folder, name: file, nameOnly: true, supported: false, type, weight: type === 'LORA' ? number(Array.isArray(item) ? item[2] : item.strength ?? item.weight, -10, 10) ?? null : null, note: 'No exact source version or checksum was supplied. Match a local filename or supply a model link to download it.' });
+      resources.push({ versionId: `name:${folder}:${file}`, file, folder, name: file, nameOnly: true, supported: false, type, weight: type === 'LORA' ? number(Array.isArray(item) ? item[2] : item.strength ?? item.weight, -100, 100) ?? null : null, note: 'No exact source version or checksum was supplied. Match a local filename or supply a model link to download it.' });
     }
     if (resources.length) warnings.push('Some source files are identified only by name. Filename matches do not verify the exact version.');
   }
@@ -108,14 +109,16 @@ export function imagePreset(image) {
 
 export function versionResource(version, weight = 1) {
   if (!Number.isSafeInteger(version?.id) || version.id < 1) throw new Error('Civitai did not return a model version.');
-  const folder = Object.hasOwn(folders, version.model?.type) ? folders[version.model.type] : '';
-  const files = (version.files || []).filter((file) => file.type === 'Model' && /\.(safetensors|gguf)$/i.test(file.name || '') && path.basename(file.name) === file.name && !file.name.includes('\\') && !/[\x00-\x1f]/.test(file.name));
+  let folder = Object.hasOwn(folders, version.model?.type) ? folders[version.model.type] : '';
+  const fileTypes = ['Model', ...(version.model?.type === 'Checkpoint' ? ['Diffusion Model'] : []), ...(['Diffusion Model', 'Text Encoder', 'VAE'].includes(version.model?.type) ? [version.model.type] : [])];
+  const files = (version.files || []).filter((file) => fileTypes.includes(file.type) && /\.(safetensors|gguf)$/i.test(file.name || '') && path.basename(file.name) === file.name && !file.name.includes('\\') && !/[\x00-\x1f]/.test(file.name));
   const file = files.find((item) => item.primary) || files[0];
+  if (file?.type === 'Diffusion Model') folder = 'diffusion_models';
   const sha256 = /^[a-f0-9]{64}$/i.test(file?.hashes?.SHA256 || '') ? file.hashes.SHA256.toLowerCase() : '';
   const spec = folder && file && sha256 ? {
     id: `civitai:${version.id}:${file.id}`, file: file.name, folder, label: String(version.model?.name || file.name).slice(0, 200),
     // Construct the endpoint from IDs rather than trusting a URL from metadata.
-    url: `https://civitai.com/api/download/models/${version.id}?type=Model&format=${/\.gguf$/i.test(file.name) ? 'GGUF' : 'SafeTensor'}${file.metadata?.fp ? `&fp=${encodeURIComponent(file.metadata.fp)}` : ''}${file.metadata?.size ? `&size=${encodeURIComponent(file.metadata.size)}` : ''}`,
+    url: `https://civitai.com/api/download/models/${version.id}?type=${encodeURIComponent(file.type)}&format=${/\.gguf$/i.test(file.name) ? 'GGUF' : 'SafeTensor'}${file.metadata?.fp ? `&fp=${encodeURIComponent(file.metadata.fp)}` : ''}${file.metadata?.size ? `&size=${encodeURIComponent(file.metadata.size)}` : ''}`,
     sha256, bytes: Number(file.sizeKB || 0) * 1024
   } : null;
   return {
@@ -128,22 +131,54 @@ export function versionResource(version, weight = 1) {
   };
 }
 
-export async function importCivitaiImage(value, { json = civitaiJson } = {}) {
+export async function importCivitaiImage(value, { generation = civitaiGenerationData, json = civitaiJson, resolveSource = async (url, folder) => (await import('./library-downloads.js')).resolveModelLink(url, folder) } = {}) {
   const { id } = civitaiLink(value);
   const response = await json(`images?imageId=${id}&withMeta=true&nsfw=true`);
   const image = response.items?.find((item) => item.id === id);
   if (!image) throw new Error('That image is unavailable. Check its link and your Civitai token.');
   const preset = imagePreset(image);
   const resources = [];
-  // Keep provider requests bounded and avoid bursting a large LoRA stack.
-  for (const item of preset.resources) {
-    if (item.nameOnly) { resources.push(item); continue; }
+  const sourceFiles = workflowModelSources(preset.sourceMetadata);
+  for (const source of sourceFiles) {
     try {
-      const resource = versionResource(await json(item.hash ? `model-versions/by-hash/${item.hash}` : `model-versions/${item.versionId}`), item.weight);
+      const spec = await resolveSource(source.url, source.folder);
+      if (spec.file !== source.file || spec.folder !== source.folder || !/^[a-f0-9]{64}$/i.test(spec.sha256 || '')) throw new Error('The source file identity could not be verified.');
+      resources.push({ versionId: spec.id, file: spec.file, folder: spec.folder, sha256: spec.sha256, bytes: spec.bytes, name: spec.file, type: Object.keys(folders).find((type) => folders[type] === spec.folder) || 'Unknown', baseModel: preset.baseModel, sourceUrl: spec.url, supported: true, weight: null, spec });
+    } catch { preset.warnings.push(`The recorded ${source.file} source could not be verified. Supply its model link or retry later.`); }
+  }
+  let associations = preset.resources.filter((resource) => !resource.nameOnly);
+  if (!associations.length) {
+    try {
+      const data = await generation(id);
+      associations = (Array.isArray(data?.resources) ? data.resources : []).filter((resource) => Number.isSafeInteger(resource.modelVersionId) && resource.modelVersionId > 0).map((resource) => ({ versionId: resource.modelVersionId, weight: number(resource.strength, -100, 100) ?? null }));
+      if (associations.length > 24) throw new Error('This image references too many resources to import.');
+    } catch { preset.warnings.push('The source page’s exact model associations could not be recovered. Filename-only entries need review.'); }
+  }
+  // Keep provider requests bounded and avoid bursting a large LoRA stack.
+  for (const item of associations.slice(0, 24)) {
+    try {
+      const version = await json(item.hash ? `model-versions/by-hash/${item.hash}` : `model-versions/${item.versionId}`);
+      const resource = versionResource(version, item.weight);
+      const named = preset.resources.find((entry) => entry.nameOnly && entry.folder === resource.folder && sameResourceFilename(entry.file, resource.file));
+      if (resource.weight === null && named) resource.weight = named.weight;
+      // The workflow records the actual variant; a model-version primary may be a different precision.
+      const recordedModels = resources.filter((entry) => ['checkpoints', 'diffusion_models'].includes(entry.folder));
+      if (['checkpoints', 'diffusion_models'].includes(resource.folder) && recordedModels.length) {
+        if (version.files?.some((file) => recordedModels.some((entry) => entry.sha256 === file.hashes?.SHA256?.toLowerCase()))) continue;
+        resource.supported = false; resource.spec = null;
+        resource.note = 'The linked model version does not match the recorded workflow weights. Review this association before downloading.';
+      }
       if (!resources.some((entry) => entry.versionId === resource.versionId)) resources.push(resource);
     }
     catch { resources.push({ ...item, versionId: item.versionId || `hash:${item.hash}`, name: item.versionId ? `Version ${item.versionId}` : 'Unresolved Resource', type: 'Unknown', supported: false, note: 'This resource is unavailable or requires access.' }); }
   }
+  for (const named of preset.resources.filter((resource) => resource.nameOnly)) {
+    const covered = resources.some((resource) => (resource.folder === named.folder || (named.folder === 'checkpoints' && resource.folder === 'diffusion_models')) && sameResourceFilename(named.file, resource.file));
+    if (!covered) resources.push(named);
+  }
+  if (resources.some((resource) => resource.supported)) preset.warnings = preset.warnings.filter((warning) => !warning.startsWith('No exact model versions were supplied.'));
+  if (!resources.some((resource) => resource.nameOnly)) preset.warnings = preset.warnings.filter((warning) => !warning.startsWith('Some source files are identified only by name.'));
+  if (resources.length > 24) throw new Error('This image references too many resources to import.');
   return { ...preset, resources };
 }
 
@@ -164,24 +199,24 @@ async function hashFile(file) {
   return hashes.get(key);
 }
 
-export async function matchResources(preset, { profiles = [], loras = [], vaes = [] } = {}, { foldersFor = modelFolders } = {}) {
+export async function matchResources(preset, { profiles = [], loras = [], textEncoders = [], vaes = [] } = {}, { foldersFor = modelFolders } = {}) {
   const resources = [];
   for (const resource of preset.resources) {
     let localName = '';
     let profileId = '';
     let conflict = false;
-    const candidates = resource.folder === 'loras' ? loras : resource.folder === 'vae' ? vaes
+    const candidates = resource.folder === 'loras' ? loras : resource.folder === 'vae' ? vaes : resource.folder === 'text_encoders' ? textEncoders
       : profiles.filter((item) => item.kind === (preset.type || 'image')).flatMap((item) => [item.defaults?.model, item.model, item.baseModel]).filter(Boolean);
     for (const name of [...new Set(candidates)]) {
       if (typeof name !== 'string' || path.isAbsolute(name) || name.split(/[\\/]/).includes('..')) continue;
-      const modelDirs = resource.folder === 'checkpoints'
+      const modelDirs = ['checkpoints', 'diffusion_models'].includes(resource.folder)
         ? [...foldersFor('checkpoints', ['checkpoints']), ...foldersFor('diffusion_models', ['diffusion_models', 'unet'])]
         : resource.folder ? foldersFor(resource.folder, [resource.folder]) : [];
       for (const dir of modelDirs) {
         const file = path.join(dir, name);
         try {
           const stat = await fs.promises.stat(file);
-          const sameName = path.basename(name) === resource.file;
+          const sameName = resource.nameOnly ? sameResourceFilename(name, resource.file) : path.basename(name) === resource.file;
           // Civitai rounds sizeKB; use a small tolerance to find renamed files.
           if (!stat.isFile() || (!sameName && (!resource.bytes || Math.abs(stat.size - resource.bytes) > 2048))) continue;
           if (resource.nameOnly && sameName) { localName = name; break; }
@@ -191,7 +226,7 @@ export async function matchResources(preset, { profiles = [], loras = [], vaes =
       }
       if (localName) break;
     }
-    if (localName && resource.folder === 'checkpoints') profileId = profiles.find((item) => item.kind === (preset.type || 'image') && [item.defaults?.model, item.model, item.baseModel].includes(localName))?.id || '';
+    if (localName && ['checkpoints', 'diffusion_models'].includes(resource.folder)) profileId = profiles.find((item) => item.kind === (preset.type || 'image') && [item.defaults?.model, item.model, item.baseModel].includes(localName))?.id || '';
     const { spec, ...publicResource } = resource;
     resources.push({ ...publicResource, conflict, localName, profileId, ...(resource.nameOnly && localName ? { note: 'Matched by filename only; the exact version is unverified.' } : {}), status: localName ? 'installed' : conflict ? 'conflict' : resource.supported ? 'missing' : 'unsupported' });
   }

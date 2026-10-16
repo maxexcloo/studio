@@ -45,7 +45,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
   };
   const select = (preset: ImagePreset) => {
     setSelected(preset);
-    setProfileId(preset.resources.find((item) => item.profileId)?.profileId || (!preset.resources.some((item) => item.folder === 'checkpoints') ? preset.type === 'video' ? models?.defaults.videoModel : models?.defaults.imageModel : '') || '');
+    setProfileId(preset.resources.find((item) => item.profileId)?.profileId || (!preset.resources.some((item) => ['checkpoints', 'diffusion_models'].includes(item.folder || '')) ? preset.type === 'video' ? models?.defaults.videoModel : models?.defaults.imageModel : '') || '');
   };
   const resolve = async (id: string) => {
     const data = await post<{ preset: ImagePreset }>('/api/presets/resolve', { id });
@@ -91,11 +91,12 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
   const profile = profiles.find((item) => item.id === profileId);
   const fit = selected ? presetFit(selected, profile) : null;
   const pending = downloads.filter((item) => ['queued', 'downloading'].includes(item.status));
-  const activeFor = (versionId: number | string) => pending.some((item) => item.id.startsWith(`civitai:${versionId}:`));
+  const matchesDownload = (id: string, versionId: number | string) => id === versionId || id.startsWith(`civitai:${versionId}:`);
+  const activeFor = (versionId: number | string) => pending.some((item) => matchesDownload(item.id, versionId));
   const missing = selected?.resources.filter((item) => item.status === 'missing' && item.supported && !activeFor(item.versionId)) || [];
   const resourceStatus = (resource: PresetResource) => {
     if (resource.status === 'installed') return resource.nameOnly ? 'Found By Filename' : 'Installed';
-    const download = downloads.find((item) => item.id.startsWith(`civitai:${resource.versionId}:`));
+    const download = downloads.find((item) => matchesDownload(item.id, resource.versionId));
     if (download?.status === 'queued') return 'Queued';
     if (download?.status === 'downloading') return download.totalBytes ? `Downloading ${Math.min(100, Math.round(download.receivedBytes / download.totalBytes * 100))}%` : 'Downloading…';
     if (download && ['error', 'paused', 'canceled'].includes(download.status)) return download.status === 'error' ? 'Download Failed' : download.status === 'paused' ? 'Paused' : 'Cancelled';
@@ -150,7 +151,13 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         {access ? <p className="preset-note">{access.note}</p> : null}
         {selected.downloadWarnings?.length ? <ul className="preset-message is-error">{selected.downloadWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
         {missing.length ? <p className="preset-note">Missing supported files are queued automatically. Downloads can be retried below.</p> : null}
-        {selected.downloadWarnings?.length && missing.length ? <button className="btn" disabled={busy} onClick={() => void run(async () => { for (const resource of missing) await post('/api/library/downloads', { versionId: resource.versionId }); showToast('Missing file downloads queued', 'success'); })}><RefreshCw size={15} />Retry Missing Files</button> : null}
+        {selected.downloadWarnings?.length && missing.length ? <button className="btn" disabled={busy} onClick={() => void run(async () => { for (const resource of missing) {
+          if (typeof resource.versionId === 'number') await post('/api/library/downloads', { versionId: resource.versionId });
+          else if (resource.sourceUrl && resource.folder) {
+            const result = await post<{ file: ModelFile }>('/api/library/downloads/preview', { url: resource.sourceUrl, folder: resource.folder });
+            await post('/api/library/downloads', { id: result.file.id });
+          }
+        } showToast('Missing file downloads queued', 'success'); })}><RefreshCw size={15} />Retry Missing Files</button> : null}
         {fit?.warnings.length ? <ul className="preset-message">{fit.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
         {fit?.blockers.length ? <ul className="preset-note">{fit.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : null}
         <div className="preset-save-row">
