@@ -49,6 +49,31 @@ test('delegated requests use only the configured API path and never follow redir
   await assert.rejects(controlRequest('downloads', null, { env, request: async () => new Response(null, { status: 403 }) }), /HTTP 403/);
 });
 
+test('delegated imports require and transmit the provider checksum', async () => {
+  const previousFetch = globalThis.fetch;
+  const sha256 = 'd'.repeat(64);
+  const spec = { id: 'civitai:18:4', file: 'verified.safetensors', folder: 'loras', sha256, url: 'https://civitai.com/api/download/models/18' };
+  const requests = [];
+  process.env.HEISS_MODEL_DOWNLOAD_URL = 'http://control.internal:9090/api';
+  process.env.HEISS_MODEL_DOWNLOAD_TOKEN = 'test-only';
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: url.href, body: init.body && JSON.parse(init.body) });
+    return Response.json(init.body ? { id: 'b'.repeat(24) } : { state: 'completed' });
+  };
+  try {
+    await assert.rejects(startLibraryDownload({ ...spec, sha256: undefined }), /provider SHA-256/);
+    assert.equal(requests.length, 0);
+    await startLibraryDownload(spec);
+    for (let attempt = 0; attempt < 20 && requests.length < 2; attempt += 1) await new Promise(setImmediate);
+    assert.deepEqual(requests[0], { url: 'http://control.internal:9090/api/downloads', body: { directory: 'loras', filename: spec.file, sha256, url: spec.url } });
+    assert.equal(requests[1].url, `http://control.internal:9090/api/jobs/${'b'.repeat(24)}`);
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete process.env.HEISS_MODEL_DOWNLOAD_URL;
+    delete process.env.HEISS_MODEL_DOWNLOAD_TOKEN;
+  }
+});
+
 test('disabled instances cannot resume previously resolved provider downloads', async () => {
   const spec = libraryDownload('civitai:17:3');
   assert.ok(spec);

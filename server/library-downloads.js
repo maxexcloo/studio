@@ -112,7 +112,7 @@ async function pumpControl() {
   try {
     if (!entry) return;
     if (!entry.jobId) {
-      const job = await controlRequest('downloads', { directory: entry.folder, filename: entry.file, url: entry.url });
+      const job = await controlRequest('downloads', { directory: entry.folder, filename: entry.file, sha256: entry.sha256, url: entry.url });
       if (!/^[a-f0-9]{24}$/.test(job.id || '')) throw new Error('The download service did not return a job.');
       entry.jobId = job.id;
       entry.status = 'downloading';
@@ -134,6 +134,7 @@ async function pumpControl() {
 
 export async function startLibraryDownload(spec) {
   if (!presetsEnabled()) throw new Error('Presets & Models is disabled on this instance.');
+  if (!/^[a-f0-9]{64}$/i.test(spec.sha256 || '')) throw new Error('This model has no valid provider SHA-256 checksum. Preview its source again.');
   if (!libraryDownloadAccess().available) throw new Error(libraryDownloadAccess().note);
   if (!backendConfig()) {
     const file = existingCopy(spec);
