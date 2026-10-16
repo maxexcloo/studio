@@ -459,7 +459,7 @@
   outline: none;
 }
 .phone-compose textarea::placeholder { color: rgb(255 255 255 / .45); }
-/* The desktop menu opens leftwards on hover; touch controls stay in the row. */
+/* Reference actions remain beside the thumbnail on touch screens. */
 .phone-compose .ref-selected { display: inline-flex; max-width: 100%; }
 .phone-compose .ref-thumb { flex: none; order: -1; }
 .phone-compose .ref-menu {
