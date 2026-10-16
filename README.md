@@ -114,7 +114,7 @@ Set `COMFY_VIDEO_URL` to a separate ComfyUI HTTP(S) endpoint to route local vide
 
 Open `http://localhost:8787`. `/data` retains settings, galleries, histories and imported workflows. Mount ComfyUI inputs, outputs and model directories separately when a feature needs local file access. The image defaults to UID 1000, exposes port 8787 and includes a health check. It starts the server directly; update the container image to update the application.
 
-The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities on `main` and `v*` tags. Browser and packaged launcher checks remain in CI. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
+CI calls the Container workflow after application and browser checks pass on `main` and `v*` tags. The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities. Packaged launcher checks run alongside it in CI. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
 
 For local verification, run `mise run setup`, then `mise run check`. Updatecli previews local tool, action, base image and npm dependency updates.
 
@@ -304,6 +304,9 @@ _Heiß_ is German for hot. Hence the steaming cup.
 </details>
 
 ## Development
+
+Install the [shared Mise configuration](https://github.com/maxexcloo/dotfiles#shared-tools--tasks)
+before running local Mise tasks.
 
 ```bash
 npm install

@@ -16,14 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Configure Global Tools
-        run: |
-          mkdir -p "$HOME/.config/mise"
-          sed -n '/^\[tools\]$/p; s/^# \([^ ]* = "latest"\)$/\1/p' .mise.toml > "$HOME/.config/mise/config.toml"
-      - name: Set Up Tools
-        uses: jdx/mise-action@v5
-        with:
-          version: 2026.10.7
+      - name: Set Up Shared Tools & Tasks
+        uses: maxexcloo/dotfiles/.github/actions/mise@main
       - name: Install Dependencies
         run: mise run setup
       - name: Run Checks

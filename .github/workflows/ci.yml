@@ -2,25 +2,25 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
+
+concurrency:
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.ref }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Configure Global Tools
-        run: |
-          mkdir -p "$HOME/.config/mise"
-          sed -n '/^\[tools\]$/p; s/^# \([^ ]* = "latest"\)$/\1/p' .mise.toml > "$HOME/.config/mise/config.toml"
-      - name: Set Up Tools
-        uses: jdx/mise-action@v5
-        with:
-          version: 2026.10.7
+      - name: Set Up Shared Tools & Tasks
+        uses: maxexcloo/dotfiles/.github/actions/mise@main
       - name: Install Dependencies
         run: mise run setup
       - name: Run Checks
@@ -131,3 +131,12 @@ jobs:
           Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
           if (-not $ok) { throw "HEISS UI did not answer on port 8787" }
           if (Select-String -Path "$env:RUNNER_TEMP\heiss.log" -Pattern "Missing dependencies|installed for another system" -Quiet) { throw "The Windows download installed packages on first start" }
+
+  container:
+    name: Container
+    if: github.event_name != 'pull_request'
+    needs: build
+    uses: ./.github/workflows/container.yaml
+    permissions:
+      contents: read
+      packages: write
