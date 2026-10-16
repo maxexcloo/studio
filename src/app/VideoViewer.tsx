@@ -72,7 +72,10 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
   return (
     <div ref={host} className="heiss-video-viewer" data-video-viewer
       onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(event) => {
+        // Only the fitted player owns clicks; its surrounding space is viewer backdrop.
+        if ((event.target as Element).closest('.heiss-phone-video, .heiss-desktop-video, .heiss-video-error')) event.stopPropagation();
+      }} onDoubleClick={(e) => e.stopPropagation()}
       onKeyDownCapture={(e) => {
         // Left and right step through the gallery, as they do for pictures, rather
         // than seek: the player never sees them, and the viewer gets them from the window.

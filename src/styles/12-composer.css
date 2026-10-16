@@ -316,3 +316,11 @@
   .composer-prompt-tools .ref-add { width: 40px; padding: 0; }
   .composer-prompt-tools .ref-add-label, .composer-prompt-tools .ref-add-label > span { gap: 0; font-size: 0; }
 }
+
+/* Count remains minus/value/plus when labels compact; each touch action has its own target. */
+@media (pointer: coarse) {
+  .composer-count-picker.number-picker { min-height: 44px; }
+  .composer-count-picker.number-picker .number-picker-btn,
+  .composer-count-picker.number-picker .number-picker-value,
+  .composer-count-picker.number-picker .number-picker-input { min-width: 44px; min-height: 44px; }
+}

@@ -137,6 +137,7 @@ export function InfoTip({ content, side = "top" }: { content: React.ReactNode; s
 }
 
 export function NumberPicker({
+  className,
   label,
   value,
   onChange,
@@ -149,6 +150,7 @@ export function NumberPicker({
   density = "full",
   icon
 }: {
+  className?: string;
   label: string;
   value: number;
   onChange: (next: number) => void;
@@ -246,7 +248,7 @@ export function NumberPicker({
   return (
     <div
       ref={rootRef}
-      className={cn("number-picker", size === "sm" && "is-sm", fill && "is-fill", density !== "full" && `is-density-${density}`)}
+      className={cn("number-picker", className, size === "sm" && "is-sm", fill && "is-fill", density !== "full" && `is-density-${density}`)}
     >
       {density === "full" || !icon ? (
         <span className="number-picker-label">{label}</span>

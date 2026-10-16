@@ -9,11 +9,11 @@ import type { ShowToast } from './toast';
  * the server says no. "Favourites" in the gallery search shows only these.
  */
 
-export type GallerySearch = { q: string; favorites: boolean };
+export type GallerySearch = { q: string; favorites: boolean; lora?: string; model?: string; workflow?: string };
 export const emptySearch: GallerySearch = { q: "", favorites: false };
 
 export function searchActive(search?: GallerySearch | null) {
-  return Boolean(search && (search.q.trim() || search.favorites));
+  return Boolean(search && (search.q.trim() || search.favorites || search.model?.trim() || search.workflow?.trim() || search.lora?.trim()));
 }
 
 export function canStar(item: GalleryItem | null | undefined) {

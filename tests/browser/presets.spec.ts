@@ -63,7 +63,7 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   await page.route('**/api/generate', async (route) => { generated = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { ok: false, error: 'Test request captured' } }); });
   if (isMobile) {
     await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
+    await page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }).click();
   } else await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.prompt).toBe(preset.prompt);
@@ -78,7 +78,7 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   const modelMenu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
   await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).first().click();
   generated = null;
-  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }).click();
   else await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.profileId).toBe('alternate-test-model');

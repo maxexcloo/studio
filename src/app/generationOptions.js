@@ -1,30 +1,28 @@
-/** Restore the workflow that made an output before considering its model file. */
-export function outputProfile(profiles = [], item = {}) {
-  const candidates = profiles.filter((profile) => profile.kind === item.type);
-  const settings = item.settings || {};
-  const importedModel = item.civitai?.resources?.find((resource) => resource.folder === 'checkpoints');
-  if (item.civitai) {
-    if (!importedModel || importedModel.status === 'conflict') return undefined;
-    const name = importedModel.localName || importedModel.file;
-    return candidates.find((profile) => profile.id === settings.profileId)
-      || candidates.find((profile) => profile.ready !== false && name && [profile.model, profile.defaults?.model].includes(name));
-  }
-  return candidates.find((profile) => profile.id === settings.profileId)
-    || candidates.find((profile) => profile.workflow === settings.workflow)
-    || candidates.find((profile) => profile.model === item.model);
+export { outputProfile } from './outputReuse.js';
+
+/** Video count is a queue of independent jobs, never the model's batch size. */
+export function profileCountRange(profile, kind = profile?.kind || "image") {
+  if (kind === "video") return { min: 1, max: 8, step: 1 };
+  if (profile?.capabilities?.variations === false) return { min: 1, max: 1, step: 1 };
+  const meta = profile?.constraints?.count || {};
+  const min = Math.max(1, Number(meta.min) || 1);
+  return { min, max: Math.max(min, Math.min(8, Number(meta.max) || 8)), step: Math.max(1, Number(meta.step) || 1), offset: Number(meta.offset) || 0 };
 }
 
-export function profileImageCount(profile, fallback) {
-  if (profile.kind === "video" || profile.capabilities?.variations === false) return 1;
-  const meta = profile.constraints?.count || {};
-  const count = Number(profile.defaults?.count || meta.default || fallback);
-  return Math.max(Number(meta.min) || 1, Math.min(Number(meta.max) || 8, count));
+export function clampProfileCount(profile, count, kind = profile?.kind || "image") {
+  const { min, max, step, offset = 0 } = profileCountRange(profile, kind);
+  const value = Math.max(min, Math.min(max, Number(count) || 1));
+  return Math.round(Math.max(min, Math.min(max, Math.round((value - offset) / step) * step + offset)));
+}
+
+export function profileImageCount(profile, fallback = 4) {
+  return clampProfileCount(profile, profile?.kind === "video" ? 1 : fallback);
 }
 
 /** Reference latents multiply memory use: queue each variant separately. */
 export function generationPlan({ count = 1, kind, profile, references = [], queueMode }) {
-  const effectiveCount = kind === "video" || profile?.capabilities?.variations === false ? 1 : Math.max(1, Math.min(8, Math.round(Number(count) || 1)));
-  const separate = kind === "image" && (queueMode === "separate" || references.length > 0);
+  const effectiveCount = clampProfileCount(profile, count, kind);
+  const separate = kind === "video" || (clampProfileCount(profile, 1, kind) === 1 && (queueMode === "separate" || references.length > 0));
   return { effectiveCount, separate, imageRuns: separate ? effectiveCount : 1, requestCount: separate ? 1 : effectiveCount };
 }
 

@@ -98,6 +98,11 @@ test("search looks through prompts, models and LoRAs; favourites filter by star"
   assert.deepEqual(ids(store.galleryFilter({ q: "sdxl" })), ["s2", "s3"]);
   assert.deepEqual(ids(store.galleryFilter({ q: "grain" })), ["s2", "s3"]);
   assert.equal(store.galleryFilter({ q: "  " }), null);
+  assert.deepEqual(ids(store.galleryFilter({ model: "sdxl", lora: "grain" })), ["s2", "s3"]);
+  assert.deepEqual(ids(store.galleryFilter({ q: "owl", model: "flux" })), ["s3"]);
+  const page = store.pageGallery({ filter: store.galleryFilter({ model: "sdxl" }), limit: 1 });
+  const next = store.pageGallery({ filter: store.galleryFilter({ model: "sdxl" }), limit: 1, cursor: page.nextCursor });
+  assert.deepEqual([...page.items, ...next.items].map((item) => item.id).sort(), ["s2", "s3"]);
 
   const since = store.galleryRevisionValue();
   store.setGalleryFavorites(["s2"], true);

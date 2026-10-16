@@ -65,7 +65,7 @@ export function registerGalleryBundleActions(app) {
 export function registerGalleryReadRoutes(app) {
   /** A gallery search from the query string (q, favorites=1), or null. Search results are never stacked. */
   function searchFilter(req) {
-    return galleryFilter({ q: String(req.query.q || "").slice(0, 200), favorites: req.query.favorites === "1" });
+    return galleryFilter({ q: String(req.query.q || "").slice(0, 200), favorites: req.query.favorites === "1", ...Object.fromEntries(["lora", "model", "workflow"].map((key) => [key, String(req.query[key] || "").slice(0, 200)])) });
   }
 
   /** The gallery with its runs collapsed; a run can straddle a page, so it collapses first. */

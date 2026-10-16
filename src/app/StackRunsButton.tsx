@@ -6,7 +6,7 @@ import { Tip } from './components';
  * tiles laid out as masonry while runs are spread, gathered into one card with
  * two edges behind it while they are stacked, moving between the two.
  */
-export function StackRunsButton({ on, onToggle, disabled = false, phone = false }: { on: boolean; onToggle: () => void; disabled?: boolean; phone?: boolean }) {
+export function StackRunsButton({ on, onToggle, disabled = false, labelled = false, phone = false }: { on: boolean; onToggle: () => void; disabled?: boolean; labelled?: boolean; phone?: boolean }) {
   const size = phone ? 22 : 18;
   const spring = { type: "spring" as const, stiffness: 520, damping: 34 };
   const rects = on
@@ -31,6 +31,7 @@ export function StackRunsButton({ on, onToggle, disabled = false, phone = false 
             <motion.rect key={index} rx={2} initial={false} animate={rect} transition={{ ...spring, delay: on ? (2 - index) * 0.03 : index * 0.03, height: { type: "tween", duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: on ? (2 - index) * 0.03 : index * 0.03 } }} />
           ))}
         </svg>
+        {labelled ? <span>Auto-Grouping</span> : null}
       </button>
     </Tip>
   );

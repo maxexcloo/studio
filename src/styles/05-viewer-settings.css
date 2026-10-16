@@ -78,6 +78,12 @@
   pointer-events: none;
   will-change: transform;
 }
+/* Finished images remain native image targets for Save/Copy and iOS long press.
+   Gestures still bubble to the canvas; video keeps its own player controls. */
+.viewer-canvas img.generation-result, .zen-output img.generation-result {
+  pointer-events: auto;
+  -webkit-touch-callout: default;
+}
 .viewer-canvas.is-zoomed img, .viewer-canvas.is-zoomed video { cursor: grab; transition: none; }
 .viewer-canvas.is-dragging img, .viewer-canvas.is-dragging video { transition: none; }
 /* Touch paints the transform itself (viewerGesture.ts): nothing eases while a
@@ -137,6 +143,12 @@
    .btn loads later, so the overrides carry its class too. */
 .viewer-actions { display: grid; gap: 8px; min-width: 0; }
 .viewer-action-main { width: 100%; }
+.viewer-reuse-split { position: relative; display: flex; width: 100%; gap: 1px; }
+.viewer-reuse-split > :first-child { flex: 1; border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.viewer-reuse-split .btn.viewer-reuse-more { flex: none; min-width: 44px; border-radius: 0 var(--r-pill) var(--r-pill) 0; }
+.viewer-reuse-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); right: 0; min-width: 160px; padding: 4px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--surface-modal); box-shadow: var(--shadow-float-sm); }
+.viewer-reuse-menu button { width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; text-align: left; }
+.viewer-reuse-menu button:is(:hover, :focus-visible) { background: var(--control-hover); }
 .viewer-action-row { display: flex; gap: 6px; min-width: 0; }
 .btn.viewer-action {
   position: relative;

@@ -658,6 +658,19 @@
 .viewer-phone-bar button:active { background: rgb(255 255 255 / .08); }
 .viewer-phone-bar button:disabled { opacity: .45; }
 .viewer-phone-bar button.is-on { color: #0b0b0b; background: #f2f2f2; }
+.viewer-phone-bar:has(.viewer-reuse-split) { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); }
+.viewer-phone-bar .viewer-reuse-split { grid-column: span 2; min-width: 90px; }
+.viewer-phone-bar .viewer-reuse-split > button { min-width: 44px; min-height: 60px; color: hsl(var(--foreground)); background: transparent; }
+.viewer-phone-bar .viewer-reuse-split .viewer-action-main { min-width: 0; white-space: normal; line-height: 1.15; }
+.viewer-phone-bar .viewer-reuse-split .viewer-reuse-more { width: 44px; padding: 0; }
+.viewer-phone-bar .viewer-reuse-menu { top: auto; bottom: calc(100% + 4px); }
+.viewer-phone-bar .viewer-reuse-menu button { display: block; min-height: 44px; padding: 8px 12px; text-align: left; }
+@media (max-width: 339px) {
+  .viewer-phone-bar:has(.viewer-reuse-split) { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
+  .viewer-phone-bar .viewer-reuse-split { grid-column: span 1; }
+  .scrim .viewer-stage:has(.viewer-reuse-split.is-compact) .viewer-canvas { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
+  .scrim .viewer-stage:has(.viewer-reuse-split.is-compact) .viewer-side { bottom: calc(156px + env(safe-area-inset-bottom)); }
+}
 /* Upscale: the icon in a 30px circle that carries the progress ring while it runs, as on desktop tiles. */
 .viewer-phone-upscale {
   position: relative;
@@ -780,9 +793,9 @@
 .phone-select-bar button:disabled { opacity: .35; }
 .phone-select-bar button.is-danger { color: #ff9c8a; }
 
-.tile.is-selecting { transition: scale 160ms var(--ease-out), opacity 160ms var(--ease-out); }
-.tile.is-selecting:not(.is-selected) { opacity: .72; }
-.tile.is-selected { scale: .94; outline: 3px solid #f2f2f2; outline-offset: -3px; opacity: 1; }
+.tile { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color 160ms var(--ease-out); }
+
+.tile.is-selected { outline-color: #f2f2f2; }
 .tile-check {
   position: absolute;
   top: 8px;

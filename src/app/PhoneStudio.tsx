@@ -8,11 +8,12 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
-import { familyLabel, setupNote } from './components';
+import { familyLabel, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
 import { autoUpscaleTiers, canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
+import { ViewerReuseAction } from './ViewerActions';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
 import { useFocusTrap } from './useFocusTrap';
@@ -232,6 +233,7 @@ export type PhoneItemActions = {
   upscale: (item: GalleryItem) => void;
   cancelUpscale: (item: GalleryItem) => void;
   reuse: (item: GalleryItem) => void;
+  promptsOnly: (item: GalleryItem) => void;
   useAsReference?: (item: GalleryItem) => void;
   hide: (item: GalleryItem) => void;
   unhide: (item: GalleryItem) => void;
@@ -303,7 +305,8 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               <Star size={20} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Unstar' : 'Star'}</span><HapticTarget />
             </button>
           ) : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use These Settings</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Model</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><Wand2 size={20} /><span>Prompts Only</span></button> : null}
           {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
           {done && !item.library ? (
             item.privateVault
@@ -327,7 +330,7 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
       {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
       {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
       {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
-      {item.prompt ? <button type="button" onClick={() => actions.reuse(item)}><Wand2 size={21} /><span>Reuse</span></button> : null}
+      {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} onUsePrompts={() => actions.promptsOnly(item)} /> : null}
       {canStar(item) ? (
         <button type="button" className={cn(item.favorite && 'is-starred')} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
           <Star size={21} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Starred' : 'Star'}</span><HapticTarget />
@@ -448,9 +451,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
           </button>
         </div>
-        {!hiddenLocked ? (
-          <button type="button" className={cn('phone-icon', searchActive(gallerySearch) && 'is-on')} aria-label="Search" aria-expanded={searchOpen || searchActive(gallerySearch)} onClick={() => { if (searchOpen || searchActive(gallerySearch)) { setGallerySearch(emptySearch); setSearchOpen(false); } else setSearchOpen(true); }}><Search size={21} /></button>
-        ) : null}
         {!hiddenLocked && gallery.some((item) => item.type === 'video') ? (
           <GridAutoplayButton phone />
         ) : null}
@@ -465,7 +465,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         {view.models?.features?.presets === true ? <button type="button" className="phone-icon" aria-label="Image & Model Library" onClick={() => view.setPresetLibraryOpen(true)}><Library size={20} /></button> : null}
         <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
       </header>
-      {!hiddenLocked && !selecting ? <PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} /> : null}
+      {!hiddenLocked ? <PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={gallery} /> : null}
 
       {runningCount ? (
         <div className="phone-running" role="status">
@@ -574,8 +574,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const { prompts: recentPrompts } = usePromptHistory(open);
   const restarting = Boolean(comfyStatus?.restarting);
-  const variations = mode === 'image' && currentProfile?.capabilities?.variations !== false;
-  const maxCount = Math.max(1, Math.min(4, Number(countMeta?.max || 4)));
+  const variations = mode === 'video' || currentProfile?.capabilities?.variations !== false;
+  const maxCount = Math.max(1, Number(countMeta?.max || 8));
   const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
   const aspect = (aspectOptions as AspectPreset[] || []).find((option) => option.value === aspectPickerValue);
   // Smart upscale, as in the desktop size menu: images only, and only while it is on in Settings.
@@ -614,7 +614,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           >
             {restarting ? <><RefreshCw size={18} className="spin" /> Restarting…</>
               : comfyOffline ? <><RefreshCw size={18} className={cn(comfyRetrying && 'spin')} /> {comfyRetrying ? 'Checking…' : 'Check Again'}</>
-              : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
+              : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? count > 1 ? `Generate ${count} Videos` : 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
             <HapticTarget />
           </button>
           </div>
@@ -623,7 +623,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     >
       <div className="phone-compose">
         <ReferenceSlots
-          scope={mode}
+          scope={`${mode}:${view.model}:${hiddenSpace}`}
           inputs={referenceInputs || []}
           inpaint={referenceInpaint}
           selected={referenceAssets || []}
@@ -632,6 +632,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
+        <div className="composer-prompt-row">
         <div className="composer-prompt-field">
         <textarea
           aria-label={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'}
@@ -640,6 +641,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
           rows={4}
         />
+        </div>
+        <div className="composer-reference-tools" />
         </div>
       <div className="composer-secondary-row">
       {canUseNegativePrompt ? (
@@ -700,12 +703,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
 
       {variations && maxCount > 1 ? (
         <div className="phone-control">
-          <span className="phone-control-label">Images</span>
-          <div className="phone-seg" role="radiogroup" aria-label="Images">
-            {Array.from({ length: maxCount }, (_, index) => index + 1).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={count === value} className={cn(count === value && 'active')} onClick={() => setCount(value)}>{value}</button>
-            ))}
-          </div>
+          <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" />
         </div>
       ) : null}
 

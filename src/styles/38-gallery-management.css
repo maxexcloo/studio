@@ -60,3 +60,155 @@
   .gallery-management, .gallery-context-menu { border-color: CanvasText; background: Canvas; }
   .gallery-management button, .gallery-context-menu button { color: ButtonText; }
 }
+
+/* A stable header keeps selection changes out of the gallery's layout. */
+.gallery-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 14;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto minmax(240px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgb(20 20 20 / .97);
+  box-shadow: 0 4px 18px rgb(0 0 0 / .15);
+}
+.gallery-toolbar .gallery-generation-mode { position: static; width: 160px; margin: 0; }
+.gallery-toolbar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
+.gallery-toolbar .gallery-management { position: static; min-height: 40px; margin: 0; padding: 0; flex-wrap: nowrap; border: 0; box-shadow: none; background: transparent; gap: 2px; }
+.gallery-toolbar .gallery-management > span { font-size: 11px; padding: 0 4px; }
+.gallery-toolbar .gallery-management.is-selecting button { flex: none; width: 34px; padding: 0; font-size: 0; }
+.gallery-toolbar .gallery-management.is-selecting button svg { width: 16px; height: 16px; }
+.app-shell .gallery-toolbar .gallery-search,
+.phone-searchbar {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: auto;
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 6px 0 10px;
+  transform: none;
+  border-radius: 12px;
+  background: #242424;
+  box-shadow: none;
+}
+.app-shell .gallery-toolbar .gallery-search input,
+.phone-searchbar > input {
+  flex: 1;
+  min-width: 0;
+  width: 80px;
+  height: 38px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.gallery-search:focus-within, .phone-searchbar:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+.gallery-search > button,
+.gallery-search .gallery-filter-trigger,
+.phone-searchbar > button,
+.phone-searchbar .gallery-filter-trigger {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 3px;
+  width: auto;
+  min-width: 32px;
+  height: 36px;
+  min-height: 36px;
+  padding: 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+}
+.gallery-search .is-on, .phone-searchbar .is-on { color: var(--ember, #ff9a6a); }
+.gallery-filter-anchor { position: relative; flex: none; }
+.gallery-filter-trigger span { font-size: 10px; }
+.gallery-filter-panel, .gallery-view-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / .16);
+  border-radius: 14px;
+  background: #202020;
+  box-shadow: 0 10px 30px rgb(0 0 0 / .45);
+}
+.gallery-filter-panel { left: auto; right: -38px; }
+.gallery-filter-panel label { display: grid; gap: 5px; margin-bottom: 10px; font-size: 12px; }
+.gallery-filter-panel label input { width: 100% !important; flex: none !important; height: 36px !important; padding: 6px 8px !important; border: 1px solid #555 !important; border-radius: 7px; }
+.gallery-filter-panel p { margin: 8px 0; font-size: 11px; line-height: 1.5; color: #aaa; }
+.gallery-filter-panel > button { min-height: 36px; border: 0; border-radius: 7px; padding: 8px; background: #333; color: #eee; }
+.gallery-view-options { position: relative; flex: none; }
+.gallery-view-options summary { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; cursor: pointer; list-style: none; }
+.gallery-view-options summary::-webkit-details-marker { display: none; }
+.gallery-view-panel { left: auto; right: 0; width: 200px; display: flex; gap: 8px; }
+.gallery-view-panel .zen-control-button { position: static; width: 44px; height: 44px; margin: 0; }
+.sidebar-pin { display: flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid #444; border-radius: 9px; padding: 8px; background: #242424; color: #eee; font-size: 12px; cursor: pointer; }
+.tile.is-selecting:hover, .tile.is-selecting:active { transform: none; }
+/* These nodes are already virtualised; content-visibility can discard decoded media on selection updates. */
+.tile, .tile img, .tile video { content-visibility: visible; }
+.tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
+@media (min-width: 1100px) {
+  .app-shell.has-pinned-controls .stage-gallery { left: calc(var(--sidebar-w) + 28px); }
+  .app-shell.has-pinned-controls .zen-prompt { left: calc(50% + (var(--sidebar-w) + 28px) / 2); width: min(960px, calc(100vw - var(--sidebar-w) - 64px)); min-width: 0; }
+}
+@media (max-width: 1099px) {
+  .gallery-toolbar { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; }
+  .gallery-toolbar-actions { grid-row: 1; grid-column: 2; }
+  .app-shell .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1 / -1; }
+}
+.phone-shell .phone-searchbar { position: fixed; top: calc(max(6px, env(safe-area-inset-top)) + 54px); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); z-index: 21; min-height: 44px; }
+.phone-searchbar > input { height: 44px; font-size: 14px; }
+.phone-searchbar > button, .phone-searchbar .gallery-filter-trigger { min-width: 40px; height: 44px; }
+.phone-searchbar .gallery-filter-panel { position: fixed; top: calc(max(6px, env(safe-area-inset-top)) + 108px); left: 8px; right: 8px; width: auto; max-width: none; }
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+.app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
+.app-shell.is-hidden-space:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + 50px); }
+.gallery-view-panel { flex-direction: column; }
+.gallery-view-panel .zen-control-button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; padding: 8px; font-size: 12px; }
+.app-shell > .zen-control-button { display: flex; align-items: center; gap: 8px; width: auto; padding: 0 14px; font-size: 12px; }
+.app-shell .gallery-toolbar .gallery-search { translate: none; }
+.gallery-management.is-selecting button { gap: 0; }
+@media (min-width: 1100px) and (max-width: 1340px) {
+  .has-pinned-controls .gallery-toolbar { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .has-pinned-controls .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; }
+  .has-pinned-controls .gallery-toolbar-actions { grid-row: 1; grid-column: 2; }
+  .app-shell.has-pinned-controls .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .gallery-toolbar { grid-template-columns: 1fr; }
+  .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; justify-self: center; }
+  .app-shell .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1; }
+  .gallery-toolbar-actions { grid-row: 3; grid-column: 1; justify-content: center; }
+}
+.zen-controls { z-index: 40; }
+@media (min-width: 1100px) {
+  .app-shell.has-pinned-controls .zen-controls { bottom: calc(2 * var(--deck-gap) + var(--deck-h)); }
+  .app-shell.has-pinned-controls .studio-dock { left: var(--deck-gap); right: auto; flex-direction: row; }
+  .app-shell.has-pinned-controls > .zen-control-button { left: calc(var(--sidebar-w) - 82px); }
+}
+/* The virtual gallery restores positions itself; native anchoring follows moving tiles. */
+.stage-gallery { overflow-anchor: none; }
+
+.virtual-gallery .tile, .virtual-gallery .run-stack { scroll-margin-top: 120px; }
