@@ -113,6 +113,12 @@ catalog, so a family that is described correctly needs no UI work.
    the partner from the model list and offers its download when missing.
    `promptPrefix` and `negativePrefix` put the system prompt a model was
    trained with in front of the user's text (Lumina 2 and its fine-tunes).
+   `upsampler` runs a small language model before the encoder, for models
+   made to read long captions rather than what people type (FLUX.3): its
+   own slot (missing means a Download button like any encoder), its makers'
+   system prompts verbatim in `server/prompt-upsamplers.js`, and the
+   TextGenerate settings from their workflow. With reference images it gets
+   the edit prompt and sees the images.
 
    Image-to-video is a family of its own with `imageToVideo: true`: its
    `latent` names the node that takes both conditionings, the VAE and the start
@@ -155,7 +161,9 @@ catalog, so a family that is described correctly needs no UI work.
    lists and ranges, links of the right type, and any node that ComfyUI
    lacks listed in the family's nodes (so it shows "Newer ComfyUI"). When a
    family needs nodes from a newer ComfyUI, record that version too with
-   `node scripts/record-object-info.mjs` while it runs.
+   `node scripts/record-object-info.mjs` while it runs. A family whose text
+   encoder type a snapshot lacks is checked against the newer one only, and
+   every family must be checked against at least one.
 
 10. **Check it against a real ComfyUI.** Save `/object_info` and
     `/system_stats`, feed them to `inferModels`, build the graph through
@@ -197,6 +205,8 @@ Current entries:
   HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
   (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
   left out.
+- **2K maybe:** FLUX.3 Klein (its card names no sizes yet; Comfy-Org's
+  templates run 1024²).
 - **2K yes:** MOSS-Image (its makers document 0.25 to 4 MP and recommend
   1 to 2 MP). 4K is left out.
 - **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1

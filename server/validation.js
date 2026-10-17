@@ -137,6 +137,7 @@ function sanitizeFamilyBody(input, info, stats) {
     // A runner that loads a whole model folder takes it by its full path (resolved when the profile was built).
     modelPath: profile.modelPath || "",
     clipVision: profile.clipVision || "",
+    upsampler: profile.upsampler || "",
     vpredPatch: profile.vpredPatch,
     krea2Enhancer: profile.family === "krea2" && Boolean(info["ComfyUI-Krea2T-Enhancer"]),
     sana: profile.sana || null,

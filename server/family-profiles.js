@@ -24,6 +24,7 @@ const clipLoaderClass = [null, "CLIPLoader", "DualCLIPLoader", "TripleCLIPLoader
 /** What a download is called in the queue and the top pill: the part, not its file name. */
 function partLabel(kind, key, file) {
   if (kind === "encoder" && encoderKinds[key]) return `${encoderKinds[key].label} text encoder`;
+  if (kind === "encoder" && families[key.replace(/_upsampler$/, "")]?.upsampler) return families[key.replace(/_upsampler$/, "")].upsampler.slot.label;
   if (kind === "vae" && vaeKinds[key]) return vaeKinds[key].label;
   if (kind === "vision" && visionKinds[key]) return `${visionKinds[key].label} encoder`;
   return file;
@@ -326,6 +327,19 @@ export function familyProfiles(info, helpers) {
       return { slot: slot.slot, label: slot.label, options, default: options[0] || "" };
     });
 
+    // A prompt upsampler the family runs behind (FLUX.3's): its own Qwen build, in text_encoders.
+    let upsampler = "";
+    if (family.upsampler && !ownLoaders) {
+      const slot = family.upsampler.slot;
+      upsampler = rankEncoders(encoderFiles, slot)[0] || "";
+      if (!upsampler) {
+        missing.push({
+          part: "encoder", slot: slot.slot, label: slot.label, kind: slot.kinds[0], detail: slot.detail,
+          downloads: downloadsFor(encoderDownloads[slot.download], "text_encoders", `encoder:${slot.download}`, device)
+        });
+      }
+    }
+
     const vaeOptions = rankVaes(vaeFiles, family.vae);
     if (!bundled.vae && !vaeOptions.length) {
       const key = family.vae[0];
@@ -471,6 +485,7 @@ export function familyProfiles(info, helpers) {
       audioVae,
       pairModel,
       clipVision,
+      upsampler,
       vpredPatch,
       ...(quantLoader ? { quant: info2.quant, checkpointLoader: quantLoader } : {}),
       detectedBy: info2.via,

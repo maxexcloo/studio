@@ -118,8 +118,6 @@ function graphProblems(graph, info, declared) {
         continue;
       }
       if (onPack && name === "sampler_name" && packSamplers.has(value)) continue;
-      // A text encoder type newer than this ComfyUI: profiles check the list first and show "Newer ComfyUI".
-      if (name === "type" && /CLIPLoader$/.test(node.class_type) && declared.has(`clipType:${value}`)) continue;
       const problem = valueProblem(spec, value, graph, info, name.split(".").pop());
       if (problem) problems.push(`${label}.${name}: ${problem}`);
     }
@@ -143,6 +141,7 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
     pairModel: family.pair ? "partner.safetensors" : "",
     modelPath: family.runners?.[source]?.loader ? `/ComfyUI/models/diffusers/${familyId}` : "",
     clipVision: family.clipVision ? "vision.safetensors" : "",
+    upsampler: family.upsampler ? "upsampler.safetensors" : "",
     prompt: "a lighthouse in fog",
     negative: "blurry",
     width,
@@ -163,8 +162,20 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
   };
 }
 
+/**
+ * Whether this ComfyUI can run the family at all. One without its text encoder
+ * type gets "Newer ComfyUI" before any run, so its graphs are checked against
+ * a newer snapshot instead (and every family against at least one).
+ */
+function runsOn(family, info) {
+  if (!family.clipType || family.slots.length > 2) return true;
+  const loader = family.slots.length === 2 ? "DualCLIPLoader" : "CLIPLoader";
+  return (info[loader]?.input?.required?.type?.[0] || []).includes(family.clipType);
+}
+
 function* cases(info) {
   for (const [familyId, family] of Object.entries(families)) {
+    if (!runsOn(family, info)) continue;
     for (const variant of family.variants) {
       for (const source of family.sources) {
         const name = `${familyId}/${variant.id} from ${source}`;
@@ -185,7 +196,7 @@ for (const snapshot of snapshots) {
     const failures = [];
     let checked = 0;
     for (const { name, family, variant, source, body } of cases(info)) {
-      const declared = new Set([...nodesFor(family, variant, body.encoders.length > 0, !body.bundled?.vae), ...(family.clipType ? [`clipType:${family.clipType}`] : [])]);
+      const declared = new Set(nodesFor(family, variant, body.encoders.length > 0, !body.bundled?.vae));
       let graph;
       try {
         graph = familyGraph(body);
@@ -233,6 +244,12 @@ for (const snapshot of snapshots) {
 
 test("there is at least one ComfyUI snapshot to check against", () => {
   assert.ok(snapshots.length >= 1);
+});
+
+test("every family's graphs are checked against at least one ComfyUI snapshot", () => {
+  const infos = snapshots.map((snapshot) => JSON.parse(fs.readFileSync(path.join(fixtures, snapshot), "utf8")));
+  const unchecked = Object.entries(families).filter(([, family]) => !infos.some((info) => runsOn(family, info))).map(([id]) => id);
+  assert.deepEqual(unchecked, []);
 });
 
 test("every image family says which sizes it draws itself, and SD 1.5/2 draw neither", () => {

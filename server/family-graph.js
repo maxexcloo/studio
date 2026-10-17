@@ -209,7 +209,9 @@ export function familyGraph(body) {
     negative = [encoded, 1];
     if (references.length && body.referenceRole !== "reference") editLatent = [encoded, 2];
   } else {
-    positive = [add("CLIPTextEncode", { text: promptText, clip }), 0];
+    // A model meant to run behind a prompt upsampler (FLUX.3) encodes the caption that writes.
+    const text = family.upsampler && body.upsampler ? upsamplePrompt(add, family, body, width, height) : promptText;
+    positive = [add("CLIPTextEncode", { text, clip }), 0];
     if (variant.guidance) positive = [add("FluxGuidance", { conditioning: positive, guidance: variant.guidance }), 0];
     if (negativeMode === "text") negative = [add("CLIPTextEncode", { text: negativeText, clip }), 0];
     else if (negativeMode === "zero") negative = [add("ConditioningZeroOut", { conditioning: positive }), 0];
@@ -363,6 +365,39 @@ function sanaGraph({ add, graph, body, variant, seed, width, height, count }) {
   const images = [add("VAEDecode", { samples, vae }), 0];
   add("SaveImage", { images, filename_prefix: "heiss-ui/image" });
   return graph;
+}
+
+/**
+ * The family's prompt upsampler through ComfyUI's TextGenerate, with its makers'
+ * system prompt and sampling: the request goes in (after a target-canvas line
+ * where the system prompt reads one), the long caption comes out. With
+ * reference images it takes the edit prompt and sees the images too.
+ */
+function upsamplePrompt(add, family, body, width, height) {
+  const spec = family.upsampler;
+  const clip = [add("CLIPLoader", { clip_name: body.upsampler, type: spec.clipType, device: "default" }), 0];
+  const references = family.references ? (body.referenceImages || []).slice(0, family.references) : [];
+  const canvas = spec.canvas && !references.length ? `TARGET CANVAS: ${ratioOf(width, height)}\n` : "";
+  const inputs = {
+    clip, prompt: `${canvas}${body.prompt || ""}`, max_length: spec.maxLength,
+    sampling_mode: "on", ...Object.fromEntries(Object.entries(spec.sampling).map(([key, value]) => [`sampling_mode.${key}`, value])),
+    thinking: false, use_default_template: true, mtp: "off",
+    system_prompt: references.length ? spec.system.edit : spec.system.text
+  };
+  if (references.length) {
+    const images = Object.fromEntries(references.map((name, index) => [`images.image${index}`, [add("LoadImage", { image: name }), 0]]));
+    inputs.image = [add("BatchImagesNode", images), 0];
+  }
+  return [add("TextGenerate", inputs), 0];
+}
+
+/** "16:9" for 1344×756: the picked shape, reduced. */
+export function ratioOf(width, height) {
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const w = Math.round(Number(width) || 1);
+  const h = Math.round(Number(height) || 1);
+  const d = gcd(w, h) || 1;
+  return `${w / d}:${h / d}`;
 }
 
 /**

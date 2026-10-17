@@ -252,7 +252,11 @@ export function rankEncoders(encoders, slot) {
   const kinds = new Set(slot.kinds);
   return encoders
     .map((item, index) => ({ ...item, index }))
-    .filter((item) => kinds.has(item.kind) && (!slot.only || slot.only.test(String(item.name).split(/[\\/]/).pop() || "")))
+    .filter((item) => {
+      const base = String(item.name).split(/[\\/]/).pop() || "";
+      // `only`: the model's own build; `not`: a tuned build of the same shapes it must not take.
+      return kinds.has(item.kind) && (!slot.only || slot.only.test(base)) && (!slot.not || !slot.not.test(base));
+    })
     .sort((a, b) => (isAbliterated(b.name) - isAbliterated(a.name)) || (a.index - b.index))
     .map((item) => item.name);
 }

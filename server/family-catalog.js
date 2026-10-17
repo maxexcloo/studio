@@ -6,6 +6,8 @@
  * same order so the same file is never read two ways.
  */
 
+import { flux3Upsampler } from './prompt-upsamplers.js';
+
 const hf = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${file}`;
 
 /** Images per run for the built-in families: the graph renders at most this many, whatever the latent node accepts. */
@@ -47,7 +49,16 @@ export const encoderDownloads = {
   ],
   qwen3vl_4b: [
     { file: "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors", fp8: true, url: hf("DreamFast/Qwen3-VL-4b-Heretic-ComfyUI", "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors"), bytes: 4_831_492_476, sha256: "7443c2b8df026a3271b3095d5d1dc07800dc5cf460b6e3586692253c7a7bc17c" },
-    { file: "qwen3vl_4b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Krea-2", "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"), bytes: 5_242_467_968, sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094" }
+    { file: "qwen3vl_4b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Krea-2", "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"), bytes: 5_242_467_968, sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094" },
+    // BFL's builds for FLUX.3 (gated: accept the license on Hugging Face first); the ones a Mac can load.
+    { file: "qwen3vl_4b_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_int8_convrot.safetensors"), bytes: 4_858_559_240 },
+    { file: "qwen3vl_4b_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408 }
+  ],
+  // FLUX.3's prompt upsampler, a Qwen3.5 9B tuned to write its captions (gated like the model).
+  flux3_upsampler: [
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"), bytes: 9_748_113_996 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", fp8: true, url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"), bytes: 6_724_090_780 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392 }
   ],
   qwen3vl_8b: [
     { file: "qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors", url: hf("DreamFast/Qwen3-VL-8B-Heretic-1.3.0", "comfyui/qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors"), bytes: 10_017_064_632, sha256: "7f8ec20de729e2d99f3a04852d4c4499c1677cda167f5ea63d21b0882a5c32b5" },
@@ -214,6 +225,12 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * their transformer/config.json.
  * setup: a guided setup dialog for a family that runs more than one way
  * (server/family-setup.js reads it).
+ * upsampler: a small language model the family is meant to run behind (FLUX.3),
+ * which rewrites your prompt into the long caption the model was trained on,
+ * through ComfyUI's TextGenerate: slot (an encoder slot, `only` its own build),
+ * clipType, system { text, edit } (edit when reference images go in, which it
+ * also sees), maxLength and sampling (TextGenerate's "on" settings), and
+ * canvas (a "TARGET CANVAS: W:H" first line, which its system prompt reads).
  * variants: first whose `match` passes wins; the last one is the fallback.
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
@@ -667,6 +684,29 @@ export const families = {
     ],
     size: [1024, 1024]
   },
+  // Black Forest Labs' FLUX.3 Image Klein (Oct 2026): a 5.6B DiT on the Flux.2 latent and
+  // VAE, reading prompts with Qwen3-VL 4B (8 tapped layers). It edits from up to ten
+  // references; the composer offers three. Settings from Comfy-Org's templates and the
+  // model card: Klein (distilled, a flow map) 16 steps without guidance; Klein Base 50 steps
+  // at CFG 3.5; euler / simple, 1024². BFL: "Do not use the model without a prompt
+  // upsampler", so every run goes through theirs first, as their workflows do.
+  flux3: {
+    label: "FLUX.3 Klein", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
+    slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "flux3",
+    vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, aspects: square,
+    requiredNodes: ["EmptyFlux2LatentImage", "TextGenerate", "BatchImagesNode"],
+    references: 3,
+    upsampler: {
+      slot: { slot: "upsampler", label: "FLUX.3 prompt upsampler", kinds: ["qwen35_9b"], only: /upsampl/i, download: "flux3_upsampler", detail: "FLUX.3 runs behind its own prompt upsampler, which writes the long caption it was trained on. Its makers say not to use it without one." },
+      clipType: "flux3", system: flux3Upsampler, maxLength: 3584, canvas: true,
+      sampling: { temperature: 1, top_k: 1, top_p: 0.95, min_p: 0, repetition_penalty: 1, seed: 0, presence_penalty: 1.5 }
+    },
+    variants: [
+      { id: "base", label: "Base", match: (name, header, detail) => (detail?.flowMap !== undefined ? !detail.flowMap : /(^|[^a-z])base([^a-z]|$)/i.test(name)), negative: "text", defaults: { steps: 50, cfg: 3.5, sampler: "euler", scheduler: "simple" } },
+      { id: "distilled", label: "Klein", negative: "zero", defaults: { steps: 16, cfg: 1, sampler: "euler", scheduler: "simple" } }
+    ],
+    size: [1024, 1024]
+  },
   // OpenMOSS's MOSS-Image (Oct 2026): a 5B single-stream DiT in Flux.2's latent space that
   // reads prompts with a stock Qwen3.5 9B. Settings from its model card and ComfyUI
   // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
@@ -675,7 +715,8 @@ export const families = {
   // Diffusers folder, which also skips layer 22 on the negative pass as they sample.
   moss_image: {
     label: "MOSS-Image", kind: "image", native: { "2k": "yes" }, sources: ["unet", "moss_diffusers"],
-    slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"] }], clipType: "moss_image",
+    // Stock Qwen3.5 9B; FLUX.3's upsampler is a tuned Qwen3.5 9B with the same shapes.
+    slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"], not: /upsampl/i }], clipType: "moss_image",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     modelSampling: { node: "ModelSamplingSD3", shift: 5 },
     requiredNodes: ["EmptyFlux2LatentImage"],
@@ -819,6 +860,7 @@ export function familyFromName(name = "", source = "unet") {
   const tests = [
     ["sana", /(^|[^a-z])sana([^a-z]|$)/i],
     ["moss_image", /moss[-_ ]?image/i],
+    ["flux3", /flux[-_. ]?3/i],
     ["ideogram4", /ideogram/i],
     ["mage_flow", /mage[-_ ]?flow/i],
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
@@ -891,6 +933,11 @@ export function familyFromHeader(header) {
   if (has("txt_in.individual_token_refiner.blocks.0.norm1.weight")) {
     if (!has("vision_in.proj.0.weight")) return { family: "hunyuan_video" };
     return dim(keys, "img_in.proj.weight", 1) === 98 ? { family: "other" } : { family: "hunyuan15" };
+  }
+  // FLUX.3, before Flux: its own text, image and reference mode blocks. A flow map (Klein,
+  // distilled) also reads the step it jumps to.
+  if (has("content_mode_blocks.image.0.attn_out.weight") && has("single_stream_modulations.txt.lin.weight")) {
+    return { family: "flux3", detail: { flowMap: has("ref_time_in.in_layer.weight") } };
   }
   const fluxLike = (has("double_blocks.0.img_attn.norm.key_norm.weight") || has("double_blocks.0.img_attn.norm.key_norm.scale"))
     && (has("img_in.weight") || has("distilled_guidance_layer.norms.0.weight") || has("distilled_guidance_layer.norms.0.scale"));
