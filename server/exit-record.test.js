@@ -51,3 +51,18 @@ test("the tail keeps the last lines, without colour codes", () => {
   tail.push("ee\n");
   assert.equal(tail.text(), "two\nthree");
 });
+
+test("a second copy that finds one running (exit 78) leaves that run's record alone", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const crashLog = new URL("./crash-log.js", import.meta.url).href;
+  const exitWith = (code) => spawnSync(process.execPath, ["--input-type=module", "-e", `const { installCrashLog } = await import(${JSON.stringify(crashLog)}); installCrashLog(); process.exit(${code});`], { env: { ...process.env }, encoding: "utf8" });
+  reset();
+  startSession({ now: Date.now() - 1000, bootedAt: 0 });
+  assert.equal(exitWith(78).status, 78);
+  assert.equal(fs.existsSync(path.join(logs, "last-exit.json")), false, "nothing written for the running copy");
+  recordExit({ who: "server", clean: true, code: 0, reason: "Stopped" });
+  assert.equal(startSession({ now: Date.now() + 1000, bootedAt: 0 }), null, "its clean stop is told as clean");
+  // A real failure in a process of its own is still written down.
+  assert.equal(exitWith(1).status, 1);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(logs, "last-exit.json"), "utf8")).code, 1);
+});

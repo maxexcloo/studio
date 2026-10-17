@@ -661,9 +661,13 @@ app.get("/api/diagnostics", async (_req, res) => {
 // When this server process started, so the app can tell a restart (e.g. after an update) happened.
 const serverStartedAt = Date.now();
 // How the last run ended, when it went wrong (exit-record.js): told once in the studio, via /api/health.
-const previousExit = startSession({ now: serverStartedAt });
-if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
-setInterval(() => noteAlive(), 60_000).unref();
+// Read once listening: a second copy that finds this one running must not take over its record.
+let previousExit = null;
+function beginSession() {
+  previousExit = startSession({ now: serverStartedAt });
+  if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
+  setInterval(() => noteAlive(), 60_000).unref();
+}
 
 // The latest lines of today's log (crash-log.js), for the crash kit and bug reports. This computer only.
 app.get("/api/logs", (req, res) => {
@@ -2417,6 +2421,7 @@ startServers(app, {
     else exit();
   },
   onListening({ plan, port: listening, moved }) {
+    beginSession();
     // From here on everything that names the address (banner, phone links in Settings) uses this one.
     setListeningPort(listening);
     if (moved) console.log(`\n  Port ${requestedPort} is in use, so HEISS UI is on ${listening} this time.`);
