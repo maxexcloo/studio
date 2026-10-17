@@ -6,6 +6,7 @@ import { dedupeGalleryItems } from './gallery';
 import { clearLoraLibrary } from './lora-storage';
 import { retryRequest, type RetryOptions, type RetryRequest } from './retry';
 import { downloadActions } from './useModelDownloads';
+import { referenceRoleFor } from './referenceSlots';
 import { sizePlan, tiledDecodeFor } from './useUpscale';
 import type { GalleryItem, Job } from './types';
 
@@ -134,7 +135,7 @@ export function useGenerationActions(view: any) {
       setStatus(startMessage);
 
       // A reference frames the output only when it is the image being edited (a painted mask always is).
-      const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && (inpaint || prefs.referenceRole !== "reference"));
+      const framedByReference = Boolean(currentProfile?.aspectPolicy === "reference" && (referenceAssets || []).length && referenceRoleFor(currentProfile, prefs.referenceRole, Boolean(inpaint)) === "edit");
       // 2K: the picked aspect drawn with its long side at 2048 (useUpscale sizePlan). Not
       // where the output's size isn't the model's to pick: a reference that frames it, or a mask.
       const plan = mode === "image" && !inpaint && !framedByReference ? sizePlan(sizeTier, Number(width), Number(height), currentProfile?.native, sizeMax, sizeArea, sizeStep) : null;

@@ -11,7 +11,7 @@ import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromG
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras, sameBaseModel } from './app/loras';
-import { arrangeReferences, withReference, withoutReferences } from './app/referenceSlots';
+import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
 import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
@@ -1334,8 +1334,9 @@ function App() {
   const framingReference = currentProfile?.aspectPolicy === "reference"
     ? composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null
     : null;
-  // Only an image being edited frames the output; a painted mask always edits it.
-  const referenceRole: ReferenceRole = activeInpaintMask ? "edit" : prefs.referenceRole === "reference" ? "reference" : "edit";
+  // Only an image being edited frames the output; a painted mask always edits it, and so does
+  // a model without the switch, whatever was picked on another.
+  const referenceRole: ReferenceRole = referenceRoleFor(currentProfile, prefs.referenceRole, Boolean(activeInpaintMask));
   const referenceForAspect = referenceRole === "edit" ? framingReference : null;
   const aspectLocked = Boolean(referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);
   // The size picked before a reference took over, put back when it lets go (same model only).
@@ -1736,7 +1737,7 @@ function App() {
   } : null;
   // The switch shows on the framing reference, once one is there. A painted mask settles it as an
   // edit: it stays, locked on Edit, so the chips say so (EDIT, the others greyed, no +).
-  const referenceRoleControl: ReferenceRoleControl | null = currentProfile?.aspectPolicy === "reference" && String(currentProfile.workflow || "").startsWith("family:") && referenceInput && framingReference ? {
+  const referenceRoleControl: ReferenceRoleControl | null = referenceRoleOffered(currentProfile) && referenceInput && framingReference ? {
     slot: referenceInput.id,
     value: referenceRole,
     locked: Boolean(activeInpaintMask),
