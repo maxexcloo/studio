@@ -670,12 +670,14 @@ test("MOSS-Image is read from its weights, Qwen3.5 9B from its encoder, and Base
   assert.equal(moss[0].encoderSlots[0].default, "qwen3.5_9b_int8_convrot.safetensors");
 });
 
-test("MOSS-Image on ComfyUI's own nodes: Qwen3.5 through CLIPLoader, shift 5, the Flux.2 latent", () => {
+test("MOSS-Image on ComfyUI's own nodes: Qwen3.5 through CLIPLoader, the model's own shift, the Flux.2 latent", () => {
   const info = objectInfo({ unets: ["moss_image_sft_bf16.safetensors"], clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
   const profile = inferModels(info).profiles.find((item) => item.family === "moss_image");
   const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a sign that says OPEN", negative: "blurry" }, info));
   assert.deepEqual(byType(graph, "CLIPLoader")[0].inputs, { clip_name: "qwen3.5_9b_int8_convrot.safetensors", type: "moss_image", device: "default" });
-  assert.equal(byType(graph, "ModelSamplingSD3")[0].inputs.shift, 5);
+  // ComfyUI's own MOSS-Image samples at shift 5 by itself; ModelSamplingSD3 would scale its timesteps by 1000.
+  assert.equal(byType(graph, "ModelSamplingSD3").length, 0);
+  assert.equal(graph[byType(graph, "KSampler")[0].inputs.model[0]].class_type, "UNETLoader");
   assert.deepEqual([byType(graph, "EmptyFlux2LatentImage").length, byType(graph, "CLIPTextEncode").length, byType(graph, "SkipLayerGuidanceDiTSimple").length], [1, 2, 0]);
   assert.deepEqual([byType(graph, "KSampler")[0].inputs.sampler_name, byType(graph, "KSampler")[0].inputs.scheduler], ["euler", "sgm_uniform"]);
 });

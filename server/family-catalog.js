@@ -227,8 +227,9 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * way (MOSS-Image's Diffusers folders through its makers' own loader): pack,
  * note, ownLoaders, loras (the pack's model still takes ComfyUI's LoRAs),
  * loader { node, path (the input that takes the folder's full path), inputs }
- * in place of the three core loaders, patches (nodes put on the model before
- * sampling, after the shift), requiredNodes (core nodes those need) and
+ * in place of the three core loaders, modelSampling (its own shift node, in
+ * place of the family's), patches (nodes put on the model before sampling,
+ * after the shift), requiredNodes (core nodes those need) and
  * folders { classNames }: which models/diffusers folders are this family, by
  * their transformer/config.json.
  * setup: a guided setup dialog for a family that runs more than one way
@@ -742,11 +743,14 @@ export const families = {
     // Stock Qwen3.5 9B; FLUX.3's upsampler is a tuned Qwen3.5 9B with the same shapes.
     slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"], not: /upsampl/i }], clipType: "moss_image",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
-    modelSampling: { node: "ModelSamplingSD3", shift: 5 },
+    // No shift node on ComfyUI's own nodes: their MOSS-Image samples at shift 5 by itself, with
+    // timesteps 0-1. ModelSamplingSD3 would scale those by 1000 and draw only noise.
     requiredNodes: ["EmptyFlux2LatentImage"],
     runners: {
       moss_diffusers: {
         pack: "moss_image", ownLoaders: true, loras: true,
+        // The makers' model is set up at shift 1 with timesteps x1000; their workflow shifts it to 5.
+        modelSampling: { node: "ModelSamplingSD3", shift: 5 },
         note: "MOSS-Image’s makers ship these nodes. They load the official model folder.",
         loader: { node: "MOSSImageHFLoader", path: "model_path", inputs: { weight_dtype: "default", text_device: "default" } },
         patches: [{ node: "SkipLayerGuidanceDiTSimple", inputs: { double_layers: "", single_layers: "22", start_percent: 0, end_percent: 1 } }],

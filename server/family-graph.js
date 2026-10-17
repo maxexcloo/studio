@@ -131,7 +131,8 @@ export function familyGraph(body) {
   ({ model, clip } = chainLoras(add, body, model, clip));
   if (lowModel) lowModel = chainLoras(add, body, lowModel, clip).model;
 
-  const sampling = variant.modelSampling || family.modelSampling;
+  // A runner's own model may want another shift node than ComfyUI's (MOSS-Image's pack).
+  const sampling = runner?.modelSampling || variant.modelSampling || family.modelSampling;
   model = modelSamplingPatch(add, sampling, model, body);
   if (lowModel) lowModel = modelSamplingPatch(add, sampling, lowModel, body);
   if (variant.vpred && body.vpredPatch) {
