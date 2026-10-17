@@ -11,163 +11,76 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
-> Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
+> Pictures at 2K, sizes your way, and two new models
 
-### Added
-- **FLUX.3 Klein.** Black Forest Labs' new 5.6B model, on ComfyUI 0.41 and
-  up. Klein (distilled, 16 steps, no CFG) and Klein Base (50 steps, CFG 4) are
-  told apart by their weights and run on the settings in BFL's own code, time
-  shift included. It edits from up to three reference images and is made for
-  2K, which the size menu draws with no warning.
-  - **Its prompt upsampler is recommended, not required.** With it in place,
-    every prompt goes through it first, with BFL's system prompts and settings
-    word for word; without it, FLUX.3 runs on your prompt as written. The setup
-    panel offers it under **Recommended**, with a **Don't show again** that
-    holds across restarts and devices.
-  - **Downloads past the gate.** BFL's files need their license accepted on
-    Hugging Face. When a download is refused, it falls back to the same file
-    from an open copy, so the Qwen3-VL 4B text encoder and the upsampler are
-    still one click away.
-- **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
-  and layouts that hold, runs with its makers' settings (50 steps, CFG 3,
-  shift 5). Comfy-Org's single files run on ComfyUI's own nodes (newer than
-  0.41.3), with the Qwen3.5 9B text encoder and Flux.2 VAE one click away.
-  The official model folder in `models/diffusers` runs on the makers' own
-  MOSS-Image nodes (one-click install, ComfyUI 0.38 and up), which skip layer
-  22 on the negative pass as the makers sample. A **Guided setup** button on
-  the model's setup panel walks through whichever way its file needs; the
-  model itself you put in ComfyUI, and HEISS recognizes it.
-- **LoRAs for FLUX.3 and MOSS-Image** are recognized by name and by their
-  weights, so they show with the model they belong to.
-- **Node packs that live inside a bigger repository** install too: only the
-  pack's own folder goes into custom_nodes.
-- **Native 2K.** The size menu has three tabs now: **Default**, **2K** and
-  **Custom**. 2K has the model draw your shape itself with its long side at
-  2048, in one run, with no upscale step after it. Models made for big pictures
-  (FLUX.3 Klein, Flux.2, Qwen-Image 2.1, Z-Image, MOSS-Image, Krea 2 Turbo,
-  Ideogram 4, MageFlow, Sana 2K/4K) are documented at that size. On the others, the menu says in one line
-  that the model isn't known for 2K and some pictures may repeat or warp. Which
-  model is which, and the sources, are in
-  [MODELS.md](./docs/guides/MODELS.md#native-2k).
-- **A size menu that shows the size.** A frame beside the shapes shows the
-  shape and pixels you'll get, gliding between them, and hovering a shape
-  previews it. The size button draws the real shape, names the ratio and tags
-  2K, MP or C. Size names snap to the steps people know: 3648 reads 4K, 2816
-  reads 3K.
-- **Custom size.** Custom folds open under the tabs. Width and height are one
-  linked field that keeps the shape, or two once you unlink them. Type a number,
-  step it with the arrow keys or drag the W or H label. Sides go from 256 to
-  4096 on the model's own step, and Custom stays when you switch to another
-  model of the same kind, fitted to its limits.
-- **Saved sizes.** **Save size** keeps a size of your own in the menu, where
-  you can rename it or remove it (with Undo). The list lives on the studio, so
-  your phone and every other device see the same one. On a model that can't go
-  as large, a saved size is scaled down with its shape kept.
-- **Size in megapixels.** Turn on Settings › Generation › Size in megapixels
-  and the size menu gets a Megapixels field in place of 2K. Type a count, step
-  it with the arrow keys or drag its MP label, and every shape is drawn at that
-  many pixels (3 MP makes 1:1 1776 × 1776). In Custom it rescales your size and
-  keeps its shape, and Reset gives each model its own size back. 1 MP is
-  1024 × 1024, as ComfyUI counts it, and Settings' "Pixels made" now counts the
-  same way. If a shape can't reach the count without a side past 4096, the menu
-  says so.
-- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference and pick **Edit** or **Reference**. Edit works like before:
-  the result keeps that image's size, and an EDIT tag on the thumbnail shows it.
-  Reference keeps the size and shape you picked, 2K included, and the image
-  still guides the picture. Try again repeats a run the way it was made. A
-  painted mask always makes it Edit, and the inpainting brush hides while
-  Reference is on.
-- **Docker support.** `docker compose up --build` runs the studio in a
-  container next to your ComfyUI, with its data on a volume and the gallery
-  served from ComfyUI's output folder. There's also a plain Dockerfile
-  (multi-stage, non-root) for `docker run` without compose, and the how-to is in
-  [DOCKER.md](./docs/guides/DOCKER.md). The studio is only published to your own
-  computer, and settings you make in the app are kept on the data volume.
-- **Find ComfyUI on its own can be turned off.** In Settings › Connection ›
-  Change address, switching it off keeps HEISS on its saved address
-  (`HEISS_COMFY_SEARCH=0`). If you run a second ComfyUI just for HEISS next to
-  your main one on 8188, HEISS no longer jumps over to the main one while its
-  own is starting or restarting.
-- **HEISS says why it stopped.** If the server or the page server stops on its
-  own, the next start shows the reason once, on this computer, with
-  **Copy details**. Ctrl+C, closing the window, Restart and `docker stop` don't
-  count.
+### Pictures at 2K
+Pick **2K** in the size menu and the model draws your picture at full size
+in one go, with no upscaling afterwards. Models made for big pictures, like
+FLUX.3, Flux.2, Qwen-Image 2.1 and Z-Image, do it natively. On the others,
+the menu tells you in one line that results may vary.
 
-### Changed
-- **Setup notices ComfyUI changes by itself.** A model's setup panel that's
-  waiting on an update or a node pack checks again every few seconds and says
-  when it last looked, and a new ComfyUI version rescans your models. No more
-  "Newer ComfyUI" after updating until you reload.
-- **Restart says how it went.** "Restarting HEISS UI…" stays up until the page
-  is back, then says it restarted. After switching network access it checks
-  the server really listens there and gives the address, or keeps an error up
-  if the setting didn't take.
-- **The size menu is about the size the model draws.** Smart upscale for every
-  new picture has left it, so new pictures are no longer upscaled as part of
-  their run. The upscale arrow on a tile or in the viewer still takes any
-  picture to 2K or 4K with SeedVR2, and it now finds SeedVR2 weights kept
-  outside `ComfyUI/models` too. A 2K or 4K pick from 0.17 now reads as 2K.
-- **Several references are one chip now.** The first image stays in the corner,
-  the others sit behind it and fan out on hover, with a + for the next one
-  (greyed out, saying how many it takes, once they're all used). In Edit only
-  the first one changes, so the others are greyed and no more can be added; in
-  Reference they all guide. Switching glides instead of jumping.
-- **Your 2K pick survives a reference.** It's skipped while an edited reference
-  or a painted mask sets the size, and comes back afterwards together with the
-  shape you had.
-- **Time estimates learn each size on its own.** A 2K run is estimated from
-  your 2K runs once there are two, not stretched from your 1K ones, and it no
-  longer pushes your 1K timings out. Edits, image-to-image runs and the tiled
-  decode a large size uses are learned separately too.
-- **On the phone**, the size menu is a sheet with the live frame and your saved
-  sizes, Edit | Reference sits in plain sight under the reference chips, and
-  "Use these settings", LoRAs and Reference in the generation details open the
-  create sheet with the change in place.
-- **Generation details** has **Copy as text** in its header, shows each LoRA
-  as a card with its strength, and gives the size of the picture on screen,
-  with "Drawn at" for the size it was generated at. "Use these settings" keeps
-  your seed, so it makes a new picture.
-- **Smaller things:** the LoRA pill reads "2 LoRAs", the gallery slides up and
-  down with search, the model button's loading placeholder is the pill it
-  stands in for, and Settings › About's feedback section is a small hero.
+### A size menu that shows you the size
+- **See it before you make it.** A live frame shows the exact shape and
+  pixels you'll get, and hovering a shape previews it.
+- **Any size you like.** Open **Custom** to type a width and height, step
+  them with the arrow keys, or drag them. They stay linked to keep the shape,
+  until you unlink them.
+- **Keep the sizes you use.** **Save size** adds your own sizes to the menu,
+  on every device.
+- **Think in megapixels?** Turn it on in Settings › Generation and pick a
+  count instead of 2K.
 
-### Removed
-- **Smart upscale for every new picture**, as above: use 2K, or the upscale
-  arrow on the picture.
-- **The viewer's "Vary with a new seed" button.**
+### Two new models
+- **FLUX.3 Klein.** The newest model from Black Forest Labs: fast, sharp and
+  made for 2K. It can also edit from up to three pictures. Add its prompt
+  helper for the best results: it turns a short idea into the detailed
+  description FLUX.3 was trained on. Prefer to write your own? It works
+  without it too.
+- **MOSS-Image.** Great at putting clear text into pictures and keeping
+  layouts in place. Put it in ComfyUI and **Guided setup** walks you through
+  what else it needs.
 
-### Fixed
-- **The size menu holds still.** Switching to 2K, Custom or Megapixels no
-  longer makes the size button change width and the menu slide sideways
-  under the pointer; the button catches up once the menu closes.
-- **No "isn't known for 2K" note without a model.** With ComfyUI off or no
-  model picked, the size menu doesn't warn about a model that isn't there.
-- **HEISS no longer stops mid-restart on Windows.** A stray console event
-  (exit 0xC000013A) around a restart was read as a crash. The server ignores
-  the console now, and its launcher starts it again if it stops anyway.
-- **A busy ComfyUI no longer shows as offline.** While it's loading a model or
-  short on memory it can take a while to answer, and its runs carry on. HEISS
-  now reads that as busy for up to a minute, doesn't go looking for another
-  ComfyUI meanwhile, and the bug report says "busy" instead of "not answering".
-- **Translators and page extensions can't crash the studio.** A page translator
-  moving text around used to end in the crash screen. HEISS now steps around
-  it, and recovers once on its own before showing the crash screen.
-- **Flux.2 Klein 9B picks a Qwen3 8B text encoder that actually runs it.**
-  MiniMax Music's encoder looks like Qwen3 8B from the outside and could become
-  the default, failing every run with "mat1 and mat2 shapes cannot be
-  multiplied". A text encoder saved with a draft that no longer fits now falls
-  back to the default instead of failing the run.
-- **4K upscales** no longer fall back to an int8 SeedVR2 build the SeedVR2 node
-  can't load.
-- **Size menu:** pressing a shape no longer snaps the preview back to the chosen
-  one, and a long saved-size name shortens with "…" instead of running under
-  its size.
-- **References:** dropping or pasting with every slot used no longer replaces
-  the picture you're editing, Undo after removing one puts all of them back where
-  they were, and the remove × is solid red under the pointer.
-- **Settings › Features › Inpainting says where its two dials are**: in the
-  sidebar's Basics, under the image, not under Advanced.
+HEISS recognizes both from the file itself and sets them up with their
+makers' settings. Anything missing is a click away.
+
+### References that guide instead of edit
+On Flux.2 and Qwen-Image 2.1, hover your first reference and choose:
+- **Edit** changes that picture, at its size.
+- **Reference** uses it as inspiration and keeps the size and shape you
+  picked, 2K included.
+
+Several references now tuck into one chip and fan out when you hover.
+
+### Smart upscale moves to the picture
+New pictures are no longer upscaled automatically. Use **2K** to draw big
+from the start, or the **upscale arrow** on any picture to take it to 2K or
+4K whenever you want.
+
+### Smaller improvements
+- **Setup keeps up with you.** Update ComfyUI or add a node pack, and the
+  setup panel notices on its own. No reload needed.
+- **Restart tells you how it went**, and when it's back.
+- **Time estimates get better at big sizes.** 2K runs learn from your 2K runs.
+- **Generation details** can be copied as text, show each LoRA with its
+  strength, and say what size a picture was made at.
+- **On your phone**, the size menu is a full sheet, and Edit or Reference sit
+  right under your pictures.
+- **Run it in Docker** with `docker compose up --build`
+  ([how](./docs/guides/DOCKER.md)).
+- **Stay on one ComfyUI.** If you run a second ComfyUI just for HEISS, turn
+  off "Find ComfyUI on its own" in Settings › Connection and HEISS stays put.
+- **If HEISS ever stops unexpectedly,** it tells you why the next time it
+  starts.
+
+### Fixes
+- A ComfyUI that's busy loading a model no longer shows as offline.
+- Page translators and browser extensions can no longer crash the studio.
+- Flux.2 Klein 9B no longer picks a text encoder that can't run it.
+- The size menu stays put while you click around in it.
+- No more 2K warning when no model is selected.
+- 4K upscales no longer fail on a model build they can't load.
+- Restarting on Windows no longer stops HEISS partway.
+- Smaller fixes to references, saved sizes and inpainting settings.
 
 ## [0.17.0] - 2026-10-09
 
