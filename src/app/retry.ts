@@ -49,6 +49,8 @@ export function retryRequest(item: GalleryItem, options: RetryOptions = {}): Ret
     loras: normalizeLoras(settings.loras),
     autoResizeInputs: settings.autoResizeInputs !== false,
     referenceAssets: references.filter((ref) => ref?.assetId).map((ref) => ({ slot: ref.slot || 'reference', assetId: ref.assetId })),
+    // Edit unless the run's first reference only guided: then the retry keeps its size and aspect too.
+    referenceRole: settings.referenceRole === 'reference' ? 'reference' : 'edit',
     startImageId: item.startImageId || item.referenceImage || '',
     startImageName: item.referenceImageName || String(settings.referenceImageName || ''),
     privateVault: Boolean(item.privateVault),

@@ -949,6 +949,8 @@ export function generationSettings(body) {
     autoResizeInputs: body.autoResizeInputs !== false,
     ...(body.requestedSize ? { width: body.requestedSize.width, height: body.requestedSize.height } : {}),
     referenceAssets: Array.isArray(body.referenceAssets) ? body.referenceAssets.map(({ slot, assetId, source, name }) => ({ slot, assetId, source, name })) : [],
+    // A first reference that only guided: kept, so a retry runs it the same way (Edit is the default).
+    ...(body.referenceRole === "reference" && Array.isArray(body.referenceAssets) && body.referenceAssets.length ? { referenceRole: "reference" } : {}),
     promptPolicy: body.promptPolicy || null
   };
   const loras = Array.isArray(body.loras)
