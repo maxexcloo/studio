@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { comfy, modelFolders } from './comfy.js';
 import { families } from './family-catalog.js';
+import { dataDir } from './gallery-store.js';
+import { enrichLoraInfo } from './lora-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
 
 /**
@@ -288,5 +290,11 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+  let sources = {};
+  try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
+  for (const [name, info] of Object.entries(result)) {
+    result[name] = enrichLoraInfo(info, name, sources, familiesFromMetadata, families);
+    lastKnown.set(name, result[name]);
+  }
   return result;
 }

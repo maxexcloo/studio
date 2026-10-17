@@ -122,7 +122,7 @@ export function settingsText(item: GalleryItem) {
     !grok && settings.sampler ? `Sampler: ${settings.sampler}${settings.scheduler ? ` (${settings.scheduler})` : ""}` : "",
     /^\d+$/.test(String(settings.seed ?? "")) ? `Seed: ${settings.seed}` : "",
     item.width && item.height ? `Size: ${item.width}×${item.height}` : "",
-    settings.denoise && (item.referenceImage || settings.referenceImageName) ? `Denoise: ${settings.denoise}` : ""
+    !String(settings.modelName || "").endsWith(".rad") && settings.denoise && (item.referenceImage || settings.referenceImageName) ? `Denoise: ${settings.denoise}` : ""
   ].filter(Boolean);
   if (parts.length) lines.push(parts.join(" · "));
   const loras = activeLoras(settings.loras);
@@ -168,7 +168,7 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
       add("Scheduler", settings.scheduler);
     }
     add("Seed", settings.seed);
-    if (item.type === "image" && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
+    if (item.type === "image" && !String(settings.modelName || "").endsWith(".rad") && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
   section(item.type === "video" ? "Video" : "Image", (add) => {
     // The size of the picture shown: an upscale's own size when that's the one on screen.

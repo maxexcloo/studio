@@ -1,3 +1,11 @@
+/** Snap typed and restored dimensions to the selected model's supported stride. */
+export function imageDimension(value, metadata = {}) {
+  const step = Number(metadata.step) || 1;
+  const minimum = Math.ceil((Number(metadata.min) || step) / step) * step;
+  const maximum = Math.floor((Number(metadata.max) || 16384) / step) * step;
+  return Math.max(minimum, Math.min(maximum, Math.round(Number(value) / step) * step));
+}
+
 export { outputProfile } from './outputReuse.js';
 
 /** Video count is a queue of independent jobs, never the model's batch size. */

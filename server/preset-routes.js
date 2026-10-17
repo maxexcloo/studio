@@ -104,6 +104,7 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
     const file = importedImageFile(item);
     if (item?.type !== 'video' || !file || !fs.existsSync(file)) { res.sendStatus(404); return; }
+    if (req.query.poster === "1") { res.type("jpeg").sendFile(await getFileVideoPoster(file), { dotfiles: "allow" }); return; }
     sendVideoPreview(req, res, await getFileVideoPreview(file));
   }));
   app.get('/api/presets/:id/thumbnail', route(async (req, res) => {

@@ -1,3 +1,4 @@
+import { imageDimension } from './generationOptions';
 import React from 'react';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import { ArrowUp, Dices, EyeOff, ChevronUp, CircleDotDashed, Film, Images, Layers, RefreshCw, SlidersHorizontal, X } from 'lucide-react';

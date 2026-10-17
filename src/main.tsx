@@ -11,7 +11,7 @@ import { useModelFolders } from './app/useModelFolders';
 import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, InpaintMask, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
-import { clampProfileCount, generationPlan, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
+import { clampProfileCount, generationPlan, imageDimension, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -1324,6 +1324,12 @@ function App() {
   }, [inpaintMask, activeInpaintMask]);
   const widthMeta = currentProfile?.constraints?.width || {};
   const heightMeta = currentProfile?.constraints?.height || {};
+  useEffect(() => {
+    if (activeInpaintMask) return;
+    const nextWidth = imageDimension(width, widthMeta), nextHeight = imageDimension(height, heightMeta);
+    if (nextWidth !== width) setWidth(nextWidth);
+    if (nextHeight !== height) setHeight(nextHeight);
+  }, [activeInpaintMask, model, width, height, widthMeta.min, widthMeta.max, widthMeta.step, heightMeta.min, heightMeta.max, heightMeta.step]);
   /* Workflows may declare that a reference image dictates the output framing
      (aspectPolicy: "reference"). When one is selected we hide the manual aspect
      and size controls and let the reference's own dimensions drive generation. */
