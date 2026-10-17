@@ -88,7 +88,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   const captionFor = (row: SizeRow | null) => row
     ? (row.small ? `${row.label} · ${row.small}` : row.label)
     : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
-  const note = (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${sizeMax} px a side.`
+  const note = (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
     : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
     : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";

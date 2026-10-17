@@ -113,8 +113,10 @@ export type SizePlan = {
   final: Size;
   /** The model isn't known to draw this size well ("maybe" or nothing in its catalog entry). */
   untested: boolean;
-  /** The model's max side kept it under 2K. */
+  /** The model's max side kept it under 2K, or short of the megapixels asked for. */
   capped: boolean;
+  /** That max side, for saying so. */
+  maxSide: number;
 };
 
 /**
@@ -126,21 +128,23 @@ export type SizePlan = {
 export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192, area = 0, step = 16): SizePlan {
   const size = upscaleSize(tier);
   const picked = { width, height };
-  const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false };
+  const plain: SizePlan = { size, draw: null, final: picked, untested: false, capped: false, maxSide: max };
   if (size === "none" && area > 0 && width > 0 && height > 0) {
     // No side past 4096, as in Custom, so taking the size into Custom never reshapes it.
     const side = { min: 64, max: Math.min(max, 4096), step: Math.max(16, step) };
     const draw = fitRatio(width / height, area, side, side, side.step);
     if (draw.width === width && draw.height === height) return plain;
-    // Short of the area asked for because a side reached the max (within a step: sides snap to it).
-    const capped = draw.width * draw.height < area * 0.97 && Math.max(draw.width, draw.height) >= side.max - side.step;
+    // Short of the area asked for because the shape at that area would need a side past the max.
+    // (Fitting the shape can stop a step or more under the max, so the drawn size can't tell.)
+    const ratio = width / height;
+    const capped = draw.width * draw.height < area * 0.97 && Math.max(Math.sqrt(area * ratio), Math.sqrt(area / ratio)) > side.max;
     // Past about 2.5 MP a model not made for 2K is on the same unknown ground as 2K.
     const untested = draw.width * draw.height > 2.5 * 1024 * 1024 && native["2k"] !== "yes";
-    return { size, draw, final: draw, untested, capped };
+    return { size, draw, final: draw, untested, capped, maxSide: side.max };
   }
   if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
   const draw = drawnAt(picked, 2048, max);
-  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048 };
+  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048, maxSide: max };
 }
 
 /**
