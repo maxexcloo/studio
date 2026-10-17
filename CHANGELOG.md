@@ -11,82 +11,83 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+> Native 2K and 4K, Docker and reference-only guidance
+
 ### Added
-- **Docker support.** `docker compose up --build` runs the studio in a
-  container next to your ComfyUI, keeping its data on a volume and serving
-  the gallery from ComfyUI's output folder. A plain Dockerfile (multi-stage,
-  non-root, for `docker run` without compose) and the how-to are in
-  [DOCKER.md](./docs/guides/DOCKER.md). The studio is published to this
-  computer only, and settings made in the app are kept on the data volume.
-- **Settings › Connection › Change address › Find ComfyUI on its own.** Off
-  keeps HEISS on its saved address (`HEISS_COMFY_SEARCH=0`): with a second
-  ComfyUI just for HEISS next to your main one on 8188, HEISS no longer
-  switches to the main one while its own is starting or restarting.
-- **Resolution: 2K and 4K drawn by the model itself.** On models made for
-  big pictures (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4,
-  MageFlow, Sana 2K/4K) the size menu reads **Resolution** with Default, 2K
-  and 4K: the model makes the picture at that size (the aspect you picked,
-  long side 2048 or 4096), faster and with nothing in between, and **Use
-  upscaler** switches to SeedVR2. Elsewhere it stays **Smart upscale**
-  through SeedVR2, with **Draw at 2K directly** where the model may manage
-  it ("Results vary"), and nothing where it plainly breaks (SD 1.5/2). The
-  list and its sources are in
-  [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
+- **Native 2K and 4K.** On models made for big pictures (Flux.2, Qwen-Image 2.1,
+  Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow, Sana 2K/4K) the size menu now
+  reads **Resolution** with Default, 2K and 4K. The model draws the picture at
+  that size itself, with your aspect and the long side at 2048 or 4096. That's
+  faster, and there's no upscale step in between. **Use upscaler** switches to
+  SeedVR2 if you'd rather have that. On other models it stays **Smart upscale**,
+  with **Draw at 2K directly** where the model might manage it ("Results vary"),
+  and nothing where it plainly breaks (SD 1.5/2). The list and its sources are
+  in [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
   without SeedVR2 still opens its setup.
 - **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference for Edit or Reference. Edit works as before: the result
-  keeps that image's size, and an EDIT tag on the thumbnail shows it.
-  Reference keeps your size and aspect, and the image still guides the
-  picture, 2K included. A painted mask settles it as Edit. The inpainting brush belongs to Edit, so it hides
-  while Reference is on.
-- **Size in megapixels.** Settings › Generation › Size in megapixels puts a
-  Megapixels field under the shapes in the size menu, in place of 2K. Type a
-  count, step it with the arrow keys or drag its MP label, and every shape is
-  drawn at that many pixels (3 MP makes 1:1 1776 × 1776); in Custom it
-  rescales the size you have, keeping its shape, and sets the count for
-  Default too. Reset gives each model its own size back. 1 MP is 1024 ×
-  1024, as ComfyUI counts it, and the size menu and Settings' "Pixels made"
-  now count the same way.
-- **Save any custom size.** "Save size" is back for a size of your own, a
-  common shape at a size of its own included; not for one Default or 2K
-  already gives.
+  first reference and pick Edit or Reference. Edit works like before: the result
+  keeps that image's size, and an EDIT tag on the thumbnail shows it. Reference
+  keeps the size and aspect you picked and the image still guides the picture,
+  2K included. A painted mask always makes it Edit, and the inpainting brush
+  hides while Reference is on.
+- **Size in megapixels.** Turn on Settings › Generation › Size in megapixels
+  and the size menu gets a Megapixels field under the shapes, in place of 2K.
+  Type a count, step it with the arrow keys or drag its MP label, and every
+  shape is drawn at that many pixels (3 MP makes 1:1 1776 × 1776). In Custom it
+  rescales your size and keeps its shape. Reset gives each model its own size
+  back. 1 MP is 1024 × 1024, as ComfyUI counts it, and the size menu and
+  Settings' "Pixels made" now count the same way.
+- **Save any custom size.** "Save size" is back for a size of your own, a common
+  shape at a size of its own included. It isn't offered for one Default or 2K
+  already gives you.
+- **Docker support.** `docker compose up --build` runs the studio in a
+  container next to your ComfyUI, with its data on a volume and the gallery
+  served from ComfyUI's output folder. There's also a plain Dockerfile
+  (multi-stage, non-root) for `docker run` without compose, and the how-to is in
+  [DOCKER.md](./docs/guides/DOCKER.md). The studio is only published to your own
+  computer, and settings you make in the app are kept on the data volume.
+- **Find ComfyUI on its own can be turned off.** In Settings › Connection ›
+  Change address, switching it off keeps HEISS on its saved address
+  (`HEISS_COMFY_SEARCH=0`). If you run a second ComfyUI just for HEISS next to
+  your main one on 8188, HEISS no longer jumps over to the main one while its
+  own is starting or restarting.
 
 ### Changed
-- **Several references are one chip.** The first image stays in the corner;
+- **Several references are one chip now.** The first image stays in the corner,
   the others sit behind it and fan out on hover, with a + for the next one
-  (greyed, saying how many it takes, once all are used). In Edit the others
-  are greyed, since only the first changes, and no more can be added; in
-  Reference they all guide. Switching glides instead of jumping, and the
-  phone lays them out in a row.
-- **A tighter size menu.** Default and the ratio it already is share one
+  (greyed out, saying how many it takes, once they're all used). In Edit only
+  the first one changes, so the others are greyed and no more can be added; in
+  Reference they all guide. Switching glides instead of jumping, and the phone
+  lays them out in a row.
+- **The size menu is tighter.** Default and the ratio it already is share one
   row, rows are more compact, and 2.35:1 is gone.
-- **A 2K/4K pick survives a reference.** It is skipped while an edited
-  reference or a painted mask sets the size, and back afterwards, together
+- **Your 2K/4K pick survives a reference.** It's skipped while an edited
+  reference or a painted mask sets the size, and comes back afterwards together
   with the aspect you had.
 - **Time estimates learn each size on its own.** A 2K or 4K draw is estimated
-  from your 2K and 4K runs once there are two, not bent from your 1K ones;
-  a stretch at 2K no longer pushes your 1K timings out, and a few misses at
-  one size no longer hide the estimate at another. Edits and image-to-image
-  runs, and the tiled decode a native size uses, are learned apart too.
+  from your 2K and 4K runs once there are two, not stretched from your 1K ones.
+  A run at 2K no longer pushes your 1K timings out, and a few misses at one size
+  no longer hide the estimate at another. Edits, image-to-image runs and the
+  tiled decode a native size uses are learned separately too.
 
 ### Fixed
-- **Size menu:** pressing a shape no longer snaps the preview back to the
-  chosen one; dragging W, H or MP changes the number and lets go, without
-  dropping you into the field or leaving the drag cursor behind; a long
-  saved-size name shortens with "…" instead of running under its size; a
-  2K or MP tag added with the menu open no longer cuts the label to "D…".
-- **References:** a drop or paste with every slot used no longer replaces
-  the picture being edited; Undo after removing one puts all of them back
-  where they were; the remove × is solid red under the pointer.
-- **Flux.2 Klein 9B picks a Qwen3 8B text encoder that runs it.** MiniMax
-  Music's encoder looks like Qwen3 8B from outside and could become the
-  default, failing every run with "mat1 and mat2 shapes cannot be
-  multiplied". A text encoder saved with the draft that no longer fits
-  falls back to the default instead of failing the run.
-- **Smart upscale finds SeedVR2 weights kept outside ComfyUI/models**, on any
-  folder from `extra_model_paths.yaml`. 4K no longer falls back to an int8
+- **Flux.2 Klein 9B picks a Qwen3 8B text encoder that actually runs it.**
+  MiniMax Music's encoder looks like Qwen3 8B from the outside and could become
+  the default, failing every run with "mat1 and mat2 shapes cannot be
+  multiplied". A text encoder saved with a draft that no longer fits now falls
+  back to the default instead of failing the run.
+- **Smart upscale finds SeedVR2 weights kept outside `ComfyUI/models`**, in any
+  folder from `extra_model_paths.yaml`. 4K also no longer falls back to an int8
   build the SeedVR2 node can't load.
-- **Settings › Features › Inpainting says where its two dials are:** in the
+- **Size menu:** pressing a shape no longer snaps the preview back to the chosen
+  one. Dragging W, H or MP changes the number and lets go, without dropping you
+  into the field or leaving the drag cursor behind. A long saved-size name
+  shortens with "…" instead of running under its size, and a 2K or MP tag added
+  with the menu open no longer cuts the label to "D…".
+- **References:** dropping or pasting with every slot used no longer replaces
+  the picture you're editing, Undo after removing one puts all of them back where
+  they were, and the remove × is solid red under the pointer.
+- **Settings › Features › Inpainting says where its two dials are**: in the
   sidebar's Basics, under the image, not under Advanced.
 
 ## [0.17.0] - 2026-10-09
