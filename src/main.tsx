@@ -429,18 +429,24 @@ function App() {
   // without a reload. Only a real offline → online change counts.
   const wasConnected = useRef<boolean | null>(null);
   const [comfyReconnectedAt, setComfyReconnectedAt] = useState(0);
+  // A new ComfyUI version counts too: an update and restart can fall between two checks
+  // without ever looking offline, and what it runs may have changed (a model it couldn't before).
+  const lastComfyVersion = useRef("");
   useEffect(() => {
     if (!comfyStatus.checked) return;
     const previous = wasConnected.current;
     wasConnected.current = comfyStatus.connected;
-    if (previous !== false || !comfyStatus.connected) return;
+    const version = comfyStatus.connected ? comfyStatus.version || "" : "";
+    const updated = Boolean(version && lastComfyVersion.current && version !== lastComfyVersion.current);
+    if (version) lastComfyVersion.current = version;
+    if (!updated && (previous !== false || !comfyStatus.connected)) return;
     refreshModels(false);
     refreshWorkflows();
     refreshHealth();
     refreshHardware();
     refreshUpscaleStatus(prefs.upscaleQuality, { fresh: true });
     setComfyReconnectedAt(Date.now());
-  }, [comfyStatus.connected, comfyStatus.checked]);
+  }, [comfyStatus.connected, comfyStatus.checked, comfyStatus.version]);
 
   // A restart HEISS asked for: every surface says "restarting", the poll speeds
   // up so ComfyUI's return shows at once, and a restart that never comes back

@@ -3,7 +3,7 @@ import { Check, ChevronDown, Download, ExternalLink, Pause, Play, RefreshCw, Rot
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ComfyRestart } from './ComfyRestart';
 import { NodeInstall, ShellCommand } from './NodeInstall';
-import { CellBar } from './UpscaleDialogs';
+import { CellBar, Watcher } from './UpscaleDialogs';
 import { formatEta } from './UpscaleDownloadActivity';
 import { cn } from './format';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
@@ -76,6 +76,22 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   // Downloads land on the computer running HEISS UI; from another device they are its job.
   const remote = remoteAnswer || state?.local === false || !thisComputer;
   const missing = profile.missing || [];
+  // Waiting on ComfyUI itself (an update, a node pack and its restart) happens outside HEISS,
+  // so the panel looks again by itself until it changes, rather than waiting for a reload.
+  const waitingOnComfy = missing.some((item) => item.part === 'comfy');
+  const [lookedAt, setLookedAt] = React.useState(0);
+  const recheck = React.useRef(onInstalled);
+  recheck.current = onInstalled;
+  React.useEffect(() => {
+    if (!waitingOnComfy) return;
+    setLookedAt(Date.now());
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      recheck.current();
+      setLookedAt(Date.now());
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [waitingOnComfy]);
   const name = profile.displayName || profile.label || 'This model';
 
   // Remember every part seen missing here; the ones no longer missing are in place.
@@ -280,7 +296,10 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
           <ComfyRestart compact onBack={onInstalled} />
         </div>
       ) : null}
-      {manual && !moving ? (
+      {waitingOnComfy ? (
+        <div className="model-setup-watch"><Watcher lastChecked={lookedAt}>{outdated ? 'Watching for the ComfyUI update…' : 'Watching for the nodes…'}</Watcher></div>
+      ) : null}
+      {manual && !moving && !waitingOnComfy ? (
         <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check again</button>
       ) : null}
       {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running HEISS UI.'}</p> : null}

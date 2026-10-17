@@ -32,7 +32,7 @@ export type SizeRow = { key: string; value: string; label: string; small?: strin
  * at 2048. Custom is any width and height; a shape row there keeps the area
  * and changes the shape.
  */
-export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native = {}, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
+export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native: modelNative, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
   value: string;
   options: AspectPreset[];
   currentSize: string;
@@ -48,6 +48,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   offerTwoK?: boolean;
 }) {
   const custom = tier === "custom";
+  // No model picked (ComfyUI off, or none listed): sizes still work, but there is no model to warn about.
+  const native = modelNative || {};
   const picked = parseSize(currentSize);
   const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax, custom ? 0 : targetArea, limits?.width.step);
   const shown = custom ? picked : plan.final;
@@ -88,7 +90,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   const captionFor = (row: SizeRow | null) => row
     ? (row.small ? `${row.label} · ${row.small}` : row.label)
     : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
-  const note = (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
+  const note = !modelNative ? ""
+    : (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
     : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
     : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";

@@ -110,7 +110,7 @@ function useFamilySetupPlan(family: string, profileId: string, open: boolean) {
 
 /* ------------------------------------------------------------ The dialog */
 
-export function FamilySetupDialog({ family, profileId, open, onOpenChange, showToast, onUse, comfyUrl }: {
+export function FamilySetupDialog({ family, profileId, open, onOpenChange, showToast, onUse, onChanged, comfyUrl }: {
   family: string;
   profileId: string;
   open: boolean;
@@ -118,6 +118,8 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
   showToast: ShowToast;
   /** Select the model in the composer, by its profile id. */
   onUse: (profileId: string) => void;
+  /** Something this dialog saw change (ComfyUI updated, nodes in, a file landed): rescan, so the rest of the studio agrees. */
+  onChanged?: () => void;
   comfyUrl?: string;
 }) {
   const { plan, checkedAt, reload } = useFamilySetupPlan(family, profileId, open);
@@ -126,6 +128,22 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
   const [step, setStep] = React.useState<Step>('comfy');
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => { if (open) setStep('comfy'); }, [open]);
+
+  // What the dialog last saw. Any change means the sidebar's copy is stale: it rescans now,
+  // not on the next reload, and once more when the dialog closes.
+  const seen = plan ? [plan.comfy.online, plan.comfy.native, plan.comfy.pack?.loaded, plan.comfy.pack?.ready, plan.profile?.ready, ...plan.parts.map((row) => Boolean(row.have))].join('|') : '';
+  const lastSeen = React.useRef('');
+  const changed = React.useRef(onChanged);
+  changed.current = onChanged;
+  React.useEffect(() => {
+    if (!seen) return;
+    if (lastSeen.current && lastSeen.current !== seen) changed.current?.();
+    lastSeen.current = seen;
+  }, [seen]);
+  React.useEffect(() => {
+    if (open) { lastSeen.current = ''; return; }
+    changed.current?.();
+  }, [open]);
 
   const route: Route = plan?.route || 'native';
   const routeOk = Boolean(plan && (route === 'native' ? plan.comfy.native : plan.comfy.pack?.ready));

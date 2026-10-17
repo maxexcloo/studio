@@ -875,6 +875,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           onOpenChange={setFamilySetupOpen}
           showToast={showToast}
           onUse={view.pickModel}
+          onChanged={() => { view.refreshModels(false); view.refreshWorkflows(); }}
           comfyUrl={health?.comfyUrl}
         />
       ) : null}
