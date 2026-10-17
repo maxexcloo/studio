@@ -460,7 +460,8 @@ test("one-click pack installs only take registry ids, and run locally with Comfy
   const started = await startPackInstall("comfyui_sana");
   assert.equal(started.route, "local");
   let state = started;
-  for (let i = 0; i < 50 && state.status === "running"; i += 1) {
+  // Up to 10 s: the full suite runs files side by side, and a busy machine starts processes slowly.
+  for (let i = 0; i < 500 && state.status === "running"; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
     state = packInstallState("comfyui_sana");
   }
