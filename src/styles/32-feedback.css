@@ -73,59 +73,146 @@
 
 /* ---------------------------------------------- Settings › Feedback */
 
+/* A small inline hero: the copy on the left, the live board tilted away in
+   3D on the right. Static transforms only; hover eases the tilt a little. */
 .feedback-hero {
   position: relative;
-  display: grid;
-  gap: 6px;
-  padding: 22px 22px 20px;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 248px;
+  padding: 26px 26px 22px;
   border-radius: var(--r-card, 18px);
   background:
-    radial-gradient(circle, rgb(255 255 255 / .05) .8px, transparent 1px) 0 0 / 18px 18px,
-    linear-gradient(180deg, #151515, #101010);
-  box-shadow: inset 0 0 0 1px var(--surface-border);
+    radial-gradient(60% 90% at 78% 30%, rgb(255 154 82 / .10), transparent 70%),
+    radial-gradient(circle, rgb(255 255 255 / .045) .8px, transparent 1px) 0 0 / 18px 18px,
+    #070707;
+  color: #f5f5f5;
 }
-.feedback-hero strong { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
-.feedback-hero p { margin: 0; max-width: 460px; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.55; }
 
-.feedback-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-.feedback-tile {
-  display: grid;
-  align-content: start;
-  justify-items: start;
+.feedback-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08), inset 0 1px 0 rgb(255 255 255 / .06);
+  pointer-events: none;
+}
+.feedback-hero::before {
+  /* Keeps the copy readable where the board passes under it. */
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #070707 28%, rgb(7 7 7 / .55) 42%, transparent 54%);
+  pointer-events: none;
+}
+.feedback-hero-copy { position: relative; z-index: 2; display: grid; justify-items: start; gap: 10px; max-width: 290px; }
+.feedback-hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--ember); font-size: 12px; font-weight: 550; }
+.feedback-hero-eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 1.5px; background: currentColor; box-shadow: var(--ember-glow); }
+.feedback-hero-copy strong {
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -.035em;
+  background: linear-gradient(180deg, #fff 30%, rgb(255 255 255 / .62));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.feedback-hero-copy p { margin: 0; color: rgb(255 255 255 / .58); font-size: 13px; line-height: 1.5; text-wrap: pretty; }
+
+.feedback-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px; }
+.feedback-hero-post {
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  padding: 14px;
+  height: 38px;
+  padding: 0 4px 0 16px;
   border: 0;
-  border-radius: 14px;
-  background: var(--control-fill);
-  color: hsl(var(--foreground));
-  text-align: left;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background var(--dur-fast), scale 100ms;
+  box-shadow: 0 0 0 4px rgb(255 255 255 / .06), 0 8px 24px -8px rgb(255 255 255 / .35);
+  transition: scale 100ms var(--ease-out), box-shadow var(--dur-fast);
 }
-.feedback-tile:hover { background: var(--control-hover); }
-.feedback-tile:active { scale: .98; }
-.feedback-tile:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.feedback-tile-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--tone) 14%, transparent);
-  color: var(--tone);
+.feedback-hero-post span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #0a0a0a; color: #fff; }
+.feedback-hero-post:hover { box-shadow: 0 0 0 5px rgb(255 255 255 / .1), 0 10px 30px -8px rgb(255 255 255 / .45); }
+.feedback-hero-post:active { scale: .97; }
+.feedback-hero-post:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.feedback-hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgb(255 255 255 / .72);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast);
 }
-.feedback-tile strong { font-size: 13.5px; font-weight: 600; }
-.feedback-tile span:last-child { margin-top: -6px; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
-.feedback-tile.is-bug { --tone: #ff6f64; }
-.feedback-tile.is-idea { --tone: var(--ember); }
-.feedback-tile.is-question { --tone: #86abff; }
+.feedback-hero-link svg { transition: translate 200ms var(--ease-out); }
+.feedback-hero-link:hover { color: #fff; }
+.feedback-hero-link:hover svg { translate: 2px -2px; }
+.feedback-hero-link:focus-visible { outline: none; border-radius: 6px; box-shadow: var(--focus-ring); }
 
+.feedback-hero-fine { position: relative; z-index: 2; max-width: 290px; margin: 18px 0 0; color: rgb(255 255 255 / .36); font-size: 11.5px; line-height: 1.45; }
+
+/* The board, leaning back into the card. */
+.feedback-hero-stage {
+  position: absolute;
+  z-index: 0;
+  top: 30px;
+  left: 47%;
+  width: 560px;
+  aspect-ratio: 1120 / 749;
+  transform-style: preserve-3d;
+  transform: perspective(1500px) rotateX(10deg) rotateY(38deg) rotateZ(8deg);
+  transform-origin: 0 0;
+  transition: transform 700ms var(--ease-out);
+  cursor: pointer;
+}
+.feedback-hero:hover .feedback-hero-stage { transform: perspective(1500px) rotateX(8deg) rotateY(32deg) rotateZ(6deg) translateX(-12px); }
+/* The fade sits on each layer: a mask on the stage would flatten the 3D. */
+.feedback-hero-window,
+.feedback-hero-sheet {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  -webkit-mask-image: linear-gradient(180deg, #000 35%, transparent 85%);
+  mask-image: linear-gradient(180deg, #000 35%, transparent 85%);
+}
+.feedback-hero-window {
+  overflow: hidden;
+  background: #0b0b0b;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14), -30px 30px 60px -20px rgb(0 0 0 / .9);
+}
+.feedback-hero-window::after {
+  /* A glancing light across the glass. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgb(255 255 255 / .09), transparent 38%);
+  pointer-events: none;
+}
+.feedback-hero-window img { display: block; width: 100%; height: 100%; user-select: none; }
+.feedback-hero-sheet {
+  background: linear-gradient(180deg, #141414, #0a0a0a);
+  box-shadow: inset 1.5px 0 0 rgb(255 255 255 / .3), inset 0 1px 0 rgb(255 255 255 / .12);
+}
+.feedback-hero-sheet:nth-child(1) { transform: translateZ(-150px); opacity: .45; }
+.feedback-hero-sheet:nth-child(2) { transform: translateZ(-100px); opacity: .65; }
+.feedback-hero-sheet:nth-child(3) { transform: translateZ(-50px); opacity: .85; }
 
 @media (max-width: 720px) {
-  .feedback-tiles { grid-template-columns: minmax(0, 1fr); }
-  .feedback-tile { grid-template-columns: 30px minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 2px; }
-  .feedback-tile-icon { grid-row: span 2; }
-  .feedback-tile span:last-child { margin-top: 0; }
+  .feedback-hero-stage { left: 52%; width: 460px; opacity: .55; }
+  .feedback-hero-sheet { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feedback-hero-stage { transition: none; }
 }
 
 /* A quiet line under the settings sections, always in reach. */

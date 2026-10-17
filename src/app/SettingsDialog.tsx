@@ -4,7 +4,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { Bug, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, HelpCircle, Info, LifeBuoy, Lightbulb, LockKeyhole, MessageSquarePlus, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, Wand2, Library } from 'lucide-react';
+import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, Wand2, Library } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -1132,26 +1132,26 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             </Group> : null}
 
             <section className="feedback-hero">
-              <strong>Found a bug? Have an idea?</strong>
-              <p>Send it to the feedback board. It’s public: others can upvote it, and you can follow its status.</p>
-              <div className="feedback-tiles">
-                <button type="button" className="feedback-tile is-bug" onClick={() => openFeedback({ kind: 'bug', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><Bug size={15} /></span>
-                  <strong>Report a bug</strong>
-                  <span>Something doesn’t work the way it should.</span>
-                </button>
-                <button type="button" className="feedback-tile is-idea" onClick={() => openFeedback({ kind: 'idea', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><Lightbulb size={15} /></span>
-                  <strong>Share an idea</strong>
-                  <span>Something it could do, or do better.</span>
-                </button>
-                <button type="button" className="feedback-tile is-question" onClick={() => openFeedback({ kind: 'question', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><HelpCircle size={15} /></span>
-                  <strong>Ask a question</strong>
-                  <span>Not sure how something works?</span>
-                </button>
+              <div className="feedback-hero-copy">
+                <span className="feedback-hero-eyebrow">Feedback board</span>
+                <strong>Found a bug?<br />Have an idea?</strong>
+                <p>Post it to the board. Others upvote it, you follow along.</p>
+                <div className="feedback-hero-actions">
+                  <button type="button" className="feedback-hero-post" onClick={() => openFeedback({ from: 'settings' })}>
+                    New post <span><Plus size={14} strokeWidth={2.4} /></span>
+                  </button>
+                  <a className="feedback-hero-link" href={boardUrl} target="_blank" rel="noreferrer">Open the board <ArrowUpRight size={14} /></a>
+                </div>
               </div>
-              <p className="set-note">A post has what you write, plus versions, system and GPU if you leave them on. No prompts, images or file names.</p>
+              <a className="feedback-hero-stage" href={boardUrl} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-window">
+                  <img src="/feedback-board.webp" alt="" width={1120} height={749} loading="lazy" decoding="async" draggable={false} />
+                </span>
+              </a>
+              <p className="feedback-hero-fine">Only what you write, plus setup info if you leave it on. Never prompts, images or file names.</p>
             </section>
 
             <HelpGroup copyToClipboard={copyToClipboard} />
