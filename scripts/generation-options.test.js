@@ -103,3 +103,15 @@ test('reference sizing respects joint limits, alignment and fixed canvases', () 
 test('missing reference dimensions leave the canvas alone', () => {
   for (const reference of [null, {}, { width: 0, height: 512 }, { width: Infinity, height: 512 }]) assert.equal(referenceImageSize(null, reference), null);
 });
+
+
+test('typed and restored dimensions follow the selected model stride and bounds', async () => {
+  const { imageDimension } = await import('../src/app/generationOptions.js');
+  for (const [value, metadata, expected] of [
+    [880, {min: 64, max: 2048, step: 32}, 896],
+    [1184, {min: 64, max: 2048, step: 32}, 1184],
+    [880, {min: 64, max: 2048, step: 16}, 880],
+    [65, {min: 64, max: 2048, step: 32}, 64],
+    [2200, {min: 64, max: 2048, step: 32}, 2048],
+  ]) assert.equal(imageDimension(value, metadata), expected);
+});

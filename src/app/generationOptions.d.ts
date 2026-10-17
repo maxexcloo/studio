@@ -1,3 +1,4 @@
+export function imageDimension(value: number, metadata?: { min?: number; max?: number; step?: number }): number;
 import type { GalleryItem, Profile } from './types';
 
 export function outputProfile(profiles: Profile[], item: GalleryItem): Profile | undefined;

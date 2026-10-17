@@ -119,3 +119,11 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
   const { data: originalData } = await sharp(original.buffer).raw().toBuffer({ resolveWithObject: true });
   assert.ok(originalData[0] < 50);
 });
+
+
+test('Radiance reference settings omit unsupported denoise', async () => {
+  const { generationSettings } = await import('./gallery-store.js');
+  const reference = { kind: 'image', modelName: 'qwen-image.rad', startImageId: 'reference', denoise: 0.7 };
+  assert.equal(generationSettings(reference).denoise, undefined);
+  assert.equal(generationSettings({ ...reference, modelName: 'qwen.safetensors' }).denoise, 0.7);
+});

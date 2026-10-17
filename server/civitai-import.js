@@ -119,6 +119,10 @@ export function versionResource(version, weight = 1) {
     id: `civitai:${version.id}:${file.id}`, file: file.name, folder, label: String(version.model?.name || file.name).slice(0, 200),
     // Construct the endpoint from IDs rather than trusting a URL from metadata.
     url: `https://civitai.com/api/download/models/${version.id}?type=${encodeURIComponent(file.type)}&format=${/\.gguf$/i.test(file.name) ? 'GGUF' : 'SafeTensor'}${file.metadata?.fp ? `&fp=${encodeURIComponent(file.metadata.fp)}` : ''}${file.metadata?.size ? `&size=${encodeURIComponent(file.metadata.size)}` : ''}`,
+    baseModel: String(version.baseModel || '').slice(0, 100),
+    sourceUrl: `https://civitai.com/models/${version.modelId}?modelVersionId=${version.id}`,
+    trainedWords: (Array.isArray(version.trainedWords) ? version.trainedWords : []).map(String).slice(0, 30),
+    version: String(version.name || '').slice(0, 200),
     sha256, bytes: Number(file.sizeKB || 0) * 1024
   } : null;
   return {

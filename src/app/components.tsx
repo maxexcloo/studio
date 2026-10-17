@@ -45,7 +45,7 @@ function MediaComponent({ item, muted = false }: { item: Output & { thumbnailUrl
     });
   };
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
-  const isThumbnail = muted && Boolean(item.thumbnailUrl) && !useFullImage;
+  const isThumbnail = item.type !== "video" && muted && Boolean(item.thumbnailUrl) && !useFullImage;
   const source = mediaUrl(isThumbnail ? item.thumbnailUrl : item.url, item as { id?: string; createdAt?: string });
   if (!source || failed) return <div className="media-fallback"><span>{titleFromPrompt(item.prompt || item.filename) || "Output unavailable"}</span></div>;
   if (item.type === "video") {

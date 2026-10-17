@@ -1,3 +1,4 @@
+import { imageDimension } from './generationOptions';
 import { GrokMediaControls } from './GrokMediaControls';
 import { VideoDurationControls } from './VideoDurationControls';
 import { modelName } from './catalogueNames';
@@ -239,8 +240,8 @@ export function SidebarControls({ view }: { view: any }) {
             <p className="sidebar-hint">{String(seed || "").trim() ? "The same picture every time." : "A new picture every time."}</p>
             {customSize && !aspectLocked ? (
               <div className="number-row">
-                <NumberPicker label="Width" value={width} onChange={setWidth} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} fill />
-                <NumberPicker label="Height" value={height} onChange={setHeight} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} fill />
+                <NumberPicker label="Width" value={width} onChange={(value) => setWidth(imageDimension(value, widthMeta))} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} fill />
+                <NumberPicker label="Height" value={height} onChange={(value) => setHeight(imageDimension(value, heightMeta))} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} fill />
               </div>
             ) : null}
             {aspectLocked ? (

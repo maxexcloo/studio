@@ -1,3 +1,4 @@
+import { imageDimension } from './generationOptions';
 import React from 'react';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
@@ -306,8 +307,8 @@ export function ComposerBar(props: ComposerBarProps) {
 
   const sizePickers = (density: ControlDensity) => customSize && !aspectLocked ? (
     <>
-      <NumberPicker label="Width" icon={<MoveHorizontal size={13} />} density={density} value={width} onChange={setWidth} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
-      <NumberPicker label="Height" icon={<MoveVertical size={13} />} density={density} value={height} onChange={setHeight} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
+      <NumberPicker label="Width" icon={<MoveHorizontal size={13} />} density={density} value={width} onChange={(value) => setWidth(imageDimension(value, widthMeta))} min={widthMeta.min ?? 64} max={widthMeta.max ?? 4096} step={widthMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
+      <NumberPicker label="Height" icon={<MoveVertical size={13} />} density={density} value={height} onChange={(value) => setHeight(imageDimension(value, heightMeta))} min={heightMeta.min ?? 64} max={heightMeta.max ?? 4096} step={heightMeta.step || (mode === "video" ? 32 : 64)} size="sm" />
     </>
   ) : null;
 

@@ -129,6 +129,10 @@ test('video imports save originals, serve byte ranges and generate thumbnails', 
     assert.equal(thumbnail.status, 200);
     assert.match(thumbnail.headers.get('content-type'), /image\/jpeg/);
     assert.equal((await sharp(Buffer.from(await thumbnail.arrayBuffer())).metadata()).width, 64);
+    const poster = await fetch(base + '/api/presets/42/video-preview?poster=1');
+    assert.equal(poster.status, 200);
+    assert.match(poster.headers.get('content-type'), /image\/jpeg/);
+    assert.equal((await sharp(Buffer.from(await poster.arrayBuffer())).metadata()).width, 64);
   } finally {
     await api('/api/presets/42', null, 'DELETE');
     sourceType = 'image';

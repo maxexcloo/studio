@@ -9,7 +9,7 @@ import { useModelFolders } from './app/useModelFolders';
 import type { ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, OutputFolderReport, Paths, Preferences, Profile, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
-import { clampProfileCount, generationPlan, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
+import { clampProfileCount, generationPlan, imageDimension, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
@@ -1151,6 +1151,12 @@ function App() {
   }, [inpaintMask, activeInpaintMask]);
   const widthMeta = currentProfile?.constraints?.width || {};
   const heightMeta = currentProfile?.constraints?.height || {};
+  useEffect(() => {
+    if (activeInpaintMask) return;
+    const nextWidth = imageDimension(width, widthMeta), nextHeight = imageDimension(height, heightMeta);
+    if (nextWidth !== width) setWidth(nextWidth);
+    if (nextHeight !== height) setHeight(nextHeight);
+  }, [activeInpaintMask, model, width, height, widthMeta.min, widthMeta.max, widthMeta.step, heightMeta.min, heightMeta.max, heightMeta.step]);
   // The first reference drives framing; extra context or end frames do not resize the canvas.
   const referenceForAspect = composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null;
   const aspectLocked = Boolean(currentProfile?.aspectPolicy === 'reference' && referenceForAspect && referenceForAspect.width > 0 && referenceForAspect.height > 0);

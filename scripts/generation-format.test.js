@@ -28,3 +28,12 @@ test('diffusion model metadata retains the sampling fields', () => {
   assert.match(settingsText(diffusion), /Steps: 20.*CFG: 8.*Sampler: euler \(simple\)/);
   assert.match(fullGenerationText(diffusion), /steps: 20/);
 });
+
+
+test('Radiance references do not advertise unsupported denoise settings', () => {
+  const reference = { type: 'image', referenceImage: 'reference', settings: { modelName: 'qwen-image.rad', denoise: 0.6 } };
+  assert.doesNotMatch(settingsText(reference), /Denoise:/);
+  assert.ok(!generationDetailEntries(reference).flatMap((section) => section.rows.map(([label]) => label)).includes('Denoise'));
+  const ordinary = { ...reference, settings: { ...reference.settings, modelName: 'qwen.safetensors' } };
+  assert.match(settingsText(ordinary), /Denoise:/);
+});

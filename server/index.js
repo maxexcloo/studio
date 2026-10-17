@@ -1,5 +1,6 @@
 // First: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
+import { createJobRecovery } from "./job-recovery.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
 import { addProbe, logDir } from "./crash-log.js";
@@ -126,7 +127,15 @@ function refreshComfyContextSoon() {
   setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
+const recoverRunningJobs = createJobRecovery({
+  backends: configuredBackends, filterHistory: withoutHiddenRuns, finishJob: setTerminalJob,
+  getGallery: () => gallery, jobs, recordsFromHistory: recordsFromComfyHistory,
+  request: comfy, setGallery, visible: filterVisibleGallery, withBackend: withComfyBackend
+});
+setInterval(() => recoverRunningJobs(), 5000).unref();
+
 async function recoverGalleryFromHistory() {
+  await recoverRunningJobs();
   cleanupGalleryState(jobs);
   // Hidden runs HEISS UI lost track of are sealed first, and never join the gallery either way.
   await settleHiddenRuns().catch(() => null);

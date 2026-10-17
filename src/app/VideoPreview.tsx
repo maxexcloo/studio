@@ -20,7 +20,13 @@ function useRetry(source: string) {
     if (attempt >= RETRY_MS.length) { setGaveUp(true); return; }
     timer.current = window.setTimeout(() => setAttempt((n) => n + 1), RETRY_MS[attempt]);
   };
-  return { attempt, gaveUp, fail };
+  const retry = () => { window.clearTimeout(timer.current); setAttempt(0); setGaveUp(false); };
+  useEffect(() => {
+    const online = () => { if (gaveUp) retry(); };
+    window.addEventListener('online', online);
+    return () => window.removeEventListener('online', online);
+  }, [source, gaveUp]);
+  return { attempt, gaveUp, fail, retry };
 }
 
 /**
@@ -52,6 +58,12 @@ export function VideoPreview({ source }: { source: string }) {
     video.current?.load();
     refreshVideoPreviews();
   }, [load, videoSrc]);
+  useEffect(() => {
+    if (load) {
+      if (videoTry.gaveUp) videoTry.retry();
+      if (posterTry.gaveUp) posterTry.retry();
+    }
+  }, [load, source]);
   return (
     <div className={`video-preview${ready ? ' is-ready' : ''}`}>
       {posterSrc ? (
@@ -70,7 +82,7 @@ export function VideoPreview({ source }: { source: string }) {
       <video ref={video} src={videoSrc} muted playsInline loop preload={load ? 'auto' : 'none'}
         disablePictureInPicture disableRemotePlayback draggable={false} aria-hidden="true"
         onLoadedData={() => { if (videoSrc) setReadySrc(videoSrc); }} onError={() => { if (videoSrc) videoTry.fail(); }} />
-      {!ready && !posterReady ? <span className="video-preview-placeholder"><Play size={22} /><span>{videoTry.gaveUp && posterTry.gaveUp ? 'Video' : 'Preview'}</span></span> : null}
+      {!ready && !posterReady ? <span className="video-preview-placeholder"><Play size={22} /><span>{videoTry.gaveUp && posterTry.gaveUp ? <button type="button" onClick={(event) => { event.stopPropagation(); videoTry.retry(); posterTry.retry(); }}>Retry Preview</button> : 'Preview'}</span></span> : null}
     </div>
   );
 }

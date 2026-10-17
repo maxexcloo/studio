@@ -4,7 +4,7 @@ export function modelName(profile) {
   const [lead, ...details] = raw.split(/\s*·\s*/);
   const precision = [];
   let name = lead.replace(/\[(FP\d+|BF\d+|INT\d+[^\]]*|W\d+A\d+)\]/gi, (_, value) => { precision.push(value.replace(/\s+ConvRot/gi, '')); return ''; })
-    .replace(/\[klein\]/gi, 'Klein').replace(/Qwen-Image/g, 'Qwen Image').replace(/\s+/g, ' ').trim();
+    .replace(/\s+/g, ' ').trim();
   let action = details.find((detail) => /^(Generate|Edit|Reference|Non-Reference|Animate Image)$/i.test(detail));
   if (/^Minimax H3 Singularity Ref2va Pruned V([\d.]+) Int8$/i.test(name)) {
     name = name.replace(/^Minimax H3 Singularity Ref2va Pruned V([\d.]+) Int8$/i, 'MiniMax H3 Singularity v$1');
@@ -36,13 +36,14 @@ export function modelName(profile) {
 
 const familyNames = {
   checkpoint: 'Checkpoint',
-  flux2_klein_9b: 'FLUX.2 Klein 9B',
-  grok: 'Grok Imagine',
-  ideogram4: 'Ideogram 4',
-  krea2: 'Krea 2',
-  minimax_h3: 'MiniMax H3',
-  qwen_image_21: 'Qwen Image 2.1',
-  wan: 'Wan Video',
+  flux2_klein_9b: 'FLUX',
+  flux3_klein: 'FLUX',
+  grok: 'Grok',
+  ideogram4: 'Ideogram',
+  krea2: 'Krea',
+  minimax_h3: 'MiniMax',
+  qwen_image_21: 'Qwen',
+  wan: 'Wan',
   z_image: 'Z-Image',
   zimage: 'Z-Image',
 };
@@ -50,9 +51,10 @@ const familyNames = {
 export function modelFamily(profile) {
   if (!profile) return '';
   const family = String(profile.family || '').replace(/-/g, '_');
-  // Fine-tunes can have their own heading while retaining H3 controls and LoRA compatibility.
-  if (family === 'minimax_h3' && /singularity/i.test([profile.baseModel, profile.displayName, profile.label].filter(Boolean).join(' '))) return 'Singularity';
-  return familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
+  const name = familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
+  const variant = [profile.baseModel, profile.displayName, profile.label].filter(Boolean).join(' ');
+  const fineTune = { krea2: /tessera|serendipity/i, qwen_image_21: /noct[ _-]*q/i, minimax_h3: /singularity|fused|dmad/i }[family];
+  return fineTune?.test(variant) ? name + ' (Fine Tunes)' : name;
 }
 
 const catalogueCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });

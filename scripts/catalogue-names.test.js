@@ -6,25 +6,25 @@ test('imported workflows share stock family headings, including aliases and clou
   const profiles = [
     { id: 'image:flux', family: 'flux2_klein_9b', familyName: 'Flux.2 Klein 9B', label: 'Stock Flux' },
     { id: 'custom:flux', family: 'flux2_klein_9b', label: 'Custom Flux' },
-    { id: 'video:h3', family: 'minimax_h3', familyName: 'MiniMax H3', label: 'Stock Video' },
+    { id: 'video:h3', family: 'minimax_h3', familyName: 'MiniMax', label: 'Stock Video' },
     { id: 'custom:h3', family: 'minimax-h3', label: 'Custom Video' },
     { id: 'custom:grok', family: 'grok', label: 'Grok Imagine Image 2.0' },
     { id: 'custom:unknown', family: 'custom', label: 'Unclassified Workflow' },
   ];
   const groups = modelGroups(profiles);
-  assert.deepEqual(groups.map((group) => group.label), ['FLUX.2 Klein 9B', 'Grok Imagine', 'MiniMax H3', 'Other Workflows']);
-  assert.deepEqual(groups.find((group) => group.label === 'FLUX.2 Klein 9B').rows.map((profile) => profile.id), ['custom:flux', 'image:flux']);
-  assert.deepEqual(groups.find((group) => group.label === 'MiniMax H3').rows.map((profile) => profile.id), ['custom:h3', 'video:h3']);
+  assert.deepEqual(groups.map((group) => group.label), ['FLUX', 'Grok', 'MiniMax', 'Other Workflows']);
+  assert.deepEqual(groups.find((group) => group.label === 'FLUX').rows.map((profile) => profile.id), ['custom:flux', 'image:flux']);
+  assert.deepEqual(groups.find((group) => group.label === 'MiniMax').rows.map((profile) => profile.id), ['custom:h3', 'video:h3']);
   assert.equal(groups.flatMap((group) => group.rows).length, profiles.length);
   assert.deepEqual(profiles.map((profile) => profile.id), ['image:flux', 'custom:flux', 'video:h3', 'custom:h3', 'custom:grok', 'custom:unknown']);
 });
 
-test('Singularity has its own heading without changing the H3 generation family', () => {
+test('Singularity has a fine tune heading without changing the H3 generation family', () => {
   const stock = { id: 'custom:h3', family: 'minimax-h3', label: 'MiniMax H3 · Generate' };
   const imported = { id: 'custom:singularity', family: 'minimax-h3', label: 'Singularity · Reference · 20 Steps' };
   const checkpoint = { id: 'video:singularity', family: 'minimax_h3', label: 'Reference', baseModel: 'Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors' };
   const groups = modelGroups([stock, imported, checkpoint]);
-  assert.deepEqual(groups.map((group) => group.label), ['MiniMax H3', 'Singularity']);
+  assert.deepEqual(groups.map((group) => group.label), ['MiniMax', 'MiniMax (Fine Tunes)']);
   assert.deepEqual(groups[0].rows.map((profile) => profile.id), ['custom:h3']);
   assert.equal(groups[1].rows.length, 2);
   assert.equal(imported.family, 'minimax-h3');
@@ -34,10 +34,10 @@ test('Singularity has its own heading without changing the H3 generation family'
 
 test('model names keep model identity separate from precision and workflow settings', () => {
   assert.deepEqual(modelName({ kind: 'video', label: 'MiniMax H3 [INT8 ConvRot] · Reference · Sol & PDD · 8 Steps · 4B Encoder (≈72 s)' }), { name: 'MiniMax H3 · Animate Image', detail: 'INT8 · Sol & PDD · 8 Steps · 4B Encoder · ~72 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B [FP8] · Distilled' }), { name: 'FLUX.2 Klein 9B', detail: 'FP8' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 [INT8 ConvRot] · Standard · 25 Steps (≈15 s)' }), { name: 'Qwen Image 2.1', detail: 'INT8 · 25 Steps · ~15 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 Turbo [BF16] · 8 Steps (≈7 s)' }), { name: 'Qwen Image 2.1 Turbo', detail: 'BF16 · 8 Steps · ~7 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B KV [FP8] · Reference · 4 Steps (≈4 s)' }), { name: 'FLUX.2 Klein 9B · Edit', detail: 'FP8 · KV Cache · 4 Steps · ~4 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B [FP8] · Distilled' }), { name: 'FLUX.2 [klein] 9B', detail: 'FP8' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 [INT8 ConvRot] · Standard · 25 Steps (≈15 s)' }), { name: 'Qwen-Image 2.1', detail: 'INT8 · 25 Steps · ~15 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 Turbo [BF16] · 8 Steps (≈7 s)' }), { name: 'Qwen-Image 2.1 Turbo', detail: 'BF16 · 8 Steps · ~7 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B KV [FP8] · Reference · 4 Steps (≈4 s)' }), { name: 'FLUX.2 [klein] 9B · Edit', detail: 'FP8 · KV Cache · 4 Steps · ~4 s' });
   assert.deepEqual(modelName({ kind: 'video', label: 'Grok Imagine Video 1.5 Preview · Animate Image · Cloud · 720p · 6 Seconds' }), { name: 'Grok Imagine Video 1.5 Preview · Animate Image', detail: 'Cloud · 720p · 6 Seconds' });
   assert.deepEqual(modelName({ kind: 'image', label: 'Grok Imagine Image 2.0 · Edit · Cloud' }), { name: 'Grok Imagine Image 2.0 · Edit', detail: 'Cloud' });
   assert.deepEqual(modelName({ kind: 'image', family: 'grok', defaults: { steps: 20 }, label: 'Grok Image Edit' }), { name: 'Grok Image · Edit', detail: 'grok' });
@@ -74,7 +74,7 @@ test('speed filters use variant metadata and recognise accelerated imported reci
   for (const name of ['Qwen Turbo', 'Flux Schnell', 'SDXL Lightning', 'H3 Sol & PDD', 'Klein Distilled']) assert.equal(workflowSpeed({ name, defaults: { steps: 10 } }), 'flash');
   assert.equal(workflowSpeed({ name: 'Flux De-distilled', defaults: { steps: 28 } }), 'standard');
   assert.equal(workflowSpeed({ name: 'Custom Recipe', defaults: { steps: 4 } }), 'flash');
-  assert.equal(workflowSpeed({ name: 'Grok Imagine', family: 'grok', defaults: { steps: 4 } }), 'standard');
+  assert.equal(workflowSpeed({ name: 'Grok', family: 'grok', defaults: { steps: 4 } }), 'standard');
   assert.equal(workflowSpeed({ name: 'MiniMax H3 · Non-Reference · PDD · 8 Steps', defaults: { steps: 20 } }, { variant: 'standard' }), 'flash');
 });
 
@@ -106,4 +106,16 @@ test('combined image and video profiles omit redundant generation actions', () =
     assert.deepEqual(modelName(profile), { name: 'Combined Model', detail: '8 Steps' });
     assert.equal(modelName({ ...profile, imageModes: undefined }).name, 'Combined Model · Generate');
   }
+});
+
+
+test('fine tunes share parent headings without changing workflow identities', () => {
+  const profiles = [
+    { id: 'tessera', family: 'krea2', label: 'Tessera Turbo' },
+    { id: 'noct', family: 'qwen_image_21', label: 'Vesper Q V4' },
+    { id: 'noct-lite', family: 'qwen_image_21', label: 'Vesper-Q Lite' },
+    { id: 'stock', family: 'qwen_image_21', label: 'Qwen Turbo' },
+  ];
+  assert.deepEqual(modelGroups(profiles).map(({label}) => label), ['Krea (Fine Tunes)', 'Qwen', 'Qwen (Fine Tunes)']);
+  assert.deepEqual(profiles.map(({id}) => id), ['tessera', 'noct', 'noct-lite', 'stock']);
 });
