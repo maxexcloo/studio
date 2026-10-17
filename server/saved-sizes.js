@@ -33,10 +33,18 @@ export function loadSavedSizes() {
   }
 }
 
-/** Replaces the list: what came in, cleaned, one per id, at most 60. */
-export function saveSavedSizes(list) {
+/**
+ * Saves a device's list: what came in, cleaned, one per id, at most 60.
+ * With `base`, the ids that device last had from here, it's a merge rather
+ * than a replace: a size another device added since (on the server, not in
+ * `base`) stays, after this device's own; only the ones it took off go.
+ */
+export function saveSavedSizes(list, base = null) {
   const seen = new Set();
-  const sizes = (Array.isArray(list) ? list : []).map(cleanSize).filter((item) => item && !seen.has(item.id) && seen.add(item.id)).slice(0, limit);
+  const incoming = (Array.isArray(list) ? list : []).map(cleanSize).filter((item) => item && !seen.has(item.id) && seen.add(item.id));
+  const known = Array.isArray(base) ? new Set(base.map(String)) : null;
+  const added = known ? loadSavedSizes().filter((item) => !seen.has(item.id) && !known.has(item.id)) : [];
+  const sizes = [...incoming, ...added].slice(0, limit);
   writeJsonFile(file, { sizes });
   return sizes;
 }

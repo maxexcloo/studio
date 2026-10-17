@@ -1012,7 +1012,7 @@ app.get("/api/sizes", (req, res) => {
 app.put("/api/sizes", (req, res) => {
   if (!requireLocal(req, res)) return;
   try {
-    res.json({ ok: true, sizes: saveSavedSizes(req.body?.sizes) });
+    res.json({ ok: true, sizes: saveSavedSizes(req.body?.sizes, req.body?.base) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }

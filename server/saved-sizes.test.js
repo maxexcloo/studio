@@ -24,3 +24,14 @@ test("the list keeps its order, one per id, and survives a reload", () => {
   assert.deepEqual(saved.map((item) => item.name), ["Wide", "Tall"]);
   assert.deepEqual(loadSavedSizes(), saved);
 });
+
+test("a device's save keeps what another device added since, and drops only what it took off", () => {
+  saveSavedSizes([{ id: "a", name: "Tall", width: 800, height: 1408 }, { id: "b", name: "Wide", width: 1920, height: 1088 }]);
+  // The phone adds "Poster" while the desktop still has a and b.
+  saveSavedSizes([...loadSavedSizes(), { id: "p", name: "Poster", width: 1024, height: 1536 }], ["a", "b"]);
+  // The desktop renames a and removes b, knowing only a and b.
+  const merged = saveSavedSizes([{ id: "a", name: "Portrait", width: 800, height: 1408 }], ["a", "b"]);
+  assert.deepEqual(merged.map((item) => item.name), ["Portrait", "Poster"]);
+  // A device that knew Poster and took it off does remove it.
+  assert.deepEqual(saveSavedSizes([{ id: "a", name: "Portrait", width: 800, height: 1408 }], ["a", "p"]).map((item) => item.id), ["a"]);
+});

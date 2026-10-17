@@ -1179,11 +1179,19 @@ function App() {
      this page comes back into view. */
   const [savedSizes, setSavedSizesState] = useState<SavedSize[]>([]);
   const savedSizesRef = useRef<SavedSize[]>([]);
+  // The ids last had from the server: sent with each save, so one another device added since is kept, not overwritten.
+  const serverSizeIdsRef = useRef<string[]>([]);
   function updateSavedSizes(change: (current: SavedSize[]) => SavedSize[]) {
     const next = change(savedSizesRef.current);
     savedSizesRef.current = next;
     setSavedSizesState(next);
-    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next }) })
+    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next, base: serverSizeIdsRef.current }) })
+      .then((data) => {
+        if (!Array.isArray(data.sizes)) return;
+        serverSizeIdsRef.current = data.sizes.map((item) => item.id);
+        // Another device's sizes come in with the answer, unless this page changed again meanwhile.
+        if (savedSizesRef.current === next) { savedSizesRef.current = data.sizes; setSavedSizesState(data.sizes); }
+      })
       .catch(() => showToast("Couldn’t save your sizes", "error", { description: "They’re kept on this page until it reloads." }));
   }
   useEffect(() => {
@@ -1191,6 +1199,7 @@ function App() {
     const load = () => apiJson<{ sizes: SavedSize[] }>("/api/sizes").then((data) => {
       if (!alive) return;
       const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+      serverSizeIdsRef.current = sizes.map((item) => item.id);
       // Sizes saved in this browser before they lived on the server move over, once.
       const local = loadPrefs().savedSizes || [];
       if (local.length) {
