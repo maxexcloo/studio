@@ -374,13 +374,15 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     if (open) setHeldWidth((held) => held ?? (triggerRef.current ? Math.ceil(triggerRef.current.getBoundingClientRect().width) : null));
     else if (!presence.mounted) setHeldWidth(null);
   }, [open, presence.mounted, heldWidth]);
-  // A tag coming or going while it's open (2K, MP, C) is measured afresh, once, so the label isn't cut to "D…".
-  const lastBadge = useRef(badge);
+  // What the button shows is held too while the menu is open: a tag coming or going (2K, MP, C)
+  // or a new ratio would change its width and move the menu under the pointer. It catches up
+  // once the menu has closed.
+  const [heldFace, setHeldFace] = useState<{ label: string; badge: string; width: number; height: number } | null>(null);
   React.useLayoutEffect(() => {
-    if (lastBadge.current === badge) return;
-    lastBadge.current = badge;
-    if (open) setHeldWidth(null);
-  }, [badge, open]);
+    if (open) setHeldFace((held) => held ?? { label, badge, width: shown.width, height: shown.height });
+    else if (!presence.mounted) setHeldFace(null);
+  }, [open, presence.mounted, label, badge, shown.width, shown.height]);
+  const face = heldFace || { label, badge, width: shown.width, height: shown.height };
   const wasOpen = useRef(false);
   useEffect(() => {
     if (wasOpen.current && !open) {
@@ -403,12 +405,12 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
       <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { width: heldWidth } : undefined} aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The shape drawn to fit an 18 × 14 box, so every ratio sits in the same slot. */}
           <span className="aspect-shape-slot">
-            <span className="aspect-shape" style={triggerShapeStyle(shown.width, shown.height)} />
-            {badge && density !== "full" ? <b className="aspect-tag is-corner" aria-hidden="true">{badge}</b> : null}
+            <span className="aspect-shape" style={triggerShapeStyle(face.width, face.height)} />
+            {face.badge && density !== "full" ? <b className="aspect-tag is-corner" aria-hidden="true">{face.badge}</b> : null}
           </span>
-          {density === "full" ? <span className="aspect-trigger-label">{label}</span> : null}
+          {density === "full" ? <span className="aspect-trigger-label">{face.label}</span> : null}
           {/* 2K or Custom: a small tag after the ratio; with no label to follow (narrow bars), on the shape's corner. */}
-          {badge && density === "full" ? <b className="aspect-tag" aria-hidden="true">{badge}</b> : null}
+          {face.badge && density === "full" ? <b className="aspect-tag" aria-hidden="true">{face.badge}</b> : null}
           {density === "mini" ? null : <ChevronDown size={14} className={cn(open && "flip")} />}
         </button></Tip>
       {presence.mounted ? (
