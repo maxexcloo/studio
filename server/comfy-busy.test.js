@@ -59,6 +59,6 @@ test("any answer, including a run's progress, starts the quiet clock over", () =
 });
 
 test("a bug report tells a busy ComfyUI from one that is not answering", () => {
-  assert.match(diagnosticsText(diagnostics({ version: "0.17.1", stats: null, comfyBusy: true })), /ComfyUI: busy, no answer within 10 s \(on this computer\)/);
-  assert.match(diagnosticsText(diagnostics({ version: "0.17.1", stats: null })), /ComfyUI: not answering \(on this computer\)/);
+  assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null, comfyBusy: true })), /ComfyUI: busy, no answer within 10 s \(on this computer\)/);
+  assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null })), /ComfyUI: not answering \(on this computer\)/);
 });

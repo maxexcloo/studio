@@ -11,35 +11,46 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
-> Native 2K and 4K, Docker and reference-only guidance
+> Native 2K, a new size menu and a lot of fixes
 
 ### Added
-- **Native 2K and 4K.** On models made for big pictures (Flux.2, Qwen-Image 2.1,
-  Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow, Sana 2K/4K) the size menu now
-  reads **Resolution** with Default, 2K and 4K. The model draws the picture at
-  that size itself, with your aspect and the long side at 2048 or 4096. That's
-  faster, and there's no upscale step in between. **Use upscaler** switches to
-  SeedVR2 if you'd rather have that. On other models it stays **Smart upscale**,
-  with **Draw at 2K directly** where the model might manage it ("Results vary"),
-  and nothing where it plainly breaks (SD 1.5/2). The list and its sources are
-  in [MODELS.md](./docs/guides/MODELS.md#native-2k4k). Picking a SeedVR2 size
-  without SeedVR2 still opens its setup.
-- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
-  first reference and pick Edit or Reference. Edit works like before: the result
-  keeps that image's size, and an EDIT tag on the thumbnail shows it. Reference
-  keeps the size and aspect you picked and the image still guides the picture,
-  2K included. A painted mask always makes it Edit, and the inpainting brush
-  hides while Reference is on.
+- **Native 2K.** The size menu has three tabs now: **Default**, **2K** and
+  **Custom**. 2K has the model draw your shape itself with its long side at
+  2048, in one run, with no upscale step after it. Models made for big pictures
+  (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow, Sana
+  2K/4K) are documented at that size. On the others, the menu says in one line
+  that the model isn't known for 2K and some pictures may repeat or warp. Which
+  model is which, and the sources, are in
+  [MODELS.md](./docs/guides/MODELS.md#native-2k).
+- **A size menu that shows the size.** A frame beside the shapes shows the
+  shape and pixels you'll get, gliding between them, and hovering a shape
+  previews it. The size button draws the real shape, names the ratio and tags
+  2K, MP or C. Size names snap to the steps people know: 3648 reads 4K, 2816
+  reads 3K.
+- **Custom size.** Custom folds open under the tabs. Width and height are one
+  linked field that keeps the shape, or two once you unlink them. Type a number,
+  step it with the arrow keys or drag the W or H label. Sides go from 256 to
+  4096 on the model's own step, and Custom stays when you switch to another
+  model of the same kind, fitted to its limits.
+- **Saved sizes.** **Save size** keeps a size of your own in the menu, where
+  you can rename it or remove it (with Undo). The list lives on the studio, so
+  your phone and every other device see the same one. On a model that can't go
+  as large, a saved size is scaled down with its shape kept.
 - **Size in megapixels.** Turn on Settings › Generation › Size in megapixels
-  and the size menu gets a Megapixels field under the shapes, in place of 2K.
-  Type a count, step it with the arrow keys or drag its MP label, and every
-  shape is drawn at that many pixels (3 MP makes 1:1 1776 × 1776). In Custom it
-  rescales your size and keeps its shape. Reset gives each model its own size
-  back. 1 MP is 1024 × 1024, as ComfyUI counts it, and the size menu and
-  Settings' "Pixels made" now count the same way.
-- **Save any custom size.** "Save size" is back for a size of your own, a common
-  shape at a size of its own included. It isn't offered for one Default or 2K
-  already gives you.
+  and the size menu gets a Megapixels field in place of 2K. Type a count, step
+  it with the arrow keys or drag its MP label, and every shape is drawn at that
+  many pixels (3 MP makes 1:1 1776 × 1776). In Custom it rescales your size and
+  keeps its shape, and Reset gives each model its own size back. 1 MP is
+  1024 × 1024, as ComfyUI counts it, and Settings' "Pixels made" now counts the
+  same way. If a shape can't reach the count without a side past 4096, the menu
+  says so.
+- **A reference that only guides.** On Flux.2 and Qwen-Image 2.1, hover the
+  first reference and pick **Edit** or **Reference**. Edit works like before:
+  the result keeps that image's size, and an EDIT tag on the thumbnail shows it.
+  Reference keeps the size and shape you picked, 2K included, and the image
+  still guides the picture. Try again repeats a run the way it was made. A
+  painted mask always makes it Edit, and the inpainting brush hides while
+  Reference is on.
 - **Docker support.** `docker compose up --build` runs the studio in a
   container next to your ComfyUI, with its data on a volume and the gallery
   served from ComfyUI's output folder. There's also a plain Dockerfile
@@ -51,39 +62,64 @@ version opens with a `> ` summary line, which the update pill shows.
   (`HEISS_COMFY_SEARCH=0`). If you run a second ComfyUI just for HEISS next to
   your main one on 8188, HEISS no longer jumps over to the main one while its
   own is starting or restarting.
+- **HEISS says why it stopped.** If the server or the page server stops on its
+  own, the next start shows the reason once, on this computer, with
+  **Copy details**. Ctrl+C, closing the window, Restart and `docker stop` don't
+  count.
 
 ### Changed
+- **The size menu is about the size the model draws.** Smart upscale for every
+  new picture has left it, so new pictures are no longer upscaled as part of
+  their run. The upscale arrow on a tile or in the viewer still takes any
+  picture to 2K or 4K with SeedVR2, and it now finds SeedVR2 weights kept
+  outside `ComfyUI/models` too. A 2K or 4K pick from 0.17 now reads as 2K.
 - **Several references are one chip now.** The first image stays in the corner,
   the others sit behind it and fan out on hover, with a + for the next one
   (greyed out, saying how many it takes, once they're all used). In Edit only
   the first one changes, so the others are greyed and no more can be added; in
-  Reference they all guide. Switching glides instead of jumping, and the phone
-  lays them out in a row.
-- **The size menu is tighter.** Default and the ratio it already is share one
-  row, rows are more compact, and 2.35:1 is gone.
-- **Your 2K/4K pick survives a reference.** It's skipped while an edited
-  reference or a painted mask sets the size, and comes back afterwards together
-  with the aspect you had.
-- **Time estimates learn each size on its own.** A 2K or 4K draw is estimated
-  from your 2K and 4K runs once there are two, not stretched from your 1K ones.
-  A run at 2K no longer pushes your 1K timings out, and a few misses at one size
-  no longer hide the estimate at another. Edits, image-to-image runs and the
-  tiled decode a native size uses are learned separately too.
+  Reference they all guide. Switching glides instead of jumping.
+- **Your 2K pick survives a reference.** It's skipped while an edited reference
+  or a painted mask sets the size, and comes back afterwards together with the
+  shape you had.
+- **Time estimates learn each size on its own.** A 2K run is estimated from
+  your 2K runs once there are two, not stretched from your 1K ones, and it no
+  longer pushes your 1K timings out. Edits, image-to-image runs and the tiled
+  decode a large size uses are learned separately too.
+- **On the phone**, the size menu is a sheet with the live frame and your saved
+  sizes, Edit | Reference sits in plain sight under the reference chips, and
+  "Use these settings", LoRAs and Reference in the generation details open the
+  create sheet with the change in place.
+- **Generation details** has **Copy as text** in its header, shows each LoRA
+  as a card with its strength, and gives the size of the picture on screen,
+  with "Drawn at" for the size it was generated at. "Use these settings" keeps
+  your seed, so it makes a new picture.
+- **Smaller things:** the LoRA pill reads "2 LoRAs", the gallery slides up and
+  down with search, and the model button's loading placeholder is the pill it
+  stands in for.
+
+### Removed
+- **Smart upscale for every new picture**, as above: use 2K, or the upscale
+  arrow on the picture.
+- **The viewer's "Vary with a new seed" button.**
 
 ### Fixed
+- **A busy ComfyUI no longer shows as offline.** While it's loading a model or
+  short on memory it can take a while to answer, and its runs carry on. HEISS
+  now reads that as busy for up to a minute, doesn't go looking for another
+  ComfyUI meanwhile, and the bug report says "busy" instead of "not answering".
+- **Translators and page extensions can't crash the studio.** A page translator
+  moving text around used to end in the crash screen. HEISS now steps around
+  it, and recovers once on its own before showing the crash screen.
 - **Flux.2 Klein 9B picks a Qwen3 8B text encoder that actually runs it.**
   MiniMax Music's encoder looks like Qwen3 8B from the outside and could become
   the default, failing every run with "mat1 and mat2 shapes cannot be
   multiplied". A text encoder saved with a draft that no longer fits now falls
   back to the default instead of failing the run.
-- **Smart upscale finds SeedVR2 weights kept outside `ComfyUI/models`**, in any
-  folder from `extra_model_paths.yaml`. 4K also no longer falls back to an int8
-  build the SeedVR2 node can't load.
+- **4K upscales** no longer fall back to an int8 SeedVR2 build the SeedVR2 node
+  can't load.
 - **Size menu:** pressing a shape no longer snaps the preview back to the chosen
-  one. Dragging W, H or MP changes the number and lets go, without dropping you
-  into the field or leaving the drag cursor behind. A long saved-size name
-  shortens with "…" instead of running under its size, and a 2K or MP tag added
-  with the menu open no longer cuts the label to "D…".
+  one, and a long saved-size name shortens with "…" instead of running under
+  its size.
 - **References:** dropping or pasting with every slot used no longer replaces
   the picture you're editing, Undo after removing one puts all of them back where
   they were, and the remove × is solid red under the pointer.
