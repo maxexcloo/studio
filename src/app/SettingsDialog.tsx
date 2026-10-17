@@ -1147,6 +1147,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 <span className="feedback-hero-sheet" />
                 <span className="feedback-hero-sheet" />
                 <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
                 <span className="feedback-hero-window">
                   <img src="/feedback-board.webp" alt="" width={1120} height={749} loading="lazy" decoding="async" draggable={false} />
                 </span>
