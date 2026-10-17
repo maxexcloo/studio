@@ -27,9 +27,9 @@ const gigabytes = (bytes) => (Number(bytes) > 0 ? `${(Number(bytes) / 1024 ** 3)
 
 /**
  * The facts, as data. `stats` is ComfyUI's /system_stats, or null when it
- * did not answer.
+ * did not answer; `comfyBusy` when it took the connection but answered too late.
  */
-export function diagnostics({ version = "", install = "", stats = null, comfyLocal = true, platform = process.platform, arch = process.arch } = {}) {
+export function diagnostics({ version = "", install = "", stats = null, comfyBusy = false, comfyLocal = true, platform = process.platform, arch = process.arch } = {}) {
   const system = stats?.system || {};
   const devices = Array.isArray(stats?.devices) ? stats.devices : [];
   return {
@@ -51,7 +51,7 @@ export function diagnostics({ version = "", install = "", stats = null, comfyLoc
           vramFreeBytes: Number(device.vram_free) || 0
         }))
       }
-      : { reachable: false, local: Boolean(comfyLocal) }
+      : { reachable: false, busy: Boolean(comfyBusy), local: Boolean(comfyLocal) }
   };
 }
 
@@ -64,7 +64,8 @@ export function diagnosticsText(report) {
     `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`
   ];
   if (!comfy.reachable) {
-    lines.push(`ComfyUI: not answering (${comfy.local ? "on this computer" : "on another computer"})`);
+    const where = comfy.local ? "on this computer" : "on another computer";
+    lines.push(comfy.busy ? `ComfyUI: busy, no answer within 10 s (${where})` : `ComfyUI: not answering (${where})`);
     return lines.join("\n");
   }
   const runtime = [comfy.python && `Python ${comfy.python}`, comfy.pytorch && `PyTorch ${comfy.pytorch}`, comfy.embeddedPython && "portable"].filter(Boolean).join(", ");

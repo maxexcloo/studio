@@ -117,9 +117,13 @@ Anything else. **Show details** on the card has ComfyUI's own message and traceb
 
 The brush sits in a reference or start image's menu. When it isn't there, **Inpainting** is turned off in **Settings › Features**, or the current model can't inpaint. Ideogram 4, MageFlow, Sana, video models and imported workflows can't. The model menu marks which models can, and **Settings › Features › Inpainting** lists yours.
 
-### Smart upscale 2K or 4K was skipped
+### 2K was skipped, or a 2K picture repeats or warps
 
-2K and 4K need the ComfyUI-SeedVR2 nodes and a SeedVR2 model. If they're missing, picking a tier offers to set them up first. A run also skips the pick when a reference image decides the framing (edit models) or part of the picture is painted for inpainting. Then the original decides the size. If an upscale stops or fails, the picture stays at its generated size, and the upscale arrow on it tries again.
+2K is drawn by the model itself. A run skips it when a reference image being edited decides the size (edit models) or part of the picture is painted for inpainting; your 2K pick comes back afterwards. A model not made for 2K says so in the size menu, and it may repeat subjects or warp at that size. Use Default there and take the picture to 2K or 4K with the upscale arrow.
+
+### Smart upscale didn't start or stopped
+
+The upscale arrow needs the ComfyUI-SeedVR2 nodes and a SeedVR2 model. If they're missing, the first upscale offers to set them up. If an upscale stops or fails, the picture stays at its generated size, and the arrow tries again.
 
 ### Auto-grouping doesn't stack anything
 

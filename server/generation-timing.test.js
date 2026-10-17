@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addRun, estimateRun, isWarm, remainingMs, RunTimer, slowSteps, timingKey, workExponent, workUnits } from "./generation-timing.js";
+import { addRun, estimateRun, isWarm, remainingMs, RunTimer, runVariant, slowSteps, timingKey, workExponent, workUnits } from "./generation-timing.js";
 
 const graph = { 3: { class_type: "KSampler" }, 4: { class_type: "UNETLoader" }, 8: { class_type: "VAEDecode" } };
 
@@ -120,9 +120,76 @@ test("the history keeps each model's latest runs", () => {
   let history = [];
   for (let index = 0; index < 45; index += 1) history = addRun(history, { body: body(), result: { runMs: 1000 + index }, at: String(index) });
   history = addRun(history, { body: body({ model: "b" }), result: { runMs: 5 }, at: "x" });
-  assert.equal(history.length, 41);
-  assert.equal(history[0].runMs, 1005);
+  assert.equal(history.length, 31);
+  assert.equal(history[0].runMs, 1015);
   assert.equal(addRun(history, { body: body(), result: null }), history);
+});
+
+const native2k = { width: 2048, height: 2048, tiledDecode: true };
+/** Runs as addRun gets them, a minute apart, each warm after the first. */
+function runsOf(list, start = Date.parse("2026-09-27T10:00:00Z")) {
+  let history = [];
+  list.forEach(({ body: extra, timing, predicted }, index) => {
+    history = addRun(history, { body: body(extra), result: resultFor(timing), predicted, warm: index > 0, at: new Date(start + index * 60_000).toISOString() });
+  });
+  return history;
+}
+const times = (count, run) => Array.from({ length: count }, () => run);
+
+test("runs at a native size speak for it, and leave the default size alone", () => {
+  // 1 MP: 500 ms a step. 4 MP draws run 9× slower a step, steeper than any one curve through both.
+  const oneK = { timing: { stepMs: 500, tailMs: 1000 } };
+  const twoK = { body: native2k, timing: { stepMs: 4500, tailMs: 9000 } };
+  const history = runsOf([...times(8, oneK), twoK, twoK, ...times(4, oneK)]);
+  const now = Date.parse("2026-09-27T10:15:00Z");
+  assert.equal(estimateRun(history, body(), { now }).stepMs, 500, "1K still estimates from 1K");
+  assert.equal(estimateRun(history, body(native2k), { now }).stepMs, 4500, "2K from its own runs");
+  assert.equal(estimateRun(history, body(native2k), { now }).tailMs, 9000);
+});
+
+test("a native size borrows the curve until it has runs of its own", () => {
+  const history = runsOf([...times(4, { timing: { stepMs: 500 } }), { body: native2k, timing: { stepMs: 4500 } }]);
+  const estimate = estimateRun(history, body({ width: 1800, height: 1800 }), { now: Date.parse("2026-09-27T10:06:00Z") });
+  assert.ok(estimate.stepMs > 2500 && estimate.stepMs < 4500, `between, along the fitted curve: ${estimate.stepMs}`);
+});
+
+test("misses at one size do not silence another", () => {
+  const oneK = { timing: {}, predicted: { totalMs: 14_000 } };
+  const missed = { body: native2k, timing: { stepMs: 4500 }, predicted: { totalMs: 30_000 } };
+  const history = runsOf([...times(5, oneK), missed, missed, missed]);
+  const now = Date.parse("2026-09-27T10:09:00Z");
+  assert.equal(estimateRun(history, body(native2k), { now }).trusted, false);
+  assert.equal(estimateRun(history, body(), { now }).trusted, true);
+});
+
+test("a stretch at 2K keeps the 1K runs", () => {
+  const history = runsOf([...times(5, { timing: {} }), ...times(40, { body: native2k, timing: { stepMs: 4500 } })]);
+  assert.equal(history.filter((run) => run.w === workUnits(body())).length, 5);
+  assert.equal(estimateRun(history, body(), { now: Date.parse("2026-09-27T11:00:00Z") }).stepMs, 500);
+});
+
+test("a tiled decode's tail is learned apart from a whole one", () => {
+  const whole = { timing: { tailMs: 1000 } };
+  const tiled = { body: { tiledDecode: true }, timing: { tailMs: 2500 } };
+  const history = runsOf([...times(4, whole), tiled, tiled]);
+  const now = Date.parse("2026-09-27T10:07:00Z");
+  assert.equal(estimateRun(history, body(), { now }).tailMs, 1000);
+  assert.equal(estimateRun(history, body({ tiledDecode: true }), { now }).tailMs, 2500);
+  assert.deepEqual(runVariant(body({ tiledDecode: true, referenceAssets: [{}, {}], startImageId: "a" })), { refs: 2, tiled: true }, "the start image is the first reference");
+  assert.deepEqual(runVariant({ refs: "1" }), { refs: 1, tiled: false }, "as the estimate asks it");
+});
+
+test("runs that read an image are learned apart once there are enough", () => {
+  // A start image at 0.6 denoise samples 12 of 20 steps, and encodes it first.
+  const plain = { timing: { setupMs: 3000 } };
+  const fromImage = { body: { startImageId: "a" }, timing: { steps: 12, setupMs: 5000 } };
+  const now = Date.parse("2026-09-27T10:10:00Z");
+  const few = runsOf([...times(4, plain), fromImage, fromImage]);
+  assert.equal(estimateRun(few, body({ refs: 1 }), { now }).steps, 20, "two are too few: all runs speak");
+  const enough = runsOf([...times(4, plain), fromImage, fromImage, fromImage]);
+  assert.equal(estimateRun(enough, body({ refs: 1 }), { now }).steps, 12);
+  assert.equal(estimateRun(enough, body({ refs: 1 }), { now }).setupMs, 5000);
+  assert.equal(estimateRun(enough, body(), { now }).steps, 20);
 });
 
 test("time left follows live steps, and the learned tail after them", () => {

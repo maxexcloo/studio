@@ -181,12 +181,15 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(100% + 12px);
+  /* Above the LoRA note when it shows (--lora-note-h, 22-accents.css). */
+  --ideas-lift: calc(var(--lora-note-h, 0px) + min(var(--lora-note-h, 0px), 8px));
+  bottom: calc(100% + 12px + var(--ideas-lift));
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) auto;
   gap: 8px;
   pointer-events: none;
+  transition: bottom var(--dur-fast) var(--ease-out);
 }
 .prompt-idea {
   display: flex;
@@ -234,7 +237,7 @@
 .prompt-idea.is-surprise:hover svg { rotate: -20deg; }
 /* At 760px and below the docks rise to sit on the prompt box (17-deck.css); the ideas go above them. */
 @media (max-width: 760px) {
-  .prompt-ideas { bottom: calc(100% + var(--deck-gap, 18px) + var(--deck-h, 44px) + 10px); }
+  .prompt-ideas { bottom: calc(100% + var(--deck-gap, 18px) + var(--deck-h, 44px) + 10px + var(--ideas-lift)); }
 }
 /* Narrow windows: the ideas stack, one line each, the dice beside the last. */
 @media (max-width: 760px) {

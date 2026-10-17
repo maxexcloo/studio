@@ -197,7 +197,7 @@ function AddressRow({ url, detail, open, onToggle, copyToClipboard, Row }: { url
 export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, restarting, copyToClipboard, showToast, Group, Row, Status, Switch }: {
   canChange: boolean;
   confirmAction: ConfirmAction;
-  restartHeiss: () => Promise<boolean>;
+  restartHeiss: (options?: { lan?: boolean }) => Promise<boolean>;
   restarting: boolean;
   copyToClipboard: (text: string) => Promise<boolean>;
   showToast: ShowToast;
@@ -228,7 +228,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
   const real = entries.filter((item) => !item.virtual);
   const shownCode = openCode || (real.length === 1 ? real[0].key : '');
 
-  const restartNow = () => { restartHeiss(); };
+  const restartNow = () => { restartHeiss({ lan: lan?.saved }); };
   const toggle = async (next: boolean) => {
     if (!lan) return;
     if (lan.supervised && !await confirmAction({
@@ -242,7 +242,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
     try {
       const result = await apiJson<{ restartNeeded: boolean }>('/api/network/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
       await load();
-      if (result.restartNeeded && lan.supervised) restartNow();
+      if (result.restartNeeded && lan.supervised) restartHeiss({ lan: next });
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Couldn’t change the setting', 'error');
     } finally {

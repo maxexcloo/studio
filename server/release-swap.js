@@ -28,6 +28,34 @@ export const RESTART_CODE = 75;
  */
 export const PORT_IN_USE_CODE = 78;
 
+/**
+ * Windows' exit code for a process a console Ctrl+C or close event ended
+ * (STATUS_CONTROL_C_EXIT, 0xC000013A). Such an event reaches every process on
+ * the console, so one can end the server while nobody is stopping HEISS UI
+ * (seen around restarts in `npm run dev`). A supervisor that wasn't stopped
+ * itself starts the server again; see consoleStopTracker.
+ */
+export const CONSOLE_STOP_CODE = 0xC000013A;
+
+/**
+ * Tells a stray console stop apart from a real one. The supervisor's own
+ * signal handler may run a moment after the server's exit, so it waits a
+ * little before deciding; and a server that keeps ending this way is let go
+ * after a few tries instead of being restarted forever.
+ */
+export function consoleStopTracker({ isStopping, waitMs = 500, limit = 3, windowMs = 60_000, now = Date.now } = {}) {
+  const recent = [];
+  return async function shouldRestart() {
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    if (isStopping()) return false;
+    const at = now();
+    while (recent.length && at - recent[0] > windowMs) recent.shift();
+    if (recent.length >= limit) return false;
+    recent.push(at);
+    return true;
+  };
+}
+
 /** Never moved, whatever a release lists. */
 const KEEP = new Set(["data", ".env", "node_modules", "runtime", ".update", ".git"]);
 

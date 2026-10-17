@@ -127,11 +127,12 @@ export function settingsText(item: GalleryItem) {
   return lines.filter(Boolean).join("\n");
 }
 
-export type GenerationDetailSection = { title: string; rows: Array<[string, string]> };
+export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; strength: string }> };
 
 /**
- * The "Generation settings" panel, most useful first: what made the picture
- * (model, LoRAs), then how it was sampled, then the size, then file metadata.
+ * The "Generation details" panel, most useful first: what made the picture
+ * (model, LoRAs as cards of their own), then how it was sampled, then the
+ * size, then file metadata.
  */
 export function generationDetailEntries(item: GalleryItem): GenerationDetailSection[] {
   const settings = item.settings || {};
@@ -148,8 +149,13 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
   section("Model", (add) => {
     add("Model", model ? fileStem(model) : "");
     add("Workflow", settings.workflow);
-    activeLoras(settings.loras).forEach((lora) => add("LoRA", `${fileStem(lora.name)} · ${Number(lora.strength ?? 0.7).toFixed(2)}`));
   });
+  const loras = activeLoras(settings.loras).map((lora) => ({ name: fileStem(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
+  if (loras.length) {
+    const modelSection = sections.find((item) => item.title === "Model");
+    if (modelSection) modelSection.loras = loras;
+    else sections.push({ title: "Model", rows: [], loras });
+  }
   section("Sampling", (add) => {
     add("Steps", settings.steps);
     add("CFG", settings.cfg);
@@ -159,7 +165,10 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     if (item.type === "image" && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
   section(item.type === "video" ? "Video" : "Image", (add) => {
-    add("Aspect", `${item.width || "?"}x${item.height || "?"}`);
+    // The size of the picture shown: an upscale's own size when that's the one on screen.
+    const upscaled = item.upscaleActive && item.upscale?.status === "done" && item.upscale.width && item.upscale.height ? item.upscale : null;
+    add("Size", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
+    if (upscaled) add("Drawn at", `${item.width || "?"} × ${item.height || "?"}`);
     if (item.type === "image") {
       const count = Number(settings.count || 0);
       if (count > 1) add("Images", count);

@@ -134,7 +134,10 @@ function sanitizeFamilyBody(input, info, stats) {
     vae: resolvedVae,
     audioVae: profile.audioVae,
     pairModel: profile.pairModel,
+    // A runner that loads a whole model folder takes it by its full path (resolved when the profile was built).
+    modelPath: profile.modelPath || "",
     clipVision: profile.clipVision || "",
+    upsampler: profile.upsampler || "",
     vpredPatch: profile.vpredPatch,
     krea2Enhancer: profile.family === "krea2" && Boolean(info["ComfyUI-Krea2T-Enhancer"]),
     sana: profile.sana || null,
@@ -158,6 +161,9 @@ function sanitizeFamilyBody(input, info, stats) {
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
     inpaint: sanitizeInpaint(input, profile, referenceAssets),
+    // "reference": the first reference guides the picture but doesn't frame it; the picked size does.
+    // A painted mask is an edit of that image, so it keeps the image's framing.
+    referenceRole: input.referenceRole === "reference" && !input.inpaint ? "reference" : "edit",
     promptPolicy: null,
     loras: sanitizeLoras(input, info, profile, kind, 8),
     // A retry after the GPU ran out of memory while decoding; only where this ComfyUI has the node.

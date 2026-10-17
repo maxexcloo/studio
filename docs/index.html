@@ -106,7 +106,7 @@
                 "name": "Can it inpaint and upscale?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes, both built in. Inpainting redraws only the part you paint over, with 18 of the 21 image families and ComfyUI’s own nodes, and the rest of the picture keeps its exact pixels. Smart upscale takes new pictures to 2K or 4K with SeedVR2 in the same run, or upscales any picture later with one click."
+                  "text": "Yes, both built in. Inpainting redraws only the part you paint over, with 18 of the 21 image families and ComfyUI’s own nodes, and the rest of the picture keeps its exact pixels. Pick 2K and the model draws the picture at 2048 itself, and Smart upscale takes any picture to 2K or 4K with SeedVR2 in one click."
                 }
               },
               {
@@ -542,7 +542,7 @@
                   </g>
                 </svg>
 
-                <!-- 05 · Smart upscale -->
+                <!-- 05 · Native 2K and Smart upscale -->
                 <svg class="art art-upscale" viewBox="0 0 480 400" data-art>
                   <defs>
                     <clipPath id="u-frame"><rect x="40" y="36" width="400" height="260" rx="18" /></clipPath>
@@ -573,13 +573,13 @@
 
                   <g class="ai" style="--s: 1">
                     <rect x="102" y="318" width="276" height="48" rx="15" class="f-card" />
-                    <rect x="114" y="328" width="126" height="28" rx="9" class="f-pill" />
-                    <text x="135" y="346" class="f-lo" font-size="11" text-anchor="middle">None</text>
-                    <text x="177" y="346" class="f-lo" font-size="11" text-anchor="middle">2K</text>
-                    <rect x="199" y="331" width="38" height="22" rx="7" class="f-white" />
-                    <text x="218" y="346" class="f-ink f-strong" font-size="11" text-anchor="middle">4K</text>
-                    <rect x="256" y="338" width="8" height="8" rx="1.5" class="f-ember" />
-                    <text x="272" y="346.5" class="f-hi" font-size="11.5">In the same run</text>
+                    <rect x="114" y="328" width="136" height="28" rx="9" class="f-pill" />
+                    <text x="139" y="346" class="f-lo" font-size="11" text-anchor="middle">Default</text>
+                    <rect x="166" y="331" width="34" height="22" rx="7" class="f-white" />
+                    <text x="183" y="346" class="f-ink f-strong" font-size="11" text-anchor="middle">2K</text>
+                    <text x="224" y="346" class="f-lo" font-size="11" text-anchor="middle">Custom</text>
+                    <rect x="264" y="338" width="8" height="8" rx="1.5" class="f-ember" />
+                    <text x="280" y="346.5" class="f-hi" font-size="11.5">Drawn at 2048</text>
                   </g>
                 </svg>
 
@@ -996,9 +996,9 @@
             </li>
             <li class="feature">
               <span class="feature-idx">05</span>
-              <h3>Smart upscale</h3>
-              <p>Pick 2K or 4K next to the size menu and every new picture comes out upscaled with SeedVR2, in the same run. Close the page if you like, and the ring counts down the time left.</p>
-              <p>Any older picture upscales with one click, and a slider drags across it to show what changed. An optional face detail pass (beta) redraws small faces first.</p>
+              <h3>Native 2K and Smart upscale</h3>
+              <p>Pick 2K and the model draws the picture at 2048 itself, in one run, with nothing in between. A live frame shows the size before you press Generate, and any size of your own, in pixels or megapixels, is saved for every device.</p>
+              <p>Any picture goes to 2K or 4K with SeedVR2 in one click, the ring counts down the time left, and a slider drags across it to show what changed. An optional face detail pass (beta) redraws small faces first.</p>
               <a class="feature-link" href="https://github.com/tristmeister/HEISS-UI#smart-upscale">Smart upscale <svg class="icon" aria-hidden="true"><use href="#i-arrow" /></svg></a>
             </li>
             <li class="feature">
@@ -1231,7 +1231,7 @@ Don't download models unless I ask. Keep it on this computer: opening it to a ph
           </details>
           <details name="faq">
             <summary>Can it inpaint and upscale?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-plus" /></svg></span></summary>
-            <div class="answer"><p>Yes, both built in. <a class="inline" href="https://github.com/tristmeister/HEISS-UI#inpainting">Inpainting</a> redraws only the part you paint over, with 18 of the 21 image families and ComfyUI’s own nodes, and the rest of the picture keeps its exact pixels. <a class="inline" href="https://github.com/tristmeister/HEISS-UI#smart-upscale">Smart upscale</a> takes new pictures to 2K or 4K with SeedVR2 in the same run, or upscales any picture later with one click.</p></div>
+            <div class="answer"><p>Yes, both built in. <a class="inline" href="https://github.com/tristmeister/HEISS-UI#inpainting">Inpainting</a> redraws only the part you paint over, with 18 of the 21 image families and ComfyUI’s own nodes, and the rest of the picture keeps its exact pixels. Pick <a class="inline" href="https://github.com/tristmeister/HEISS-UI#native-2k-and-sizes">2K</a> and the model draws the picture at 2048 itself, and <a class="inline" href="https://github.com/tristmeister/HEISS-UI#smart-upscale">Smart upscale</a> takes any picture to 2K or 4K with SeedVR2 in one click.</p></div>
           </details>
           <details name="faq">
             <summary>Does it do video?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-plus" /></svg></span></summary>

@@ -65,11 +65,11 @@ export function useViewerControls(view: any) {
   }
 
   /**
-   * Loads an output's prompt and settings into the composer. `vary` is for
-   * "Vary this": a new seed and no toast, since a new image follows at once.
+   * Loads an output's prompt and settings into the composer. The seed stays
+   * as it is, so "Use these settings" makes a new picture, not the same one.
    * Returns whether its model is installed.
    */
-  function applyAllSettings(item: GalleryItem, { vary = false }: { vary?: boolean } = {}) {
+  function applyAllSettings(item: GalleryItem) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const nextMode = item.type;
@@ -86,8 +86,6 @@ export function useViewerControls(view: any) {
     if (itemSettings.steps) setSteps(Number(itemSettings.steps));
     if (itemSettings.cfg) setCfg(Number(itemSettings.cfg));
     if (itemSettings.denoise) setDenoise(Number(itemSettings.denoise));
-    if (itemSettings.seed && itemSettings.seed !== "Random" && !vary) setSeed(String(itemSettings.seed));
-    else setSeed("");
     if (itemSettings.count) setCount(Number(itemSettings.count));
     if (itemSettings.frames) setFrames(Number(itemSettings.frames));
     if (itemSettings.fps) setFps(Number(itemSettings.fps));
@@ -105,11 +103,7 @@ export function useViewerControls(view: any) {
     if (setStartImageId) setStartImageId(item.startImageId || item.referenceImage || "");
     setStartImageName(item.referenceImageName || String(itemSettings.referenceImageName || ""));
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === Number(item.width) && option.h === Number(item.height)));
-    if (vary) return Boolean(matchingProfile);
-    const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
-    const message = matchingProfile
-      ? `Settings applied.${seedNote}`
-      : `Settings applied. Its model isn’t installed, so the current model stays.${seedNote}`;
+    const message = matchingProfile ? "Settings applied." : "Settings applied. Its model isn’t installed, so the current model stays.";
     toast(message, {
       duration: 8000,
       action: before ? { label: "Undo", onClick: () => restoreDraft(before) } : undefined

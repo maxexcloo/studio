@@ -67,14 +67,17 @@ function tokenMatches(given, expected) {
  *   thisComputer  the browser runs on the machine HEISS UI runs on
  *   network       another device HEISS UI may answer once it signs in (LAN mode)
  */
-export function classifyClient(req, { lanActions = false, devToken = "" } = {}) {
+export function classifyClient(req, { lanActions = false, devToken = "", hostOnly = false } = {}) {
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
   // Vite in `npm run dev`, vouched for by the token scripts/dev.mjs made.
   const viaDevProxy = isLoopbackAddress(address) && tokenMatches(headers["x-heiss-dev-token"], devToken);
   if (viaDevProxy) address = plainAddress(headers["x-heiss-dev-client"] || "");
   const proxied = hasProxyHeaders(headers);
-  const thisComputer = !proxied && isLoopbackAddress(address);
+  // hostOnly: a container whose port is published on the host's 127.0.0.1 only
+  // (HEISS_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker
+  // address (the bridge gateway, 192.168.65.1 on Docker Desktop), never loopback.
+  const thisComputer = !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
   // Behind a proxy the real address is unknown (its header can be forged), so
   // it counts as another device, and only when devices are let in at all.
   const network = !thisComputer && lanActions && (proxied || isPrivateAddress(address));

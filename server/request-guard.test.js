@@ -111,3 +111,13 @@ test("only the dev proxy with the right token may say who is behind it", () => {
   // A token sent from elsewhere is not believed at all.
   assert.equal(classifyClient({ socket: { remoteAddress: "192.168.1.40" }, headers: { "x-heiss-dev-token": "secret-token", "x-heiss-dev-client": "127.0.0.1" } }, { devToken: "secret-token" }).thisComputer, false);
 });
+
+test("a host-only Docker port counts the host's Docker address as this computer, and nothing else", () => {
+  const desktop = { socket: { remoteAddress: "::ffff:192.168.65.1" }, headers: {} };
+  assert.equal(classifyClient(desktop).thisComputer, false);
+  assert.equal(classifyClient(desktop, { hostOnly: true }).thisComputer, true);
+  assert.equal(classifyClient({ socket: { remoteAddress: "172.18.0.1" }, headers: {} }, { hostOnly: true }).thisComputer, true);
+  // A public address or anything through a proxy never does.
+  assert.equal(classifyClient({ socket: { remoteAddress: "203.0.113.9" }, headers: {} }, { hostOnly: true }).thisComputer, false);
+  assert.equal(classifyClient({ socket: { remoteAddress: "172.18.0.1" }, headers: { "x-forwarded-for": "203.0.113.9" } }, { hostOnly: true }).thisComputer, false);
+});

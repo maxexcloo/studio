@@ -280,14 +280,19 @@
   .gallery-search-fav span { display: none; }
 }
 
-.app-shell:has(.gallery-search) .stage-gallery {
+/* The tiles make room as the field opens and close the gap as it goes. Keyed
+   to the open state, not the field's presence, so they move with its fade
+   instead of waiting for it to finish. */
+.app-shell .stage-gallery { transition: padding-top 320ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .app-shell .stage-gallery { transition: none; } }
+.app-shell.is-searching .stage-gallery {
   padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--dock-h) + 12px);
   scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--dock-h) + 12px);
 }
 /* In Hidden the bar owns the top left; where both would touch, the field goes under it. */
 @media (max-width: 920px) {
   .gallery-search.is-hidden-space { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px)); }
-  .app-shell.is-hidden-space:has(.gallery-search) .stage-gallery {
+  .app-shell.is-hidden-space.is-searching .stage-gallery {
     padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--dock-h) + 12px);
   }
 }

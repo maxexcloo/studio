@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { recordExit } from "./exit-record.js";
+import { PORT_IN_USE_CODE } from "./release-swap.js";
+
+/** The launchers' "restart me" exit code (release-swap.js RESTART_CODE), a stop that was meant. */
+const RESTART_EXIT = 75;
 
 /**
  * What HEISS UI writes down when something goes wrong, so "the server is down"
@@ -87,19 +92,41 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
   process.on("uncaughtException", (error) => {
     write("fatal", "Crashed: uncaught exception", { ...describe(error), ...readings() });
     write("fatal", "Last events before the crash", { recent: recent.slice(-15, -1) });
+    const { message, stack } = describe(error);
+    recordExit({ who: "server", reason: `The server crashed: ${message}`, code: 1, detail: stack || message });
     process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {
     // Kept running: one failed background task shouldn't stop the studio.
     write("error", "Unhandled promise rejection (kept running)", { ...describe(reason), ...readings() });
   });
-  process.on("exit", (code) => { write(code ? "error" : "info", "HEISS UI exited", { code, ...readings() }); });
+  process.on("exit", (code) => {
+    write(code ? "error" : "info", "HEISS UI exited", { code, ...readings() });
+    // Started while a copy already ran: that one's run, not this, so its record stays its own.
+    if (code === PORT_IN_USE_CODE) return;
+    const meant = code === 0 || code === RESTART_EXIT;
+    recordExit({ who: "server", clean: meant, code, reason: code === RESTART_EXIT ? "Restarted" : meant ? "Stopped" : `The server stopped with exit code ${code}` });
+  });
   // Only noted: gallery-store.js owns stopping (it saves the gallery first,
   // then raises the signal again for Node's default exit). Once, like that
   // one: a listener left behind would catch the raised signal and the server
   // would never stop (Ctrl+C, the launcher's stop, a test's SIGTERM).
   for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.once(signal, () => { write("info", `Stopping on ${signal}`); });
+    process.once(signal, () => {
+      write("info", `Stopping on ${signal}`);
+      // A stop asked for. Written here: the re-raised signal ends Node without an "exit" event.
+      recordExit({ who: "server", clean: true, signal, reason: "Stopped" });
+    });
+  }
+  // Windows: the console window closing (SIGHUP; Windows ends the process ~10 s later) or
+  // Ctrl+Break. Noted, since nothing else gets written: it ends the server from outside.
+  if (process.platform === "win32") {
+    for (const signal of ["SIGHUP", "SIGBREAK"]) {
+      process.once(signal, () => {
+        write("info", `Stopping on ${signal}`);
+        recordExit({ who: "server", clean: true, signal, reason: signal === "SIGHUP" ? "Its window was closed" : "Stopped with Ctrl+Break" });
+      });
+    }
   }
 
   // The event loop running late means the server can't answer: log stalls as
