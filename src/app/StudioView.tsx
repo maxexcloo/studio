@@ -97,6 +97,7 @@ const ZenStrip = memoLatest(function ZenStrip({ items, activeId, stripRef, onPoi
 function comfyStatusLabel(status: any) {
   if (status?.restarting) return "ComfyUI is restarting…";
   if (status?.checking) return "Checking ComfyUI…";
+  if (status?.busy) return `ComfyUI is busy${status.device ? ` · ${status.device}` : ""} · slow to answer, runs carry on`;
   if (status?.connected) {
     const detail = [status.device, status.latencyMs ? `${status.latencyMs}ms` : "", status.version ? `v${status.version}` : ""].filter(Boolean).join(" · ");
     return `ComfyUI connected${detail ? ` · ${detail}` : ""}`;

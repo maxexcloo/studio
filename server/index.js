@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import { printBanner } from './banner.js';
 import { releaseStatus, requestRestart, saveUpdatePrefs, startReleaseUpdate, warmReleaseCheck } from './updater.js';
 import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
-import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
+import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
 import { limitedCheck, registerAccessRoutes } from './access-routes.js';
 import { requestGuard } from './request-guard.js';
@@ -653,8 +653,10 @@ app.get("/api/diagnostics", async (_req, res) => {
   const install = fs.existsSync(path.join(root, ".git"))
     ? `Git checkout${since?.commits ? `, ${since.tag} + ${since.commits}` : ""}`
     : fs.existsSync(path.join(root, "release.json")) ? "release" : "";
-  const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(3000) }).then((response) => (response.ok ? response.json() : null), () => null);
-  const report = diagnostics({ version: appVersion, install, stats, comfyLocal: comfyIsLocal() });
+  // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
+  let comfyBusy = false;
+  const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then((response) => (response.ok ? response.json() : null), (error) => { comfyBusy = isComfyTimeout(error); return null; });
+  const report = diagnostics({ version: appVersion, install, stats, comfyBusy, comfyLocal: comfyIsLocal() });
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
 
@@ -703,8 +705,12 @@ function adoptFoundComfy(found) {
   return true;
 }
 
+// What the last answer said, for the status while ComfyUI is busy.
+let lastComfyAnswer = { url: "", version: "", device: "" };
+
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
   const startedAt = performance.now();
+  const sentAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -717,12 +723,14 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     }
     const stats = await response.json();
     const device = stats?.devices?.[0]?.name || "";
+    const version = stats?.system?.comfyui_version || "";
+    lastComfyAnswer = { url: comfyUrl, version, device };
     res.json({
       ...restartFields(),
       connected: true,
       url: comfyUrl,
       latencyMs,
-      version: stats?.system?.comfyui_version || "",
+      version,
       device,
       ...(res.locals.foundComfy ? { found: res.locals.foundComfy } : {})
     });
@@ -732,16 +740,28 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
       res.json({ connected: true, isMock: true, url: comfyUrl, latencyMs: 0, device: "Demo mode" });
       return;
     }
-    // A timeout counts here too: this poll is the app asking whether ComfyUI is there.
-    noteComfyFetchError(error?.name === "AbortError" ? new Error("timed out") : error);
-    // Not at this address: on this computer it may well be on the other usual port (Desktop uses 8000).
-    const found = comfyRestarting() || res.locals.foundComfy ? "" : await findComfyNow(comfyUrl);
+    // It took the connection but hasn't answered: busy (comfy.js), not gone.
+    // Its runs carry on, so the studio stays connected, and nothing goes
+    // looking for another ComfyUI to replace it.
+    if (isComfyTimeout(error) && !comfyRestarting()) {
+      const silent = noteComfySilent(sentAt);
+      if (silent.first) logWarning("ComfyUI is slow to answer", { url: comfyUrl, waitedMs: Date.now() - sentAt });
+      if (silent.busy) {
+        const known = lastComfyAnswer.url === comfyUrl ? lastComfyAnswer : {};
+        res.json({ ...restartFields(), connected: true, busy: true, url: comfyUrl, version: known.version || "", device: known.device || "" });
+        return;
+      }
+    }
+    // A timeout that outlasted the grace counts too: this poll is the app asking whether ComfyUI is there.
+    noteComfyFetchError(isComfyTimeout(error) ? new Error("timed out") : error);
+    // Refused: on this computer it may well be on the other usual port (Desktop uses 8000).
+    const found = comfyRestarting() || res.locals.foundComfy || isComfyTimeout(error) ? "" : await findComfyNow(comfyUrl);
     if (found && adoptFoundComfy(found)) {
       res.locals.foundComfy = found;
       return comfyStatus(req, res);
     }
     const latencyMs = Math.round(performance.now() - startedAt);
-    const message = error?.name === "AbortError" ? "Connection timed out" : error?.message || "Connection failed";
+    const message = isComfyTimeout(error) ? "Not answering for over a minute" : error?.message || "Connection failed";
     res.json({ connected: false, isMock: demoMode, url: comfyUrl, latencyMs, ...restartFields(), nearby: comfySearchEnabled() ? nearbyAddresses(comfyUrl) : [], error: `${message}${demoMode ? " (Demo Mode Active)" : ""}` });
   } finally {
     clearTimeout(timeout);

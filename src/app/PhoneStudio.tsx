@@ -402,7 +402,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const [searchOpen, setSearchOpen] = React.useState(false);
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
-  const statusText = restarting ? 'ComfyUI is restarting' : connected ? `ComfyUI connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? 'ComfyUI is offline' : 'Checking ComfyUI…';
+  const statusText = restarting ? 'ComfyUI is restarting' : comfyStatus?.busy ? 'ComfyUI is busy' : connected ? `ComfyUI connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? 'ComfyUI is offline' : 'Checking ComfyUI…';
   const workflowName = currentProfile?.displayName || currentProfile?.label || 'Choose a model';
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 

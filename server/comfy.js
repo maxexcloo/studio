@@ -182,10 +182,35 @@ export const demoMode = process.env.HEISS_DEMO === "1";
  * answer from ComfyUI, and expires on its own after a few seconds.
  */
 let comfyUnreachableUntil = 0;
+// When ComfyUI went quiet without refusing (a check timed out); 0 while it answers.
+let comfySilentSince = 0;
 export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
   comfyUnreachableUntil = 0;
+  comfySilentSince = 0;
   noteComfyState(true);
+}
+
+/*
+ * Busy or stopped. A ComfyUI that has stopped refuses the connection at once;
+ * one that is loading a model, building its node list or paging memory takes
+ * the connection and answers late, and its runs carry on meanwhile. So a check
+ * that timed out reads as busy, for as long as a run would wait for it
+ * (comfy-queue.js), and only then as stopped.
+ */
+export const comfyBusyGraceMs = Number(process.env.HEISS_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.HEISS_COMFY_LOST_AFTER_MS) : 60_000;
+/** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
+export function isComfyTimeout(error) {
+  return error?.name === "AbortError" || error?.name === "TimeoutError";
+}
+/**
+ * A check sent at `sentAt` timed out: whether ComfyUI still counts as busy
+ * rather than stopped. `first` is true on the first timeout since it last answered.
+ */
+export function noteComfySilent(sentAt, now = Date.now()) {
+  const first = !comfySilentSince;
+  if (first) comfySilentSince = sentAt;
+  return { busy: now - comfySilentSince < comfyBusyGraceMs, first, silentForMs: now - comfySilentSince };
 }
 /** Call with what a fetch to ComfyUI threw; a canceled request says nothing about ComfyUI. */
 export function noteComfyFetchError(error) {
