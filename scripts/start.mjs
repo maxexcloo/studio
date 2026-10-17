@@ -89,8 +89,11 @@ const serverTail = exitRecord.tailKeeper();
 // Ctrl+C reaches the server too; wait for it instead of leaving it behind. Each is a stop someone
 // meant, written down first: on Windows, kill() ends the server before it can say so itself.
 const meant = { SIGINT: "Stopped with Ctrl+C", SIGTERM: "Stopped", SIGHUP: "Its window was closed", SIGBREAK: "Stopped with Ctrl+Break" };
+// Set on a stop someone meant: the server then ends on that signal (or, on Windows, by kill()), which is no crash.
+let stopping = false;
 for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"] : ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
+    stopping = true;
     exitRecord.recordExit({ who: "launcher", clean: true, signal, reason: meant[signal] });
     if (child) child.kill(signal === "SIGINT" ? "SIGINT" : "SIGTERM"); else process.exit(130);
   });
@@ -115,7 +118,7 @@ function runServer(onReady) {
     child.on("exit", (code, signal) => {
       child = null;
       // The server writes its own crash down; this catches what it couldn't (killed from outside).
-      if (code !== 0 && code !== RESTART_CODE && code !== PORT_IN_USE_CODE) {
+      if (!stopping && code !== 0 && code !== RESTART_CODE && code !== PORT_IN_USE_CODE) {
         exitRecord.recordExit({ who: "server", code, signal, reason: signal ? `The server was ended (${signal})` : `The server stopped with exit code ${code}`, detail: serverTail.text() });
       }
       resolve({ code, signal, ready });
