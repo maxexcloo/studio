@@ -50,15 +50,23 @@ export const encoderDownloads = {
   qwen3vl_4b: [
     { file: "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors", fp8: true, url: hf("DreamFast/Qwen3-VL-4b-Heretic-ComfyUI", "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors"), bytes: 4_831_492_476, sha256: "7443c2b8df026a3271b3095d5d1dc07800dc5cf460b6e3586692253c7a7bc17c" },
     { file: "qwen3vl_4b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Krea-2", "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"), bytes: 5_242_467_968, sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094" },
-    // BFL's builds for FLUX.3 (gated: accept the license on Hugging Face first); the ones a Mac can load.
+    // BFL's builds for FLUX.3, the ones a Mac can load. BFL's repository is gated (a license to
+    // accept while signed in), so each is followed by the same file from an ungated community
+    // copy, which a download falls back to when BFL's answers 401.
     { file: "qwen3vl_4b_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_int8_convrot.safetensors"), bytes: 4_858_559_240 },
-    { file: "qwen3vl_4b_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408 }
+    { file: "qwen3vl_4b_int8_convrot.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_int8_convrot.safetensors"), bytes: 4_858_559_240, sha256: "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c" },
+    { file: "qwen3vl_4b_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408 },
+    { file: "qwen3vl_4b_bf16.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408, sha256: "f0b24fc5c8d7c0ea6ca909da14c20af5cac53f22506be942c6c956f838b9630f" }
   ],
-  // FLUX.3's prompt upsampler, a Qwen3.5 9B tuned to write its captions (gated like the model).
+  // FLUX.3's prompt upsampler, a Qwen3.5 9B tuned to write its captions: gated like the model,
+  // so each build is followed by the same file from the ungated community copy (see qwen3vl_4b).
   flux3_upsampler: [
     { file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"), bytes: 9_748_113_996 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"), bytes: 9_748_113_996, sha256: "cb8cb9b9dcd2569509de755dca54d96fd93a16a7aabfd2f4051f0a144230620f" },
     { file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", fp8: true, url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"), bytes: 6_724_090_780 },
-    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392 }
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", fp8: true, url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"), bytes: 6_724_090_780, sha256: "e5d85a7421d197bf5a12474511936ecabce19a833252f16e9310a983194a4458" },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392, sha256: "f5062a1fba3e63afe5c88349a311903fec06c959b362f1247127e63d5c860ed4" }
   ],
   qwen3vl_8b: [
     { file: "qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors", url: hf("DreamFast/Qwen3-VL-8B-Heretic-1.3.0", "comfyui/qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors"), bytes: 10_017_064_632, sha256: "7f8ec20de729e2d99f3a04852d4c4499c1677cda167f5ea63d21b0882a5c32b5" },
@@ -233,6 +241,8 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * editSampling (what an edit changes in them), editRequest (how an edit's
  * request is worded, {prompt} for yours) and referenceMegapixels (how large
  * it sees the references, by how many there are; the last covers the rest).
+ * optional: the model runs without it; a missing one is offered as recommended
+ * (the profile's `recommended`), not needed.
  * variants: first whose `match` passes wins; the last one is the fallback.
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
@@ -706,7 +716,9 @@ export const families = {
     // and 0 for an edit. An edit's request is worded as theirs is, with its references at most
     // 1 MP for one, 724² for two and 512² for more.
     upsampler: {
-      slot: { slot: "upsampler", label: "FLUX.3 prompt upsampler", kinds: ["qwen35_9b"], only: /upsampl/i, download: "flux3_upsampler", detail: "FLUX.3 runs behind its own prompt upsampler, which writes the long caption it was trained on. Its makers say not to use it without one." },
+      // Recommended, not required: it runs without one, and long prompts lose little.
+      optional: true,
+      slot: { slot: "upsampler", label: "FLUX.3 prompt upsampler", kinds: ["qwen35_9b"], only: /upsampl/i, download: "flux3_upsampler", detail: "FLUX.3 runs without it. It was trained on long, detailed captions, and this turns a short prompt into one; BFL recommend it. With it in place, every run uses it." },
       clipType: "flux3", system: flux3Upsampler, maxLength: 3584,
       sampling: { temperature: 1, top_k: 1, top_p: 0.95, min_p: 0, repetition_penalty: 1, seed: 0, presence_penalty: 1.5 },
       editSampling: { presence_penalty: 0 },

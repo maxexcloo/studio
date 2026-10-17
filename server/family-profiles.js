@@ -3,6 +3,7 @@ import path from 'node:path';
 import { hasNode, missingNodes, modelFolders, nodeRange, optionsFor } from './comfy.js';
 import { MAX_BATCH, checkpointDownloads, encoderDownloads, families, knownFamilies, modelDownloads, quantFormats, runnerFor, sanaConf, sanaLabel, sanaLatentNode, sanaPresets, vaeDownloads, variantDefaults, variantFor, visionDownloads, visionKinds } from './family-catalog.js';
 import { diffusersFolderPath, diffusersFolders } from './diffusers-folders.js';
+import { isDismissed } from './dismissals.js';
 import { nodePack } from './node-packs.js';
 import { existingCopy } from './model-downloads.js';
 import { inpaintingEnabled } from './features.js';
@@ -328,13 +329,18 @@ export function familyProfiles(info, helpers) {
     });
 
     // A prompt upsampler the family runs behind (FLUX.3's): its own Qwen build, in text_encoders.
+    // An optional one that's missing is recommended, not needed: the model runs without it.
     let upsampler = "";
+    const recommended = [];
     if (family.upsampler && !ownLoaders) {
       const slot = family.upsampler.slot;
       upsampler = rankEncoders(encoderFiles, slot)[0] || "";
-      if (!upsampler) {
-        missing.push({
+      // `dismissKey`: "Don't show again" hides a recommendation for the whole family, for good.
+      const dismissKey = `${info2.family}:${slot.slot}`;
+      if (!upsampler && !(family.upsampler.optional && isDismissed(dismissKey))) {
+        (family.upsampler.optional ? recommended : missing).push({
           part: "encoder", slot: slot.slot, label: slot.label, kind: slot.kinds[0], detail: slot.detail,
+          ...(family.upsampler.optional ? { dismissKey } : {}),
           downloads: downloadsFor(encoderDownloads[slot.download], "text_encoders", `encoder:${slot.download}`, device)
         });
       }
@@ -490,6 +496,7 @@ export function familyProfiles(info, helpers) {
       ...(quantLoader ? { quant: info2.quant, checkpointLoader: quantLoader } : {}),
       detectedBy: info2.via,
       missing,
+      recommended,
       ready: missing.length === 0,
       // For the model menu's quiet size note; 0 when the file is on another computer.
       weightBytes: source.startsWith("sana") || folderFamily ? 0 : modelFileBytes(source, name),

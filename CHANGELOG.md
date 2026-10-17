@@ -18,9 +18,12 @@ version opens with a `> ` summary line, which the update pill shows.
   and up: Klein (distilled, 16 steps) and Klein Base (50 steps, CFG 4), told
   apart by their weights, with up to three reference images for edits, on the
   time shift BFL's own code now uses. It's made for 2K, which the size menu
-  draws with no warning. BFL says not to run it without its prompt upsampler,
-  so every prompt goes through it first, with their system prompts and
-  settings word for word. The Qwen3-VL 4B text encoder, the upsampler and the Flux.2 VAE are one
+  draws with no warning. Its prompt upsampler is recommended, not required:
+  with it in place every prompt goes through it first, with BFL's system
+  prompts and settings word for word; without it FLUX.3 runs on your prompt as
+  written, and the setup panel offers it with a **Don't show again** that
+  holds across restarts and devices. BFL's files are gated, so a download
+  that's refused falls back to the same file from an open copy. The Qwen3-VL 4B text encoder, the upsampler and the Flux.2 VAE are one
   click away (BFL's files need their license accepted on Hugging Face).
 - **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
   and layouts that hold, runs with its makers' settings (50 steps, CFG 3,

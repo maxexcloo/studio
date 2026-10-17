@@ -812,13 +812,30 @@ test("FLUX.3 Klein and Klein Base are told apart by their weights, and run behin
   assert.deepEqual([byType(edit, "ReferenceLatent").length, byType(edit, "ConditioningZeroOut").length], [4, 1]);
 });
 
-test("FLUX.3 without its prompt upsampler names it, with BFL's builds to download", () => {
-  const info = objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clips: ["qwen3vl_4b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: flux3Types, extra: { TextGenerate: node(), BatchImagesNode: node() } });
-  const profile = inferModels(info).profiles.find((item) => item.family === "flux3" && item.model === "flux3-image-klein-bf16.safetensors");
-  const part = profile.missing.find((item) => item.slot === "upsampler");
-  assert.equal(part.label, "FLUX.3 prompt upsampler");
-  assert.deepEqual(part.downloads.map((item) => item.file), ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"]);
-  assert.equal(part.downloads[0].label, "FLUX.3 prompt upsampler");
+test("FLUX.3 runs without its prompt upsampler, which is recommended until dismissed, and gated files fall back to the open copy", async () => {
+  const info = objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clips: ["qwen3vl_4b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: flux3Types, extra: { TextGenerate: node(), BatchImagesNode: node(), ImageScaleToTotalPixels: node() } });
+  const profileOf = () => inferModels(info).profiles.find((item) => item.family === "flux3" && item.model === "flux3-image-klein-bf16.safetensors");
+  const profile = profileOf();
+  assert.deepEqual([profile.ready, profile.missing.length, profile.upsampler], [true, 0, ""]);
+  const part = profile.recommended.find((item) => item.slot === "upsampler");
+  assert.deepEqual([part.label, part.dismissKey], ["FLUX.3 prompt upsampler", "flux3:upsampler"]);
+  // BFL's gated file first, then the same file from the open copy, build by build.
+  assert.deepEqual(part.downloads.slice(0, 2).map((item) => [item.file, item.source]), [
+    ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "black-forest-labs"],
+    ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "ml-resources"]
+  ]);
+  const { catalogDownload } = await import("./family-profiles.js");
+  assert.match(catalogDownload(part.downloads[0].id).alternatives[0].url, /ml-resources\/flux-3-image-klein-comfy/);
+  // Without it the plain prompt goes straight to the encoder.
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a fox" }, info));
+  assert.deepEqual([byType(graph, "TextGenerate").length, byType(graph, "CLIPTextEncode")[0].inputs.text], [0, "a fox"]);
+  // "Don't show again" holds for the family, and can be taken back.
+  const { setDismissed } = await import("./dismissals.js");
+  setDismissed("flux3:upsampler");
+  assert.deepEqual(profileOf().recommended, []);
+  setDismissed("flux3:upsampler", false);
+  assert.equal(profileOf().recommended.length, 1);
+  assert.throws(() => setDismissed("../etc"), /isn’t something/);
   // An older ComfyUI: update first.
   const old = inferModels(objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clipTypes: newTypes })).profiles.find((item) => item.family === "flux3");
   assert.equal(old.missing[0].label, "Newer ComfyUI");

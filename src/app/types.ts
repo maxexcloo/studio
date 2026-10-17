@@ -120,6 +120,8 @@ export type Profile = {
   family: string;
   /** The family's name as people know it ("Flux.1"), for built-in families. */
   familyName?: string;
+  /** Parts it runs without but works better with (FLUX.3's prompt upsampler), offered like missing ones. */
+  recommended?: MissingPart[];
   /** A family with a guided setup dialog of its own (server/family-setup.js): its id. */
   setupGuide?: string;
   defaults: Record<string, string | number>;
@@ -171,6 +173,8 @@ export type MissingPart = {
   part: "encoder" | "vae" | "model" | "vision" | "comfy"; slot?: string; label: string; kind?: string; detail?: string; downloads: PartDownload[];
   nodePack?: NodePackInfo; install?: NodeInstallPlan; autoInstall?: PackAutoInstall; missingNodes?: string[];
   command?: ShellPlan & { target?: string };
+  /** A recommended part that "Don't show again" hides for good (server/dismissals.js). */
+  dismissKey?: string;
 };
 export type ModelDownload = { id: string; file: string; folder?: string; label: string; status: "queued" | "downloading" | "done" | "error" | "canceled" | "paused"; receivedBytes: number; totalBytes: number; bytesPerSecond?: number; already?: boolean; error?: string; finishedAt?: number; /** false when trying again cannot help (full disk, gated file). */ retryable?: boolean; /** Gated: only the browser, logged in to Hugging Face, can fetch it. */ needsBrowser?: boolean; /** Which automatic reconnect this is, while the connection is down. */ reconnecting?: number; /** Gone or gated, and the next build of the same part the server tried instead. */ unavailable?: boolean; fellBackTo?: string; fallbackFrom?: string ; /** All there, being checked against its published SHA-256. */ verifying?: boolean };
 export type DownloadState = { local?: boolean; active: ModelDownload | null; queued: ModelDownload[]; recent: ModelDownload[]; paused?: ModelDownload[]; /** Free bytes where each models folder lands, and which disk that is. */ space?: Record<string, { free: number; disk: string }> };

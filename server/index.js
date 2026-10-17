@@ -50,6 +50,7 @@ import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
 import { starterPlan } from './starter-models.js';
 import { familySetupPlan, guidedSetups } from './family-setup.js';
+import { setDismissed } from './dismissals.js';
 import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
@@ -903,6 +904,15 @@ app.get("/api/family-setup/:family", async (req, res) => {
     comfyVersion: String(context?.stats?.system?.comfyui_version || "")
   });
   res.json({ ok: true, ...plan, local: downloadState().local });
+});
+
+// "Don't show again" for a recommended part (FLUX.3's prompt upsampler), kept in the data folder.
+app.put("/api/models/recommendations/:key", (req, res) => {
+  try {
+    res.json({ ok: true, dismissed: setDismissed(String(req.params.key), req.body?.dismissed !== false) });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
 });
 
 app.post("/api/models/downloads/cancel", (req, res) => {
