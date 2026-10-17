@@ -11,20 +11,23 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
-> Native 2K, a new size menu and a lot of fixes
+> Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
 
 ### Added
-- **FLUX.3 Klein.** Black Forest Labs' new 5.6B model runs on ComfyUI 0.41
-  and up: Klein (distilled, 16 steps) and Klein Base (50 steps, CFG 4), told
-  apart by their weights, with up to three reference images for edits, on the
-  time shift BFL's own code now uses. It's made for 2K, which the size menu
-  draws with no warning. Its prompt upsampler is recommended, not required:
-  with it in place every prompt goes through it first, with BFL's system
-  prompts and settings word for word; without it FLUX.3 runs on your prompt as
-  written, and the setup panel offers it with a **Don't show again** that
-  holds across restarts and devices. BFL's files are gated, so a download
-  that's refused falls back to the same file from an open copy. The Qwen3-VL 4B text encoder, the upsampler and the Flux.2 VAE are one
-  click away (BFL's files need their license accepted on Hugging Face).
+- **FLUX.3 Klein.** Black Forest Labs' new 5.6B model, on ComfyUI 0.41 and
+  up. Klein (distilled, 16 steps, no CFG) and Klein Base (50 steps, CFG 4) are
+  told apart by their weights and run on the settings in BFL's own code, time
+  shift included. It edits from up to three reference images and is made for
+  2K, which the size menu draws with no warning.
+  - **Its prompt upsampler is recommended, not required.** With it in place,
+    every prompt goes through it first, with BFL's system prompts and settings
+    word for word; without it, FLUX.3 runs on your prompt as written. The setup
+    panel offers it under **Recommended**, with a **Don't show again** that
+    holds across restarts and devices.
+  - **Downloads past the gate.** BFL's files need their license accepted on
+    Hugging Face. When a download is refused, it falls back to the same file
+    from an open copy, so the Qwen3-VL 4B text encoder and the upsampler are
+    still one click away.
 - **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
   and layouts that hold, runs with its makers' settings (50 steps, CFG 3,
   shift 5). Comfy-Org's single files run on ComfyUI's own nodes (newer than
@@ -32,14 +35,17 @@ version opens with a `> ` summary line, which the update pill shows.
   The official model folder in `models/diffusers` runs on the makers' own
   MOSS-Image nodes (one-click install, ComfyUI 0.38 and up), which skip layer
   22 on the negative pass as the makers sample. A **Guided setup** button on
-  the model's setup panel walks through whichever way its file needs.
+  the model's setup panel walks through whichever way its file needs; the
+  model itself you put in ComfyUI, and HEISS recognizes it.
+- **LoRAs for FLUX.3 and MOSS-Image** are recognized by name and by their
+  weights, so they show with the model they belong to.
 - **Node packs that live inside a bigger repository** install too: only the
   pack's own folder goes into custom_nodes.
 - **Native 2K.** The size menu has three tabs now: **Default**, **2K** and
   **Custom**. 2K has the model draw your shape itself with its long side at
   2048, in one run, with no upscale step after it. Models made for big pictures
-  (Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow, Sana
-  2K/4K) are documented at that size. On the others, the menu says in one line
+  (FLUX.3 Klein, Flux.2, Qwen-Image 2.1, Z-Image, MOSS-Image, Krea 2 Turbo,
+  Ideogram 4, MageFlow, Sana 2K/4K) are documented at that size. On the others, the menu says in one line
   that the model isn't known for 2K and some pictures may repeat or warp. Which
   model is which, and the sources, are in
   [MODELS.md](./docs/guides/MODELS.md#native-2k).
@@ -89,6 +95,14 @@ version opens with a `> ` summary line, which the update pill shows.
   count.
 
 ### Changed
+- **Setup notices ComfyUI changes by itself.** A model's setup panel that's
+  waiting on an update or a node pack checks again every few seconds and says
+  when it last looked, and a new ComfyUI version rescans your models. No more
+  "Newer ComfyUI" after updating until you reload.
+- **Restart says how it went.** "Restarting HEISS UI…" stays up until the page
+  is back, then says it restarted. After switching network access it checks
+  the server really listens there and gives the address, or keeps an error up
+  if the setting didn't take.
 - **The size menu is about the size the model draws.** Smart upscale for every
   new picture has left it, so new pictures are no longer upscaled as part of
   their run. The upscale arrow on a tile or in the viewer still takes any
@@ -115,8 +129,8 @@ version opens with a `> ` summary line, which the update pill shows.
   with "Drawn at" for the size it was generated at. "Use these settings" keeps
   your seed, so it makes a new picture.
 - **Smaller things:** the LoRA pill reads "2 LoRAs", the gallery slides up and
-  down with search, and the model button's loading placeholder is the pill it
-  stands in for.
+  down with search, the model button's loading placeholder is the pill it
+  stands in for, and Settings › About's feedback section is a small hero.
 
 ### Removed
 - **Smart upscale for every new picture**, as above: use 2K, or the upscale
@@ -124,6 +138,14 @@ version opens with a `> ` summary line, which the update pill shows.
 - **The viewer's "Vary with a new seed" button.**
 
 ### Fixed
+- **The size menu holds still.** Switching to 2K, Custom or Megapixels no
+  longer makes the size button change width and the menu slide sideways
+  under the pointer; the button catches up once the menu closes.
+- **No "isn't known for 2K" note without a model.** With ComfyUI off or no
+  model picked, the size menu doesn't warn about a model that isn't there.
+- **HEISS no longer stops mid-restart on Windows.** A stray console event
+  (exit 0xC000013A) around a restart was read as a crash. The server ignores
+  the console now, and its launcher starts it again if it stops anyway.
 - **A busy ComfyUI no longer shows as offline.** While it's loading a model or
   short on memory it can take a while to answer, and its runs carry on. HEISS
   now reads that as busy for up to a minute, doesn't go looking for another
