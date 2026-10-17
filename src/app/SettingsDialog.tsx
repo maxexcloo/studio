@@ -1133,14 +1133,14 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
             <section className="feedback-hero">
               <div className="feedback-hero-copy">
-                <span className="feedback-hero-eyebrow">Feedback board</span>
-                <strong>Found a bug?<br />Have an idea?</strong>
-                <p>Post it to the board. Others upvote it, you follow along.</p>
+                <span className="feedback-hero-eyebrow">Feedback</span>
+                <strong>Make HEISS better.</strong>
+                <p>Report a bug or suggest an idea on the public board.</p>
                 <div className="feedback-hero-actions">
                   <button type="button" className="feedback-hero-post" onClick={() => openFeedback({ from: 'settings' })}>
                     New post <span><Plus size={14} strokeWidth={2.4} /></span>
                   </button>
-                  <a className="feedback-hero-link" href={boardUrl} target="_blank" rel="noreferrer">Open the board <ArrowUpRight size={14} /></a>
+                  <a className="feedback-hero-link" href={boardUrl} target="_blank" rel="noreferrer">View board <ArrowUpRight size={14} /></a>
                 </div>
               </div>
               <a className="feedback-hero-stage" href={boardUrl} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
@@ -1151,7 +1151,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                   <img src="/feedback-board.webp" alt="" width={1120} height={749} loading="lazy" decoding="async" draggable={false} />
                 </span>
               </a>
-              <p className="feedback-hero-fine">Only what you write, plus setup info if you leave it on. Never prompts, images or file names.</p>
+              <p className="feedback-hero-fine">Posts never include prompts, images or file names.</p>
             </section>
 
             <HelpGroup copyToClipboard={copyToClipboard} />
