@@ -152,18 +152,21 @@ catalog, so a family that is described correctly needs no UI work.
   it: a Download button, node install steps, or a copyable command. A model
   that is not ready never runs.
 
-## Native 2K/4K
+## Native 2K
 
 `native` on a family (or a variant) says, per size, whether the model draws 2K
-or 4K itself:
+or 4K itself. The size menu's **2K** tab draws the picked shape with its long
+side at 2048 on every image model; `native` decides what the menu says about it:
 
-- **`"yes"`**: its makers document that size. 2K/4K draw natively by default,
-  the size menu reads **Resolution · Default / 2K / 4K**, and a **Use upscaler**
-  switch picks SeedVR2 instead.
-- **`"maybe"`**: reports are mixed or missing. SeedVR2 stays the default (the
-  menu reads **Smart upscale · None / 2K / 4K**), and a **Draw at 2K directly**
-  switch, marked "Results vary with this model", tries it.
-- **Left out**: the model plainly breaks there. No switch.
+- **`"yes"`**: its makers document that size. 2K draws with no note.
+- **`"maybe"`**: reports are mixed or missing. The menu says the model isn't
+  known for 2K and some pictures may repeat or warp.
+- **Left out**: the model plainly breaks there. Same note.
+
+The same note shows for a Megapixels count past about 2.5 MP on a model without
+`"2k": "yes"`. 4K is recorded for the families that document it but isn't
+drawn from the size menu; the upscale arrow (SeedVR2) gives 2K and 4K for any
+picture.
 
 Current entries:
 

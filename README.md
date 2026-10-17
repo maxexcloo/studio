@@ -41,7 +41,8 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 
 - **28 model families, ready to go.** From SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Wan 2.2, each with its makers' recommended settings. [The full list ↓](#supported-models)
 - **Missing parts, one click away.** Pick a model and see what it still needs, with a Download button for each part and **Get all** for the lot.
-- **Smart upscale.** Pick 2K or 4K and every new picture comes out bigger and sharper, with a countdown. Any older picture upscales in one click.
+- **Native 2K.** Pick 2K and the model draws the picture at 2048 itself, in one run, with no upscale in between. Or set any size of your own, in pixels or megapixels, and save it for every device. [Sizes ↓](#native-2k-and-sizes)
+- **Smart upscale.** Any picture goes to 2K or 4K with SeedVR2 in one click, with a countdown. [How ↓](#smart-upscale)
 - **Bring your own workflow.** Import a ComfyUI workflow and it becomes a clean set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
 - **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
 - **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan.
@@ -142,7 +143,8 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 <details>
 <summary><b>Reference slots, the library and your workflows</b></summary>
 
-- **Slots as you need them.** The composer opens a new reference slot each time you fill one, and the first reference frames the result.
+- **Slots as you need them.** The composer opens a new reference slot each time you fill one. Several references stack into one chip that fans out on hover.
+- **Edit or Reference.** On Flux.2 and Qwen-Image 2.1 the first reference is **Edit** (the result keeps its size and changes that picture) or **Reference** (it only guides, and the size and shape stay yours, 2K included).
 - **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
 
@@ -163,21 +165,28 @@ Change one part of a picture and keep the rest. Hover a reference or start image
 
 Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no outpainting or layers. Inpainting is in beta and on by default; **Settings › Features › Inpainting** turns it off.
 
+## Native 2K and sizes
+
+- **2K drawn by the model.** The size menu has **Default**, **2K** and **Custom**. 2K draws your shape with its long side at 2048 in one run, faster than an upscale and with nothing in between. Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow and Sana 2K/4K are made for it; on other models the menu says when a model isn't known for 2K. [Which models ↗](./docs/guides/MODELS.md#native-2k)
+- **See the size before you run.** A live frame shows the shape and pixels you'll get, and hovering a shape previews it.
+- **Custom, linked or not.** Width and height move together and keep the shape, or unlink them. Type, use the arrow keys or drag the label, from 256 to 4096.
+- **Saved sizes on every device.** **Save size** keeps a size of your own, to rename or remove later. Your phone and every other device see the same list.
+- **Or count in megapixels.** **Settings › Generation › Size in megapixels** puts a Megapixels field in the menu, and every shape is drawn at that many pixels.
+
+A reference being edited or a painted mask sets the size itself, and your 2K pick comes back afterwards.
+
 ## Smart upscale
 
 Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler), without leaving the studio.
 
-- **2K or 4K for every new picture.** Pick **None**, **2K** or **4K** next to the size menu (on the phone, in the create sheet). The upscale is part of the run, so you can close the page and it still finishes. The next run waits for it, and if you stop it or it fails, you keep the picture at its generated size.
-- **Any picture, one click.** The upscale arrow on a tile or in the viewer upscales anything already in the gallery, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
+- **Any picture, one click.** The upscale arrow on a tile or in the viewer takes anything in the gallery to 2K or 4K, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
 - **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
-- **Set up when you need it.** Picking 2K or 4K without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads.
-- **Or drawn at that size.** On models made for big pictures (Flux.2, Qwen-Image 2.1, Z-Image and more) the menu reads **Resolution**: 2K and 4K are drawn by the model itself, faster and with nothing in between, and **Use upscaler** switches to SeedVR2. Other models that may manage it offer **Draw at 2K directly**.
-
+- **Set up when you need it.** The first upscale without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads. Weights kept in any folder ComfyUI reads are found.
 
 <details>
-<summary><b>Effort, faces and when it's skipped</b></summary>
+<summary><b>Effort and faces</b></summary>
 
-**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort for the upscale arrow is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes. Imported workflows get 2K and 4K too, and a run whose size comes from a reference image or a painted mask skips the 2K/4K pick. A reference set to **Ref** leaves the size to you, so the pick applies.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes.
 
 </details>
 
@@ -203,7 +212,7 @@ Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **S
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference image, workflow, shape, number of images and Smart upscale's None, 2K or 4K, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
+The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference images (with Edit or Reference in plain sight), workflow, size (Default, 2K, Custom and your saved sizes) and number of images, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
 
 **Use the full studio** under More switches a phone to the complete layout.
 

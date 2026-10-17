@@ -208,12 +208,11 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  */
 /**
  * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
- * document that size (then 2K/4K draw natively by default, the size menu reads
- * Resolution and offers SeedVR2 as the alternative), "maybe" where reports are
- * mixed or missing (SeedVR2 stays the default, drawing directly is a switch
- * away, marked as varying). Left out only where it plainly breaks: the 1 MP
- * generation (SD 1.5/2) at 2K, and models documented at ~1 MP at 4K.
- * Sources per family: docs/guides/MODELS.md, "Native 2K/4K".
+ * document that size (the size menu's 2K draws with no note), "maybe" where
+ * reports are mixed or missing (2K says the model isn't known for it). Left
+ * out only where it plainly breaks: the 1 MP generation (SD 1.5/2) at 2K, and
+ * models documented at ~1 MP at 4K.
+ * Sources per family: docs/guides/MODELS.md, "Native 2K".
  */
 const drawsNone = {};
 const draws2kMaybe = { "2k": "maybe" };
