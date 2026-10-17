@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { applyPending, confirmApplied, lockPackages, readPending, rollback, takeResult, updateDir, writePending } from "./release-swap.js";
+import { applyPending, confirmApplied, consoleStopTracker, lockPackages, readPending, rollback, takeResult, updateDir, writePending } from "./release-swap.js";
 import { isNewer, pickAsset } from "./updater.js";
 
 const write = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
@@ -150,4 +150,19 @@ test("Linux keeps its desktop entry beside the .sh; other systems drop it", asyn
   removeForeignLaunchers(root, "linux");
   assert.deepEqual(fs.readdirSync(root).filter((name) => name.startsWith("Start")).sort(), [DESKTOP_ENTRY, LAUNCHERS.linux].sort());
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("a stray console stop restarts the server, a meant one or a run of them doesn't", async () => {
+  let stopping = false;
+  let clock = 0;
+  const shouldRestart = consoleStopTracker({ isStopping: () => stopping, waitMs: 0, limit: 2, windowMs: 1000, now: () => clock });
+  assert.equal(await shouldRestart(), true);
+  assert.equal(await shouldRestart(), true);
+  // A third inside the window: something keeps ending it, so let it go.
+  assert.equal(await shouldRestart(), false);
+  clock = 5000;
+  assert.equal(await shouldRestart(), true);
+  // The launcher got the event too: someone meant it.
+  stopping = true;
+  assert.equal(await shouldRestart(), false);
 });

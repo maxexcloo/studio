@@ -20,7 +20,7 @@ const { execFileSync, execSync, fork } = await import("node:child_process");
 const { existsSync } = await import("node:fs");
 const path = (await import("node:path")).default;
 const { fileURLToPath } = await import("node:url");
-const { PORT_IN_USE_CODE, RESTART_CODE, applyPending, confirmApplied, rollback } = await import("../server/release-swap.js");
+const { CONSOLE_STOP_CODE = 0xC000013A, PORT_IN_USE_CODE, RESTART_CODE, applyPending, confirmApplied, consoleStopTracker, rollback } = await import("../server/release-swap.js");
 const { pruneRuntimes } = await import("../server/node-runtime.js");
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,7 +104,8 @@ function runServer(onReady) {
   return new Promise((resolve) => {
     let ready = false;
     // Flags given to the launcher (npm start -- --lan) reach every server it starts.
-    child = fork(path.join(root, "server", "index.js"), process.argv.slice(2), { cwd: root, stdio: ["inherit", "inherit", "pipe", "ipc"] });
+    // The server never reads the console, so it gets none.
+    child = fork(path.join(root, "server", "index.js"), process.argv.slice(2), { cwd: root, stdio: ["ignore", "inherit", "pipe", "ipc"] });
     // Shown as before, and its last lines kept for the exit record.
     child.stderr?.on("data", (chunk) => { serverTail.push(chunk); process.stderr.write(chunk); });
     child.on("message", (message) => {
@@ -118,7 +119,8 @@ function runServer(onReady) {
     child.on("exit", (code, signal) => {
       child = null;
       // The server writes its own crash down; this catches what it couldn't (killed from outside).
-      if (!stopping && code !== 0 && code !== RESTART_CODE && code !== PORT_IN_USE_CODE) {
+      // A console stop is decided in the loop, once it is clear whether this launcher was stopped too.
+      if (!stopping && code !== 0 && code !== RESTART_CODE && code !== PORT_IN_USE_CODE && code !== CONSOLE_STOP_CODE) {
         exitRecord.recordExit({ who: "server", code, signal, reason: signal ? `The server was ended (${signal})` : `The server stopped with exit code ${code}`, detail: serverTail.text() });
       }
       resolve({ code, signal, ready });
@@ -128,6 +130,9 @@ function runServer(onReady) {
 
 // Node.js runtimes an earlier update left behind (a download's own Node).
 try { pruneRuntimes(root, log); } catch { /* best effort */ }
+
+// An older release-swap.js has no tracker: a console stop then ends HEISS UI as before.
+const strayConsoleStop = consoleStopTracker ? consoleStopTracker({ isStopping: () => stopping }) : async () => false;
 
 let trial = null;
 let reinstall = false;
@@ -154,6 +159,13 @@ for (;;) {
     openOnce(message.url || `http://localhost:${process.env.PORT || 8787}`);
   });
   if (code === RESTART_CODE) continue;
+  if (code === CONSOLE_STOP_CODE && !stopping) {
+    if (await strayConsoleStop()) {
+      log("The server was ended by a console event nobody sent to HEISS UI. Starting it again.");
+      continue;
+    }
+    if (!stopping) exitRecord.recordExit({ who: "server", code, reason: "The server kept being ended by console events (Ctrl+C or a closed window) that HEISS UI didn't get itself", detail: serverTail.text() });
+  }
   // A taken port (HEISS already running) says nothing about the update; keep it on trial.
   if (code === PORT_IN_USE_CODE) process.exit(code);
   if (trial && !ready && !signal) {
