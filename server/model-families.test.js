@@ -777,7 +777,7 @@ test("FLUX.3 Klein and Klein Base are told apart by their weights, and run behin
   const flux3 = inferModels(info).profiles.filter((item) => item.family === "flux3");
   assert.deepEqual(flux3.map((item) => [item.model, item.variant, item.ready, item.defaults.steps, item.defaults.cfg, item.capabilities.negativePrompt, item.upsampler]), [
     ["flux3-image-klein-int8-convrot.safetensors", "distilled", true, 16, 1, false, "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"],
-    ["my-flux3-finetune.safetensors", "base", true, 50, 3.5, true, "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"]
+    ["my-flux3-finetune.safetensors", "base", true, 50, 4, true, "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"]
   ]);
   assert.equal(flux3[0].mediaInputs.length, 3);
   // MOSS-Image reads stock Qwen3.5 9B and never takes the tuned upsampler of the same shape.
@@ -786,21 +786,29 @@ test("FLUX.3 Klein and Klein Base are told apart by their weights, and run behin
 
   const base = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: flux3[1].workflow, profileId: flux3[1].id, prompt: "a fox in snow", negative: "blurry", width: 1344, height: 768 }, info));
   const generate = byType(base, "TextGenerate")[0].inputs;
-  assert.equal(generate.prompt, "TARGET CANVAS: 7:4\na fox in snow");
+  // As BFL's own code sends it: the request alone, greedy, presence 1.5 for a picture.
+  assert.equal(generate.prompt, "a fox in snow");
   assert.match(generate.system_prompt, /^You are the prompt upsampler of a text-to-image model/);
-  assert.deepEqual([generate.sampling_mode, generate["sampling_mode.top_k"], generate["sampling_mode.presence_penalty"], generate.max_length, generate.mtp], ["on", 1, 1.5, 3584, "off"]);
+  assert.deepEqual([generate.sampling_mode, generate["sampling_mode.top_k"], generate["sampling_mode.repetition_penalty"], generate["sampling_mode.presence_penalty"], generate.max_length, generate.mtp], ["on", 1, 1, 1.5, 3584, "off"]);
+  // Their time shift of 16, which ComfyUI's built-in 6.93 predates.
+  assert.deepEqual(byType(base, "ModelSamplingFlux").map((item) => [item.inputs.max_shift, item.inputs.base_shift]), [[Math.log(16), Math.log(16)]]);
   assert.deepEqual(byType(base, "CLIPLoader").map((item) => [item.inputs.clip_name, item.inputs.type]), [["qwen3vl_4b_int8_convrot.safetensors", "flux3"], ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "flux3"]]);
   // The positive encodes the upsampler's caption; the negative stays as typed.
   const [positive, negative] = byType(base, "CLIPTextEncode");
   assert.equal(base[positive.inputs.text[0]].class_type, "TextGenerate");
   assert.equal(negative.inputs.text, "blurry");
-  assert.deepEqual([byType(base, "KSampler")[0].inputs.cfg, byType(base, "EmptyFlux2LatentImage").length], [3.5, 1]);
+  assert.deepEqual([byType(base, "KSampler")[0].inputs.cfg, byType(base, "EmptyFlux2LatentImage").length], [4, 1]);
 
   const edit = familyGraph({ family: "flux3", variant: "distilled", source: "unet", model: "flux3.safetensors", encoders: ["qwen3vl_4b.safetensors"], vae: "flux2-vae.safetensors", upsampler: "upsampler.safetensors", prompt: "make the dress red", referenceImages: ["a.png", "b.png"], steps: 16, cfg: 1, seed: 1 });
   const editGenerate = byType(edit, "TextGenerate")[0].inputs;
-  assert.equal(editGenerate.prompt, "make the dress red");
+  assert.equal(editGenerate.prompt, "Reference images follow in order (the first image, the second image, ...).\nUser request: make the dress red\nOutput the caption.");
   assert.match(editGenerate.system_prompt, /^You are the prompt upsampler of an image-editing model/);
+  assert.doesNotMatch(editGenerate.system_prompt, /\\"/);
+  assert.equal(editGenerate["sampling_mode.presence_penalty"], 0);
   assert.deepEqual(Object.keys(byType(edit, "BatchImagesNode")[0].inputs), ["images.image0", "images.image1"]);
+  // Two references: each seen at about 724², as BFL feed them; the model itself still gets them as the shared path scales them.
+  const forUpsampler = Object.values(byType(edit, "BatchImagesNode")[0].inputs).map((link) => edit[link[0]]);
+  assert.deepEqual(forUpsampler.map((item) => [item.class_type, item.inputs.megapixels]), [["ImageScaleToTotalPixels", 0.52], ["ImageScaleToTotalPixels", 0.52]]);
   assert.deepEqual([byType(edit, "ReferenceLatent").length, byType(edit, "ConditioningZeroOut").length], [4, 1]);
 });
 

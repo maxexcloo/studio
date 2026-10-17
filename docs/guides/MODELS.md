@@ -205,14 +205,12 @@ Current entries:
   HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
   (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
   left out.
-- **2K maybe:** FLUX.3 Klein (its card names no sizes yet; Comfy-Org's
-  templates run 1024²).
 - **2K yes:** MOSS-Image (its makers document 0.25 to 4 MP and recommend
   1 to 2 MP). 4K is left out.
 - **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1
   (native 2K), Z-Image (up to 2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to
   2048), MageFlow (512-2048, any aspect), Sana 2K. No hands-on 4K reports.
-- **2K and 4K yes:** Sana 4K.
+- **2K and 4K yes:** Sana 4K, FLUX.3 Klein (BFL: up to 4K, best at 2K).
 
 A new family states its own `native`; leaving it out means none.
 

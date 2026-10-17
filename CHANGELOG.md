@@ -15,11 +15,12 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ### Added
 - **FLUX.3 Klein.** Black Forest Labs' new 5.6B model runs on ComfyUI 0.41
-  and up: Klein (distilled, 16 steps) and Klein Base (50 steps, CFG 3.5), told
-  apart by their weights, with up to three reference images for edits. BFL
-  says not to run it without its prompt upsampler, so every prompt goes
-  through it first, with their own system prompts, the way their workflows
-  do. The Qwen3-VL 4B text encoder, the upsampler and the Flux.2 VAE are one
+  and up: Klein (distilled, 16 steps) and Klein Base (50 steps, CFG 4), told
+  apart by their weights, with up to three reference images for edits, on the
+  time shift BFL's own code now uses. It's made for 2K, which the size menu
+  draws with no warning. BFL says not to run it without its prompt upsampler,
+  so every prompt goes through it first, with their system prompts and
+  settings word for word. The Qwen3-VL 4B text encoder, the upsampler and the Flux.2 VAE are one
   click away (BFL's files need their license accepted on Hugging Face).
 - **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
   and layouts that hold, runs with its makers' settings (50 steps, CFG 3,

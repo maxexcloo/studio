@@ -229,8 +229,10 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * which rewrites your prompt into the long caption the model was trained on,
  * through ComfyUI's TextGenerate: slot (an encoder slot, `only` its own build),
  * clipType, system { text, edit } (edit when reference images go in, which it
- * also sees), maxLength and sampling (TextGenerate's "on" settings), and
- * canvas (a "TARGET CANVAS: W:H" first line, which its system prompt reads).
+ * also sees), maxLength, sampling (TextGenerate's "on" settings) and
+ * editSampling (what an edit changes in them), editRequest (how an edit's
+ * request is worded, {prompt} for yours) and referenceMegapixels (how large
+ * it sees the references, by how many there are; the last covers the rest).
  * variants: first whose `match` passes wins; the last one is the fallback.
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
@@ -686,23 +688,33 @@ export const families = {
   },
   // Black Forest Labs' FLUX.3 Image Klein (Oct 2026): a 5.6B DiT on the Flux.2 latent and
   // VAE, reading prompts with Qwen3-VL 4B (8 tapped layers). It edits from up to ten
-  // references; the composer offers three. Settings from Comfy-Org's templates and the
-  // model card: Klein (distilled, a flow map) 16 steps without guidance; Klein Base 50 steps
-  // at CFG 3.5; euler / simple, 1024². BFL: "Do not use the model without a prompt
-  // upsampler", so every run goes through theirs first, as their workflows do.
+  // references; the composer offers three. Settings from BFL's reference code
+  // (black-forest-labs/flux-3-image-klein, 2026-10-17): Klein (distilled, a flow map) 16
+  // steps without guidance, Klein Base 50 steps at CFG 4, both on a time shift of 16 (ComfyUI
+  // still builds in 6.93, so the shift is set here: mu = ln 16), euler / simple. Up to 4K;
+  // BFL recommend 2K. "Do not use the model without a prompt upsampler", so every run goes
+  // through theirs first, as their code runs it.
   flux3: {
-    label: "FLUX.3 Klein", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
+    label: "FLUX.3 Klein", kind: "image", native: draws4k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "flux3",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, aspects: square,
-    requiredNodes: ["EmptyFlux2LatentImage", "TextGenerate", "BatchImagesNode"],
+    requiredNodes: ["EmptyFlux2LatentImage", "TextGenerate", "BatchImagesNode", "ImageScaleToTotalPixels"],
+    modelSampling: { node: "ModelSamplingFlux", shift: Math.log(16) },
     references: 3,
+    // BFL's pup.py: greedy decoding (top_k 1 here, as Comfy-Org's templates do it, since TextGenerate
+    // needs sampling on for a presence penalty), no repetition penalty, presence 1.5 for a picture
+    // and 0 for an edit. An edit's request is worded as theirs is, with its references at most
+    // 1 MP for one, 724² for two and 512² for more.
     upsampler: {
       slot: { slot: "upsampler", label: "FLUX.3 prompt upsampler", kinds: ["qwen35_9b"], only: /upsampl/i, download: "flux3_upsampler", detail: "FLUX.3 runs behind its own prompt upsampler, which writes the long caption it was trained on. Its makers say not to use it without one." },
-      clipType: "flux3", system: flux3Upsampler, maxLength: 3584, canvas: true,
-      sampling: { temperature: 1, top_k: 1, top_p: 0.95, min_p: 0, repetition_penalty: 1, seed: 0, presence_penalty: 1.5 }
+      clipType: "flux3", system: flux3Upsampler, maxLength: 3584,
+      sampling: { temperature: 1, top_k: 1, top_p: 0.95, min_p: 0, repetition_penalty: 1, seed: 0, presence_penalty: 1.5 },
+      editSampling: { presence_penalty: 0 },
+      editRequest: "Reference images follow in order (the first image, the second image, ...).\nUser request: {prompt}\nOutput the caption.",
+      referenceMegapixels: [1, 0.52, 0.25]
     },
     variants: [
-      { id: "base", label: "Base", match: (name, header, detail) => (detail?.flowMap !== undefined ? !detail.flowMap : /(^|[^a-z])base([^a-z]|$)/i.test(name)), negative: "text", defaults: { steps: 50, cfg: 3.5, sampler: "euler", scheduler: "simple" } },
+      { id: "base", label: "Base", match: (name, header, detail) => (detail?.flowMap !== undefined ? !detail.flowMap : /(^|[^a-z])base([^a-z]|$)/i.test(name)), negative: "text", defaults: { steps: 50, cfg: 4, sampler: "euler", scheduler: "simple" } },
       { id: "distilled", label: "Klein", negative: "zero", defaults: { steps: 16, cfg: 1, sampler: "euler", scheduler: "simple" } }
     ],
     size: [1024, 1024]
