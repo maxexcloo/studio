@@ -10,7 +10,6 @@ import { formatDownload, formatGB, hardwareSentence, memoryWord, type Hardware }
 import { useThisComputer } from './device';
 import type { ModelDownload } from './types';
 import type { ShowToast } from './toast';
-import { openFamilySetup } from './FamilySetupDialog';
 
 /**
  * "Pick a first model": Krea 2, Flux.2 and SDXL, each in three versions for
@@ -26,9 +25,7 @@ type StarterVersion = {
   file: string; downloads: StarterDownload[]; totalBytes: number; remainingBytes: number; installed: boolean; fits: boolean | null;
 };
 type StarterFamily = { family: string; title: string; blurb: string; versions: StarterVersion[]; best: string | null; pick: string | null };
-/** A model with a guided setup of its own (server/family-setup.js), offered above the starters. */
-type GuidedSetup = { family: string; title: string; blurb: string; maker: string; tag: string };
-type StarterPlan = { hardware: Hardware | null; local: boolean; families: StarterFamily[]; guided?: GuidedSetup[] };
+type StarterPlan = { hardware: Hardware | null; local: boolean; families: StarterFamily[] };
 
 /** What the studio does once a starter model is in place: select it and offer a prompt. */
 export type StarterPick = { family: string; file: string; title: string };
@@ -214,25 +211,6 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
   );
 }
 
-/** New models with a guided setup, above the starters: one row each, opening its own dialog. */
-function GuidedOffers({ onOpen }: { onOpen: (family: string) => void }) {
-  const { plan } = useStarterPlan();
-  if (!plan?.guided?.length) return null;
-  return (
-    <>
-      {plan.guided.map((item) => (
-        <div key={item.family} className="family-setup-offer">
-          <div>
-            <strong>{item.title}{item.tag ? <em>{item.tag}</em> : null}</strong>
-            <span>{item.blurb}</span>
-          </div>
-          <button type="button" className="btn" onClick={() => onOpen(item.family)}>Set up</button>
-        </div>
-      ))}
-    </>
-  );
-}
-
 /** The same picks as a sheet, from the empty model menu's "Get a model". */
 export function GetModelsSheet({ open, onOpenChange, showToast, onStarted, onUse, onFindModels }: {
   open: boolean;
@@ -251,7 +229,6 @@ export function GetModelsSheet({ open, onOpenChange, showToast, onStarted, onUse
       className="starter-sheet"
       footer={onFindModels ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onFindModels(); }}>Find models on this computer</button> : undefined}
     >
-      <GuidedOffers onOpen={(family) => { onOpenChange(false); openFamilySetup(family); }} />
       <StarterModels compact showToast={showToast} onStarted={onStarted} onUse={(file) => { onOpenChange(false); onUse(file); }} />
     </Modal>
   );

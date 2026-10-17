@@ -49,7 +49,7 @@ import { applyBundles, createBundles, DEFAULT_COOLDOWN_MINUTES, dissolveBundle, 
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
 import { starterPlan } from './starter-models.js';
-import { cancelFolderDownload, familySetupPlan, folderDownloadCommand, folderDownloadState, guidedSetups, startFolderDownload } from './family-setup.js';
+import { familySetupPlan, guidedSetups } from './family-setup.js';
 import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
@@ -883,13 +883,11 @@ app.post("/api/models/downloads", async (req, res) => {
 app.get("/api/starter-models", async (_req, res) => {
   const context = await loadComfyContext().catch(() => null);
   const hardware = await describeHardware({ stats: context?.stats, comfyUrl });
-  // Models with a guided setup of their own, offered above the starters.
-  const guided = Object.entries(guidedSetups).map(([family, setup]) => ({ family, title: setup.title, blurb: setup.blurb, maker: setup.maker, tag: setup.tag || "" }));
-  res.json({ ok: true, hardware, local: downloadState().local, families: starterPlan({ hardware, info: context?.info }), guided });
+  res.json({ ok: true, hardware, local: downloadState().local, families: starterPlan({ hardware, info: context?.info }) });
 });
 
-// Guided setup for a model family people fetch on purpose (family-setup.js): versions,
-// how ComfyUI runs it, and every file it needs, read fresh while the dialog watches.
+// Guided setup for a model already in ComfyUI that can run more than one way
+// (family-setup.js): how it runs and what that still needs, read fresh while the dialog watches.
 let setupContextAt = 0;
 app.get("/api/family-setup/:family", async (req, res) => {
   const familyId = String(req.params.family);
@@ -901,31 +899,10 @@ app.get("/api/family-setup/:family", async (req, res) => {
   const hardware = await describeHardware({ stats: context?.stats, comfyUrl }).catch(() => null);
   const profiles = context?.info ? inferModels(context.info, context.stats).profiles : [];
   const plan = familySetupPlan(familyId, {
-    info: context?.info || null, profiles, local: downloadState().local, device: { apple: Boolean(hardware?.unified) },
+    info: context?.info || null, profiles, profileId: String(req.query.profile || ""), device: { apple: Boolean(hardware?.unified) },
     comfyVersion: String(context?.stats?.system?.comfyui_version || "")
   });
-  const commands = Object.fromEntries(guidedSetups[familyId].versions.map((version) => [version.id, folderDownloadCommand(familyId, version.id)]));
-  res.json({ ok: true, ...plan, folderCommands: commands, hardware, downloads: downloadState() });
-});
-
-app.post("/api/family-setup/:family/folder", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const familyId = String(req.params.family);
-  try {
-    const job = startFolderDownload(familyId, String(req.body?.version || ""), { onDone: () => refreshComfyContextSoon() });
-    res.json({ ok: true, job });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/family-setup/:family/folder/cancel", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true, job: cancelFolderDownload(String(req.params.family)) });
-});
-
-app.get("/api/family-setup/:family/folder", (req, res) => {
-  res.json({ ok: true, job: folderDownloadState(String(req.params.family)) });
+  res.json({ ok: true, ...plan, local: downloadState().local });
 });
 
 app.post("/api/models/downloads/cancel", (req, res) => {

@@ -139,11 +139,12 @@ catalog, so a family that is described correctly needs no UI work.
    pair) or `ownLoaders` cannot. `canInpaint` in `server/family-profiles.js`
    decides, and the model menu shows the result.
 
-   **Guided setup.** A model people go and get on purpose (rather than drop
-   in) can have a setup dialog of its own: describe its versions, builds and
-   folder downloads in `guidedSetups` (`server/family-setup.js`) and point
-   the family at it with `setup`. "Get a model" then offers it, and its
-   setup panel gets a **Guided setup** button.
+   **Guided setup.** A family that runs more than one way can have a setup
+   dialog of its own: add it to `guidedSetups` (`server/family-setup.js`)
+   and point the family at it with `setup`. Its setup panel then gets a
+   **Guided setup** button. The dialog works out the way from the file you
+   have and walks through what that needs; like everything else here, it
+   never downloads the model itself.
 
 9. **Tests** in `server/model-families.test.js`. Cover detection from a
    header, each variant's defaults, what a missing part or pack reports, and

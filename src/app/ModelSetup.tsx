@@ -218,7 +218,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         </div>
         {profile.setupGuide ? (
           // A family with its own guided setup: the same parts, with the choices that come before them.
-          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!)}>Guided setup</button>
+          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!, profile.id)}>Guided setup</button>
         ) : null}
         {startable.length > 1 && !outdated ? (
           <button type="button" className={cn('btn', short ? 'is-ghost' : 'is-primary')} onClick={getAll}>

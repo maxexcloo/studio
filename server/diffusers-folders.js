@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { comfyModelsDir, modelFolders } from "./comfy.js";
+import { modelFolders } from "./comfy.js";
 
 /**
  * Hugging Face Diffusers folders in ComfyUI's models/diffusers, for model
@@ -82,11 +82,3 @@ export function diffusersFolderPath(name = "", classNames = [], roots = diffuser
 }
 
 const wantedClass = (dir, classNames) => classNames.includes(transformerClass(dir));
-
-/** Where a new folder of this kind belongs: ComfyUI's models/diffusers, made if needed later by the download. */
-export function diffusersTarget(name = "") {
-  const roots = diffusersRoots();
-  const models = comfyModelsDir();
-  const root = roots.find((dir) => path.basename(dir) === "diffusers") || roots[0] || (models ? path.join(models, "diffusers") : "");
-  return root && name ? path.join(root, name) : root;
-}

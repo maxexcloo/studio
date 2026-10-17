@@ -293,10 +293,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [noComfyOpen, setNoComfyOpen] = React.useState(false);
   const [getModelsOpen, setGetModelsOpen] = React.useState(false);
   const openGetModels = React.useCallback(() => setGetModelsOpen(true), []);
-  // A guided setup (MOSS-Image), opened from "Get a model" or a model's setup panel.
-  const [familySetup, setFamilySetup] = React.useState("");
+  // A guided setup (MOSS-Image), opened from a model's setup panel.
+  const [familySetup, setFamilySetup] = React.useState({ family: "", profileId: "" });
   const [familySetupOpen, setFamilySetupOpen] = React.useState(false);
-  useFamilySetupRequests((family) => { setFamilySetup(family); setFamilySetupOpen(true); });
+  useFamilySetupRequests((request) => { setFamilySetup(request); setFamilySetupOpen(true); });
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   // "?" anywhere outside a field lists the keyboard shortcuts.
   React.useEffect(() => {
@@ -867,14 +867,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} />
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
-      {familySetup ? (
+      {familySetup.family ? (
         <FamilySetupDialog
-          family={familySetup}
+          family={familySetup.family}
+          profileId={familySetup.profileId}
           open={familySetupOpen}
           onOpenChange={setFamilySetupOpen}
           showToast={showToast}
-          onUse={view.selectStarterModel}
-          onStarted={view.onStarterStarted}
+          onUse={view.pickModel}
           comfyUrl={health?.comfyUrl}
         />
       ) : null}

@@ -740,46 +740,24 @@ test("a pack inside a bigger repository is cloned beside its folder and only its
   assert.match(windows.commands[1].command, /xcopy \/E \/I \/Q/);
 });
 
-test("MOSS-Image's guided setup knows both ways to run it, and what each still needs", async () => {
-  const { familySetupPlan, folderDownloadCommand } = await import("./family-setup.js");
+test("MOSS-Image's guided setup takes the way from the file, and lists only what that way lacks", async () => {
+  const { familySetupPlan } = await import("./family-setup.js");
   const unets = ["moss_image_sft_int8_convrot.safetensors"];
-  // A ComfyUI without MOSS-Image and without the pack: the pack is the way that works today.
-  const old = objectInfo({ unets, clipTypes: newTypes });
-  const before = familySetupPlan("moss_image", { info: old, profiles: inferModels(old).profiles, local: true });
-  assert.deepEqual([before.comfy.native, before.comfy.pack.loaded, before.recommended], [false, false, "pack"]);
-  assert.equal(before.comfy.pack.part.nodePack.subdir, "comfyui/moss-image");
-  assert.deepEqual(before.versions.map((version) => [version.id, version.builds.int8.model.file, version.folder.name]), [
-    ["sft", "moss_image_sft_int8_convrot.safetensors", "MOSS-Image-SFT"], ["base", "moss_image_base_int8_convrot.safetensors", "MOSS-Image-Base"]
-  ]);
-  assert.equal(before.versions[0].builds.int8.model.listed, true);
-  // A current ComfyUI with everything in place: its own nodes, and the listed file is ready.
+  // Comfy-Org's single file on a ComfyUI too old for it: an update, then the encoder (the VAE is there).
+  const old = objectInfo({ unets, vaeFiles: ["flux2-vae.safetensors"], clipTypes: newTypes });
+  const oldProfiles = inferModels(old).profiles;
+  const single = oldProfiles.find((item) => item.family === "moss_image" && item.source === "unet");
+  assert.equal(single.setupGuide, "moss_image");
+  const before = familySetupPlan("moss_image", { info: old, profiles: oldProfiles, profileId: single.id });
+  assert.deepEqual([before.route, before.comfy.native, before.profile.ready], ["native", false, false]);
+  assert.deepEqual(before.parts.map((item) => [item.part, Boolean(item.have), item.download?.file || ""]), [["encoder", false, "qwen3.5_9b_int8_convrot.safetensors"], ["vae", true, ""]]);
+  // A current ComfyUI with everything in place: nothing left.
   const current = objectInfo({ unets, clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
-  const after = familySetupPlan("moss_image", { info: current, profiles: inferModels(current).profiles, local: true });
-  assert.deepEqual([after.comfy.native, after.recommended, Boolean(after.versions[0].builds.int8.ready)], [true, "native", true]);
-  assert.deepEqual(after.shared.map((item) => [item.part, Boolean(item.have), item.download]), [["encoder", true, null], ["vae", true, null]]);
-  const command = folderDownloadCommand("moss_image", "sft", "linux");
-  assert.match(command.commands[0].command, /snapshot_download\('OpenMOSS-Team\/MOSS-Image-SFT', local_dir=r'.*diffusers\/MOSS-Image-SFT'/);
+  const after = familySetupPlan("moss_image", { info: current, profiles: inferModels(current).profiles, profileId: single.id });
+  assert.deepEqual([after.comfy.native, after.profile.ready, after.parts.every((item) => item.have)], [true, true, true]);
+  // The official folder runs on the makers' pack, which brings its own encoder and VAE.
+  const folder = oldProfiles.find((item) => item.source === "moss_diffusers");
+  const pack = familySetupPlan("moss_image", { info: old, profiles: oldProfiles, profileId: folder.id });
+  assert.deepEqual([pack.route, pack.parts.length, pack.comfy.pack.loaded, pack.comfy.pack.part.nodePack.subdir], ["pack", 0, false, "comfyui/moss-image"]);
   assert.equal(familySetupPlan("sdxl", { info: current }), null);
-});
-
-test("a model folder downloads with ComfyUI's Python into models/diffusers, and only catalog versions", async () => {
-  const { startFolderDownload, folderDownloadState, cancelFolderDownload } = await import("./family-setup.js");
-  assert.throws(() => startFolderDownload("moss_image", "../../etc"), /Unknown model version/);
-  if (process.platform === "win32") return;
-  const calls = [];
-  const fakeSpawn = (exe, args, options) => {
-    calls.push({ exe, args, options });
-    const listeners = {};
-    const child = { stdout: { on() {} }, stderr: { on() {} }, on: (event, fn) => { listeners[event] = fn; }, kill: () => listeners.close?.(null) };
-    return child;
-  };
-  const job = startFolderDownload("moss_image", "base", { spawnProcess: fakeSpawn });
-  assert.equal(job.status, "running");
-  assert.match(calls[0].exe, /\.venv\/bin\/python$/);
-  assert.match(calls[0].args[1], /snapshot_download\("OpenMOSS-Team\/MOSS-Image-Base", local_dir=".*diffusers\/MOSS-Image-Base"/);
-  // A second start while it runs is the same job.
-  startFolderDownload("moss_image", "sft", { spawnProcess: fakeSpawn });
-  assert.equal(calls.length, 1);
-  assert.equal(cancelFolderDownload("moss_image").status, "cancelled");
-  assert.equal(folderDownloadState("moss_image").status, "cancelled");
 });

@@ -16,13 +16,12 @@ version opens with a `> ` summary line, which the update pill shows.
 ### Added
 - **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
   and layouts that hold, runs with its makers' settings (50 steps, CFG 3,
-  shift 5). **Get a model** offers a guided setup: pick SFT or Base, pick how
-  ComfyUI runs it, and get every file in one go. On a ComfyUI newer than
-  0.41.3 it runs on ComfyUI's own nodes with Comfy-Org's files (5.4 or 10 GB,
-  plus the Qwen3.5 9B text encoder and the Flux.2 VAE, all one-click). On
-  older versions it runs on the makers' own MOSS-Image nodes, which install in
-  one click and load the official model folder, which HEISS also downloads.
-  Those nodes skip layer 22 on the negative pass, as the makers sample.
+  shift 5). Comfy-Org's single files run on ComfyUI's own nodes (newer than
+  0.41.3), with the Qwen3.5 9B text encoder and Flux.2 VAE one click away.
+  The official model folder in `models/diffusers` runs on the makers' own
+  MOSS-Image nodes (one-click install, ComfyUI 0.38 and up), which skip layer
+  22 on the negative pass as the makers sample. A **Guided setup** button on
+  the model's setup panel walks through whichever way its file needs.
 - **Node packs that live inside a bigger repository** install too: only the
   pack's own folder goes into custom_nodes.
 - **Native 2K.** The size menu has three tabs now: **Default**, **2K** and
