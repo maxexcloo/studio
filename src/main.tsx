@@ -32,7 +32,7 @@ import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
 import { sizePlan, tiledDecodeFor, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
-import { closestPreset, fitRatio, MEGAPIXEL, snapSide } from './app/sizing';
+import { closestPreset, fitRatio, MEGAPIXEL, sameRatio, snapSide } from './app/sizing';
 import type { MegapixelControl, SizeTier } from './app/SizeMenu';
 import { useHidden, type HiddenIntent } from './app/useHidden';
 import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
@@ -1251,7 +1251,9 @@ function App() {
     });
   }
   function pickSavedSize(saved: SavedSize) {
-    const fitted = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
+    const snapped = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
+    // Past this model's limits: its shape at the largest size that fits, not each side cut on its own (a 2:1 turned 4:3).
+    const fitted = sameRatio(snapped, saved) ? snapped : fitRatio(saved.width / saved.height, saved.width * saved.height, customLimits.width, customLimits.height, 16);
     setCustomDimensions(fitted);
     if (fitted.width !== saved.width || fitted.height !== saved.height) {
       showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default", { description: `It’s saved as ${saved.width} × ${saved.height}, past what ${currentProfile?.displayName || currentProfile?.label || "this model"} takes.` });
