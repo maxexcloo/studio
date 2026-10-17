@@ -648,3 +648,138 @@ test("reference slots show only where this ComfyUI has the nodes to wire them", 
   assert.deepEqual(withNodes.mediaInputs.map((input) => input.id), ["reference", "reference_2", "reference_3"]);
   assert.equal(withNodes.aspectPolicy, "reference");
 });
+
+/* ------------------------------------------------------------ MOSS-Image */
+
+const mossDit = { "shared_block_modulation.weight": t([18432, 3072]), "layers.0.proj.ffn_up_gate.weight": t([16384, 3072]), "layers.0.proj.qkv.weight": t([9216, 3072]), "video_head_modulation.weight": t([6144, 3072]) };
+const qwen35 = (width) => ({ "model.language_model.layers.0.linear_attn.A_log": t([32]), "model.language_model.layers.0.input_layernorm.weight": t([width]), "model.visual.blocks.0.attn.qkv.weight": t([3456, 1152]) });
+const mossTypes = [...newTypes, "moss_image"];
+
+test("MOSS-Image is read from its weights, Qwen3.5 9B from its encoder, and Base from its name", () => {
+  assert.equal(familyFromHeader(mossDit).family, "moss_image");
+  assert.equal(encoderKindFromHeader(qwen35(4096)), "qwen35_9b");
+  assert.equal(encoderKindFromHeader(qwen35(2560)), "other");
+  const clips = [put("text_encoders", "qwen3.5_9b_int8_convrot.safetensors", qwen35(4096))];
+  const vaeFiles = [put("vae", "flux2-vae.safetensors", vaes.flux2)];
+  const unets = [put("diffusion_models", "moss_image_sft_bf16.safetensors", mossDit), put("diffusion_models", "moss_image_base_int8_convrot.safetensors", mossDit)];
+  const moss = inferModels(objectInfo({ unets, clips, vaeFiles, clipTypes: mossTypes })).profiles.filter((profile) => profile.family === "moss_image");
+  assert.deepEqual(moss.map((profile) => [profile.model, profile.variant, profile.ready, profile.defaults.steps, profile.defaults.cfg, profile.defaults.scheduler]), [
+    ["moss_image_sft_bf16.safetensors", "sft", true, 50, 3, "sgm_uniform"],
+    ["moss_image_base_int8_convrot.safetensors", "base", true, 50, 3, "sgm_uniform"]
+  ]);
+  assert.equal(moss[0].encoderSlots[0].default, "qwen3.5_9b_int8_convrot.safetensors");
+});
+
+test("MOSS-Image on ComfyUI's own nodes: Qwen3.5 through CLIPLoader, shift 5, the Flux.2 latent", () => {
+  const info = objectInfo({ unets: ["moss_image_sft_bf16.safetensors"], clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
+  const profile = inferModels(info).profiles.find((item) => item.family === "moss_image");
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a sign that says OPEN", negative: "blurry" }, info));
+  assert.deepEqual(byType(graph, "CLIPLoader")[0].inputs, { clip_name: "qwen3.5_9b_int8_convrot.safetensors", type: "moss_image", device: "default" });
+  assert.equal(byType(graph, "ModelSamplingSD3")[0].inputs.shift, 5);
+  assert.deepEqual([byType(graph, "EmptyFlux2LatentImage").length, byType(graph, "CLIPTextEncode").length, byType(graph, "SkipLayerGuidanceDiTSimple").length], [1, 2, 0]);
+  assert.deepEqual([byType(graph, "KSampler")[0].inputs.sampler_name, byType(graph, "KSampler")[0].inputs.scheduler], ["euler", "sgm_uniform"]);
+});
+
+test("MOSS-Image says what's missing: a newer ComfyUI first, then the encoder and VAE with downloads", () => {
+  const unets = ["moss_image_sft_int8_convrot.safetensors"];
+  const old = inferModels(objectInfo({ unets, clipTypes: newTypes })).profiles.find((item) => item.family === "moss_image");
+  assert.deepEqual(old.missing.map((item) => item.part), ["comfy", "encoder", "vae"]);
+  assert.equal(old.missing[0].label, "Newer ComfyUI");
+  const current = inferModels(objectInfo({ unets, clipTypes: mossTypes })).profiles.find((item) => item.family === "moss_image");
+  const encoder = current.missing.find((item) => item.part === "encoder");
+  assert.deepEqual(encoder.downloads.map((item) => item.file), ["qwen3.5_9b_int8_convrot.safetensors", "qwen3.5_9b_w4a8_gptq.safetensors"]);
+  assert.equal(current.missing.find((item) => item.part === "vae").downloads[0].file, "flux2-vae.safetensors");
+});
+
+test("MOSS-Image's Diffusers folders run through its makers' loader, with their layer skip", () => {
+  const root = path.join(scratch, "ComfyUI", "models", "diffusers");
+  const folder = (name, transformerClass) => {
+    const dir = path.join(root, name);
+    for (const [part, files] of [["transformer", ["diffusion_pytorch_model-00001-of-00001.safetensors"]], ["text_encoder", ["model.safetensors"]], ["vae", ["diffusion_pytorch_model.safetensors"]], ["tokenizer", []]]) {
+      fs.mkdirSync(path.join(dir, part), { recursive: true });
+      for (const file of files) fs.writeFileSync(path.join(dir, part, file), "");
+    }
+    fs.writeFileSync(path.join(dir, "transformer", "config.json"), JSON.stringify({ _class_name: transformerClass }));
+    fs.writeFileSync(path.join(dir, "transformer", "diffusion_pytorch_model.safetensors.index.json"), JSON.stringify({ weight_map: { "a.weight": "diffusion_pytorch_model-00001-of-00001.safetensors" } }));
+    for (const part of ["text_encoder", "vae"]) fs.writeFileSync(path.join(dir, part, "config.json"), "{}");
+    return dir;
+  };
+  const sft = folder("MOSS-Image-SFT", "MOSImageTransformer");
+  folder("some-other-pipeline", "FluxTransformer2DModel");
+  // Half downloaded: a shard the index names isn't there yet.
+  const partial = folder("MOSS-Image-Base", "MOSImageTransformer");
+  fs.writeFileSync(path.join(partial, "transformer", "diffusion_pytorch_model.safetensors.index.json"), JSON.stringify({ weight_map: { "a.weight": "diffusion_pytorch_model-00001-of-00002.safetensors", "b.weight": "diffusion_pytorch_model-00002-of-00002.safetensors" } }));
+
+  const without = inferModels(objectInfo({ clipTypes: newTypes })).profiles.filter((item) => item.source === "moss_diffusers");
+  assert.deepEqual(without.map((item) => [item.model, item.missing.map((part) => part.label)]), [["MOSS-Image-SFT", ["MOSS-Image nodes"]]]);
+  assert.equal(without[0].missing[0].nodePack.subdir, "comfyui/moss-image");
+
+  const info = objectInfo({ clipTypes: newTypes, extra: { MOSSImageHFLoader: list({ model_path: ["STRING", {}], weight_dtype: [["default", "bf16"]], text_device: [["default", "cpu"]] }), SkipLayerGuidanceDiTSimple: node() } });
+  const profile = inferModels(info).profiles.find((item) => item.source === "moss_diffusers");
+  assert.deepEqual([profile.ready, profile.variant, profile.capabilities.textEncoder, profile.capabilities.vae], [true, "sft", false, false]);
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a fox" }, info));
+  assert.deepEqual(byType(graph, "MOSSImageHFLoader")[0].inputs, { model_path: sft, weight_dtype: "default", text_device: "default" });
+  assert.deepEqual([byType(graph, "CLIPLoader").length, byType(graph, "UNETLoader").length, byType(graph, "VAELoader").length], [0, 0, 0]);
+  const skip = byType(graph, "SkipLayerGuidanceDiTSimple")[0];
+  assert.equal(skip.inputs.single_layers, "22");
+  // The skip sits after the shift, and the sampler samples the skipped model.
+  assert.equal(graph[skip.inputs.model[0]].class_type, "ModelSamplingSD3");
+  assert.equal(graph[byType(graph, "KSampler")[0].inputs.model[0]], skip);
+});
+
+test("a pack inside a bigger repository is cloned beside its folder and only its folder is copied in", async () => {
+  const { packInstallPlan } = await import("./node-install.js");
+  const { nodePack } = await import("./node-packs.js");
+  const plan = packInstallPlan(nodePack("moss_image"), "/opt/ComfyUI", "linux");
+  const [command] = plan.commands;
+  assert.match(command.command, /git clone https:\/\/github\.com\/OpenMOSS\/MOSS-Image\.git moss-image\.src/);
+  assert.match(command.command, /cp -R "moss-image\.src\/comfyui\/moss-image" "moss-image" && rm -rf "moss-image\.src"/);
+  assert.doesNotMatch(command.command, /pip install/);
+  const windows = packInstallPlan(nodePack("moss_image"), "C:\\ComfyUI", "win32");
+  assert.match(windows.commands[0].command, /Copy-Item -Recurse -LiteralPath "moss-image\.src\\comfyui\\moss-image"/);
+  assert.match(windows.commands[1].command, /xcopy \/E \/I \/Q/);
+});
+
+test("MOSS-Image's guided setup knows both ways to run it, and what each still needs", async () => {
+  const { familySetupPlan, folderDownloadCommand } = await import("./family-setup.js");
+  const unets = ["moss_image_sft_int8_convrot.safetensors"];
+  // A ComfyUI without MOSS-Image and without the pack: the pack is the way that works today.
+  const old = objectInfo({ unets, clipTypes: newTypes });
+  const before = familySetupPlan("moss_image", { info: old, profiles: inferModels(old).profiles, local: true });
+  assert.deepEqual([before.comfy.native, before.comfy.pack.loaded, before.recommended], [false, false, "pack"]);
+  assert.equal(before.comfy.pack.part.nodePack.subdir, "comfyui/moss-image");
+  assert.deepEqual(before.versions.map((version) => [version.id, version.builds.int8.model.file, version.folder.name]), [
+    ["sft", "moss_image_sft_int8_convrot.safetensors", "MOSS-Image-SFT"], ["base", "moss_image_base_int8_convrot.safetensors", "MOSS-Image-Base"]
+  ]);
+  assert.equal(before.versions[0].builds.int8.model.listed, true);
+  // A current ComfyUI with everything in place: its own nodes, and the listed file is ready.
+  const current = objectInfo({ unets, clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
+  const after = familySetupPlan("moss_image", { info: current, profiles: inferModels(current).profiles, local: true });
+  assert.deepEqual([after.comfy.native, after.recommended, Boolean(after.versions[0].builds.int8.ready)], [true, "native", true]);
+  assert.deepEqual(after.shared.map((item) => [item.part, Boolean(item.have), item.download]), [["encoder", true, null], ["vae", true, null]]);
+  const command = folderDownloadCommand("moss_image", "sft", "linux");
+  assert.match(command.commands[0].command, /snapshot_download\('OpenMOSS-Team\/MOSS-Image-SFT', local_dir=r'.*diffusers\/MOSS-Image-SFT'/);
+  assert.equal(familySetupPlan("sdxl", { info: current }), null);
+});
+
+test("a model folder downloads with ComfyUI's Python into models/diffusers, and only catalog versions", async () => {
+  const { startFolderDownload, folderDownloadState, cancelFolderDownload } = await import("./family-setup.js");
+  assert.throws(() => startFolderDownload("moss_image", "../../etc"), /Unknown model version/);
+  if (process.platform === "win32") return;
+  const calls = [];
+  const fakeSpawn = (exe, args, options) => {
+    calls.push({ exe, args, options });
+    const listeners = {};
+    const child = { stdout: { on() {} }, stderr: { on() {} }, on: (event, fn) => { listeners[event] = fn; }, kill: () => listeners.close?.(null) };
+    return child;
+  };
+  const job = startFolderDownload("moss_image", "base", { spawnProcess: fakeSpawn });
+  assert.equal(job.status, "running");
+  assert.match(calls[0].exe, /\.venv\/bin\/python$/);
+  assert.match(calls[0].args[1], /snapshot_download\("OpenMOSS-Team\/MOSS-Image-Base", local_dir=".*diffusers\/MOSS-Image-Base"/);
+  // A second start while it runs is the same job.
+  startFolderDownload("moss_image", "sft", { spawnProcess: fakeSpawn });
+  assert.equal(calls.length, 1);
+  assert.equal(cancelFolderDownload("moss_image").status, "cancelled");
+  assert.equal(folderDownloadState("moss_image").status, "cancelled");
+});

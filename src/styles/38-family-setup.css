@@ -1,0 +1,115 @@
+/* ---------------------------------------------------------------------------
+   Guided model setup (src/app/FamilySetupDialog.tsx)
+
+   The smart upscale setup's material (24-upscale.css) for a model family:
+   the same hero frame, stepper, watcher, file list and meter, plus choice
+   cards that say what each option weighs and where it stands.
+--------------------------------------------------------------------------- */
+
+/* Choice cards: a name with its tag, one line on what it is, and a status line. */
+.family-setup-choices {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 18px;
+  background: var(--well);
+}
+.family-setup-choices.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.family-setup-choices button {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 13px 12px;
+  border: 0;
+  border-radius: var(--r-item);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.family-setup-choices button:hover { background: var(--control-hover); }
+.family-setup-choices button.is-active { background: var(--selected); color: hsl(var(--foreground) / .8); box-shadow: inset 0 0 0 1px rgb(255 154 82 / .28); }
+.family-setup-choices strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; font-size: 13.5px; font-weight: 600; color: hsl(var(--foreground)); }
+.family-setup-choices strong em {
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--ember-soft);
+  color: var(--ember);
+  font: 600 10px/1.5 var(--font-mono);
+  font-style: normal;
+  letter-spacing: .02em;
+}
+.family-setup-choices span { font-size: 12px; line-height: 1.45; }
+
+.family-setup-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  font: 500 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground) / .8);
+}
+.family-setup-status i { width: 7px; height: 7px; border-radius: 2px; background: rgb(255 255 255 / .22); }
+.family-setup-status.is-ok i { background: #a9e2b8; box-shadow: 0 0 6px rgb(169 226 184 / .45); }
+
+/* What the picked way still needs, right under the cards. */
+.family-setup-route { margin-top: 16px; animation: upscale-body-in 260ms var(--ease-out); }
+.family-setup-route .upscale-callout code { font: 500 11.5px var(--font-mono); color: hsl(var(--foreground)); }
+.family-setup-ok { display: flex; align-items: center; gap: 8px; margin: 0; padding: 11px 14px; border-radius: var(--r-item); background: var(--well); font-size: 12.5px; color: hsl(var(--foreground) / .85); }
+.family-setup-ok svg { color: #a9e2b8; }
+
+/* Three facts about the model, quiet, under the version cards. */
+.family-setup-facts { display: grid; gap: 7px; margin: 16px 0 0; padding: 0 4px; list-style: none; font-size: 12.5px; color: hsl(var(--muted-foreground)); }
+.family-setup-facts li { display: flex; align-items: center; gap: 9px; }
+.family-setup-facts svg { flex: none; color: hsl(var(--muted-foreground) / .7); }
+.family-setup-facts a { display: inline-flex; align-items: center; gap: 3px; color: hsl(var(--foreground) / .85); text-decoration: none; }
+.family-setup-facts a:hover { color: hsl(var(--foreground)); text-decoration: underline; text-underline-offset: 3px; }
+
+.family-setup-builds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.family-setup-command { margin-top: 12px; }
+.family-setup-command .upscale-fine { margin: 0 0 6px; }
+.family-setup-gap { margin-top: 12px; }
+
+/* Ready: the model, how it runs, and one tip worth knowing on the first prompt. */
+.family-setup-ready { display: grid; gap: 12px; }
+.family-setup-ready > div {
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: var(--r-item);
+  background: linear-gradient(135deg, rgb(255 236 214 / .07), transparent 60%), var(--control-fill);
+  box-shadow: inset 0 0 0 1px rgb(255 236 214 / .08);
+}
+.family-setup-ready strong { font-size: 14px; font-weight: 600; }
+.family-setup-ready span { font-size: 12px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.family-setup-ready p { margin: 0; padding: 0 4px; font-size: 12.5px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.family-setup-ready q { color: hsl(var(--foreground) / .9); quotes: none; }
+
+/* A model menu row that opens a guided setup. */
+.family-setup-offer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--r-item);
+  background: linear-gradient(110deg, rgb(255 154 82 / .1), transparent 55%), var(--control-fill);
+  box-shadow: inset 0 0 0 1px rgb(255 154 82 / .14);
+}
+.family-setup-offer > div { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.family-setup-offer strong { display: flex; align-items: baseline; gap: 7px; font-size: 13.5px; font-weight: 600; }
+.family-setup-offer strong em { color: var(--ember); font: 600 10px var(--font-mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; }
+.family-setup-offer span { font-size: 12px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
+
+/* Two build cards have room for their line where three effort cards don't. */
+@media (max-width: 760px) {
+  .family-setup-builds span { display: block; white-space: normal; }
+}
+@media (max-width: 560px) {
+  .family-setup-choices.is-two, .family-setup-builds { grid-template-columns: minmax(0, 1fr); }
+  .family-setup-offer { flex-wrap: wrap; }
+}

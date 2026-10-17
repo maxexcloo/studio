@@ -57,6 +57,11 @@ export const encoderDownloads = {
     { file: "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors", url: hf("ethanfel/Qwen3-VL-32B-Ultra-Heretic-H3-ComfyUI-INT8-ConvRot", "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"), bytes: 26_363_476_151, sha256: "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192" },
     { file: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", url: hf("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"), bytes: 15_687_142_551, sha256: "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6" }
   ],
+  // Only Comfy-Org's quantized builds exist as single files so far; the w4a8 one carries fp8 scales.
+  qwen35_9b: [
+    { file: "qwen3.5_9b_int8_convrot.safetensors", url: hf("Comfy-Org/MOSS-Image", "text_encoders/qwen3.5_9b_int8_convrot.safetensors"), bytes: 9_748_121_532, sha256: "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a" },
+    { file: "qwen3.5_9b_w4a8_gptq.safetensors", fp8: true, url: hf("Comfy-Org/MOSS-Image", "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors"), bytes: 7_343_591_088, sha256: "4cc6a1543ad2061806da46f35f90cadb4801dcba246c44782cf42ec0feb6407c" }
+  ],
   qwen25vl_7b: [
     { file: "qwen_2.5_vl_7b_huihui_abliterated_int8_convrot.safetensors", url: hf("ethanfel/Qwen2.5-VL-7B-Huihui-Abliterated-ComfyUI-ConvRot-INT8", "qwen_2.5_vl_7b_huihui_abliterated_int8_convrot.safetensors"), bytes: 10_064_106_602, sha256: "3dc4aae7dc34000c95de546cb220f1b67e51c86d7095fb9e3d19cec7032f5df7" },
     { file: "qwen_2.5_vl_7b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"), bytes: 9_384_670_680, sha256: "cb5636d852a0ea6a9075ab1bef496c0db7aef13c02350571e388aea959c5c0b4" }
@@ -111,6 +116,11 @@ export const modelDownloads = {
   wan22_i2v_low_fp16: wan22("wan2.2_i2v_low_noise_14B_fp16.safetensors", 28_577_914_792, "edb89340c8a6fbf1a70e76a839ae01eaf7d289f05ea1ebd6b1a3fc6f533826e9"),
   ideogram4_uncond_fp8: [{ file: "ideogram4_unconditional_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Ideogram-4", "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors"), bytes: 9_280_741_293, sha256: "9b359007dae162cca7591d00868feea733eb7c56e56e3a214a4d5a9a2a07cd60" }],
   ideogram4_uncond_int8: [{ file: "ideogram4_unconditional_int8_convrot.safetensors", url: hf("Comfy-Org/Ideogram-4", "diffusion_models/ideogram4_unconditional_int8_convrot.safetensors"), bytes: 9_583_465_712, sha256: "cd03ed94f244c9cb705e7d30ca0f40b5f5b004bb20674117adff88d16416c23d" }],
+  // MOSS-Image (Comfy-Org's repack): SFT for pictures, Base for training; int8 ConvRot or full bf16.
+  moss_image_sft_int8: [{ file: "moss_image_sft_int8_convrot.safetensors", label: "MOSS-Image SFT", url: hf("Comfy-Org/MOSS-Image", "diffusion_models/moss_image_sft_int8_convrot.safetensors"), bytes: 5_413_698_958, sha256: "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f" }],
+  moss_image_sft_bf16: [{ file: "moss_image_sft_bf16.safetensors", label: "MOSS-Image SFT", url: hf("Comfy-Org/MOSS-Image", "diffusion_models/moss_image_sft_bf16.safetensors"), bytes: 10_164_655_808, sha256: "f96738d8116d78b7316b57c663d8c98591ddafab7488f48e3099b7655e34ab6f" }],
+  moss_image_base_int8: [{ file: "moss_image_base_int8_convrot.safetensors", label: "MOSS-Image Base", url: hf("Comfy-Org/MOSS-Image", "diffusion_models/moss_image_base_int8_convrot.safetensors"), bytes: 5_413_698_958, sha256: "f601c1e1161915fb3fea003da0c1782e374dd960fbb3978bc0e4e3fa1f2d8e6f" }],
+  moss_image_base_bf16: [{ file: "moss_image_base_bf16.safetensors", label: "MOSS-Image Base", url: hf("Comfy-Org/MOSS-Image", "diffusion_models/moss_image_base_bf16.safetensors"), bytes: 10_164_655_808, sha256: "cacd158728a1fb9e57c408a922b54752ec71fceb566b3821269927964e62b41f" }],
   // Starter models (see starterModels below).
   krea2_turbo_fp8: [{ file: "krea2_turbo_fp8_scaled.safetensors", fp8: true, label: "Krea 2 Turbo", url: hf("Comfy-Org/Krea-2", "diffusion_models/krea2_turbo_fp8_scaled.safetensors"), bytes: 13_141_730_784, sha256: "eb4dd8c612cfd10f64f25b057e6e6bbcb5737c94a7372177e456dbf7579502f1" }],
   krea2_turbo_bf16: [{ file: "krea2_turbo_bf16.safetensors", label: "Krea 2 Turbo", url: hf("Comfy-Org/Krea-2", "diffusion_models/krea2_turbo_bf16.safetensors"), bytes: 26_283_332_608, sha256: "78bbf8f4165eda19cea3cb06c78089221932a39e2eed8af9da741f942c47ffb3" }],
@@ -199,6 +209,16 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * with the same layout, which is `as` (a knownFamilies id) instead.
  * pack: a node-packs.js id when the family runs on custom nodes. ownLoaders:
  * the pack loads encoder and VAE itself (no pickers, no LoRAs).
+ * runners: per model source, a custom node pack that runs the family another
+ * way (MOSS-Image's Diffusers folders through its makers' own loader): pack,
+ * note, ownLoaders, loras (the pack's model still takes ComfyUI's LoRAs),
+ * loader { node, path (the input that takes the folder's full path), inputs }
+ * in place of the three core loaders, patches (nodes put on the model before
+ * sampling, after the shift), requiredNodes (core nodes those need) and
+ * folders { classNames }: which models/diffusers folders are this family, by
+ * their transformer/config.json.
+ * setup: the guided setup dialog for families people fetch on purpose
+ * (server/family-setup.js reads it).
  * variants: first whose `match` passes wins; the last one is the fallback.
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
@@ -651,6 +671,35 @@ export const families = {
       { id: "standard", label: "Sana", defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } }
     ],
     size: [1024, 1024]
+  },
+  // OpenMOSS's MOSS-Image (Oct 2026): a 5B single-stream DiT in Flux.2's latent space that
+  // reads prompts with a stock Qwen3.5 9B. Settings from its model card and ComfyUI
+  // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
+  // Two ways to run it: ComfyUI's own nodes (master after 0.41.3, CLIPLoader type
+  // moss_image) with Comfy-Org's single files, or its makers' pack with the official
+  // Diffusers folder, which also skips layer 22 on the negative pass as they sample.
+  moss_image: {
+    label: "MOSS-Image", kind: "image", native: { "2k": "yes" }, sources: ["unet", "moss_diffusers"],
+    slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"] }], clipType: "moss_image",
+    vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
+    modelSampling: { node: "ModelSamplingSD3", shift: 5 },
+    requiredNodes: ["EmptyFlux2LatentImage"],
+    runners: {
+      moss_diffusers: {
+        pack: "moss_image", ownLoaders: true, loras: true,
+        note: "MOSS-Image’s makers ship these nodes. They load the official model folder.",
+        loader: { node: "MOSSImageHFLoader", path: "model_path", inputs: { weight_dtype: "default", text_device: "default" } },
+        patches: [{ node: "SkipLayerGuidanceDiTSimple", inputs: { double_layers: "", single_layers: "22", start_percent: 0, end_percent: 1 } }],
+        requiredNodes: ["SkipLayerGuidanceDiTSimple", "ModelSamplingSD3", "EmptyFlux2LatentImage"],
+        folders: { classNames: ["MOSImageTransformer", "MOSSImageTransformer"] }
+      }
+    },
+    setup: "moss_image",
+    variants: [
+      { id: "base", label: "Base", match: (name) => /(^|[^a-z])base([^a-z]|$)/i.test(name), defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" } },
+      { id: "sft", label: "SFT", defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" } }
+    ],
+    size: [1024, 1024]
   }
 };
 
@@ -686,6 +735,12 @@ export const sanaRunners = {
 };
 
 export const sanaRunnerFor = (source) => sanaRunners[source === "sana_diffusers" ? "sana_diffusers" : "sana"];
+/** The custom-node runner a family uses for one model source (see `runners`), or null for ComfyUI's own nodes. */
+export function runnerFor(family, source) {
+  if (!family) return null;
+  if (family.sampling === "sana") return sanaRunnerFor(source);
+  return family.runners?.[source] || null;
+}
 
 /** A friendly name for a Sana preset or a diffusers folder of one. */
 export function sanaLabel(name = "") {
@@ -767,6 +822,7 @@ export function familyFromName(name = "", source = "unet") {
   const base = String(name).split(/[\\/]/).pop() || "";
   const tests = [
     ["sana", /(^|[^a-z])sana([^a-z]|$)/i],
+    ["moss_image", /moss[-_ ]?image/i],
     ["ideogram4", /ideogram/i],
     ["mage_flow", /mage[-_ ]?flow/i],
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
@@ -901,6 +957,8 @@ export function familyFromHeader(header) {
     return { family: "qwen_image" };
   }
   if (has("embed_image_indicator.weight")) return { family: "ideogram4" };
+  // MOSS-Image: one shared modulation for every block, fused feed-forward up/gate.
+  if (has("shared_block_modulation.weight") && has("layers.0.proj.ffn_up_gate.weight")) return { family: "moss_image" };
   if (has("txtfusion.projector.weight")) return { family: "krea2" };
   if (has("visual_transformer_blocks.0.cross_attention.key_norm.weight")) return { family: "kandinsky5" };
   if (has("layers.0.mlp.linear_fc2.weight")) return { family: "ernie" };

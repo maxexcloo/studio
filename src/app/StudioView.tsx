@@ -45,6 +45,7 @@ import { Toaster } from './Toaster';
 import { EmptyStage } from './EmptyStage';
 import { SettingsDialog, type SettingsSection } from './SettingsDialog';
 import { GetModelsSheet, StarterModels } from './StarterModels';
+import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
 import { FeedbackHost } from './FeedbackDialog';
 import { ShortcutsSheet } from './shortcuts';
@@ -292,6 +293,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [noComfyOpen, setNoComfyOpen] = React.useState(false);
   const [getModelsOpen, setGetModelsOpen] = React.useState(false);
   const openGetModels = React.useCallback(() => setGetModelsOpen(true), []);
+  // A guided setup (MOSS-Image), opened from "Get a model" or a model's setup panel.
+  const [familySetup, setFamilySetup] = React.useState("");
+  const [familySetupOpen, setFamilySetupOpen] = React.useState(false);
+  useFamilySetupRequests((family) => { setFamilySetup(family); setFamilySetupOpen(true); });
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   // "?" anywhere outside a field lists the keyboard shortcuts.
   React.useEffect(() => {
@@ -862,6 +867,17 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} />
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
+      {familySetup ? (
+        <FamilySetupDialog
+          family={familySetup}
+          open={familySetupOpen}
+          onOpenChange={setFamilySetupOpen}
+          showToast={showToast}
+          onUse={view.selectStarterModel}
+          onStarted={view.onStarterStarted}
+          comfyUrl={health?.comfyUrl}
+        />
+      ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}

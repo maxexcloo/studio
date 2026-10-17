@@ -10,6 +10,7 @@ import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } fro
 import type { MissingPart, ModelDownload, PartDownload, Profile } from './types';
 import { useThisComputer } from './device';
 import type { ShowToast } from './toast';
+import { openFamilySetup } from './FamilySetupDialog';
 
 function formatBytes(bytes = 0) {
   if (!bytes) return '';
@@ -35,7 +36,7 @@ const partHint: Partial<Record<MissingPart['part'], string>> = {
 type RowState = 'idle' | 'queued' | 'downloading' | 'paused' | 'error' | 'landed' | 'manual' | 'installed';
 
 /** What a setup panel is for: a built-in model's profile, or an imported workflow. */
-export type SetupSubject = Pick<Profile, 'id' | 'missing'> & Partial<Pick<Profile, 'displayName' | 'label' | 'encoderBuiltIn' | 'source'>>;
+export type SetupSubject = Pick<Profile, 'id' | 'missing'> & Partial<Pick<Profile, 'displayName' | 'label' | 'encoderBuiltIn' | 'source' | 'setupGuide'>>;
 
 const partKey = (item: MissingPart) => `${item.part}:${item.slot || item.kind || item.label}`;
 
@@ -215,6 +216,10 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
           <strong>{title}</strong>
           <span>{short && !moving ? `These need ${formatBytes(short.need)} and the disk has ${formatBytes(short.free)} free.` : subtitle}</span>
         </div>
+        {profile.setupGuide ? (
+          // A family with its own guided setup: the same parts, with the choices that come before them.
+          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!)}>Guided setup</button>
+        ) : null}
         {startable.length > 1 && !outdated ? (
           <button type="button" className={cn('btn', short ? 'is-ghost' : 'is-primary')} onClick={getAll}>
             <Download size={14} /> Get all{remainingBytes ? ` · ${formatBytes(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}

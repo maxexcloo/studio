@@ -50,7 +50,20 @@ catalog, so a family that is described correctly needs no UI work.
    ComfyUI's own Python. Manager 4 cannot install by Git URL (only in its
    legacy UI, behind a config flag), so unlisted packs always take the local
    route. Manual steps (Manager or terminal) stay one tap away and are all a
-   remote ComfyUI gets.
+   remote ComfyUI gets. A pack that ships inside its makers' model repository
+   gets `subdir` (its folder there): the one-click route checks the repository
+   out outside custom_nodes and copies only that folder in, and the terminal
+   steps do the same. `requirements: false` leaves pip out for a pack with no
+   requirements.txt.
+
+   When a model runs both on ComfyUI's own nodes and on a pack, give the
+   family `runners`: per model source, the pack, its `loader` (one node that
+   loads model, encoder and VAE, standing in for the three core loaders),
+   `patches` for the model before sampling, the core nodes those need, and
+   `folders` when the loader takes a Diffusers folder by path (HEISS lists
+   matching folders in models/diffusers itself; see `server/diffusers-folders.js`).
+   MOSS-Image is the example: Comfy-Org's single files on core nodes, the
+   official folder on its makers' pack.
 
 4. **Describe the family** in `families`. Settings live on variants; the last
    variant is the fallback. `match(name, header, detail)` picks a variant, so
@@ -126,6 +139,12 @@ catalog, so a family that is described correctly needs no UI work.
    pair) or `ownLoaders` cannot. `canInpaint` in `server/family-profiles.js`
    decides, and the model menu shows the result.
 
+   **Guided setup.** A model people go and get on purpose (rather than drop
+   in) can have a setup dialog of its own: describe its versions, builds and
+   folder downloads in `guidedSetups` (`server/family-setup.js`) and point
+   the family at it with `setup`. "Get a model" then offers it, and its
+   setup panel gets a **Guided setup** button.
+
 9. **Tests** in `server/model-families.test.js`. Cover detection from a
    header, each variant's defaults, what a missing part or pack reports, and
    the graph's nodes and inputs. The fixtures write tiny fake safetensors
@@ -177,6 +196,8 @@ Current entries:
   HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
   (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
   left out.
+- **2K yes:** MOSS-Image (its makers document 0.25 to 4 MP and recommend
+  1 to 2 MP). 4K is left out.
 - **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1
   (native 2K), Z-Image (up to 2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to
   2048), MageFlow (512-2048, any aspect), Sana 2K. No hands-on 4K reports.

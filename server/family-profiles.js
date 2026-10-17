@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { hasNode, missingNodes, modelFolders, nodeRange, optionsFor } from './comfy.js';
-import { MAX_BATCH, checkpointDownloads, encoderDownloads, families, knownFamilies, modelDownloads, quantFormats, sanaConf, sanaLabel, sanaLatentNode, sanaPresets, sanaRunnerFor, vaeDownloads, variantDefaults, visionDownloads, visionKinds } from './family-catalog.js';
+import { MAX_BATCH, checkpointDownloads, encoderDownloads, families, knownFamilies, modelDownloads, quantFormats, runnerFor, sanaConf, sanaLabel, sanaLatentNode, sanaPresets, vaeDownloads, variantDefaults, variantFor, visionDownloads, visionKinds } from './family-catalog.js';
+import { diffusersFolderPath, diffusersFolders } from './diffusers-folders.js';
+import { nodePack } from './node-packs.js';
 import { existingCopy } from './model-downloads.js';
 import { inpaintingEnabled } from './features.js';
 import { inpaintNodes } from './inpaint.js';
@@ -191,6 +193,17 @@ function sanaFiles(info) {
 }
 
 /**
+ * Model folders a family's runner loads by path (see `runners` in the catalog):
+ * MOSS-Image's Diffusers folders in models/diffusers. Only on this computer,
+ * where HEISS can look; a remote ComfyUI shows none.
+ */
+function runnerFolderFiles() {
+  return Object.entries(families).flatMap(([familyId, family]) => Object.entries(family.runners || {})
+    .filter(([, runner]) => runner.folders)
+    .flatMap(([source, runner]) => diffusersFolders(runner.folders.classNames).map((name) => ({ source, name, folderFamily: familyId }))));
+}
+
+/**
  * How the ExtraModels nodes should load a Sana model. Gemma only runs on CUDA
  * or the CPU there (and only in FP32 on the CPU), so Macs encode on the CPU.
  */
@@ -228,11 +241,12 @@ export function familyProfiles(info, helpers) {
   const files = [
     ...unets.map((name) => ({ source: "unet", name })),
     ...checkpoints.map((name) => ({ source: "checkpoint", name })),
-    ...sanaFiles(info)
+    ...sanaFiles(info),
+    ...runnerFolderFiles()
   ];
   const lowNoisePartners = new Set();
 
-  for (const { source, name, preset } of files) {
+  for (const { source, name, preset, folderFamily } of files) {
     const base = String(name).split(/[\\/]/).pop() || name;
     // The second file of a pair (Wan's low-noise half, Ideogram's unconditional
     // model) runs with its partner and is not a model of its own, whatever its weights say.
@@ -245,7 +259,9 @@ export function familyProfiles(info, helpers) {
     }
     const info2 = source.startsWith("sana")
       ? { family: "sana", variant: families.sana.variants.find((item) => !item.match || item.match(name)), via: "preset", bundled: null, detail: null, header: null }
-      : classifyModel(source, name);
+      : folderFamily
+        ? { family: folderFamily, variant: variantFor(folderFamily, name), via: "folder", bundled: null, detail: null, header: null }
+        : classifyModel(source, name);
     const family = families[info2.family];
     const fileEntry = {
       name, source, family: info2.family, via: info2.via,
@@ -253,7 +269,7 @@ export function familyProfiles(info, helpers) {
       choice: family ? (family.variants.length > 1 ? `${info2.family}/${info2.variant?.id}` : info2.family) : "",
       supported: false, reason: "", missing: []
     };
-    if (!source.startsWith("sana")) modelFiles.push(fileEntry);
+    if (!source.startsWith("sana") && !folderFamily) modelFiles.push(fileEntry);
 
     if (!family || !family.sources.includes(source)) {
       fileEntry.reason = knownFamilies[info2.family] && info2.family !== "other"
@@ -287,10 +303,12 @@ export function familyProfiles(info, helpers) {
     }
 
     const variant = info2.variant || family.variants.at(-1);
-    const runner = family.sampling === "sana" ? sanaRunnerFor(source) : null;
+    const runner = runnerFor(family, source);
     const diffusersRunner = source === "sana_diffusers";
+    // A pack whose loader brings its own encoder and VAE (the family's, or this source's runner).
+    const ownLoaders = Boolean(runner?.ownLoaders ?? family.ownLoaders);
     // Families with their own loaders fetch encoder and VAE themselves; count them as carried.
-    const bundled = family.ownLoaders ? { encoder: true, vae: true, known: true }
+    const bundled = ownLoaders ? { encoder: true, vae: true, known: true }
       : source === "checkpoint" ? info2.bundled : { encoder: false, vae: false, known: true };
     const encoderBuiltIn = bundled.encoder && !family.neverBundledEncoder;
     const missing = [];
@@ -341,7 +359,8 @@ export function familyProfiles(info, helpers) {
     }
     const ggufPart = isGguf(name) && missingPackPart(info, "gguf", { detail: "ComfyUI loads GGUF models through the ComfyUI-GGUF custom nodes." });
     if (ggufPart) missing.push(ggufPart);
-    const nodes = runner ? [] : missingNodes(info, nodesFor(family, variant, !encoderBuiltIn, !bundled.vae));
+    // A runner's pack brings its loaders; the core nodes it still needs are its own list.
+    const nodes = runner ? missingNodes(info, runner.requiredNodes || []) : missingNodes(info, nodesFor(family, variant, !encoderBuiltIn, !bundled.vae));
     // A family that runs on a custom node pack names it (family.pack, or its runner's); a
     // quantized file, its format's loader pack.
     const needs = runner || family;
@@ -349,14 +368,14 @@ export function familyProfiles(info, helpers) {
       || (needs.pack && missingPackPart(info, needs.pack, { extra: needs.variantNodes?.[variant.id] || [], detail: needs.note }));
     if (packPart) {
       missing.push(packPart);
-    } else if (!packPart && (nodes.length || !clipTypeAvailable(info, family))) {
+    } else if (!packPart && (nodes.length || (!runner && !clipTypeAvailable(info, family)))) {
       missing.push({ part: "comfy", label: "Newer ComfyUI", detail: `This version of ComfyUI can’t run ${family.label} yet${nodes.length ? ` (missing ${nodes.join(", ")})` : ""}. Update ComfyUI, then restart it.`, downloads: [] });
     }
     // What ComfyUI itself lacks comes first: the files are no use until it can run them.
     missing.sort((a, b) => Number(b.part === "comfy") - Number(a.part === "comfy"));
 
     const [width, height] = variant.size || family.size;
-    const latentNode = runner ? runner.sizeNode : family.latent;
+    const latentNode = runner?.sizeNode || family.latent;
     const step = family.sizeStep || 8;
     // Some latent nodes accept 0 ("use the reference image's size"); a picked size never goes below 64.
     const widthRange = { ...nodeRange(info, latentNode, "width", { default: width, min: 64, max: 8192, step }), step: Math.max(step, 8) };
@@ -395,6 +414,7 @@ export function familyProfiles(info, helpers) {
       displayName: (runner && sanaLabel(name)) || prettyModelName(name),
       description: preset ? `NVIDIA ${preset.label}, downloaded by ComfyUI on first use`
         : diffusersRunner ? `${family.label}${variant.id === "sprint" ? " Sprint" : ""} through ComfyUI-SANA`
+        : folderFamily ? `${family.label} ${variant.label} through the ${runner?.pack ? nodePack(runner.pack).name : ""} nodes`
         : `${family.variants.length > 1 && !variant.label.includes(family.label) ? `${family.label} ${variant.label}` : family.variants.length > 1 ? variant.label : family.label}${source === "checkpoint" ? " checkpoint" : ""}`,
       model: name,
       workflow: `family:${info2.family}`,
@@ -424,12 +444,12 @@ export function familyProfiles(info, helpers) {
         negativePrompt: negativeMode === "text" || negativeMode === "qwen21",
         variations: family.kind === "image" && family.sampling !== "pair",
         textEncoder: encoderSlots.length > 0,
-        vae: !family.ownLoaders,
+        vae: !ownLoaders,
         weightDtype: source === "unet" && !isGguf(name),
         // ComfyUI-SANA runs the whole diffusers pipeline in one node, with its own scheduler.
         ...(diffusersRunner ? { sampler: false, scheduler: false } : {}),
         // ComfyUI's LoRA loader cannot patch a model it did not build.
-        lora: canUseLoras && !family.ownLoaders,
+        lora: canUseLoras && (!ownLoaders || Boolean(runner?.loras)),
         startImage: Boolean(family.img2img || family.startImage),
         startImageRequired: family.startImage === "required",
         denoise: Boolean(family.img2img),
@@ -441,6 +461,7 @@ export function familyProfiles(info, helpers) {
     Object.assign(profile, {
       source,
       familyName: family.label,
+      ...(family.setup ? { setupGuide: family.setup } : {}),
       variant: variant.id,
       variantLabel: variant.label,
       encoderSlots,
@@ -456,7 +477,9 @@ export function familyProfiles(info, helpers) {
       missing,
       ready: missing.length === 0,
       // For the model menu's quiet size note; 0 when the file is on another computer.
-      weightBytes: source.startsWith("sana") ? 0 : modelFileBytes(source, name),
+      weightBytes: source.startsWith("sana") || folderFamily ? 0 : modelFileBytes(source, name),
+      // A folder the runner's loader reads by its full path on this computer.
+      ...(runner?.loader?.path && runner.folders ? { modelPath: diffusersFolderPath(name, runner.folders.classNames) } : {}),
       ...(family.sampling === "sana" ? { sana: sanaSettings(info, name, variant, info2.detail, cuda) } : {})
     });
     profiles.push(profile);

@@ -14,6 +14,17 @@ version opens with a `> ` summary line, which the update pill shows.
 > Native 2K, a new size menu and a lot of fixes
 
 ### Added
+- **MOSS-Image.** OpenMOSS's new 5B model, known for clean text in pictures
+  and layouts that hold, runs with its makers' settings (50 steps, CFG 3,
+  shift 5). **Get a model** offers a guided setup: pick SFT or Base, pick how
+  ComfyUI runs it, and get every file in one go. On a ComfyUI newer than
+  0.41.3 it runs on ComfyUI's own nodes with Comfy-Org's files (5.4 or 10 GB,
+  plus the Qwen3.5 9B text encoder and the Flux.2 VAE, all one-click). On
+  older versions it runs on the makers' own MOSS-Image nodes, which install in
+  one click and load the official model folder, which HEISS also downloads.
+  Those nodes skip layer 22 on the negative pass, as the makers sample.
+- **Node packs that live inside a bigger repository** install too: only the
+  pack's own folder goes into custom_nodes.
 - **Native 2K.** The size menu has three tabs now: **Default**, **2K** and
   **Custom**. 2K has the model draw your shape itself with its long side at
   2048, in one run, with no upscale step after it. Models made for big pictures

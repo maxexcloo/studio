@@ -21,6 +21,12 @@ const byFamily: Record<string, string[]> = {
     'Portrait of a red fox in a snowy forest at golden hour, shallow depth of field',
     'An astronaut tending a vegetable garden on Mars, cinematic lighting, dust in the air'
   ],
+  // MOSS-Image is made for text in pictures and layouts with several things in their place.
+  moss: [
+    'A hand-lettered chalkboard menu outside a corner café that reads "Today: lemon tart & mint tea", morning sun',
+    'A vintage travel poster for the Faroe Islands, bold title "FØROYAR" at the top, cliffs and a puffin below',
+    'A sticky note on a fridge door, handwritten "Buy milk, eggs and bread!", kitchen counter with a fruit bowl'
+  ],
   other: [
     'A glass greenhouse full of tropical plants at golden hour, light rays through the leaves',
     'A paper boat drifting down a rain-filled street gutter, macro photograph, reflections',
@@ -62,6 +68,7 @@ const surprise = [
 function setFor(family = '', kind = 'image') {
   if (kind === 'video') return 'video';
   if (/krea/.test(family)) return 'krea';
+  if (/moss/.test(family)) return 'moss';
   if (/flux|ideogram|qwen|ernie/.test(family)) return 'flux';
   if (/sd(xl|15|2)|checkpoint|auraflow|anima|lumina/.test(family)) return 'sdxl';
   return 'other';

@@ -23,6 +23,7 @@ export const encoderKinds = {
   t5xl: { label: "T5-XL (Pile)", name: /t5[-_ ]?xl(?!l)|pile[-_ ]?t5|pony[-_ ]?v7.*t5/i },
   t5xxl: { label: "T5-XXL", name: /t5[-_ ]?(v1_1[-_ ]?)?xxl|t5xxl/i },
   byt5_glyph: { label: "ByT5 Glyph", name: /byt5/i },
+  qwen35_9b: { label: "Qwen3.5 9B", name: /qwen[-_ ]?3[._]5[-_ ]?9b|qwen35[-_ ]?9b/i },
   qwen3vl_32b: { label: "Qwen3-VL 32B", name: /qwen[-_ ]?3[-_ ]?vl.*32b/i },
   qwen3vl_8b: { label: "Qwen3-VL 8B", name: /qwen[-_ ]?3[-_ ]?vl.*8b/i },
   qwen3vl_4b: { label: "Qwen3-VL 4B", name: /qwen[-_ ]?3[-_ ]?vl.*4b|qwen[-_ ]?3[-_ ]?vl(?!.*\d+b)/i },
@@ -96,6 +97,10 @@ export function encoderKindFromHeader(header) {
   }
   if (keys.has("model.layers.0.self_attn.k_proj.bias")) {
     return shape(header, "model.layers.0.self_attn.k_proj.bias")[0] === 512 ? "qwen25vl_7b" : "other";
+  }
+  // Qwen3.5: hybrid linear attention, under the multimodal model's language_model prefix.
+  if (keys.has("model.language_model.layers.0.linear_attn.A_log") && keys.has("model.language_model.layers.0.input_layernorm.weight")) {
+    return shape(header, "model.language_model.layers.0.input_layernorm.weight")[0] === 4096 ? "qwen35_9b" : "other";
   }
   if (keys.has("model.visual.deepstack_merger_list.0.norm.weight")) {
     return shape(header, "model.visual.merger.linear_fc2.weight")[0] === 2560 ? "qwen3vl_4b" : "qwen3vl_8b";

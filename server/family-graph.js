@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { MAX_BATCH, families, sanaConf, sanaLatentNode } from './family-catalog.js';
+import { MAX_BATCH, families, runnerFor, sanaConf, sanaLatentNode } from './family-catalog.js';
 import { krea2RawShift } from './model-families.js';
 
 /**
@@ -72,12 +72,21 @@ export function familyGraph(body) {
   const frames = Number(body.frames || family.frames || 33);
   const bundled = body.source === "checkpoint" ? (body.bundled || { encoder: true, vae: true }) : { encoder: false, vae: false };
   if (family.sampling === "sana") return sanaGraph({ add, graph, body, variant, seed, width, height, count });
+  // A custom-node runner for this source (MOSS-Image's own pack for its Diffusers folders).
+  const runner = runnerFor(family, body.source);
 
   // ---- Load
   let model;
   let clip = null;
   let vae = null;
-  if (body.source === "checkpoint") {
+  if (runner?.loader) {
+    // One node loads the whole folder: model, text encoder and VAE.
+    if (!body.modelPath) throw new Error(`${family.label} can’t find that model folder on this computer anymore.`);
+    const id = add(runner.loader.node, { [runner.loader.path]: body.modelPath, ...runner.loader.inputs, ...(body.weightDtype && "weight_dtype" in runner.loader.inputs ? { weight_dtype: body.weightDtype } : {}) });
+    model = [id, 0];
+    clip = [id, 1];
+    vae = [id, 2];
+  } else if (body.source === "checkpoint") {
     const id = add(body.checkpointLoader || "CheckpointLoaderSimple", { ckpt_name: body.model });
     model = [id, 0];
     if (bundled.encoder && !family.neverBundledEncoder) clip = [id, 1];
@@ -130,6 +139,8 @@ export function familyGraph(body) {
   }
   // Krea 2 Raw's shift follows the image size (Turbo keeps ComfyUI's fixed 1.15).
   if (variant.rawShift) model = modelSamplingPatch(add, { node: "ModelSamplingFlux", shift: krea2RawShift(width, height) }, model, body);
+  // A runner's own patches go after the shift, so they see the same schedule (MOSS-Image's layer skip).
+  for (const patch of runner?.patches || []) model = [add(patch.node, { model, ...patch.inputs }), 0];
 
   // ---- MiniMax H3: its own conditioning + latent node, guidance-free, video with audio
   if (family.sampling === "h3") {

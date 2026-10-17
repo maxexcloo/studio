@@ -120,6 +120,8 @@ export type Profile = {
   family: string;
   /** The family's name as people know it ("Flux.1"), for built-in families. */
   familyName?: string;
+  /** A family with a guided setup dialog of its own (server/family-setup.js): its id. */
+  setupGuide?: string;
   defaults: Record<string, string | number>;
   aspectPresets: AspectPreset[];
   constraints?: Record<string, { min?: number; max?: number; step?: number; default?: number }>;
@@ -154,7 +156,7 @@ export type Profile = {
 export type EncoderSlot = { slot: string; label: string; options: string[]; default: string };
 export type PartDownload = { id: string; file: string; url: string; folder: string; label: string; bytes?: number; /** Already in a ComfyUI model folder, waiting for ComfyUI to list it. */ onDisk?: boolean; /** Who publishes it on Hugging Face (the repo owner), and the repo. */ source?: string; repo?: string };
 /** A ComfyUI custom node pack (server/node-packs.js). */
-export type NodePackInfo = { id?: string; name: string; repository: string; folder?: string; search?: string; note?: string; /** The reviewed commit a one-click install takes, and what it is (a release tag, or a branch and date). */ commit?: string; ref?: string };
+export type NodePackInfo = { id?: string; name: string; repository: string; folder?: string; search?: string; note?: string; /** Where the pack sits inside its repository, when it isn't the whole repository. */ subdir?: string; /** The reviewed commit a one-click install takes, and what it is (a release tag, or a branch and date). */ commit?: string; ref?: string };
 /** Which one-click routes HEISS has for a pack: Manager (the pack is in its list) and/or a local clone + pip. */
 export type PackAutoInstall = { manager: boolean; local: boolean };
 export type PackInstallState = { id: string; name: string; route: "manager" | "local"; status: "running" | "done" | "error" | "blocked"; step: string; log: string; error: string; startedAt: number; finishedAt: number; /** Blocked by ComfyUI-Manager's security level: whether ComfyUI's own Python could do it instead, if the person agrees. */ canOverride?: boolean };

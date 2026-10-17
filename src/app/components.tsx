@@ -727,6 +727,12 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
               <em>{strayCount ? "Add" : "Search"}</em>
             </button>
           ) : null}
+          {onGetModels && profiles.length ? (
+            <button type="button" className="model-menu-find" onClick={() => { close(); onGetModels(); }}>
+              <span>Get a model</span>
+              <em>Download</em>
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
