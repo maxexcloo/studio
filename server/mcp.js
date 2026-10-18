@@ -9,7 +9,7 @@ import { hostAllowed } from './request-guard.js';
 import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 
-const instructions = 'Use HEISS tools directly for requested images or videos. Discover Models by kind, then fetch the selected exact profile_id once for its prompting guidance, defaults and reference slots. Preserve explicit model choices and user intent. Generate takes prompts as a list of strings and returns job IDs immediately. Never wait for generation in the foreground or poll in a loop. If the host exposes run_in_background on Result, start exactly one Result for each returned job with wait_seconds=1800 and run_in_background=true, then acknowledge submission immediately; the host delivers completion automatically. Otherwise use Status or Result for the exact job only when asked; never resubmit completed work. Generate one image at the saved dimensions unless the user explicitly requests more or another size. Present attached image previews briefly without reproducing image/download URLs. Upload user-supplied images, or Reuse an owned image for follow-ups. Never invent results or tool responses. GPU allocation is manual: only use separately authorised AI Control tools for an explicit control request, present Preview and obtain approval before Apply. Media generation never changes allocation.';
+const instructions = 'Use HEISS tools directly for requested images or videos. Discover Models by kind, then fetch the selected exact profile_id once for its prompting guidance, defaults and reference slots. Preserve explicit model choices and user intent. Generate takes prompts as a list of strings and returns job IDs immediately. Never wait for generation in the foreground or poll in a loop. If the host exposes run_in_background on Result, start exactly one Result for each returned job with wait_seconds=1800 and run_in_background=true, then acknowledge submission immediately; the host delivers completion automatically. Otherwise use Status or Result for the exact job only when asked; never resubmit completed work. Generate one image at the saved dimensions unless the user explicitly requests more or another size. Show attached images inline with a brief caption. Label original links View Original, never Download. Do not replace the image with a text link or reproduce raw URLs. Upload user-supplied images, or Reuse an owned image for follow-ups. Never invent results or tool responses. GPU allocation is manual: only use separately authorised AI Control tools for an explicit control request, present Preview and obtain approval before Apply. Media generation never changes allocation.';
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200) };
@@ -27,6 +27,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
   const media = mediaKey ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl }) : null;
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
+  const reviewedGuides = new Map();
+  const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
   const guard = (req, res, next) => {
     res.set('Cache-Control', 'private, no-store');
     if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) return res.status(403).json({ error: 'Unrecognised MCP host.' });
@@ -58,6 +60,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           profiles = profiles.filter(profile => profile.id === profile_id);
           if (!profiles.length) throw new Error('Choose a ready profile from Models.');
         }
+        if (profile_id !== undefined) {
+          if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
+          reviewedGuides.set(guideKey(owner, profile_id), Date.now());
+        }
         const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'options'];
         return mcpJson({ profiles: profiles.map(profile => ({ ...Object.fromEntries(fields.filter(key => key in profile).map(key => [key, profile[key]])), ...(profile_id === undefined ? {} : { defaults: { ...profile.defaults, count: 1 } }), prompting: prompting(profile, profile_id !== undefined) })) });
       }, { readOnlyHint: true });
@@ -67,6 +73,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.literal(0).default(0), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async (args) => {
+        const reviewed = reviewedGuides.get(guideKey(owner, args.profile_id));
+        if (reviewed === undefined || Date.now() - reviewed >= 3600000) throw new Error('Fetch Models with this exact profile_id to read its full prompting guide and saved controls before generating. Guidance must be refreshed after one hour or a studio restart.');
         const submission = await media.queue(owner, args);
         return mcpJson({ ...submission, message: 'Submitted. If Result supports run_in_background, start one Result per returned job with wait_seconds=1800 and run_in_background=true, then reply immediately. Otherwise reply now and retrieve only when requested. Never poll, wait in the foreground or resubmit.' });
       });
@@ -122,7 +130,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');
       const claims = media.claims(req.params.token);
       const result = await media.download(claims.owner, claims.jobId, claims.index);
-      res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'attachment', 'Content-Type': result.mime }).send(result.content);
+      res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline', 'Content-Type': result.mime }).send(result.content);
     } catch { res.status(404).json({ error: 'The result link is invalid, unavailable or expired.' }); }
   });
   return true;
