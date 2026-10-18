@@ -12,6 +12,7 @@ async function prepare(page: Page, phone: boolean, imageMaximum = 8) {
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
   await page.goto('/');
   if (phone) await page.locator('.phone-create-open').click();
+  else await composer(page, phone).getByRole('textbox', { name: 'Prompt', exact: true }).focus();
 }
 
 function composer(page: Page, phone: boolean) {
@@ -20,6 +21,7 @@ function composer(page: Page, phone: boolean) {
 
 async function setCount(page: Page, phone: boolean, kind: 'Images' | 'Videos', count: number) {
   const root = composer(page, phone);
+  if (!phone) await root.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   await root.getByRole('button', { name: new RegExp(`^${kind}: \\d+, click to edit$`) }).click();
   const input = root.locator('.number-picker-input');
   await input.fill(String(count));
@@ -28,6 +30,7 @@ async function setCount(page: Page, phone: boolean, kind: 'Images' | 'Videos', c
 }
 
 async function mode(page: Page, phone: boolean, kind: 'Image' | 'Video') {
+  if (!phone) await composer(page, phone).getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   await composer(page, phone).getByRole('group', { name: 'Generation Mode', exact: true }).getByRole('button', { name: kind, exact: true }).click();
 }
 
@@ -51,6 +54,7 @@ test('image defaults to four and video to one, retaining independent choices and
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-draft') || '{}').count)).toBe(3);
   await page.reload();
   if (isMobile) await page.locator('.phone-create-open').click();
+  else await composer(page, isMobile).getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   await expect(composer(page, isMobile).getByRole('button', { name: 'Videos: 3, click to edit', exact: true })).toBeVisible();
   await mode(page, isMobile, 'Image');
   await expect(composer(page, isMobile).getByRole('button', { name: 'Images: 6, click to edit', exact: true })).toBeVisible();
@@ -137,7 +141,10 @@ test('Stop All prevents further video submissions and cancels an in-flight accep
   await page.route('**/api/jobs/late-count-job', (route) => route.fulfill({ json: { status: 'canceled', outputs: [] } }));
   await generate(page, isMobile, 'A stoppable video selection');
   await expect.poll(() => submissions).toBe(1);
-  await page.locator(isMobile ? '.phone-pill' : '.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop All Generations', exact: true }).click();
+  } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Stop all', exact: true }).click();
   await expect.poll(() => queueStopped).toBe(true);
   release();

@@ -460,9 +460,9 @@ export function WorkflowGallery({ view }: { view: any }) {
         ) : (
           <div className="wf-empty">
             <Search size={20} />
-            <h3>{query ? "Nothing Matches" : filter === "favorites" ? "No Favourites Yet" : `No ${kind} workflows yet`}</h3>
+            <h3>{query ? "Nothing Matches" : filter === "favorites" ? "No Favourites Yet" : `No ${kind === "video" ? "Video" : "Image"} Workflows Yet`}</h3>
             <p>{query ? "Try another name or clear the search." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : "Import a workflow."}</p>
-            {query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import workflow</button> : null}
+            {query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
           </div>
         )}
       </section>
@@ -515,7 +515,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             </dl>
           </>
         ) : (
-          <div className="wf-empty"><Wand2 size={22} /><h3>No workflow selected</h3><p>Choose one to see its details.</p></div>
+          <div className="wf-empty"><Wand2 size={22} /><h3>No Workflow Selected</h3><p>Choose one to see its details.</p></div>
         )}
       </aside>
 
@@ -596,7 +596,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                 </div>
               );
             })}
-            {!imports.length ? <div className="wf-empty"><FileJson size={20} /><h3>Nothing to import</h3><p>Add a file or paste JSON.</p></div> : null}
+            {!imports.length ? <div className="wf-empty"><FileJson size={20} /><h3>Nothing to Import</h3><p>Add a file or paste JSON.</p></div> : null}
           </div>
         )}
       </Modal>

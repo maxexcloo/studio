@@ -328,6 +328,16 @@
   border-top: 1px solid rgb(255 255 255 / .06);
 }
 
+/* Tile actions use two compact columns instead of a screen of oversized rows. */
+.phone-item-actions { max-height: min(520px, 76dvh); }
+.phone-item-actions .phone-sheet-head { min-height: 44px; }
+.phone-item-actions .phone-sheet-head h2 { font-size: 15px; }
+.phone-item-actions .phone-sheet-body { padding: 0 12px 8px; }
+.phone-item-actions .phone-group { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: var(--r-panel); }
+.phone-item-actions .phone-row { gap: 8px; min-height: 48px; padding: 8px; border-radius: var(--r-item); font-size: 13px; }
+.phone-item-actions .phone-row > svg, .phone-item-actions .phone-row > .copy-icon { flex: none; }
+.phone-item-actions .phone-row > span { min-width: 0; }
+
 /* Rows, groups, sections */
 .phone-group {
   display: grid;
@@ -1081,7 +1091,8 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
 
 /* Viewer extras on the phone: Info beside Close at the top right, notices above the bar,
    and a comparison line you can grab. */
-.viewer-phone-bar .viewer-phone-info {
+.viewer-phone-bar .viewer-phone-info,
+.viewer-phone-bar .viewer-phone-star {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));
   right: calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px);
@@ -1092,6 +1103,10 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
   border-radius: var(--r-pill);
   background: rgb(22 22 22 / .86);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 6px 20px rgb(0 0 0 / .4);
+}
+.viewer-phone-bar .viewer-phone-star {
+  right: auto;
+  left: max(10px, env(safe-area-inset-left));
 }
 .viewer-phone-notice {
   position: absolute;

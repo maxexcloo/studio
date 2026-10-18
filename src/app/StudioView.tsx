@@ -1,5 +1,7 @@
 import { GalleryManagement } from './GalleryManagement';
-import { PromptActions } from './PromptActions';
+import { AnimatePhotos } from './AnimatePhotos';
+import { PromptField } from './PromptField';
+import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
@@ -7,12 +9,12 @@ import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
-import { PromptIdeas } from './PromptIdeas';
 import { useHorizontalWheel, useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
 import { GenerationMedia, GenerationPreviewMode } from './GenerationPreview';
 import { GenerationProgress } from './GenerationProgress';
 import { ComposerBar } from './ComposerBar';
+import { ExpandingComposer } from './ExpandingComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
 import { features } from './constants';
 import { RunCard, runKind } from './RunStack';
@@ -138,13 +140,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
   const searchOn = searchActive(gallerySearch);
-  const [wideStudio, setWideStudio] = React.useState(() => window.matchMedia('(min-width: 1100px)').matches);
-  React.useEffect(() => {
-    const query = window.matchMedia('(min-width: 1100px)');
-    const update = () => setWideStudio(query.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const hidden = view.hidden as HiddenState;
   // Hidden, locked (or mid-unlock): the lock takes the gallery's place.
@@ -185,42 +180,56 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // Phones get the simplified phone studio, unless someone chose the full one.
   const phoneDevice = usePhone();
   const phone = phoneDevice && !prefs.fullStudioOnPhone;
-  const controlsPinned = Boolean(prefs.controlsPinned && wideStudio && !phone);
-  const controlsOpen = Boolean(zenControls || controlsPinned);
-  const toggleControls = () => {
-    if (controlsPinned) setPrefs({ controlsPinned: false });
-    setZenControls(!controlsOpen);
-  };
-  const pinControls = <button type="button" className="sidebar-pin" aria-label={controlsPinned ? 'Unpin Controls' : 'Pin Controls'} aria-pressed={controlsPinned} onClick={() => { setPrefs({ controlsPinned: !controlsPinned }); setZenControls(true); }}>{controlsPinned ? <PinOff size={15} /> : <Pin size={15} />}{controlsPinned ? 'Unpin Controls' : 'Keep Controls Open'}</button>;
-
-
+  const [composerExpanded, setComposerExpanded] = React.useState(false);
+  const [composerPrimaryTarget, setComposerPrimaryTarget] = React.useState<HTMLDivElement | null>(null);
+  const [lorasOpen, setLorasOpen] = React.useState(false);
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (!composerExpanded || phone) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"]')) return;
+      setComposerExpanded(false);
+    };
+    document.addEventListener('pointerdown', outside, true);
+    return () => document.removeEventListener('pointerdown', outside, true);
+  }, [composerExpanded, phone]);
+  React.useEffect(() => {
+    if (!zenControls) return;
+    setComposerExpanded(true);
+    setZenControls(false);
+  }, [zenControls, setZenControls]);
   // Recent prompts: ↑ in an empty prompt or the clock in the composer opens them.
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
+  const hasNegativeHistory = usePromptHistory(!phone, 'negative').prompts.length > 0;
   const hasPromptHistory = usePromptHistory(!phone).prompts.length > 0;
   // The very first prompt is recorded as it runs; the clock shows up then, not after a reload.
   React.useEffect(() => {
-    if (phone || !runningCount || hasPromptHistory) return;
-    const timer = window.setTimeout(() => refreshPrompts(), 1500);
+    if (phone || !runningCount) return;
+    const timer = window.setTimeout(() => { refreshPrompts(); refreshPrompts('negative'); }, 1500);
     return () => window.clearTimeout(timer);
   }, [runningCount > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggleHistory = React.useCallback(() => setHistoryOpen((value) => !value), []);
+  const toggleHistory = React.useCallback(() => { setHistoryKind('positive'); setHistoryOpen((value) => historyKind !== 'positive' || !value); }, [historyKind]);
   const insertPrompt = (text: string) => {
-    const previous = String(prompt || "");
-    setPrompt(clampText(text, promptLimit));
+    const previous = String(historyKind === 'negative' ? negative || "" : prompt || "");
+    if (historyKind === 'negative') setNegative(clampText(text, negativeLimit));
+    else setPrompt(clampText(text, promptLimit));
     setHistoryOpen(false);
     window.requestAnimationFrame(() => {
-      const field = zenPromptRef.current as HTMLTextAreaElement | null;
+      const field = historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : zenPromptRef.current as HTMLTextAreaElement | null;
       if (!field) return;
       field.focus();
       field.setSelectionRange(field.value.length, field.value.length);
     });
     // Only a prompt that was really there is worth an undo.
-    if (previous.trim() && previous.trim() !== text.trim()) showToast("Prompt replaced", "default", { group: "prompt-replaced", action: { label: "Undo", onClick: () => setPrompt(previous) } });
+    if (previous.trim() && previous.trim() !== text.trim()) showToast(historyKind === 'negative' ? "Negative prompt replaced" : "Prompt replaced", "default", { group: "prompt-replaced", action: { label: "Undo", onClick: () => historyKind === 'negative' ? setNegative(previous) : setPrompt(previous) } });
   };
   const promptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const plain = !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey;
     if (event.key === "ArrowUp" && plain && !String(prompt || "").trim() && hasPromptHistory && !event.nativeEvent.isComposing) {
       event.preventDefault();
+      setHistoryKind('positive');
       setHistoryOpen(true);
       return;
     }
@@ -228,8 +237,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   };
   const historyPopover = (
     <PromptHistoryPopover
+      kind={historyKind}
       open={historyOpen && !phone}
-      onClose={(reason) => { setHistoryOpen(false); if (reason === "escape") (zenPromptRef.current as HTMLTextAreaElement | null)?.focus(); }}
+      onClose={(reason) => { setHistoryOpen(false); if (reason === "escape") (historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : zenPromptRef.current as HTMLTextAreaElement | null)?.focus(); }}
       onPick={insertPrompt}
       hiddenSpace={Boolean(hiddenSpace)}
       onError={(message) => showToast(message, "error")}
@@ -239,6 +249,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [phoneActionsFor, setPhoneActionsFor] = React.useState<GalleryItem | null>(null);
   const openTileActions = React.useCallback((item: GalleryItem) => { haptic('press'); setPhoneActionsFor(item); }, []);
   // Selecting several on the phone: null when not selecting.
+  const [animationItems, setAnimationItems] = React.useState<GalleryItem[] | null>(null);
   const [phoneSelection, setPhoneSelection] = React.useState<Set<string> | null>(null);
   const toggleSelected = React.useCallback((item: GalleryItem) => {
     haptic('tap');
@@ -289,6 +300,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     upscaleBusy: (item) => Boolean(upscaleBusyIds?.has(item.id)),
     upscale: activateUpscale,
     cancelUpscale,
+    copyPrompt: (item) => copyToClipboard(item.prompt || ""),
     // Reuse opens the composer above the current viewer, so closing it returns here.
     reuse: (item) => { applyAllSettings(item); setPhoneCreate(true); },
     promptsOnly: (item) => { applyPromptsOnly(item); setPhoneCreate(true); },
@@ -304,9 +316,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </AnimatePresence>
   );
   const comfyOffline = comfyStatus && !comfyStatus.connected && !comfyStatus.checking;
-  // Prompts to start from, above the prompt box, until the first image or the first word.
-  const showIdeas = galleryLoaded && !renderedGallery.length && !searchOn && !hiddenSpace && !phone && !comfyOffline && Boolean(currentProfile) && !prompt.trim() && !historyOpen;
-  const promptIdeas = showIdeas ? <PromptIdeas prompts={view.starterPrompts} onPick={view.fillPrompt} onSurprise={view.surprise} /> : null;
   // Back closes the viewer and the workflow gallery rather than leaving the app.
   useHistoryDismiss(Boolean(active), () => setActive(null));
   const viewerRef = React.useRef<HTMLDivElement | null>(null);
@@ -477,25 +486,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </AnimatePresence>
       </div>
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
-      <Tip content={hiddenSpace ? "Back to the Gallery" : hidden.enabled ? hidden.unlocked ? "Hidden · unlocked" : "Hidden · locked" : "Hidden"}>
-        <button
-          data-hidden-dock
-          className={cn("icon-button hidden-dock-button", hiddenSpace && "active", hidden.enabled && hidden.unlocked && "is-open")}
-          aria-label={hiddenSpace ? "Leave Hidden" : hidden.enabled && hidden.unlocked ? "Open Hidden, unlocked" : "Open Hidden"}
-          aria-pressed={hiddenSpace}
-          onClick={toggleHiddenSpace}
-        >
-          <LockKeyhole size={16} />
-        </button>
-      </Tip>
-      {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
-      <Tip content="Workflow Gallery"><button className="icon-button" aria-label="Workflow Gallery" onFocus={() => { void loadWorkflows().catch(() => undefined); }} onPointerEnter={() => { void loadWorkflows().catch(() => undefined); }} onPointerDown={() => { void loadWorkflows().catch(() => undefined); }} onClick={() => setWorkflowGalleryOpen(true)}><GalleryHorizontalEnd size={16} /></button></Tip>
-      <Tip content="Settings"><button className="icon-button" aria-label="Settings" onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
+      {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" aria-haspopup="dialog" aria-expanded={Boolean(view.presetLibraryOpen)} onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
+      <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {prefs.zenMode ? (
         <Tip content="Exit Zen (Esc)"><button className="icon-button" aria-label="Exit Zen" onClick={() => setZenMode(false)}><Minimize2 size={16} /></button></Tip>
-      ) : (
-        <Tip content="Zen Mode"><button className="icon-button" aria-label="Enter Zen Mode" onClick={() => setZenMode(true)}><Maximize2 size={16} /></button></Tip>
-      )}
+      ) : null}
     </div>
   );
   const hiddenBar = (
@@ -556,7 +551,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             <section className="gallery"><div className="empty stage-empty hidden-empty">
               <div className="stage-mark"><LockMark className="stage-layer" stage="open" /></div>
               <div className="stage-copy">
-                <h2>Nothing hidden yet</h2>
+                <h2>Nothing Hidden Yet</h2>
                 <p>Generate here, or hide images from the gallery with <EyeOff size={13} className="inline-icon" />.</p>
               </div>
             </div></section>
@@ -587,16 +582,111 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </>
   );
 
+  const composer = (
+          <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
+            <div className="composer-prompt-row">
+              <PromptField kind="positive" value={prompt} textareaRef={zenPromptRef} ariaLabel={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
+              <div className="composer-primary-actions" ref={setComposerPrimaryTarget} />
+            </div>
+            {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
+            {negativeSupported ? <div className="composer-secondary-row">
+              <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative("")} historyAvailable={hasNegativeHistory} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen((open) => historyKind !== 'negative' || !open); }} />
+              {nearTextLimit(negative, negativeLimit) ? <span className="prompt-count">{characterMeta(negative, negativeLimit)}</span> : null}
+            </div> : null}
+            <StableComposerBar
+              primaryTarget={composerExpanded ? null : composerPrimaryTarget}
+              advancedOpen={advancedOpen}
+              onAdvanced={() => setAdvancedOpen(true)}
+              onBrowseModels={() => setWorkflowGalleryOpen(true)}
+              onReset={view.resetCreation}
+              models={models}
+              model={model}
+              modelProfiles={modelProfiles}
+              showInpaint={prefs.inpainting !== false}
+              profileBadges={profileBadges}
+              chooseModel={pickModel}
+              modelMenu={modelMenu}
+              currentProfile={currentProfile}
+              comfyOffline={Boolean(comfyOffline)}
+              comfyRestarting={Boolean(comfyStatus?.restarting)}
+              onFindModels={thisComputer ? modelFolders?.openDialog : undefined}
+              onGetModels={thisComputer ? openGetModels : undefined}
+              strayModelCount={strayModelCount}
+              mode={mode}
+              onModeChange={view.changeMode}
+              aspectPickerValue={aspectPickerValue}
+              aspectOptions={aspectOptions}
+              aspectValue={aspectValue}
+              defaultAspectSize={defaultAspectSize}
+              applyAspect={applyAspect}
+              sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
+              sizeMax={view.sizeMax}
+              customLimits={view.customLimits}
+              chooseSizeTier={view.chooseSizeTier}
+              applyCustomRatio={view.applyCustomRatio}
+              setCustomDimensions={view.setCustomDimensions}
+              savedSizes={view.savedSizes}
+              saveCustomSize={view.saveCustomSize}
+              renameSavedSize={view.renameSavedSize}
+              removeSavedSize={view.removeSavedSize}
+              pickSavedSize={view.pickSavedSize}
+              customSize={Boolean(customSize)}
+              aspectLocked={Boolean(aspectLocked)}
+              width={width}
+              widthMeta={widthMeta}
+              setWidth={setWidth}
+              height={height}
+              heightMeta={heightMeta}
+              setHeight={setHeight}
+              steps={steps}
+              stepsMeta={stepsMeta}
+              setSteps={setSteps}
+              count={count}
+              countMeta={countMeta}
+              setCount={setCount}
+              loraActiveCount={loraActiveCount}
+              hiddenSpace={Boolean(hiddenSpace)}
+              lorasOpen={lorasOpen}
+              onOpenLoras={() => setLorasOpen(true)}
+              canUseNegativePrompt={canUseNegativePrompt}
+              runningCount={runningCount}
+              generateDisabled={Boolean(generateDisabled)}
+              generateDisabledReason={generateDisabledReason}
+              generate={generate}
+              refreshComfyStatus={retryComfyStatus}
+              comfyRetrying={Boolean(comfyRetrying)}
+              referenceInputs={referenceInputs}
+              referenceInpaint={referenceInpaint}
+              referenceRole={referenceRole}
+              loraMismatch={view.loraMismatch}
+              onDismissLoraMismatch={view.dismissLoraMismatch}
+              referenceAssets={referenceAssets}
+              onReferenceSelect={selectReferenceAsset}
+              onReferenceRemove={removeReferenceAsset}
+              onReferenceDeleteRequest={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: "It’s removed from uploads.", action: "Delete", destructive: true })}
+              onReferenceError={(message) => showToast(message, "error")}
+              pinnedSeed={view.seed}
+              onRandomSeed={() => view.setSeed("")}
+              generationEstimate={view.generationEstimate}
+              generateKey={view.generateKey}
+            />
+            {historyPopover}
+          </ExpandingComposer>
+  );
+
   return (
     <GenerationPreviewMode.Provider value={prefs.generationPreviewMode}>
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass, controlsPinned && "has-pinned-controls")} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
-          view={view}
+          view={{ ...view, lorasOpen, openLoras: () => setLorasOpen(true), phoneSearchOpen: searchOpen, setPhoneSearchOpen: setSearchOpen }}
           galleryBody={galleryBody}
           canUseNegativePrompt={canUseNegativePrompt}
           comfyOffline={Boolean(comfyOffline)}
@@ -609,6 +699,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           setActionsFor={setPhoneActionsFor}
           selection={phoneSelection}
           setSelection={setPhoneSelection}
+          onAnimate={setAnimationItems}
         />
       ) : prefs.zenMode ? (
         <>
@@ -647,7 +738,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             ) : hiddenSpace ? (
               <div className="zen-empty hidden-empty">
                 <div className="stage-mark"><LockMark className="stage-layer" stage="open" /></div>
-                <p>Nothing hidden yet</p>
+                <p>Nothing Hidden Yet</p>
               </div>
             ) : (
               <div className="zen-empty">
@@ -664,9 +755,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <Tip content="Next Output"><button aria-label="Next Output" onClick={() => moveZen(1)}><ChevronRight size={22} /></button></Tip>
             </div>
           ) : null}
-          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={controlsOpen} aria-controls="studio-controls" onClick={toggleControls}>
-            <PanelLeft size={16} /><span>Controls</span>
-          </button></Tip>
           {zenItem && !zenItem.run ? (
             <div className={cn("zen-zoom-dock", zenControls && "with-side")}>
               <Tip content="Zoom Out (-)"><button className="icon-button" aria-label="Zoom Out" onClick={() => zoomViewer(viewerZoom - 0.25)} disabled={viewerZoom <= 0.5}><ZoomOut size={15} /></button></Tip>
@@ -681,105 +769,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           ) : null}
           {studioDock}
           {hiddenBar}
-          {zenControls && !controlsPinned ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
-          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", controlsOpen && "open")} inert={!controlsOpen} aria-label="Generation Controls">
-            {wideStudio ? pinControls : null}
-            {sidebarControls}
-          </aside>
-          <section className="zen-prompt">
-            <div className="composer-prompt-row">
-              <div className="composer-prompt-field">
-                <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-              </div>
-              <div className="composer-reference-tools" />
-            </div>
-            {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            <div className="composer-secondary-row">
-            {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
-              <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative Prompt" rows={1} value={negative} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-              </div>
-              {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
-            </div> : null}
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
-            </div>
-            <StableComposerBar
-              models={models}
-              model={model}
-              modelProfiles={modelProfiles}
-              showInpaint={prefs.inpainting !== false}
-              profileBadges={profileBadges}
-              chooseModel={pickModel}
-              modelMenu={modelMenu}
-              currentProfile={currentProfile}
-              comfyOffline={Boolean(comfyOffline)}
-              comfyRestarting={Boolean(comfyStatus?.restarting)}
-              onFindModels={thisComputer ? modelFolders?.openDialog : undefined}
-              onGetModels={thisComputer ? openGetModels : undefined}
-              strayModelCount={strayModelCount}
-              mode={mode}
-              onModeChange={view.changeMode}
-              aspectPickerValue={aspectPickerValue}
-              aspectOptions={aspectOptions}
-              aspectValue={aspectValue}
-              defaultAspectSize={defaultAspectSize}
-              applyAspect={applyAspect}
-              sizeTier={customSize ? "custom" : view.sizeTier}
-              sizeTiers={view.sizeTiers}
-              sizeArea={view.sizeArea}
-              megapixelControl={view.megapixelControl}
-              sizeMax={view.sizeMax}
-              customLimits={view.customLimits}
-              chooseSizeTier={view.chooseSizeTier}
-              applyCustomRatio={view.applyCustomRatio}
-              setCustomDimensions={view.setCustomDimensions}
-              savedSizes={view.savedSizes}
-              saveCustomSize={view.saveCustomSize}
-              renameSavedSize={view.renameSavedSize}
-              removeSavedSize={view.removeSavedSize}
-              pickSavedSize={view.pickSavedSize}
-              customSize={Boolean(customSize)}
-              aspectLocked={Boolean(aspectLocked)}
-              width={width}
-              widthMeta={widthMeta}
-              setWidth={setWidth}
-              height={height}
-              heightMeta={heightMeta}
-              setHeight={setHeight}
-              steps={steps}
-              stepsMeta={stepsMeta}
-              setSteps={setSteps}
-              count={count}
-              countMeta={countMeta}
-              setCount={setCount}
-              loraActiveCount={loraActiveCount}
-              hiddenSpace={Boolean(hiddenSpace)}
-              onOpenLoras={view.openLoras}
-              canUseNegativePrompt={canUseNegativePrompt}
-              runningCount={runningCount}
-              generateDisabled={Boolean(generateDisabled)}
-              generateDisabledReason={generateDisabledReason}
-              generate={generate}
-              refreshComfyStatus={retryComfyStatus}
-              comfyRetrying={Boolean(comfyRetrying)}
-              referenceInputs={referenceInputs}
-              referenceInpaint={referenceInpaint}
-              referenceRole={referenceRole}
-              loraMismatch={view.loraMismatch}
-              onDismissLoraMismatch={view.dismissLoraMismatch}
-              referenceAssets={referenceAssets}
-              onReferenceSelect={selectReferenceAsset}
-              onReferenceRemove={removeReferenceAsset}
-              onReferenceDeleteRequest={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: "It’s removed from uploads.", action: "Delete", destructive: true })}
-              onReferenceError={(message) => showToast(message, "error")}
-              pinnedSeed={view.seed}
-              onRandomSeed={() => view.setSeed("")}
-              generationEstimate={view.generationEstimate}
-              generateKey={view.generateKey}
-            />
-            {historyPopover}
-            {promptIdeas}
-          </section>
+          {composer}
           {zenGallery.length && zenGalleryOpen && !hiddenLocked ? (
             <div data-open-surface className="zen-gallery-wrap">
               <Tip content="Hide Gallery"><button className="zen-gallery-toggle" aria-label="Hide Gallery" onClick={() => setZenGalleryOpen(false)}><ChevronUp size={16} /></button></Tip>
@@ -800,119 +790,18 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement items={renderedGallery} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Generation Mode">
+            <GalleryManagement onAnimate={setAnimationItems} items={renderedGallery} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Gallery Mode">
               {(["image", "video"] as const).map((nextMode) => (
                 <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
-                  {nextMode === "image" ? "Image" : "Video"}
+                  {nextMode === "image" ? "Images" : "Videos"}
                 </button>
               ))}
-            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<details className="gallery-view-options" data-open-surface><summary aria-label="Gallery View Options"><MoreHorizontal size={18} /></summary><div className="gallery-view-panel"><StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} />{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}</div></details>} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>
+            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<><StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} />{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}</>} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
           {hiddenBar}
-          <Tip content="Controls"><button data-open-trigger className="zen-control-button" aria-label="Controls" aria-expanded={controlsOpen} aria-controls="studio-controls" onClick={toggleControls}>
-            <PanelLeft size={16} /><span>Controls</span>
-          </button></Tip>
-          {zenControls && !controlsPinned ? <button className="sidebar-dismiss" aria-label="Close Controls" onClick={() => setZenControls(false)} /> : null}
-          <aside id="studio-controls" translate="no" data-open-surface className={cn("zen-controls", controlsOpen && "open")} inert={!controlsOpen} aria-label="Generation Controls">
-            {wideStudio ? pinControls : null}
-            {sidebarControls}
-          </aside>
-          <section className="zen-prompt">
-            <div className="composer-prompt-row">
-              <div className="composer-prompt-field">
-                <textarea ref={zenPromptRef} aria-label={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} value={prompt} placeholder="Prompt" onKeyDown={promptKeyDown} onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))} />
-              </div>
-              <div className="composer-reference-tools" />
-            </div>
-            {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
-            <div className="composer-secondary-row">
-            {canUseNegativePrompt ? <div data-open-surface className={cn("negative-drawer open", !negativeSupported && "is-unused")}>
-              <div className="negative-unavailable-frame">
-                <textarea aria-label="Negative Prompt" rows={1} value={negative} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-              </div>
-              {nearTextLimit(negative, negativeLimit) ? <span>{characterMeta(negative, negativeLimit)}</span> : null}
-            </div> : null}
-            <PromptActions hasHistory={hasPromptHistory} historyOpen={historyOpen} onHistory={toggleHistory} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(""); setNegative(""); setShowNegativePrompt(false); }} />
-            </div>
-            <StableComposerBar
-              models={models}
-              model={model}
-              modelProfiles={modelProfiles}
-              showInpaint={prefs.inpainting !== false}
-              profileBadges={profileBadges}
-              chooseModel={pickModel}
-              modelMenu={modelMenu}
-              currentProfile={currentProfile}
-              comfyOffline={Boolean(comfyOffline)}
-              comfyRestarting={Boolean(comfyStatus?.restarting)}
-              onFindModels={thisComputer ? modelFolders?.openDialog : undefined}
-              onGetModels={thisComputer ? openGetModels : undefined}
-              strayModelCount={strayModelCount}
-              mode={mode}
-              onModeChange={view.changeMode}
-              aspectPickerValue={aspectPickerValue}
-              aspectOptions={aspectOptions}
-              aspectValue={aspectValue}
-              defaultAspectSize={defaultAspectSize}
-              applyAspect={applyAspect}
-              sizeTier={customSize ? "custom" : view.sizeTier}
-              sizeTiers={view.sizeTiers}
-              sizeArea={view.sizeArea}
-              megapixelControl={view.megapixelControl}
-              sizeMax={view.sizeMax}
-              customLimits={view.customLimits}
-              chooseSizeTier={view.chooseSizeTier}
-              applyCustomRatio={view.applyCustomRatio}
-              setCustomDimensions={view.setCustomDimensions}
-              savedSizes={view.savedSizes}
-              saveCustomSize={view.saveCustomSize}
-              renameSavedSize={view.renameSavedSize}
-              removeSavedSize={view.removeSavedSize}
-              pickSavedSize={view.pickSavedSize}
-              customSize={Boolean(customSize)}
-              aspectLocked={Boolean(aspectLocked)}
-              width={width}
-              widthMeta={widthMeta}
-              setWidth={setWidth}
-              height={height}
-              heightMeta={heightMeta}
-              setHeight={setHeight}
-              steps={steps}
-              stepsMeta={stepsMeta}
-              setSteps={setSteps}
-              count={count}
-              countMeta={countMeta}
-              setCount={setCount}
-              loraActiveCount={loraActiveCount}
-              hiddenSpace={Boolean(hiddenSpace)}
-              onOpenLoras={view.openLoras}
-              canUseNegativePrompt={canUseNegativePrompt}
-              runningCount={runningCount}
-              generateDisabled={Boolean(generateDisabled)}
-              generateDisabledReason={generateDisabledReason}
-              generate={generate}
-              refreshComfyStatus={retryComfyStatus}
-              comfyRetrying={Boolean(comfyRetrying)}
-              referenceInputs={referenceInputs}
-              referenceInpaint={referenceInpaint}
-              referenceRole={referenceRole}
-              loraMismatch={view.loraMismatch}
-              onDismissLoraMismatch={view.dismissLoraMismatch}
-              referenceAssets={referenceAssets}
-              onReferenceSelect={selectReferenceAsset}
-              onReferenceRemove={removeReferenceAsset}
-              onReferenceDeleteRequest={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: "It’s removed from uploads.", action: "Delete", destructive: true })}
-              onReferenceError={(message) => showToast(message, "error")}
-              pinnedSeed={view.seed}
-              onRandomSeed={() => view.setSeed("")}
-              generationEstimate={view.generationEstimate}
-              generateKey={view.generateKey}
-            />
-            {historyPopover}
-            {promptIdeas}
-          </section>
+          {composer}
         </>
       )}
       {settings ? <React.Suspense fallback={<Modal open title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
@@ -932,6 +821,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
+      {advancedOpen ? <Modal open title="Advanced Settings" className="composer-advanced-modal" onOpenChange={setAdvancedOpen}><div className="composer-advanced-body">{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</div></Modal> : null}
+      <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
+      {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs !== false} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
       <UpscaleSetupDialog
         setup={upscaleSetup}
@@ -988,7 +880,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onTouchEnd={endViewerTouch}
                   onTouchCancel={endViewerTouch}
                   onClick={clickViewer}
-                  onDoubleClick={(event) => { event.stopPropagation(); zoomViewer(viewerZoom > 1 ? 1 : 2.5); }}
+                  onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > 1 ? 1 : 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
                   {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain">

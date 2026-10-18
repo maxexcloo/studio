@@ -92,3 +92,40 @@ test("turned off, nothing new is kept and the recent prompts go; starred ones st
   history.recordPrompt("remembered again");
   assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["remembered again", "a kept star"]);
 });
+
+test("negative history is independent and excludes Hidden and sealed gallery entries", () => {
+  setGallery([
+    { id: "normal", status: "done", prompt: "A landscape", negative: "Blur and noise", createdAt: "2026-01-01T00:00:00Z" },
+    { id: "hidden", status: "done", negative: "Private exclusions", privateVault: true },
+    { id: "sealed", status: "done", negative: "enc:v1:sealed" },
+    { id: "legacy", status: "done", negative: "Protected exclusions", negativeEncrypted: "enc:v1:sealed" }
+  ], { persist: false });
+  fs.rmSync(history.negativePromptHistoryPath, { force: true });
+  fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });
+  history.resetPromptHistoryCache();
+  const positives = history.listPrompts();
+  assert.deepEqual(history.listPrompts("negative").map((entry) => entry.text), ["Blur and noise"]);
+  history.recordPrompt("Extra fingers", "negative");
+  history.setPromptPinned("Extra fingers", true, "negative");
+  assert.deepEqual(history.listPrompts(), positives);
+  history.forgetPrompts(["Blur and noise"], new Set(), "negative");
+  assert.ok(!fs.readFileSync(`${history.negativePromptHistoryPath}.bak`, "utf8").includes("Blur and noise"));
+  history.setPromptHistoryEnabled(false);
+  history.recordPrompt("Do not save", "negative");
+  assert.deepEqual(history.listPrompts("negative").map((entry) => entry.text), ["Extra fingers"]);
+  history.resetPromptHistoryCache();
+  assert.equal(history.promptHistoryEnabled("negative"), false);
+  history.setPromptHistoryEnabled(true);
+});
+
+test("new negative history honours an existing disabled history preference", () => {
+  history.setPromptHistoryEnabled(false);
+  fs.rmSync(history.negativePromptHistoryPath, { force: true });
+  fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });
+  history.resetPromptHistoryCache();
+  assert.equal(history.promptHistoryEnabled("negative"), false);
+  assert.deepEqual(history.listPrompts("negative"), []);
+  history.recordPrompt("Not recorded", "negative");
+  assert.deepEqual(history.listPrompts("negative"), []);
+  history.setPromptHistoryEnabled(true);
+});

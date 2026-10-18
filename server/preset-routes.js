@@ -42,7 +42,6 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     if (!presets.some((item) => item.id === id)) return;
     presets = presets.filter((item) => item.id !== id);
     writeJsonFile(presetsPath, presets);
-    writeJsonFile(presetsPath, presets);
     if (/^[1-9]\d*$/.test(id)) fs.rmSync(path.join(previewsDir, `${id}.webp`), { force: true });
   };
   const images = () => filterVisibleGallery(gallery).filter((item) => item.civitai && importedImageFile(item)).map(presetFromGallery);

@@ -51,6 +51,8 @@ export type Activity = {
   metaLines?: 1 | 2;
   /** Something small on the right edge of the body, like a thumbnail. */
   aside?: React.ReactNode;
+  /** A short, single-line completion notification. */
+  compact?: boolean;
   wide?: boolean;
   /** Clicking the body: where this work lives. */
   open?: ActivityCommand;
@@ -185,7 +187,7 @@ function ActivityIsland({ activity }: { activity: Activity }) {
     <motion.div
       ref={islandRef}
       layout="position"
-      className={cn('island', 'activity', `is-${activity.state}`, activity.wide && 'is-wide', expanded && 'is-expanded')}
+      className={cn('island', 'activity', `is-${activity.state}`, activity.compact && 'is-compact', activity.wide && 'is-wide', expanded && 'is-expanded')}
       role="status"
       aria-live="polite"
       // Opacity on the glass itself: on a parent it would cut off the backdrop blur.
@@ -193,6 +195,13 @@ function ActivityIsland({ activity }: { activity: Activity }) {
       animate={{ opacity: 1, y: 0, scale: 1, height: height ?? 'auto' }}
       exit={reduced ? { opacity: 0 } : { opacity: 0, y: -14, scale: 0.96 }}
       transition={reduced ? { duration: 0.15 } : ENTER}
+      drag={activity.compact && activity.dismiss ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.55}
+      dragSnapToOrigin
+      onDragEnd={(_, info) => {
+        if (Math.abs(info.offset.x) > 48 || Math.abs(info.velocity.x) > 420) activity.dismiss?.run();
+      }}
       onPointerDownCapture={(event) => { pointer.current = event.pointerType; }}
       onPointerEnter={(event) => { setHeld(true); if (event.pointerType !== 'touch') hover(true); }}
       onPointerLeave={(event) => { setHeld(false); if (event.pointerType !== 'touch') hover(false); }}

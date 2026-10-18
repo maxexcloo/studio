@@ -107,13 +107,14 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe, prompting }) {
   return {
     id,
     kind,
     label,
     displayName: displayName || label,
     description: description || modelBasename(model),
+    ...((imageModes.generate?.prompting ?? prompting) ? { prompting: structuredClone(imageModes.generate?.prompting ?? prompting) } : {}),
     model,
     // The weights file it runs, so switching workflows on the same file can keep its LoRAs.
     baseModel: baseModel ?? modelBasename(model),
@@ -215,6 +216,7 @@ export function inferModels(info, stats = {}) {
       label: workflow.name,
       displayName: workflow.name,
       description: workflow.description,
+      prompting: workflow.prompting,
       model: workflow.profileId,
       baseModel: modelBasename(defaults.model || ""),
       workflow: workflow.profileId,
@@ -244,7 +246,8 @@ export function inferModels(info, stats = {}) {
       constraints: { prompt: textMeta, negative: textMeta, width: widthRange, height: heightRange, count: countRange, frames: frameRange, fps: fpsRange, duration: durationRange, ...samplerRange },
       imageModes: Object.fromEntries(Object.entries(workflow.imageModes || {}).map(([name, mode]) => [name, {
         capabilities: mode.capabilities,
-        defaults: mode.defaults
+        defaults: mode.defaults,
+        ...(mode.prompting ? { prompting: mode.prompting } : {})
       }])),
       capabilities: workflow.capabilities,
       mediaInputs: workflow.mediaInputs || [],

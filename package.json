@@ -36,11 +36,13 @@
     "test:browser": "playwright test"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "busboy": "^1.6.0",
     "compression": "^1.8.2",
     "express": "^5.2.1",
     "express-static-gzip": "^3.0.2",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@fontsource-variable/geist": "^5.2.8",

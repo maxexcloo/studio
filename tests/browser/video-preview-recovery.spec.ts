@@ -20,7 +20,7 @@ test('imported video previews use media URLs and recover after exhausting retrie
     await route.fulfill({ status: 503, body: 'Offline' });
   });
   await page.goto('/');
-  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: 'Video', exact: true }).click();
+  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
   const tile = page.locator('[data-tile-id="civitai:42"]');
   await expect(tile).toBeVisible();
   await expect.poll(() => attempts.has(0)).toBe(true);

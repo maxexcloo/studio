@@ -66,7 +66,7 @@
   .gallery-management button, .gallery-context-menu button { color: ButtonText; }
 }
 
-/* A stable header keeps selection changes out of the gallery's layout. */
+/* Separate tools use the same glass, height and ghost buttons as the status dock. */
 .gallery-toolbar {
   --gallery-toolbar-h: 48px;
   position: sticky;
@@ -78,31 +78,15 @@
   gap: 12px;
   min-height: var(--dock-h);
   margin-bottom: 20px;
-  padding: 0;
-  background: transparent;
 }
-.gallery-toolbar .gallery-generation-mode { position: static; width: 160px; min-height: var(--dock-h); margin: 0; padding: 3px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); box-shadow: var(--shadow-float-sm); }
-.gallery-toolbar .gallery-generation-mode button { min-height: var(--control-h); }
-.gallery-toolbar-actions { display: flex; justify-self: end; justify-content: flex-end; align-items: center; gap: 2px; min-width: 0; min-height: var(--dock-h); padding: 3px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); box-shadow: var(--shadow-float-sm); }
-.gallery-toolbar .gallery-management { position: static; min-height: 40px; margin: 0; padding: 0; flex-wrap: nowrap; border: 0; box-shadow: none; background: transparent; gap: 2px; }
-.gallery-toolbar .gallery-management > span { font-size: 11px; padding: 0 4px; }
-.gallery-toolbar .gallery-management.is-selecting button { flex: none; width: 34px; min-height: var(--control-h); padding: 0; font-size: 0; }
-.gallery-toolbar .gallery-management.is-selecting button svg { width: 16px; height: 16px; }
-.app-shell .gallery-toolbar .gallery-search,
-.phone-searchbar {
-  position: relative;
-  top: auto;
-  left: auto;
-  width: auto;
-  min-width: 0;
+.gallery-toolbar .gallery-generation-mode,
+.gallery-toolbar .gallery-management,
+.gallery-toolbar-actions > .gallery-action-shell,
+.gallery-search,
+.gallery-filter-anchor,
+.gallery-search-clear {
   min-height: var(--dock-h);
-  height: var(--dock-h);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  padding: 3px 4px 3px 14px;
-  transform: none;
+  padding: 3px;
   border: 1px solid var(--surface-border);
   border-radius: var(--r-pill);
   background: var(--surface-grain), var(--surface-float);
@@ -110,122 +94,116 @@
   backdrop-filter: var(--surface-float-blur);
   box-shadow: var(--shadow-float-sm);
 }
-.app-shell .gallery-toolbar .gallery-search input,
-.phone-searchbar > input {
-  flex: 1;
-  min-width: 0;
-  width: 80px;
-  height: 38px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  outline: none;
+.gallery-toolbar .gallery-generation-mode { position: static; width: 160px; margin: 0; }
+.gallery-toolbar .gallery-generation-mode button { min-height: var(--control-h); }
+.gallery-toolbar-actions,
+.gallery-search-tools { display: flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; min-width: 0; }
+.gallery-toolbar-actions { justify-self: end; }
+.gallery-search-tools { justify-self: start; }
+.gallery-toolbar .gallery-management { position: static; display: flex; flex-wrap: nowrap; gap: 2px; min-width: 0; margin: 0; }
+.gallery-toolbar .gallery-select-toggle,
+.gallery-toolbar .gallery-action-shell > .zen-control-button,
+.gallery-search-trigger,
+.gallery-filter-trigger,
+.gallery-filter-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 6px; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
+.gallery-toolbar .gallery-select-toggle { font-size: 12px; font-weight: 550; }
+.gallery-toolbar .gallery-select-toggle > span,
+.gallery-filter-label,
+.gallery-toolbar .gallery-action-shell > .zen-control-button > span,
+.gallery-search-clear > span { display: none; }
+.gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
+.gallery-filter-anchor.is-expanded .gallery-filter-trigger { width: auto; padding: 0 10px; }
+.gallery-toolbar .gallery-select-toggle[aria-expanded="true"] > span,
+.gallery-filter-anchor.is-expanded .gallery-filter-label { display: inline; }
+
+.gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
+.gallery-toolbar .gallery-action-shell > .zen-control-button.is-on,
+.gallery-search-trigger.is-on { background: var(--selected); color: hsl(var(--foreground)); }
+.gallery-action-shell { display: contents; }
+.gallery-toolbar-actions > .gallery-action-shell { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.gallery-toolbar .gallery-action-shell > .zen-control-button { position: static; inset: auto; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); margin: 0; padding: 0; border: 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.gallery-toolbar .gallery-action-shell > .zen-control-button:hover:not(:disabled) { background: var(--control-hover); box-shadow: none; }
+.gallery-toolbar .gallery-action-shell > .zen-control-button > svg { width: 16px; height: 16px; }
+.gallery-toolbar .gallery-action-shell > .zen-control-button:disabled { opacity: .45; }
+.gallery-toolbar .gallery-select-toggle:focus-visible,
+.gallery-toolbar .gallery-action-shell > .zen-control-button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-toolbar .gallery-selection-actions button { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 0; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0; font-size: 0; }
+/* Native scrollbar tracks must not change height while an action strip animates. */
+.gallery-selection-actions { display: flex; align-items: center; gap: 2px; min-width: 0; height: var(--control-h); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.gallery-selection-actions::-webkit-scrollbar { display: none; }
+.app-shell .gallery-toolbar .gallery-search,
+.phone-searchbar .gallery-search { position: relative; inset: auto; display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: var(--dock-h); height: var(--dock-h); margin: 0; overflow: hidden; translate: initial; transform: none; }
+/* `initial` survives production minification, unlike translate:none beside transform:none. */
+.app-shell .gallery-toolbar .gallery-search.is-expanded { min-width: 64px; max-width: 260px; }
+.gallery-search-field { flex: 1; min-width: 0; overflow: hidden; }
+.gallery-search input { display: block; width: 100%; min-width: 0; height: var(--control-h); border: 0; padding: 0 4px; background: transparent; color: inherit; font: inherit; font-size: 13px; outline: none; }
+.gallery-search:focus-within { border-color: var(--surface-border); }
+.gallery-search input:focus-visible { border-radius: var(--r-pill); outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-query-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
+.gallery-search-trigger { min-width: var(--control-h); }
+.gallery-search-clear,
+.gallery-search-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--dock-h); height: var(--dock-h); color: hsl(var(--foreground)); cursor: pointer; }
+.gallery-search-close { width: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
+.gallery-toolbar button:hover:not(:disabled),
+.phone-searchbar button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.gallery-search-tools button:focus-visible,
+.phone-searchbar button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-filter-anchor { position: relative; display: flex; flex: none; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.gallery-filter-trigger { font-size: 12px; }
+.gallery-filter-count { font-size: 10px; }
+.gallery-filter-panel { display: flex; flex: none; align-items: center; min-width: 0; max-width: 440px; overflow: hidden; }
+.gallery-filter-controls { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px; width: 440px; max-width: calc(100vw - 24px); }
+.gallery-filter-select { display: inline-flex; flex: 1 0 100px; align-items: center; justify-content: center; gap: 4px; width: 100px; min-width: 0; height: var(--control-h); padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); font-size: 12px; cursor: pointer; }
+.gallery-filter-select > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gallery-filter-select > svg { flex: none; }
+.gallery-filter-select:hover { background: var(--control-hover); }
+.gallery-filter-menu { position: fixed; right: auto; bottom: auto; border-radius: var(--r-menu); z-index: 45; display: grid; gap: 3px; width: min(240px, calc(100vw - 16px)); overflow-y: auto; padding: 6px; }
+.gallery-filter-menu .aspect-option { display: flex; justify-content: flex-start; min-height: 40px; width: 100%; padding: 8px 10px; text-align: left; overflow-wrap: anywhere; }
+.gallery-filter-icon.is-on,
+.gallery-filter-select.is-on,
+.gallery-filter-trigger.is-on { background: var(--selected); color: hsl(var(--foreground)); }
+/* A narrow lane gives the sliding icons their own compact row, without scrolling. */
+@media (max-width: 1600px) {
+  .gallery-toolbar .gallery-search-tools { position: relative; }
+  .gallery-toolbar .gallery-filter-anchor { position: static; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .gallery-toolbar:has(.gallery-filter-panel) { margin-bottom: calc(28px + var(--gallery-filter-row-h, 48px)); }
+  .gallery-filter-panel { position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; height: auto; max-width: min(448px, calc(100vw - 24px)); padding: 3px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); box-shadow: var(--shadow-float-sm); }
 }
-.app-shell .gallery-toolbar .gallery-search:focus-within, .phone-searchbar:focus-within { border-color: rgb(255 255 255 / .24); }
-.gallery-search > button,
-.gallery-search .gallery-filter-trigger,
-.phone-searchbar > button,
-.phone-searchbar .gallery-filter-trigger {
-  position: static;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  gap: 3px;
-  width: auto;
-  min-width: var(--control-h);
-  height: var(--control-h);
-  min-height: var(--control-h);
-  padding: 5px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-}
-.gallery-search .is-on, .phone-searchbar .is-on { color: var(--ember); background: var(--ember-soft); }
-.gallery-search > button:hover, .gallery-search .gallery-filter-trigger:hover, .phone-searchbar > button:hover, .phone-searchbar .gallery-filter-trigger:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.gallery-filter-anchor { position: relative; flex: none; }
-.gallery-filter-trigger span { font-size: 10px; }
-.gallery-filter-panel, .gallery-view-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-  width: 280px;
-  max-width: calc(100vw - 24px);
-  padding: 12px;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--r-menu);
-  background: var(--surface-grain), var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float);
-}
-.gallery-filter-panel { left: auto; right: -38px; max-height: calc(100dvh - var(--zen-prompt-h, 200px) - var(--gallery-toolbar-h, 48px) - 2 * var(--deck-gap, 18px) - 24px); overflow-y: auto; overscroll-behavior: contain; }
-.gallery-filter-panel label { display: grid; gap: 5px; margin-bottom: 10px; font-size: 12px; }
-.gallery-filter-panel label input { width: 100% !important; flex: none !important; height: 36px !important; padding: 6px 8px !important; border: 1px solid var(--surface-border) !important; border-radius: var(--r-pill); background: var(--well); }
-.gallery-filter-panel p { margin: 8px 0; font-size: 11px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
-.gallery-filter-panel > button { min-height: var(--control-h); border: 0; border-radius: var(--r-pill); padding: 8px 14px; background: var(--control-fill); color: hsl(var(--foreground)); cursor: pointer; }
-.gallery-view-options { position: relative; flex: none; }
-.gallery-view-options summary { display: grid; place-items: center; width: var(--control-h); height: var(--control-h); border-radius: var(--r-pill); cursor: pointer; list-style: none; }
-.gallery-view-options summary::-webkit-details-marker { display: none; }
-.gallery-view-panel { left: auto; right: 0; width: 200px; display: flex; gap: 8px; }
-.gallery-view-panel .zen-control-button { position: static; width: 44px; height: 44px; margin: 0; }
-.sidebar-pin { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--control-h); border: 1px solid transparent; border-radius: var(--r-pill); padding: 0 14px; background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 12px; cursor: pointer; transition: background var(--dur-fast), color var(--dur-fast); }
-.sidebar-pin:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.sidebar-pin[aria-pressed="true"] { background: var(--selected); color: hsl(var(--foreground)); }
-.sidebar-pin:focus-visible, .gallery-view-options summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.gallery-view-options summary:hover, .gallery-view-options[open] summary { background: var(--control-hover); }
-.tile.is-selecting:hover, .tile.is-selecting:active { transform: none; }
-/* These nodes are already virtualised; content-visibility can discard decoded media on selection updates. */
-.tile, .tile img, .tile video { content-visibility: visible; }
-.tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
-@media (min-width: 1100px) {
-  .app-shell.has-pinned-controls .stage-gallery { left: calc(var(--sidebar-w) + 28px); }
-  .app-shell.has-pinned-controls .zen-prompt { left: calc(50% + (var(--sidebar-w) + 28px) / 2); width: min(960px, calc(100vw - var(--sidebar-w) - 64px)); min-width: 0; }
-}
-@media (max-width: 859px) {
-  .gallery-toolbar { --gallery-toolbar-h: 104px; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; }
-  .gallery-toolbar-actions { grid-row: 1; grid-column: 2; }
-  .app-shell .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1 / -1; }
-}
-.phone-shell .phone-searchbar { position: fixed; top: calc(max(6px, env(safe-area-inset-top)) + 54px); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); z-index: 21; min-height: var(--dock-h); }
-.phone-searchbar > input { height: 44px; font-size: 14px; }
-.phone-searchbar > button, .phone-searchbar .gallery-filter-trigger { min-width: 40px; height: 44px; min-height: 44px; }
-.phone-searchbar .gallery-filter-panel { position: absolute; top: calc(100% + 8px); left: auto; right: 0; width: min(280px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 140px); overflow-y: auto; overscroll-behavior: contain; }
-@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
-.app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
-.app-shell.is-hidden-space:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + 50px); }
-.gallery-view-panel { flex-direction: column; }
-.gallery-view-panel .zen-control-button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; padding: 8px 12px; border-radius: var(--r-item); font-size: 12px; }
-.app-shell > .zen-control-button { display: flex; align-items: center; gap: 8px; width: auto; padding: 0 14px; font-size: 12px; }
-.app-shell .gallery-toolbar .gallery-search { translate: none; }
-.gallery-management.is-selecting button { gap: 0; }
-@media (min-width: 1100px) and (max-width: 1340px) {
-  .has-pinned-controls .gallery-toolbar { --gallery-toolbar-h: 104px; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .has-pinned-controls .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; }
-  .has-pinned-controls .gallery-toolbar-actions { grid-row: 1; grid-column: 2; }
-  .app-shell.has-pinned-controls .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1 / -1; }
+@media (max-width: 1050px) {
+  .gallery-toolbar { --gallery-toolbar-h: 104px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .gallery-toolbar .gallery-generation-mode { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+  .gallery-search-tools { grid-column: 1; grid-row: 2; }
+  .gallery-toolbar-actions { grid-column: 2; grid-row: 2; }
 }
 @media (max-width: 600px) {
-  .gallery-toolbar { --gallery-toolbar-h: 160px; grid-template-columns: 1fr; }
-  .gallery-toolbar .gallery-generation-mode { grid-row: 1; grid-column: 1; justify-self: center; }
-  .app-shell .gallery-toolbar .gallery-search { grid-row: 2; grid-column: 1; }
-  .gallery-toolbar-actions { grid-row: 3; grid-column: 1; justify-content: center; }
+  .gallery-toolbar { --gallery-toolbar-h: 160px; grid-template-columns: minmax(0, 1fr); }
+  .gallery-toolbar .gallery-generation-mode { grid-column: 1; }
+  .gallery-search-tools { grid-column: 1; grid-row: 2; }
+  .gallery-toolbar-actions { grid-column: 1; grid-row: 3; }
 }
-/* Keep sticky gallery chrome below the existing sidebar, composer and viewer layers. */
-.stage-gallery { isolation: isolate; z-index: 0; }
-@media (min-width: 1100px) {
-  .app-shell.has-pinned-controls .zen-controls { bottom: calc(2 * var(--deck-gap) + var(--deck-h)); }
-  .app-shell.has-pinned-controls .studio-dock { left: var(--deck-gap); right: auto; flex-direction: row; }
-  .app-shell.has-pinned-controls > .zen-control-button { left: calc(var(--sidebar-w) - 82px); }
-}
-/* The virtual gallery restores positions itself; native anchoring follows moving tiles. */
-.stage-gallery { overflow-anchor: none; }
-
-.virtual-gallery .tile, .virtual-gallery .run-stack { scroll-margin-top: 120px; }
+.phone-shell .phone-searchbar { --phone-search-offset: 54px; position: fixed; top: calc(max(6px, env(safe-area-inset-top)) + var(--phone-search-offset)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); z-index: 21; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.phone-searchbar .gallery-search { flex: none; min-width: var(--dock-h); }
+.phone-searchbar .gallery-search.is-expanded { flex: 1; min-width: 64px; }
+.phone-searchbar .gallery-search input { font-size: 14px; }
+/* Its containing block stays the search row, so the slideout remains in the viewport. */
+.phone-searchbar .gallery-filter-anchor { position: static; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.phone-searchbar .gallery-filter-controls { width: min(440px, calc(100vw - 24px)); }
+.phone-searchbar .gallery-filter-panel { position: absolute; left: 0; top: calc(100% + 8px); max-width: min(448px, calc(100vw - 16px)); }
+.phone-shell:has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px); }
+.phone-shell:has(.phone-gallery-mode):has(.phone-searchbar .gallery-filter-panel) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 174px + var(--gallery-filter-row-h, 48px)); }
+.phone-running-inline { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px; min-width: 36px; min-height: 44px; padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ember); font-size: 12px; }
+.phone-gallery-options .zen-control-button { position: static; display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 48px; margin: 0; padding: 10px 16px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font-size: 14px; }
+.phone-gallery-options .zen-control-button:disabled { opacity: .4; }
+.tile.is-selecting:hover,
+.tile.is-selecting:active { transform: none; }
+/* These nodes are virtualised; content-visibility can discard decoded media on selection updates. */
+.tile,
+.tile img,
+.tile video { content-visibility: visible; }
+.tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
+.stage-gallery { isolation: isolate; z-index: 0; overflow-anchor: none; }
+.app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
+.app-shell.is-hidden-space:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + 50px); }
+.virtual-gallery .tile,
+.virtual-gallery .run-stack { scroll-margin-top: 120px; }
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

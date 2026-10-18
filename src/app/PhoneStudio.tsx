@@ -1,4 +1,5 @@
-import { PromptActions } from './PromptActions';
+import { PromptField } from './PromptField';
+import { canAnimatePhoto } from './AnimatePhotos';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
@@ -7,19 +8,20 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, RefreshCw, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
-import { familyLabel, NumberPicker, setupNote } from './components';
+import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
 import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { ViewerReuseAction } from './ViewerActions';
+import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
 import { useFocusTrap } from './useFocusTrap';
 import { useHistoryDismiss } from './useHistoryDismiss';
-import { progressLine, progressReading, RunLeft } from './GenerationProgress';
+import { progressReading } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
@@ -235,6 +237,7 @@ export type PhoneItemActions = {
   upscaleBusy: (item: GalleryItem) => boolean;
   upscale: (item: GalleryItem) => void;
   cancelUpscale: (item: GalleryItem) => void;
+  copyPrompt: (item: GalleryItem) => Promise<boolean>;
   reuse: (item: GalleryItem) => void;
   promptsOnly: (item: GalleryItem) => void;
   useAsReference?: (item: GalleryItem) => void;
@@ -288,18 +291,18 @@ function UpscaleBarButton({ item, actions }: { item: GalleryItem; actions: Phone
   );
 }
 
-/** What a long press on a tile offers, as one sheet of big labelled rows. */
+/** A compact action sheet keeps the picture and its actions within reach. */
 export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: GalleryItem | null; onClose: () => void; actions: PhoneItemActions; onSelect?: (item: GalleryItem) => void }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const done = item?.status === 'done' && Boolean(item?.url);
   const run = (action: () => void) => { onClose(); action(); };
   return (
-    <Sheet open={Boolean(item)} onClose={onClose} title={item?.prompt ? truncate(item.prompt, 60) : 'Image'}>
+    <Sheet className="phone-item-actions" open={Boolean(item)} onClose={onClose} title={item?.prompt ? truncate(item.prompt, 60) : 'Image'}>
       {item ? (
         <div className="phone-group">
           {done ? (
             <button type="button" className="phone-row" onClick={() => run(() => shareItem(item, actions.showToast))}>
-              {canShareFiles ? <Share size={20} /> : <Download size={20} />}<span>{canShareFiles ? 'Share or save' : 'Save'}</span>
+              {canShareFiles ? <Share size={20} /> : <Download size={20} />}<span>{canShareFiles ? 'Share or Save' : 'Save'}</span>
             </button>
           ) : null}
           {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleSheetRow item={item} actions={actions} run={run} /> : null}
@@ -309,6 +312,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
             </button>
           ) : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Model</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => { void actions.copyPrompt(item); })}><CopyIcon copied={false} size={20} /><span>Copy Prompt</span></button> : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><Wand2 size={20} /><span>Prompts Only</span></button> : null}
           {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
           {done && !item.library ? (
@@ -316,7 +320,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               ? <button type="button" className="phone-row" onClick={() => run(() => actions.unhide(item))}><Eye size={20} /><span>Move to Gallery</span></button>
               : <button type="button" className="phone-row" onClick={() => run(() => actions.hide(item))}><EyeOff size={20} /><span>Move to Hidden</span></button>
           ) : null}
-          {onSelect && (item.status === 'done' || item.status === 'error') ? <button type="button" className="phone-row" onClick={() => run(() => onSelect(item))}><CheckCircle2 size={20} /><span>Select several<small>Then save, hide or delete them together</small></span><HapticTarget /></button> : null}
+          {onSelect && (item.status === 'done' || item.status === 'error') ? <button type="button" className="phone-row" onClick={() => run(() => onSelect(item))}><CheckCircle2 size={20} /><span>Select Several</span><HapticTarget /></button> : null}
           <button type="button" className="phone-row is-danger" onClick={() => run(() => { haptic('warning'); actions.remove(item); })}><Trash2 size={20} /><span>{item.library ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
         </div>
       ) : null}
@@ -324,19 +328,21 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
   );
 }
 
-/** The viewer's bottom bar on a phone: five big labelled actions and Info. */
+/** Direct actions below the image, with Star and Details beside the close control. */
 export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, compareOpen, onToggleCompare }: { item: GalleryItem; actions: PhoneItemActions; showDetails: boolean; onToggleDetails: () => void; compareOpen: boolean; onToggleCompare: () => void }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const done = item.status === 'done' && Boolean(item.url);
+  const promptCopy = useCopyFeedback();
   return (
     <nav className="viewer-phone-bar" aria-label="Image actions">
       {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
       {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
       {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
       {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} onUsePrompts={() => actions.promptsOnly(item)} /> : null}
+      {item.prompt ? <button type="button" aria-label="Copy Prompt" onClick={() => { void promptCopy.copyWith(() => actions.copyPrompt(item)); }}><CopyIcon copied={Boolean(promptCopy.copied)} size={21} /><span>{promptCopy.copied ? 'Copied' : 'Copy Prompt'}</span></button> : null}
       {canStar(item) ? (
-        <button type="button" className={cn(item.favorite && 'is-starred')} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
-          <Star size={21} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Starred' : 'Star'}</span><HapticTarget />
+        <button type="button" className={cn('viewer-phone-star', item.favorite && 'is-starred')} aria-label={item.favorite ? 'Unstar' : 'Star'} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
+          <Star size={21} fill={item.favorite ? 'currentColor' : 'none'} /><HapticTarget />
         </button>
       ) : null}
       {done && !item.library ? (
@@ -358,7 +364,7 @@ function truncate(text: string, length: number) {
 
 /* ------------------------------------------------------------ The shell */
 
-export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, itemActions, actionsFor, setActionsFor, selection, setSelection }: {
+export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, itemActions, actionsFor, setActionsFor, selection, setSelection, onAnimate }: {
   view: Record<string, any>;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
@@ -372,6 +378,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   setActionsFor: (item: GalleryItem | null) => void;
   selection: Set<string> | null;
   setSelection: (selection: Set<string> | null) => void;
+  onAnimate: (items: GalleryItem[]) => void;
 }) {
   const {
     prompt, currentProfile, hiddenSpace, hidden, runningCount, cancelQueue, comfyStatus, retryComfyStatus, mode, changeMode,
@@ -402,10 +409,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     : !generatingCount
       ? upscalingCount === 1 ? 'Upscaling 1 image' : `Upscaling ${upscalingCount}`
       : `Generating ${generatingCount} · upscaling ${upscalingCount}`;
-  const stepLine = pending.length === 1 ? progressLine(pending[0].progress) : withSteps.length ? `${Math.round(progress * 100)}%` : '';
 
-  // A finished run shows itself: a small card slides up, tap to open.
-  const [peek, setPeek] = React.useState<GalleryItem | null>(null);
+  // Finished runs use the shared compact notification, including swipe to dismiss.
   const pendingJobs = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
     const nowPending = new Set(pending.map((item) => item.jobId || item.id));
@@ -413,22 +418,26 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     pendingJobs.current = nowPending;
     if (!landed) return;
     haptic('success');
-    if (!createOpen && !active) setPeek(landed);
+    if (!createOpen && !active) showToast(landed.type === 'video' ? 'Video Ready' : 'Image Ready', 'success', {
+      duration: 5500,
+      group: 'phone-generation-ready',
+      action: { label: 'View', onClick: () => openItem(landed) }
+    });
   }, [gallery]); // eslint-disable-line react-hooks/exhaustive-deps
-  React.useEffect(() => {
-    if (!peek) return;
-    const timer = window.setTimeout(() => setPeek(null), 5500);
-    return () => window.clearTimeout(timer);
-  }, [peek]);
   const [moreOpen, setMoreOpen] = React.useState(false);
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
-  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const filterTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const searchOpen = Boolean(view.phoneSearchOpen);
+  const activeFilters = Boolean(hiddenSpace || gallerySearch.favorites || gallerySearch.model || gallerySearch.workflow || gallerySearch.lora);
+  const searchExpanded = searchOpen || Boolean(gallerySearch.q.trim());
+  const filtersExpanded = filtersOpen || activeFilters;
+  const setSearchOpen = view.setPhoneSearchOpen as (open: boolean) => void;
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
   const statusText = restarting ? `${connectionName} is restarting` : comfyStatus?.busy ? `${connectionName} is busy` : connected ? `${connectionName} connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? `${connectionName} is offline` : `Checking ${connectionName}…`;
-  const workflowName = currentProfile?.displayName || currentProfile?.label || 'Choose a Model';
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
   return (
@@ -453,30 +462,20 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
             <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
           </button>
+          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Scroll To Top`} title={runningLabel} onClick={scrollToTop}>
+            <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
+          </button> : null}
         </div>
-        {!hiddenLocked && gallery.some((item) => item.type === 'video') ? (
-          <GridAutoplayButton phone />
-        ) : null}
-        {!hiddenLocked && !selecting ? (
-          <StackRunsButton phone on={Boolean(view.prefs.stackRuns)} disabled={searchActive(gallerySearch)} onToggle={() => { haptic('tap'); view.setPrefs({ stackRuns: !view.prefs.stackRuns }); }} />
-        ) : null}
-        {!hiddenSpace ? (
-          <button type="button" className={cn('phone-icon', hidden.enabled && hidden.unlocked && 'has-dot')} aria-label={hidden.enabled && hidden.unlocked ? 'Open Hidden, unlocked' : 'Open Hidden'} onClick={toggleHiddenSpace}><LockKeyhole size={20} /></button>
-        ) : hidden.unlocked ? (
-          <button type="button" className="phone-pill" onClick={() => hidden.lock()}><LockKeyhole size={15} /> Lock</button>
-        ) : null}
-        {view.models?.features?.presets === true ? <button type="button" className="phone-icon" aria-label="Image & Model Library" onClick={() => view.setPresetLibraryOpen(true)}><Library size={20} /></button> : null}
+        {!hiddenLocked ? <button type="button" className={cn('phone-icon', Boolean(gallerySearch.q.trim()) && 'has-dot')} aria-label="Search Gallery" aria-expanded={searchExpanded} onClick={() => setSearchOpen(gallerySearch.q.trim() ? true : !searchExpanded)}><Search size={20} /></button> : null}
+        <button type="button" className={cn('phone-icon', activeFilters && 'has-dot')} ref={filterTriggerRef} aria-label="Open Gallery Filters" title="Filters" aria-expanded={filtersExpanded} onClick={() => setFiltersOpen(activeFilters ? true : !filtersExpanded)}><SlidersHorizontal size={20} /></button>
         <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
-      </header>
-      {!hiddenLocked ? <PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={gallery} /> : null}
-
-      {runningCount ? (
-        <div className="phone-running" role="status">
-          <RefreshCw size={14} className="spin" />
-          <span>{runningLabel}</span>
-          <button type="button" className="phone-pill" onClick={cancelQueue}><CircleStop size={15} /> Stop all</button>
+        <div className="phone-gallery-mode-row">
+          <div className="phone-mode-select phone-gallery-mode" role="group" aria-label="Gallery Mode">
+            {(['image', 'video'] as const).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => { haptic('tap'); changeMode(value); }}>{value === 'image' ? 'Images' : 'Videos'}</button>)}
+          </div>
         </div>
-      ) : null}
+      </header>
+      {<PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchExpanded} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} filterTriggerRef={filterTriggerRef} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} items={gallery} />}
 
       <main ref={galleryStageRef} className="phone-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
         {galleryBody}
@@ -484,6 +483,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       {selecting ? (
         <nav className="phone-select-bar" aria-label="Selected Items">
+          <button type="button" disabled={!selectedItems.some(canAnimatePhoto)} onClick={() => onAnimate(selectedItems.filter(canAnimatePhoto))}><Video size={21} /><span>Animate</span></button>
           <button type="button" disabled={!readyItems.length} onClick={() => shareItems(readyItems, showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button>
           <button type="button" disabled={!starredItems.length} onClick={() => view.toggleFavorite(starredItems, !allStarred)}><Star size={21} /><span>{allStarred ? 'Unstar' : 'Star'}</span></button>
           {hiddenSpace
@@ -495,16 +495,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       {!hiddenLocked && !selecting ? (
         <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
-          <div className="phone-mode-select" role="group" aria-label="Generation Mode">
-            {(['image', 'video'] as const).map((value) => (
-              <button key={value} type="button" aria-label={value === 'image' ? 'Image' : 'Video'} aria-pressed={mode === value} onClick={() => { haptic('tap'); changeMode(value); }}>
-                {value === 'image' ? <ImageIcon size={20} aria-hidden="true" /> : <Video size={20} aria-hidden="true" />}
-              </button>
-            ))}
-          </div>
           <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
-            <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() ? truncate(prompt, 90) : 'Prompt'}</strong>
-            <small>{stepLine ? <span className="phone-step-line">{pending.length > 1 ? `Generating ${pending.length} · ` : 'Generating · '}{stepLine}{pending.length === 1 && pending[0].progress?.endsAt ? <> · <RunLeft progress={pending[0].progress} /></> : null}</span> : workflowName}</small>
+            <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() || 'Prompt...'}</strong>
           </button>
           <button
             type="button"
@@ -520,23 +512,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       <AnimatePresence>
-        {peek && !selecting ? (
-          <motion.button
-            key={peek.id}
-            type="button"
-            className="phone-peek"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-            onClick={() => { setPeek(null); openItem(peek); }}
-            aria-label="Image ready. Open it"
-          >
-            <span className="phone-peek-thumb"><Media item={peek} muted /></span>
-            <span className="phone-peek-text"><strong>Ready</strong><small>Tap to open</small></span>
-            <ChevronRight size={18} />
-          </motion.button>
-        ) : null}
       </AnimatePresence>
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
@@ -578,6 +553,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
   const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
+  const { prompts: recentNegatives } = usePromptHistory(open, 'negative');
   const { prompts: recentPrompts } = usePromptHistory(open);
   const restarting = Boolean(comfyStatus?.restarting);
   const variations = mode === 'video' || currentProfile?.capabilities?.variations !== false;
@@ -610,18 +587,21 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       footer={
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
-          <div className="composer-submit-actions">
-          <button
-            type="button"
-            className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')}
-            aria-disabled={restarting || (!comfyOffline && (!prompt.trim() || generateDisabled)) || undefined}
-            onClick={go}
-          >
-            {restarting ? <><RefreshCw size={18} className="spin" /> Restarting…</>
-              : comfyOffline ? <><RefreshCw size={18} className={cn(comfyRetrying && 'spin')} /> {comfyRetrying ? 'Checking…' : 'Check Again'}</>
-              : <><ArrowUp size={20} strokeWidth={2.4} /> {mode === 'video' ? count > 1 ? `Generate ${count} Videos` : 'Generate Video' : count > 1 ? `Generate ${count}` : 'Generate'}</>}
-            <HapticTarget />
-          </button>
+          <div className="phone-creation-resources">
+            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}><Plus size={16} /><span>LoRAs</span>{view.loraActiveCount ? <b>{view.loraActiveCount}</b> : null}</button></div>
+            <button type="button" className="phone-model-browse" aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')}><SlidersHorizontal size={16} /><span>{currentProfile?.recipe?.modelLabel || currentProfile?.displayName || currentProfile?.label || 'Model'}</span></button>
+          </div>
+          <div className="phone-creation-toolbar phone-creation-submit-row">
+            <ComposerModeSelect mode={mode} onChange={view.changeMode} />
+            {!aspectLocked ? <button type="button" aria-label="Aspect Ratio" aria-haspopup="dialog" aria-expanded={sheet === 'size'} onClick={() => setSheet('size')}><span className="aspect-shape phone-aspect" style={aspectIconStyle({ label: "", value: "", w: size.shown.width, h: size.shown.height })} /></button> : null}
+            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" /> : null}
+            <button type="button" aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={sheet === 'advanced'} onClick={() => setSheet('advanced')}><MoreHorizontal size={18} /></button>
+            <button type="button" className="phone-creation-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={18} /></button>
+            <div className="composer-submit-actions">
+              <button type="button" className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={restarting || (!comfyOffline && (!prompt.trim() || generateDisabled)) || undefined} onClick={go}>
+                {restarting || comfyOffline ? <RefreshCw size={20} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={20} strokeWidth={2.4} />}<HapticTarget />
+              </button>
+            </div>
           </div>
         </>
       }
@@ -658,86 +638,29 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <div className="composer-prompt-row">
-        <div className="composer-prompt-field">
-        <textarea
-          aria-label={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'}
-          value={prompt}
-          placeholder="Prompt"
-          onChange={(event) => setPrompt(clampText(event.target.value, promptLimit))}
-          rows={4}
-        />
-        </div>
-        <div className="composer-reference-tools" />
-        </div>
-      <div className="composer-secondary-row">
-      {canUseNegativePrompt ? (
-        <label className={cn("phone-negative", currentProfile?.capabilities?.negativePrompt === false && "is-unused")}>
-          <textarea aria-label="Negative Prompt" value={negative} rows={1} placeholder="Negative Prompt" onChange={(event) => setNegative(clampText(event.target.value, negativeLimit))} />
-        </label>
-      ) : null}
-        <PromptActions hasHistory={Boolean(recentPrompts.length)} historyOpen={historyOpen} onHistory={() => { haptic('tap'); setHistoryOpen(true); }} hasText={Boolean(prompt || negative)} onClear={() => { setPrompt(''); setNegative(''); setShowNegativePrompt(false); }} />
-      </div>
-        <div className="phone-compose-actions">
-          <ComposerModeSelect mode={view.mode} onChange={view.changeMode} />
-        </div>
+        <PromptField kind="positive" value={prompt} ariaLabel={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+        {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
       </div>
       <PromptHistorySheet
+        kind={historyKind}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
-        onPick={(text) => { setPrompt(clampText(text, promptLimit)); setHistoryOpen(false); }}
+        onPick={(text) => { if (historyKind === 'negative') setNegative(clampText(text, negativeLimit)); else setPrompt(clampText(text, promptLimit)); setHistoryOpen(false); }}
         onError={(message) => showToast(message, 'error')}
       />
 
+      <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
+      <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
+      <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced Settings" full className="phone-advanced">
+        {currentProfile?.family !== 'grok' ? <div className="phone-control"><NumberPicker label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /></div> : null}
       {String(seed || '').trim() ? (
         <button type="button" className="phone-row phone-seed" onClick={() => setSeed('')}>
           <Dices size={20} /><span>Seed {String(seed).trim()} is fixed<small>Tap for a random seed</small></span>
         </button>
       ) : null}
 
-      <div className="phone-group">
-        <button type="button" className="phone-row" onClick={() => setSheet('workflow')}>
-          <SlidersHorizontal size={20} />
-          <span>{currentProfile ? currentProfile.recipe?.modelLabel || modelName(currentProfile).name : 'Choose a Model'}<small>{currentProfile ? currentProfile.recipe?.label || modelName(currentProfile).detail : 'Model'}</small></span>
-          <ChevronRight size={18} className="phone-row-end" />
-        </button>
-      </div>
-      <div className="phone-loras">{modelLoraControls}</div>
       {grokMediaControls}
       {phoneVideoDurationControls}
-      <div className="phone-group">
-        {(aspectOptions || []).length && !aspectLocked ? (
-          <button type="button" className="phone-row" onClick={() => setSheet('size')}>
-            {/* The real shape, tagged 2K or C like the desktop's size button. */}
-            <span className="aspect-shape-slot phone-size-icon">
-              <span className="aspect-shape" style={aspectIconStyle({ label: '', value: '', w: size.shown.width, h: size.shown.height })} />
-              {size.badge ? <b className="aspect-upscale-badge" aria-hidden="true">{size.badge}</b> : null}
-            </span>
-            <span>{size.captionFor(null)}<small>{size.shown.width} × {size.shown.height}</small></span>
-            <ChevronRight size={18} className="phone-row-end" />
-          </button>
-        ) : null}
-      </div>
-
-      {variations && maxCount > 1 ? (
-        <div className="phone-control">
-          <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" />
-        </div>
-      ) : null}
-
-      {currentProfile?.family !== 'grok' ? <div className="phone-control">
-        <span className="phone-control-label">Steps <b>{steps}</b></span>
-        <input className="phone-slider" type="range" min={stepMin} max={stepMax} step={1} value={steps} aria-label="Steps" onChange={(event) => setSteps(Number(event.target.value))} />
-        <span className="phone-control-hint"><span>Faster</span>{stepDefault ? <button type="button" className="phone-step-default" onClick={() => setSteps(stepDefault)} disabled={steps === stepDefault}>Recommended {stepDefault}</button> : null}<span>More detail</span></span>
-      </div> : null}
-
-      <button type="button" className="phone-link is-strong" onClick={() => setSheet('advanced')}>
-        Advanced Settings <ChevronRight size={16} />
-      </button>
-
-      <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
-      <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
-      <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced" full className="phone-advanced">
         {phoneAdvancedControls}
       </Sheet>
     </Sheet>
@@ -754,15 +677,13 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const favorites = new Set(menu?.favorites || []);
   const needle = query.trim().toLowerCase();
   const matches = (profile: Profile) => profileMatchesFilters(profile, filters, menu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
-  const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
-  const recent = needle ? [] : (menu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
   const rest = profiles.filter(matches);
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
       <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
         {profile.id === model ? <Check size={18} className="model-selection-tick" aria-hidden="true" /> : null}
-        <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelName(profile).detail, setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
+        <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
 
       </button>
       {modelMenu ? (
@@ -786,9 +707,8 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
       </div>
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Add a model to ComfyUI to see it here.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
       {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
-      {recent.length ? <><h3 className="phone-section">Recent</h3><div className="phone-group">{recent.map(row)}</div></> : null}
       {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}
-      {!starred.length && !recent.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
+      {!starred.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
     </Sheet>
   );
 }
@@ -994,6 +914,13 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
           : hidden.unlocked
             ? <button type="button" className="phone-row" onClick={() => { hidden.lock(); onClose(); }}><LockKeyhole size={20} /><span>Lock Hidden<small>Also locks when idle</small></span></button>
             : <button type="button" className="phone-row" onClick={() => { onClose(); hidden.requestUnlock(null); }}><LockKeyhole size={20} /><span>Unlock Hidden</span></button>}
+      </div>
+      <h3 className="phone-section">Gallery</h3>
+      <div className="phone-group phone-gallery-options">
+        <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchActive(view.gallerySearch || emptySearch)} onToggle={() => { haptic('tap'); setPrefs({ stackRuns: !prefs.stackRuns }); }} />
+        {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}
+        {view.models?.features?.presets === true ? <button type="button" className="phone-row" aria-label="Image & Model Library" onClick={() => { onClose(); view.setPresetLibraryOpen(true); }}><Library size={20} /><span>Image & Model Library</span></button> : null}
+        {view.runningCount ? <button type="button" className="phone-row" onClick={() => { onClose(); view.cancelQueue(); }}><CircleStop size={20} /><span>Stop All Generations</span></button> : null}
       </div>
       <h3 className="phone-section">Studio</h3>
       <div className="phone-group">

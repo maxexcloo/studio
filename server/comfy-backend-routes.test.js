@@ -185,3 +185,23 @@ test("SFW instances hide restricted models and LoRAs and reject saved Grok reque
   }
   assert.ok((await api("/api/models")).body.profiles.some((profile) => profile.id === grok.id));
 });
+
+test("repeating an acknowledged client job ID does not queue another video", { timeout: 10000 }, async () => {
+  const profile = (await api("/api/models")).body.profiles.find((item) => item.family === "minimax_h3");
+  const body = { ...generation(profile), clientJobId: "animation-retry-once" };
+  const promptCount = video.requests.filter((request) => request.pathname === "/prompt").length;
+  const next = video.nextPrompt();
+  const [first, concurrent] = await Promise.all([api("/api/generate", body), api("/api/generate", body)]);
+  assert.equal(first.status, 200);
+  assert.equal(concurrent.status, 200);
+  assert.equal(concurrent.body.jobId, first.body.jobId);
+  const queued = await next;
+  const before = video.requests.filter((request) => request.pathname === "/prompt").length;
+  assert.equal(before, promptCount + 1);
+  const repeat = await api("/api/generate", body);
+  assert.equal(repeat.status, 200);
+  assert.equal(repeat.body.jobId, first.body.jobId);
+  assert.equal(video.requests.filter((request) => request.pathname === "/prompt").length, before);
+  await api(`/api/jobs/${first.body.jobId}/cancel`, {});
+  video.drop(queued.id);
+});

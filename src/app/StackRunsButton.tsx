@@ -14,7 +14,7 @@ export function StackRunsButton({ on, onToggle, disabled = false, labelled = fal
     : [{ x: 2.5, y: 2.5, width: 6.5, height: 15 }, { x: 11, y: 2.5, width: 6.5, height: 6.5 }, { x: 11, y: 11, width: 6.5, height: 6.5 }];
   const label = disabled ? "Auto-grouping is paused in search results" : on ? "Turn off auto-grouping" : "Turn on auto-grouping";
   return (
-    <Tip content={label}>
+    <span className="gallery-action-shell"><Tip content={label}>
       <button
         type="button"
         className={`${phone ? "phone-icon" : "zen-control-button stack-runs-button"}${on ? " is-on" : ""}`}
@@ -33,6 +33,6 @@ export function StackRunsButton({ on, onToggle, disabled = false, labelled = fal
         </svg>
         {labelled ? <span>Auto-Grouping</span> : null}
       </button>
-    </Tip>
+    </Tip></span>
   );
 }

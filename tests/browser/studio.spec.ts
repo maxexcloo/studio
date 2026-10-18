@@ -10,7 +10,7 @@ function controls(page: Page, phone: boolean) {
     mode,
     scroller: page.locator(phone ? '.phone-gallery' : '.stage-gallery'),
     switchMode: async (value: 'image' | 'video') => {
-      await mode.getByRole('button', { name: value === 'video' ? 'Video' : 'Image', exact: true }).click();
+      await mode.getByRole('button', { name: value === 'video' ? /^Videos?$/ : /^Images?$/ }).click();
     },
   };
 }
@@ -39,16 +39,17 @@ test('image and video keep their own scroll positions through repeated switches'
         expect(box!.height).toBeGreaterThanOrEqual(44);
       }
       expect(selector!.height).toBeGreaterThanOrEqual(44);
-      expect(selector!.x + selector!.width).toBeLessThanOrEqual(prompt!.x);
-      expect(selector!.y).toBeCloseTo(prompt!.y, 0);
-      expect(selector!.y).toBeGreaterThan(viewport.height / 2);
+      expect(selector!.x).toBeGreaterThanOrEqual(0);
+      expect(selector!.x + selector!.width).toBeLessThanOrEqual(viewport.width);
+      expect(selector!.y).toBeLessThan(viewport.height / 2);
+      expect(prompt!.y).toBeGreaterThan(viewport.height / 2);
       expect(prompt!.width).toBeGreaterThan(100);
       expect(pill!.x + pill!.width).toBeLessThanOrEqual(viewport.width);
       await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await mode.getByRole('button', { name: 'Image', exact: true }).focus();
-    await expect(mode.getByRole('button', { name: 'Image', exact: true })).toBeFocused();
+    await mode.getByRole('button', { name: /^Images?$/ }).focus();
+    await expect(mode.getByRole('button', { name: /^Images?$/ })).toBeFocused();
   } else expect(await mode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
   await scroller.evaluate((element) => { element.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1700 })); element.scrollTo({ top: 1700, behavior: 'instant' }); });
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(1600);
@@ -115,6 +116,7 @@ test('swipes move through previews and generation details stay accessible', asyn
 
 async function openComposer(page: Page, phone: boolean) {
   if (phone) await page.locator('.phone-create-open').click();
+  else await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
 }
 
 for (const kind of ['image', 'video']) {
@@ -129,11 +131,11 @@ for (const kind of ['image', 'video']) {
     await page.goto('/');
     await controls(page, isMobile).switchMode(kind as 'image' | 'video');
     await openComposer(page, isMobile);
-    await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+    await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
     await page.getByRole('button', { name: 'Aspect Reference', exact: true }).click();
     await expect(page.locator('.reference-popover')).toHaveCount(0);
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Follow the reference framing');
-    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: kind === 'video' ? 'Generate Video' : 'Generate 4', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
     await generate.click();
     await expect.poll(() => body).not.toBeNull();
     expect(body!.kind).toBe(kind);
@@ -170,7 +172,7 @@ for (const selection of ['empty', 'previous', 'manual']) {
     if (existingReference) {
       await controls(page, isMobile).switchMode('video');
       await openComposer(page, isMobile);
-      await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+      await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
       await page.getByRole('button', { name: previous.name, exact: true }).click();
       await page.getByRole('button', { name: 'Add End Image', exact: true }).click();
       await page.getByRole('button', { name: previous.name, exact: true }).click();
@@ -191,19 +193,22 @@ for (const selection of ['empty', 'previous', 'manual']) {
       }
       await controls(page, isMobile).switchMode('video');
       await openComposer(page, isMobile);
-    } else await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    } else {
+      if (!isMobile) await openComposer(page, false);
+      await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    }
     await expect.poll(() => resolves).toBe(1);
-    const pendingGenerate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }) : page.getByRole('button', { name: 'Loading the reused image', exact: true });
+    const pendingGenerate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Loading the reused image', exact: true });
     await expect(pendingGenerate).toBeDisabled();
     if (selection === 'manual') {
-      await page.getByRole('button', { name: `Change start image, currently ${previous.name}`, exact: true }).click();
+      await page.getByRole('button', { name: `Change reference image, currently ${previous.name}`, exact: true }).click();
       await page.getByRole('button', { name: manual.name, exact: true }).click();
     }
     releaseReference();
     const expected = selection === 'manual' ? manual : reference;
-    await expect(page.getByRole('button', { name: `Change start image, currently ${expected.name}`, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Change reference image, currently ${expected.name}`, exact: true })).toBeVisible();
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the image');
-    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+    const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
     await generate.click();
     await expect.poll(() => body).not.toBeNull();
     expect(body!.kind).toBe('video');
@@ -225,12 +230,19 @@ test('generation completion stays in its mode and unsupported negatives remain s
   });
   const effectRequests: string[] = [];
   page.on('request', (request) => { if (/\/assets\/generation-fx-/.test(request.url())) effectRequests.push(request.url()); });
-  await page.route('**/api/models', async (route) => {
-    const response = await route.fetch();
-    const models = await response.json();
-    for (const profile of models.profiles) profile.capabilities.negativePrompt = false;
-    await route.fulfill({ json: models });
-  });
+  const models = await (await page.request.get('/api/models')).json();
+  for (const kind of ['image', 'video']) {
+    const profile = models.profiles.find((item: any) => item.id === models.defaults[kind === 'image' ? 'imageModel' : 'videoModel']);
+    Object.assign(profile, { displayName: `Supported ${kind}`, capabilities: { ...profile.capabilities, negativePrompt: true, startImageRequired: false }, mediaInputs: [] });
+    models.profiles.push({ ...profile, id: `no-negative-${kind}`, displayName: `Unsupported ${kind}`, label: `Unsupported ${kind}`, capabilities: { ...profile.capabilities, negativePrompt: false } });
+  }
+  await page.route('**/api/models', route => route.fulfill({ json: models }));
+  const choose = async (name: string) => {
+    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
+    else await page.locator('.zen-prompt .model-trigger').click();
+    const menu = page.locator(isMobile ? '.phone-model-sheet' : '.model-menu');
+    await menu.locator(isMobile ? '.phone-model-option' : '[role="option"]').filter({ hasText: name }).first().click();
+  };
   let body: Record<string, any> = {}, done = false;
   await page.route('**/api/generate', async (route) => {
     body = route.request().postDataJSON();
@@ -244,11 +256,13 @@ test('generation completion stays in its mode and unsupported negatives remain s
     await switchMode(kind as 'image' | 'video');
     await openComposer(page, isMobile);
     await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill(`Saved ${kind} negative`);
+    await choose(`Unsupported ${kind}`);
+    await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).not.toBeVisible();
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A verification generation');
     await scroller.evaluate((element) => element.scrollTo({ top: 1200, behavior: 'instant' }));
     done = false;
     const posted = page.waitForResponse('**/api/generate');
-    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: kind === 'video' ? 'Generate Video' : 'Generate 4', exact: true }).click();
+    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
     else await page.getByRole('button', { name: 'Generate', exact: true }).click();
     await posted;
     expect(body).not.toHaveProperty('negative');
@@ -261,6 +275,8 @@ test('generation completion stays in its mode and unsupported negatives remain s
   }
   await switchMode('image');
   await openComposer(page, isMobile);
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).not.toBeVisible();
+  await choose('Supported image');
   await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue('Saved image negative');
   expect(effectRequests).toEqual([]);
 });
@@ -280,7 +296,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await page.goto('/');
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   await openComposer(page, isMobile);
-  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
   await expect(page.getByText('Images Unavailable')).toBeVisible();
   fail = false;
   await page.getByRole('button', { name: 'Try Again', exact: true }).click();
@@ -305,11 +321,11 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await page.keyboard.press('Escape');
   await expect(page.locator('.reference-popover')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await page.getByRole('tab', { name: 'Uploads', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0);
-  await page.getByRole('tab', { name: 'Generations', exact: true }).click();
+  await page.getByRole('tab', { name: 'Library', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await body.evaluate((element) => { element.scrollTop = 0; });
   await expect(page.locator('[data-reference-index="0"]')).toBeVisible();
@@ -322,16 +338,16 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await page.keyboard.press('Home');
   await expect(page.locator('[data-reference-index="0"]')).toBeFocused();
   expect(await page.locator('[data-reference-index][tabindex="0"]').count()).toBe(1);
-  await page.getByRole('searchbox', { name: 'Search Reference Images' }).fill('Reference 999');
+  await page.getByRole('searchbox', { name: 'Search Library' }).fill('Reference 999');
   await expect(page.getByRole('button', { name: 'Reference 999', exact: true })).toBeVisible();
   await expect(page.locator('[data-reference-index]')).toHaveCount(1);
-  await page.getByRole('searchbox', { name: 'Search Reference Images' }).fill('No Such Reference');
+  await page.getByRole('searchbox', { name: 'Search Library' }).fill('No Such Reference');
   await expect(page.getByText('No Matching Images')).toBeVisible();
   await page.getByRole('button', { name: 'Clear Reference Search' }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   await expect(page.locator('[data-reference-index][tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Add Start Image', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Reference Image', exact: true })).toBeFocused();
 });
 
 test('secondary panels load only when opened and connections identify each generation mode', async ({ page, isMobile }) => {
@@ -357,7 +373,9 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
   await page.locator('.settings-modal').getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('button', { name: 'Workflow Gallery', exact: true }).click();
+  await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await page.locator('.zen-prompt .model-trigger').click();
+  await page.locator('.model-menu').getByRole('button', { name: 'Browse Models', exact: true }).click();
   const workflows = page.locator('.workflow-gallery');
   await expect(workflows).toBeVisible();
   await workflows.locator('.wf-card').filter({ hasText: 'In Use' }).dblclick();
@@ -384,12 +402,12 @@ test('Fast and Quality filters retain all reference variants and All clears them
   await openComposer(page, isMobile);
   const composerMode = page.locator('.composer-mode-select');
   await composerMode.getByRole('button', { name: 'Video', exact: true }).click();
-  await expect(controls(page, isMobile).mode.getByRole('button', { name: 'Video', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(controls(page, isMobile).mode.getByRole('button', { name: /^Videos?$/ })).toHaveAttribute('aria-pressed', 'true');
   await composerMode.getByRole('button', { name: 'Image', exact: true }).click();
-  if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Standard Generate' }).click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
   else await page.locator('.model-trigger').first().click();
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
-  const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
+  const rows = menu.locator(isMobile ? '.phone-model-option' : '[role="option"]');
   const filters = menu.getByRole('group', { name: 'Filter Models' });
   const expectSingleRow = async () => {
     if (isMobile) return;
@@ -427,7 +445,7 @@ test('Fast and Quality filters retain all reference variants and All clears them
   } else await page.locator('.model-trigger').first().click();
   await controls(page, isMobile).switchMode('video');
   await openComposer(page, isMobile);
-  if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'MiniMax H3' }).click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
   else await page.locator('.model-trigger').first().click();
   await expect(rows).toHaveCount(2);
   await expect(filters.getByRole('button', { name: 'Generate', exact: true })).toHaveCount(0);
@@ -439,6 +457,16 @@ test('Fast and Quality filters retain all reference variants and All clears them
 });
 
 test('model picker keeps shortcuts in the normal list and supports keyboard selection', async ({ page, isMobile }) => {
+  let preferences = { favorites: [] as string[], lastUsed: {} as Record<string, string>, thumbnails: {} };
+  await page.route('**/api/workflows', async (route) => {
+    const data = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...data, preferences } });
+  });
+  await page.route('**/api/workflows/preferences', async (route) => {
+    const changes = route.request().postDataJSON();
+    preferences = { ...preferences, ...changes, lastUsed: { ...preferences.lastUsed, ...changes.lastUsed } };
+    await route.fulfill({ json: { ok: true, preferences } });
+  });
   await page.route('**/api/models', async (route) => {
     const result = await (await route.fetch()).json();
     const base = result.profiles.find((profile: any) => profile.kind === 'image');
@@ -450,12 +478,15 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await page.goto('/');
   await openComposer(page, isMobile);
   const open = async () => {
-    if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: /Model \d/ }).click();
-    else await page.locator('.model-trigger').first().click();
+    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
+    else {
+      await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+      await page.locator('.model-trigger').first().click();
+    }
   };
   await open();
   const menu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
-  const rows = menu.locator(isMobile ? '.phone-model-option' : '.model-option');
+  const rows = menu.locator(isMobile ? '.phone-model-option' : '[role="option"]');
   await expect(rows).toHaveCount(28);
   const selectedRow = rows.filter({ hasText: 'Model 01' }).first();
   await expect(selectedRow.locator('.model-selection-tick')).toHaveCount(1);
@@ -465,8 +496,9 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   expect(tick!.x + tick!.width).toBeLessThan(text!.x);
   await rows.filter({ hasText: 'Model 02' }).click();
   await open();
-  await expect(rows).toHaveCount(29);
-  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
+  await expect(rows).toHaveCount(28);
+  await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(1);
+  await expect(menu.getByText('Recent', { exact: true })).toHaveCount(0);
   const shortcut = rows.filter({ hasText: 'Model 02' }).first();
   await shortcut.locator('..').getByRole('button', { name: /Add .*favorites/ }).click();
   await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
@@ -509,62 +541,41 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
 });
 
 
-test('composer actions share a row and Clear clears both prompt fields', async ({ page, isMobile }) => {
-  await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [{ id: 'toolbar-reference', source: 'upload', name: 'Test Reference', thumbnailUrl: picture, url: picture, mime: 'image/png', width: 512, height: 512, size: 1, createdAt: '', privacyDomain: 'gallery' }], hasMore: false, nextCursor: '' } }));
-  await page.route('**/api/prompts', (route) => route.fulfill({ json: { prompts: [{ text: 'Recent prompt', at: new Date().toISOString(), uses: 1 }], enabled: true } }));
+test('each prompt keeps its own Clear and history actions without changing the other field', async ({ page, isMobile }) => {
+  const models = await (await page.request.get('/api/models')).json();
+  for (const profile of models.profiles) profile.capabilities.negativePrompt = true;
+  await page.route('**/api/models', route => route.fulfill({ json: models }));
+  await page.route('**/api/prompts*', (route) => route.fulfill({ json: { prompts: [{ text: 'Recent prompt', at: new Date().toISOString(), uses: 1 }], enabled: true } }));
   await page.goto('/');
   await openComposer(page, isMobile);
-  const tools = page.locator('.composer-prompt-tools');
-  await expect(tools.getByRole('button', { name: 'Recent Prompts' })).toBeVisible();
-  const references = page.locator('.composer-reference-tools');
-  await expect(references.getByRole('button', { name: 'Add Start Image', exact: true })).toBeVisible();
-  await page.waitForTimeout(600);
-  await page.mouse.move(0, 0);
-  const layout = await tools.evaluate((element) => [...element.querySelectorAll('button')].map((button) => ({ top: Math.round(button.getBoundingClientRect().top), height: button.getBoundingClientRect().height, background: getComputedStyle(button).backgroundColor })));
-  expect(new Set(layout.map((item) => item.top)).size).toBe(1);
-  expect(new Set(layout.map((item) => item.height)).size).toBe(1);
-  expect(new Set(layout.map((item) => item.background)).size).toBe(1);
-  const promptBox = page.getByRole('textbox', { name: 'Prompt', exact: true });
-  const actionBox = await tools.boundingBox();
-  const textBox = await promptBox.boundingBox();
-  expect(actionBox!.y).toBeGreaterThanOrEqual(textBox!.y + textBox!.height);
-  const negativeRowBox = await page.locator('.composer-secondary-row').boundingBox();
-  expect(actionBox!.y).toBeGreaterThanOrEqual(negativeRowBox!.y);
-  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(negativeRowBox!.y + negativeRowBox!.height);
-  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveAttribute('placeholder', 'Prompt');
-  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveAttribute('placeholder', 'Negative Prompt');
-  const fieldBox = await page.locator('.composer-prompt-field').boundingBox();
-  expect(textBox!.width).toBeCloseTo(fieldBox!.width, 0);
-  const clearBox = await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).boundingBox();
-  expect(clearBox!.x + clearBox!.width).toBeLessThanOrEqual(negativeRowBox!.x + negativeRowBox!.width);
-  const referencesBox = await references.boundingBox();
-  expect(referencesBox!.x).toBeGreaterThanOrEqual(textBox!.x + textBox!.width);
-  const negativeBox = page.getByRole('textbox', { name: 'Negative Prompt', exact: true });
-  await expect(page.locator('.composer-mode-select')).toBeVisible();
-  await page.waitForTimeout(300);
-  const initial = await negativeBox.boundingBox();
-  for (const mode of ['Video', 'Image', 'Video', 'Image']) {
-    await page.locator('.composer-mode-select').getByRole('button', { name: mode, exact: true }).click();
-    await page.waitForTimeout(300);
-    const next = await negativeBox.boundingBox();
-    expect(next!.height).toBeCloseTo(initial!.height, 0);
-    expect(next!.y).toBeCloseTo(initial!.y, 0);
+  const composer = page.locator(isMobile ? '.phone-create' : '.zen-prompt');
+  const prompt = composer.getByRole('textbox', { name: 'Prompt', exact: true });
+  const negative = composer.getByRole('textbox', { name: 'Negative Prompt', exact: true });
+  await expect(prompt).toHaveAttribute('placeholder', 'Prompt');
+  await expect(negative).toHaveAttribute('placeholder', 'Negative Prompt');
+  for (const [field, clear, history] of [[prompt, 'Clear Prompt', 'Recent Prompts'], [negative, 'Clear Negative Prompt', 'Recent Negative Prompts']] as const) {
+    const container = composer.locator(clear === 'Clear Prompt' ? '.composer-prompt-field:not(.is-negative)' : '.composer-prompt-field.is-negative');
+    await expect(container.getByRole('button', { name: clear, exact: true })).toBeVisible();
+    await expect(container.getByRole('button', { name: history, exact: true })).toBeVisible();
+    await expect.poll(() => container.evaluate(element => {
+      const field = element.querySelector('textarea')!.getBoundingClientRect();
+      return [...element.querySelectorAll('button')].every(button => {
+        const bounds = button.getBoundingClientRect();
+        return bounds.x >= field.x - 1 && bounds.right <= field.right + 1 && bounds.y >= field.y - 1 && bounds.bottom <= field.bottom + 1;
+      });
+    })).toBe(true);
   }
-
-  await references.getByRole('button', { name: 'Add Start Image', exact: true }).click();
-  await page.getByRole('button', { name: 'Test Reference', exact: true }).click();
-  await expect(references.locator('.ref-thumb')).toBeVisible();
-  const withReference = await negativeBox.boundingBox();
-  expect(withReference!.y).toBeCloseTo(initial!.y, 0);
-
-  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
-  const negative = page.getByRole('textbox', { name: 'Negative Prompt', exact: true });
   await prompt.fill('A photo');
   await negative.fill('Blur');
-  await tools.getByRole('button', { name: 'Clear Prompt & Negative' }).click();
+  await composer.getByRole('button', { name: 'Clear Prompt', exact: true }).click();
   await expect(prompt).toHaveValue('');
+  await expect(negative).toHaveValue('Blur');
+  await expect(composer.getByRole('button', { name: 'Clear Prompt', exact: true })).toBeDisabled();
+  await prompt.fill('A photo');
+  await composer.getByRole('button', { name: 'Clear Negative Prompt', exact: true }).click();
   await expect(negative).toHaveValue('');
-  await expect(tools.getByRole('button', { name: 'Clear Prompt & Negative' })).toBeDisabled();
+  await expect(prompt).toHaveValue('A photo');
+  await expect(composer.getByRole('button', { name: 'Clear Negative Prompt', exact: true })).toBeDisabled();
 });
 
 test('attaching a reference activates that mode’s controls without losing the image picker', async ({ page, isMobile }) => {
@@ -587,19 +598,26 @@ test('attaching a reference activates that mode’s controls without losing the 
   await page.goto('/');
   await openComposer(page, isMobile);
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A scene');
-  await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('blur');
-  const generate = () => isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
-  await generate().click();
-  await expect.poll(() => requests.length).toBe(1);
-  expect(requests[0]).not.toHaveProperty('negative');
-  await openComposer(page, isMobile);
-  await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).not.toBeVisible();
+  const generate = () => isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+  await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
   await page.getByRole('button', { name: 'Mode Reference', exact: true }).click();
   await expect(page.locator('.reference-popover')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('blur');
+  await generate().click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0].negative).toBe('blur');
+  expect(requests[0].referenceAssets).toEqual([{ slot: 'reference', assetId: reference.id }]);
+  await openComposer(page, isMobile);
+  await page.getByRole('button', { name: 'Remove reference image', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).not.toBeVisible();
   await generate().click();
   await expect.poll(() => requests.length).toBe(2);
-  expect(requests[1].negative).toBe('blur');
-  expect(requests[1].referenceAssets).toEqual([{ slot: 'reference', assetId: reference.id }]);
+  expect(requests[1]).not.toHaveProperty('negative');
+  await openComposer(page, isMobile);
+  await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Mode Reference', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue('blur');
 });
 
 test('gallery selection supports bulk stars, ranges, context actions and mode changes', async ({ page, isMobile }, testInfo) => {
@@ -702,11 +720,14 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   }
 });
 
-test('gallery toolbar keeps selection stable and search visible on desktop and phone', async ({ page, isMobile }, testInfo) => {
+test('gallery toolbar keeps selection stable and phone search opens on demand', async ({ page, isMobile }, testInfo) => {
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: images.map((item, index) => ({ ...item, createdAt: new Date(Date.UTC(2026, 0, 1) - index * 60000).toISOString() })), revision: 1, hasMore: false } }));
   await page.goto('/');
   const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  await expect(search).toHaveCount(0);
+  await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await expect(search).toBeVisible();
+  await search.fill('Image');
   const tile = page.locator('[data-tile-id="image-0"] .tile');
   const image = await tile.locator('img').elementHandle();
   await expect.poll(() => image!.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
@@ -714,6 +735,8 @@ test('gallery toolbar keeps selection stable and search visible on desktop and p
   if (isMobile) {
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: 'Select Items', exact: true }).click();
+    await expect(page.locator('.phone-sheet')).toHaveCount(0);
+    await expect(page.locator('.phone-bar.is-selecting')).toBeVisible();
   } else await page.getByRole('group', { name: 'Gallery Management' }).getByRole('button', { name: 'Select', exact: true }).click();
   await tile.click();
   await expect(tile).toHaveAttribute('aria-pressed', 'true');
@@ -747,45 +770,44 @@ test('model, workflow and LoRA filters reach gallery queries and clear independe
   await page.route('**/api/gallery?*', async (route) => {
     const params = new URL(route.request().url()).searchParams;
     queries.push(params);
-    await route.fulfill({ json: { items: images.slice(0, 3), revision: 1, hasMore: false } });
+    await route.fulfill({ json: { items: images.slice(0, 3).map((item) => ({ ...item, model: 'flux', settings: { ...item.settings, workflow: 'landscape', loras: [{ name: 'grain', strength: 1 }] } })), revision: 1, hasMore: false } });
   });
   await page.goto('/');
+  if (isMobile) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Filter By Model' }).fill('flux');
-  await page.getByRole('combobox', { name: 'Filter By Workflow' }).fill('landscape');
-  await page.getByRole('combobox', { name: 'Filter By LoRA' }).fill('grain');
+  for (const [name, value] of [['Model', 'flux'], ['Workflow', 'landscape'], ['LoRA', 'grain']]) {
+    await page.getByRole('button', { name: `Filter By ${name}`, exact: true }).click();
+    await page.getByRole('listbox', { name: `${name} Filter`, exact: true }).getByRole('option', { name: value, exact: true }).click();
+  }
   await expect.poll(() => queries.some((query) => query.get('model') === 'flux' && query.get('workflow') === 'landscape' && query.get('lora') === 'grain')).toBe(true);
   await page.getByRole('button', { name: 'Clear Filters', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Filter By Model' })).toHaveValue('');
-  await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Gallery Filters', exact: true })).not.toHaveClass(/is-on/);
+  if (await page.getByRole('button', { name: 'Gallery Filters', exact: true }).getAttribute('aria-expanded') === 'true') await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  if (!await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).count()) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).fill('snow');
   await expect.poll(() => queries.some((query) => query.get('q') === 'snow' && !query.has('model') && !query.has('workflow') && !query.has('lora'))).toBe(true);
   await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).not.toBeVisible();
+  await expect.poll(() => queries.some(query => !query.has('q') && !query.has('model') && !query.has('workflow') && !query.has('lora'))).toBe(true);
 });
 
-test('desktop controls can stay pinned while browsing and across reloads', async ({ page, isMobile }, testInfo) => {
-  test.skip(isMobile, 'Phones use the existing controls sheet.');
+test('creation options expand in the bottom box without a side panel', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phones use their creation sheet.');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Controls', exact: true }).click();
-  await page.getByRole('button', { name: 'Pin Controls', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Controls', exact: true })).toHaveAttribute('aria-expanded', 'true');
-  const sidebar = await page.getByRole('complementary', { name: 'Generation Controls' }).boundingBox();
-  const gallery = await page.locator('[data-tile-id="image-0"] .tile').boundingBox();
-  expect(gallery!.x).toBeGreaterThan(sidebar!.x + sidebar!.width);
-  const dock = await page.locator('.studio-dock').boundingBox();
-  const composer = await page.locator('.zen-prompt').boundingBox();
-  expect(dock!.x + dock!.width).toBeLessThan(composer!.x);
-  await page.screenshot({ path: testInfo.outputPath('pinned-controls.png') });
-  await page.reload();
-  await expect(page.getByRole('button', { name: 'Unpin Controls', exact: true })).toBeVisible();
-  await page.setViewportSize({ width: 900, height: 700 });
-  await expect(page.getByRole('button', { name: 'Controls', exact: true })).toHaveAttribute('aria-expanded', 'false');
-  await page.getByRole('button', { name: 'Controls', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: 'Generation Controls' })).toBeVisible();
+  const composer = page.locator('.zen-prompt');
+  await expect(composer).not.toHaveClass(/is-expanded/);
+  await expect(page.getByRole('button', { name: 'Controls', exact: true })).toHaveCount(0);
+  await expect(page.locator('.studio-dock').getByRole('button', { name: 'Workflow Gallery', exact: true })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await expect(composer).toHaveClass(/is-expanded/);
+  await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
+  const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
+  await expect(advanced.getByRole('textbox', { name: 'Seed', exact: true })).toBeVisible();
+  await advanced.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.stage-gallery').click({ position: { x: 200, y: 150 } });
+  await expect(composer).not.toHaveClass(/is-expanded/);
+  await expect(page.getByRole('complementary', { name: 'Generation Controls' })).toHaveCount(0);
 });
-
 
 test('generating preserves the gallery scroll position', async ({ page, isMobile }) => {
   await page.route('**/api/generate', (route) => route.fulfill({ json: { jobId: 'scroll-preserved', items: [] } }));
@@ -802,4 +824,14 @@ test('generating preserves the gallery scroll position', async ({ page, isMobile
   await composer.locator('.composer-submit-actions button').click();
   await request;
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
+  if (isMobile) {
+    const indicator = page.locator('.phone-title .phone-running-inline');
+    await expect(indicator).toBeVisible();
+    await expect(page.locator('.phone-running')).toHaveCount(0);
+    const galleryTitle = await page.getByRole('button', { name: 'Scroll To Top', exact: true }).boundingBox();
+    const badge = await indicator.boundingBox();
+    expect(Math.abs(badge!.y - galleryTitle!.y)).toBeLessThan(3);
+    await indicator.click();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
+  }
 });

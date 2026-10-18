@@ -241,6 +241,8 @@ export function registerPrivacyRoutes(app) {
       // A prompt that now only belongs to Hidden leaves the prompt history too.
       const stillShown = new Set(filterVisibleGallery(gallery).map((item) => promptKey(item.prompt)));
       forgetPrompts((result.movedFrom || []).map((item) => item.prompt || ""), stillShown);
+      const negativesStillShown = new Set(filterVisibleGallery(gallery).map((item) => promptKey(item.negative)));
+      forgetPrompts((result.movedFrom || []).map((item) => item.negative || ""), negativesStillShown, "negative");
       for (const item of result.movedFrom || []) {
         await forgetItemThumbnails(item).catch(() => 0);
         await forgetItemVideoPreviews(item).catch(() => 0);

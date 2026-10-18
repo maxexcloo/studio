@@ -46,3 +46,63 @@ test('gallery keeps management actions and Shift-right-click permits native imag
   await page.keyboard.press('Shift+F10');
   await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
 });
+
+test('phone image actions stay compact and expose Copy Prompt', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The compact action sheet belongs to the phone gallery.');
+  await page.goto('/');
+  await page.locator('[data-tile-id]').first().locator('.tile').dispatchEvent('contextmenu');
+  const sheet = page.locator('.phone-item-actions');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Copy Prompt', exact: true })).toBeVisible();
+  const bounds = await sheet.boundingBox();
+  expect(bounds!.height).toBeLessThan(440);
+  const rows = sheet.locator('.phone-row');
+  for (const row of await rows.all()) {
+    const box = await row.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  }
+});
+
+test('phone viewer keeps Star at the top and copies prompts directly', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone viewer has its own action layout.');
+  await page.addInitScript(() => {
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', { value: {
+      writeText: async (text: string) => { copied = text; },
+      readText: async () => copied,
+    } });
+  });
+  await page.goto('/');
+  await page.locator('[data-tile-id]').first().locator('.tile').click();
+  const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
+  const star = viewer.getByRole('button', { name: 'Star', exact: true });
+  await expect(star).toBeVisible();
+  expect((await star.boundingBox())!.y).toBeLessThan(80);
+  await viewer.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(image.prompt);
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator('.viewer-phone-bar')).toContainText('Copied');
+});
+
+test('phone double taps zoom in and back out without browser click interference', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Touch zoom uses the phone gesture handler.');
+  await page.goto('/');
+  await page.locator('[data-tile-id]').first().locator('.tile').click();
+  const canvas = page.locator('.viewer-canvas');
+  const media = canvas.locator('img.generation-result');
+  await expect(media).toBeVisible();
+  const box = await media.boundingBox();
+  const x = box!.x + box!.width / 2;
+  const y = box!.y + box!.height / 2;
+  await page.touchscreen.tap(x, y);
+  await page.touchscreen.tap(x + 2, y + 2);
+  await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--zoom'))).toBe('2.5');
+  // Let the zoom settle before starting a separate pair of taps.
+  await expect.poll(() => canvas.getAttribute('data-settle')).toBeNull();
+  await page.touchscreen.tap(x, y);
+  await page.touchscreen.tap(x, y);
+  await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--zoom'))).toBe('1');
+  await expect(page.getByRole('dialog', { name: 'Image Viewer', exact: true })).toBeVisible();
+});

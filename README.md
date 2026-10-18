@@ -118,6 +118,21 @@ CI calls the Container workflow after application and browser checks pass on `ma
 
 For local verification, run `mise run setup`, then `mise run check`. Updatecli previews action, base image and npm dependency updates.
 
+### Native MCP
+
+HEISS serves optional Streamable HTTP MCP at `/mcp` on its existing application port, in the same Node process. Set `HEISS_MCP_API_KEY` on each studio instance to enable its seven tools: Models, Generate, Status, Result, Cancel, Upload and Reuse. Each key accesses only its own studio. No additional service, Python runtime, studio passwords or other studio URLs are needed. Generation returns job IDs immediately; request Status or Result when wanted. Run `mise run test:mcp` for the native integration and importer tests; `mise run check` includes them too.
+
+Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/heiss`; signed links retain that prefix. Without it, links use the studio’s local loopback address. Set and preserve `MCP_SIGNING_KEY` and retain `mcp-ownership.json` in `HEISS_DATA_DIR` across updates. Keep shared provider credentials at the trusted gateway, which sets `x-bento-user-id` to partition job and reference ownership. Direct provider calls use a separate fallback owner; the forwarded header alone grants no access. Result links expire after ten minutes and are revoked when outputs are hidden or deleted.
+
+Profiles and researched guidance remain in the sibling AI configuration repository (`../ai`). Maintained profiles carry their selected rules, examples, patterns and sources in `heissUi.prompting`; the model API preserves that guidance and MCP returns it with profile details. Compact discovery returns only its summary and selected mode/variant identifiers. Explicit `imageModes` guidance overrides the shared profile guidance. For older profiles, optionally mount a prompting inventory read-only and set `MCP_PROMPTING_PATH` as a fallback. The native endpoint uses the existing studio generation, reference and result APIs.
+
+Optional AI Control tools require `CONTROL_MCP_API_KEY`, `CONTROL_API_KEY` and `CONTROL_URL` on the instance that exposes them. The control MCP credential must differ from the media credential and the upstream control API credential. It exposes only GPUStatus, Workloads, Preview, Apply and Operation; media credentials cannot discover or invoke them. Allocation changes require an explicit preview and approved apply.
+
+To preserve chat job ownership when replacing the legacy Python bridge, stop both the bridge and destination studio before running the offline importer with Node 22.13 or newer. Resolve `MCP_SIGNING_KEY` and the destination studio’s `HEISS_MCP_API_KEY` through the existing credential environment; never put secret values in command arguments. Run `node server/mcp-import.js --data-dir <studio-data> --database <legacy-jobs.sqlite> --studio primary`, then repeat for the other studio’s data directory with `--studio secondary` and its own provider key. The importer reads the selected studio’s legacy SQLite records without modifying them, preserves forwarded-user identities and maps the matching studio provider to its native key. It atomically merges compatible owners, skips existing matches, and rejects unknown owners or conflicts before writing. Keep the original SQLite database and all studio data. Do not run the importer while either service is writing ownership records.
+
+The source migration does not deploy or switch a running service. Existing deployed bridge state remains unchanged until an explicit deployment and ownership import.
+
+
 ## Supported models
 
 30 families run out of the box with their makers' recommended settings, and a renamed file is still recognized.
@@ -323,6 +338,8 @@ Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 
 ## License
 
-[MIT](./LICENSE). The original J-AI Studio copyright notice is kept alongside HEISS UI's, as the license asks.
+The upstream application retains its [MIT licence](./LICENSE). The original J-AI Studio copyright notice is kept alongside HEISS UI’s.
+
+The native MCP modules and importer (`server/mcp*.js`, except independently authored tests) retain the [AGPL-3.0 licence](./server/mcp.LICENSE) of the ported MCP service. Both licence texts are preserved in the source and distributed application.
 
 The downloads include an [FFmpeg](https://ffmpeg.org) build (via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)) for video previews. It's licensed separately under the GPL, with its license and source at those links.

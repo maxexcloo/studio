@@ -41,13 +41,16 @@ export function presetFit(preset: ImagePreset, profile?: Profile) {
         delete settings[key];
       }
     }
-    for (const key of ['cfg', 'height', 'steps', 'width'] as const) {
+    for (const key of ['cfg', 'fps', 'frames', 'height', 'steps', 'width'] as const) {
       const value = settings[key];
       if (value === undefined) continue;
       const range = profile.constraints?.[key] || {};
       const step = range.step || (key === 'width' || key === 'height' ? 8 : key === 'cfg' ? 0.1 : 1);
-      const adjusted = Math.max(range.min ?? (key === 'cfg' ? 0 : 1), Math.min(range.max ?? 16384, Math.round(value / step) * step));
-      if (adjusted !== value) warnings.push(`${key === 'cfg' ? 'CFG' : key[0].toUpperCase() + key.slice(1)} will use ${adjusted}, within this workflow’s limits.`);
+      const minimum = range.min ?? (key === 'cfg' ? 0 : key === 'width' || key === 'height' ? 8 : 1);
+      const maximum = range.max ?? 16384;
+      const lastStep = Math.floor((maximum - minimum) / step);
+      const adjusted = Number((minimum + Math.max(0, Math.min(lastStep, Math.round((value - minimum) / step))) * step).toFixed(6));
+      if (adjusted !== value) warnings.push(`${key === 'cfg' ? 'CFG' : key === 'fps' ? 'FPS' : key[0].toUpperCase() + key.slice(1)} will use ${adjusted}, within this workflow’s limits.`);
       settings[key] = adjusted;
     }
     if (preset.negative && profile.capabilities.negativePrompt === false) warnings.push('This workflow does not use a negative prompt.');

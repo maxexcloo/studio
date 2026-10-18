@@ -12,8 +12,8 @@ test('prepared recipes select actual workflows without merging conditioning vari
   await page.goto('/');
   if (isMobile) {
     await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create .phone-row').filter({ hasText: 'Example' }).first().click();
-  }
+    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
+  } else await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   let recipe = page.getByLabel('Recipe', { exact: true }).filter({ visible: true }).first();
   await expect(recipe).toBeVisible();
   await expect(recipe.locator('option')).toHaveText(['Standard · 30-Step', 'Turbo · 4-Step']);
@@ -25,7 +25,7 @@ test('prepared recipes select actual workflows without merging conditioning vari
   await expect(menu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Example Base' })).toHaveCount(1);
   await expect(menu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Example Reference' })).toHaveCount(1);
   await menu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Example Reference' }).click();
-  if (isMobile) await page.locator('.phone-create .phone-row').filter({ hasText: 'Example' }).first().click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
   recipe = page.getByLabel('Recipe', { exact: true }).filter({ visible: true }).first();
   await expect(recipe.locator('option')).toHaveText(['Standard · 30-Step']);
   await expect(recipe).toHaveValue('example-reference');
