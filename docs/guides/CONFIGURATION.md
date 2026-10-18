@@ -20,7 +20,19 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `HEISS_DEVICE_COOKIE_NAME` optionally gives each studio on the same hostname a distinct device sign-in cookie. The default remains `heiss_device`.
 
-In multi-user mode, `HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). Set a positive whole number to change the limit. Administrators are not limited by this setting.
+## Multi-User Mode
+
+`HEISS_MULTI_USER=1` turns on optional accounts. It is off by default; single-user mode, the launcher and device sign-in behave exactly as before.
+
+- **Every request needs an account,** including requests from this computer. The first visit on the computer running HEISS UI creates the recovery administrator; after that, administrators add accounts in **Settings › Accounts & MCP**.
+- **Administrators** have full access. **Ordinary accounts** get one access profile, which lists the generation profiles they may use and switches for galleries, prompt history, LoRAs, references and image/video generation. New generation profiles stay administrator-only until a profile grants them.
+- **Each account's outputs, prompt history, LoRA stacks, references and jobs are private** and saved under its own output subfolder. Ordinary accounts only reach reviewed, owner-checked routes; studio administration (models, library folders, Hidden, connection, updates, presets, trash) stays with administrators. Hidden and run grouping are unavailable to accounts.
+- **Personal MCP tokens** are issued once in Settings, stored only as hashes, and work only for MCP. They are never an administrator credential. Rotating or revoking a token leaves existing result links working; a result link ends when its output is hidden or deleted.
+- **Records from single-user mode have no owner** and stay out of every account's gallery until they are explicitly migrated to an account.
+
+`HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). `HEISS_ACCOUNT_COOKIE_NAME` renames the account cookie (`heiss_account` by default). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`; `HEISS_ACCOUNT_COOKIE_SECURE=1` forces it.
+
+In multi-user mode the shared `HEISS_MCP_API_KEY` and `CONTROL_MCP_API_KEY` credentials and the forwarded `x-bento-user-id` identity are not accepted; MCP clients use personal tokens.
 
 `HEISS_ENABLE_GROK=0`, `HEISS_ENABLE_TESSERA=0` and `HEISS_ENABLE_LORAS=0` disable those optional catalogue features and reject unavailable generation settings. All three are enabled by default.
 

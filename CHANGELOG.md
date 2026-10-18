@@ -14,10 +14,13 @@ version opens with a `> ` summary line, which the update pill shows.
 > Reliable selections and fork release safeguards
 
 ### Added
+- **Optional multi-user mode (`HEISS_MULTI_USER=1`):** local accounts with a recovery administrator, access profiles that grant generation profiles and features, private per-account galleries, prompt history, LoRA stacks, references and jobs, personal MCP tokens, a per-account outstanding-job limit and an **Accounts & MCP** settings section. Single-user mode is unchanged.
 - **LoRA details & ordering:** existing descriptions, trigger words and safe source links are available in the picker; selected effects support drag, keyboard and button reordering.
 - **Reference search:** find images by prompt, model or filename across the full library.
 
 ### Changed
+- **Signed MCP result links no longer expire:** they keep working until the output is hidden or deleted.
+- **Multi-user migration:** existing single-user galleries, history and MCP ownership have no account owner and stay hidden in multi-user mode until migrated explicitly. Shared MCP keys, AI Control MCP keys and forwarded gateway identities are not accepted in multi-user mode.
 - **Fork release safety:** release/update links use the fork repository, upstream metadata is tracked separately, and publication waits for browser, platform-launcher and container checks before promoting draft assets. Signing ownership remains an explicit publication gate.
 - **Reference selection:** click to select or deselect without closing the picker; selected images remain first across searches and tabs, including at capacity.
 - **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
