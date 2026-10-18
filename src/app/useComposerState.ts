@@ -26,7 +26,7 @@ export function useComposerState(initialDraft: ReturnType<typeof loadDraft>, pre
   const [inpaintStrength, setInpaintStrength] = useState(Number(initialDraft.inpaintStrength ?? 1));
   const [inpaintFeather, setInpaintFeather] = useState(Number(initialDraft.inpaintFeather ?? 0.4));
   const [seed, setSeed] = useState(String(initialDraft.seed || ""));
-  const [count, setCount] = useState(Number(initialDraft.count || (initialDraft.mode === "video" ? 1 : prefs.defaultImageCount)));
+  const [count, setCount] = useState(Number(initialDraft.count || (prefs.defaultImageCount)));
   const [frames, setFrames] = useState(Number(initialDraft.frames || prefs.defaultVideoFrames));
   const [fps, setFps] = useState(Number(initialDraft.fps || prefs.defaultFps));
   const [duration, setDuration] = useState(Number(initialDraft.duration || 6));

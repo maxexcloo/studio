@@ -26,11 +26,11 @@ test("Civitai reuse matches the downloaded source model rather than an unrelated
 
 test("image defaults use the selected preference rather than a workflow batch default", () => {
   const profile = { kind: "image", defaults: {}, constraints: { count: { default: 4 } } };
-  assert.equal(profileImageCount(profile), 4);
-  assert.equal(profileImageCount({ ...profile, defaults: { count: 2 } }), 4);
+  assert.equal(profileImageCount(profile), 2);
+  assert.equal(profileImageCount({ ...profile, defaults: { count: 2 } }), 2);
   assert.equal(profileImageCount(profile, 1), 1, "an explicit preferred count is retained");
   assert.equal(profileImageCount({ ...profile, capabilities: { variations: false } }, 4), 1);
-  assert.equal(profileImageCount({ ...profile, kind: "video" }, 4), 1);
+  assert.equal(profileImageCount({ ...profile, kind: "video" }, 4), 4);
 });
 
 test("four reference variants become four single-image requests even in batch mode", () => {
@@ -65,7 +65,7 @@ test("a family's named starting aspect wins over its default canvas", () => {
 
 test("image selection stays within model count limits", () => {
   assert.equal(profileImageCount({ kind: "image", defaults: { count: 4 }, constraints: { count: { min: 1, max: 2 } } }, 4), 2);
-  assert.equal(profileImageCount({ kind: "image", defaults: {}, constraints: { count: { default: 1, max: 8 } } }), 4);
+  assert.equal(profileImageCount({ kind: "image", defaults: {}, constraints: { count: { default: 1, max: 8 } } }), 2);
 });
 
 test('count controls and payload planning honour model batch limits and alignment', () => {
@@ -76,7 +76,7 @@ test('count controls and payload planning honour model batch limits and alignmen
   assert.deepEqual(generationPlan({ kind: 'image', count: 4, profile, queueMode: 'separate', references: [{}] }), { effectiveCount: 4, separate: false, imageRuns: 1, requestCount: 4 });
   assert.equal(generationPlan({ kind: 'image', count: 4, profile: { constraints: { count: { max: 2 } } } }).requestCount, 2);
   assert.deepEqual(profileCountRange({ kind: 'video', capabilities: { variations: false } }), { min: 1, max: 8, step: 1 });
-  assert.equal(profileImageCount({ kind: 'video' }, 4), 1);
+  assert.equal(profileImageCount({ kind: 'video' }, 4), 4);
   assert.equal(clampProfileCount({ kind: 'video' }, Infinity), 8);
 });
 

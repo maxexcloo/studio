@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
+import { defaultGenerationCount } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
@@ -69,7 +70,7 @@ export class McpMedia {
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
-    const { profile_id, prompts, loras = [], reference_asset_ids = [], count = 1, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
+    const { profile_id, prompts, loras = [], reference_asset_ids = [], count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles()).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
@@ -96,9 +97,9 @@ export class McpMedia {
       if (profile.kind !== 'image') throw new Error('Smart upscale requires an image profile.');
       controls.autoUpscale = { quality: upscale_quality, faceDetail: face_detail };
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
-    const runs = profile.kind === 'image' ? count : 1;
+    const runs = count;
     if (prompts.length * runs > 4) throw new Error('Submit at most four jobs at a time.');
-    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: profile.kind === 'image' ? 1 : count, loras: loras.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
+    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: loras.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     const queued = [];
     for (const prompt of prompts) for (let variant = 0; variant < runs; variant++) {

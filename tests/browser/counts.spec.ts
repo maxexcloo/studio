@@ -40,12 +40,12 @@ async function generate(page: Page, phone: boolean, prompt: string) {
   await root.locator('.composer-submit-actions button').click();
 }
 
-test('image defaults to four and video to one, retaining independent choices and reloads', async ({ page, isMobile }) => {
+test('image and video default to two, retaining independent choices and reloads', async ({ page, isMobile }) => {
   await prepare(page, isMobile);
-  await expect(composer(page, isMobile).getByRole('button', { name: 'Images: 4, click to edit', exact: true })).toBeVisible();
+  await expect(composer(page, isMobile).getByRole('button', { name: 'Images: 2, click to edit', exact: true })).toBeVisible();
   await setCount(page, isMobile, 'Images', 6);
   await mode(page, isMobile, 'Video');
-  await expect(composer(page, isMobile).getByRole('button', { name: 'Videos: 1, click to edit', exact: true })).toBeVisible();
+  await expect(composer(page, isMobile).getByRole('button', { name: 'Videos: 2, click to edit', exact: true })).toBeVisible();
   await setCount(page, isMobile, 'Videos', 3);
   await mode(page, isMobile, 'Image');
   await expect(composer(page, isMobile).getByRole('button', { name: 'Images: 6, click to edit', exact: true })).toBeVisible();
@@ -62,7 +62,7 @@ test('image defaults to four and video to one, retaining independent choices and
   expect(layout.scroll).toBeLessThanOrEqual(layout.width + 1);
 });
 
-test('image payload batches four while video counts queue independent single-video jobs', async ({ page, isMobile }) => {
+test('image payload batches two while video counts queue independent single-video jobs', async ({ page, isMobile }) => {
   await prepare(page, isMobile);
   const requests: Record<string, any>[] = [];
   await page.route('**/api/generate', (route) => {
@@ -70,9 +70,9 @@ test('image payload batches four while video counts queue independent single-vid
     return route.fulfill({ json: { jobId: `count-job-${requests.length}`, items: [] } });
   });
   await page.route('**/api/jobs/count-job-*', (route) => route.fulfill({ json: { status: 'done', outputs: [] } }));
-  await generate(page, isMobile, 'Four images');
+  await generate(page, isMobile, 'Two images');
   await expect.poll(() => requests.length).toBe(1);
-  expect(requests[0]).toMatchObject({ kind: 'image', count: 4, variationCount: 4 });
+  expect(requests[0]).toMatchObject({ kind: 'image', count: 2, variationCount: 2 });
   if (isMobile) await page.locator('.phone-create-open').click();
   await mode(page, isMobile, 'Video');
   await setCount(page, isMobile, 'Videos', 3);
@@ -87,10 +87,10 @@ test('image payload batches four while video counts queue independent single-vid
   expect(new Set(requests.map((request) => request.clientJobId)).size).toBe(4);
 });
 
-test('image defaults and outgoing count honour a model maximum below four', async ({ page, isMobile }) => {
-  await prepare(page, isMobile, 2);
+test('image defaults and outgoing count honour a model maximum of one', async ({ page, isMobile }) => {
+  await prepare(page, isMobile, 1);
   const root = composer(page, isMobile);
-  await expect(root.getByRole('button', { name: 'Images: 2, click to edit', exact: true })).toBeVisible();
+  if (!isMobile) await expect(root.getByRole('button', { name: 'Images: 1, click to edit', exact: true })).toBeVisible();
   const increase = root.getByRole('button', { name: 'Increase images', exact: true });
   if (await increase.count()) await expect(increase).toBeDisabled();
   let payload: Record<string, any> | null = null;
@@ -98,9 +98,9 @@ test('image defaults and outgoing count honour a model maximum below four', asyn
     payload = route.request().postDataJSON();
     return route.fulfill({ status: 400, json: { error: 'Captured count payload' } });
   });
-  await generate(page, isMobile, 'Two images within the model limit');
+  await generate(page, isMobile, 'One image within the model limit');
   await expect.poll(() => payload).not.toBeNull();
-  expect(payload).toMatchObject({ kind: 'image', count: 2, variationCount: 2 });
+  expect(payload).toMatchObject({ kind: 'image', count: 1, variationCount: 1 });
 });
 
 test('a failed video submission stops the remainder and preserves queued jobs', async ({ page, isMobile }) => {

@@ -1060,7 +1060,7 @@ function App() {
       for (const [key, value] of Object.entries(saved)) setters[key]?.(value);
       setLorasWithMemory(normalizeLoras(saved.loras), saved.model);
       const profile = models?.profiles.find((item) => item.id === saved.model);
-      setCount(clampProfileCount(profile, saved.count ?? (next === "video" ? 1 : prefs.defaultImageCount), next));
+      setCount(clampProfileCount(profile, saved.count ?? (prefs.defaultImageCount), next));
       return;
     }
     if (!models) return;

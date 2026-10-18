@@ -1,3 +1,4 @@
+import { defaultGenerationCount } from './generation-defaults.js';
 import { catalogueLoraInfo } from './lora-info.js';
 import { optionalLoraPolicyIssue } from './lora-catalogue.js';
 import { missingNodes, nodeRange, optionsFor } from './comfy.js';
@@ -160,7 +161,7 @@ function sanitizeFamilyBody(input, info, stats) {
     sampler: String(input.sampler || profile.defaults.sampler || ""),
     scheduler: String(input.scheduler || profile.defaults.scheduler || ""),
     seed: String(input.seed || ""),
-    count: profile.capabilities.variations === false ? 1 : snapInteger(input.count, 1, c.count),
+    count: profile.capabilities.variations === false ? 1 : snapInteger(input.count, defaultGenerationCount, c.count),
     ...(input.variationCount !== undefined ? { variationCount: kind === "image" && profile.capabilities.variations !== false ? clampInteger(input.variationCount, 1, 1, 8) : 1 } : {}),
     frames: kind === "video" ? snapInteger(input.frames, c.frames?.default, c.frames) : 0,
     fps: kind === "video" ? snapInteger(input.fps, c.fps?.default, c.fps) : 0,
