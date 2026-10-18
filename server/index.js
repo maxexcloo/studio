@@ -218,7 +218,13 @@ function requireSignedIn(req, res, next) {
 
 app.use(requireSignedIn);
 registerAccessRoutes(app);
-registerMultiUserAuthRoutes(app, { availableProfiles: async () => (await inferModels()).profiles.map((profile) => profile.id) });
+// Grantable profiles come from the same discovery as /api/models, across image and video backends.
+registerMultiUserAuthRoutes(app, {
+  availableProfiles: async () => {
+    const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+    return (models.profiles || []).map((profile) => profile.id);
+  }
+});
 
 async function runRepoCommand(command, args) {
   const npm = command === npmCommand ? npmInvocation(args) : { command, args, shell: false };
@@ -479,7 +485,20 @@ function adoptFoundComfy(found) {
 let lastComfyAnswer = { url: "", version: "", device: "" };
 const backendAnswers = new Map();
 
+/** Ordinary accounts see whether backends answer, never their addresses or nearby hosts. */
+function withoutBackendAddresses(status) {
+  const { url: _url, nearby: _nearby, found: _found, backends, ...rest } = status || {};
+  return backends
+    ? { ...rest, backends: Object.fromEntries(Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [name, backend])) }
+    : rest;
+}
+
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
+  if (req.heissAccount && !canAdmin(req) && !res.locals.ordinaryStatus) {
+    res.locals.ordinaryStatus = true;
+    const send = res.json.bind(res);
+    res.json = (body) => send(withoutBackendAddresses(body));
+  }
   if (configuredBackends().length > 1) {
     const started = performance.now();
     const names = configuredBackends();
@@ -554,7 +573,9 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     // A timeout that outlasted the grace counts too: this poll is the app asking whether ComfyUI is there.
     noteComfyFetchError(isComfyTimeout(error) ? new Error("timed out") : error);
     // Refused: on this computer it may well be on the other usual port (Desktop uses 8000).
-    const found = comfyRestarting() || res.locals.foundComfy || isComfyTimeout(error) ? "" : await findComfyNow(comfyUrl);
+    // Looking for and adopting another ComfyUI changes the studio: administrators only.
+    const mayDiscover = !res.locals.ordinaryStatus;
+    const found = !mayDiscover || comfyRestarting() || res.locals.foundComfy || isComfyTimeout(error) ? "" : await findComfyNow(comfyUrl);
     if (found && adoptFoundComfy(found)) {
       res.locals.foundComfy = found;
       return comfyStatus(req, res);
@@ -1198,7 +1219,12 @@ app.post("/api/comfy-search", (req, res) => {
   res.json({ ok: true, enabled: comfySearchEnabled() });
 });
 
-registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage });
+// Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
+registerGenerationRoutes(app, {
+  loadComfyContext,
+  mediaModels: (force) => mediaModels(force).catch((error) => { if (demoMode) return { models: mockModelResult() }; throw error; }),
+  comfyDownMessage
+});
 
 /** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
 async function upscaleContext(res, { force = false } = {}) {

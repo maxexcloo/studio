@@ -1,12 +1,13 @@
 import React from 'react';
-import { Copy, LogOut, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Copy, KeyRound, LogOut, Pencil, RefreshCw, UserPlus, X } from 'lucide-react';
 import { apiJson } from './api';
 import { Group, Row } from './SettingsControls';
+import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
 type Feature = 'loras' | 'imageGeneration' | 'videoGeneration' | 'imageReferences' | 'videoReferences' | 'gallery' | 'promptHistory';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; features: Record<Feature, boolean> };
-type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean };
+type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string } };
 type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[] };
 type TokenStatus = { enabled: boolean; createdAt: string; endpoint: string };
 
@@ -15,12 +16,16 @@ const featureLabels: [Feature, string][] = [
   ['loras', 'LoRAs'], ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
 ];
 const blankFeatures = () => Object.fromEntries(featureLabels.map(([key]) => [key, false])) as Record<Feature, boolean>;
+const jsonPost = (method: string, body: unknown) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+const message = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
-export function AccountSettings({ showToast, copyToClipboard, isAdmin }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; isAdmin: boolean }) {
+export function AccountSettings({ showToast, copyToClipboard, confirmAction, isAdmin }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction; isAdmin: boolean }) {
   const [admin, setAdmin] = React.useState<AdminData | null>(null);
   const [token, setToken] = React.useState<TokenStatus | null>(null);
+  const [loadError, setLoadError] = React.useState('');
   const [issuedToken, setIssuedToken] = React.useState('');
   const [busy, setBusy] = React.useState(true);
+  const [editingId, setEditingId] = React.useState('');
   const [profileName, setProfileName] = React.useState('');
   const [profileId, setProfileId] = React.useState('');
   const [selectedProfiles, setSelectedProfiles] = React.useState<string[]>([]);
@@ -29,130 +34,165 @@ export function AccountSettings({ showToast, copyToClipboard, isAdmin }: { showT
   const [displayName, setDisplayName] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [assignedProfile, setAssignedProfile] = React.useState('');
+  const [resetAccount, setResetAccount] = React.useState('');
+  const [resetPassword, setResetPassword] = React.useState('');
 
   const refresh = React.useCallback(async () => {
     setBusy(true);
     try {
-      const tokenResult = await apiJson<TokenStatus>('/api/accounts/mcp-token');
-      setToken(tokenResult);
+      setToken(await apiJson<TokenStatus>('/api/accounts/mcp-token'));
       if (isAdmin) {
         const adminResult = await apiJson<AdminData>('/api/accounts/admin');
         setAdmin(adminResult);
-        if (!assignedProfile && adminResult.accessProfiles[0]) setAssignedProfile(adminResult.accessProfiles[0].id);
+        setAssignedProfile((current) => current || adminResult.accessProfiles[0]?.id || '');
       }
+      setLoadError('');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not load account settings.', 'error');
+      setLoadError(message(error, 'Could not load account settings.'));
     } finally { setBusy(false); }
-  }, [assignedProfile, isAdmin, showToast]);
+  }, [isAdmin]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
 
-  const saveProfile = async () => {
-    const id = (profileId || profileName).trim().toLocaleLowerCase('en-AU').replace(/[^a-z0-9:-]+/g, '-').replace(/^-+|-+$/g, '');
-    if (!id || !profileName.trim()) return;
+  const run = async (action: () => Promise<unknown>, failure: string) => {
+    if (busy) return false;
     setBusy(true);
     try {
-      await apiJson('/api/accounts/profiles', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, name: profileName.trim(), generationProfiles: selectedProfiles, features }) });
-      setProfileName(''); setProfileId(''); setSelectedProfiles([]); setFeatures(blankFeatures());
-      await refresh();
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not save the access profile.', 'error'); }
-    finally { setBusy(false); }
-  };
-
-  const createAccount = async () => {
-    setBusy(true);
-    try {
-      await apiJson('/api/accounts/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, displayName, password, accessProfileId: assignedProfile }) });
-      setUsername(''); setDisplayName(''); setPassword('');
-      await refresh();
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not create the account.', 'error'); }
-    finally { setBusy(false); }
-  };
-
-  const issueToken = async () => {
-    setBusy(true);
-    try {
-      const result = await apiJson<TokenStatus & { token: string }>('/api/accounts/mcp-token', { method: 'POST' });
-      setIssuedToken(result.token); setToken((current) => ({ ...current!, enabled: true, createdAt: result.createdAt }));
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not create the MCP token.', 'error'); }
-    finally { setBusy(false); }
-  };
-
-  const revokeToken = async () => {
-    setBusy(true);
-    try {
-      const result = await apiJson<TokenStatus>('/api/accounts/mcp-token/revoke', { method: 'POST' });
-      setToken((current) => current ? { ...current, ...result } : current); setIssuedToken('');
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not revoke the MCP token.', 'error'); }
-    finally { setBusy(false); }
-  };
-
-  const signOut = async () => {
-    setBusy(true);
-    try {
-      await apiJson('/api/accounts/sign-out', { method: 'POST' });
-      window.location.reload();
+      await action();
+      return true;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not sign out.', 'error');
-      setBusy(false);
+      showToast(message(error, failure), 'error');
+      return false;
+    } finally { setBusy(false); }
+  };
+
+  const copy = async (text: string, what: string) => {
+    // A failed copy is announced by copyToClipboard; the token also stays selectable below.
+    if (await copyToClipboard(text)) showToast(`${what} Copied`, 'success');
+  };
+
+  const clearProfileForm = () => { setEditingId(''); setProfileName(''); setProfileId(''); setSelectedProfiles([]); setFeatures(blankFeatures()); };
+  const editProfile = (profile: AccessProfile) => {
+    setEditingId(profile.id); setProfileName(profile.name); setProfileId(profile.id);
+    setSelectedProfiles(profile.generationProfiles); setFeatures({ ...blankFeatures(), ...profile.features });
+  };
+
+  const saveProfile = async () => {
+    const id = editingId || (profileId || profileName).trim().toLocaleLowerCase('en-AU').replace(/[^a-z0-9:-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!id || !profileName.trim()) return;
+    if (await run(() => apiJson('/api/accounts/profiles', jsonPost('POST', { id, name: profileName.trim(), generationProfiles: selectedProfiles, features })), 'Could not save the access profile.')) {
+      clearProfileForm();
+      await refresh();
     }
   };
 
-  const assign = async (account: Account, accessProfileId: string) => {
-    try {
-      await apiJson(`/api/accounts/users/${encodeURIComponent(account.id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessProfileId }) });
+  const createAccount = async () => {
+    if (await run(() => apiJson('/api/accounts/users', jsonPost('POST', { username, displayName, password, accessProfileId: assignedProfile })), 'Could not create the account.')) {
+      setUsername(''); setDisplayName(''); setPassword('');
       await refresh();
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not update the account.', 'error'); }
+    }
   };
 
-  const setDisabled = async (account: Account, disabled: boolean) => {
-    try {
-      await apiJson(`/api/accounts/users/${encodeURIComponent(account.id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disabled }) });
-      await refresh();
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not update the account.', 'error'); }
+  const issueToken = async () => {
+    if (token?.enabled && !await confirmAction({ title: 'Rotate Your MCP Token?', description: 'Clients using the current token stop connecting until they receive the new one. Existing result links keep working.', action: 'Rotate Token', destructive: true })) return;
+    await run(async () => {
+      const result = await apiJson<TokenStatus & { token: string }>('/api/accounts/mcp-token', { method: 'POST' });
+      setIssuedToken(result.token);
+      setToken((current) => ({ endpoint: current?.endpoint || '', enabled: true, createdAt: result.createdAt }));
+    }, 'Could not create the MCP token.');
   };
+
+  const revokeToken = async () => {
+    if (!await confirmAction({ title: 'Revoke Your MCP Token?', description: 'Clients using it stop connecting. Your jobs, outputs and existing result links are kept.', action: 'Revoke Token', destructive: true })) return;
+    await run(async () => {
+      const result = await apiJson<TokenStatus>('/api/accounts/mcp-token/revoke', { method: 'POST' });
+      setToken((current) => current ? { ...current, ...result } : current);
+      setIssuedToken('');
+    }, 'Could not revoke the MCP token.');
+  };
+
+  const signOut = async () => {
+    if (await run(() => apiJson('/api/accounts/sign-out', { method: 'POST' }), 'Could not sign out.')) window.location.reload();
+  };
+
+  const patchAccount = async (account: Account, body: Record<string, unknown>) => {
+    if (await run(() => apiJson(`/api/accounts/users/${encodeURIComponent(account.id)}`, jsonPost('PATCH', body)), 'Could not update the account.')) await refresh();
+  };
+
+  const toggleDisabled = async (account: Account) => {
+    if (!account.disabled && !await confirmAction({ title: `Disable ${account.displayName}?`, description: 'Their browser sessions end and their MCP token stops working. Their outputs are kept.', action: 'Disable Account', destructive: true })) return;
+    await patchAccount(account, { disabled: !account.disabled });
+  };
+
+  const submitPasswordReset = async () => {
+    const account = admin?.accounts.find((item) => item.id === resetAccount);
+    if (!account || resetPassword.length < 12) return;
+    if (!await confirmAction({ title: `Reset ${account.displayName}’s Password?`, description: 'Their browser sessions end. Their MCP token and outputs are kept.', action: 'Reset Password', destructive: true })) return;
+    await patchAccount(account, { password: resetPassword });
+    setResetPassword('');
+  };
+
+  // Stored grants stay listed while discovery is degraded, marked unavailable.
+  const grantable = [...new Set([...(admin?.availableProfiles || []), ...selectedProfiles])];
+  const unavailable = new Set(grantable.filter((id) => !admin?.availableProfiles.includes(id)));
+  const localAccounts = (admin?.accounts || []).filter((account) => account.identity?.provider !== 'pocket-id');
 
   return <>
-    <Group title="Personal MCP Connection" note="The bearer token belongs to your account and uses its current access profile.">
-      <Row label="Endpoint" description={token?.endpoint || 'Loading the configured endpoint…'}>
-        {token?.endpoint ? <button className="btn is-ghost" onClick={() => void copyToClipboard(token.endpoint)}><Copy size={14} /> Copy URL</button> : null}
+    {loadError ? <Group><Row label="Account Settings Unavailable" description={loadError}><button className="btn is-ghost" disabled={busy} onClick={() => void refresh()}><RefreshCw size={14} /> Retry</button></Row></Group> : null}
+    <Group title="Personal MCP Connection" note="The bearer token belongs to your account and uses its current access profile. It only works for MCP, never for account or studio administration.">
+      <Row label="Endpoint" description={token?.endpoint || (loadError ? 'Unavailable until account settings load.' : 'Loading the configured endpoint…')}>
+        {token?.endpoint ? <button className="btn is-ghost" onClick={() => void copy(token.endpoint, 'URL')}><Copy size={14} /> Copy URL</button> : null}
       </Row>
-      <Row label={token?.enabled ? 'Token is active' : 'No token issued'} description={token?.createdAt ? `Created ${new Date(token.createdAt).toLocaleString()}` : 'Create a personal token to connect an MCP client.'}>
-        {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void issueToken()}><RefreshCw size={14} /> Rotate</button> : <button className="btn is-primary" disabled={busy} onClick={() => void issueToken()}>Create Token</button>}
+      <Row label={token?.enabled ? 'Token Active' : 'No Token Issued'} description={token?.createdAt ? `Created ${new Date(token.createdAt).toLocaleString('en-AU')}` : 'Create a personal token to connect an MCP client.'}>
+        {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void issueToken()}><RefreshCw size={14} /> Rotate</button> : <button className="btn is-primary" disabled={busy || !token} onClick={() => void issueToken()}>Create Token</button>}
         {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void revokeToken()}><X size={14} /> Revoke</button> : null}
       </Row>
-      {issuedToken ? <Row label="Copy your new token" description="It is shown once. Store it in your MCP client as a bearer credential, separate from the endpoint URL."><button className="btn is-primary" onClick={() => void copyToClipboard(issuedToken)}><Copy size={14} /> Copy Token</button></Row> : null}
+      {issuedToken ? <Row stacked label="New Token" description="Shown once. Store it in your MCP client as a bearer credential, separate from the endpoint URL.">
+        <input aria-label="New MCP token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
+        <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
+      </Row> : null}
     </Group>
 
-    {isAdmin ? <Group title="Access Profiles" note="Ordinary accounts receive one profile. Administrators always retain full access.">
-      {admin?.accessProfiles.map((profile) => <Row key={profile.id} label={profile.name} description={`${profile.generationProfiles.length} generation profile${profile.generationProfiles.length === 1 ? '' : 's'} · ${profile.id}`} />)}
-      <Row label="Profile Name"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
-      <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen."><input value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="studio-artists" /></Row>
+    {isAdmin ? <Group title="Access Profiles" note="Ordinary accounts receive one profile. Administrators always retain full access. New generation profiles stay administrator-only until granted here.">
+      {admin?.accessProfiles.map((profile) => <Row key={profile.id} label={profile.name} description={`${profile.generationProfiles.length} generation profile${profile.generationProfiles.length === 1 ? '' : 's'} · ${profile.id}`}>
+        <button className="btn is-ghost" disabled={busy} aria-label={`Edit ${profile.name}`} onClick={() => editProfile(profile)}><Pencil size={14} /> Edit</button>
+      </Row>)}
+      <Row label={editingId ? 'Profile Name' : 'New Profile Name'}><input aria-label="Profile name" value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
+      {editingId ? <Row label="Profile ID" description={editingId} /> : <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen."><input aria-label="Profile ID" value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="studio-artists" /></Row>}
       <fieldset className="account-profile-list"><legend>Generation Profiles</legend>
-        {(admin?.availableProfiles || []).map((id) => <label key={id}><input type="checkbox" checked={selectedProfiles.includes(id)} onChange={(event) => setSelectedProfiles((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} />{id}</label>)}
+        {grantable.map((id) => <label key={id}><input type="checkbox" checked={selectedProfiles.includes(id)} onChange={(event) => setSelectedProfiles((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} />{id}{unavailable.has(id) ? ' (Unavailable)' : ''}</label>)}
       </fieldset>
       <fieldset className="account-profile-list"><legend>Features</legend>
         {featureLabels.map(([id, label]) => <label key={id}><input type="checkbox" checked={features[id]} onChange={(event) => setFeatures((current) => ({ ...current, [id]: event.target.checked }))} />{label}</label>)}
       </fieldset>
-      <Row label="Save Access Profile"><button className="btn is-primary" disabled={busy || !profileName.trim()} onClick={() => void saveProfile()}>Save Profile</button></Row>
+      <Row label={editingId ? 'Update Access Profile' : 'Save Access Profile'}>
+        {editingId ? <button className="btn is-ghost" disabled={busy} onClick={clearProfileForm}>Cancel</button> : null}
+        <button className="btn is-primary" disabled={busy || !profileName.trim()} onClick={() => void saveProfile()}>Save Profile</button>
+      </Row>
     </Group> : null}
 
     {isAdmin ? <Group title="Accounts">
-      {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role}${account.disabled ? ' · Disabled' : ''}`}>
+      {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role === 'administrator' ? 'Administrator' : 'User'}${account.disabled ? ' · Disabled' : ''}`}>
         {account.role === 'user' ? <>
-          <select aria-label={`Access profile for ${account.username}`} value={account.accessProfileId || ''} onChange={(event) => void assign(account, event.target.value)}><option value="" disabled>Choose a profile</option>{admin.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
-          <button className="btn is-ghost" onClick={() => void setDisabled(account, !account.disabled)}>{account.disabled ? 'Enable' : 'Disable'}</button>
+          <select aria-label={`Access profile for ${account.username}`} disabled={busy} value={account.accessProfileId || ''} onChange={(event) => void patchAccount(account, { accessProfileId: event.target.value })}><option value="" disabled>Choose a Profile</option>{admin.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
+          <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? 'Enable' : 'Disable'}</button>
         </> : null}
       </Row>)}
-      <Row label="Username"><input autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
-      <Row label="Display Name"><input autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
-      <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
-      <Row label="Access Profile"><select value={assignedProfile} onChange={(event) => setAssignedProfile(event.target.value)}><option value="">Choose a profile</option>{admin?.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></Row>
+      <Row label="Username"><input aria-label="Username" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
+      <Row label="Display Name"><input aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
+      <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
+      <Row label="Access Profile"><select aria-label="Access profile for the new account" value={assignedProfile} onChange={(event) => setAssignedProfile(event.target.value)}><option value="">Choose a Profile</option>{admin?.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || password.length < 12 || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
+    {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
+      <Row label="Account"><select aria-label="Account to reset" value={resetAccount} onChange={(event) => setResetAccount(event.target.value)}><option value="">Choose an Account</option>{localAccounts.map((account) => <option key={account.id} value={account.id}>{account.displayName} ({account.username})</option>)}</select></Row>
+      <Row label="New Password" description="Use at least 12 characters."><input aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
+      <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || resetPassword.length < 12} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
+    </Group> : null}
+
     <Group title="Account Session" note="Sign out of this browser before handing it to someone else.">
-      <Row label="Signed in on this device"><button className="btn is-ghost" disabled={busy} onClick={() => void signOut()}><LogOut size={14} /> Sign Out</button></Row>
+      <Row label="This Browser"><button className="btn is-ghost" disabled={busy} onClick={() => void signOut()}><LogOut size={14} /> Sign Out</button></Row>
     </Group>
   </>;
 }

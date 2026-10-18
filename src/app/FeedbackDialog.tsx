@@ -5,6 +5,7 @@ import { Segmented, Switch } from './SettingsControls';
 import { knownDiagnostics, loadDiagnostics } from './diagnostics';
 import { boardComposeUrl, boardUrl, sendFeedback, subscribeFeedback, versionFromDiagnostics, type FeedbackDraft, type FeedbackKind, type SentPost } from './feedback';
 import { cn } from './format';
+import { scopedStorageKey } from './api';
 
 const NAME_KEY = 'heiss-feedback-name';
 
@@ -20,8 +21,8 @@ const COPY: Record<FeedbackKind, { title: string; heading: string; body: string;
   question: { title: 'Your question', heading: 'Ask a question', body: 'What are you trying to do?', send: 'Ask' }
 };
 
-const readName = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } };
-const saveName = (name: string) => { try { if (name) localStorage.setItem(NAME_KEY, name); else localStorage.removeItem(NAME_KEY); } catch { /* private mode */ } };
+const readName = () => { try { return localStorage.getItem(scopedStorageKey(NAME_KEY)) || ''; } catch { return ''; } };
+const saveName = (name: string) => { try { if (name) localStorage.setItem(scopedStorageKey(NAME_KEY), name); else localStorage.removeItem(scopedStorageKey(NAME_KEY)); } catch { /* private mode */ } };
 
 /**
  * Sends a bug, idea or question to the public feedback board. Mounted once

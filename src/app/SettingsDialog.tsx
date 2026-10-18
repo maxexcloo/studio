@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, Wand2, Library } from 'lucide-react';
+import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -39,10 +39,12 @@ export const SETTINGS_SECTIONS = [
   { id: 'library', label: 'Library', icon: Library, description: 'Where images are saved and what the gallery shows.' },
   { id: 'privacy', label: 'Hidden', icon: LockKeyhole, description: 'Images you keep to yourself, encrypted and unlocked with a password, Touch ID or Windows Hello.' },
   { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
-  { id: 'accounts', label: 'Accounts & MCP', icon: LockKeyhole, description: 'Manage account access profiles and personal MCP connections.' },
+  { id: 'accounts', label: 'Accounts & MCP', icon: UsersRound, description: 'Manage account access profiles and personal MCP connections.' },
   { id: 'about', label: 'About', icon: Info, description: 'Version, stats, updates, feedback and credits.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
+/** Studio administration that ordinary accounts never see; the server refuses it too. */
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'library', 'privacy', 'connection']);
 
 /* ------------------------------------------------------------ Primitives */
 
@@ -674,6 +676,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
       setAccountMode(status.mode === 'multi-user');
       setAccountRole(status.account?.role || '');
       if (status.mode !== 'multi-user' && section === 'accounts') onSectionChange('general');
+      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('general');
     }).catch(() => { if (live) setAccountMode(false); });
     return () => { live = false; };
   }, [open, section, onSectionChange]);
@@ -763,7 +766,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   return (
     <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" className="settings-modal" bodyClassName="set-layout" title="Settings">
       <nav className="set-nav" aria-label="Settings sections">
-        {SETTINGS_SECTIONS.filter((item) => (thisComputer || item.id !== 'models') && (item.id !== 'accounts' || accountMode)).map((item) => {
+        {SETTINGS_SECTIONS.filter((item) => (thisComputer || item.id !== 'models') && (item.id !== 'accounts' || accountMode)
+          && !(accountMode && accountRole !== 'administrator' && ADMINISTRATION_SECTIONS.has(item.id))).map((item) => {
           const Icon = item.icon;
           return (
             <button key={item.id} type="button" className={cn('set-nav-item', section === item.id && 'active')} aria-current={section === item.id ? 'page' : undefined} aria-controls="settings-panel" data-section={item.id} onClick={() => onSectionChange(item.id)}>
@@ -959,7 +963,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           <HiddenSettings hidden={hidden} prefs={prefs} setPrefs={setPrefs} showToast={showToast} confirmAction={confirmAction} Group={Group} Row={Row} Status={Status} Switch={Switch} />
         ) : null}
 
-        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} isAdmin={accountRole === 'administrator'} /> : null}
+        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} /> : null}
 
         {section === 'connection' ? (
           <>

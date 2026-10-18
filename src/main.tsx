@@ -13,7 +13,7 @@ import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
 import { clampProfileCount, generationPlan, imageDimension, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
-import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery, saveDraft, savePrefs } from './app/api';
+import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery, saveDraft, savePrefs, scopedStorageKey } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras } from './app/loras';
@@ -1714,7 +1714,7 @@ function App() {
   const { fitViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
   // Select a downloaded starter model once ComfyUI reports it ready.
-  const starterKey = "heiss-ui:starter-pick";
+  const starterKey = scopedStorageKey("heiss-ui:starter-pick");
   const [starterPick, setStarterPick] = useState<StarterPick | null>(() => {
     try { return JSON.parse(localStorage.getItem(starterKey) || "null"); } catch { return null; }
   });

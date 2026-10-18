@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toast } from './toast';
-import { apiFetch, apiJson, serverClockOffset } from './api';
+import { apiFetch, apiJson, scopedStorageKey, serverClockOffset } from './api';
 import { clientJobUuid } from './format';
 import { dedupeGalleryItems } from './gallery';
 import { clearLoraLibrary } from './lora-storage';
@@ -425,8 +425,11 @@ export function useGenerationActions(view: any) {
 
   async function resetAllSettings() {
     if (!await confirmAction({"title": "Reset all settings?", "description": "Preferences, prompt drafts and saved LoRA stacks are deleted here and on the server. The page reloads. This can’t be undone.", "action": "Reset", "destructive": true, "irreversible": true})) return;
-    localStorage.removeItem("heiss-ui-draft");
-    localStorage.removeItem("heiss-ui-prefs");
+    // The signed-in account's own copies, and the unscoped single-user ones.
+    for (const key of ["heiss-ui-draft", "heiss-ui-prefs"]) {
+      localStorage.removeItem(key);
+      localStorage.removeItem(scopedStorageKey(key));
+    }
     localStorage.removeItem("j-ai-studio-draft");
     localStorage.removeItem("j-ai-studio-prefs");
     clearLoraLibrary();

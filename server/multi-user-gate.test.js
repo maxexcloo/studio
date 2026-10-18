@@ -27,7 +27,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   for (const [method, path] of [
     ["GET", "/api/gallery"], ["GET", "/api/gallery/delta"], ["POST", "/api/generate"], ["GET", "/api/jobs/abc-1"],
     ["POST", "/api/jobs/abc-1/cancel"], ["GET", "/api/reference-assets/a1/thumbnail"], ["POST", "/api/reference-assets/upload"],
-    ["GET", "/api/loras/library"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
+    ["GET", "/api/loras/library"], ["GET", "/api/comfy/status"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
   ]) assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
     ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],

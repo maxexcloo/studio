@@ -75,16 +75,50 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(profile.generationProfiles).toEqual(['video-hd']);
   expect(profile.features.loras).toBe(true);
   await page.getByRole('button', { name: 'Disable', exact: true }).click();
-  expect(posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
+  // Disabling asks first; nothing is sent until it is confirmed.
+  expect(posts.some((post) => post.url === '/api/accounts/users/artist-id')).toBe(false);
+  await page.getByRole('button', { name: 'Disable Account', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
+
+  await page.getByRole('button', { name: 'Edit Artists', exact: true }).click();
+  await expect(page.getByLabel('Profile name')).toHaveValue('Artists');
+  await expect(page.getByRole('checkbox', { name: 'image-fast' })).toBeChecked();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await page.getByRole('button', { name: 'Create Token', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Copy Token', exact: true })).toBeVisible();
+  // The one-time token stays readable if the clipboard is unavailable.
+  await expect(page.getByLabel('New MCP token')).toHaveValue('new-one-time-secret');
   await expect(page.getByText('https://studio.example.test/mcp')).toBeVisible();
-  await page.getByPlaceholder('new.artist').fill('new.artist');
-  await page.getByPlaceholder('New Artist').fill('New Artist');
-  await page.getByPlaceholder('At least 12 characters').fill('a secure temporary password');
+  await page.getByLabel('Username', { exact: true }).fill('new.artist');
+  await page.getByLabel('Display name', { exact: true }).fill('New Artist');
+  await page.getByLabel('Temporary password', { exact: true }).fill('a secure temporary password');
   await page.getByRole('button', { name: 'Create User', exact: true }).click();
   await expect.poll(() => posts.some((post) => post.url === '/api/accounts/users')).toBe(true);
   await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
+});
+
+test('ordinary accounts open their own studio without administration sections', async ({ page, isMobile }) => {
+  await page.route('**/api/accounts/**', async (request) => {
+    const url = new URL(request.request().url());
+    if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn: true, account: { id: 'artist-id', role: 'user', generationProfiles: [], features: {} } } });
+    if (url.pathname === '/api/accounts/mcp-token') return request.fulfill({ json: { ok: true, enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
+    if (url.pathname === '/api/accounts/admin') throw new Error('An ordinary account must not request administration data.');
+    return request.continue();
+  });
+  await page.goto('/');
+  await expect(page.getByText('Your private studio is being prepared')).toHaveCount(0);
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: /Use the full studio/ }).click();
+  }
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const sections = page.getByRole('navigation', { name: 'Settings sections' });
+  await expect(sections.getByRole('button', { name: 'Accounts & MCP', exact: true })).toBeVisible();
+  for (const name of ['Models', 'Library', 'Hidden', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await sections.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible();
 });
