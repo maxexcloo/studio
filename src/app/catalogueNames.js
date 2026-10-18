@@ -92,7 +92,7 @@ export function modelLoras(options, fitOf, all = false) {
   return all ? options : options.filter((name) => fitOf(name) !== 'other');
 }
 
-export { loraCompatibility } from './loraPolicy.js';
+export { loraCompatibility } from '../../server/lora-policy.js';
 
 /** Prefer model variant metadata; imported recipes can identify acceleration by name or step count. */
 export function workflowSpeed(workflow, profile) {

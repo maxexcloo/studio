@@ -1,4 +1,4 @@
-import { compatibilityNote, strengthRange as publishedStrengthRange } from './loraPolicy';
+import { compatibilityNote, strengthRange as publishedStrengthRange } from '../../server/lora-policy';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';

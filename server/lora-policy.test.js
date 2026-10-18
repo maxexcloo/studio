@@ -1,6 +1,10 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compatibilityNote, loraCompatibility, strengthRange } from '../src/app/loraPolicy.js';
+import { compatibilityNote, loraCompatibility, strengthRange } from './lora-policy.js';
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from './lora-catalogue.js';
 
 const profile = { id: 'custom:fl', family: 'minimax_h3', baseModel: 'models/h3.safetensors', recipe: { conditioning: 'FL2VA' } };
@@ -49,4 +53,22 @@ test('local and provider policy enrichment retains explicit constraints without 
   assert.deepEqual(enriched.compatibility, entry.compatibility);
   assert.deepEqual(enriched.strengthRange, entry.strengthRange);
   assert.deepEqual(enriched.families, ['minimax_h3']);
+});
+
+
+test('packaged server catalogue imports and applies policy without a source tree', async () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-packaged-lora-policy-'));
+  try {
+    fs.mkdirSync(path.join(scratch, 'server'));
+    fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({ type: 'module' }));
+    for (const name of ['lora-policy.js', 'lora-catalogue.js']) {
+      fs.copyFileSync(fileURLToPath(new URL(name, import.meta.url)), path.join(scratch, 'server', name));
+    }
+    assert.equal(fs.existsSync(path.join(scratch, 'src')), false);
+    const packaged = await import(pathToFileURL(path.join(scratch, 'server', 'lora-catalogue.js')).href);
+    assert.match(packaged.optionalLoraPolicyIssue({ name: 'effect', strength: 1 }, effect, { ...profile, recipe: { conditioning: 'Ref2VA' } }), /conditioning variant/);
+    assert.equal(packaged.optionalLoraPolicyIssue({ name: 'effect', strength: 1 }, effect, profile), '');
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
 });
