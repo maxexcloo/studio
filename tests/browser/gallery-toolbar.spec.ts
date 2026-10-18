@@ -70,7 +70,7 @@ test('phone opens inline filters from its header without a separate Hidden contr
   await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   await expect(page.locator('.phone-bar:not(.is-behind)').getByRole('button', { name: 'Search Gallery', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await expect(tools.getByRole('button', { name: 'Show Hidden', exact: true })).toBeVisible();
-  for (const label of ['Model', 'Workflow', 'LoRA']) {
+  for (const label of ['Model', 'LoRA']) {
     const select = tools.getByRole('button', { name: `Filter By ${label}`, exact: true });
     await select.scrollIntoViewIfNeeded();
     await expect(select).toBeInViewport();
@@ -326,7 +326,7 @@ test('phone search and filters retain inset neutral actions without changing hea
 });
 
 
-test('focused search keeps the shared shell border and an inset keyboard focus indicator', async ({ page, isMobile }, testInfo) => {
+test('search keeps a neutral shell without a selected input highlight', async ({ page, isMobile }, testInfo) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
@@ -338,7 +338,8 @@ test('focused search keeps the shared shell border and an inset keyboard focus i
   const border = node => node.evaluate(n => { const s = getComputedStyle(n); return { colour: s.borderColor, width: s.borderWidth, style: s.borderStyle }; });
   await expect(input).toBeFocused();
   expect(await border(search)).toEqual(await border(filters));
-  expect(await input.evaluate(n => ({ style: getComputedStyle(n).outlineStyle, width: getComputedStyle(n).outlineWidth, offset: getComputedStyle(n).outlineOffset }))).toEqual({ style: 'solid', width: '2px', offset: '-2px' });
+  expect(await input.evaluate(n => getComputedStyle(n).outlineStyle)).toBe('none');
+  await expect(input).toHaveAttribute('placeholder', 'Search');
   await input.fill('picture');
   await search.hover();
   expect(await border(search)).toEqual(await border(filters));
@@ -356,4 +357,76 @@ test('focused search keeps the shared shell border and an inset keyboard focus i
   expect(await border(search)).toEqual(await border(filters));
   await page.keyboard.press('Escape');
   await expect(input).toHaveCount(0);
+});
+
+
+test('filter options scroll independently and have a compact local search', async ({ page }) => {
+  const many = Array.from({ length: 45 }, (_, index) => ({ ...items[0], id: `filter-${index}`, model: `Model ${String(index).padStart(2, '0')}` }));
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: many, revision: 1, hasMore: false } }));
+  await page.goto('/');
+  const phoneFilters = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
+  if (await phoneFilters.count()) await phoneFilters.click();
+  else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Filter By Workflow', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter By Model', exact: true }).click();
+  const menu = page.locator('.gallery-filter-menu');
+  const list = page.getByRole('listbox', { name: 'Model Filter', exact: true });
+  const search = page.getByRole('textbox', { name: 'Search Models', exact: true });
+  await expect(search).toBeVisible();
+  await expect(list.getByRole('option')).toHaveCount(46);
+  await page.waitForTimeout(250);
+  const before = await menu.boundingBox();
+  await list.evaluate(node => { node.scrollTop = 250; });
+  await expect.poll(() => list.evaluate(node => node.scrollTop)).toBeGreaterThan(200);
+  await page.waitForTimeout(100);
+  const after = await menu.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+  expect(Math.abs(after!.height - before!.height)).toBeLessThan(1);
+  await search.fill('model 32');
+  await expect(list.getByRole('option')).toHaveCount(2);
+  await expect(list.getByRole('option', { name: 'Model 32', exact: true })).toBeVisible();
+  await expect(search).toBeFocused();
+  await search.fill('not in this list');
+  await expect(menu.getByRole('status')).toHaveText('No Matches');
+  await menu.getByRole('button', { name: 'Clear Option Search' }).click();
+  await expect(list.getByRole('option')).toHaveCount(46);
+  await search.fill('model 32');
+  await search.press('Enter');
+  await expect(page.getByRole('button', { name: 'Filter By Model' })).toHaveText('Model 32');
+  await expect(menu).toHaveCount(0);
+});
+
+test('selection dims only unselected media and keeps the right-hand action order', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Full studio toolbar; media styles are shared with the phone selection mode.');
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+  await page.goto('/');
+  const toolbar = page.locator('.gallery-toolbar');
+  const grouping = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const select = toolbar.getByRole('button', { name: 'Select', exact: true });
+  expect((await grouping.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
+  await select.click();
+  const tiles = page.locator('button.tile');
+  const opacity = node => node.locator('.generation-surface').evaluate(n => Number(getComputedStyle(n).opacity));
+  await expect.poll(() => opacity(tiles.first())).toBe(.65);
+  await tiles.first().click();
+  await expect.poll(() => opacity(tiles.first())).toBe(1);
+  expect(await opacity(tiles.nth(1))).toBe(.65);
+  await toolbar.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
+  await expect.poll(() => opacity(tiles.nth(1))).toBe(1);
+});
+
+
+test('video gallery actions run from playback through grouping to Select', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Full studio toolbar.');
+  const videos = items.map(item => ({ ...item, type: 'video' }));
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: videos, revision: 1, hasMore: false } }));
+  await page.goto('/');
+  const toolbar = page.locator('.gallery-toolbar');
+  await toolbar.getByRole('group', { name: 'Gallery Mode', exact: true }).getByRole('button', { name: 'Videos', exact: true }).click();
+  const play = toolbar.getByRole('button', { name: /^Grid autoplay:/ });
+  const group = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const select = toolbar.getByRole('button', { name: 'Select', exact: true });
+  await expect(play).toBeVisible();
+  expect((await play.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
+  expect((await group.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
 });
