@@ -88,3 +88,15 @@ test("metadata uses the readable title before training output names", () => {
   const name = put("sdxl/numeric-123.safetensors", { __metadata__: { "modelspec.title": "Watercolour Portrait", ss_output_name: "training_run_123" } });
   assert.equal(loraInfo(name).title, "Watercolour Portrait");
 });
+
+
+test("Klein 9B LoKr uses explicit trainer metadata when projection widths are unavailable", () => {
+  const header = {
+    __metadata__: { ss_base_model_version: "flux2_klein_9b" },
+    "diffusion_model.double_blocks.0.img_attn.proj.lokr_w1": t([4, 4]),
+    "diffusion_model.double_blocks.0.img_attn.proj.lokr_w2": t([1024, 1024]),
+  };
+  assert.deepEqual(familiesFromKeys(header), []);
+  const name = put("klein-lokr.safetensors", header);
+  assert.deepEqual(loraInfo(name).families, ["flux2_klein_9b"]);
+});
