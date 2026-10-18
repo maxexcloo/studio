@@ -76,11 +76,11 @@ import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoic
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
-import { accountForRequest, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
+import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
-import { accountAccessForId, verifyAccountMcpToken } from './account-store.js';
+import { accountAccessForId, gatewayAccountAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -114,6 +114,9 @@ registerMcpRoutes(app, {
   allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
   accountMode: multiUserEnabled,
   authenticateAccountToken: verifyAccountMcpToken,
+  authenticateGatewayIdentity: gatewayAccountAccess,
+  noteGatewayIdentity,
+  internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult
 });
 app.use(express.json({ limit: "25mb" }));

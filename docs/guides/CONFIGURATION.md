@@ -32,7 +32,13 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). `HEISS_ACCOUNT_COOKIE_NAME` renames the account cookie (`heiss_account` by default). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`; `HEISS_ACCOUNT_COOKIE_SECURE=1` forces it.
 
-In multi-user mode the shared `HEISS_MCP_API_KEY` and `CONTROL_MCP_API_KEY` credentials and the forwarded `x-bento-user-id` identity are not accepted; MCP clients use personal tokens.
+MCP clients connect in one of three ways in multi-user mode:
+
+- **Personal token:** a client sends the account's own token.
+- **Trusted gateway:** a chat gateway such as LiteLLM sends the shared `HEISS_MCP_API_KEY` together with its own user ID in `x-bento-user-id`. HEISS acts for that user only after an administrator links the ID to an account under **Settings › Accounts & MCP › Chat Gateway Users**. Unlinked IDs are refused and listed there for linking.
+- **AI Control:** `CONTROL_MCP_API_KEY` keeps its control tools and reaches no galleries or accounts.
+
+MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
 `HEISS_ENABLE_GROK=0`, `HEISS_ENABLE_TESSERA=0` and `HEISS_ENABLE_LORAS=0` disable those optional catalogue features and reject unavailable generation settings. All three are enabled by default.
 

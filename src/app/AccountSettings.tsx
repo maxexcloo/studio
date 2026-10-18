@@ -8,7 +8,8 @@ import type { ShowToast } from './toast';
 type Feature = 'loras' | 'imageGeneration' | 'videoGeneration' | 'imageReferences' | 'videoReferences' | 'gallery' | 'promptHistory';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string } };
-type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[] };
+type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
+type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; gateway?: GatewayIdentities };
 type TokenStatus = { enabled: boolean; createdAt: string; endpoint: string };
 
 const featureLabels: [Feature, string][] = [
@@ -36,6 +37,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
   const [assignedProfile, setAssignedProfile] = React.useState('');
   const [resetAccount, setResetAccount] = React.useState('');
   const [resetPassword, setResetPassword] = React.useState('');
+  const [gatewayChoice, setGatewayChoice] = React.useState<Record<string, string>>({});
 
   const refresh = React.useCallback(async () => {
     setBusy(true);
@@ -132,6 +134,15 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
     setResetPassword('');
   };
 
+  const setGatewayLink = async (identity: string, accountId: string) => {
+    const account = admin?.accounts.find((item) => item.id === accountId);
+    if (!accountId && !await confirmAction({ title: 'Unlink This Chat User?', description: 'Their chat stops reaching HEISS until it is linked again. Their outputs stay with the account.', action: 'Unlink', destructive: true })) return;
+    if (await run(() => apiJson('/api/accounts/gateway-links', jsonPost('POST', { identity, ...(accountId ? { accountId } : {}) })), 'Could not update the chat user.')) {
+      if (account) showToast(`Linked to ${account.displayName}`, 'success');
+      await refresh();
+    }
+  };
+
   // Stored grants stay listed while discovery is degraded, marked unavailable.
   const grantable = [...new Set([...(admin?.availableProfiles || []), ...selectedProfiles])];
   const unavailable = new Set(grantable.filter((id) => !admin?.availableProfiles.includes(id)));
@@ -183,6 +194,20 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
       <Row label="Access Profile"><select aria-label="Access profile for the new account" value={assignedProfile} onChange={(event) => setAssignedProfile(event.target.value)}><option value="">Choose a Profile</option>{admin?.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || password.length < 12 || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
+    </Group> : null}
+
+    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches HEISS only after it is linked to an account here.">
+      {(admin?.gateway?.links || []).map((link) => {
+        const account = admin?.accounts.find((item) => item.id === link.accountId);
+        return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
+          <button className="btn is-ghost" disabled={busy} aria-label={`Unlink ${link.identity}`} onClick={() => void setGatewayLink(link.identity, '')}><X size={14} /> Unlink</button>
+        </Row>;
+      })}
+      {(admin?.gateway?.pending || []).map((item) => <Row key={item.identity} label={item.identity} description={`Waiting since ${new Date(item.firstSeenAt).toLocaleString('en-AU')}`}>
+        <select aria-label={`Account for ${item.identity}`} disabled={busy} value={gatewayChoice[item.identity] || ''} onChange={(event) => setGatewayChoice((current) => ({ ...current, [item.identity]: event.target.value }))}><option value="">Choose an Account</option>{admin?.accounts.map((account) => <option key={account.id} value={account.id}>{account.displayName} ({account.username})</option>)}</select>
+        <button className="btn is-primary" disabled={busy || !gatewayChoice[item.identity]} onClick={() => void setGatewayLink(item.identity, gatewayChoice[item.identity])}>Link</button>
+      </Row>)}
+      {!admin?.gateway?.links.length && !admin?.gateway?.pending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
     </Group> : null}
 
     {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">

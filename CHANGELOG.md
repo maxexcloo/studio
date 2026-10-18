@@ -20,7 +20,7 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ### Changed
 - **Signed MCP result links no longer expire:** they keep working until the output is hidden or deleted.
-- **Multi-user migration:** existing single-user galleries, history and MCP ownership have no account owner and stay hidden in multi-user mode until migrated explicitly. Shared MCP keys, AI Control MCP keys and forwarded gateway identities are not accepted in multi-user mode.
+- **Multi-user migration:** existing single-user galleries, history and MCP ownership have no account owner and stay hidden in multi-user mode until migrated explicitly. In multi-user mode, a trusted gateway's shared MCP key works only for forwarded user IDs that an administrator has linked to an account, and the AI Control MCP key keeps only its control tools.
 - **Fork release safety:** release/update links use the fork repository, upstream metadata is tracked separately, and publication waits for browser, platform-launcher and container checks before promoting draft assets. Signing ownership remains an explicit publication gate.
 - **Reference selection:** click to select or deselect without closing the picker; selected images remain first across searches and tabs, including at capacity.
 - **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.

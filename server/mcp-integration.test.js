@@ -26,7 +26,7 @@ const imageProfile = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, resolveSignedResult } = {}) {
+async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -43,7 +43,7 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
   let deduplicateUploads = false;
   let profiles = [structuredClone(imageProfile), structuredClone(videoProfile), { ...imageProfile, id: 'not-ready', ready: false }];
   let base;
-  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization }); next(); });
+  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
   app.get('/api/models', (_req, res) => res.json({ profiles, defaults: { imageModel: imageProfile.id, videoModel: videoProfile.id } }));
   app.post('/api/generate', (req, res) => {
@@ -76,6 +76,9 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     environment,
     accountMode,
     authenticateAccountToken,
+    ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
+    ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
+    ...(internalCredential ? { internalCredential } : {}),
     resolveSignedResult,
     fetchImpl: async (url, init) => {
       if (String(url).startsWith('http://fixture-control.invalid')) {
@@ -130,6 +133,35 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
   assert.ok(f.downloads.includes('/comfy/view?filename=account-result.png'));
   const rejected = await fetch(`${f.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   assert.equal(rejected.status, 401);
+});
+
+test('account mode trusts the gateway key only for linked forwarded users and keeps the control scope', async t => {
+  const linked = { userId: 'stable-account-gateway', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const noted = [];
+  const f = await fixture(t, {
+    accountMode: true,
+    environment: adminEnvironment,
+    authenticateGatewayIdentity: user => user === 'librechat-linked' ? linked : null,
+    noteGatewayIdentity: user => noted.push(user),
+    internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId })
+  });
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-bento-user-id': user } : {}) });
+  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers(''), body })).status, 403);
+  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers('librechat-unlinked'), body })).status, 403);
+  assert.deepEqual(noted, ['librechat-unlinked']);
+
+  const client = await f.client('librechat-linked');
+  const id = jobId(await generate(client));
+  const submission = f.requests.find(request => request.path === '/generate');
+  // MCP's loopback call carries the internal credential for the linked account, never the gateway key.
+  assert.equal(submission.authorization, undefined);
+  assert.equal(submission.internal, 'fixture-internal');
+  assert.equal(submission.account, linked.userId);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8')).jobs[id], linked.userId);
+
+  const control = await f.client('administrator', controlKey);
+  assert.deepEqual((await control.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
 });
 
 test('account signed result links survive restart without persisting bearer tokens and recheck output availability', async t => {

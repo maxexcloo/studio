@@ -137,3 +137,38 @@ test("session cookies are Secure behind a TLS-terminating proxy", async () => {
   const signedIn = await call(routes["POST /api/accounts/sign-in"], { ...local({ username: "recovery", password: "a secure recovery password" }), headers: { host: "studio.example.test", "x-forwarded-proto": "https" } });
   assert.match([].concat(signedIn.headers["Set-Cookie"])[0], /; Secure/);
 });
+
+test("gateway identities map to accounts only through administrator links, and the internal credential stays on loopback MCP routes", async () => {
+  const { gatewayAccountAccess, noteGatewayIdentity } = await import("./account-store.js");
+  const { internalMcpHeaders } = await import("./multi-user-auth.js");
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], local({ username: "recovery", password: "a secure recovery password" }));
+  const admin = { ...local(), headers: { ...local().headers, cookie: [].concat(signedIn.headers["Set-Cookie"])[0].split(";")[0] } };
+  const artist = (await call(routes["GET /api/accounts/admin"], admin)).body.accounts.find((account) => account.username === "artist");
+
+  assert.equal(gatewayAccountAccess("librechat-user-1"), null);
+  noteGatewayIdentity("librechat-user-1");
+  assert.deepEqual((await call(routes["GET /api/accounts/admin"], admin)).body.gateway.pending.map((item) => item.identity), ["librechat-user-1"]);
+  const refused = await call(routes["POST /api/accounts/gateway-links"], { ...local({ identity: "librechat-user-1", accountId: artist.id }), socket: { remoteAddress: "192.168.1.30" } });
+  assert.equal(refused.statusCode, 403);
+  const linked = await call(routes["POST /api/accounts/gateway-links"], { ...admin, body: { identity: "librechat-user-1", accountId: artist.id } });
+  assert.deepEqual(linked.body.gateway.links.map((item) => [item.identity, item.accountId]), [["librechat-user-1", artist.id]]);
+  assert.deepEqual(linked.body.gateway.pending, []);
+  const access = gatewayAccountAccess("librechat-user-1");
+  assert.equal(access.userId, artist.id);
+  assert.equal(access.credential, "mcp-token");
+
+  const internal = (method, routePath, extra = {}) => ({ ...local(), method, path: routePath, headers: { ...local().headers, ...Object.fromEntries(Object.entries(internalMcpHeaders(artist.id)).map(([name, value]) => [name.toLowerCase(), value])), ...extra } });
+  assert.equal(accountForRequest(internal("POST", "/api/generate")).userId, artist.id);
+  assert.equal(accountForRequest(internal("GET", "/api/accounts/admin")), null);
+  // Behind a proxy the request is not this computer, so the credential is refused.
+  assert.equal(accountForRequest(internal("POST", "/api/generate", { "x-forwarded-for": "203.0.113.9" })), null);
+  assert.equal(accountForRequest({ ...internal("POST", "/api/generate"), headers: { ...internal("POST", "/api/generate").headers, "x-heiss-mcp-internal": "guessed" } }), null);
+
+  await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: true } });
+  assert.equal(gatewayAccountAccess("librechat-user-1"), null);
+  assert.equal(accountForRequest(internal("POST", "/api/generate")), null);
+  await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: false } });
+  const unlinked = await call(routes["POST /api/accounts/gateway-links"], { ...admin, body: { identity: "librechat-user-1" } });
+  assert.deepEqual(unlinked.body.gateway.links, []);
+  assert.equal(gatewayAccountAccess("librechat-user-1"), null);
+});

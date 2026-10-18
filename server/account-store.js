@@ -13,7 +13,9 @@ const maxSessions = 500;
 const kdf = "scrypt-n32768-r8-p1";
 let cache;
 
-const emptyStore = () => ({ version: 1, accounts: [], profiles: {}, sessions: [] });
+const emptyStore = () => ({ version: 1, accounts: [], profiles: {}, sessions: [], gatewayLinks: [], gatewayPending: [] });
+const maxPendingGatewayIdentities = 100;
+const validGatewayIdentity = (value) => typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value);
 const tokenHash = (token) => crypto.createHash("sha256").update(String(token)).digest("base64url");
 const usernameKey = (value) => String(value || "").trim().normalize("NFKC").toLocaleLowerCase("en-AU");
 
@@ -26,7 +28,9 @@ function readStore() {
       ...saved,
       accounts: Array.isArray(saved?.accounts) ? saved.accounts : [],
       profiles: saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles) ? saved.profiles : {},
-      sessions: Array.isArray(saved?.sessions) ? saved.sessions : []
+      sessions: Array.isArray(saved?.sessions) ? saved.sessions : [],
+      gatewayLinks: Array.isArray(saved?.gatewayLinks) ? saved.gatewayLinks : [],
+      gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : []
     };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -224,4 +228,59 @@ export function setAccountDisabled(accountId, disabled) {
   if (account.disabled) readStore().sessions = readStore().sessions.filter((item) => item.accountId !== accountId);
   saveStore({ scrubBackup: account.disabled });
   return { id: account.id, disabled: account.disabled };
+}
+
+/* -------------------------------------------- Trusted chat gateway identities */
+
+/**
+ * A trusted gateway (LiteLLM for LibreChat) authenticates with its shared key and
+ * forwards its own user ID. Only an administrator's explicit link maps that ID to
+ * an account; unlinked IDs are remembered so they can be linked, and get nothing.
+ */
+export function gatewayAccountAccess(identity) {
+  if (!validGatewayIdentity(identity)) return null;
+  const store = readStore();
+  const link = store.gatewayLinks.find((item) => item.identity === identity);
+  const account = link && store.accounts.find((item) => item.id === link.accountId && item.disabled !== true);
+  const access = account ? effectiveAccountAccess(account, store.profiles) : null;
+  return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
+}
+
+export function noteGatewayIdentity(identity) {
+  if (!validGatewayIdentity(identity)) return;
+  const store = readStore();
+  if (store.gatewayLinks.some((item) => item.identity === identity)) return;
+  const now = new Date().toISOString();
+  const pending = store.gatewayPending.find((item) => item.identity === identity);
+  if (pending) {
+    // At most one write a minute per identity: a chat retries often.
+    if (Date.now() - Date.parse(pending.lastSeenAt || 0) < 60_000) return;
+    pending.lastSeenAt = now;
+  } else {
+    store.gatewayPending.push({ identity, firstSeenAt: now, lastSeenAt: now });
+    store.gatewayPending = store.gatewayPending.slice(-maxPendingGatewayIdentities);
+  }
+  saveStore();
+}
+
+export function listGatewayIdentities() {
+  const store = readStore();
+  return {
+    links: store.gatewayLinks.map(({ identity, accountId, linkedAt }) => ({ identity, accountId, linkedAt })),
+    pending: store.gatewayPending.map(({ identity, firstSeenAt, lastSeenAt }) => ({ identity, firstSeenAt, lastSeenAt }))
+  };
+}
+
+/** Link (or, with no account, unlink) one gateway identity. Each identity maps to one account. */
+export function setGatewayLink(identity, accountId) {
+  if (!validGatewayIdentity(identity)) throw new Error("Choose a valid gateway user ID.");
+  const store = readStore();
+  store.gatewayLinks = store.gatewayLinks.filter((item) => item.identity !== identity);
+  if (accountId) {
+    if (!store.accounts.some((item) => item.id === accountId)) throw new Error("That account was not found.");
+    store.gatewayLinks.push({ identity, accountId, linkedAt: new Date().toISOString() });
+    store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
+  }
+  saveStore({ scrubBackup: !accountId });
+  return listGatewayIdentities();
 }

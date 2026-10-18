@@ -1,4 +1,5 @@
-import { accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import crypto from "node:crypto";
+import { accountAccessForId, listGatewayIdentities, setGatewayLink, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 
@@ -29,12 +30,28 @@ export function mcpBearerRouteAllowed(method, routePath) {
   return mcpBearerRoutes.some(([allowedMethod, pattern]) => allowedMethod === method && pattern.test(routePath));
 }
 
+// MCP's own loopback calls for gateway-linked accounts carry this per-process credential, never a stored token.
+const internalSecret = crypto.randomBytes(32).toString("base64url");
+export function internalMcpHeaders(accountId) {
+  return { "X-Heiss-Mcp-Internal": internalSecret, "X-Heiss-Mcp-Account": String(accountId || "") };
+}
+
+function internalMcpAccount(req, method, routePath) {
+  const given = String(req?.headers?.["x-heiss-mcp-internal"] || "");
+  if (!given || Buffer.byteLength(given) !== Buffer.byteLength(internalSecret) || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(internalSecret))) return null;
+  if (!clientOf(req).thisComputer || !mcpBearerRouteAllowed(method, routePath)) return null;
+  const access = accountAccessForId(String(req.headers["x-heiss-mcp-account"] || ""));
+  return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
+}
+
 export function accountForRequest(req) {
   if (req?.heissAccount !== undefined) return req.heissAccount;
   const bearer = /^Bearer ([^\s]+)$/i.exec(String(req?.headers?.authorization || ""))?.[1] || "";
   const routePath = String(req?.path || req?.url || "").split("?")[0];
+  const method = String(req?.method || "GET").toUpperCase();
   const account = accountSession(cookieToken(req))
-    || (bearer && mcpBearerRouteAllowed(String(req?.method || "GET").toUpperCase(), routePath) ? verifyAccountMcpToken(bearer) : null);
+    || (bearer && mcpBearerRouteAllowed(method, routePath) ? verifyAccountMcpToken(bearer) : null)
+    || internalMcpAccount(req, method, routePath);
   if (req) req.heissAccount = account;
   return account;
 }
@@ -174,7 +191,16 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     if (!requireAccountAdmin(req, res)) return;
     const profiles = await availableProfiles();
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, accounts: listAccounts(), accessProfiles: listAccessProfiles(profiles), availableProfiles: profiles });
+    res.json({ ok: true, accounts: listAccounts(), accessProfiles: listAccessProfiles(profiles), availableProfiles: profiles, gateway: listGatewayIdentities() });
+  });
+
+  post("/api/accounts/gateway-links", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      res.json({ ok: true, gateway: setGatewayLink(req.body?.identity, typeof req.body?.accountId === "string" ? req.body.accountId : "") });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
   });
 
   post("/api/accounts/profiles", async (req, res) => {

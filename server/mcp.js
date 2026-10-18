@@ -18,7 +18,7 @@ const output = { ...job, output_index: z.number().int().min(0).max(999).default(
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, resolveSignedResult } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult } = {}) {
   const mediaKey = environment.HEISS_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
@@ -40,12 +40,30 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (!own) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
     }
     const token = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ''))?.[1];
-    const account = accountMode ? authenticateAccountToken(token) : null;
-    const scope = accountMode ? (account ? 'media' : '') : equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
-    if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="HEISS MCP"').json({ error: 'A valid MCP bearer credential is required.' });
-    if (account) media.credentials.set(account.userId, token);
     const user = String(req.headers['x-bento-user-id'] || '');
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user)) return res.status(400).json({ error: 'Invalid forwarded user identity.' });
+    let account = null;
+    let scope = '';
+    if (!accountMode) scope = equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
+    else if (equal(token, controlKey)) scope = 'control';
+    else if (equal(token, mediaKey)) {
+      // Gateway trust: the shared key vouches for the gateway; only an administrator's link maps its user to an account.
+      if (!user) return res.status(403).json({ error: 'The gateway must forward its user identity.' });
+      account = authenticateGatewayIdentity(user);
+      if (!account) {
+        noteGatewayIdentity(user);
+        return res.status(403).json({ error: 'This chat user is not linked to a HEISS account yet. Ask a HEISS administrator to link it in Settings › Accounts & MCP.' });
+      }
+      scope = 'media';
+      media.credentials.set(account.userId, internalCredential(account.userId));
+    } else {
+      account = authenticateAccountToken(token);
+      if (account) {
+        scope = 'media';
+        media.credentials.set(account.userId, { Authorization: `Bearer ${token}` });
+      }
+    }
+    if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="HEISS MCP"').json({ error: 'A valid MCP bearer credential is required.' });
     req.mcpActor = { scope, owner: account?.userId || (scope === 'media' ? media.owner(user, token) : null) };
     next();
   };

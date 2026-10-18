@@ -18,7 +18,11 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
       return request.fulfill({ json: { ok: true } });
     }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
-    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'] } });
+    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
+    if (url.pathname === '/api/accounts/gateway-links') {
+      posts.push({ url: url.pathname, body: request.request().postDataJSON() });
+      return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
+    }
     if (url.pathname === '/api/accounts/profiles' && request.request().method() === 'POST') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, profile: request.request().postDataJSON() } });
@@ -84,6 +88,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByLabel('Profile name')).toHaveValue('Artists');
   await expect(page.getByRole('checkbox', { name: 'image-fast' })).toBeChecked();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  await page.getByLabel('Account for librechat-user-7').selectOption('artist-id');
+  await page.getByRole('button', { name: 'Link', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-links')?.body).toEqual({ identity: 'librechat-user-7', accountId: 'artist-id' });
 
   await page.getByRole('button', { name: 'Create Token', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Copy Token', exact: true })).toBeVisible();

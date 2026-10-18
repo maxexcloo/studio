@@ -51,7 +51,8 @@ export class McpMedia {
     if (!['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname) || base.protocol !== 'http:') throw new Error('MCP requires the studio’s private HTTP loopback endpoint.');
     let response;
     const credential = this.credentials.get(owner);
-    const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Heiss': '1', ...(credential ? { Authorization: `Bearer ${credential}` } : {}) };
+    // An account's credential is a header set: its personal bearer, or MCP's internal loopback credential.
+    const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Heiss': '1', ...(credential || {}) };
     try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(60000) }); } catch {
       const error = new Error('The studio connection was interrupted. Check the returned job before retrying.');
       error.submissionUncertain = true;
