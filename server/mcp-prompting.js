@@ -24,7 +24,7 @@ export function loadMcpPrompting(file) {
     if (!name) return null;
     const pack = packs[name];
     const { default_mode, modes, ...details } = pack;
-    const result = detailed ? { id: name, ...details, reviewed_on: configuration.reviewed_on } : { id: name, summary: pack.summary };
+    const result = detailed ? { id: name, ...details, reviewed_on: pack.reviewed_on || configuration.reviewed_on } : { id: name, summary: pack.summary };
     if (modes) {
       const mode = binding.mode || (modes[profile.kind] ? profile.kind : default_mode);
       if (!modes[mode]) throw new Error('Choose a prompting mode for this profile.');

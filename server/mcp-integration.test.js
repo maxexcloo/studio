@@ -123,7 +123,10 @@ async function failure(client, name, args = {}) {
   try { result = await call(client, name, args); } catch (error) { assert.ok(error instanceof Error); return; }
   assert.equal(result.isError, true, `Expected ${name} to refuse the request`);
 }
-async function generate(client, args = {}) { return data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'], ...args })); }
+async function generate(client, args = {}) {
+  await call(client, 'Models', { profile_id: args.profile_id || imageProfile.id });
+  return data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'], ...args }));
+}
 function jobId(result) { assert.ok(result.jobs?.length); return result.jobs[0].job_id; }
 function links(result) { return (result.content || []).filter(item => item.type === 'resource_link').map(item => item.uri); }
 function localLink(f, publicLink) { const url = new URL(publicLink); assert.equal(url.origin, 'https://studio.example.test'); assert.match(url.pathname, /^\/mcp\/results\//); return f.base + url.pathname; }
@@ -172,6 +175,22 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   assert.equal(detail.defaults.count, 1);
   assert.equal(detail.prompting, null);
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
+});
+
+test('Generate requires this account to read the selected full guide, not discovery or another profile', async t => {
+  const f = await fixture(t);
+  const alice = await f.client('alice');
+  const args = { profile_id: imageProfile.id, prompts: ['A landscape'] };
+  await failure(alice, 'Generate', args);
+  await call(alice, 'Models', { kind: 'image' });
+  await failure(alice, 'Generate', args);
+  await call(alice, 'Models', { profile_id: videoProfile.id });
+  await failure(alice, 'Generate', args);
+  assert.equal(f.submitted.length, 0);
+  await call(alice, 'Models', { profile_id: imageProfile.id });
+  assert.equal(data(await call(alice, 'Generate', args)).status, 'queued');
+  await failure(await f.client('bob'), 'Generate', args);
+  assert.equal(f.submitted.length, 1);
 });
 
 test('Generate returns immediately with one saved-size image and passes explicit controls without polling', async t => {
@@ -272,6 +291,9 @@ test('image Result attaches a preview and a signed private download of the uncha
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(response.headers.get('content-disposition'), 'inline');
+  assert.ok(result.content.some(item => item.type === 'text' && item.text.startsWith('[View Original]')));
+  assert.equal(JSON.stringify(result.content).includes('[Download'), false);
   const tampered = localLink(f, link).replace(/.$/, value => value === 'a' ? 'b' : 'a');
   assert.equal((await fetch(tampered)).status, 404);
   const status = data(await call(client, 'Status', { job_id: id }));
@@ -438,6 +460,7 @@ test('Generate never waits or fetches completed results, including when retrieva
   const client = await f.client();
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 1 });
   assert.equal(f.submitted.length, 0);
+  await call(client, 'Models', { profile_id: imageProfile.id });
   const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'] });
   assert.notEqual(result.isError, true);
   assert.equal(result.content.some(item => item.type === 'image'), false);
@@ -571,6 +594,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   assert.equal((await client.listTools()).tools.length, 7);
   const profiles = data(await call(client, 'Models', { kind: 'image' })).profiles;
   assert.ok(profiles.length);
+  await call(client, 'Models', { profile_id: profiles[0].id });
   const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'] }));
   assert.equal(queued.status, 'queued');
   assert.equal(queued.jobs.length, 1);
