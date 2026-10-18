@@ -27,6 +27,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
+- **Container security updates:** Debian mirrors use verified HTTPS, and a package-index download failure now stops the build instead of silently leaving vulnerable packages installed.
 - **Video frame references:** deselecting a start frame preserves the end frame in its own slot, including when both use the same image.
 - **LoRA trigger:** opening the picker preserves the composer and reliably tracks its opener on touch devices.
 - **Saved variant counts:** preference migration preserves explicit image counts of 1 and 4.

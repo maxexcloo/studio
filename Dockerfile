@@ -24,8 +24,11 @@ COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/server ./server
 COPY --from=build /app/workflows ./workflows
 
-RUN apt-get update \
-    && apt-get upgrade --no-install-recommends -y \
+# Slim may omit a system CA bundle; retain TLS verification using Node's bundled roots.
+RUN node -e 'const fs = require("node:fs"); const file = "/etc/ssl/certs/ca-certificates.crt"; if (!fs.existsSync(file)) { fs.mkdirSync("/etc/ssl/certs", { recursive: true }); fs.writeFileSync(file, require("node:tls").rootCertificates.join("\n")); }' \
+    && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get --error-on=any update \
+    && apt-get --no-install-recommends --yes upgrade \
     && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm /opt/yarn* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && mkdir /data && chown node:node /data
