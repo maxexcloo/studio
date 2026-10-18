@@ -19,9 +19,12 @@ import { upscaleQualities, upscaleTargets } from './upscale.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { ownerIdForRequest } from './account-ownership.js';
 import { mayUseFeature, mayUseGenerationProfile } from './account-policy.js';
+import { configuredAccountJobLimit, reserveAccountJob } from './account-jobs.js';
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
+  const accountReservations = new Map();
+  const accountJobLimit = configuredAccountJobLimit();
   app.post("/api/generate", async (req, res) => {
     const id = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     // Serialise retries before any asynchronous image staging or backend work.
@@ -31,9 +34,18 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       while (submissions.has(id)) await submissions.get(id);
       submissions.set(id, new Promise((resolve) => { release = resolve; }));
     }
+    let releaseReservation = () => {};
     try {
+      if (req.heissAccount?.role === "user" && !(id && jobs.has(id))) {
+        const reservation = reserveAccountJob(req.heissAccount.userId, jobs, accountReservations, accountJobLimit);
+        if (!reservation.accepted) {
+          return res.status(429).json({ ok: false, reason: "job-limit", error: `You can have up to ${accountJobLimit} outstanding jobs.` });
+        }
+        releaseReservation = reservation.release;
+      }
       await dispatchGenerate(req, res);
     } finally {
+      releaseReservation();
       if (id) { submissions.delete(id); release(); }
     }
   });
@@ -84,6 +96,9 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const duplicateId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     const existing = duplicateId && jobs.get(duplicateId);
     if (existing) {
+      if (req.heissAccount?.role === "user" && existing.ownerId !== req.heissAccount.userId) {
+        return res.status(404).json({ ok: false, error: "That generation is unavailable." });
+      }
       if ((hidden && !existing.privateVault) || (existing.privateVault && (!requestKey || (existing.vaultKey && !existing.vaultKey.equals(requestKey))))) {
         return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
       }

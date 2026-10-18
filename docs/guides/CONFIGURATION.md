@@ -20,6 +20,8 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `HEISS_DEVICE_COOKIE_NAME` optionally gives each studio on the same hostname a distinct device sign-in cookie. The default remains `heiss_device`.
 
+In multi-user mode, `HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). Set a positive whole number to change the limit. Administrators are not limited by this setting.
+
 `HEISS_ENABLE_GROK=0`, `HEISS_ENABLE_TESSERA=0` and `HEISS_ENABLE_LORAS=0` disable those optional catalogue features and reject unavailable generation settings. All three are enabled by default.
 
 `HEISS_DEFAULT_IMAGE_PROFILE` and `HEISS_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
