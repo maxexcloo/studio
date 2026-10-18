@@ -5,7 +5,7 @@ import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -875,6 +875,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         <div className="readout-box">
                           <p>{active.prompt || "No prompt recorded"}</p>
                           <Tip content="Copy Prompt"><button className="readout-copy" aria-label="Copy Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.prompt || ""), "prompt")}><CopyIcon copied={viewerCopy.copied === "prompt"} size={13} /></button></Tip>
+                          <Tip content="Use This Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use This Prompt" disabled={!active.prompt} onClick={() => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); }}><Wand2 size={13} /></button></Tip>
                         </div>
                       </div>
                       {active.negative ? (
@@ -883,6 +884,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           <div className="readout-box">
                             <p>{active.negative}</p>
                             <Tip content="Copy Negative Prompt"><button className="readout-copy" aria-label="Copy Negative Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.negative || ""), "negative")}><CopyIcon copied={viewerCopy.copied === "negative"} size={13} /></button></Tip>
+                            <Tip content="Use This Negative Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use This Negative Prompt" disabled={!active.negative} onClick={() => { setNegative(clampText(active.negative || "", negativeLimit)); showToast("Negative prompt applied."); }}><Wand2 size={13} /></button></Tip>
                           </div>
                         </div>
                       ) : null}
@@ -890,7 +892,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         item={active}
                         copied={viewerCopy.copied === "settings"}
                         onUseSettings={() => applyAllSettings(active)}
-                        onUsePrompts={() => applyPromptsOnly(active)}
                         onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}

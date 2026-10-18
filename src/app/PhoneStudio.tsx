@@ -309,7 +309,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
               <Star size={20} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Unstar' : 'Star'}</span><HapticTarget />
             </button>
           ) : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Model</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Prompt</span></button> : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => { void actions.copyPrompt(item); })}><CopyIcon copied={false} size={20} /><span>Copy Prompt</span></button> : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><Wand2 size={20} /><span>Prompts Only</span></button> : null}
           {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
@@ -336,7 +336,7 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
       {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
       {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
       {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
-      {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} onUsePrompts={() => actions.promptsOnly(item)} /> : null}
+      {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} /> : null}
       {item.prompt ? <button type="button" aria-label="Copy Prompt" onClick={() => { void promptCopy.copyWith(() => actions.copyPrompt(item)); }}><CopyIcon copied={Boolean(promptCopy.copied)} size={21} /><span>{promptCopy.copied ? 'Copied' : 'Copy Prompt'}</span></button> : null}
       {canStar(item) ? (
         <button type="button" className={cn('viewer-phone-star', item.favorite && 'is-starred')} aria-label={item.favorite ? 'Unstar' : 'Star'} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>

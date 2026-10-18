@@ -143,12 +143,7 @@
    .btn loads later, so the overrides carry its class too. */
 .viewer-actions { display: grid; gap: 8px; min-width: 0; }
 .viewer-action-main { width: 100%; }
-.viewer-reuse-split { position: relative; display: flex; width: 100%; gap: 1px; }
-.viewer-reuse-split > :first-child { flex: 1; border-radius: var(--r-pill) 0 0 var(--r-pill); }
-.viewer-reuse-split .btn.viewer-reuse-more { flex: none; min-width: 44px; border-radius: 0 var(--r-pill) var(--r-pill) 0; }
-.viewer-reuse-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); right: 0; min-width: 160px; padding: 4px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--surface-modal); box-shadow: var(--shadow-float-sm); }
-.viewer-reuse-menu button { width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; text-align: left; }
-.viewer-reuse-menu button:is(:hover, :focus-visible) { background: var(--control-hover); }
+.viewer-reuse { width: 100%; }
 .viewer-action-row { display: flex; gap: 6px; min-width: 0; }
 .btn.viewer-action {
   position: relative;
@@ -192,6 +187,7 @@
   min-width: 0;
 }
 .prompt-readout p {
+  min-height: 84px;
   max-height: 32vh;
   overflow: auto;
   margin: 0;
@@ -220,6 +216,12 @@
   color: hsl(var(--foreground));
   cursor: pointer;
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.readout-use { top: 44px; }
+@media (pointer: coarse) {
+  .prompt-readout p { min-height: 108px; padding-right: 64px; }
+  .readout-copy { width: 44px; height: 44px; }
+  .readout-use { top: 56px; }
 }
 .readout-copy:hover {
   background: hsl(var(--accent));
