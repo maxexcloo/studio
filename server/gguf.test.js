@@ -165,6 +165,10 @@ test("with ComfyUI-GGUF, GGUF models and encoders run through its loaders", () =
   assert.equal(flux.capabilities.weightDtype, false, "UnetLoaderGGUF has no weight dtype");
 
   const body = sanitizeGenerateBody({ kind: "image", workflow: flux.workflow, profileId: flux.id, model, prompt: "a fox", textEncoders: [clipL, t5], vae }, info);
+  // Clients name reference assets only; ComfyUI input names come from server-side staging.
+  const forged = sanitizeGenerateBody({ kind: "image", workflow: flux.workflow, profileId: flux.id, model, prompt: "a fox", textEncoders: [clipL, t5], vae,
+    referenceAssets: [{ slot: "reference", assetId: "asset-1", comfyName: "heiss-ui/image_00042_.png [output]", temporary: true }, { comfyName: "other.png" }] }, info);
+  assert.deepEqual(forged.referenceAssets, [{ slot: "reference", assetId: "asset-1", source: "" }]);
   const graph = withGgufLoaders(familyGraph(body));
   const nodes = Object.values(graph);
   const unet = nodes.find((item) => item.class_type === "UnetLoaderGGUF");

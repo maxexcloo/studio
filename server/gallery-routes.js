@@ -136,7 +136,9 @@ export function registerGalleryReadRoutes(app) {
     if (!requireGalleryAccess(req, res)) return res.json({ revision: 0, reset: false, upserts: [], removes: [] });
     const since = Number(req.query.since || 0);
     if (req.heissAccount) {
-      res.json({ revision: galleryRevisionValue(), reset: since !== galleryRevisionValue(), upserts: [], removes: [] });
+      // Bundles are off in account mode, so the owner's own changes patch in place.
+      const delta = galleryDelta({ since, type: String(req.query.type || ""), includeFailed: req.query.includeFailed !== "0", owner: ownerIdForRequest(req), filter: searchFilter(req) });
+      res.json({ ...delta, upserts: revealGalleryItemsForRequest(delta.upserts || []) });
       return;
     }
     // Collapsed runs only come out of a full page, so with any run grouped the
@@ -243,9 +245,11 @@ export function registerGalleryDeleteRoute(app) {
   app.delete("/api/gallery/:id", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
     const id = decodeURIComponent(req.params.id);
-    const inGallery = gallery.some((item) => item.id === id || item.url === id);
     const owned = recordsForRequest(gallery, req);
     const removed = owned.filter((item) => item.id === id || item.url === id);
+    // Accounts never learn whether another owner's item exists.
+    if (req.heissAccount && !removed.length) { res.status(404).json({ ok: false, error: "That item was not found." }); return; }
+    const inGallery = gallery.some((item) => item.id === id || item.url === id);
     // Only an id the gallery does not know can be a Hidden one, and only then is a key needed.
     let vault = { removed: 0 };
     if (!inGallery && vaultConfigured()) {

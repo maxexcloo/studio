@@ -116,7 +116,12 @@ function sanitizeFamilyBody(input, info, stats) {
   if (input.sampler) ensureOption(info, "KSampler", "sampler_name", input.sampler, "Sampler");
   if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
   const c = profile.constraints || {};
-  const supplied = Array.isArray(input.referenceAssets) ? input.referenceAssets.slice(0, 8) : [];
+  // Only asset IDs come from the client; ComfyUI input names are always staged by the server.
+  const supplied = Array.isArray(input.referenceAssets) ? input.referenceAssets.slice(0, 8).map((item) => ({
+    slot: String(item?.slot || "reference").replace(/[^a-z0-9._-]/gi, "").slice(0, 80) || "reference",
+    assetId: String(item?.assetId || "").slice(0, 2048),
+    source: String(item?.source || "").slice(0, 40)
+  })).filter((item) => item.assetId) : [];
   const slots = (profile.mediaInputs || []).map((item) => item.id);
   // A model with reference slots takes an image per slot, in slot order; others keep the first as a start image.
   const referenceAssets = slots.length

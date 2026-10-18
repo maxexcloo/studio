@@ -123,11 +123,13 @@ function bumpRevision(changes = {}) {
   galleryRevision = Math.max(galleryRevision + 1, Date.now());
   const upserts = Array.isArray(changes.upserts) ? changes.upserts : [];
   const removes = Array.isArray(changes.removes) ? changes.removes : [];
+  // Each removed key keeps its owner, so an account's delta never names another owner's item.
+  const removeOwners = Array.isArray(changes.removeOwners) ? changes.removeOwners : [];
   if (upserts.length || removes.length || changes.reset) {
     // Live previews are base64 frames: the log keeps up to changeLogLimit entries, so
     // they stay out of it and a delta attaches the item's current one instead.
     const logged = upserts.map((item) => (item.preview ? withoutPreview(item) : item));
-    galleryChanges.push({ revision: galleryRevision, upserts: logged, removes, reset: Boolean(changes.reset) });
+    galleryChanges.push({ revision: galleryRevision, upserts: logged, removes, removeOwners, reset: Boolean(changes.reset) });
     if (galleryChanges.length > changeLogLimit) galleryChanges.splice(0, galleryChanges.length - changeLogLimit);
   }
   return galleryRevision;
@@ -147,15 +149,16 @@ function diffGallery(before, after) {
   const afterMap = new Map(after.map((item) => [galleryKey(item), item]).filter(([key]) => key));
   const upserts = [];
   const removes = [];
+  const removeOwners = [];
   for (const [key, item] of afterMap) {
     const previous = beforeMap.get(key);
     if (previous === item) continue;
     if (!previous || JSON.stringify(previous) !== JSON.stringify(item)) upserts.push(item);
   }
-  for (const key of beforeMap.keys()) {
-    if (!afterMap.has(key)) removes.push(key);
+  for (const [key, item] of beforeMap) {
+    if (!afterMap.has(key)) { removes.push(key); removeOwners.push(item?.ownerId || ""); }
   }
-  return { upserts, removes };
+  return { upserts, removes, removeOwners };
 }
 
 export function setGallery(items, options = {}) {
@@ -175,14 +178,16 @@ export function isComfyOutputItem(item) {
 export function hideGalleryItems(items) {
   const hiddenAt = Date.now();
   const removes = [];
+  const removeOwners = [];
   for (const item of items) {
     const key = galleryKey(item);
     if (key) {
       hiddenGalleryIds.set(markerOf(key), hiddenAt);
       removes.push(key);
+      removeOwners.push(item?.ownerId || "");
     }
   }
-  if (removes.length) bumpRevision({ removes });
+  if (removes.length) bumpRevision({ removes, removeOwners });
   saveHiddenGalleryIds();
 }
 
@@ -363,7 +368,9 @@ export function pageGallery({ type = "", limit = 200, cursor = "", includeFailed
   return { items, nextCursor, hasMore: Boolean(nextCursor), revision: galleryRevision, totalApprox: all.length };
 }
 
-export function galleryDelta({ since = 0, type = "", includeFailed = true, filter = null } = {}) {
+/** `owner` (account mode) keeps only that owner's upserts and removes; other owners' changes stay invisible. */
+export function galleryDelta({ since = 0, type = "", includeFailed = true, filter = null, owner = null } = {}) {
+  const mine = (ownerId) => owner === null || (ownerId || "") === owner;
   const numericSince = Number(since || 0);
   const earliest = galleryChanges[0]?.revision || galleryRevision;
   if (!numericSince || numericSince < earliest - 1) {
@@ -376,14 +383,15 @@ export function galleryDelta({ since = 0, type = "", includeFailed = true, filte
     if (change.reset) return { revision: galleryRevision, reset: true, upserts: [], removes: [] };
     for (const item of change.upserts || []) {
       const key = galleryKey(item);
-      if (!key) continue;
+      if (!key || !mine(item.ownerId)) continue;
       upsertMap.set(key, item);
       removes.delete(key);
     }
-    for (const key of change.removes || []) {
+    (change.removes || []).forEach((key, index) => {
+      if (owner !== null && (change.removeOwners?.[index] === undefined || !mine(change.removeOwners[index]))) return;
       removes.add(key);
       upsertMap.delete(key);
-    }
+    });
   }
   const upserts = [...upsertMap.values()].filter((item) => {
     if (type && item.type !== type) return false;
@@ -995,7 +1003,10 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   const title = promptTitle(body.prompt);
   const job = jobs.get(id) || {};
   const durationMs = job.startedAt ? Date.now() - job.startedAt : 0;
-  const existing = gallery.filter((item) => item.jobId === id);
+  // The server-owned owner travels from the pending tiles to the finished outputs.
+  const ownerId = body.ownerId || job.ownerId || "";
+  const ownJob = (item) => item.jobId === id && (item.ownerId || "") === ownerId;
+  const existing = gallery.filter(ownJob);
   const completed = await Promise.all(outputs.map(async (item, index) => {
     let videoSize = null;
     if (item.type === "video" && typeof item.url === "string" && item.url.startsWith("/comfy/view?")) {
@@ -1010,6 +1021,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
       ...item,
       id: item.url,
       jobId: id,
+      ...(ownerId ? { ownerId } : {}),
       status,
       prompt: body.prompt || "",
       negative: body.negative || "",
@@ -1034,7 +1046,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   let nextIndex = 0;
   const replaced = [];
   gallery.forEach((item) => {
-    if (item.jobId !== id) {
+    if (!ownJob(item)) {
       replaced.push(item);
       return;
     }

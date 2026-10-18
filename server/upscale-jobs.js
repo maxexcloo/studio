@@ -6,6 +6,7 @@ import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
+import { saveIntoHeissFolder } from "./graphs.js";
 import { forgetComfyRun } from "./hidden-traces.js";
 import { releaseHiddenRun, rememberHiddenRun } from "./hidden-runs.js";
 import { attachVaultUpscale, patchVaultItem, setRuntimeUpscale } from "./vault.js";
@@ -148,7 +149,9 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
   let socket = null;
   let clock = null;
   try {
-    const { graph, plan } = upscaleGraph(body, info);
+    const { graph: built, plan } = upscaleGraph(body, info);
+    // An account's upscale is saved beside its other outputs, in the owner's folder.
+    const graph = body.ownerId ? saveIntoHeissFolder(built, body.ownerId) : built;
     target.patch({ status: "running", jobId, quality: plan.quality, faceDetail: Boolean(body.faceDetail), scale: plan.scale, startedAt: new Date().toISOString(), error: "" });
     // How long it should take, from every SeedVR2 upscale here before (upscale-timing.js).
     const learn = { quality: plan.quality, model: plan.model || "", faceDetail: Boolean(body.faceDetail), work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight }) };
@@ -246,10 +249,11 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
     width: Number(item.width || 0),
     height: Number(item.height || 0),
     prompt: item.prompt || "",
+    ...(item.ownerId ? { ownerId: item.ownerId } : {}),
     ...faceDetailSource(item, customWorkflow)
   };
   const plan = upscalePlan(body);
-  jobs.set(jobId, { status: "queued", kind: "upscale", galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
+  jobs.set(jobId, { status: "queued", kind: "upscale", ...(item.ownerId ? { ownerId: item.ownerId } : {}), galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
   setTimeout(() => hiddenKey
     ? runUpscaleJob(jobId, body, info, hiddenTarget(item.id, hiddenKey, [imageName]))
     : runUpscaleJob(jobId, body, info), 0);

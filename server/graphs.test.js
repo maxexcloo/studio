@@ -71,3 +71,10 @@ test("legacy start images resize before upload and register their temporary copy
   await uploadReferenceImage(url, { width: 1024, height: 1024, autoResizeInputs: false });
   assert.deepEqual(uploads[1], buffer);
 });
+
+test("account image runs and their upscales save into the owner's folder", async () => {
+  const { accountOutputSubfolder } = await import("./account-ownership.js");
+  const graph = saveIntoHeissFolder({ 1: { class_type: "SaveImage", inputs: { filename_prefix: "heiss-ui/upscale" } }, 2: { class_type: "SaveImage", inputs: { filename_prefix: "image" } } }, "account-a");
+  assert.equal(graph[1].inputs.filename_prefix, `${accountOutputSubfolder("account-a")}/upscale`);
+  assert.equal(graph[2].inputs.filename_prefix, `${accountOutputSubfolder("account-a")}/image`);
+});

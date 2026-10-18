@@ -406,9 +406,9 @@ app.get("/api/estimate", (req, res) => {
   res.json({ ok: true, ...(trusted ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) } : {}), ...(queueMs ? { queueMs } : {}) });
 });
 
-app.get("/api/stats", async (_req, res) => {
+app.get("/api/stats", async (req, res) => {
   const since = await commitsSinceRelease();
-  res.json({ ok: true, version: appVersion, sinceRelease: since, stats: galleryStats(gallery) });
+  res.json({ ok: true, version: appVersion, sinceRelease: since, stats: galleryStats(recordsForRequest(gallery, req)) });
 });
 
 // What ComfyUI runs on (GPU, memory and the budget fit hints use). See server/hardware.js.
@@ -457,7 +457,7 @@ app.get("/api/health", async (req, res) => {
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
-    res.json({ ok: true, comfyUrl, comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
+    res.json({ ok: true, ...(req.heissAccount && !canAdmin(req) ? {} : { comfyUrl }), comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   } catch (error) {
     res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   }
@@ -777,16 +777,24 @@ app.post("/api/output-dir/browse", async (req, res) => {
   }
 });
 
-app.get("/api/workflows", async (_req, res) => {
+/** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
+function workflowsForRequest(req, workflows) {
+  if (!req.heissAccount || canAdmin(req)) return workflows;
+  return workflows
+    .filter((item) => mayUseGenerationProfile(req.heissAccount, item.profileId))
+    .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
+}
+
+app.get("/api/workflows", async (req, res) => {
   try {
     const { info, stats } = await loadComfyContext().catch(() => ({ info: {}, stats: {} }));
     const models = Object.keys(info || {}).length ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
     const preferences = loadWorkflowPreferences();
-    res.json({ workflows: workflowSummaries({ info, profiles: models.profiles, preferences }), preferences });
+    res.json({ workflows: workflowsForRequest(req, workflowSummaries({ info, profiles: models.profiles, preferences })), preferences });
   } catch {
     const models = demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
     const preferences = loadWorkflowPreferences();
-    res.json({ workflows: workflowSummaries({ info: {}, profiles: models.profiles, preferences }), preferences });
+    res.json({ workflows: workflowsForRequest(req, workflowSummaries({ info: {}, profiles: models.profiles, preferences })), preferences });
   }
 });
 
@@ -1207,6 +1215,8 @@ app.get("/api/upscale/status", async (req, res) => {
   const info = await upscaleContext(res, { force: req.query.fresh === "1" });
   if (!info) return;
   const status = upscaleStatus(info, req.query.quality);
+  // Install plans name server paths: they are for administrators only.
+  if (req.heissAccount && !canAdmin(req)) return res.json({ ok: true, ...status });
   // Only worth the extra round trips while the nodes still need installing.
   if (!status.nodesInstalled) status.nodeSetup = { manager: await managerAvailable(), pack: nodePack("seedvr2"), autoInstall: packInstallRoutes("seedvr2"), ...nodeInstallPlan() };
   // The face pass has its own two packs; each missing one gets the same install panel.
@@ -1396,7 +1406,8 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
     res.json({ ok: true, stale: true, changed });
     return;
   }
-  if (req.heissAccount && job.ownerId !== req.heissAccount.userId) return res.json({ status: "missing" });
+  // Another account's live job answers exactly like an unknown one.
+  if (req.heissAccount && job.ownerId !== req.heissAccount.userId) return res.json({ ok: true, stale: true, changed: false });
   jobs.set(req.params.id, { ...job, status: "canceling" });
   // Its pictures are saved and only Smart upscale is left: they stay, and runJob delivers them.
   if (!job.keepsPicture) updateGalleryJob(req.params.id, { status: "canceled" });

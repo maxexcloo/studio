@@ -95,10 +95,15 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
     const duplicateId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     const existing = duplicateId && jobs.get(duplicateId);
+    // In account mode a job ID belongs to one owner for good: a reused ID must never touch
+    // another account's live job or saved outputs, and the answer must not reveal which.
+    if (duplicateId && req.heissAccount) {
+      const ownerId = ownerIdForRequest(req);
+      const foreign = (existing && (existing.ownerId || "") !== ownerId)
+        || gallery.some((item) => item.jobId === duplicateId && (item.ownerId || "") !== ownerId);
+      if (foreign) return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
+    }
     if (existing) {
-      if (req.heissAccount?.role === "user" && existing.ownerId !== req.heissAccount.userId) {
-        return res.status(404).json({ ok: false, error: "That generation is unavailable." });
-      }
       if ((hidden && !existing.privateVault) || (existing.privateVault && (!requestKey || (existing.vaultKey && !existing.vaultKey.equals(requestKey))))) {
         return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
       }

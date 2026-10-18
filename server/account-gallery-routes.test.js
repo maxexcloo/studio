@@ -28,7 +28,7 @@ function call(handler, req) {
 
 const item = (ownerId, jobId) => ({
   id: `${jobId}-0`, ownerId, jobId, index: 0, type: "image", status: "done",
-  prompt: `private prompt for ${ownerId}`, model: "test-model", createdAt: new Date().toISOString(),
+  prompt: `private prompt for ${ownerId}`, model: "test-model", createdAt: "2026-10-19T00:00:00.000Z",
   url: `/files/${jobId}.png`, filename: `${jobId}.png`
 });
 
@@ -50,4 +50,32 @@ test("access profiles without gallery permission cannot read pages or exact job 
   const request = { heissAccount: { userId: "account-a", role: "user", authenticated: true, generationProfiles: [], features: { gallery: false } }, query: {} };
   assert.deepEqual(call(routes["/api/gallery"], request).items, []);
   assert.deepEqual(call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items, []);
+});
+
+test("account deltas carry only the owner's own upserts and removes", () => {
+  galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b")]);
+  const request = (since) => ({ heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: { since: String(since) } });
+  const start = galleryStore.galleryRevisionValue();
+  galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b2")]);
+  const foreignOnly = call(routes["/api/gallery/delta"], request(start));
+  assert.equal(foreignOnly.reset, false);
+  assert.deepEqual(foreignOnly.upserts, []);
+  assert.deepEqual(foreignOnly.removes, []);
+
+  const next = galleryStore.galleryRevisionValue();
+  galleryStore.setGallery([item("account-a", "job-a2"), item("account-b", "job-b2")]);
+  const own = call(routes["/api/gallery/delta"], request(next));
+  assert.deepEqual(own.upserts.map((record) => record.jobId), ["job-a2"]);
+  assert.deepEqual(own.removes, [galleryStore.galleryKey(item("account-a", "job-a"))]);
+});
+
+test("finished outputs keep the pending tiles' owner and never replace another owner's tiles", async () => {
+  const pending = (ownerId) => ({ ...item(ownerId, "shared-job"), id: `pending-${ownerId}`, url: "", status: "pending" });
+  galleryStore.setGallery([pending("account-a"), pending("account-b")]);
+  const jobs = new Map([["shared-job", { ownerId: "account-a", startedAt: Date.now() }]]);
+  const [done] = await galleryStore.replaceGalleryJob("shared-job", [{ type: "image", url: "/files/finished-a.png", filename: "finished-a.png" }], { prompt: "a", ownerId: "account-a" }, jobs);
+  assert.equal(done.ownerId, "account-a");
+  const remaining = galleryStore.gallery.filter((record) => record.jobId === "shared-job");
+  assert.deepEqual(remaining.map((record) => record.ownerId).sort(), ["account-a", "account-b"]);
+  assert.equal(remaining.find((record) => record.ownerId === "account-b").status, "pending");
 });

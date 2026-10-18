@@ -57,7 +57,8 @@ export function composeWorkflowPrompt(workflow, userPrompt = "") {
 export async function imageGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
   const graph = await builtInGraph(body);
-  return graph;
+  // Account outputs always land in the owner's folder; single-user images keep upstream's names.
+  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
 }
 
 export async function videoGraph(body) {

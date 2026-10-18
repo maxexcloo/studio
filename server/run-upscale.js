@@ -1,6 +1,7 @@
 import { normalizeComfyError } from "./comfy.js";
 import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
 import { generationSettings, outputsFrom } from "./gallery-store.js";
+import { saveIntoHeissFolder } from "./graphs.js";
 
 /**
  * Smart upscale as part of a run: the size menu's 2K and 4K. The upscale goes
@@ -55,6 +56,8 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
     try {
       const embedded = embedUpscale(graph, attempt, info, { phase });
       if (!embedded) return { skipped: "This workflow saves no image for Smart upscale to work on", quality };
+      // The embedded save nodes arrive after the run's own prefix rewrite.
+      if (body.ownerId && embedded.graph) saveIntoHeissFolder(embedded.graph, body.ownerId);
       return { ...embedded, quality, label, faceDetail: Boolean(attempt.faceDetail) };
     } catch (error) {
       lastError = error;

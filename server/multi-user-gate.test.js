@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 
-function call(path, account = null) {
+function call(path, account = null, method = "GET") {
   const res = {
     headers: {}, statusCode: 200, body: null,
     setHeader(name, value) { this.headers[name] = value; },
@@ -10,7 +10,7 @@ function call(path, account = null) {
     json(body) { this.body = body; return this; }
   };
   let continued = false;
-  enforceMultiUserRequest({ path }, res, () => { continued = true; }, { accountForRequest: () => account });
+  enforceMultiUserRequest({ path, method }, res, () => { continued = true; }, { accountForRequest: () => account });
   return { res, continued };
 }
 
@@ -22,10 +22,23 @@ test("account mode requires identity on loopback and exposes only sign-in/bootst
   assert.equal(call("/api/accounts/bootstrap").continued, true);
 });
 
-test("ordinary accounts cannot enter shared data stores or raw ComfyUI, administrators can", () => {
+test("ordinary accounts reach only reviewed owner-scoped routes; administrators reach everything", () => {
   const user = { userId: "user", role: "user" };
-  assert.equal(call("/api/gallery", user).res.body.reason, "ownership-pending");
-  assert.equal(call("/comfy/prompt", user).res.statusCode, 403);
-  assert.equal(call("/api/gallery", { userId: "admin", role: "administrator" }).continued, true);
-  assert.equal(call("/comfy/prompt", { userId: "admin", role: "administrator" }).continued, true);
+  for (const [method, path] of [
+    ["GET", "/api/gallery"], ["GET", "/api/gallery/delta"], ["POST", "/api/generate"], ["GET", "/api/jobs/abc-1"],
+    ["POST", "/api/jobs/abc-1/cancel"], ["GET", "/api/reference-assets/a1/thumbnail"], ["POST", "/api/reference-assets/upload"],
+    ["GET", "/api/loras/library"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
+  ]) assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
+  for (const [method, path] of [
+    ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
+    ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"], ["PUT", "/api/sizes"],
+    ["PUT", "/api/workflows/preferences"], ["GET", "/api/hidden/gallery"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
+    ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"]
+  ]) {
+    const denied = call(path, user, method);
+    assert.equal(denied.continued, false, `${method} ${path}`);
+    assert.equal(denied.res.statusCode, 403, `${method} ${path}`);
+  }
+  assert.equal(call("/api/gallery/clear", { userId: "admin", role: "administrator" }, "POST").continued, true);
+  assert.equal(call("/comfy/prompt", { userId: "admin", role: "administrator" }, "POST").continued, true);
 });

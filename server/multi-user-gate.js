@@ -4,9 +4,43 @@ const publicAccountPaths = new Set([
   "/api/accounts/sign-out",
   "/api/accounts/bootstrap"
 ]);
-const ownerMediaPaths = new Set(["/comfy/view", "/comfy/thumb", "/comfy/video-preview"]);
 
-/** Account mode must require identity even on loopback; ordinary users stay out until stores are owner-scoped. */
+/**
+ * What an ordinary account may reach. Every route here is owner-scoped or
+ * reveals nothing private; anything else stays administrator-only, so a new
+ * route is closed to ordinary accounts until it is reviewed and added.
+ */
+const ordinaryRoutes = [
+  ["GET", /^\/api\/(ping|health|models|estimate|sizes|workflows|stats|paths)$/],
+  ["GET", /^\/api\/privacy\/status$/],
+  ["GET", /^\/api\/accounts\/mcp-token$/],
+  ["POST", /^\/api\/accounts\/mcp-token(\/revoke)?$/],
+  ["POST", /^\/api\/generate$/],
+  ["GET", /^\/api\/jobs\/[\w-]+$/],
+  ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
+  ["POST", /^\/api\/queue\/cancel$/],
+  ["GET", /^\/api\/gallery(\/delta|\/export|\/jobs\/[\w-]+)?$/],
+  ["POST", /^\/api\/gallery\/(favorite|errors\/clear)$/],
+  ["DELETE", /^\/api\/gallery\/[^/]+$/],
+  ["GET", /^\/api\/prompts$/],
+  ["POST", /^\/api\/prompts\/(clear|enabled|forget|pin)$/],
+  ["GET", /^\/api\/loras\/[^/]+$/],
+  ["PUT", /^\/api\/loras\/[^/]+$/],
+  ["POST", /^\/api\/loras\/library\/ops$/],
+  ["GET", /^\/api\/reference-assets(\/[^/]+(\/[a-z-]+)?)?$/],
+  ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
+  ["DELETE", /^\/api\/reference-assets\/[^/]+$/],
+  ["GET", /^\/api\/upscale\/status$/],
+  ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],
+  ["GET", /^\/comfy\/(view|thumb|video-preview)$/]
+];
+
+export function ordinaryRouteAllowed(method, routePath) {
+  const verb = method === "HEAD" ? "GET" : method;
+  return ordinaryRoutes.some(([allowed, pattern]) => allowed === verb && pattern.test(routePath));
+}
+
+/** Account mode requires identity even on loopback; ordinary accounts reach only reviewed routes. */
 export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
   if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
   if (publicAccountPaths.has(req.path)) return next();
@@ -16,14 +50,11 @@ export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
     res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with an approved account to continue." });
     return;
   }
-  if (req.path.startsWith("/comfy") && account.role !== "administrator") {
-    if (ownerMediaPaths.has(req.path)) return next();
-    res.status(403).json({ ok: false, error: "Raw ComfyUI access is restricted to administrators." });
-    return;
-  }
-  if (account.role !== "administrator") {
-    res.status(503).json({ ok: false, reason: "ownership-pending", error: "This account is approved, but private studio storage is not ready yet." });
-    return;
-  }
-  next();
+  if (account.role === "administrator") return next();
+  if (ordinaryRouteAllowed(String(req.method || "GET").toUpperCase(), req.path)) return next();
+  res.status(403).json({
+    ok: false,
+    reason: "administrator",
+    error: req.path.startsWith("/comfy") ? "Raw ComfyUI access is restricted to administrators." : "This action is restricted to administrators."
+  });
 }
