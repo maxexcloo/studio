@@ -99,10 +99,11 @@ async function resolveSignedMcpResult(owner, jobId, index) {
   const request = { heissAccount: { userId: owner } };
   if (type !== 'output' || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
   try {
-    const file = localOutputFile(filename, subfolder, type);
-    const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(item.settings?.comfyBackend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
+    const backend = item.settings?.comfyBackend === 'video' ? 'video' : 'primary';
+    const file = backend === 'primary' ? localOutputFile(filename, subfolder, type) : null;
+    const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(backend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
     const extension = path.extname(filename).toLowerCase();
-    const mime = ({ '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.png': 'image/png', '.webm': 'video/webm', '.webp': 'image/webp' })[extension];
+    const mime = ({ '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.m4v': 'video/mp4', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.png': 'image/png', '.webm': 'video/webm', '.webp': 'image/webp' })[extension];
     return mime ? { content: Buffer.from(bytes), mime } : null;
   } catch { return null; }
 }
