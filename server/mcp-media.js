@@ -196,10 +196,11 @@ export class McpMedia {
     this.save();
     return result;
   }
-  async result(owner, jobId, index = 0, seconds = 0) {
+  async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview') {
     const job = await this.job(owner, jobId, seconds);
     if (!finished.has(job.status)) return mcpJson({ job_id: jobId, ...this.summary(job) });
     const available = this.available(job, index);
+    if (delivery === 'notification') return mcpJson({ job_id: jobId, output_index: index, status: 'done', kind: job.kind, message: 'This job is finished. Call Result once now with delivery=preview and wait_seconds=0 to show its image inline or view its video. Do not background the preview, poll or generate again.' });
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
