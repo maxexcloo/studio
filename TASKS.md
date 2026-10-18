@@ -70,13 +70,16 @@ Changes span `heiss-ui`, `../ai` and `../kubelab`. The linked private conversati
 53. [x] Embed the existing researched prompting guidelines & patterns in all 45 maintained AI profiles and expose them through the model API & MCP. Prefer profile-owned guidance over the compatibility inventory.
 54. [x] Preserve per-user MCP ownership, separate studio & AI Control credentials, non-blocking submission, revocable signed results and an explicit offline legacy-ownership importer.
 
+55. [x] Match LoRAs to Reference Image’s composer width, toggle & outside-click behaviour; align its list controls and refine the expanded prompt Clear action. Final checks: 707 tests passed, six LoRA browser checks passed; composer checks passed with layout-specific skips.
+
 ## Delivery
 
 - [x] Finish final browser checks and the required AI configuration check on Bento. Initial HEISS checks: 656 tests passed; browser checks: 108 passed with 10 intentional skips. Bento's isolated `mise run check --ci`: passed, including 234 Python tests. Production builds were reserved for verifying bundled UI changes.
 - [x] Verify AI Control and Kubelab. AI Control: 8 UI tests passed. Kubelab `mise run check`: passed, including 92 Python tests and 502 valid resources with zero schema errors. Both affected Kustomize bases and pinned Helm charts rendered successfully.
-- [ ] Deferred by user: provision the distinct AI Control MCP provider credential and grant an administrator's personal LiteLLM key access to `ai-control`. Ordinary chat credentials must remain unable to control GPUs.
+- [x] Verify the configured distinct AI Control MCP provider credential matches Bento and the gateway.
+- [ ] Verify an administrator's personal LiteLLM key can access `ai-control`, while ordinary chat credentials remain unable to control GPUs.
 - [x] Complete native MCP source ownership in `heiss-ui`, retire `../ai/media_mcp` and update the local AI & Kubelab consumers. Kubelab checks passed: 92 Python tests, 504 valid resources, zero schema errors; affected Kustomize configuration & the pinned LiteLLM Helm chart rendered successfully.
-- [ ] Deferred by user: publish and deploy the reviewed changes, import legacy ownership explicitly if needed, then verify live integrations. No release, live credentials or deployment have been changed in this session.
+- [ ] Publish the reviewed image, deploy the AI & Kubelab consumers, preserve legacy ownership and verify live integrations. Deployment is now authorised.
 - [x] Verify the UI refinements above after their final changes. `mise run check`: 671 passed; production build passed. Bundled browser suite: 143 passed & 20 intentional skips; its five failures were corrected and the final affected desktop/mobile checks passed 24/24. Local demo remains available for review; no deployment was performed.
 - [x] Verify the final native MCP, profile guidance & control-state changes locally. HEISS `mise run check`: 707 tests passed, including 29 native integration & five importer tests. Final focused desktop/mobile browser checks: 36 passed & 12 intentional skips. AI Python suite: 200 passed & five platform skips. Diff whitespace checks passed in all three repositories. Local demo: http://127.0.0.1:5173/.
-- [ ] Run the required final AI configuration check on Bento for the native MCP & profile changes. Automatic approval review rejected copying the private source to Bento; explicit approval is required. Earlier Bento checks above predate these changes.
+- [x] Run the required final AI configuration check on Bento for the native MCP & profile changes. Following deployment authorisation, the isolated `mise run check --ci` passed all 205 tests.

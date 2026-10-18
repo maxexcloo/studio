@@ -1,4 +1,4 @@
-import { Eraser, History } from 'lucide-react';
+import { History, X } from 'lucide-react';
 import type { KeyboardEventHandler, Ref } from 'react';
 import { useAutosizeTextarea } from '@/hooks/use-autosize-textarea';
 import { Tip } from './components';
@@ -39,12 +39,12 @@ export function PromptField({ kind, value, onChange, onClear, onHistory, history
       style={{ paddingRight: 72 }}
     />
     <div className="composer-field-tools">
-      <Tip content={clearLabel}>
-        <button type="button" className="prompt-action" aria-label={clearLabel} disabled={!value} onClick={onClear}><Eraser size={15} aria-hidden="true" /></button>
-      </Tip>
       {<Tip content={historyLabel}>
         <button type="button" data-history-trigger disabled={!historyAvailable} className={cn('prompt-action', historyOpen && 'active')} aria-label={historyLabel} aria-expanded={historyOpen} aria-haspopup="dialog" onClick={onHistory}><History size={15} aria-hidden="true" /></button>
       </Tip>}
+      <Tip content={clearLabel}>
+        <button type="button" className="prompt-action prompt-clear" aria-label={clearLabel} disabled={!value} onClick={onClear}><X size={15} aria-hidden="true" /></button>
+      </Tip>
     </div>
   </div>;
 }

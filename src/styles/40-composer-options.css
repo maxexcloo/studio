@@ -176,3 +176,19 @@
 :is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn) > svg,
 :is(.zen-prompt, .phone-create) :is(.number-picker-icon, .number-picker-btn) svg,
 .studio-dock .icon-button > svg { flex-shrink: 0; width: 16px; height: 16px; }
+
+/* Resource pickers share the reference surface, search and selection rhythm. */
+.composer-loras .lora-popover-body { padding: 0; overflow: hidden; }
+.composer-loras .lora-panel { display: flex; flex-direction: column; overflow-y: auto; }
+.composer-loras .lora-picker { gap: 0; }
+.composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--surface-border); }
+.composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: rgb(255 255 255 / .045); }
+.composer-loras .lora-filter { order: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 10px; }
+.composer-loras .lora-filter small { max-width: 260px; text-align: right; }
+.composer-loras .lora-picker-list { order: 2; margin: 0; padding: 0 12px 10px; }
+.composer-loras .lora-library-row:last-child { border-bottom: 0; }
+.composer-loras .lora-library-select { border-radius: var(--r-item); }
+.composer-loras .lora-library-select:hover { background: var(--control-hover); }
+.composer-loras .lora-panel > :not(.lora-picker) { margin-left: 12px; margin-right: 12px; }
+.composer-field-tools .prompt-clear { color: hsl(var(--muted-foreground) / .7); }
+@media (max-width: 760px) { .composer-loras .lora-filter small { display: none; } }
