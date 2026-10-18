@@ -765,7 +765,7 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   await page.screenshot({ path: testInfo.outputPath('gallery-toolbar.png') });
 });
 
-test('model, workflow and LoRA filters reach gallery queries and clear independently', async ({ page, isMobile }) => {
+test('model and LoRA filters reach gallery queries and clear independently', async ({ page, isMobile }) => {
   const queries: URLSearchParams[] = [];
   await page.route('**/api/gallery?*', async (route) => {
     const params = new URL(route.request().url()).searchParams;
@@ -775,11 +775,11 @@ test('model, workflow and LoRA filters reach gallery queries and clear independe
   await page.goto('/');
   if (isMobile) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
-  for (const [name, value] of [['Model', 'flux'], ['Workflow', 'landscape'], ['LoRA', 'grain']]) {
+  for (const [name, value] of [['Model', 'flux'], ['LoRA', 'grain']]) {
     await page.getByRole('button', { name: `Filter By ${name}`, exact: true }).click();
     await page.getByRole('listbox', { name: `${name} Filter`, exact: true }).getByRole('option', { name: value, exact: true }).click();
   }
-  await expect.poll(() => queries.some((query) => query.get('model') === 'flux' && query.get('workflow') === 'landscape' && query.get('lora') === 'grain')).toBe(true);
+  await expect.poll(() => queries.some((query) => query.get('model') === 'flux' && !query.has('workflow') && query.get('lora') === 'grain')).toBe(true);
   await page.getByRole('button', { name: 'Clear Filters', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Gallery Filters', exact: true })).not.toHaveClass(/is-on/);
   if (await page.getByRole('button', { name: 'Gallery Filters', exact: true }).getAttribute('aria-expanded') === 'true') await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
