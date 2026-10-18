@@ -1,3 +1,5 @@
+import { catalogueLoraInfo } from './lora-info.js';
+import { optionalLoraPolicyIssue } from './lora-catalogue.js';
 import { missingNodes, nodeRange, optionsFor } from './comfy.js';
 import { inferModels } from './models.js';
 import { workflowFor, workflowIds } from './workflow-registry.js';
@@ -53,10 +55,13 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
     const name = String(item.name || "").trim();
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn’t available in ComfyUI.`);
+    const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
+    const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), profile);
+    if (issue) throw new Error(issue);
     sanitized.push({
       name,
       enabled: true,
-      strength: snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange)
+      strength
     });
   }
   return sanitized;
