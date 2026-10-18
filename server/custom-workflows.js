@@ -154,7 +154,7 @@ export function metadataFromJson(raw, file) {
     return mapping?.node && mapping?.input ? graph?.[mapping.node]?.inputs?.[mapping.input] : undefined;
   };
   const imageModes = Object.fromEntries(Object.entries(meta.imageModes || {}).map(([mode, variant]) => [mode,
-    metadataFromJson({ graph: variant.graph || graph, heissUi: { ...meta, ...variant, capabilities: variant.capabilities || {}, imageModes: undefined } }, file)
+    metadataFromJson({ graph: variant.graph || graph, heissUi: { ...meta, ...variant, capabilities: variant.capabilities || {}, prompting: variant.prompting, imageModes: undefined } }, file)
   ]));
   const classes = [...new Set([graph, ...Object.values(imageModes).map((mode) => mode.graph)].flatMap((value) => Object.values(value || {}).map((node) => node?.class_type)).filter(Boolean))];
   return {
@@ -162,6 +162,7 @@ export function metadataFromJson(raw, file) {
     profileId: `custom:${id}`,
     name: meta.name || id,
     description: meta.description || "Custom ComfyUI workflow",
+    ...(meta.prompting && typeof meta.prompting === "object" && !Array.isArray(meta.prompting) ? { prompting: structuredClone(meta.prompting) } : {}),
     kind: meta.kind === "video" ? "video" : "image",
     family: meta.family || "custom",
     recipe: meta.recipe,

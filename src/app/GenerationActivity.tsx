@@ -28,7 +28,7 @@ type Landed = { key: string; items: GalleryItem[] };
 export function useGenerationActivity({ items, enabled, watching, reveal, onJump, onView }: {
   /** The gallery as shown: its pending items are the work, its finished ones the results. */
   items: GalleryItem[];
-  /** Off on the phone (it has its own running bar) and while Hidden is locked. */
+  /** Off on the phone (it has its own activity chip) and while Hidden is locked. */
   enabled: boolean;
   /** The rendering work is on screen already, so there is nothing to stand in for. */
   watching: boolean;
@@ -115,15 +115,13 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
     const count = landed.items.length;
     const kind = first.type === 'video' ? 'video' : 'image';
     const shown = landed.items.filter(reveal);
-    const prompt = shown.length && !first.promptProtected ? titleFromPrompt(first.prompt || '') : '';
     return {
       id: 'generation',
       phase: `landed:${landed.key}`,
       state: 'done',
+      compact: true,
       glyph: <ResultFan items={shown.slice(0, RESULT_FAN)} />,
-      title: count === 1 ? `${kind === 'video' ? 'Video' : 'Image'} ready` : `${count} ${kind}s ready`,
-      meta: prompt || 'In the gallery',
-      metaTitle: prompt || undefined,
+      title: count === 1 ? `${kind === 'video' ? 'Video' : 'Image'} Ready` : `${count} ${kind === 'video' ? 'Videos' : 'Images'} Ready`,
       action: { label: 'View', run: () => { setLanded(null); onView(first); } },
       dismiss: { label: 'Dismiss', run: () => setLanded(null) },
       expire: { after: DONE_HOLD_MS, run: () => setLanded(null) }

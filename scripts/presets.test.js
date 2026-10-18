@@ -24,3 +24,13 @@ test('preset application blocks unavailable architectures and missing source enc
   const ready = presetFit({ ...preset, resources: preset.resources.map((resource) => ({ ...resource, localName: resource.file })) }, { ...profile, ready: true });
   assert.deepEqual(ready.blockers, []);
 });
+
+test('imported video settings honour frame offsets and valid boundary steps', () => {
+  const profile = { id: 'h3', capabilities: {}, constraints: { frames: { min: 5, max: 362, step: 17 }, fps: { min: 12, max: 30, step: 6 }, width: { min: 256, max: 1000, step: 64 } } };
+  const preset = { prompt: 'Waves', negative: '', settings: { frames: 124, fps: 99, width: 1024 }, warnings: [], resources: [] };
+  const result = presetFit(preset, profile);
+  assert.equal(result.settings.frames, 124);
+  assert.equal(result.settings.fps, 30);
+  assert.equal(result.settings.width, 960);
+  assert.ok(result.warnings.some((warning) => /FPS will use 30/.test(warning)));
+});

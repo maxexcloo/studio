@@ -117,3 +117,22 @@ test('trusted optional adapter policy validates conditioning and full publisher 
   fs.writeFileSync(path.join(scratch, 'lora-catalogue.json'), JSON.stringify(catalogue));
   assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
 });
+
+test('runtime profiles expose owned prompting and select explicit image-mode guidance', () => {
+  const prompting = { id: 'profile-guide', summary: 'Shared profile guidance', rules: ['Keep the subject'], sources: ['https://example.test/profile'], reviewed_on: '2026-10-16' };
+  const generation = { ...prompting, summary: 'Text generation guidance', mode: { id: 'generate', example: 'A tree' } };
+  const reference = { ...prompting, summary: 'Reference guidance', mode: { id: 'reference', example: 'Preserve the tree' } };
+  saveCustomWorkflow({ ...raw, heissUi: { ...raw.heissUi, id: 'owned-prompting', prompting, imageModes: {
+    generate: { ...raw.heissUi.imageModes.generate, prompting: generation },
+    reference: { ...raw.heissUi.imageModes.reference, prompting: reference }
+  } } });
+  const profile = inferModels(info).profiles.find(item => item.id === 'custom:owned-prompting');
+  assert.deepEqual(profile.prompting, generation);
+  assert.deepEqual(profile.imageModes.generate.prompting, generation);
+  assert.deepEqual(profile.imageModes.reference.prompting, reference);
+  assert.equal(profile.imageModes.reference.graph, undefined);
+  saveCustomWorkflow({ ...raw, heissUi: { ...raw.heissUi, id: 'inherited-prompting', prompting } });
+  const inherited = inferModels(info).profiles.find(item => item.id === 'custom:inherited-prompting');
+  assert.deepEqual(inherited.prompting, prompting);
+  assert.equal(inherited.imageModes.generate.prompting, undefined);
+});

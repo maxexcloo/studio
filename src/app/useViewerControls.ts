@@ -43,6 +43,7 @@ export function useViewerControls(view: any) {
   } = view;
   const swipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swiping = useRef(false);
+  const tapPointRef = useRef<Pan | null>(null);
   const latestView = useRef(view);
   latestView.current = view;
   // A swipe in flight is only abandoned when the viewer itself goes away. An
@@ -55,6 +56,8 @@ export function useViewerControls(view: any) {
   const lastTouchRef = view.lastTouchRef as React.MutableRefObject<number>;
   const touchGestureRef = view.touchGestureRef as React.MutableRefObject<TouchGesture | null>;
   function resetViewer() {
+    lastTapRef.current = 0;
+    tapPointRef.current = null;
     setViewerZoom(1);
     setViewerPan({ x: 0, y: 0 });
   }
@@ -351,6 +354,8 @@ export function useViewerControls(view: any) {
   }
 
   function beginPinch(canvas: HTMLElement, touches: React.TouchList, zoom: number, pan: Pan) {
+    lastTapRef.current = 0;
+    tapPointRef.current = null;
     touchGestureRef.current = {
       mode: "pinch",
       geometry: measureViewer(canvas),
@@ -510,6 +515,7 @@ export function useViewerControls(view: any) {
   function endViewerTouch(event: React.TouchEvent) {
     const gesture = touchGestureRef.current;
     lastTouchRef.current = Date.now();
+    viewerCanvas(event).dataset.lastTouchAt = String(lastTouchRef.current);
     if (!gesture) return;
     const canvas = viewerCanvas(event);
     if (event.type === "touchcancel") {
@@ -517,7 +523,11 @@ export function useViewerControls(view: any) {
       settleViewer(canvas, viewerZoom, viewerPan);
       return;
     }
-    if (gesture.mode !== "done" && gesture.moved) viewerDragEndRef.current = Date.now();
+    if (gesture.mode !== "done" && gesture.moved) {
+      viewerDragEndRef.current = Date.now();
+      lastTapRef.current = 0;
+      tapPointRef.current = null;
+    }
     // One finger of a pinch lifts: the pinch is over, and the finger left
     // behind does nothing until it lifts too, so nothing lurches.
     if (gesture.mode === "pinch") {
@@ -544,6 +554,14 @@ export function useViewerControls(view: any) {
       }
     }
     if (!gesture.moved && active?.type === "video") return;
+    const nowTap = Date.now();
+    const lastPoint = tapPointRef.current;
+    // Two taps must land near one another; separate taps across the image aren't zoom.
+    const doubleTap = Boolean(endedTouch && lastPoint && nowTap - lastTapRef.current < 320 && Math.hypot(endedTouch.clientX - lastPoint.x, endedTouch.clientY - lastPoint.y) < 36);
+    if (!gesture.moved && endedTouch) {
+      lastTapRef.current = doubleTap ? 0 : nowTap;
+      tapPointRef.current = doubleTap ? null : { x: endedTouch.clientX, y: endedTouch.clientY };
+    }
 
     if (gesture.mode === "swipe") {
       if (gesture.moved) {
@@ -564,8 +582,7 @@ export function useViewerControls(view: any) {
       }
       // A tap, or the second of a double tap: zoom in on the spot tapped.
       const touch = event.changedTouches[0];
-      const nowTap = Date.now();
-      if (touch && nowTap - lastTapRef.current < 280) {
+      if (touch && doubleTap) {
         event.preventDefault();
         lastTapRef.current = 0;
         const geometry = measureViewer(canvas);
@@ -575,21 +592,18 @@ export function useViewerControls(view: any) {
         settleViewer(canvas, zoom, pan);
         return;
       }
-      lastTapRef.current = nowTap;
       settleViewer(canvas, 1, { x: 0, y: 0 }, false);
       return;
     }
 
     // A pan ends where the finger left it; a double tap zooms back to fit.
     if (!gesture.moved) {
-      const nowTap = Date.now();
-      if (nowTap - lastTapRef.current < 280) {
+      if (doubleTap) {
         event.preventDefault();
         lastTapRef.current = 0;
         settleViewer(canvas, 1, { x: 0, y: 0 });
         return;
       }
-      lastTapRef.current = nowTap;
     }
     settleViewer(canvas, gesture.zoom, gesture.current, false);
   }

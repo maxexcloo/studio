@@ -1,7 +1,8 @@
 import { imageDimension } from './generationOptions';
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Layers, MoveHorizontal, MoveVertical, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Plus, MoveHorizontal, MoveVertical, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
@@ -36,7 +37,6 @@ const LADDER: Array<[ControlId, Demotion]> = [
   ["private", "compact"],
   ["workflow", "compact"],
   ["steps", "drawer"],
-  ["lora", "drawer"],
   ["size", "drawer"],
   ["variants", "drawer"],
   ["aspect", "drawer"],
@@ -209,7 +209,11 @@ export type ComposerBarProps = {
   comfyOffline: boolean;
   /** Down on purpose: the button says "Restarting…" and waits instead of offering a retry. */
   comfyRestarting?: boolean;
+  advancedOpen?: boolean;
+  onAdvanced?: () => void;
+  onBrowseModels?: () => void;
   onFindModels?: () => void;
+  onReset?: () => void;
   /** Opens "Get a Model": the starter models, from the model menu. */
   onGetModels?: () => void;
   strayModelCount?: number;
@@ -238,6 +242,7 @@ export type ComposerBarProps = {
   setCount: (value: number) => void;
   loraActiveCount: number;
   hiddenSpace: boolean;
+  lorasOpen?: boolean;
   onOpenLoras?: () => void;
   canUseNegativePrompt: boolean;
   runningCount: number;
@@ -262,37 +267,40 @@ export type ComposerBarProps = {
   onRandomSeed?: () => void;
   /** The key that sends the prompt, shown in Generate's tooltip. */
   generateKey?: string;
+  primaryTarget?: HTMLElement | null;
   onModeChange?: (mode: 'image' | 'video') => void;
 };
 
 export function ComposerBar(props: ComposerBarProps) {
   const {
-    models, model, modelProfiles, showInpaint = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, onFindModels, onGetModels, strayModelCount, mode,
+    models, model, modelProfiles, showInpaint = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, advancedOpen = false, onAdvanced, onBrowseModels, onFindModels, onGetModels, onReset, strayModelCount, mode,
     aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, autoUpscale = "none", onAutoUpscaleChange,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
-    hiddenSpace, onOpenLoras,
+    hiddenSpace, lorasOpen = false, onOpenLoras,
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceInpaint = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
-    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange
+    pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange, primaryTarget = null
   } = props;
 
   const showVariants = mode === "video" || currentProfile?.capabilities.variations !== false;
   const countLabel = mode === "video" ? "Videos" : "Images";
   const displayCount = showVariants ? count : 1;
   const workflowName = currentProfile?.displayName || currentProfile?.label || "";
-  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim()].join("|");
+  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim(), Boolean(primaryTarget)].join("|");
   const { rowRef, plan, level } = useDensityLevel(contentKey);
   useComposerHeightVar(rowRef);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   /* Every control is a function of its density, so the drawer can render the
      same control at full size while the bar shows a demoted copy. */
+  const recipePicker = models && recipesFor(modelProfiles, model).length ? <label className="recipe-control">Recipe<select className="is-framed" aria-label="Recipe" value={model} onChange={(event) => chooseModel(event.target.value)}>{recipesFor(modelProfiles, model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null;
+
   const workflowPicker = (density: ControlDensity) => models
     ? <>
-      <ModelPicker value={model} profiles={modelRecipeOptions(modelProfiles, model)} showInpaint={showInpaint} onChange={chooseModel} menu={recipeModelMenu(modelMenu, modelProfiles, model)} compact badges={profileBadges} density={density} onFindModels={comfyOffline ? undefined : onFindModels} onGetModels={comfyOffline ? undefined : onGetModels} strayCount={strayModelCount} emptyHint={comfyOffline ? "Start ComfyUI to see your models." : strayModelCount ? "Some models are in a folder ComfyUI doesn’t read." : "No usable models in ComfyUI yet. Add one to its models folder, or find yours."} />
-      {recipesFor(modelProfiles, model).length ? <label className="recipe-control">Recipe<select className="is-framed" aria-label="Recipe" value={model} onChange={(event) => chooseModel(event.target.value)}>{recipesFor(modelProfiles, model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
+      <ModelPicker value={model} profiles={modelRecipeOptions(modelProfiles, model)} showInpaint={showInpaint} onChange={chooseModel} menu={recipeModelMenu(modelMenu, modelProfiles, model)} compact badges={profileBadges} density={density} onFindModels={comfyOffline ? undefined : onFindModels} onGetModels={comfyOffline ? undefined : onGetModels} onBrowseModels={onBrowseModels} strayCount={strayModelCount} emptyHint={comfyOffline ? "Start ComfyUI to see your models." : strayModelCount ? "Some models are in a folder ComfyUI doesn’t read." : "No usable models in ComfyUI yet. Add one to its models folder, or find yours."} />
+      {recipePicker}
     </>
     : comfyOffline ? null : <Skeleton className="composer-skeleton" />;
 
@@ -324,11 +332,11 @@ export function ComposerBar(props: ComposerBarProps) {
     <NumberPicker className="composer-count-picker" label={countLabel} icon={mode === "video" ? <Film size={14} /> : <Images size={14} />} density={density} value={count} onChange={setCount} min={countMeta.min || 1} max={countMeta.max ?? 8} step={countMeta.step || 1} size="sm" />
   ) : null;
 
-  const loraPill = (density: ControlDensity) => loraActiveCount ? (
-    <Tip content={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit`}>
-      <button type="button" className={cn("lora-pill", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} aria-label={`${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active, edit LoRAs`}>
-        {density === "full" ? "LoRA" : <Layers size={13} />}
-        <AnimatedNumber value={loraActiveCount} />
+  const loraPill = (density: ControlDensity) => onOpenLoras ? (
+    <Tip content={loraActiveCount ? `${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit` : "LoRAs"}>
+      <button type="button" className={cn("lora-pill composer-resource-add", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={lorasOpen}>
+        <Plus size={13} /><span>LoRAs</span>
+        {loraActiveCount ? <AnimatedNumber value={loraActiveCount} /> : null}
       </button>
     </Tip>
   ) : null;
@@ -352,8 +360,28 @@ export function ComposerBar(props: ComposerBarProps) {
 
   const inline = (id: ControlId, render: (density: ControlDensity) => React.ReactNode) => (plan[id].drawer ? null : render(plan[id].density));
 
+  const submitActions = (
+        <div className="composer-submit-actions" data-fluid-group>
+        <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `Generate ${displayCount} ${mode === "video" ? "video" : "image"}${displayCount === 1 ? "" : "s"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
+          <GenerateButton
+            className={cn("generate", Boolean(runningCount) && !comfyOffline && !comfyRestarting && "is-working", comfyRestarting ? "is-restarting" : comfyOffline && "is-offline")}
+            onClick={comfyRestarting ? undefined : comfyOffline ? refreshComfyStatus : generate}
+            disabled={comfyRestarting || (comfyOffline ? comfyRetrying : false)}
+            blocked={!comfyOffline && !comfyRestarting && generateDisabled}
+            busy={comfyRestarting || (comfyOffline && comfyRetrying) || undefined}
+            aria-label={comfyRestarting ? "ComfyUI is restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI offline, check again") : generateDisabledReason || "Generate"}
+          >
+            {comfyRestarting
+              ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>
+              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <ArrowUp size={18} strokeWidth={2.4} />}
+          </GenerateButton>
+        </Tip>
+        </div>
+  );
+
   return (
     <>
+      {primaryTarget ? createPortal(submitActions, primaryTarget) : null}
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
       <ReferenceSlots scope={`${mode}:${model}:${hiddenSpace}`} inputs={referenceInputs} inpaint={referenceInpaint} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
       <AnimatePresence initial={false}>
@@ -379,6 +407,10 @@ export function ComposerBar(props: ComposerBarProps) {
         </motion.div>
         ) : null}
       </AnimatePresence>
+      <div className="composer-resource-row">
+        <div className="composer-resource-left"><div className="composer-reference-tools" />{loraPill("compact")}</div>
+        <div className="composer-resource-model">{workflowPicker("compact")}</div>
+      </div>
       <div className="zen-prompt-actions" ref={rowRef} data-density-level={level}>
         <div className="prompt-left-actions" data-fluid-group>
           {onModeChange ? <ComposerModeSelect mode={mode} onChange={onModeChange} /> : null}
@@ -399,12 +431,11 @@ export function ComposerBar(props: ComposerBarProps) {
           ) : null}
         </div>
         <div className="zen-inline-settings" data-fluid-group>
-          {inline("workflow", workflowPicker)}
           {inline("aspect", aspectPicker)}
           {inline("size", sizePickers)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
-          {inline("lora", loraPill)}
+          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
           {tucked.length ? (
             <Tip content="More settings">
               <button
@@ -415,28 +446,14 @@ export function ComposerBar(props: ComposerBarProps) {
                 aria-expanded={drawerOpen}
                 onClick={() => setDrawerOpen((value) => !value)}
               >
-                <SlidersHorizontal size={15} />
+                <MoreHorizontal size={15} />
                 <i>{tucked.length}</i>
               </button>
             </Tip>
           ) : null}
         </div>
-        <div className="composer-submit-actions" data-fluid-group>
-        <Tip content={comfyRestarting ? "ComfyUI is restarting. Back in a few seconds." : comfyOffline ? "ComfyUI is offline. Click to check again." : generateDisabledReason || `Generate ${displayCount} ${mode === "video" ? "video" : "image"}${displayCount === 1 ? "" : "s"}${estimatePhrase(generationEstimate) ? ` · ${estimatePhrase(generationEstimate)}` : ""}${generateKey ? ` · ${generateKey}` : ""}`}>
-          <GenerateButton
-            className={cn("generate", Boolean(runningCount) && !comfyOffline && !comfyRestarting && "is-working", comfyRestarting ? "is-restarting" : comfyOffline && "is-offline")}
-            onClick={comfyRestarting ? undefined : comfyOffline ? refreshComfyStatus : generate}
-            disabled={comfyRestarting || (comfyOffline ? comfyRetrying : false)}
-            blocked={!comfyOffline && !comfyRestarting && generateDisabled}
-            busy={comfyRestarting || (comfyOffline && comfyRetrying) || undefined}
-            aria-label={comfyRestarting ? "ComfyUI is restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI offline, check again") : generateDisabledReason || "Generate"}
-          >
-            {comfyRestarting
-              ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>
-              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <ArrowUp size={18} strokeWidth={2.4} />}
-          </GenerateButton>
-        </Tip>
-        </div>
+        {onReset ? <Tip content="Reset Creation"><button type="button" className="icon-button composer-reset" aria-label="Reset Creation" onClick={onReset}><ListRestart size={15} /></button></Tip> : null}
+        {primaryTarget ? null : submitActions}
       </div>
     </>
   );

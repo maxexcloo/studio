@@ -146,9 +146,9 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   );
 }
 
-export function ModelLoraControls({ view }: { view: any }) {
+export function ModelLoraControls({ view, browseFirst = false }: { view: any; browseFirst?: boolean }) {
   const { loraOptions, loraLimit, loraUnavailable } = loraSetup(view);
-  return <section className="model-loras" aria-label="Optional LoRAs"><h3>Optional LoRAs</h3><LoraPanel loras={view.loras} setLoras={view.setLoras} options={loraOptions} profile={view.currentProfile} limit={loraLimit} library={view.loraLibrary} rememberedStrength={view.rememberedLoraStrength} unavailableReason={loraUnavailable} /></section>;
+  return <section className="model-loras" aria-label="Optional LoRAs"><h3>Optional LoRAs</h3><LoraPanel browseFirst={browseFirst} loras={view.loras} setLoras={view.setLoras} options={loraOptions} profile={view.currentProfile} limit={loraLimit} library={view.loraLibrary} rememberedStrength={view.rememberedLoraStrength} unavailableReason={loraUnavailable} /></section>;
 }
 
 export function SidebarControls({ view }: { view: any }) {

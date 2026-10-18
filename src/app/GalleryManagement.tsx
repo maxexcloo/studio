@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckSquare, Copy, Download, Eye, EyeOff, Star, Trash2, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { springs } from '@/lib/springs';
+import { CheckSquare, Copy, Download, Eye, EyeOff, Star, Trash2, Video, X } from 'lucide-react';
 import { canStar, useStar } from './favorites';
+import { canAnimatePhoto } from './AnimatePhotos';
 import { GallerySelectionContext } from './gallerySelection';
 import { useHiddenActions } from './hiddenContext';
 import { downloadItems } from './PhoneStudio';
@@ -9,7 +12,7 @@ import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 import type { ShowToast } from './toast';
 
-export function GalleryManagement({ children, items, modeSelector, onDelete, onCopy, resetKey, search, showToast, showToolbar = true, tools }: {
+export function GalleryManagement({ children, items, modeSelector, onAnimate, onDelete, onCopy, resetKey, search, showToast, showToolbar = true, tools }: {
   children: React.ReactNode;
   items: GalleryItem[];
   modeSelector: React.ReactNode;
@@ -17,10 +20,12 @@ export function GalleryManagement({ children, items, modeSelector, onDelete, onC
   search: React.ReactNode;
   showToolbar?: boolean;
   tools?: React.ReactNode;
+  onAnimate: (items: GalleryItem[]) => void;
   onDelete: (items: GalleryItem[]) => Promise<unknown>;
   onCopy: (item: GalleryItem) => void;
   showToast: ShowToast;
 }) {
+  const reducedMotion = useReducedMotion();
   const [selection, setSelection] = useState<Set<string> | null>(null);
   const [menu, setMenu] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   useEffect(() => { setSelection(null); setMenu(null); }, [resetKey]);
@@ -88,6 +93,7 @@ export function GalleryManagement({ children, items, modeSelector, onDelete, onC
   const allStarred = starred.length > 0 && starred.every((item) => item.favorite);
   const act = (action: () => void) => { closeMenu(); action(); };
   const actions = (inMenu: boolean) => <>
+    <button type="button" role={inMenu ? 'menuitem' : undefined} title="Animate" disabled={!targets.some(canAnimatePhoto)} onClick={() => act(() => onAnimate(targets.filter(canAnimatePhoto)))}><Video size={16} />Animate</button>
     <button type="button" role={inMenu ? 'menuitem' : undefined} title="Download" disabled={!ready.length} onClick={() => act(() => { void downloadItems(ready, showToast); })}><Download size={16} />Download</button>
     {star ? <button type="button" role={inMenu ? 'menuitem' : undefined} title={allStarred ? "Unstar" : "Star"} disabled={!starred.length} onClick={() => act(() => star(starred, !allStarred))}><Star size={16} />{allStarred ? 'Unstar' : 'Star'}</button> : null}
     {hidden ? <button type="button" role={inMenu ? 'menuitem' : undefined} title={hidden.space === "hidden" ? "Move To Gallery" : "Move To Hidden"} disabled={!movable.length} onClick={() => act(() => hidden.space === 'hidden' ? hidden.unhide(movable) : hidden.hide(movable))}>{hidden.space === 'hidden' ? <Eye size={16} /> : <EyeOff size={16} />}{hidden.space === 'hidden' ? 'Move To Gallery' : 'Move To Hidden'}</button> : null}
@@ -123,12 +129,11 @@ export function GalleryManagement({ children, items, modeSelector, onDelete, onC
   }), [items, selection]); // eslint-disable-line react-hooks/exhaustive-deps
   return <GallerySelectionContext.Provider value={context}>
     {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions"><div className={selection ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
-      {selection ? <>
-        <span role="status">{selected.length} Selected</span>
+      <button type="button" className="gallery-select-toggle" aria-label={selection ? 'Stop Selecting' : 'Select'} aria-expanded={Boolean(selection)} title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => selection ? end() : setSelection(new Set())}>{selection ? <X size={16} /> : <CheckSquare size={16} />}<span role={selection ? 'status' : undefined}>{selection ? `${selected.length} Selected` : 'Select'}</span></button>
+      <AnimatePresence initial={false}>{selection ? <motion.div className="gallery-selection-actions" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <button type="button" title={selected.length === selectable.length && selectable.length ? "Deselect All" : "Select All Loaded"} onClick={() => selected.length === selectable.length ? setSelection(new Set()) : all()}><CheckSquare size={16} />{selected.length === selectable.length && selectable.length ? 'Deselect All' : 'Select All Loaded'}</button>
         {actions(false)}
-        <button type="button" aria-label="Stop Selecting" onClick={end}><X size={16} /></button>
-      </> : <button type="button" title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => setSelection(new Set())}><CheckSquare size={16} />Select</button>}
+      </motion.div> : null}</AnimatePresence>
     </div>{tools}</div></header> : null}
     {children}
     {menu ? createPortal(<div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y }} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {

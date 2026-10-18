@@ -19,7 +19,24 @@ import { upscaleQualities } from './upscale.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
+  const submissions = new Map();
   app.post("/api/generate", async (req, res) => {
+    const id = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
+    // Serialise retries before any asynchronous image staging or backend work.
+    // Once acknowledged, the job below answers repeats without staging again.
+    let release;
+    if (id) {
+      while (submissions.has(id)) await submissions.get(id);
+      submissions.set(id, new Promise((resolve) => { release = resolve; }));
+    }
+    try {
+      await dispatchGenerate(req, res);
+    } finally {
+      if (id) { submissions.delete(id); release(); }
+    }
+  });
+
+  async function dispatchGenerate(req, res) {
     if (configuredBackends().length === 1) return generateOnBackend(req, res);
     try {
       const available = await mediaModels();
@@ -31,7 +48,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     } catch (error) {
       if (!res.headersSent) res.status(503).json({ ok: false, error: error.message });
     }
-  });
+  }
 
   async function generateOnBackend(req, res) {
     const requestKey = encryptionKeyFromRequest(req);
@@ -44,6 +61,14 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (hidden && !requestKey) {
       res.status(401).json({ ok: false, locked: true, reason: "locked", error: "Hidden is locked. Unlock it to generate." });
       return;
+    }
+    const duplicateId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
+    const existing = duplicateId && jobs.get(duplicateId);
+    if (existing) {
+      if ((hidden && !existing.privateVault) || (existing.privateVault && (!requestKey || (existing.vaultKey && !existing.vaultKey.equals(requestKey))))) {
+        return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
+      }
+      return res.json({ jobId: duplicateId, items: existing.items || existing.outputs || [], hidden: existing.privateVault, revision: galleryRevisionValue() });
     }
     let body;
     let isMockJob = false;
@@ -108,7 +133,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail) }
       : null;
     // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
-    if (!body.privateVault) try { recordPrompt(body.prompt); } catch { /* a run matters more than its history */ }
+    if (!body.privateVault) try { recordPrompt(body.prompt); recordPrompt(body.negative, "negative"); } catch { /* a run matters more than its history */ }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {

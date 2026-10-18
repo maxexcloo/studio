@@ -26,7 +26,8 @@ import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
 import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
-import { requestGuard } from './request-guard.js';
+import { hostAllowed, requestGuard } from './request-guard.js';
+import { registerMcpRoutes } from './mcp.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
@@ -76,6 +77,11 @@ addProbe("thumbs", () => buildStats());
 const app = express();
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
+registerMcpRoutes(app, {
+  dataDir,
+  baseUrl: () => `http://127.0.0.1:${port}`,
+  allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() })
+});
 app.use(express.json({ limit: "25mb" }));
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
 app.use((error, _req, res, next) => {
@@ -789,9 +795,9 @@ registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory });
 
 registerHiddenFavoriteRoute(app);
 
-app.get("/api/prompts", (_req, res) => {
+app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.json({ prompts: listPrompts(), enabled: promptHistoryEnabled() });
+  res.json({ prompts: listPrompts(req.query.kind), enabled: promptHistoryEnabled(req.query.kind) });
 });
 
 app.post("/api/prompts/enabled", (req, res) => {
@@ -800,15 +806,15 @@ app.post("/api/prompts/enabled", (req, res) => {
 });
 
 app.post("/api/prompts/pin", (req, res) => {
-  res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned)) });
+  res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {
-  res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")]) });
+  res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")], new Set(), req.body?.kind) });
 });
 
 app.post("/api/prompts/clear", (req, res) => {
-  res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }) });
+  res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind) });
 });
 
 app.get("/api/civitai", (_req, res) => {

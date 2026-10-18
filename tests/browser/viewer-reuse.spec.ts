@@ -5,6 +5,13 @@ import ffmpeg from 'ffmpeg-static';
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const video = execFileSync(ffmpeg!, ['-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '2', '-an', '-c:v', 'libx264', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', '-loglevel', 'error', 'pipe:1']);
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
+  const models = await (await page.request.get('/api/models')).json();
+  for (const profile of models.profiles) profile.capabilities.negativePrompt = true;
+  await page.route('**/api/models', route => route.fulfill({ json: models }));
+});
+
 for (const kind of ['image', 'video'] as const) {
   for (const failed of [false, true]) {
     test(`reusing ${failed ? 'failed' : 'completed'} ${kind} settings keeps its viewer open`, async ({ page, isMobile }) => {
@@ -27,7 +34,7 @@ for (const kind of ['image', 'video'] as const) {
       await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
       await page.route('**/reuse-video.mp4*', (route) => route.fulfill({ body: video, contentType: 'video/mp4' }));
       await page.goto('/');
-      if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: 'Video', exact: true }).click();
+      if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
       await page.locator(`[data-tile-id="${item.id}"]`).click();
       const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
       await expect(viewer).toBeVisible();
@@ -69,6 +76,7 @@ for (const promptsOnly of [false, true]) {
   test(`${promptsOnly ? 'prompts-only reuse preserves' : 'missing-model reuse safely adapts to'} the current model`, async ({ page, isMobile }) => {
     const models = await (await page.request.get('/api/models')).json();
     const current = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
+    current.capabilities.negativePrompt = true;
     current.constraints.steps = { min: 1, max: 50, step: 1 };
     current.constraints.width = { min: 256, max: 2048, step: 32 };
     current.constraints.height = { min: 256, max: 2048, step: 32 };
@@ -83,7 +91,7 @@ for (const promptsOnly of [false, true]) {
     await page.goto('/');
     if (isMobile) await page.locator('.phone-create-open').click();
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Original draft');
-    await page.getByRole('button', { name: 'Add Start Image', exact: true }).click();
+    await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
     await page.getByRole('button', { name: reference.name, exact: true }).click();
     if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
     await page.locator(`[data-tile-id="${item.id}"]`).click();
@@ -109,9 +117,10 @@ for (const promptsOnly of [false, true]) {
     await expect(viewer).toBeVisible();
     await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
     if (isMobile) await page.locator('.phone-create-open').click();
+    else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
     await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(item.prompt);
     await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue(item.negative);
-    await (isMobile ? page.locator('.phone-create') : page).getByRole('button', { name: isMobile ? 'Generate 4' : 'Generate', exact: true }).click();
+    await (isMobile ? page.locator('.phone-create') : page).getByRole('button', { name: 'Generate', exact: true }).click();
     await expect.poll(() => body).not.toBeNull();
     expect(body!.profileId).toBe(current.id);
     expect(body!.width % 32).toBe(0);

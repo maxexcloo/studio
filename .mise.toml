@@ -21,3 +21,7 @@ run = "npm test"
 # Setup
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"
+
+# Native MCP
+[tasks."test:mcp"]
+run = "node --test server/mcp*.test.js"

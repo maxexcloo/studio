@@ -1,0 +1,178 @@
+/* A single creation surface: fields above one consistent toolbar. */
+.zen-prompt { display: block; padding: 0; max-height: none; }
+.composer-inner { display: grid; gap: 6px; padding: 8px; }
+.zen-prompt .composer-prompt-row { display: flex; align-items: center; gap: 8px; }
+.composer-prompt-field { position: relative; flex: 1; min-width: 0; }
+.zen-prompt .composer-prompt-field textarea { display: block; box-sizing: border-box; width: 100%; min-height: 60px; max-height: min(18dvh, 160px) !important; padding: 8px 72px 8px 10px; font-size: 15px; line-height: 1.4; }
+.zen-prompt .composer-prompt-field.is-negative textarea { max-height: min(16dvh, 140px) !important; }
+.composer-field-tools { position: absolute; top: 5px; right: 6px; display: flex; align-items: center; gap: 2px; }
+.composer-field-tools .prompt-action { width: 28px; height: 28px; }
+.composer-prompt-preview { display: none; }
+.composer-primary-actions { display: flex; flex: none; align-items: center; }
+.composer-primary-actions .composer-submit-actions { padding: 0; }
+.zen-prompt .generate { width: var(--control-h); min-width: var(--control-h); height: var(--control-h); padding: 0; border-radius: var(--r-pill); }
+.zen-prompt .generate span { display: none; }
+.zen-prompt .composer-secondary-row { align-items: flex-start; padding: 6px 0 0; }
+.zen-prompt .zen-prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 2px 0; border-top: 1px solid var(--surface-border); }
+.zen-prompt .zen-inline-settings { flex: 1; min-width: 0; flex-wrap: wrap; }
+.zen-prompt .composer-reference-tools { flex: none; max-width: min(340px, 100%); padding: 0; }
+.zen-prompt .composer-reference-slots { align-items: flex-start; }
+.zen-prompt .reference-slot-list { justify-content: flex-start; gap: 8px; }
+.zen-prompt .reference-count { display: none; }
+.zen-prompt .ref-add { width: auto; height: var(--control-h); min-height: var(--control-h); padding: 6px 10px; flex-direction: row; gap: 6px; border-style: solid; border-radius: var(--r-pill); }
+.zen-prompt .ref-add-label { font-size: 12px; white-space: nowrap; }
+.zen-prompt .ref-selected, .zen-prompt .ref-chip.is-busy { width: var(--control-h); height: var(--control-h); }
+.zen-prompt .composer-advanced-trigger, .zen-prompt .composer-reset { flex: none; width: var(--control-h); height: var(--control-h); padding: 0; border-radius: var(--r-pill); background: var(--well); }
+.zen-prompt.is-expanded .composer-primary-actions { display: none; }
+.zen-prompt:not(.is-expanded) { background: rgb(22 22 22 / .5); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.zen-prompt:not(.is-expanded) .composer-prompt-field textarea { height: var(--control-h) !important; min-height: var(--control-h) !important; max-height: var(--control-h) !important; padding: 10px; overflow: hidden !important; white-space: nowrap; opacity: 0; }
+.zen-prompt:not(.is-expanded) .composer-prompt-preview { position: absolute; inset: 0; display: block; overflow: hidden; padding: 0 10px; color: hsl(var(--muted-foreground) / .72); font-size: 14px; line-height: var(--control-h); text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.zen-prompt:not(.is-expanded) .composer-field-tools,
+.zen-prompt:not(.is-expanded) .composer-secondary-row,
+.zen-prompt:not(.is-expanded) .zen-prompt-actions,
+.zen-prompt:not(.is-expanded) .composer-drawer,
+.zen-prompt:not(.is-expanded) .prompt-count,
+.zen-prompt:not(.is-expanded) .lora-mismatch { display: none; }
+.composer-advanced-body { display: grid; gap: 12px; max-height: min(65dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
+.composer-advanced-body .phone-advanced-body { padding: 0; }
+.composer-loras .model-loras { padding: 0; }
+.composer-loras .model-loras > h3 { display: none; }
+.phone-create .phone-compose { display: grid; gap: 12px; }
+.phone-create .composer-prompt-field textarea { box-sizing: border-box; width: 100%; min-height: 68px; padding: 10px 72px 10px 10px; border: 0; border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); font: inherit; font-size: 16px; line-height: 1.4; resize: none; }
+.phone-create .composer-field-tools { top: 7px; right: 7px; }
+.phone-create .phone-sheet-foot { display: grid; gap: 8px; }
+.phone-creation-toolbar, .phone-creation-submit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.phone-creation-toolbar > button, .phone-creation-reset { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; min-width: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
+.phone-creation-toolbar .phone-model-browse { flex: 1; min-width: 80px; max-width: 180px; }
+.phone-model-browse span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.phone-creation-toolbar > button[aria-label="LoRAs"] span { display: none; }
+.phone-creation-submit-row .composer-reference-tools { flex: 1; max-width: none; padding: 0; }
+.phone-creation-submit-row .composer-reference-slots { align-items: flex-start; }
+.phone-creation-submit-row .reference-slot-list { justify-content: flex-start; gap: 8px; }
+.phone-creation-submit-row .ref-add { width: auto; height: 44px; padding: 6px 10px; flex-direction: row; gap: 6px; border-style: solid; border-radius: var(--r-pill); }
+.phone-creation-submit-row .ref-add-label { font-size: 12px; }
+.phone-creation-submit-row .ref-selected { width: 44px; height: 44px; }
+.phone-creation-submit-row .reference-count { display: none; }
+.phone-creation-submit-row .phone-generate { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: var(--r-pill); }
+.phone-create-open strong { color: hsl(var(--muted-foreground) / .72); font-weight: 400; }
+.phone-gallery-mode { display: flex; justify-content: center; gap: 2px; margin: 0 auto 8px; width: fit-content; padding: 3px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-float); }
+.phone-gallery-mode button { min-width: 78px; min-height: 38px; padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 13px; }
+.phone-gallery-mode button[aria-pressed="true"] { background: var(--control-hover); color: hsl(var(--foreground)); }
+.phone-gallery-mode-row { flex-basis: 100%; width: 100%; }
+.phone-shell:has(.phone-gallery-mode) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 108px); }
+.phone-shell:has(.phone-gallery-mode):has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 166px); }
+.phone-bar { flex-wrap: wrap; }
+.phone-shell:has(.phone-gallery-mode) .phone-searchbar { --phone-search-offset: 108px; }
+.phone-gallery-mode.phone-mode-select button { width: auto; min-width: 78px; height: 44px; }
+@media (min-width: 761px) { .zen-prompt { width: min(920px, calc(100vw - 176px)); min-width: 0; } }
+.phone-create-pill { background: rgb(22 22 22 / .5); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+/* Resources form the third row; shared generation controls stay below. */
+.composer-field-tools { top: 50%; transform: translateY(-50%); }
+.phone-create .composer-field-tools { top: 50%; }
+.composer-resource-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }
+.composer-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
+.composer-resource-left .composer-reference-tools { flex: 0 1 auto; min-width: 0; }
+.composer-resource-left .lora-pill { flex: none; }
+.composer-resource-model { flex: none; max-width: 220px; margin-left: auto; }
+.composer-resource-model .model-copy strong { max-width: 160px; }
+.zen-prompt:not(.is-expanded) .composer-resource-row { display: none; }
+.phone-creation-resources { display: flex; align-items: center; gap: 8px; }
+.phone-creation-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: 6px; }
+.phone-creation-resource-left .composer-reference-tools { flex: 1; min-width: 0; max-width: none; padding: 0; }
+.phone-creation-resource-left .reference-slot-list { justify-content: flex-start; gap: 8px; }
+.phone-creation-resource-left .reference-count { display: none; }
+.phone-creation-resource-left .ref-add { width: 44px; height: 44px; padding: 0; border-radius: var(--r-pill); border-style: solid; }
+.phone-creation-resource-left .ref-add-label { display: none; }
+.phone-creation-resource-left .ref-selected { width: 44px; height: 44px; }
+.phone-creation-resources > button, .phone-creation-resource-left > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; }
+.phone-creation-resources .phone-model-browse { flex: none; max-width: 160px; margin-left: auto; }
+.phone-creation-submit-row .composer-submit-actions { margin-left: auto; }
+.composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
+.composer-resource-left .composer-resource-add, .phone-creation-resource-left > .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
+.composer-resource-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.composer-resource-add svg { flex: none; }
+.composer-resource-model .model-menu { width: min(460px, calc(100vw - 32px)); }
+.model-menu .model-option .model-copy em { display: block; font-size: 12px; line-height: 1.45; white-space: normal; }
+.model-menu .model-menu-list { scrollbar-gutter: auto; }
+.model-menu .model-menu-browse { display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; min-height: 58px; margin: 6px 0 0; padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); text-align: left; }
+.model-menu-browse > .model-copy { grid-column: 2; grid-row: 1; }
+.model-menu-browse > svg { grid-column: 1; grid-row: 1; justify-self: center; }
+.model-menu .model-menu-browse:hover { background: var(--control-hover); }
+.model-menu-browse .model-copy strong { max-width: none; font-size: 13px; }
+.model-menu-browse .model-copy em { margin-top: 2px; color: hsl(var(--muted-foreground)); }
+.composer-advanced-modal { width: min(600px, calc(100vw - 32px)); border-radius: var(--r-panel); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); }
+.composer-advanced-modal .modal-head { align-items: center; padding: 16px 16px 8px; }
+.composer-advanced-modal .modal-titles h2 { font-size: 15px; }
+.composer-advanced-modal .modal-body { padding: 8px 16px 16px; }
+.composer-advanced-modal .composer-advanced-body { max-height: none; overflow: visible; gap: 10px; }
+.composer-advanced-modal .phone-advanced-controls, .phone-advanced .phone-advanced-controls { gap: 8px; }
+.composer-advanced-modal .phone-section, .phone-advanced .phone-section { margin: 10px 2px 2px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; }
+.composer-advanced-modal .phone-group, .phone-advanced .phone-group { margin: 0; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
+.composer-advanced-modal .phone-row, .phone-advanced .phone-row { min-height: 44px; padding: 10px 12px; font-size: 13px; }
+.composer-advanced-modal .phone-row small, .phone-advanced .phone-row small { font-size: 11px; }
+.composer-advanced-modal .phone-control, .phone-advanced .phone-control { margin: 0; padding: 10px 12px; gap: 6px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
+.composer-advanced-modal .phone-control-label, .phone-advanced .phone-control-label { font-size: 13px; font-weight: 500; }
+.composer-advanced-modal .phone-slider, .phone-advanced .phone-slider { height: 32px; }
+.composer-advanced-modal .phone-control-hint, .phone-advanced .phone-control-hint { font-size: 11px; }
+.composer-advanced-modal .phone-seed-field input, .phone-advanced .phone-seed-field input { min-height: 40px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--well); }
+
+.phone-creation-resource-left > .composer-resource-add { height: 44px; min-height: 44px; }
+.composer-advanced-modal .phone-slider::-webkit-slider-runnable-track { height: 4px; }
+.composer-advanced-modal .phone-slider::-moz-range-track { height: 4px; }
+.composer-advanced-modal .phone-slider::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
+.composer-advanced-modal .phone-slider::-moz-range-thumb { width: 18px; height: 18px; }
+
+/* LoRA browsing shares the reference picker's anchored glass surface. */
+.composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
+.composer-loras .lora-popover-body { display: flex; flex-direction: column; mask-image: none; }
+.composer-loras .model-loras, .composer-loras .lora-panel { flex: 1; min-height: 0; }
+.composer-loras .lora-picker { max-height: none; height: 100%; }
+.composer-loras .lora-picker-list { min-height: 60px; }
+.composer-loras .lora-filter { flex-wrap: wrap; }
+.composer-loras .lora-filter small { font-size: 11px; }
+.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 8px; border: 0; background: transparent; }
+.composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--control-hover); }
+.composer-loras .lora-option-check { flex: none; }
+.composer-loras .lora-option-star { flex: none; opacity: 1; }
+.composer-loras .lora-option-copy span { white-space: normal; overflow-wrap: anywhere; }
+.composer-loras .lora-option > em { max-width: 28%; }
+.composer-loras .lora-picker-foot { gap: 8px; }
+.composer-loras .lora-picker-foot .btn { flex-shrink: 0; }
+.composer-loras .model-loras { display: flex; flex-direction: column; margin: 0; }
+.composer-loras .lora-picker { flex: 1; height: auto; }
+.composer-loras .lora-picker-head, .composer-loras .lora-picker-search, .composer-loras .lora-filter { flex-shrink: 0; }
+
+/* A tick identifies the chosen model without a persistent selected surface. */
+.model-menu .model-option.active { background: transparent; box-shadow: none; }
+.model-menu .model-option.active:hover { background: var(--control-hover); }
+
+/* Direct LoRA selection keeps weights beside each selected file. */
+.composer-loras .lora-library-row { position: relative; min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--surface-border); }
+.composer-loras .lora-library-select { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 34px 4px 2px; border: 0; border-radius: 0; background: transparent; color: hsl(var(--foreground)); text-align: left; cursor: pointer; }
+.composer-loras .lora-library-select:hover { color: hsl(var(--foreground)); }
+.composer-loras .lora-library-select:focus-visible { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
+.composer-loras .lora-library-select:disabled { opacity: .45; cursor: default; }
+.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: 5px; color: hsl(var(--background)); }
+.composer-loras .lora-library-select[aria-checked="true"] .lora-library-check { background: hsl(var(--foreground)); border-color: hsl(var(--foreground)); }
+.composer-loras .lora-library-select .lora-option-copy { flex: 1; min-width: 0; }
+.composer-loras .lora-library-select .lora-option-copy strong { font-size: 12px; }
+.composer-loras .lora-library-select .lora-option-copy span { display: block; overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); font-size: 10.5px; }
+.composer-loras .lora-library-row > .lora-option-star { position: absolute; top: 12px; right: 0; }
+.composer-loras .lora-library-note { margin: 2px 30px 4px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
+.composer-loras .lora-library-settings { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 6px 2px 4px 30px; }
+.composer-loras .lora-library-settings .lora-strength { flex: 1; min-width: 150px; }
+.composer-loras .lora-library-settings .lora-triggers { flex-basis: 100%; margin: 0; }
+.composer-loras .lora-picker:not(.is-list) .lora-option { display: flex; min-height: 52px; }
+
+/* Creation and dock icons share the same quiet, hover and open states. */
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn),
+.studio-dock .icon-button { color: hsl(var(--muted-foreground)); }
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn):hover:not(:disabled),
+.studio-dock .icon-button:hover:not(:disabled) { background: var(--control-hover); color: hsl(var(--foreground)); }
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn)[aria-expanded="true"],
+.studio-dock .icon-button[aria-expanded="true"] { background: var(--selected); color: hsl(var(--foreground)); }
+.zen-prompt :is(.composer-advanced-trigger, .composer-reset, .composer-more) { border-color: transparent; }
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn) > svg,
+:is(.zen-prompt, .phone-create) :is(.number-picker-icon, .number-picker-btn) svg,
+.studio-dock .icon-button > svg { flex-shrink: 0; width: 16px; height: 16px; }

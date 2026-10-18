@@ -191,11 +191,18 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
   const image = asset.url || asset.thumbnailUrl || "";
 
   // Pinned above the prompt bar, like the reference picker; its height follows the image.
-  const [box, setBox] = React.useState<{ left: number; width: number; bottom: number } | null>(null);
+  const [box, setBox] = React.useState<{ left: number; width: number; bottom: number; availableHeight: number } | null>(null);
   React.useLayoutEffect(() => {
     const measure = () => {
       const rect = anchor.getBoundingClientRect();
-      setBox({ left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top + 10 });
+      // The editor needs a canvas-sized workspace even when its composer is narrow.
+      const width = Math.min(Math.max(rect.width, 720), window.innerWidth - 24);
+      const left = clamp(rect.left + (rect.width - width) / 2, 12, window.innerWidth - width - 12);
+      // Keep the tools reachable when the expanded composer leaves little room above it.
+      // In that case the editor overlaps the composer rather than shrinking to a strip.
+      const workspace = Math.min(400, window.innerHeight - 24);
+      const bottom = clamp(window.innerHeight - rect.top + 10, 12, window.innerHeight - workspace - 12);
+      setBox({ left, width, bottom, availableHeight: window.innerHeight - bottom - 12 });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -203,7 +210,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
     window.addEventListener("resize", measure);
     return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
   }, [anchor]);
-  const asSheet = anchor.classList.contains("phone-compose");
+  const asSheet = anchor.classList.contains("phone-create");
 
   /* ---- Image and canvas */
   React.useEffect(() => {
@@ -325,6 +332,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
     const viewport = viewportRef.current;
     if (!viewport || !size) return;
     const refit = () => {
+      if (!viewport.clientWidth || !viewport.clientHeight) return;
       const scale = Math.min(viewport.clientWidth / size.width, viewport.clientHeight / size.height);
       const wasFit = Math.abs(view.current.scale - fit.current.scale) < 0.001 || !fit.current.scale;
       fit.current = { scale, x: (viewport.clientWidth - size.width * scale) / 2, y: (viewport.clientHeight - size.height * scale) / 2 };
@@ -336,7 +344,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
     const observer = new ResizeObserver(refit);
     observer.observe(viewport);
     return () => observer.disconnect();
-  }, [apply, contain, size]);
+  }, [apply, Boolean(box), contain, size]);
 
   React.useLayoutEffect(() => {
     if (size) replay();
@@ -524,7 +532,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
 
   if (!box) return null;
   const aspect = size ? size.height / size.width : 0.75;
-  const height = `min(${Math.round(Math.max(300, box.width * aspect))}px, 70dvh)`;
+  const height = `min(${Math.round(Math.max(300, box.width * aspect))}px, 70dvh, ${Math.round(box.availableHeight)}px)`;
   const tools: Array<{ id: Tool; label: string; key: string; icon: React.ReactNode }> = [
     { id: "brush", label: "Brush", key: "B", icon: <Brush size={16} /> },
     { id: "eraser", label: "Eraser", key: "E", icon: <Eraser size={16} /> },

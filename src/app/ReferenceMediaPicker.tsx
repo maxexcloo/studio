@@ -240,7 +240,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   if (!box) return null;
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
-  const asSheet = Boolean(anchor?.classList.contains("phone-compose"));
+  const asSheet = Boolean(anchor?.classList.contains("phone-create"));
   // An exiting picker must not intercept Escape intended for the next overlay.
   return createPortal(
     <motion.div
@@ -261,12 +261,12 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
     >
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
-          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Generations</button>
+          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
           {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => changeTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
         </div>
         <span className="reference-popover-hint">Drop or paste an image anywhere on the prompt</span>
-        <button type="button" className="btn is-primary reference-upload" onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
+        <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
           <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
         </button>
@@ -276,14 +276,14 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
 
       <div className="reference-search picker-search">
         <Search size={15} aria-hidden="true" />
-        <input ref={searchRef} type="search" aria-label="Search Reference Images" placeholder="Search Reference Images" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <input ref={searchRef} type="search" aria-label={tab === "upload" ? "Search Uploads" : "Search Library"} placeholder={tab === "upload" ? "Search Uploads" : "Search Library"} value={search} onChange={(event) => setSearch(event.target.value)} />
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
       </div>
       <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null) memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "hidden" && !hiddenOpen ? (
           <div className="reference-empty">
             <LockKeyhole size={22} />
-            <strong>Hidden is locked</strong>
+            <strong>Hidden Is Locked</strong>
             <p>Unlock it to use a hidden image. The image stays in Hidden.</p>
             <button className="btn is-primary" onClick={() => hidden?.unlock()}><LockKeyhole size={14} /> Unlock</button>
           </div>
@@ -296,9 +296,8 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
         ) : !page.items.length ? (
           <div className="reference-empty">
             <ImageIcon size={22} />
-            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Generations Yet" : tab === "hidden" ? "Nothing in Hidden Yet" : "No Uploads Yet"}</strong>
+            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : tab === "hidden" ? "Nothing Hidden Yet" : "No Uploads Yet"}</strong>
             <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : tab === "hidden" ? "Images you hide show up here." : "Upload one, or drop it on the prompt."}</p>
-            {tab === "upload" ? <button className="btn" onClick={() => uploadInput.current?.click()}><Upload size={14} /> Upload image</button> : null}
           </div>
         ) : (
           <>
@@ -384,8 +383,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
   const [broken, setBroken] = React.useState(false);
   React.useEffect(() => { setBroken(false); }, [image]);
   const required = Boolean(input.required || (input.min || 0) > 0);
-  const label = input.label || "Reference image";
   const isStart = input.role === "start";
+  const label = isStart ? "Reference Image" : input.label || "Reference image";
 
   if (busy) {
     return (
@@ -403,12 +402,12 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
           data-open-trigger
           data-reference-slot={input.id}
           className={cn("ref-chip ref-add", required && "is-required", open && "is-open")}
-          aria-label={`Add ${label.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}${required ? ", required" : ""}`}
+          aria-label={isStart ? "Reference Image" : `Add ${label.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}${required ? ", required" : ""}`}
           aria-expanded={open}
           onClick={onOpen}
         >
           <Plus size={15} strokeWidth={2.2} />
-          <span className="ref-add-label"><span>{isStart ? "Add Start Image" : "Add Reference"}{required ? <em aria-hidden="true">*</em> : null}</span></span>
+          <span className="ref-add-label"><span>{isStart ? "Reference Image" : "Add Reference"}{required ? <em aria-hidden="true">*</em> : null}</span></span>
         </button>
       </Tip>
     );
@@ -493,7 +492,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
   // Find the prompt bar whenever this renders into it. On first mount there may be
   // no inputs yet (the workflow is still loading), so nothing is rendered to look from.
   React.useLayoutEffect(() => {
-    const next = rootRef.current?.closest<HTMLElement>(".zen-prompt, .phone-compose") || null;
+    const next = rootRef.current?.closest<HTMLElement>(".zen-prompt, .phone-create") || null;
     hostRef.current = next;
     setHost((current) => current === next ? current : next);
   });

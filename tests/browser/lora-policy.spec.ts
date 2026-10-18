@@ -6,6 +6,7 @@ test('optional LoRAs show unverified variants and expose full published strength
   Object.assign(base, { family: 'boogu', baseModel: 'boogu_edit.safetensors', recipe: { modelLabel: 'Boogu Edit Test', conditioning: 'Generate', label: 'Standard', adapters: [] }, options: { ...base.options, loras: ['slider.safetensors', 'excluded.safetensors', 'unknown.safetensors'] } });
   models.loras = base.options.loras;
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
   await page.route('**/api/loras/info', (route) => route.fulfill({ json: { loras: {
     'slider.safetensors': { title: 'Published Slider', families: ['boogu'], base: 'Boogu', triggers: [], compatibility: { baseModels: ['boogu_base.safetensors'] }, strengthRange: { min: -3, max: 10, step: 0.05 } },
     'excluded.safetensors': { title: 'Excluded Conditioning', families: ['boogu'], base: 'Boogu', triggers: [], compatibility: { conditionings: ['Reference'], unlisted: 'other' } },
@@ -18,17 +19,22 @@ test('optional LoRAs show unverified variants and expose full published strength
     if (await openLoras.count()) await openLoras.click();
   } else {
     await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    const openLoras = page.locator('.composer-options').getByRole('button', { name: 'LoRAs', exact: true });
-    if (await openLoras.count()) await openLoras.click();
-    else await page.getByRole('button', { name: 'Controls', exact: true }).click();
+    const openLoras = page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
+    await openLoras.click();
   }
-  await page.getByRole('button', { name: 'Add LoRA', exact: true }).filter({ visible: true }).click();
   const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
+  await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toBeVisible();
+  await expect(picker.getByRole('button', { name: 'This Model', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
   await expect(picker.getByText('Compatibility has not been verified for this model variant.', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
-  await picker.locator('.lora-option').filter({ hasText: 'Published Slider' }).first().click();
-  await picker.getByRole('button', { name: 'Add', exact: true }).click();
+  await picker.getByRole('button', { name: 'All Models', exact: true }).click();
+  await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
+  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
+  await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
+  await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
   const value = page.getByLabel('Published Slider strength value', { exact: true }).filter({ visible: true });
   await value.fill('10');
   await value.press('Enter');
@@ -38,6 +44,77 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(slider).toHaveAttribute('max', '10');
   await value.press('ArrowUp');
   await expect(value).toHaveValue('10.00');
+  await value.fill('-3');
+  await value.press('Enter');
+  await expect(value).toHaveValue('-3.00');
+  await value.press('ArrowDown');
+  await expect(value).toHaveValue('-3.00');
+});
+
+test('LoRA library offers direct list selection with inline strengths and accessible dismissal', async ({ page, isMobile }) => {
+  const models = await (await page.request.get('/api/models')).json();
+  const profile = models.profiles.find((item: any) => item.id === models.defaults.imageModel);
+  profile.options.loras = ['cards-one.safetensors', 'cards-two.safetensors'];
+  models.loras = profile.options.loras;
+  await page.route('**/api/models', route => route.fulfill({ json: models }));
+  await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
+  await page.route('**/api/loras/info', route => route.fulfill({ json: { loras: {
+    'cards-one.safetensors': { title: 'Cards One', families: [], base: '', triggers: [] },
+    'cards-two.safetensors': { title: 'Cards Two', families: [], base: '', triggers: [] }
+  } } }));
+  await page.goto('/');
+  if (isMobile) await page.locator('.phone-create-open').click();
+  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
+  const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
+  await expect(surface).toHaveClass(isMobile ? /is-sheet/ : /composer-loras/);
+  await expect.poll(() => surface.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
+  })).toBe(true);
+  const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  const search = picker.getByRole('textbox', { name: 'Search LoRAs', exact: true });
+  await expect(search).toBeVisible();
+  await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
+  await expect.poll(() => picker.locator('.lora-picker-items').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
+  await search.fill('Cards Two');
+  const row = picker.getByRole('checkbox', { name: 'Select Cards Two', exact: true });
+  await expect(picker.getByRole('checkbox', { name: 'Select Cards One', exact: true })).toHaveCount(0);
+  await row.focus();
+  await row.press('Space');
+  await expect(row).toHaveAttribute('aria-checked', 'true');
+  const strength = picker.getByLabel('Cards Two strength value', { exact: true });
+  await expect(strength).toBeVisible();
+  await strength.fill('1.25');
+  await strength.press('Enter');
+  await expect(strength).toHaveValue('1.25');
+  await expect(row).toHaveAttribute('aria-checked', 'true');
+  for (const width of isMobile ? [390, 320] : [900]) {
+    await page.setViewportSize({ width, height: isMobile ? 844 : 1000 });
+    await expect.poll(() => surface.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const children = [...element.querySelectorAll('.lora-library-row, .lora-library-settings, .lora-library-settings input')];
+      return children.every(child => { const box = child.getBoundingClientRect(); return box.left >= bounds.left && box.right <= bounds.right + 1; });
+    })).toBe(true);
+    if (!isMobile) expect((await surface.boundingBox())!.width).toBeLessThanOrEqual(460);
+  }
+  await row.click();
+  await expect(row).toHaveAttribute('aria-checked', 'false');
+  await expect(strength).toHaveCount(0);
+  await row.click();
+  await picker.getByRole('button', { name: 'Manage Stack', exact: true }).click();
+  await expect(page.getByLabel('Cards Two strength value', { exact: true })).toBeVisible();
+  await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
+  await expect(surface).not.toBeVisible();
+  const open = page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
+  await open.click();
+  await expect(surface).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(surface).not.toBeVisible();
+  await open.click();
+  await expect(surface).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(surface).not.toBeVisible();
 });
 
 
@@ -48,6 +125,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   models.profiles = [...models.profiles.filter((profile: any) => profile.kind !== 'image'), fineTune];
   models.loras = fineTune.options.loras;
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
   await page.route('**/api/loras/info', (route) => route.fulfill({ json: { loras: {
     'krea.safetensors': { title: 'Krea Effect', families: ['krea2'], base: 'Krea 2', triggers: [] },
     'flux3.safetensors': { title: 'FLUX.3 Effect', families: ['flux3_klein'], base: 'FLUX.3 Klein', triggers: [] },
@@ -56,7 +134,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await page.goto('/');
   if (isMobile) {
     await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create .phone-row').filter({ hasText: 'Tesserafine Turbo' }).first().click();
+    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
   } else {
     await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
     await page.locator('.model-trigger').filter({ visible: true }).click();
@@ -71,15 +149,26 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
     const open = page.locator('.phone-create').getByRole('button', { name: /^LoRAs/ });
     if (await open.count()) await open.click();
   } else {
-    const open = page.locator('.composer-options').getByRole('button', { name: 'LoRAs', exact: true });
-    if (await open.count()) await open.click();
-    else await page.getByRole('button', { name: 'Controls', exact: true }).click();
+    await page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
   }
-  await page.getByRole('button', { name: 'Add LoRA', exact: true }).filter({ visible: true }).click();
+  const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
+  await expect(surface).toHaveClass(isMobile ? /is-sheet/ : /composer-loras/);
+  await expect.poll(() => surface.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
+  })).toBe(true);
   const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
   await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
-  await picker.getByLabel('LoRA Model Filter', { exact: true }).selectOption('all');
+  await picker.getByRole('button', { name: 'All Models', exact: true }).click();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
+  const crossFamily = picker.getByRole('checkbox', { name: 'Select FLUX.3 Effect', exact: true });
+  await crossFamily.click();
+  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
+  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
+  await expect(crossFamily).toHaveCount(1);
+  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
+  await crossFamily.click();
+  await expect(crossFamily).toHaveCount(0);
 });

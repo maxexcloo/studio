@@ -91,6 +91,8 @@ export type Profile = {
   label: string;
   displayName?: string;
   description?: string;
+  /** Researched guidance owned by this profile; MCP exposes a compact summary or its full detail. */
+  prompting?: Record<string, unknown>;
   model: string;
   /** The weights file the workflow runs; empty when a custom workflow doesn't say. */
   baseModel?: string;
@@ -117,7 +119,7 @@ export type Profile = {
     loras?: string[];
     resolutions?: string[];
   };
-  imageModes?: Record<string, { capabilities: Record<string, boolean>; defaults: Record<string, string | number> }>;
+  imageModes?: Record<string, { capabilities: Record<string, boolean>; defaults: Record<string, string | number>; prompting?: Record<string, unknown> }>;
   capabilities: Record<string, boolean>;
   mediaInputs?: MediaInput[];
   aspectPolicy?: "manual" | "reference";

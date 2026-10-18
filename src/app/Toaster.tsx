@@ -260,11 +260,14 @@ function ToastItem({ toast, index, expanded, paused, y, height, onHeight }: {
     >
       <motion.div
         className="toast-drag"
-        drag={readable ? 'y' : false}
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0.55, bottom: 0.06 }}
+        drag={readable}
+        dragDirectionLock
+        dragConstraints={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        dragElastic={{ top: 0.55, right: 0.55, bottom: 0.06, left: 0.55 }}
         dragSnapToOrigin
-        onDragEnd={(_, info) => { if (info.offset.y < -26 || info.velocity.y < -420) dismissToast(toast.id); }}
+        onDragEnd={(_, info) => {
+          if (Math.abs(info.offset.x) > 48 || Math.abs(info.velocity.x) > 420 || info.offset.y < -26 || info.velocity.y < -420) dismissToast(toast.id);
+        }}
       >
         <div ref={bumpScope} className="toast-bump">
           {/* Opacity lives on the glass itself: on a parent it would cut off the backdrop blur. */}

@@ -4,7 +4,7 @@ import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './PhoneStudio';
 import { haptic } from './phoneControls';
-import { forgetPrompt, matchPrompt, pinPrompt, usePromptHistory, whenUsed, type PromptEntry } from './recentPrompts';
+import { forgetPrompt, matchPrompt, pinPrompt, usePromptHistory, whenUsed, type PromptEntry, type PromptKind } from './recentPrompts';
 
 /* ---------------------------------------------------------------------------
    Recent prompts
@@ -56,20 +56,21 @@ function meta(entry: PromptEntry) {
 }
 
 /** Pin and forget, told plainly when the server says no. */
-function useRowActions(onError: (message: string) => void) {
-  const pin = (entry: PromptEntry) => pinPrompt(entry.text, !entry.pinned).catch((error) => onError(error instanceof Error ? error.message : 'Couldn’t save that'));
-  const forget = (entry: PromptEntry) => forgetPrompt(entry.text).catch((error) => onError(error instanceof Error ? error.message : 'Couldn’t remove that prompt'));
+function useRowActions(onError: (message: string) => void, kind: PromptKind) {
+  const pin = (entry: PromptEntry) => pinPrompt(entry.text, !entry.pinned, kind).catch((error) => onError(error instanceof Error ? error.message : 'Couldn’t save that'));
+  const forget = (entry: PromptEntry) => forgetPrompt(entry.text, kind).catch((error) => onError(error instanceof Error ? error.message : 'Couldn’t remove that prompt'));
   return { pin, forget };
 }
 
 /* ------------------------------------------------------------ Desktop */
 
-export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = false, onError }: {
+export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = false, onError, kind = 'positive' }: {
   open: boolean;
   /** "escape" hands the keyboard back to the prompt; a click elsewhere leaves focus where it went. */
   onClose: (reason: 'escape' | 'outside') => void;
   onPick: (text: string) => void;
   hiddenSpace?: boolean;
+  kind?: PromptKind;
   onError: (message: string) => void;
 }) {
   const reduced = useReducedMotion();
@@ -77,7 +78,7 @@ export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = fals
     <AnimatePresence>
       {open ? (
         <motion.div
-          key="history"
+          key={`history-${kind}`}
           className="prompt-history"
           data-open-surface
           initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.985 }}
@@ -85,15 +86,15 @@ export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = fals
           exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.99 }}
           transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
         >
-          <HistoryPanel onClose={onClose} onPick={onPick} hiddenSpace={hiddenSpace} onError={onError} />
+          <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} hiddenSpace={hiddenSpace} onError={onError} />
         </motion.div>
       ) : null}
     </AnimatePresence>
   );
 }
 
-function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (reason: 'escape' | 'outside') => void; onPick: (text: string) => void; hiddenSpace: boolean; onError: (message: string) => void }) {
-  const { prompts, ready } = usePromptHistory(true);
+function HistoryPanel({ onClose, onPick, hiddenSpace, onError, kind }: { onClose: (reason: 'escape' | 'outside') => void; onPick: (text: string) => void; hiddenSpace: boolean; kind: PromptKind; onError: (message: string) => void }) {
+  const { prompts, ready } = usePromptHistory(true, kind);
   const [query, setQuery] = React.useState('');
   const sections = React.useMemo(() => sectionsFor(prompts, query), [prompts, query]);
   const flat = React.useMemo(() => sections.flatMap((section) => section.rows), [sections]);
@@ -104,7 +105,7 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const panelRef = React.useRef<HTMLDivElement | null>(null);
   const id = React.useId();
-  const { pin, forget } = useRowActions(onError);
+  const { pin, forget } = useRowActions(onError, kind);
 
   React.useEffect(() => { searchRef.current?.focus({ preventScroll: true }); }, []);
   React.useEffect(() => {
@@ -156,7 +157,7 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
 
   let rowIndex = -1;
   return (
-    <div ref={panelRef} className="prompt-history-panel" role="dialog" aria-label="Recent Prompts" onKeyDown={onKeyDown}>
+    <div ref={panelRef} className="prompt-history-panel" role="dialog" aria-label={kind === 'negative' ? 'Recent Negative Prompts' : 'Recent Prompts'} onKeyDown={onKeyDown}>
       <label className="model-menu-search picker-search">
         <Search size={14} aria-hidden="true" />
         <input
@@ -164,8 +165,8 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
           className="is-framed"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search Prompts"
-          aria-label="Search Prompts"
+          placeholder={kind === 'negative' ? 'Search Negative Prompts' : 'Search Prompts'}
+          aria-label={kind === 'negative' ? 'Search Negative Prompts' : 'Search Prompts'}
           aria-controls={`${id}-list`}
           aria-activedescendant={cursor >= 0 ? `${id}-row-${cursor}` : undefined}
           spellCheck={false}
@@ -173,7 +174,7 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
         />
         {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><X size={12} /></button> : null}
       </label>
-      <div ref={listRef} id={`${id}-list`} className="prompt-history-list" role="listbox" aria-label="Recent Prompts">
+      <div ref={listRef} id={`${id}-list`} className="prompt-history-list" role="listbox" aria-label={kind === 'negative' ? 'Recent Negative Prompts' : 'Recent Prompts'}>
         {sections.map((section) => (
           <div key={section.id} className="prompt-history-section" role="group" aria-label={section.label || undefined}>
             {section.label ? <div className="prompt-history-label">{section.label}</div> : null}
@@ -215,19 +216,19 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError }: { onClose: (rea
 
 /* ------------------------------------------------------------ Phone */
 
-export function PromptHistorySheet({ open, onClose, onPick, onError }: { open: boolean; onClose: () => void; onPick: (text: string) => void; onError: (message: string) => void }) {
-  const { prompts, ready } = usePromptHistory(open);
+export function PromptHistorySheet({ open, onClose, onPick, onError, kind = 'positive' }: { kind?: PromptKind; open: boolean; onClose: () => void; onPick: (text: string) => void; onError: (message: string) => void }) {
+  const { prompts, ready } = usePromptHistory(open, kind);
   const [query, setQuery] = React.useState('');
-  React.useEffect(() => { if (!open) setQuery(''); }, [open]);
+  React.useEffect(() => { if (!open) setQuery(''); }, [open, kind]);
   const sections = React.useMemo(() => sectionsFor(prompts, query), [prompts, query]);
   const count = sections.reduce((sum, section) => sum + section.rows.length, 0);
-  const { pin, forget } = useRowActions(onError);
+  const { pin, forget } = useRowActions(onError, kind);
   return (
-    <Sheet open={open} onClose={onClose} title="Recent Prompts" full className="phone-prompt-history">
+    <Sheet open={open} onClose={onClose} title={kind === 'negative' ? 'Recent Negative Prompts' : 'Recent Prompts'} full className="phone-prompt-history">
       {prompts.length > 6 ? (
         <label className="phone-search picker-search">
           <Search size={17} aria-hidden="true" />
-          <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Prompts" aria-label="Search Prompts" spellCheck={false} autoComplete="off" />
+          <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === 'negative' ? 'Search Negative Prompts' : 'Search Prompts'} aria-label={kind === 'negative' ? 'Search Negative Prompts' : 'Search Prompts'} spellCheck={false} autoComplete="off" />
         </label>
       ) : null}
       {sections.map((section) => (

@@ -9,79 +9,94 @@ import { apiJson } from './api';
 
 export type PromptEntry = { text: string; at: string; uses: number; pinned?: boolean };
 
-let entries: PromptEntry[] = [];
-let enabled = true;
-let loaded = false;
-let loading: Promise<void> | null = null;
-const listeners = new Set<() => void>();
+export type PromptKind = 'positive' | 'negative';
 
-function publish(next: PromptEntry[], on?: boolean) {
-  entries = next;
-  if (typeof on === "boolean") enabled = on;
-  loaded = true;
-  listeners.forEach((listener) => listener());
+function createHistory(kind: PromptKind) {
+  let entries: PromptEntry[] = [];
+  let enabled = true;
+  let loaded = false;
+  let loading: Promise<void> | null = null;
+  const listeners = new Set<() => void>();
+
+  function publish(next: PromptEntry[], on?: boolean) {
+    entries = next;
+    if (typeof on === "boolean") enabled = on;
+    loaded = true;
+    listeners.forEach((listener) => listener());
+  }
+
+  function subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }
+
+  /** Asks the server for the list; concurrent callers share one request. */
+  function refreshPrompts() {
+    loading ||= apiJson<{ prompts: PromptEntry[]; enabled?: boolean }>(`/api/prompts${kind === "negative" ? "?kind=negative" : ""}`)
+      .then((data) => publish(Array.isArray(data.prompts) ? data.prompts : [], data.enabled !== false))
+      .catch(() => { loaded = true; })
+      .finally(() => { loading = null; });
+    return loading;
+  }
+
+  /** Stars a prompt (or takes the star off), here at once and then on the server. */
+  async function pinPrompt(text: string, pinned: boolean) {
+    const key = promptKey(text);
+    const found = entries.some((entry) => promptKey(entry.text) === key);
+    publish(found
+      ? entries.map((entry) => (promptKey(entry.text) === key ? { ...entry, pinned: pinned || undefined } : entry))
+      : pinned ? [{ text: text.trim(), at: new Date().toISOString(), uses: 0, pinned: true }, ...entries] : entries);
+    const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/pin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, pinned, kind }) });
+    publish(data.prompts || []);
+  }
+
+  async function forgetPrompt(text: string) {
+    const key = promptKey(text);
+    publish(entries.filter((entry) => promptKey(entry.text) !== key));
+    const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/forget", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, kind }) });
+    publish(data.prompts || []);
+  }
+
+  async function clearPrompts() {
+    const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/clear", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keepPinned: true, kind }) });
+    publish(data.prompts || []);
+  }
+
+  /** Keeps new prompts or not, for every device; off forgets the recent ones, starred stay. */
+  async function setPromptHistoryEnabled(on: boolean) {
+    const data = await apiJson<{ prompts: PromptEntry[]; enabled: boolean }>("/api/prompts/enabled", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: on }) });
+    publish(data.prompts || [], data.enabled);
+  }
+
+  /** The list, kept current; `refresh` asks the server again. */
+  function usePromptHistory(active = true) {
+    const list = useSyncExternalStore(subscribe, () => entries, () => entries);
+    const on = useSyncExternalStore(subscribe, () => enabled, () => enabled);
+    const [ready, setReady] = useState(loaded);
+    useEffect(() => {
+      if (!active) return;
+      let live = true;
+      refreshPrompts().then(() => { if (live) setReady(true); });
+      return () => { live = false; };
+    }, [active]);
+    const refresh = useCallback(() => refreshPrompts(), []);
+    return { prompts: list, enabled: on, ready: ready || loaded, refresh };
+  }
+
+  return { clearPrompts, forgetPrompt, pinPrompt, refreshPrompts, setPromptHistoryEnabled, usePromptHistory };
 }
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
-}
-
-/** Asks the server for the list; concurrent callers share one request. */
-export function refreshPrompts() {
-  loading ||= apiJson<{ prompts: PromptEntry[]; enabled?: boolean }>("/api/prompts")
-    .then((data) => publish(Array.isArray(data.prompts) ? data.prompts : [], data.enabled !== false))
-    .catch(() => { loaded = true; })
-    .finally(() => { loading = null; });
-  return loading;
-}
-
+const histories = { negative: createHistory('negative'), positive: createHistory('positive') };
+export const refreshPrompts = (kind: PromptKind = 'positive') => histories[kind].refreshPrompts();
+export const pinPrompt = (text: string, pinned: boolean, kind: PromptKind = 'positive') => histories[kind].pinPrompt(text, pinned);
+export const forgetPrompt = (text: string, kind: PromptKind = 'positive') => histories[kind].forgetPrompt(text);
+export const clearPrompts = () => Promise.all([histories.positive.clearPrompts(), histories.negative.clearPrompts()]);
+export const setPromptHistoryEnabled = async (on: boolean) => {
+  await histories.positive.setPromptHistoryEnabled(on);
+  await histories.negative.refreshPrompts();
+};
+export const usePromptHistory = (active = true, kind: PromptKind = 'positive') => histories[kind].usePromptHistory(active);
 export function promptKey(text = "") {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-/** Stars a prompt (or takes the star off), here at once and then on the server. */
-export async function pinPrompt(text: string, pinned: boolean) {
-  const key = promptKey(text);
-  const found = entries.some((entry) => promptKey(entry.text) === key);
-  publish(found
-    ? entries.map((entry) => (promptKey(entry.text) === key ? { ...entry, pinned: pinned || undefined } : entry))
-    : pinned ? [{ text: text.trim(), at: new Date().toISOString(), uses: 0, pinned: true }, ...entries] : entries);
-  const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/pin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, pinned }) });
-  publish(data.prompts || []);
-}
-
-export async function forgetPrompt(text: string) {
-  const key = promptKey(text);
-  publish(entries.filter((entry) => promptKey(entry.text) !== key));
-  const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/forget", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
-  publish(data.prompts || []);
-}
-
-export async function clearPrompts() {
-  const data = await apiJson<{ prompts: PromptEntry[] }>("/api/prompts/clear", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keepPinned: true }) });
-  publish(data.prompts || []);
-}
-
-/** Keeps new prompts or not, for every device; off forgets the recent ones, starred stay. */
-export async function setPromptHistoryEnabled(on: boolean) {
-  const data = await apiJson<{ prompts: PromptEntry[]; enabled: boolean }>("/api/prompts/enabled", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: on }) });
-  publish(data.prompts || [], data.enabled);
-}
-
-/** The list, kept current; `refresh` asks the server again. */
-export function usePromptHistory(active = true) {
-  const list = useSyncExternalStore(subscribe, () => entries, () => entries);
-  const on = useSyncExternalStore(subscribe, () => enabled, () => enabled);
-  const [ready, setReady] = useState(loaded);
-  useEffect(() => {
-    if (!active) return;
-    let live = true;
-    refreshPrompts().then(() => { if (live) setReady(true); });
-    return () => { live = false; };
-  }, [active]);
-  const refresh = useCallback(() => refreshPrompts(), []);
-  return { prompts: list, enabled: on, ready: ready || loaded, refresh };
 }
 
 /* ------------------------------------------------------------ Search */

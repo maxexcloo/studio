@@ -21,33 +21,28 @@ test.beforeEach(async ({ page, isMobile }) => {
   if (!isMobile) await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
 });
 
-test('desktop menus stay above controls and the viewer covers a pinned sidebar', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Desktop layering and pinning.');
+test('composer menus stay reachable and side controls are removed', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Desktop composer layering.');
   await page.setViewportSize({ width: 900, height: 1000 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Controls', exact: true }).click();
-  const sidebar = page.getByRole('complementary', { name: 'Generation Controls' });
-  await expect(sidebar).toHaveClass(/open/);
+  await expect(page.getByRole('complementary', { name: 'Generation Controls' })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await expect(page.locator('.zen-prompt')).toHaveClass(/is-expanded/);
   await page.locator('.zen-prompt .model-trigger').click();
   await reachable(page.locator('.model-menu .model-option').first(), true);
-  await reachable(page.locator('.model-menu .model-star').first());
   await page.keyboard.press('Escape');
   const more = page.locator('.zen-prompt').getByRole('button', { name: 'More settings', exact: true });
-  await more.click();
-  await reachable(page.locator('.composer-drawer').getByRole('button', { name: 'Increase images', exact: true }));
-  await page.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Close Controls', exact: true }).click();
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole('button', { name: 'Controls', exact: true }).click();
-  await page.getByRole('button', { name: 'Pin Controls', exact: true }).click();
-  const sidebarBox = await sidebar.boundingBox();
+  if (await more.isVisible()) {
+    await more.click();
+    await expect(page.locator('.composer-drawer')).toBeVisible();
+    await page.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
+  }
+  await page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'LoRAs', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.locator('[data-tile-id]').first().locator('.tile').click();
   const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
-  await expect.poll(() => viewer.evaluate((element, box) => element.contains(document.elementFromPoint(box!.x + box!.width / 2, box!.y + box!.height / 2)), sidebarBox)).toBe(true);
   await reachable(viewer.getByRole('button', { name: 'Toggle Details', exact: true }));
-  await viewer.getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('button', { name: 'Unpin Controls', exact: true }).click();
-  await expect(page.locator('.app-shell')).not.toHaveClass(/has-pinned-controls/);
 });
 
 test('search and selection preserve toolbar geometry while open surfaces remain reachable', async ({ page, isMobile }) => {
@@ -64,45 +59,52 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     await expect(management.getByRole('status')).toHaveText('12 Selected');
     const actionsBox = await toolbar.locator('.gallery-toolbar-actions').boundingBox();
     const modeBox = await toolbar.locator('.gallery-generation-mode').boundingBox();
-    expect(actionsBox!.x).toBeGreaterThanOrEqual(modeBox!.x + modeBox!.width);
+    expect(actionsBox!.y >= modeBox!.y + modeBox!.height || actionsBox!.x >= modeBox!.x + modeBox!.width).toBe(true);
     expect(actionsBox!.x + actionsBox!.width).toBeLessThanOrEqual(width);
     await expect.poll(async () => (await toolbar.boundingBox())!.height).toBe(before!.height);
     expect((await toolbar.locator('.gallery-generation-mode').boundingBox())!.x).toBe(modeBefore!.x);
     await management.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
+    await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
     await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).fill('Layout');
     await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+    await expect.poll(() => page.getByRole('group', { name: 'Gallery Filters', exact: true }).evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    await page.getByLabel('Filter By Model', { exact: true }).scrollIntoViewIfNeeded();
     await reachable(page.getByLabel('Filter By Model', { exact: true }));
+    expect(await page.locator('.stage-gallery').evaluate(n => n.scrollLeft)).toBe(0);
+    await expect(page.getByRole('button', { name: 'Search Gallery', exact: true })).toBeInViewport();
     expect((await toolbar.boundingBox())!.height).toBe(before!.height);
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-    await page.getByLabel('Gallery View Options', { exact: true }).click();
-    await reachable(page.locator('.gallery-view-panel button').first());
-    await page.getByLabel('Gallery View Options', { exact: true }).click();
+    await reachable(page.getByRole('button', { name: 'Auto-grouping', exact: true }));
+    await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   }
 });
 
-test('phone filter panels stay on screen and yield to create and reference sheets', async ({ page, isMobile }) => {
+test('phone filter tools stay on screen and yield to create and reference sheets', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Phone containment and sheets.');
   await page.goto('/');
+  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
-    await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+    await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
     const panel = page.getByRole('group', { name: 'Gallery Filters', exact: true });
     const box = await panel.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+    await expect.poll(() => page.getByRole('group', { name: 'Gallery Filters', exact: true }).evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    await page.getByLabel('Filter By Model', { exact: true }).scrollIntoViewIfNeeded();
     await reachable(page.getByLabel('Filter By Model', { exact: true }));
-    await panel.getByRole('button', { name: 'Clear Filters', exact: true }).scrollIntoViewIfNeeded();
-    await reachable(panel.getByRole('button', { name: 'Clear Filters', exact: true }));
+    await panel.getByRole('button', { name: 'Show Hidden', exact: true }).scrollIntoViewIfNeeded();
+    await reachable(panel.getByRole('button', { name: 'Show Hidden', exact: true }));
     await page.keyboard.press('Escape');
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
   await page.locator('.phone-create-open').click();
-  await reachable(page.locator('.phone-create').getByRole('textbox', { name: 'Prompt', exact: true }));
+  await reachable(page.locator('.phone-create').getByRole('textbox', { name: 'Prompt', exact: true }), true);
   await page.locator('.phone-create .ref-add').click();
-  await reachable(page.locator('.reference-popover').getByRole('searchbox', { name: 'Search Reference Images', exact: true }));
+  await reachable(page.locator('.reference-popover').getByRole('searchbox', { name: 'Search Library', exact: true }));
   await page.locator('.reference-popover').getByRole('button', { name: 'Close', exact: true }).click();
   await reachable(page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }));
 });
@@ -121,12 +123,12 @@ test('horizontal dock and Generate keep separate lanes without changing dock ori
   }
 });
 
-test('short desktop filters scroll above the composer', async ({ page, isMobile }) => {
+test('short desktop filter tools stay above the composer', async ({ page, isMobile }) => {
   test.skip(isMobile, 'Full studio filter and composer overlap.');
   await page.setViewportSize({ width: 900, height: 500 });
   await page.goto('/');
   await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
-  const clear = page.getByRole('group', { name: 'Gallery Filters', exact: true }).getByRole('button', { name: 'Clear Filters', exact: true });
+  const clear = page.getByRole('button', { name: 'Filter By Model', exact: true });
   await clear.scrollIntoViewIfNeeded();
   await reachable(clear);
   const panel = await page.locator('.gallery-filter-panel').boundingBox();

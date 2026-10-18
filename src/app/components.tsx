@@ -4,7 +4,7 @@ import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState }
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
-import { Brush, Check, ChevronDown, ImagePlus, Info, Minus, Plus, Search, Star, X } from 'lucide-react';
+import { Brush, Check, ChevronDown, ImagePlus, Info, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -447,8 +447,6 @@ export type ModelMenuState = {
   toggleFavorite: (id: string) => void;
 };
 
-const menuRecentLimit = 4;
-
 function profileText(profile: Profile) {
   return `${profile.displayName || ""} ${profile.label || ""} ${profile.description || ""} ${familyLabel(profile)} ${profile.model || ""}`.toLowerCase();
 }
@@ -459,13 +457,16 @@ function sizeNote(profile: Profile, hardware: ReturnType<typeof useHardware>) {
   return { size: formatDownload(bytes), fits: modelFits(hardware, bytes, profile.model) };
 }
 
-/**
- * The model menu keeps search above Favourites (starred), Recent, and
- * the rest by family, including imported graphs, scrolling
- * inside a capped height with "Find Models" pinned below. With no model at
- * all it offers "Get a Model" instead. Arrow keys move, Enter picks, typing
- * searches.
- */
+/** Metadata supplied by the model profile, shared by desktop and phone model menus. */
+export function modelDetails(profile: Profile) {
+  const name = modelName(profile);
+  const images = profile.mediaInputs?.filter(input => input.kind === "image") || [];
+  const capacity = images.length && images.every(input => Number.isFinite(input.max) && Number(input.max) > 0)
+    ? images.reduce((sum, input) => sum + Number(input.max), 0) : 0;
+  const references = capacity ? `${capacity} Reference Image${capacity === 1 ? "" : "s"}` : images.length ? "Reference Images" : "";
+  return [...new Set([name.detail, profile.label !== name.name ? profile.label : "", familyLabel(profile), profile.kind === "video" ? "Video" : "Image", references].filter(Boolean))].join(" · ");
+}
+
 /**
  * What a model can do with a picture, as two small plain icons before its
  * family badge: edits from reference images, and inpainting (paint over part
@@ -485,7 +486,7 @@ function ModelAbilities({ profile, showInpaint = true, onHover }: { profile: Pro
   );
 }
 
-export function ModelPicker({ value, profiles, showInpaint = true, onChange, compact = false, badges = {}, density = "full", emptyHint = "", onFindModels, onGetModels, strayCount = 0, menu }: { value: string; profiles: Profile[]; showInpaint?: boolean; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string>; density?: ControlDensity; emptyHint?: string; onFindModels?: () => void; onGetModels?: () => void; strayCount?: number; menu?: ModelMenuState }) {
+export function ModelPicker({ value, profiles, showInpaint = true, onChange, compact = false, badges = {}, density = "full", emptyHint = "", onGetModels, onBrowseModels, menu }: { value: string; profiles: Profile[]; showInpaint?: boolean; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string>; density?: ControlDensity; emptyHint?: string; onFindModels?: () => void; onGetModels?: () => void; onBrowseModels?: () => void; strayCount?: number; menu?: ModelMenuState }) {
   const [filters, setFilters] = useState(emptyCatalogueFilter);
   const hardware = useHardware();
   const [abilityRow, setAbilityRow] = React.useState("");
@@ -511,14 +512,11 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     }
     if (!menu) return [{ id: "all", label: "", rows: matching }];
     const favorites = new Set(menu.favorites);
-    const byId = new Map(matching.map((profile) => [profile.id, profile]));
     const starred = matching.filter((profile) => favorites.has(profile.id));
-    const recent = menu.recents.filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile)).slice(0, menuRecentLimit).sort(compareModelNames);
     // The rest by family, so seven Sana variants sit together instead of scattering.
     const rest = matching;
     return [
       { id: "favorites", label: "Favourites", rows: starred },
-      { id: "recent", label: "Recent", rows: recent },
       ...modelGroups(rest)
     ].filter((section) => section.rows.length);
   }, [filters, menu, profiles, query]);
@@ -616,8 +614,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
             <div className="model-menu-empty">
               <strong>No Models Yet</strong>
               <span>{emptyHint || "No usable models in ComfyUI yet."}</span>
-              {onGetModels && !strayCount ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button>
-                : onFindModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onFindModels(); }}>{strayCount ? `Add ${strayCount} model${strayCount === 1 ? "" : "s"}` : "Find Models"}</button> : null}
+              {onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}
             </div>
           )}
           {searchable ? (
@@ -636,8 +633,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                   {section.rows.map((profile) => {
                     rowIndex += 1;
                     const starred = favorites.has(profile.id);
-                    // Without a menu (favorites and recents as sections), its Favorite / Recent / Workflow word stays as a pill.
-                    const badge = menu ? "" : badges[profile.id] || "";
+                    const badge = menu || /^recent$/i.test(badges[profile.id] || "") ? "" : badges[profile.id] || "";
                     const { size, fits } = sizeNote(profile, hardware);
                     return (
                       <div key={`${section.id}:${profile.id}`} className={cn("model-row", starred && "is-starred")}>
@@ -653,9 +649,8 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                             {profile.id === value ? <Check className="model-selection-tick" size={15} aria-hidden="true" /> : null}
                             <span className="model-copy">
                               <strong>{modelName(profile).name}</strong>
-                              {setupNote(profile) ? <em className="is-setup">{[modelName(profile).detail, setupNote(profile)].filter(Boolean).join(" · ")}</em> : (
-                                // The family once, under the name, instead of a pill beside a line that said it too.
-                                <em>{modelName(profile).detail}{size ? <span className="model-size"> · {size}</span> : null}</em>
+                              {setupNote(profile) ? <em className="is-setup">{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(" · ")}</em> : (
+                                <em>{modelDetails(profile)}{size ? <span className="model-size"> · {size}</span> : null}</em>
                               )}
                             </span>
                             <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
@@ -673,13 +668,8 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
               {!flat.length ? <div className="model-menu-none">{query ? `Nothing matches “${query.trim()}”.` : "No Models Match These Filters."}</div> : null}
             </div>
           ) : null}
-          {onFindModels && profiles.length ? (
-            // Always one tap from where people notice a model is missing.
-            <button type="button" className={cn("model-menu-find", strayCount > 0 && "has-found")} onClick={() => { close(); onFindModels(); }}>
-              <span>{strayCount ? `${strayCount} model${strayCount === 1 ? "" : "s"} found` : "Find More Models"}</span>
-              <em>{strayCount ? "Add" : "Search"}</em>
-            </button>
-          ) : null}
+          {onBrowseModels ? <button type="button" className="model-option model-menu-browse" aria-label="Browse Models" onClick={() => { close(); onBrowseModels(); }}><span className="model-copy"><strong>Browse Models</strong><em>View Models & Workflows</em></span><SlidersHorizontal size={15} /></button> : null}
+
         </div>
       ) : null}
     </div>

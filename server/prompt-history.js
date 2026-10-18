@@ -72,106 +72,131 @@ export function addPrompt(entries, text, at = new Date()) {
   return capEntries([next, ...entries.filter((entry) => entry !== previous)]);
 }
 
-let cache = null;
-let enabled = true;
+export const negativePromptHistoryPath = path.join(dataDir, "negative-prompt-history.json");
 
-/**
- * The saved list. The very first time there is none, it starts from the
- * prompts already in the gallery, so the list is useful from day one.
- */
-export function loadPromptHistory(seedItems = gallery) {
-  if (cache) return cache;
-  try {
-    const saved = readJsonFile(promptHistoryPath);
-    enabled = saved?.enabled !== false;
-    cache = cleanEntries(saved);
-  } catch {
-    let entries = [];
-    const seeds = seedItems
-      // Prompts still sealed by the old privacy scheme are not readable text, so they stay out.
-      .filter((item) => item?.prompt && !item.privateVault && !item.promptProtected && !hasLegacyPrompt(item) && item.status === "done")
-      .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
-    for (const item of seeds) entries = addPrompt(entries, item.prompt, Date.parse(item.createdAt || "") || Date.now());
-    cache = entries;
-    if (entries.length) save();
+function createHistory(field, historyPath, initiallyEnabled = () => true) {
+  let cache = null;
+  let enabled = true;
+
+  /**
+   * The saved list. The very first time there is none, it starts from the
+   * prompts already in the gallery, so the list is useful from day one.
+   */
+  function loadPromptHistory(seedItems = gallery) {
+    if (cache) return cache;
+    try {
+      const saved = readJsonFile(historyPath);
+      enabled = saved?.enabled !== false;
+      cache = cleanEntries(saved);
+    } catch {
+      enabled = initiallyEnabled();
+      let entries = [];
+      const seeds = (enabled ? seedItems : [])
+        // Prompts still sealed by the old privacy scheme are not readable text, so they stay out.
+        .filter((item) => item?.[field] && !item.privateVault && !item.promptProtected && !hasLegacyPrompt(item) && !String(item[field]).startsWith("enc:v1:") && item.status === "done")
+        .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
+      for (const item of seeds) entries = addPrompt(entries, item[field], Date.parse(item.createdAt || "") || Date.now());
+      cache = entries;
+      if (entries.length) save();
+    }
+    return cache;
   }
-  return cache;
+
+  /**
+   * `forget`: the store keeps the previous copy as .bak, and a prompt taken out
+   * (forgotten, cleared, or hidden along with its image) must not stay in it.
+   */
+  function save({ forget = false } = {}) {
+    writeJsonFile(historyPath, { version: 1, enabled, entries: cache || [] });
+    if (forget) writeJsonFile(historyPath, { version: 1, enabled, entries: cache || [] });
+  }
+
+  function promptHistoryEnabled() {
+    loadPromptHistory();
+    return enabled;
+  }
+
+  /** Turning it off forgets the recent prompts (starred ones stay) and keeps no new ones. */
+  function setPromptHistoryEnabled(on) {
+    loadPromptHistory();
+    enabled = Boolean(on);
+    if (!enabled) cache = cache.filter((entry) => entry.pinned);
+    save({ forget: !enabled });
+    return cache;
+  }
+
+  function listPrompts() {
+    return loadPromptHistory();
+  }
+
+  function recordPrompt(text) {
+    if (!promptHistoryEnabled()) return cache;
+    const entries = addPrompt(loadPromptHistory(), text);
+    if (entries === cache) return cache;
+    cache = entries;
+    save();
+    return cache;
+  }
+
+  function setPromptPinned(text, pinned) {
+    const key = promptKey(text);
+    const entries = loadPromptHistory();
+    const found = entries.find((entry) => promptKey(entry.text) === key);
+    // Pinning something not in the list yet (a prompt typed but never run) keeps it too.
+    if (!found && !pinned) return entries;
+    const clean = cleanText(text);
+    if (!found && !promptKey(clean)) return entries;
+    cache = capEntries(found
+      ? entries.map((entry) => {
+        if (entry !== found) return entry;
+        const { pinned: _pinned, ...rest } = entry;
+        return pinned ? { ...rest, pinned: true } : rest;
+      })
+      : [{ text: clean, at: new Date().toISOString(), uses: 0, pinned: true }, ...entries]);
+    save();
+    return cache;
+  }
+
+  /** Forgets these prompts. `keep` (keys) spares any that should stay, pinned or not. */
+  function forgetPrompts(texts, keep = new Set()) {
+    const keys = new Set(texts.map(promptKey).filter((key) => key && !keep.has(key)));
+    if (!keys.size) return loadPromptHistory();
+    const entries = loadPromptHistory();
+    const next = entries.filter((entry) => !keys.has(promptKey(entry.text)));
+    if (next.length === entries.length) return entries;
+    cache = next;
+    save({ forget: true });
+    return cache;
+  }
+
+  function clearPromptHistory({ keepPinned = true } = {}) {
+    cache = keepPinned ? loadPromptHistory().filter((entry) => entry.pinned) : [];
+    save({ forget: true });
+    return cache;
+  }
+
+  /** For tests: forget what was read, so the next call reads the file again. */
+  function resetPromptHistoryCache() {
+    cache = null;
+  }
+  return { clearPromptHistory, forgetPrompts, listPrompts, loadPromptHistory, promptHistoryEnabled, recordPrompt, resetPromptHistoryCache, setPromptHistoryEnabled, setPromptPinned };
 }
 
-/**
- * `forget`: the store keeps the previous copy as .bak, and a prompt taken out
- * (forgotten, cleared, or hidden along with its image) must not stay in it.
- */
-function save({ forget = false } = {}) {
-  writeJsonFile(promptHistoryPath, { version: 1, enabled, entries: cache || [] });
-  if (forget) writeJsonFile(promptHistoryPath, { version: 1, enabled, entries: cache || [] });
-}
+const histories = {
+  negative: createHistory('negative', negativePromptHistoryPath, () => histories.positive.promptHistoryEnabled()),
+  positive: createHistory('prompt', promptHistoryPath)
+};
+const historyFor = (kind) => histories[kind === 'negative' ? 'negative' : 'positive'];
 
-export function promptHistoryEnabled() {
-  loadPromptHistory();
-  return enabled;
-}
-
-/** Turning it off forgets the recent prompts (starred ones stay) and keeps no new ones. */
-export function setPromptHistoryEnabled(on) {
-  loadPromptHistory();
-  enabled = Boolean(on);
-  if (!enabled) cache = cache.filter((entry) => entry.pinned);
-  save({ forget: !enabled });
-  return cache;
-}
-
-export function listPrompts() {
-  return loadPromptHistory();
-}
-
-export function recordPrompt(text) {
-  if (!promptHistoryEnabled()) return cache;
-  const entries = addPrompt(loadPromptHistory(), text);
-  if (entries === cache) return cache;
-  cache = entries;
-  save();
-  return cache;
-}
-
-export function setPromptPinned(text, pinned) {
-  const key = promptKey(text);
-  const entries = loadPromptHistory();
-  const found = entries.find((entry) => promptKey(entry.text) === key);
-  // Pinning something not in the list yet (a prompt typed but never run) keeps it too.
-  if (!found && !pinned) return entries;
-  const clean = cleanText(text);
-  if (!found && !promptKey(clean)) return entries;
-  cache = capEntries(found
-    ? entries.map((entry) => {
-      if (entry !== found) return entry;
-      const { pinned: _pinned, ...rest } = entry;
-      return pinned ? { ...rest, pinned: true } : rest;
-    })
-    : [{ text: clean, at: new Date().toISOString(), uses: 0, pinned: true }, ...entries]);
-  save();
-  return cache;
-}
-
-/** Forgets these prompts. `keep` (keys) spares any that should stay, pinned or not. */
-export function forgetPrompts(texts, keep = new Set()) {
-  const keys = new Set(texts.map(promptKey).filter((key) => key && !keep.has(key)));
-  if (!keys.size) return loadPromptHistory();
-  const entries = loadPromptHistory();
-  const next = entries.filter((entry) => !keys.has(promptKey(entry.text)));
-  if (next.length === entries.length) return entries;
-  cache = next;
-  save({ forget: true });
-  return cache;
-}
-
-export function clearPromptHistory({ keepPinned = true } = {}) {
-  cache = keepPinned ? loadPromptHistory().filter((entry) => entry.pinned) : [];
-  save({ forget: true });
-  return cache;
-}
-
-/** For tests: forget what was read, so the next call reads the file again. */
-export function resetPromptHistoryCache() {
-  cache = null;
-}
+export const loadPromptHistory = (seedItems = gallery, kind = 'positive') => historyFor(kind).loadPromptHistory(seedItems);
+export const listPrompts = (kind = 'positive') => historyFor(kind).listPrompts();
+export const promptHistoryEnabled = (kind = 'positive') => historyFor(kind).promptHistoryEnabled();
+export const recordPrompt = (text, kind = 'positive') => historyFor(kind).recordPrompt(text);
+export const setPromptPinned = (text, pinned, kind = 'positive') => historyFor(kind).setPromptPinned(text, pinned);
+export const forgetPrompts = (texts, keep = new Set(), kind = 'positive') => historyFor(kind).forgetPrompts(texts, keep);
+export const clearPromptHistory = (options = {}, kind = 'positive') => historyFor(kind).clearPromptHistory(options);
+export const setPromptHistoryEnabled = (on) => {
+  histories.negative.setPromptHistoryEnabled(on);
+  return histories.positive.setPromptHistoryEnabled(on);
+};
+export const resetPromptHistoryCache = () => Object.values(histories).forEach((history) => history.resetPromptHistoryCache());

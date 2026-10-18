@@ -14,7 +14,7 @@ test('swiping in either direction autoplays videos even after a slow load', asyn
     await route.fulfill({ body: video, contentType: 'video/mp4' });
   });
   await page.goto('/');
-  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: 'Video', exact: true }).click();
+  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
   await page.locator('[data-tile-id="autoplay-0"]').click();
   const canvas = page.locator('.viewer-canvas');
   const playing = () => canvas.locator('video').evaluate((element: HTMLVideoElement) => !element.paused && element.currentTime > 0);

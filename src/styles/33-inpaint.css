@@ -226,9 +226,13 @@
   transform-origin: 50% 100%;
 }
 @media (max-width: 620px) {
-  .inpaint-pill { top: 10px; }
+  .inpaint-pill { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100% - 20px); }
   .inpaint-tool { width: 40px; height: 40px; }
+  .inpaint-divider { margin: 0 1px; }
+  .inpaint-viewport { top: 68px; bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .inpaint-hint { bottom: 8px; }
   .inpaint-size { left: 10px; }
+  .inpaint-zoom { position: absolute; right: 0; bottom: calc(100% + 8px); border-radius: var(--r-pill); background: rgb(30 30 30 / .82); }
 }
 
 @media (prefers-reduced-motion: reduce) {

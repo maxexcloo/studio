@@ -10,6 +10,12 @@ test('Normal instances hide the preset library on desktop and phone', async ({ p
   await expect(page.getByRole('button', { name: 'Image & Model Library', exact: true })).toHaveCount(0);
 });
 
+async function openLibrary(page: import('@playwright/test').Page) {
+  if (await page.locator('.phone-shell').count()) await page.getByRole('button', { name: 'More', exact: true }).click();
+  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).click();
+  await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
+}
+
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="640"><rect width="512" height="640" fill="#527b8f"/><circle cx="256" cy="250" r="110" fill="#a3c0b0"/></svg>');
 const preset = {
   id: '42', galleryItemId: 'civitai:42', name: 'Civitai 42', sourceUrl: 'https://civitai.com/images/42', thumbnailUrl: picture,
@@ -37,17 +43,17 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { ok: true, preset: saved[0] || preset } }));
   await page.route('**/api/library/downloads', (route) => route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
+  await openLibrary(page);
   let dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
   await dialog.getByLabel('Image Link').fill('https://civitai.com/images/42');
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save Image', exact: true }).click();
   await expect(dialog.getByRole('status').filter({ hasText: 'Importing image:' })).toBeVisible();
   finishImport();
   await expect(dialog.getByText('A watercolour landscape at dawn', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('status').filter({ hasText: 'Image Saved' })).toContainText('Ready To Use');
   await expect(dialog.getByText('Installed', { exact: true })).toHaveCount(2);
   await expect(dialog.getByLabel('Preset Name')).toHaveCount(0);
-  await expect(dialog.getByLabel('Use With Model')).toHaveCount(0);
+  await expect(dialog.getByLabel('Use With Model')).toHaveValue('mock-flux-schnell');
   await expect(dialog.getByText(/Civitai Access|managed at the computer/)).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Library', exact: true }).click();
   await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
@@ -63,7 +69,7 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   await page.route('**/api/generate', async (route) => { generated = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { ok: false, error: 'Test request captured' } }); });
   if (isMobile) {
     await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }).click();
+    await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
   } else await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.prompt).toBe(preset.prompt);
@@ -73,25 +79,31 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
   if (isMobile) {
     await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create .phone-row').filter({ hasText: 'Original Test Model' }).click();
-  } else await page.locator('.model-trigger').first().click();
+    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
+  } else {
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+    await page.locator('.model-trigger').first().click();
+  }
   const modelMenu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
   await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).first().click();
   generated = null;
-  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }).click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
   else await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.profileId).toBe('alternate-test-model');
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
   if (isMobile) {
     await expect(page.locator('.phone-create')).toHaveCount(0);
-    await page.locator('.phone-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+    await page.getByRole('group', { name: 'Gallery Mode', exact: true }).getByRole('button', { name: 'Videos', exact: true }).click();
     await page.locator('.phone-create-open').click();
-  } else await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
-  await expect(page.getByRole('button', { name: `Change start image, currently ${preset.name}`, exact: true })).toBeVisible();
+  } else {
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+    await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
+  }
+  await expect(page.getByRole('button', { name: `Change reference image, currently ${preset.name}`, exact: true })).toBeVisible();
   generated = null;
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the imported image');
-  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate Video', exact: true }).click();
+  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
   else await page.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.kind).toBe('video');
@@ -107,10 +119,10 @@ test('missing LoRAs and filename conflicts remain explicit and download errors a
     ? route.fulfill({ status: 400, json: { ok: false, error: 'Civitai requires access to this resource.' } })
     : route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
+  await openLibrary(page);
   const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
   await dialog.getByLabel('Image Link').fill('https://civitai.com/images/42');
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save Image', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeDisabled();
   await expect(dialog.getByText('Civitai requires access to this resource.', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /Download Missing Files/ })).toHaveCount(0);
@@ -135,12 +147,58 @@ test('model links preview their destination before download', async ({ page }) =
     else await route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: 'Downloads enter ComfyUI.' } } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
+  await openLibrary(page);
   const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
-  await dialog.getByRole('radio', { name: 'Models', exact: true }).click();
+  await dialog.getByRole('radio', { name: 'Download Models', exact: true }).click();
   await dialog.getByLabel('Model Or LoRA Link').fill('https://civitai.com/models/9?modelVersionId=19');
   await dialog.getByRole('button', { name: 'Preview Download', exact: true }).click();
   await expect(dialog.getByText('film.safetensors', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Download', exact: true }).click();
   await expect.poll(() => queued).toEqual({ id: 'civitai:19:3' });
+});
+
+test('missing source models can use an installed alternative and missing files can be retried without import warnings', async ({ page }) => {
+  const source = { ...preset, resources: [{ ...preset.resources[0], profileId: '', localName: '', status: 'missing' }] };
+  let catalogueReads = 0;
+  let downloadReads = 0;
+  let retried: unknown;
+  await page.route('**/api/presets', (route) => { catalogueReads += 1; return route.fulfill({ json: { presets: [source], downloads: { available: true, backend: 'local', note: '' } } }); });
+  await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { preset: source } }));
+  await page.route('**/api/library/downloads', (route) => {
+    if (route.request().method() === 'POST') { retried = route.request().postDataJSON(); return route.fulfill({ json: { ok: true } }); }
+    downloadReads += 1;
+    return route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: '' } } });
+  });
+  await page.goto('/');
+  await openLibrary(page);
+  const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
+  await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
+  await dialog.getByRole('button', { name: /Civitai 42/ }).click();
+  await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeDisabled();
+  await dialog.getByLabel('Use With Model').selectOption('mock-flux-schnell');
+  await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Retry Missing Files', exact: true }).click();
+  await expect.poll(() => retried).toEqual({ versionId: 17 });
+  // Download polling must not re-read and re-match every saved model file.
+  await expect.poll(() => downloadReads, { timeout: 7000 }).toBeGreaterThan(1);
+  expect(catalogueReads).toBe(1);
+});
+
+test('failed library loads can be retried and saved images can be searched', async ({ page }) => {
+  let attempts = 0;
+  await page.route('**/api/presets', (route) => {
+    attempts += 1;
+    return attempts === 1 ? route.fulfill({ status: 503, json: { error: 'Test library unavailable' } }) : route.fulfill({ json: { presets: [preset], downloads: { available: true, backend: 'local', note: '' } } });
+  });
+  await page.route('**/api/library/downloads', (route) => route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: '' } } }));
+  await page.goto('/');
+  await openLibrary(page);
+  const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
+  await expect(dialog.getByRole('alert')).toHaveText('Test library unavailable');
+  await dialog.getByRole('button', { name: 'Try Again', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
+  await dialog.getByRole('searchbox', { name: 'Search Saved Images' }).fill('nothing matches');
+  await expect(dialog.getByText('No Matching Images', { exact: true })).toBeVisible();
+  await dialog.getByRole('searchbox', { name: 'Search Saved Images' }).fill('watercolour');
+  await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
 });

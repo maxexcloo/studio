@@ -3,9 +3,10 @@ import { expect, test, type Page } from '@playwright/test';
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
 const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '', privacyDomain: 'gallery' });
 
-async function prepare(page: Page, phone: boolean, capacity: number) {
+async function prepare(page: Page, phone: boolean, capacity: number, inpaint = false) {
   const models = await (await page.request.get('/api/models')).json();
   for (const profile of models.profiles) if (profile.kind === 'image') {
+    if (inpaint) profile.capabilities = { ...profile.capabilities, inpaint: true };
     profile.mediaInputs = Array.from({ length: capacity }, (_, index) => ({ id: index ? `reference_${index + 1}` : 'reference', kind: 'image', role: 'reference', label: index ? `Reference ${index + 1}` : 'Reference Image', min: 0, max: 1, required: false, ...(index ? { follows: index > 1 ? `reference_${index}` : 'reference' } : {}) }));
   }
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
@@ -18,10 +19,11 @@ async function prepare(page: Page, phone: boolean, capacity: number) {
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [image('library-image')], nextCursor: '' } }));
   await page.goto('/');
   if (phone) await page.locator('.phone-create-open').click();
+  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   return uploads;
 }
 
-async function drop(page: Page, count: number, selector = '.composer-prompt-row') {
+async function drop(page: Page, count: number, selector = '.zen-prompt, .phone-create') {
   await page.locator(selector).evaluate((element, count) => {
     const transfer = new DataTransfer();
     for (let index = 0; index < count; index++) transfer.items.add(new File(['image'], `image-${index}.png`, { type: 'image/png' }));
@@ -46,18 +48,18 @@ test('multiple upload selection fills declared slots and removal closes gaps', a
   await expect(page.locator('.ref-thumb').first()).toHaveAttribute('aria-label', /uploaded-2.png/);
   await expect(page.locator('.reference-count')).toHaveText('2/3 References');
   await expect(page.getByRole('button', { name: 'Add Reference 3', exact: true })).toBeVisible();
-  const layout = await page.locator('.composer-prompt-row').evaluate((element) => {
+  const layout = await page.locator(isMobile ? '.phone-create' : '.zen-prompt').evaluate((element) => {
     const prompt = element.querySelector('textarea')!.getBoundingClientRect();
     const references = element.querySelector('.composer-reference-tools')!.getBoundingClientRect();
-    return { promptRight: prompt.right, referenceLeft: references.left, right: references.right, viewport: innerWidth, width: element.clientWidth, scroll: element.scrollWidth };
+    return { promptBottom: prompt.bottom, promptRight: prompt.right, referenceLeft: references.left, referenceTop: references.top, right: references.right, viewport: innerWidth, width: element.clientWidth, scroll: element.scrollWidth };
   });
-  expect(layout.referenceLeft).toBeGreaterThanOrEqual(layout.promptRight);
+  expect(layout.referenceLeft >= layout.promptRight || layout.referenceTop >= layout.promptBottom).toBe(true);
   expect(layout.right).toBeLessThanOrEqual(layout.viewport);
   expect(layout.scroll).toBeLessThanOrEqual(layout.width + 1);
   let generated: Record<string, any> | null = null;
   await page.route('**/api/generate', async (route) => { generated = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A scene with both references');
-  const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate 4', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
+  const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
   await generate.click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.referenceAssets).toEqual([{ slot: 'reference', assetId: 'uploaded-2' }, { slot: 'reference_2', assetId: 'uploaded-3' }]);
@@ -113,8 +115,8 @@ test('late uploads do not attach after leaving the composer context', async ({ p
     await expect(page.locator('.phone-create')).toHaveCount(0);
     await page.locator('.phone-create-open').click();
   } else {
-    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Video', exact: true }).click();
-    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Image', exact: true }).click();
+    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Videos', exact: true }).click();
+    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Images', exact: true }).click();
   }
   const completed = page.waitForResponse('**/api/reference-assets/upload');
   finish();
@@ -122,4 +124,43 @@ test('late uploads do not attach after leaving the composer context', async ({ p
   await expect(page.locator('.ref-chip.is-busy')).toHaveCount(0);
   await expect(page.locator('.ref-thumb')).toHaveCount(0);
   expect(uploads).toBe(1);
+});
+
+
+test('the image editor fills a usable workspace with reachable mobile tools', async ({ page, isMobile }) => {
+  await prepare(page, isMobile, 1, true);
+  await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
+  await page.getByRole('button', { name: 'library-image.png', exact: true }).click();
+  await page.getByRole('button', { name: 'Paint the part to change', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Paint the part to change' });
+  await expect(editor).toBeVisible();
+  await expect.poll(() => editor.locator('.inpaint-stage img').evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(isMobile ? 300 : 500);
+  const tools = await editor.getByRole('toolbar').boundingBox();
+  const close = await editor.getByRole('button', { name: 'Done painting' }).boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(tools!.y).toBeGreaterThanOrEqual(0);
+  expect(close!.y).toBeGreaterThanOrEqual(0);
+  expect(close!.y + close!.height).toBeLessThanOrEqual(viewport.height);
+  expect(tools!.x).toBeGreaterThanOrEqual(0);
+  expect(tools!.x + tools!.width).toBeLessThanOrEqual(viewport.width);
+  expect(tools!.y + tools!.height).toBeLessThanOrEqual(viewport.height);
+  if (isMobile) expect(tools!.y).toBeGreaterThan(close!.y + close!.height);
+  await editor.getByRole('button', { name: 'Done painting' }).click();
+  await expect(editor).toHaveCount(0);
+});
+
+
+test('reference sources name their search and keep one upload action', async ({ page, isMobile }) => {
+  await prepare(page, isMobile, 2);
+  await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
+  await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
+  const picker = page.locator('.reference-popover');
+  await picker.getByRole('tab', { name: 'Library', exact: true }).click();
+  await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveAttribute('placeholder', 'Search Library');
+  await expect(picker.getByText('No Outputs Yet', { exact: true })).toBeVisible();
+  await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
+  await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
+  await expect(picker.getByRole('searchbox', { name: 'Search Uploads', exact: true })).toHaveAttribute('placeholder', 'Search Uploads');
+  await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
+  await expect(picker.locator('.reference-empty button')).toHaveCount(0);
 });

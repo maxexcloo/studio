@@ -73,6 +73,11 @@
 button.activity-main { cursor: pointer; }
 .activity-main:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .activity-glyph { flex: none; display: grid; place-items: center; min-width: 38px; }
+.activity.is-compact { width: min(300px, calc(100vw - 24px)); touch-action: pan-y; }
+.activity.is-compact .activity-main { min-height: 44px; gap: 9px; padding: 6px 10px; }
+.activity.is-compact .activity-glyph { min-width: 26px; }
+.activity.is-compact .activity-frame,
+.activity.is-compact .activity-fan { width: 26px; height: 26px; }
 /* Positioned, so the words leaving on a new phase lie over the ones arriving. */
 .activity-text { position: relative; display: grid; flex: 1; min-width: 0; }
 .activity-copy { display: grid; gap: 5px; min-width: 0; }

@@ -54,3 +54,15 @@ test("prepared recipe metadata preserves conditioning and exact adapter identiti
   assert.deepEqual(workflow.recipe, recipe);
   assert.equal(workflow.profileId, "custom:ref-pdd");
 });
+
+test('profile-owned prompting metadata preserves structured guidance and only explicit mode overrides', () => {
+  const prompting = { id: 'researched-guide', summary: 'Fixture guidance', rules: ['Keep the subject'], patterns: { subject: 'A subject', setting: 'A setting' }, reviewed_on: '2026-10-16', extension: { future: true } };
+  const reference = { ...prompting, summary: 'Preserve the reference subject' };
+  const raw = { graph: {}, heissUi: { id: 'prompting-metadata', prompting, imageModes: { generate: {}, reference: { prompting: reference } } } };
+  const workflow = metadataFromJson(raw);
+  assert.deepEqual(workflow.prompting, prompting);
+  assert.equal(workflow.imageModes.generate.prompting, undefined);
+  assert.deepEqual(workflow.imageModes.reference.prompting, reference);
+  workflow.prompting.rules[0] = 'A local edit';
+  assert.equal(raw.heissUi.prompting.rules[0], 'Keep the subject');
+});

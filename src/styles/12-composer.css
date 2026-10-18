@@ -16,7 +16,7 @@
 .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
 .composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 28px; padding: 0 var(--prompt-text-inset, 4px); }
 .composer-secondary-row { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--surface-border); padding-top: 4px; }
-.composer-secondary-row .negative-drawer.open { flex: 1; min-width: 0; border: 0; margin: 0; padding: 0 var(--prompt-text-inset, 10px); }
+.composer-secondary-row .negative-drawer.open { max-height: none; overflow: visible; flex: 1; min-width: 0; border: 0; margin: 0; padding: 0 var(--prompt-text-inset, 10px); }
 .composer-secondary-row .phone-negative { flex: 1; min-width: 0; border: 0; padding: 0; }
 .composer-secondary-row .composer-prompt-tools { flex: none; padding-left: 0; }
 .composer-reference-tools:empty { display: none; }

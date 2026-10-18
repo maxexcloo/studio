@@ -12,7 +12,7 @@ for (const kind of ['image', 'video']) {
     await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
     await page.route('**/backdrop-video.mp4*', (route) => route.fulfill({ body: video, contentType: 'video/mp4' }));
     await page.goto('/');
-    if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: 'Video', exact: true }).click();
+    if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
     await page.locator('[data-tile-id]').first().locator('.tile').click();
     const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
     const canvas = viewer.locator('.viewer-canvas');
