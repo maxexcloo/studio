@@ -17,11 +17,9 @@ function Surface({ onClose, children }: { onClose: () => void; children: React.R
     if (!anchor) return;
     const measure = () => {
       const rect = anchor.getBoundingClientRect();
-      const width = Math.min(460, window.innerWidth - 24);
-      const trigger = opener.current?.getBoundingClientRect();
-      // Keep the picker usable even when a long prompt fills most of the screen.
+      // Long drafts can leave less room above the composer than the normal picker height.
       const bottom = Math.min(window.innerHeight - rect.top + 10, window.innerHeight - 248);
-      setBox({ left: Math.max(12, Math.min(trigger?.left ?? rect.left, window.innerWidth - width - 12)), width, bottom, height: Math.min(560, window.innerHeight * .62, window.innerHeight - bottom - 8) });
+      setBox({ left: rect.left, width: rect.width, bottom, height: Math.min(440, window.innerHeight * .58, window.innerHeight - bottom - 8) });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -29,7 +27,7 @@ function Surface({ onClose, children }: { onClose: () => void; children: React.R
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
   }, [anchor]);
-  return createPortal(<motion.div ref={surface} className={`reference-popover composer-loras${asSheet ? ' is-sheet' : ''}`} style={asSheet ? undefined : box} role={present ? 'dialog' : undefined} aria-label="LoRAs" aria-hidden={!present || undefined} inert={!present} data-open-surface initial={{ opacity: 0, y: 10, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .98 }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
+  return createPortal(<motion.div ref={surface} className={`reference-popover composer-loras${asSheet ? ' is-sheet' : ''}`} style={asSheet ? undefined : box} role={present ? 'dialog' : undefined} aria-label="LoRAs" aria-hidden={!present || undefined} inert={!present} data-open-surface initial={{ opacity: 0, y: 10, scale: .97, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, y: 8, scale: .98, filter: 'blur(3px)' }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
     <header className="reference-popover-head"><Layers size={16} /><strong>LoRAs</strong><button type="button" className="reference-popover-close" aria-label="Close LoRAs" onClick={close}><X size={15} /></button></header>
     <div className="reference-popover-body lora-popover-body">{children}</div>
   </motion.div>, document.body);

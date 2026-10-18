@@ -262,11 +262,11 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
         <button type="button" className="btn is-ghost lora-picker-back" onClick={onClose}><ArrowLeft size={14} /> {libraryView ? "Manage Stack" : "Back"}</button>
         <span>{swapping ? <>Replace <strong>{fileName(swapping)}</strong></> : libraryView ? `${current.length} Selected` : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
       </div>
-      <label className="lora-picker-search">
+      <label className={cn("lora-picker-search", libraryView && "picker-search")}>
         <Search size={14} />
         <input
           ref={inputRef}
-          className="is-framed"
+          className={libraryView ? undefined : "is-framed"}
           value={query}
           placeholder={libraryView ? "Search LoRAs" : `Search ${options.length} LoRAs`}
           aria-label="Search LoRAs"

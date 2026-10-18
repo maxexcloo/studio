@@ -96,7 +96,13 @@ test('LoRA library offers direct list selection with inline strengths and access
       const children = [...element.querySelectorAll('.lora-library-row, .lora-library-settings, .lora-library-settings input')];
       return children.every(child => { const box = child.getBoundingClientRect(); return box.left >= bounds.left && box.right <= bounds.right + 1; });
     })).toBe(true);
-    if (!isMobile) expect((await surface.boundingBox())!.width).toBeLessThanOrEqual(460);
+    if (!isMobile) {
+      await expect.poll(async () => {
+        const composer = await page.locator('.zen-prompt').boundingBox();
+        const popover = await surface.boundingBox();
+        return Math.abs(popover!.width - composer!.width) < 1 && Math.abs(popover!.x - composer!.x) < 1;
+      }).toBe(true);
+    }
   }
   await row.click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
@@ -109,12 +115,30 @@ test('LoRA library offers direct list selection with inline strengths and access
   const open = page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
   await open.click();
   await expect(surface).toBeVisible();
+  await expect(open).toHaveAttribute('aria-expanded', 'true');
+  if (!isMobile) {
+    await open.click();
+    await expect(surface).not.toBeVisible();
+    await expect(open).toHaveAttribute('aria-expanded', 'false');
+    await open.click();
+    await expect(surface).toBeVisible();
+  }
   await page.keyboard.press('Escape');
   await expect(surface).not.toBeVisible();
   await open.click();
   await expect(surface).toBeVisible();
   await page.mouse.click(4, 4);
   await expect(surface).not.toBeVisible();
+  if (!isMobile) {
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A detailed landscape\n'.repeat(60));
+    await open.click();
+    await expect(surface).toBeVisible();
+    await expect.poll(() => surface.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.top >= 0 && bounds.bottom <= innerHeight;
+    })).toBe(true);
+  }
 });
 
 
