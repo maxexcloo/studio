@@ -151,3 +151,22 @@ test('Stop All prevents further video submissions and cancels an in-flight accep
   await expect.poll(() => lateJobStopped).toBe(true);
   expect(submissions).toBe(1);
 });
+
+
+for (const count of [1, 4]) {
+  test(`an explicitly saved image default of ${count} survives preference migration`, async ({ page, isMobile }) => {
+    await page.addInitScript(count => {
+      localStorage.setItem('heiss-ui-prefs', JSON.stringify({ defaultImageCount: count }));
+    }, count);
+    await prepare(page, isMobile);
+    await expect(composer(page, isMobile).getByRole('button', { name: `Images: ${count}, click to edit`, exact: true })).toBeVisible();
+    let payload: Record<string, any> | null = null;
+    await page.route('**/api/generate', route => {
+      payload = route.request().postDataJSON();
+      return route.fulfill({ status: 400, json: { error: 'Captured saved count' } });
+    });
+    await generate(page, isMobile, 'Retain the saved count');
+    await expect.poll(() => payload).not.toBeNull();
+    expect(payload!.variationCount).toBe(count);
+  });
+}

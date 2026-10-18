@@ -188,11 +188,8 @@ export function loadPrefs(): Preferences {
     const saved = migratedGet(prefsKey, legacyPrefsKey);
     if (!saved) return { ...defaultPrefs };
     const parsed = JSON.parse(saved);
-    // Migrate the old image default while retaining other explicitly chosen defaults.
-    if (parsed.countDefaultsVersion !== 2) {
-      if ([1, 4].includes(parsed.defaultImageCount)) parsed.defaultImageCount = defaultPrefs.defaultImageCount;
-      parsed.countDefaultsVersion = 2;
-    }
+    // Defaults fill missing preferences; an explicit count remains the user’s choice.
+    parsed.countDefaultsVersion = 2;
     // Run grouping's first version kept its own settings; grouping is a view now.
     delete parsed.groupRuns;
     delete parsed.runGroupingMode;
