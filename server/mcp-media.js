@@ -63,7 +63,9 @@ export class McpMedia {
     }
   }
   async profiles(kind = 'all') {
-    const models = await this.request('GET', '/api/models?cached=1');
+    // Concurrent submissions share discovery; do not queue repeated catalogue scans.
+    this.profileRequest ||= this.request('GET', '/api/models?cached=1').finally(() => { this.profileRequest = null; });
+    const models = await this.profileRequest;
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
