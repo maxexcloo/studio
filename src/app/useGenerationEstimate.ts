@@ -21,6 +21,12 @@ type EstimateInput = {
   /** Smart upscale's effort when each image upscales as part of its run, so its time is in the estimate. */
   upscale?: string;
   upscaleFaceDetail?: boolean;
+  /** The long side the upscale aims at (2048/4096). */
+  upscaleTarget?: number;
+  /** Images the run reads (references, a start image), which the server learns apart. */
+  refs?: number;
+  /** Decoded in tiles, as a native 2K/4K draw is. */
+  tiled?: boolean;
 };
 
 /**
@@ -30,7 +36,7 @@ type EstimateInput = {
  */
 export function useGenerationEstimate(input: EstimateInput): GenerationEstimate | null {
   const [estimate, setEstimate] = React.useState<GenerationEstimate | null>(null);
-  const { mode, model, profileId, family = '', width, height, count, steps, frames, runs, revision, upscale = '', upscaleFaceDetail = false } = input;
+  const { mode, model, profileId, family = '', width, height, count, steps, frames, runs, revision, upscale = '', upscaleFaceDetail = false, upscaleTarget = 0, refs = 0, tiled = false } = input;
   React.useEffect(() => {
     if (!model || !width || !height) {
       setEstimate(null);
@@ -38,13 +44,13 @@ export function useGenerationEstimate(input: EstimateInput): GenerationEstimate 
     }
     let current = true;
     const timer = window.setTimeout(() => {
-      const query = new URLSearchParams({ kind: mode, model, profileId, family, width: String(width), height: String(height), count: String(count), steps: String(steps), frames: String(frames), runs: String(runs), ...(upscale ? { upscale, faceDetail: upscaleFaceDetail ? '1' : '0' } : {}) });
+      const query = new URLSearchParams({ kind: mode, model, profileId, family, width: String(width), height: String(height), count: String(count), steps: String(steps), frames: String(frames), runs: String(runs), ...(refs ? { refs: String(refs) } : {}), ...(tiled ? { tiled: '1' } : {}), ...(upscale ? { upscale, faceDetail: upscaleFaceDetail ? '1' : '0', ...(upscaleTarget ? { upscaleTarget: String(upscaleTarget) } : {}) } : {}) });
       apiJson<GenerationEstimate>(`/api/estimate?${query}`)
         .then((data) => { if (current) setEstimate(data.ms || data.queueMs ? { ms: data.ms, queueMs: data.queueMs } : null); })
         .catch(() => { if (current) setEstimate(null); });
     }, 300);
     return () => { current = false; window.clearTimeout(timer); };
-  }, [mode, model, profileId, family, width, height, count, steps, frames, runs, revision, upscale, upscaleFaceDetail]);
+  }, [mode, model, profileId, family, width, height, count, steps, frames, runs, revision, upscale, upscaleFaceDetail, upscaleTarget, refs, tiled]);
   return estimate;
 }
 

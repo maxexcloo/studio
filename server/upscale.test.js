@@ -8,7 +8,7 @@ import test from "node:test";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-seedvr2-"));
 process.env.HEISS_SEEDVR2_MODEL_DIR = dir;
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-const { faceDetailSource, installState, modelFiles, startModelInstall, upscaleGraph, upscaleStatus } = await import("./upscale.js");
+const { faceDetailSource, installState, modelFiles, startModelInstall, upscaleGraph, upscalePlan, upscaleStatus } = await import("./upscale.js");
 
 // Shaped like the real /object_info: V3 combos, and offload_device is an optional input.
 const combo = (values) => ["COMBO", { options: values }];
@@ -201,6 +201,17 @@ test("face detail on an imported workflow's image loads the workflow's model fil
   assert.deepEqual(graph["9"].inputs.images, ["5", 0]);
   assert.equal(graph["17"].inputs.force_inpaint, false, "a face already past guide_size is left alone, not sampled at full size");
   assert.throws(() => upscaleGraph({ ...body, sourceModel: "custom:flux2-real-dream-image-edit" }, info), /custom:flux2-real-dream-image-edit, and ComfyUI doesn’t have it/);
+});
+
+test("the size menu's 2K/4K reach their long side, whatever the scale", () => {
+  // 4K on a model drawn at 2K: doubles. On a square 1024: four times, not capped at 2816.
+  assert.deepEqual([upscalePlan({ width: 2048, height: 2048, quality: "high", target: 4096 })].map((plan) => [plan.estimatedWidth, plan.estimatedHeight]), [[4096, 4096]]);
+  assert.equal(upscalePlan({ width: 1024, height: 1024, quality: "high", target: 4096 }).resolution, 4096);
+  const wide = upscalePlan({ width: 1344, height: 768, quality: "balanced", target: 2048 });
+  assert.deepEqual([wide.estimatedWidth, wide.estimatedHeight], [2044, 1168], "the short side steps by 16");
+  // Never smaller than drawn, and no target keeps the effort's own scale.
+  assert.equal(upscalePlan({ width: 3000, height: 3000, quality: "balanced", target: 2048 }).resolution, 3008);
+  assert.equal(upscalePlan({ width: 1024, height: 1024, quality: "high" }).resolution, 2816);
 });
 
 test("video upscale saves restored frames with the original audio and frame rate", () => {

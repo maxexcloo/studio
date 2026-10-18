@@ -1,0 +1,435 @@
+/* ---------------------------------------------------------------------------
+   The size menu (SizeMenu.tsx, components.tsx AspectPicker): a live frame on
+   the left, the tabs, Custom's linked fields and the shapes on the right.
+   Same well, pill and ember as the rest of the composer's menus.
+--------------------------------------------------------------------------- */
+
+.aspect-menu.size-menu {
+  width: min(300px, calc(100vw - 24px));
+  gap: 4px;
+  padding: 7px;
+}
+.size-menu-side { display: grid; gap: 4px; align-content: start; min-width: 0; }
+/* The top block spaces its rows with padding, not a grid gap: a gap would stay
+   behind Custom's fold until it's gone, and the menu would drop 6px at the end. */
+.aspect-menu.size-menu .aspect-upscale { gap: 0; }
+.aspect-menu.size-menu .aspect-upscale-head { padding-bottom: 6px; }
+.aspect-menu.size-menu .size-menu-note { padding-top: 6px; }
+.size-menu .aspect-list { gap: 2px; }
+.size-menu .aspect-option { min-height: 32px; align-items: center; }
+/* The sizes: one mono column, right-aligned, so their digits line up row to row. */
+.size-menu .aspect-option em {
+  justify-self: end;
+  padding-right: 4px;
+  color: hsl(var(--muted-foreground) / .85);
+  font: 500 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* The size button: shape, ratio, a 2K/C tag, chevron, in one row with even
+   gaps. The shape has its own fixed slot (drawn to fit 18 × 14), so a wide
+   and a tall ratio line their labels up the same. */
+.aspect-picker > button.aspect-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px 0 12px;
+}
+.aspect-trigger .aspect-shape-slot { position: relative; flex: none; display: grid; place-items: center; width: 18px; height: 18px; }
+.aspect-trigger .aspect-shape { transform: none; border-width: 1.5px; border-radius: 2.5px; opacity: .9; }
+.aspect-trigger .aspect-trigger-label { min-width: 0; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.aspect-trigger > svg { flex: none; margin-left: -1px; color: hsl(var(--muted-foreground)); }
+.aspect-tag {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgb(255 154 82 / .15);
+  box-shadow: inset 0 0 0 1px rgb(255 154 82 / .22);
+  color: var(--ember);
+  font: 700 9.5px/1 var(--font-mono);
+  letter-spacing: .03em;
+}
+/* No label beside it: the tag sits on the shape's corner, solid so the shape can't show through. */
+.aspect-tag.is-corner {
+  position: absolute;
+  right: -7px;
+  bottom: -6px;
+  height: 12px;
+  min-width: 12px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #3a2414;
+  box-shadow: 0 0 0 1.5px #090909, inset 0 0 0 1px rgb(255 154 82 / .3);
+  font-size: 8px;
+}
+
+/* Held at its opening width while the menu is open (AspectPicker): a longer
+   label shortens rather than widening the button and shifting the bar. */
+.aspect-trigger.is-held { min-width: 0; }
+.aspect-trigger.is-held .aspect-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The preview: a window of its own to the menu's left, its full height. The
+   window is the stage; lines from the frame's edges run across all of it. */
+.size-peek {
+  --size-spring: cubic-bezier(.3, 1.5, .45, 1);
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: calc(100% + 8px);
+  width: 216px;
+  overflow: hidden;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--r-menu);
+  /* Nearly opaque: inside the menu's own blur its backdrop would read as empty. */
+  background: var(--surface-grain), rgb(22 22 22 / .96);
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  transform: translateX(10px) scale(.98);
+  transform-origin: right center;
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-out), transform 260ms var(--spring);
+}
+.size-peek.is-on { opacity: 1; transform: none; }
+/* Until it's measured, nothing in it has a place to glide from. */
+.size-peek:not(.is-measured) * { transition: none !important; }
+.size-guide {
+  position: absolute;
+  background: rgb(255 255 255 / .07);
+  transition: top 300ms var(--size-spring), left 300ms var(--size-spring);
+}
+.size-guide.is-x { left: 0; right: 0; height: 1px; }
+.size-guide.is-y { top: 0; bottom: 0; width: 1px; }
+.size-frame {
+  position: absolute;
+  border: 1.5px solid rgb(255 255 255 / .92);
+  border-radius: 5px;
+  background: rgb(255 255 255 / .03);
+  transition: left 300ms var(--size-spring), top 300ms var(--size-spring), width 300ms var(--size-spring), height 300ms var(--size-spring), border-color 200ms var(--ease-out);
+}
+/* 2K or Custom: the frame takes the ember, like the tag on the trigger. */
+.size-peek.is-accent .size-frame { border-color: var(--ember); }
+.size-peek-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0;
+  white-space: nowrap;
+}
+.size-peek-caption strong { color: hsl(var(--foreground)); font-size: 12.5px; font-weight: 600; }
+.size-peek-caption span {
+  color: hsl(var(--muted-foreground));
+  font: 500 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* With the window there, the rows don't draw their shapes: the window does. */
+@media (hover: hover) and (min-width: 761px) {
+  .size-menu .aspect-option { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-left: 12px; }
+  .size-menu .aspect-option > .aspect-shape { display: none; }
+}
+/* Touch, or a narrow window: no room beside the menu, so no window; the rows keep their shapes. */
+@media (hover: none), (max-width: 760px) {
+  .size-peek { display: none; }
+}
+
+/* Custom: width and height on one line: W, the link, H.
+   Linked, the two pills reach under the link from each side and overlap
+   there, so they read as one pill with no seam. Hovering the link draws
+   them back a little and shows the link's own middle cell between them,
+   a preview of the split. Apart, two pills with the link floating free;
+   hovering it draws them in, and linking slides them together under it.
+   The link itself never grows a shape of its own. */
+.size-custom { overflow: hidden; }
+.size-custom-body { display: grid; gap: 6px; padding: 8px 0 0; }
+.size-fields {
+  --cell-spring: cubic-bezier(.3, 1.45, .45, 1);
+  --pill: 18px; /* half the cells' height: a full round end */
+  --seam: 0px;
+  --inner: 0px;
+  --reach: -16px; /* how far each pill reaches under the 30px link: past its middle, so they overlap */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+  align-items: stretch;
+  column-gap: var(--seam);
+  height: 36px;
+  transition: column-gap 340ms var(--cell-spring);
+}
+/* The hover previews are for a pointer: a tap leaves :hover stuck on touch, which would hold a split preview open. */
+@media (hover: hover) { .size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; } }
+.size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); --reach: 0px; }
+@media (hover: hover) { .size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; } }
+.size-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+  transition: border-radius 340ms var(--cell-spring), margin 340ms var(--cell-spring), padding 340ms var(--cell-spring), background-color 180ms var(--ease-out);
+}
+/* Each pill pads by as much as it reaches, so its W/H and digits stay put while it slides. */
+.size-field:first-child { margin-right: var(--reach); padding-right: calc(var(--reach) * -1); border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
+.size-field:last-child { margin-left: var(--reach); padding-left: calc(var(--reach) * -1); border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
+/* Focus lifts the cell a shade; no ring around a borderless field. */
+.size-field:focus-within { background: linear-gradient(rgb(255 255 255 / .045), rgb(255 255 255 / .045)), var(--well); }
+/* The W/H label is the drag handle. */
+.size-field-key {
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  color: hsl(var(--muted-foreground) / .8);
+  font: 600 11px/1 var(--font-mono);
+  cursor: ew-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: color 160ms var(--ease-out);
+}
+/* Hover only where there is one: a tap leaves :hover stuck, which read as still dragging. */
+@media (hover: hover) { .size-field-key:hover { color: var(--ember); } }
+.size-field.is-dragging .size-field-key { color: var(--ember); }
+.size-field input,
+.size-field input:focus,
+.size-field input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: 500 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.size-field input::selection { background: rgb(255 154 82 / .32); color: #fff; }
+.size-link {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), color 160ms var(--ease-out);
+}
+.size-link:hover,
+.size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
+/* The middle cell shows only in the hover preview of a split, between the drawn-back pills. */
+@media (hover: hover) { .size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); } }
+.size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-link-icon { display: grid; place-items: center; animation: linkTurn 420ms var(--cell-spring) both; }
+.size-link:active .size-link-icon { scale: .86; transition: scale 80ms; }
+@keyframes linkTurn {
+  from { opacity: 0; transform: rotate(-80deg) scale(.5); }
+  to { opacity: 1; transform: none; }
+}
+html.is-size-scrubbing,
+html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !important; }
+
+.size-custom-note,
+.size-menu-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.size-custom-note { align-items: center; min-height: 20px; }
+.size-custom-note .is-limit { color: var(--ember); }
+/* "Save size": a quiet link on the readout's right; "Saved" once this size is kept. */
+.size-save {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-right: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.size-save > span { display: inline-flex; align-items: center; gap: 4px; animation: saveSwap 260ms var(--spring) both; }
+.size-save:not(:disabled):hover { color: var(--ember); background: rgb(255 154 82 / .08); }
+.size-save:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-save.is-saved { color: hsl(var(--muted-foreground) / .75); cursor: default; }
+@keyframes saveSwap {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A saved size: a row like the others. Hovered or focused, its size steps
+   left for Rename and Remove; on touch they simply stay out. */
+.size-saved { overflow: hidden; }
+.size-saved-row { position: relative; }
+.size-saved-row .aspect-option { width: 100%; }
+/* Room for Rename and Remove comes from the row's own padding, so the size moves left and the
+   name, which can be long, shortens with "…" instead of running under it. */
+.size-saved-row .aspect-option { transition: padding-right 280ms var(--ease-out); }
+.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option { padding-right: 70px; }
+.aspect-option > .size-saved-label { display: flex; align-items: baseline; min-width: 0; overflow: hidden; }
+.size-saved-label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.size-saved-label > small { flex: none; }
+.size-saved-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  translate: 10px -50%;
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-out), translate 280ms var(--spring);
+}
+.size-saved-row:is(:hover, :focus-within) .size-saved-actions { opacity: 1; translate: 0 -50%; pointer-events: auto; }
+.size-saved-actions button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 160ms var(--spring);
+}
+.size-saved-actions button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.size-saved-actions button.is-remove:hover { color: #ff8a80; }
+.size-saved-actions button:active { transform: scale(.9); }
+.size-saved-actions button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Renaming: the name becomes a small field in the row, the rest stays where it was. */
+.size-saved-name {
+  min-width: 0;
+  height: 24px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  outline: 0;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .12);
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.size-saved-name:focus, .size-saved-name:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 154 82 / .45); outline: 0; }
+.size-saved-name::selection { background: rgb(255 154 82 / .32); color: #fff; }
+@media (hover: none) {
+  .size-saved-row .aspect-option em { transform: translateX(-58px); }
+  .size-saved-actions { opacity: 1; translate: 0 -50%; pointer-events: auto; }
+}
+.size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
+
+
+/* Every composer menu leaves the way it came. */
+@keyframes surfaceOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+[data-open-surface]:is(.aspect-menu, .model-menu).is-closing {
+  animation: surfaceOut 150ms var(--motion-ease) both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .size-guide, .size-frame, .size-fields, .size-field, .size-link, .size-peek { transition: none; }
+  .size-link-icon, .size-save > span { animation: none; }
+  .size-saved-row .aspect-option, .size-saved-actions { transition: none; }
+  [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
+}
+/* Where the rows keep their shapes, the name's column may shrink too. */
+@media (hover: none), (max-width: 760px) {
+  .size-menu .size-saved-row .aspect-option { grid-template-columns: 30px minmax(0, 1fr) auto; }
+}
+
+/* Megapixels (Settings › Generation), under the shapes: what it is on the left, the count on
+   the right as one pill whose MP is the drag handle, so it reads "2.5 MP". */
+.size-mp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 10px 4px 2px 6px;
+  box-shadow: inset 0 1px 0 var(--surface-border);
+}
+.size-mp-label { display: grid; justify-items: start; gap: 2px; min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
+.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: saveSwap 260ms var(--spring) both; }
+.size-mp-reset {
+  height: 16px;
+  margin-left: -4px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: saveSwap 260ms var(--spring) both;
+  transition: color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.size-mp-reset:hover { color: var(--ember); background: rgb(255 154 82 / .08); }
+.size-mp-reset:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-mp .size-mp-field {
+  flex: none;
+  width: 96px;
+  height: 32px;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-radius: 999px;
+}
+.size-mp .size-mp-field input,
+.size-mp .size-mp-field input:focus,
+.size-mp .size-mp-field input:focus-visible { padding: 0 4px 0 0; text-align: right; }
+.size-mp .size-mp-field .size-field-key { width: 30px; padding-right: 4px; }
+
+/* The phone's sheet: its own block under the shapes, at thumb size. */
+.phone-size-mp { padding: 2px 4px 10px; }
+.phone-size-mp .size-mp { margin-top: 0; padding: 12px 6px 4px 8px; box-shadow: none; }
+.phone-size-mp .size-mp-label { font-size: 15px; }
+.phone-size-mp .size-mp-label small,
+.phone-size-mp .size-mp-reset { font-size: 13px; }
+.phone-size-mp .size-mp-reset { height: 22px; }
+.phone-size-mp .size-mp .size-mp-field { width: 116px; height: 42px; }
+.phone-size-mp .size-mp-field input { font-size: 16px; }
+.phone-size-mp .size-mp .size-mp-field .size-field-key { width: 42px; }
+/* Reset at thumb size: the hit area grows, the word doesn't. */
+.phone-size-mp .size-mp-reset { position: relative; }
+.phone-size-mp .size-mp-reset::after { content: ""; position: absolute; inset: -11px -8px; }
+
+.size-tier-controls, .size-resolution { display: grid; gap: 6px; min-width: 0; }
+.size-custom-action { min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.size-custom-action:hover, .size-custom-action.is-active { background: var(--selected); color: hsl(var(--foreground)); }
+.phone-size .size-custom-action { min-height: 44px; }

@@ -4,8 +4,8 @@
  * React render, and hands the resting place to state when the fingers lift.
  */
 
-export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 6;
+export const MIN_ZOOM = 0.01;
+export const MAX_ZOOM = 64;
 
 export type Pan = { x: number; y: number };
 

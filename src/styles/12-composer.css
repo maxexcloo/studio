@@ -29,24 +29,39 @@
 /* The row never wraps any more: the ladder is what makes it fit. */
 .zen-inline-settings { flex-wrap: nowrap; }
 
-/* Workflow picker placeholder while models load: match the real trigger's
-   footprint (40px pill) so the bar keeps its height, and lift the shimmer
-   clear of the near-black composer ground so it does not read as empty. */
-.zen-inline-settings .composer-skeleton {
+/* The model button while models load: the same 40px pill on the same dark
+   as the real one, a soft bar where its name goes, and a light passing over
+   it. Outranks 22-accents' squared text skeletons. */
+.zen-inline-settings .skeleton.composer-skeleton {
+  position: relative;
+  overflow: hidden;
   width: 168px;
   height: 40px;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  background:
-    linear-gradient(110deg, hsl(0 0% 11%) 8%, hsl(0 0% 20%) 44%, hsl(0 0% 11%) 80%),
-    hsl(0 0% 11%);
-  background-size: 260% 100%;
-  /* .zen-inline-settings > * assigns the controlIn entrance here; restore the
-     shimmer (this selector outranks it) so the placeholder reads as loading. */
-  animation: skeletonShimmer 1.8s var(--ease-soft) infinite;
+  border: 0;
+  border-radius: 20px;
+  background: #090909;
+}
+.zen-inline-settings .skeleton.composer-skeleton::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 96px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / .09);
+}
+.zen-inline-settings .skeleton.composer-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / .05) 45%, rgb(255 255 255 / .08) 50%, rgb(255 255 255 / .05) 55%, transparent 75%);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 2.2s cubic-bezier(.4, 0, .2, 1) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .zen-inline-settings .composer-skeleton { animation: none; }
+  .zen-inline-settings .skeleton.composer-skeleton::after { animation: none; opacity: 0; }
 }
 
 /* --- Number pickers: label -> icon -> icon + value ------------------------ */
@@ -298,6 +313,8 @@
 }
 .zen-prompt-actions:not([data-density-level="0"]) .composer-estimate { display: none; }
 
+/* "2 LoRAs": the count, then the word. */
+.lora-pill-word { margin-left: 4px; }
 .model-loras { min-width: 0; margin: 12px 0; }
 .model-loras > h3 { margin: 0 0 8px; font-size: 13px; }
 .lora-filter { display: grid; gap: 6px; padding: 8px 0; }

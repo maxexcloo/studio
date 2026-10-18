@@ -32,6 +32,51 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Settings › Features › Inpainting says where its two dials are:** in the
   sidebar's Basics, under the image, not under Advanced.
 
+## [0.18.0] - 2026-10-17
+
+> Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
+
+### Added
+- **2K.** Pick 2K in the size menu and the model draws your picture at full
+  size in one go. The menu tells you if a model isn't made for it.
+- **A new size menu.** See the exact size before you make it, set your own
+  width and height, save sizes you use often, or pick a size in megapixels
+  (Settings › Generation).
+- **FLUX.3 Klein.** Black Forest Labs' newest model: fast, sharp, made for 2K,
+  and it can edit from up to three pictures. Its prompt helper turns a short
+  idea into a detailed one; it's recommended, not required.
+- **MOSS-Image.** Great at clear text in pictures. **Guided setup** shows what
+  it still needs.
+- **Edit or Reference.** On Flux.2 and Qwen-Image 2.1, choose whether your
+  first picture gets changed or only guides a new one.
+- **Docker.** Run HEISS with `docker compose up --build`
+  ([how](./docs/guides/DOCKER.md)).
+- **HEISS tells you why it stopped**, if it ever stops on its own.
+
+### Changed
+- **Upscaling moved to the picture.** New pictures aren't upscaled
+  automatically anymore. Use 2K, or the upscale arrow on any picture.
+- **Setup notices changes by itself.** Update ComfyUI or add nodes, and it
+  picks that up without a reload.
+- **Restart shows how it went.**
+- **Several references sit in one chip** and fan out on hover.
+- **Better time estimates** for big pictures.
+- **Generation details** can be copied as text and show your LoRAs.
+- **Find ComfyUI on its own** can be turned off in Settings › Connection.
+
+### Removed
+- Automatic upscaling of every new picture (see above).
+- The viewer's "Vary with a new seed" button.
+
+### Fixed
+- A busy ComfyUI no longer shows as offline.
+- Translators and browser extensions no longer crash the studio.
+- Flux.2 Klein 9B picks a text encoder that works.
+- The size menu stays still while you use it, and shows no 2K note without a
+  model.
+- 4K upscales and restarts on Windows work again.
+- Smaller fixes to references and saved sizes.
+
 ## [0.17.0] - 2026-10-09
 
 > Inpainting, auto-grouping and smart upscale built in
@@ -1122,7 +1167,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.14.0...v0.15.0

@@ -58,7 +58,7 @@ Until the public 1.0 release, versions stay at `0.x.y`:
 Before every release, on a real ComfyUI with GPU:
 
 1. Generate with three or four model families, including one all-in-one checkpoint and one model-only file.
-2. Run one Smart upscale (a 2K run and one from the upscale arrow) and one inpaint.
+2. Run one native 2K picture, one upscale from the upscale arrow and one inpaint.
 3. Unpack the release zip (`npm run package` builds it) in a fresh folder and start it with its launcher.
 4. Check that **Settings › About** shows the version and the update check answers.
 

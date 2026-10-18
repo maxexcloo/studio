@@ -1,3 +1,4 @@
+import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos } from './AnimatePhotos';
 import { PromptField } from './PromptField';
@@ -5,9 +6,9 @@ import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, Shuffle, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, settingsText } from './format';
+import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { useHorizontalWheel, useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -50,6 +51,7 @@ import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
 import { GetModelsSheet, StarterModels } from './StarterModels';
+import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
 import { FeedbackHost } from './FeedbackDialog';
 import { ShortcutsSheet } from './shortcuts';
@@ -103,6 +105,7 @@ function comfyStatusLabel(status: any) {
   const name = status?.label || "ComfyUI";
   if (status?.restarting) return `${name} is restarting…`;
   if (status?.checking) return `Checking ${name}…`;
+  if (status?.busy) return `${name} is busy${status.device ? ` · ${status.device}` : ""} · slow to answer, runs carry on`;
   if (status?.connected) {
     const detail = [status.device, status.latencyMs ? `${status.latencyMs}ms` : "", status.version ? `v${status.version}` : ""].filter(Boolean).join(" · ");
     return `${name} connected${detail ? ` · ${detail}` : ""}`;
@@ -130,11 +133,10 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 export function StudioView({ view }: { view: Record<string, any> }) {
   const { active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
-  const smartUpscaleTabs = mode === "image" && prefs.smartUpscale !== false;
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
-  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -329,6 +331,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [noComfyOpen, setNoComfyOpen] = React.useState(false);
   const [getModelsOpen, setGetModelsOpen] = React.useState(false);
   const openGetModels = React.useCallback(() => setGetModelsOpen(true), []);
+  // A guided setup (MOSS-Image), opened from a model's setup panel.
+  const [familySetup, setFamilySetup] = React.useState({ family: "", profileId: "" });
+  const [familySetupOpen, setFamilySetupOpen] = React.useState(false);
+  useFamilySetupRequests((request) => { setFamilySetup(request); setFamilySetupOpen(true); });
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   // "?" anywhere outside a field lists the keyboard shortcuts.
   React.useEffect(() => {
@@ -577,6 +583,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </>
   );
 
+  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={resetViewer} onFit={view.fitViewer} />;
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
@@ -614,8 +621,20 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               aspectValue={aspectValue}
               defaultAspectSize={defaultAspectSize}
               applyAspect={applyAspect}
-              autoUpscale={prefs.autoUpscale || "none"}
-              onAutoUpscaleChange={smartUpscaleTabs ? view.chooseAutoUpscale : undefined}
+              sizeTier={customSize ? "custom" : view.sizeTier}
+              sizeTiers={view.sizeTiers}
+              sizeArea={view.sizeArea}
+              megapixelControl={view.megapixelControl}
+              sizeMax={view.sizeMax}
+              customLimits={view.customLimits}
+              chooseSizeTier={view.chooseSizeTier}
+              applyCustomRatio={view.applyCustomRatio}
+              setCustomDimensions={view.setCustomDimensions}
+              savedSizes={view.savedSizes}
+              saveCustomSize={view.saveCustomSize}
+              renameSavedSize={view.renameSavedSize}
+              removeSavedSize={view.removeSavedSize}
+              pickSavedSize={view.pickSavedSize}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}
@@ -643,6 +662,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               comfyRetrying={Boolean(comfyRetrying)}
               referenceInputs={referenceInputs}
               referenceInpaint={referenceInpaint}
+              referenceRole={referenceRole}
               loraMismatch={view.loraMismatch}
               onDismissLoraMismatch={view.dismissLoraMismatch}
               referenceAssets={referenceAssets}
@@ -664,7 +684,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -739,9 +759,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           ) : null}
           {zenItem && !zenItem.run ? (
             <div className={cn("zen-zoom-dock", zenControls && "with-side")}>
-              <Tip content="Zoom Out (-)"><button className="icon-button" aria-label="Zoom Out" onClick={() => zoomViewer(viewerZoom - 0.25)} disabled={viewerZoom <= 0.5}><ZoomOut size={15} /></button></Tip>
-              <Tip content="Reset zoom (0)"><button className="text-button viewer-zoom" aria-label={`Reset zoom, now ${Math.round(viewerZoom * 100)}%`} onClick={resetViewer}>{viewerZoom !== 1 ? <RotateCcw size={13} /> : null} {Math.round(viewerZoom * 100)}%</button></Tip>
-              <Tip content="Zoom In (+)"><button className="icon-button" aria-label="Zoom In" onClick={() => zoomViewer(viewerZoom + 0.25)} disabled={viewerZoom >= 6}><ZoomIn size={15} /></button></Tip>
+              {zenDisplayItem.type === "image" ? imageZoomControls : null}
             </div>
           ) : null}
           {zenGallery.length && !zenGalleryOpen ? (
@@ -789,6 +807,18 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {settings ? <React.Suspense fallback={<Modal open title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
+      {familySetup.family ? (
+        <FamilySetupDialog
+          family={familySetup.family}
+          profileId={familySetup.profileId}
+          open={familySetupOpen}
+          onOpenChange={setFamilySetupOpen}
+          showToast={showToast}
+          onUse={view.pickModel}
+          onChanged={() => { view.refreshModels(false); view.refreshWorkflows(); }}
+          comfyUrl={health?.comfyUrl}
+        />
+      ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
       {advancedOpen ? <Modal open title="Advanced Settings" className="composer-advanced-modal" onOpenChange={setAdvancedOpen}><div className="composer-advanced-body">{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</div></Modal> : null}
@@ -850,7 +880,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onTouchEnd={endViewerTouch}
                   onTouchCancel={endViewerTouch}
                   onClick={clickViewer}
-                  onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > 1 ? 1 : 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
+                  onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > view.viewerNativeZoom * 1.05 ? view.viewerNativeZoom : view.viewerNativeZoom * 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
                   {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain">
@@ -888,27 +918,39 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           </div>
                         </div>
                       ) : null}
+                      {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        copied={viewerCopy.copied === "settings"}
                         onUseSettings={() => applyAllSettings(active)}
-                        onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <section className="settings-disclosure">
-                          <h3>Generation Settings</h3>
-                          {generationDetailEntries(active).map((section: { title: string; rows: Array<[string, string]> }) => (
+                          <div className="detail-heading"><h3>Generation Settings</h3><button type="button" className="detail-copy" aria-label="Copy Generation Settings" onClick={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}><CopyIcon copied={viewerCopy.copied === "settings"} size={13} /><span>{viewerCopy.copied === "settings" ? "Copied" : "Copy as Text"}</span></button></div>
+                          {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
-                              <div className="detail-grid">
-                                {section.rows.map(([key, value], index) => (
-                                  <React.Fragment key={`${key}-${index}`}>
-                                    <span>{key}</span><strong>{value}</strong>
-                                  </React.Fragment>
-                                ))}
-                              </div>
+                              {section.rows.length ? (
+                                <div className="detail-grid">
+                                  {section.rows.map(([key, value], index) => (
+                                    <React.Fragment key={`${key}-${index}`}>
+                                      <span>{key}</span><strong>{value}</strong>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {section.loras?.length ? (
+                                <ul className="detail-loras" aria-label="LoRAs">
+                                  {section.loras.map((lora, index) => (
+                                    <li key={`${lora.name}-${index}`} className="detail-lora">
+                                      <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
+                                      <i aria-hidden="true" />
+                                      <span className="detail-lora-strength" aria-label={`strength ${lora.strength}`}>{lora.strength}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
                             </div>
                           ))}
                         </section>
@@ -921,6 +963,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     {upscaleNotices?.get(active.id) ? (
                       <div className="viewer-phone-notice"><UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /></div>
                     ) : null}
+                    {active.type === "image" && !showDetails ? <div className="viewer-phone-zoom">{imageZoomControls}</div> : null}
                     <PhoneViewerBar
                       item={active}
                       actions={phoneItemActions}
@@ -932,9 +975,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   </>
                 ) : (
                 <div data-open-trigger className={cn("viewer-dock", showDetails && "with-side")}>
-                  <Tip content="Zoom Out (-)"><button className="icon-button is-zoom-control" aria-label="Zoom Out" onClick={() => zoomViewer(viewerZoom - 0.25)} disabled={viewerZoom <= 0.5}><ZoomOut size={15} /></button></Tip>
-                  <Tip content="Reset zoom (0)"><button className="text-button viewer-zoom is-zoom-control" aria-label={`Reset zoom, now ${Math.round(viewerZoom * 100)}%`} onClick={resetViewer}>{viewerZoom > 1 ? <RotateCcw size={13} /> : null} {Math.round(viewerZoom * 100)}%</button></Tip>
-                  <Tip content="Zoom In (+)"><button className="icon-button is-zoom-control" aria-label="Zoom In" onClick={() => zoomViewer(viewerZoom + 0.25)} disabled={viewerZoom >= 6}><ZoomIn size={15} /></button></Tip>
+                  {active.type === "image" ? imageZoomControls : null}
                   <span className="viewer-divider is-zoom-control" />
                   <Tip content={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"}><button className="icon-button" aria-label={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"} onClick={() => viewerCopy.copyWith(() => copyItemToClipboard(active), "item")}><CopyIcon copied={viewerCopy.copied === "item"} size={15} /></button></Tip>
                   {canStar(active) ? (
@@ -944,7 +985,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       </button>
                     </Tip>
                   ) : null}
-                  {active.status === "done" && active.url && !active.vaultLocked && !active.library ? <Tip content="Vary with a new seed"><button className="icon-button" aria-label="Vary This" onClick={() => view.varyItem(active)}><Shuffle size={15} /></button></Tip> : null}
                   {canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? <Tip content="Use as Reference Image"><button className="icon-button" aria-label="Use as Reference Image" onClick={() => useOutputAsStartImage(active)}><ImagePlus size={15} /></button></Tip> : null}
                   {prefs.smartUpscale !== false && canUpscaleItem(active) ? (
                     <span className="upscale-notice-anchor">

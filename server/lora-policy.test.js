@@ -72,3 +72,10 @@ test('packaged server catalogue imports and applies policy without a source tree
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test('FLUX.3 adapters fit built-in and imported Klein family identifiers', () => {
+  assert.equal(loraCompatibility({ families: ['flux3'] }, { family: 'flux3' }), 'fits');
+  assert.equal(loraCompatibility({ families: ['flux3'] }, { family: 'flux3_klein' }), 'fits');
+  assert.equal(loraCompatibility({ families: ['flux3_klein'] }, { family: 'flux3' }), 'fits');
+  assert.equal(loraCompatibility({ families: ['flux3'] }, { family: 'flux1' }), 'other');
+});

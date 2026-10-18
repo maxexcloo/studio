@@ -7,9 +7,10 @@ import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
 import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
-import type { MediaInput, ReferenceAsset, ReferenceInpaint, SelectedReferenceAsset } from "./types";
+import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
+import { showToastTone } from './toast';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
@@ -361,13 +362,114 @@ export function referenceName(name: string) {
   return name.replace(/\.[a-z0-9]{2,5}$/i, "") || name;
 }
 
+// The menu opens a beat after the pointer arrives and stays a moment after it
+// leaves, so passing over the chip or wobbling off its edge never flickers it.
+const hoverOpenDelay = 70;
+const hoverCloseDelay = 260;
+const inpaintIntroKey = "heiss-ui-inpaint-introduced";
+const inpaintIntroduced = () => { try { return localStorage.getItem(inpaintIntroKey) === "1"; } catch { return true; } };
+const coarsePointer = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+const noHoverQuery = "(hover: none)";
+/** A screen with no hover (a phone, a tablet without a trackpad), kept live: a trackpad can come and go. The CSS's always-shown × uses the same test. */
+function useNoHover() {
+  const [none, setNone] = React.useState(() => typeof window !== "undefined" && Boolean(window.matchMedia?.(noHoverQuery).matches));
+  React.useEffect(() => {
+    const query = window.matchMedia?.(noHoverQuery);
+    if (!query) return;
+    const update = () => setNone(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return none;
+}
+const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey, "1"); } catch { /* shown again next time, which is fine */ } };
+
+/** One of the other references in a stack: what it holds, and how to change or remove it. */
+type StackItem = { input: MediaInput; asset: ReferenceAsset; open: boolean; busy: boolean; progress: number; fresh: boolean; onOpen: () => void; onRemove: () => void };
+/**
+ * The references that follow the first one (a model that reads several): the
+ * first stays the chip in the corner, the others sit behind it as a deck and
+ * fan out into its strip, with a + for the next one (greyed once all are used).
+ */
+type ReferenceStack = {
+  items: StackItem[];
+  /** The next empty slot, or null when every slot holds a picture. */
+  add: { open: boolean; busy: boolean; progress: number; onOpen: () => void } | null;
+  max: number;
+  /** No + in Edit: it changes one picture. */
+  canAdd: boolean;
+  /** Open the strip for a moment, to show where a dropped picture went. */
+  intro: boolean;
+};
+
+const foldEase = "cubic-bezier(.16, 1, .3, 1)";
+/**
+ * Something in a row that comes and goes with a state switch (Edit | Reference): it stays
+ * mounted and folds to nothing, width and the row's gap with it, so its neighbours glide
+ * instead of jumping. Folded, it can't be reached by pointer, keyboard or screen reader.
+ */
+function Fold({ shown, children, gap = 6 }: { shown: boolean; children: React.ReactNode; gap?: number }) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const was = React.useRef(shown);
+  // Its width while shown, kept up to date: once folded (width 0) its content can be squeezed.
+  const openWidth = React.useRef(0);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && shown && !el.classList.contains("is-folding")) openWidth.current = el.offsetWidth;
+  });
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.inert = !shown;
+    const before = was.current;
+    was.current = shown;
+    if (before === shown || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Unfolding, it's back at its natural width to measure; folding, the last width it had.
+    const width = `${shown ? el.offsetWidth : openWidth.current}px`;
+    if (!shown && !openWidth.current) return;
+    const open = { width, marginLeft: "0px", opacity: 1, scale: "1" };
+    const shut = { width: "0px", marginLeft: `${-gap}px`, opacity: 0, scale: ".7" };
+    // Clipped only while it moves, so a focus ring or a corner × isn't cut off at rest.
+    el.classList.add("is-folding");
+    const animation = el.animate(shown ? [shut, open] : [open, shut], { duration: 340, easing: foldEase });
+    const done = () => el.classList.remove("is-folding");
+    animation.onfinish = done;
+    animation.oncancel = done;
+    return () => animation.cancel();
+  }, [shown, gap]);
+  return <span ref={ref} className={cn("ref-fold", !shown && "is-folded")} style={{ "--fold-gap": `${-gap}px` } as React.CSSProperties} aria-hidden={!shown || undefined}>{children}</span>;
+}
+
+const fullMessage = (max: number) => `Up to ${max} references. Remove one to add another`;
+
+/** The + for another reference: greyed, with why, once every slot is used. */
+function AddMore({ max, add, className, size = 15 }: { max: number; add: ReferenceStack["add"]; className: string; size?: number }) {
+  if (add?.busy) return <span className={cn(className, "is-busy")} aria-live="polite"><LoaderCircle className="spin" size={size} /></span>;
+  return (
+    <Tip content={add ? "Add another reference, or drop one on the prompt" : fullMessage(max)}>
+      <button
+        type="button"
+        data-open-trigger={add ? true : undefined}
+        className={cn(className, add?.open && "is-open", !add && "is-full")}
+        aria-label={add ? "Add another reference" : fullMessage(max)}
+        aria-disabled={!add || undefined}
+        aria-expanded={add ? add.open : undefined}
+        onClick={() => add ? add.onOpen() : showToastTone(fullMessage(max), "default")}
+      >
+        <Plus size={size} strokeWidth={2.2} />
+      </button>
+    </Tip>
+  );
+}
+
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
  * introduces itself as "Add Reference" (or "Add Start Image" for plain
  * image-to-image). With an
  * image it becomes a large thumbnail with visible remove and paint actions.
  */
-function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, onOpen, onRemove }: {
+function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, stack = null, guide = false, onOpen, onRemove }: {
   input: MediaInput;
   selected: ReferenceAsset | null;
   open: boolean;
@@ -375,7 +477,13 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
   progress: number;
   fresh: boolean;
   /** Painting on this image, for a model that can inpaint: the studio's state and how to open it. */
-  paint?: { masked: boolean; open: boolean; onOpen: () => void } | null;
+  paint?: { masked: boolean; open: boolean; intro: boolean; hidden?: boolean; onOpen: () => void } | null;
+  /** For a reference that can frame the output: edit this image, or only use it as a reference. */
+  role?: ReferenceRoleControl | null;
+  /** The references after this one, folded behind it (desktop only; a phone lays them out in a row). */
+  stack?: ReferenceStack | null;
+  /** A later reference while the first is edited: it isn't changed, only drawn from. */
+  guide?: boolean;
   onOpen: () => void;
   onRemove: () => void;
 }) {
@@ -384,6 +492,30 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
   React.useEffect(() => { setBroken(false); }, [image]);
   const required = Boolean(input.required || (input.min || 0) > 0);
   const isStart = input.role === "start";
+  const [hover, setHover] = React.useState(false);
+  const hoverTimer = React.useRef(0);
+  React.useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  // The brush folds by its measured width: the menu sizes to its content, where CSS can't tween to "auto".
+  const paintSlot = React.useRef<HTMLSpanElement>(null);
+  const paintWidth = React.useRef(0);
+  const paintHidden = Boolean(paint?.hidden);
+  const paintWasHidden = React.useRef(paintHidden);
+  React.useLayoutEffect(() => {
+    const slot = paintSlot.current;
+    if (!slot) return;
+    const was = paintWasHidden.current;
+    paintWasHidden.current = paintHidden;
+    if (!paintHidden) paintWidth.current = slot.scrollWidth;
+    if (was === paintHidden || !paintWidth.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const open = `${paintWidth.current}px`;
+    slot.animate({ width: paintHidden ? [open, "0px"] : ["0px", open] }, { duration: 320, easing: "cubic-bezier(.16, 1, .3, 1)" });
+  });
+  const hoverTo = (next: boolean, event: React.PointerEvent) => {
+    if (event.pointerType === "touch") return;
+    window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => setHover(next), next ? hoverOpenDelay : hoverCloseDelay);
+  };
+
   const label = isStart ? "Reference Image" : input.label || "Reference image";
 
   if (busy) {
@@ -413,20 +545,97 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
     );
   }
 
+  // The thumbnail is the anchor and says what the image is at rest: EDIT when it's the picture
+  // being changed, a deck behind it when others come with it. The strip that grows out of it on
+  // hover holds the choices (Edit | Reference, the brush) and the other references with a + for more.
+  const menu = Boolean(role || paint || stack);
+  const many = Boolean(stack?.items.length);
+  const editing = role?.value === "edit";
+  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}${guide ? " · Not edited, only drawn from" : ""}`;
+  const stackOpen = Boolean(stack && (stack.add?.open || stack.items.some((item) => item.open)));
   return (
-    <div className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", fresh && "is-new")}>
-      <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open} title={selected.name}>
-        {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => {
-          // An older thumbnail can expire independently of the full reference.
-          if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url;
-          else setBroken(true);
-        }} /> : selected.source === "vault" ? <LockKeyhole size={20} /> : <ImageIcon size={22} />}
-      </button>
-      <button type="button" className="ref-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={13} /></button>
-      {paint ? <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
-        <button type="button" className={cn("ref-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} onClick={paint.onOpen}><Brush size={15} /></button>
-      </Tip> : null}
+    <div
+      className={cn("ref-chip ref-selected", (open || paint?.open || stackOpen) && "is-open", hover && "is-hover", (paint?.intro || stack?.intro) && "is-intro", fresh && "is-new", editing && "is-edit", many && "has-deck")}
+      onPointerEnter={(event) => hoverTo(true, event)}
+      onPointerLeave={(event) => hoverTo(false, event)}
+    >
+      {/* The menu reveals leftward from behind the thumbnail with a clip-path, so
+          nothing reflows and the thumbnail never moves. */}
+      {menu ? <div className="ref-menu">
+        {role ? <RoleSwitch role={role} many={many} /> : null}
+        {paint ? (
+          // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
+          <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
+            {role ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
+            <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
+              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
+                <Brush size={17} />
+                <span className="ref-menu-paint-label"><span>{coarsePointer() ? "Tap" : "Click"} to inpaint</span></span>
+              </button>
+            </Tip>
+          </span>
+        ) : null}
+        {stack ? (
+          <span className="ref-stack">
+            {/* The divider goes with the last thing after it: in Edit with no other pictures, nothing is. */}
+            {role || paint ? <Fold shown={stack.items.length > 0 || stack.canAdd} gap={0}><span className="ref-menu-divider" aria-hidden="true" /></Fold> : null}
+            {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} guide={editing} />)}
+            <Fold shown={stack.canAdd}><AddMore max={stack.max} add={stack.add} className="ref-stack-add" /></Fold>
+          </span>
+        ) : null}
+      </div> : null}
+      {/* The others peek out from behind the thumbnail, so it says "and more" at rest. */}
+      {stack?.items.slice(0, 2).map((item, index) => {
+        const src = assetImage(item.asset);
+        return <i key={item.input.id} className={cn("ref-deck-card", `is-${index + 1}`)} aria-hidden="true" style={src ? { backgroundImage: `url("${src.replace(/"/g, "%22")}")` } : undefined} />;
+      })}
+      <Tip content={`${name} · Click to change`}>
+        <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+          {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
+        </button>
+      </Tip>
+      {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Reference; Undo is in its toast. */}
+      <Tip content={`Remove ${label.toLowerCase()}`}>
+        <button type="button" className="ref-thumb-remove" aria-label={`Remove ${label.toLowerCase()}`} onClick={onRemove}><X size={10} strokeWidth={2.8} /></button>
+      </Tip>
+      {paint?.masked ? <i className="ref-mask-badge" aria-hidden="true"><Brush size={9} strokeWidth={2.6} /></i> : null}
+      {/* The picture being edited is the one that's different from the rest: Ref leaves every image a plain reference. */}
+      {role ? <i className={cn("ref-role-badge", editing && "is-on")} aria-hidden="true">EDIT</i> : null}
     </div>
+  );
+}
+
+/** Edit | Reference: one thumb slides between the two, like the size menu's tabs. */
+export function RoleSwitch({ role, many, className }: { role: ReferenceRoleControl; many: boolean; className?: string }) {
+  return (
+    <div className={cn("ref-menu-role", role.value === "reference" && "is-ref", role.locked && "is-locked", className)} role="radiogroup" aria-label="What this image is">
+      <i aria-hidden="true" />
+      <Tip content={many ? "Change the first picture, at its size and framing. The others are what it can draw from" : "Change this picture: the result keeps its size and framing"}>
+        <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>
+      </Tip>
+      <Tip content={role.locked ? "The painted part is changed in this picture. Clear the paint to use it as a reference" : many ? "Let them all guide a new picture, at the size you picked" : "Let it guide a new picture, at the size you picked"}>
+        <button type="button" role="radio" aria-checked={role.value === "reference"} aria-disabled={role.locked || undefined} className={cn(role.value === "reference" && "is-active")} onClick={() => { if (!role.locked) role.onChange("reference"); }}>Reference</button>
+      </Tip>
+    </div>
+  );
+}
+
+/** Another reference in the stack's strip: click to change it, × to take it off. */
+function StackThumb({ item, number, guide }: { item: StackItem; number: number; /** Edit: it isn't changed, only drawn from. */ guide: boolean }) {
+  const src = assetImage(item.asset);
+  const [broken, setBroken] = React.useState(false);
+  React.useEffect(() => { setBroken(false); }, [src]);
+  return (
+    <span className={cn("ref-stack-item", item.open && "is-open", item.fresh && "is-new")}>
+      <Tip content={`Reference ${number}: ${referenceName(item.asset.name)}${guide ? " · Not edited, only drawn from" : ""} · Click to change`}>
+        <button type="button" data-open-trigger className="ref-stack-thumb" aria-label={`Change reference ${number}, currently ${item.asset.name}`} aria-expanded={item.open} onClick={item.onOpen}>
+          {item.busy ? <LoaderCircle className="spin" size={14} /> : src && !broken ? <img src={src} alt="" draggable={false} onError={() => setBroken(true)} /> : item.asset.source === "vault" ? <LockKeyhole size={13} /> : <ImageIcon size={14} />}
+        </button>
+      </Tip>
+      <Tip content={`Remove reference ${number}`}>
+        <button type="button" className="ref-stack-remove" aria-label={`Remove reference ${number}`} onClick={item.onRemove}><X size={9} strokeWidth={2.8} /></button>
+      </Tip>
+    </span>
   );
 }
 
@@ -436,10 +645,11 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, on
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ scope = "image", inputs, inpaint = null, selected, onSelect, onRemove, confirmDelete, onError }: {
+export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError }: {
   scope?: string;
   inputs: MediaInput[];
   inpaint?: ReferenceInpaint | null;
+  role?: ReferenceRoleControl | null;
   selected: SelectedReferenceAsset[];
   onSelect: (slot: string, asset: ReferenceAsset) => void;
   onRemove: (slots: string | string[]) => void;
@@ -455,6 +665,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
   if (!memories.current.has(scope)) memories.current.set(scope, pickerMemory());
   const memory = memories.current.get(scope)!;
   const [openSlot, setOpenSlot] = React.useState("");
+  const noHover = useNoHover();
   const [uploadSlot, setUploadSlot] = React.useState("");
   const [progress, setProgress] = React.useState(0);
   const uploading = React.useRef(false);
@@ -489,6 +700,18 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
   React.useEffect(() => { if (!inpaint) setPainting(false); }, [inpaint]);
   const paintedAsset = inpaint ? selected.find((item) => item.slot === inpaint.slot)?.asset || null : null;
   React.useEffect(() => { setPainting(false); }, [paintedAsset?.id]);
+  // Ref only guides a new picture, so there is nothing of this image to paint: Ref closes the brush studio.
+  const asRef = role?.value === "reference";
+  React.useEffect(() => { if (asRef) setPainting(false); }, [asRef]);
+  // The first image that can be painted on shows where the brush is, once, by opening its menu for a moment.
+  const [introSlot, setIntroSlot] = React.useState("");
+  React.useEffect(() => {
+    // Not while it's a Ref: the brush is folded away, and the one-time intro would be spent on nothing.
+    if (!inpaint || !paintedAsset || asRef || inpaintIntroduced()) return;
+    const start = window.setTimeout(() => setIntroSlot(inpaint.slot), 500);
+    const end = window.setTimeout(() => { setIntroSlot(""); rememberInpaintIntro(); }, 3600);
+    return () => { window.clearTimeout(start); window.clearTimeout(end); setIntroSlot(""); };
+  }, [inpaint?.slot, paintedAsset?.id, asRef]);
   // Find the prompt bar whenever this renders into it. On first mount there may be
   // no inputs yet (the workflow is still loading), so nothing is rendered to look from.
   React.useLayoutEffect(() => {
@@ -498,12 +721,43 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
   });
 
   const assetFor = (slot: string) => selected.find((item) => item.slot === slot)?.asset || null;
+  // What's picked now, for a removal's Undo, which runs later.
+  const selectedNow = React.useRef(selected);
+  selectedNow.current = selected;
+  // Slots that follow one another (a model that reads several references) form one chain: the
+  // first is the chip, the rest its stack. Independent inputs (a custom workflow's) stand alone.
+  // Edit changes one picture: no slot for another (the ones already there stay, to draw from; Ref adds more).
+  const editOnly = role?.value === "edit";
+  const usable = editOnly ? inputs.filter((input) => !input.follows || assetFor(input.id)) : inputs;
+  // Every slot is laid out either way; what Edit leaves out folds away (Fold), so the switch glides.
+  const chains: MediaInput[][] = [];
+  for (const input of inputs) {
+    const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
+    if (chain) chain.push(input); else chains.push([input]);
+  }
+  // A phone, or a screen without hover, lays the stack out in a row: there's nothing to hover open.
+  const phone = Boolean(host?.classList.contains("phone-create"));
+  const inline = phone || noHover;
+  // New images go to the slot that's open, else the first empty one. With every one of several
+  // references used, a new one replaces none of them (least of all the picture being edited);
+  // a single slot, or a workflow's own inputs, swap the first.
+  const chained = inputs.some((input) => input.follows);
+  const targetSlot = () => openSlot || usable.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
+  const maxReferences = Math.max(1, ...chains.map((chain) => chain.length));
+  // The picker open on a slot that's no longer offered (Edit, or the picture before it removed):
+  // close it, so nothing lands there and a later paste doesn't reopen it.
+  const usableIds = usable.map((input) => input.id).join(" ");
+  React.useEffect(() => {
+    if (openSlot && !usableIds.split(" ").includes(openSlot)) setOpenSlot("");
+  }, [openSlot, usableIds]);
+  const blockedMessage = editOnly ? "Edit changes one picture. Switch to Reference to add more" : fullMessage(maxReferences);
+
   // Explicit replacement targets win; otherwise add to the first free slot.
   const uploadFiles = React.useCallback(async (files: File[], preferred = "") => {
     if (uploading.current || !files.length) return null;
     const images = files.filter(isImageFile);
     if (!images.length) { onError?.("Choose an image file"); return null; }
-    const empty = inputs.filter((input) => !selected.some((item) => item.slot === input.id)).map((input) => input.id);
+    const empty = usable.filter((input) => !selected.some((item) => item.slot === input.id)).map((input) => input.id);
     const targets = preferred ? [preferred, ...empty.filter((id) => id !== preferred)] : empty;
     if (!targets.length) { onError?.("All reference slots are filled. Remove an image or drop onto a thumbnail to replace it."); return null; }
     if (images.length > targets.length) onError?.(`This model has room for ${targets.length} more reference ${targets.length === 1 ? "image" : "images"}. Extra files were skipped.`);
@@ -518,7 +772,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
         setProgress(0);
         try {
           const asset = await uploadReferenceAsset(file, setProgress);
-          if (!current()) return null;
+          if (!current() || !usableIds.split(" ").includes(slot)) return null;
           onSelect(slot, asset);
           setFreshSlot(slot);
           latest = asset;
@@ -617,30 +871,75 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, select
   const count = inputs.filter((input) => assetFor(input.id)).length;
   const revision = context.current.revision;
   const openInput = inputs.find((input) => input.id === openSlot) || null;
+  const openFor = (id: string) => () => { setPainting(false); setOpenSlot((current) => current === id ? "" : id); };
+  // Undo puts every picture back where it was: the ones after it closed up into its slot. Only onto
+  // what the removal left, though: a picture added since (or another model's slots) would be overwritten.
+  const ids = (items: SelectedReferenceAsset[]) => items.map((item) => item.asset.id).join(" ");
+  const removeFor = (input: MediaInput) => () => {
+    const asset = assetFor(input.id);
+    const before = selected.slice();
+    const left = ids(before.filter((item) => item.slot !== input.id));
+    onRemove(input.id);
+    if (asset) showToastTone(`Removed ${(input.label || "reference image").toLowerCase()}`, "removed", { action: { label: "Undo", onClick: () => {
+      if (ids(selectedNow.current) !== left) { showToastTone("The references changed since, so there’s nothing to undo", "default"); return; }
+      before.forEach((item) => onSelect(item.slot, item.asset));
+    } } });
+  };
+  const renderSlot = (input: MediaInput, stack: ReferenceStack | null, guide = false) => (
+    <ReferenceSlot
+      key={input.id}
+      input={input}
+      selected={assetFor(input.id)}
+      open={openSlot === input.id}
+      busy={uploadSlot === input.id}
+      progress={progress}
+      fresh={freshSlot === input.id}
+      stack={stack}
+      guide={guide}
+      // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
+      paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+        hidden: role?.slot === input.id && role.value === "reference",
+        masked: Boolean(inpaint.mask),
+        open: painting,
+        intro: introSlot === input.id,
+        onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
+      } : null}
+      role={role && role.slot === input.id && assetFor(input.id) ? role : null}
+      onOpen={openFor(input.id)}
+      onRemove={removeFor(input)}
+    />
+  );
 
   const tools = host?.querySelector(".composer-reference-tools");
   const slots = (
-      <div className="composer-reference-slots" ref={slotsRef} role="group" aria-label="Reference Images">
+      <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef} role="group" aria-label="Reference Images">
         {inputs.length > 1 ? <span className="reference-count" aria-live="polite">{count}/{inputs.length} References</span> : null}
         <div className="reference-slot-list">
-        {visibleInputs.map((input) => (
-          <ReferenceSlot
-            key={input.id}
-            input={input}
-            selected={assetFor(input.id)}
-            open={openSlot === input.id}
-            busy={uploadSlot === input.id}
-            progress={progress}
-            fresh={freshSlot === input.id}
-            paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
-              masked: Boolean(inpaint.mask),
-              open: painting,
-              onOpen: () => { setOpenSlot(""); setPainting((current) => !current); }
-            } : null}
-            onOpen={() => { setPainting(false); setOpenSlot((current) => current === input.id ? "" : input.id); }}
-            onRemove={() => onRemove(input.id)}
-          />
-        ))}
+        {/* No hover to open the strip (a tablet, the full studio on a phone): Edit | Reference in plain
+            sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
+        {inline && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
+        {chains.flatMap((chain) => {
+          const [lead, ...rest] = chain;
+          const stacked = Boolean(role) && !inline && rest.length > 0 && Boolean(assetFor(lead.id));
+          const filled = rest.filter((input) => assetFor(input.id));
+          const next = rest.find((input) => !assetFor(input.id)) || null;
+          const stack: ReferenceStack | null = stacked ? {
+            items: filled.map((input) => ({ input, asset: assetFor(input.id)!, open: openSlot === input.id, busy: uploadSlot === input.id, progress, fresh: freshSlot === input.id, onOpen: openFor(input.id), onRemove: removeFor(input) })),
+            add: next ? { open: openSlot === next.id, busy: uploadSlot === next.id, progress, onOpen: openFor(next.id) } : null,
+            max: chain.length,
+            canAdd: !editOnly,
+            // Open while one uploads into it too, so its progress shows (it's in the strip).
+            intro: rest.some((input) => freshSlot === input.id || uploadSlot === input.id)
+          } : null;
+          const shown = stacked ? [lead] : chain;
+          // In a row, every slot of a full chain is used: a greyed + says how many it takes.
+          // Edit folds the row's empty slot and this + away (Fold), rather than dropping them.
+          const full = !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
+          return [
+            ...shown.map((input) => input === lead ? renderSlot(input, stack) : <Fold key={input.id} shown={!editOnly || Boolean(assetFor(input.id))}>{renderSlot(input, null, editOnly)}</Fold>),
+            ...(full ? [<Fold key={`${lead.id}:full`} shown={!editOnly}><AddMore max={chain.length} add={null} className="ref-chip ref-add" /></Fold>] : [])
+          ];
+        })}
         </div>
       </div>
   );

@@ -70,7 +70,7 @@ export class McpMedia {
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
-    const { profile_id, prompts, loras = [], reference_asset_ids = [], count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
+    const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles()).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
@@ -93,6 +93,10 @@ export class McpMedia {
     const slots = profile.mediaInputs || [];
     if (reference_asset_ids.length > slots.length || slots.some((slot, index) => slot.required && !reference_asset_ids[index])) throw new Error('Supply the references required by this profile.');
     for (const id of reference_asset_ids) this.own(owner, id, 'assets');
+    if (reference_role !== undefined) {
+      if (!reference_asset_ids.length || profile.aspectPolicy !== 'reference' || !String(profile.workflow || '').startsWith('family:')) throw new Error('Edit or Reference requires references on a supported built-in profile.');
+      controls.referenceRole = reference_role;
+    }
     if (upscale_quality) {
       if (profile.kind !== 'image') throw new Error('Smart upscale requires an image profile.');
       controls.autoUpscale = { quality: upscale_quality, faceDetail: face_detail };
@@ -101,6 +105,8 @@ export class McpMedia {
     if (prompts.length * runs > 4) throw new Error('Submit at most four jobs at a time.');
     const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: loras.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
+    // Native 2K decodes in tiles, matching the browser’s generation path.
+    if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;
     const queued = [];
     for (const prompt of prompts) for (let variant = 0; variant < runs; variant++) {
       const id = crypto.randomUUID();

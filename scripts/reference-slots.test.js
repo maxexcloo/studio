@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { arrangeReferences, withReference, withoutReferences } from "../src/app/referenceSlots.js";
+import { arrangeReferences, referenceRoleFor, withReference, withoutReferences } from "../src/app/referenceSlots.js";
 
 // Flux.2-style slots, as server/family-profiles.js referenceSlots(3) builds them.
 const three = [
@@ -50,4 +50,16 @@ test("duplicates and empty entries are dropped; no slots keeps nothing", () => {
   assert.deepEqual(ids(arrangeReferences(picked, three)), ["reference=a"]);
   assert.deepEqual(arrangeReferences(picked, []), []);
   assert.deepEqual(arrangeReferences(undefined, three), []);
+});
+
+test("Reference only applies where the switch is offered; elsewhere, and with a mask, it's an edit", () => {
+  const flux2 = { aspectPolicy: "reference", workflow: "family:flux2" };
+  assert.equal(referenceRoleFor(flux2, "reference"), "reference");
+  assert.equal(referenceRoleFor(flux2, "edit"), "edit");
+  assert.equal(referenceRoleFor(flux2, undefined), "edit");
+  assert.equal(referenceRoleFor(flux2, "reference", true), "edit", "a painted mask edits");
+  // A bundled edit workflow framed by its reference has no switch: Reference picked on Flux.2 must not carry over.
+  assert.equal(referenceRoleFor({ aspectPolicy: "reference", workflow: "flux2-real-dream-image-edit.json" }, "reference"), "edit");
+  assert.equal(referenceRoleFor({ workflow: "family:sdxl" }, "reference"), "edit");
+  assert.equal(referenceRoleFor(null, "reference"), "edit");
 });

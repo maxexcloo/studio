@@ -8,7 +8,11 @@
  *       that prove it is loaded), commit and ref (the reviewed version HEISS
  *       installs, see below), search (optional: what finds it in Manager's
  *       node list), manager (optional: its id there, so one click can queue
- *       the install in Manager), note (optional, one line for the panel) }
+ *       the install in Manager), note (optional, one line for the panel),
+ *       subdir (optional: where the pack sits inside its repository, for
+ *       makers who ship it next to their model code; only that folder lands
+ *       in custom_nodes), requirements (false when the pack has no
+ *       requirements.txt, so the terminal steps leave pip out) }
  *
  * commit pins the exact code a one-click install clones: a pack's moving
  * branch could change under us, and whatever lands in custom_nodes runs with
@@ -86,6 +90,22 @@ export const nodePacks = {
     ref: "main, 2024-08-15",
     nodes: ["CheckpointLoaderNF4"],
     note: "bitsandbytes runs on NVIDIA GPUs only."
+  },
+  // OpenMOSS's own MOSS-Image loaders (Comfy Registry "moss-image", publisher mosi). Its model
+  // supports the layer skip MOSS-Image's makers sample with; ComfyUI's built-in one doesn't yet.
+  // Loads the official Diffusers folder; needs a ComfyUI with Qwen3.5 (0.38 or newer).
+  moss_image: {
+    name: "MOSS-Image",
+    repository: "https://github.com/OpenMOSS/MOSS-Image.git",
+    subdir: "comfyui/moss-image",
+    folder: "moss-image",
+    search: "MOSS-Image",
+    manager: "moss-image",
+    commit: "c1355e6b1986dfe8fba3c0455783a05899212342",
+    ref: "0.1.1 (main, 2026-10-16)",
+    requirements: false,
+    nodes: ["MOSSImageHFLoader"],
+    note: "From MOSS-Image’s makers. It needs ComfyUI 0.38 or newer."
   }
 };
 

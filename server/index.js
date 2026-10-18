@@ -3,7 +3,9 @@ import "./data-snapshot.js";
 import { createJobRecovery } from "./job-recovery.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
-import { addProbe, logDir } from "./crash-log.js";
+import { addProbe, logDir, logWarning } from "./crash-log.js";
+import { noteAlive, startSession } from "./exit-record.js";
+import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
@@ -23,8 +25,8 @@ import { promisify } from "node:util";
 import { printBanner } from './banner.js';
 import { releaseStatus, requestRestart, saveUpdatePrefs, startReleaseUpdate, warmReleaseCheck } from './updater.js';
 import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
-import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
-import { canAdmin, clientOf, deviceSession } from './access.js';
+import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
+import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
@@ -48,8 +50,11 @@ import { loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
-import { findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
-import { loadWorkflowPreferences, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
+import { starterPlan } from './starter-models.js';
+import { familySetupPlan, guidedSetups } from './family-setup.js';
+import { setDismissed } from './dismissals.js';
+import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
+import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
 import { encryptionKeyFromRequest, isPrivacyEnabled, revealGalleryItemsForRequest } from './privacy.js';
 import { findVaultItem, patchVaultItem } from './vault.js';
@@ -64,7 +69,7 @@ import { upscaleWork } from './upscale-timing.js';
 import { comfyRootDir, packInstallPlan } from './node-install.js';
 import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-folders.js';
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
-import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, uploadUpscaleVideoSource } from './upscale.js';
+import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, upscaleTargets, uploadUpscaleVideoSource } from './upscale.js';
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
@@ -347,7 +352,10 @@ app.get("/api/estimate", (req, res) => {
     height: Number(query.height) || 0,
     count: Number(query.count) || 1,
     steps: Number(query.steps) || 0,
-    frames: Number(query.frames) || 0
+    frames: Number(query.frames) || 0,
+    // What else changes the time: images it reads, and a native size's tiled decode.
+    refs: Number(query.refs) || 0,
+    tiledDecode: query.tiled === "1"
   };
   const now = Date.now();
   const estimate = generationEstimate(body, { now });
@@ -356,7 +364,7 @@ app.get("/api/estimate", (req, res) => {
   const rest = runs > 1 ? generationEstimate(body, { now, warm: true }) : null;
   // Smart upscale is part of each run: its time, from the upscales this machine has made, is added to every one.
   const upscaleQuality = body.kind === "image" && upscaleQualities.includes(query.upscale) ? query.upscale : "";
-  const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality }) : null;
+  const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality, target: Number(query.upscaleTarget) || 0 }) : null;
   const upscale = plan ? upscaleEstimate({ quality: upscaleQuality, faceDetail: query.faceDetail === "1", work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight, count: body.count }) }) : null;
   const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
   const backend = process.env.COMFY_VIDEO_URL && isLocalVideoProfile(body) ? "video" : "primary";
@@ -383,13 +391,23 @@ app.get("/api/diagnostics", async (_req, res) => {
   const install = fs.existsSync(path.join(root, ".git"))
     ? `Git checkout${since?.commits ? `, ${since.tag} + ${since.commits}` : ""}`
     : fs.existsSync(path.join(root, "release.json")) ? "release" : "";
-  const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(3000) }).then((response) => (response.ok ? response.json() : null), () => null);
-  const report = diagnostics({ version: appVersion, install, stats, comfyLocal: comfyIsLocal() });
+  // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
+  let comfyBusy = false;
+  const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then((response) => (response.ok ? response.json() : null), (error) => { comfyBusy = isComfyTimeout(error); return null; });
+  const report = diagnostics({ version: appVersion, install, stats, comfyBusy, comfyLocal: comfyIsLocal() });
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
 
 // When this server process started, so the app can tell a restart (e.g. after an update) happened.
 const serverStartedAt = Date.now();
+// How the last run ended, when it went wrong (exit-record.js): told once in the studio, via /api/health.
+// Read once listening: a second copy that finds this one running must not take over its record.
+let previousExit = null;
+function beginSession() {
+  previousExit = startSession({ now: serverStartedAt });
+  if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
+  setInterval(() => noteAlive(), 60_000).unref();
+}
 
 // The latest lines of today's log (crash-log.js), for the crash kit and bug reports. This computer only.
 app.get("/api/logs", (req, res) => {
@@ -407,9 +425,9 @@ app.get("/api/health", async (req, res) => {
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
-    res.json({ ok: true, comfyUrl, startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer });
+    res.json({ ok: true, comfyUrl, comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   } catch (error) {
-    res.status(503).json({ ok: false, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt });
+    res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   }
 });
 
@@ -425,26 +443,41 @@ function adoptFoundComfy(found) {
   return true;
 }
 
+// What the last answer said, for the status while ComfyUI is busy.
+let lastComfyAnswer = { url: "", version: "", device: "" };
+const backendAnswers = new Map();
+
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
   if (configuredBackends().length > 1) {
     const started = performance.now();
     const names = configuredBackends();
-    const results = await Promise.allSettled(names.map((backend) => withComfyBackend(backend, () => comfy("/system_stats", { timeout: 1500 }))));
-    const backends = Object.fromEntries(results.map((result, index) => [names[index], {
-      connected: result.status === "fulfilled",
-      device: result.status === "fulfilled" ? result.value?.devices?.[0]?.name || "" : "",
-      url: withComfyBackend(names[index], () => activeComfyUrl()),
-      ...(result.status === "rejected" ? { error: "Not connected" } : {})
-    }]));
+    const sentAt = Date.now();
+    const results = await Promise.all(names.map((backend) => withComfyBackend(backend, async () => {
+      const url = activeComfyUrl();
+      try {
+        const stats = await comfy("/system_stats", { timeout: 1500 });
+        const answer = { busy: false, connected: true, device: stats?.devices?.[0]?.name || "", url, version: stats?.system?.comfyui_version || "" };
+        backendAnswers.set(backend, answer);
+        return answer;
+      } catch (error) {
+        const restarting = backend === "primary" && comfyRestarting();
+        const busy = !restarting && isComfyTimeout(error) && noteComfySilent(sentAt).busy;
+        const known = backendAnswers.get(backend);
+        return { busy: Boolean(busy), connected: Boolean(busy), device: busy && known?.url === url ? known.device : "", version: busy && known?.url === url ? known.version : "", url, ...(busy ? {} : { error: "Not connected" }) };
+      }
+    })));
+    const backends = Object.fromEntries(results.map((result, index) => [names[index], result]));
     return res.json({
       connected: Object.values(backends).some((backend) => backend.connected),
       backends,
+      ...restartFields(),
       device: Object.entries(backends).filter(([, backend]) => backend.connected).map(([name, backend]) => `${name === "video" ? "Video" : "Images"}: ${backend.device}`).join(" · "),
       latencyMs: Math.round(performance.now() - started),
       url: comfyUrl
     });
   }
   const startedAt = performance.now();
+  const sentAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -457,12 +490,14 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     }
     const stats = await response.json();
     const device = stats?.devices?.[0]?.name || "";
+    const version = stats?.system?.comfyui_version || "";
+    lastComfyAnswer = { url: comfyUrl, version, device };
     res.json({
       ...restartFields(),
       connected: true,
       url: comfyUrl,
       latencyMs,
-      version: stats?.system?.comfyui_version || "",
+      version,
       device,
       ...(res.locals.foundComfy ? { found: res.locals.foundComfy } : {})
     });
@@ -472,17 +507,29 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
       res.json({ connected: true, isMock: true, url: comfyUrl, latencyMs: 0, device: "Demo mode" });
       return;
     }
-    // A timeout counts here too: this poll is the app asking whether ComfyUI is there.
-    noteComfyFetchError(error?.name === "AbortError" ? new Error("timed out") : error);
-    // Not at this address: on this computer it may well be on the other usual port (Desktop uses 8000).
-    const found = comfyRestarting() || res.locals.foundComfy ? "" : await findComfyNow(comfyUrl);
+    // It took the connection but hasn't answered: busy (comfy.js), not gone.
+    // Its runs carry on, so the studio stays connected, and nothing goes
+    // looking for another ComfyUI to replace it.
+    if (isComfyTimeout(error) && !comfyRestarting()) {
+      const silent = noteComfySilent(sentAt);
+      if (silent.first) logWarning("ComfyUI is slow to answer", { url: comfyUrl, waitedMs: Date.now() - sentAt });
+      if (silent.busy) {
+        const known = lastComfyAnswer.url === comfyUrl ? lastComfyAnswer : {};
+        res.json({ ...restartFields(), connected: true, busy: true, url: comfyUrl, version: known.version || "", device: known.device || "" });
+        return;
+      }
+    }
+    // A timeout that outlasted the grace counts too: this poll is the app asking whether ComfyUI is there.
+    noteComfyFetchError(isComfyTimeout(error) ? new Error("timed out") : error);
+    // Refused: on this computer it may well be on the other usual port (Desktop uses 8000).
+    const found = comfyRestarting() || res.locals.foundComfy || isComfyTimeout(error) ? "" : await findComfyNow(comfyUrl);
     if (found && adoptFoundComfy(found)) {
       res.locals.foundComfy = found;
       return comfyStatus(req, res);
     }
     const latencyMs = Math.round(performance.now() - startedAt);
-    const message = error?.name === "AbortError" ? "Connection timed out" : error?.message || "Connection failed";
-    res.json({ connected: false, isMock: demoMode, url: comfyUrl, latencyMs, ...restartFields(), nearby: nearbyAddresses(comfyUrl), error: `${message}${demoMode ? " (Demo Mode Active)" : ""}` });
+    const message = isComfyTimeout(error) ? "Not answering for over a minute" : error?.message || "Connection failed";
+    res.json({ connected: false, isMock: demoMode, url: comfyUrl, latencyMs, ...restartFields(), nearby: comfySearchEnabled() ? nearbyAddresses(comfyUrl) : [], error: `${message}${demoMode ? " (Demo Mode Active)" : ""}` });
   } finally {
     clearTimeout(timeout);
   }
@@ -600,6 +647,34 @@ app.put("/api/models/types", async (req, res) => {
 });
 
 registerModelDownloadRoutes(app, { loadComfyContext });
+// Guided setup for a model already in ComfyUI that can run more than one way
+// (family-setup.js): how it runs and what that still needs, read fresh while the dialog watches.
+let setupContextAt = 0;
+app.get("/api/family-setup/:family", async (req, res) => {
+  const familyId = String(req.params.family);
+  if (!Object.hasOwn(guidedSetups, familyId)) return res.status(404).json({ ok: false, error: "No guided setup for that model." });
+  // The dialog polls; ComfyUI is asked again at most every few seconds.
+  const fresh = Date.now() - setupContextAt > 2500;
+  const context = await loadComfyContext({ force: fresh }).catch(() => null);
+  if (fresh && context) setupContextAt = Date.now();
+  const hardware = await describeHardware({ stats: context?.stats, comfyUrl }).catch(() => null);
+  const profiles = context?.info ? inferModels(context.info, context.stats).profiles : [];
+  const plan = familySetupPlan(familyId, {
+    info: context?.info || null, profiles, profileId: String(req.query.profile || ""), device: { apple: Boolean(hardware?.unified) },
+    comfyVersion: String(context?.stats?.system?.comfyui_version || "")
+  });
+  res.json({ ok: true, ...plan, local: downloadState().local });
+});
+
+// "Don't show again" for a recommended part (FLUX.3's prompt upsampler), kept in the data folder.
+app.put("/api/models/recommendations/:key", (req, res) => {
+  try {
+    res.json({ ok: true, dismissed: setDismissed(String(req.params.key), req.body?.dismissed !== false) });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
 registerPresetRoutes(app, { models: async () => {
   const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
   return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
@@ -681,6 +756,20 @@ app.put("/api/workflows/preferences", (req, res) => {
     };
     saveWorkflowPreferences(preferences);
     res.json({ ok: true, preferences });
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+// Saved sizes (saved-sizes.js): every device's size menu shows the same list.
+app.get("/api/sizes", (req, res) => {
+  res.json({ ok: true, sizes: loadSavedSizes() });
+});
+
+app.put("/api/sizes", (req, res) => {
+  if (!requireLocal(req, res)) return;
+  try {
+    res.json({ ok: true, sizes: saveSavedSizes(req.body?.sizes, req.body?.base) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
@@ -1019,6 +1108,18 @@ app.post("/api/comfy-url", async (req, res) => {
     }
   }
   res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: comfyUrl });
+});
+
+/** The Settings switch for looking on the usual ports when the saved address doesn't answer. */
+app.post("/api/comfy-search", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    writeLocalEnvValue("HEISS_COMFY_SEARCH", req.body?.enabled === false ? "0" : "1");
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+    return;
+  }
+  res.json({ ok: true, enabled: comfySearchEnabled() });
 });
 
 registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage });
@@ -1640,6 +1741,7 @@ startServers(app, {
     else exit();
   },
   onListening({ plan, port: listening, moved }) {
+    beginSession();
     // From here on everything that names the address (banner, phone links in Settings) uses this one.
     setListeningPort(listening);
     if (moved) console.log(`\n  Port ${requestedPort} is in use, so HEISS UI is on ${listening} this time.`);
@@ -1649,7 +1751,7 @@ startServers(app, {
     const pagePort = dev ? 5173 : listening;
     Promise.resolve(printBanner({ version: appVersion, url: `http://${shownHost}:${pagePort}`, comfyUrl })).then(async () => {
       // Listening beyond this computer: say where a phone can open it.
-      if ((host === "0.0.0.0" || host === "::") && !plan.tlsProblem) {
+      if (lanListening && (host === "0.0.0.0" || host === "::") && !plan.tlsProblem) {
         const addresses = plan.httpsHost
           ? startupTls.names.filter((name) => !name.startsWith("*.")).map((name) => `https://${name.includes(":") ? `[${name}]` : name}:${httpsPort}`)
           : Object.values(os.networkInterfaces()).flatMap((entries) => entries || []).filter((entry) => entry.family === "IPv4" && !entry.internal).map((entry) => `http://${entry.address}:${pagePort}`);

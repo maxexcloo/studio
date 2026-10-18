@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { Bug, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, HelpCircle, Info, LifeBuoy, Lightbulb, LockKeyhole, MessageSquarePlus, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, Wand2, Library } from 'lucide-react';
+import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, Wand2, Library } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -66,7 +66,7 @@ function RunStyleGlyph({ kind }: { kind: 'burst' | 'flow' }) {
 }
 
 /** Where HEISS UI looks for ComfyUI: test an address, then keep it. */
-function ComfyAddressRow({ current, showToast, onSaved }: { current: string; showToast: ShowToast; onSaved: () => void }) {
+function ComfyAddressRow({ current, search, showToast, onSaved }: { current: string; search: boolean; showToast: ShowToast; onSaved: () => void }) {
   const [value, setValue] = React.useState(current);
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState('');
@@ -90,7 +90,7 @@ function ComfyAddressRow({ current, showToast, onSaved }: { current: string; sho
   };
   const changed = value.trim() && value.trim() !== current;
   return (
-    <Row label="Address" description={note || 'Where ComfyUI runs. ComfyUI Desktop usually uses port 8000, a manual install 8188; on this computer both are tried.'}>
+    <Row label="Address" description={note || `Where ComfyUI runs. ComfyUI Desktop usually uses port 8000, a manual install 8188${search ? '; on this computer both are tried' : ''}.`}>
       <div className="set-address">
         <input className="set-path-input" value={value} onChange={(event) => setValue(event.target.value)} aria-label="ComfyUI address" spellCheck={false} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Enter' && changed) submit(true); }} />
         <button className="btn" onClick={() => submit(false)} disabled={busy || !value.trim()}>Test</button>
@@ -105,6 +105,33 @@ function SwitchRow({ label, tag, description, checked, onChange, disabled }: { l
     <Row label={tag ? <>{label}{tag}</> : label} description={description} disabled={disabled}>
       <Switch label={label} checked={checked} onChange={onChange} disabled={disabled} />
     </Row>
+  );
+}
+
+/** Whether HEISS looks on the usual ports when its address doesn't answer. Off for a second ComfyUI kept just for HEISS. */
+function ComfySearchRow({ enabled, onSaved }: { enabled: boolean; onSaved: () => void }) {
+  const [checked, setChecked] = React.useState(enabled);
+  const [note, setNote] = React.useState('');
+  React.useEffect(() => { setChecked(enabled); }, [enabled]);
+  const change = async (next: boolean) => {
+    setChecked(next);
+    setNote('');
+    try {
+      const response = await apiFetch('/api/comfy-search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
+      if (!response.ok) throw new Error();
+      onSaved();
+    } catch {
+      setChecked(!next);
+      setNote('Couldn’t save that. Make sure HEISS UI is running.');
+    }
+  };
+  return (
+    <SwitchRow
+      label="Find ComfyUI on its own"
+      description={note || 'When nothing answers at this address, try ports 8188 and 8000 and switch to the ComfyUI there. Turn off to stay on this address, e.g. with a second ComfyUI just for HEISS.'}
+      checked={checked}
+      onChange={change}
+    />
   );
 }
 
@@ -784,6 +811,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 <Segmented label="Run variants as" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One batch' }, { value: 'separate', label: 'Separate jobs' }]} />
               </Row>
               <PromptHistoryRow Row={Row} Switch={Switch} showToast={showToast} confirmAction={confirmAction} />
+              <SwitchRow label="Size in megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
             </Group>
             <Group title="Previews">
               <Row label="While generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
@@ -938,7 +966,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </Row>
               {thisComputer ? (
                 <SettingsDrawer key={health && !connected ? 'off' : 'on'} id="set-comfy-address" title="Change address" description="If ComfyUI runs on another port or computer" defaultOpen={Boolean(health && !connected && !comfyRestarting)}>
-                  <ComfyAddressRow current={health?.comfyUrl || 'http://127.0.0.1:8188'} showToast={showToast} onSaved={() => { refreshHealth(); refreshModels(false); refreshWorkflows(); }} />
+                  <ComfyAddressRow current={health?.comfyUrl || 'http://127.0.0.1:8188'} search={health?.comfySearch !== false} showToast={showToast} onSaved={() => { refreshHealth(); refreshModels(false); refreshWorkflows(); }} />
+                  <ComfySearchRow enabled={health?.comfySearch !== false} onSaved={refreshHealth} />
                 </SettingsDrawer>
               ) : (
                 <Row label="Restart ComfyUI" description="Loads new custom nodes and files, and frees memory.">
@@ -1072,26 +1101,27 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             </Group> : null}
 
             <section className="feedback-hero">
-              <strong>Found a bug? Have an idea?</strong>
-              <p>Send it to the feedback board. It’s public: others can upvote it, and you can follow its status.</p>
-              <div className="feedback-tiles">
-                <button type="button" className="feedback-tile is-bug" onClick={() => openFeedback({ kind: 'bug', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><Bug size={15} /></span>
-                  <strong>Report a bug</strong>
-                  <span>Something doesn’t work the way it should.</span>
-                </button>
-                <button type="button" className="feedback-tile is-idea" onClick={() => openFeedback({ kind: 'idea', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><Lightbulb size={15} /></span>
-                  <strong>Share an idea</strong>
-                  <span>Something it could do, or do better.</span>
-                </button>
-                <button type="button" className="feedback-tile is-question" onClick={() => openFeedback({ kind: 'question', from: 'settings' })}>
-                  <span className="feedback-tile-icon"><HelpCircle size={15} /></span>
-                  <strong>Ask a question</strong>
-                  <span>Not sure how something works?</span>
-                </button>
+              <div className="feedback-hero-copy">
+                <span className="feedback-hero-eyebrow">Feedback</span>
+                <strong>Make HEISS better.</strong>
+                <p>Report a bug or suggest an idea on the public board.</p>
+                <div className="feedback-hero-actions">
+                  <button type="button" className="feedback-hero-post" onClick={() => openFeedback({ from: 'settings' })}>
+                    New post <span><Plus size={14} strokeWidth={2.4} /></span>
+                  </button>
+                  <a className="feedback-hero-link" href={boardUrl} target="_blank" rel="noreferrer">View board <ArrowUpRight size={14} /></a>
+                </div>
               </div>
-              <p className="set-note">A post has what you write, plus versions, system and GPU if you leave them on. No prompts, images or file names.</p>
+              <a className="feedback-hero-stage" href={boardUrl} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-sheet" />
+                <span className="feedback-hero-window">
+                  <img src="/feedback-board.webp" alt="" width={1120} height={749} loading="lazy" decoding="async" draggable={false} />
+                </span>
+              </a>
+              <p className="feedback-hero-fine">Posts never include prompts, images or file names.</p>
             </section>
 
             <HelpGroup copyToClipboard={copyToClipboard} />

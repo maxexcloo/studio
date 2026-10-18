@@ -45,8 +45,18 @@ async function probeComfy(url) {
   }
 }
 
+/**
+ * Whether HEISS may go looking for ComfyUI when its address doesn't answer.
+ * HEISS_COMFY_SEARCH=0 (Settings › Connection) keeps it on its own ComfyUI,
+ * e.g. next to another one on 8188 that it must not adopt.
+ */
+export function comfySearchEnabled() {
+  return process.env.HEISS_COMFY_SEARCH !== "0";
+}
+
 /** The first usual address that answers as ComfyUI, or "". */
 export async function findComfy({ current, candidates = usualComfyAddresses, probe = probeComfy } = {}) {
+  if (!comfySearchEnabled()) return "";
   for (const candidate of nearbyAddresses(current, candidates)) {
     if (await probe(candidate)) return candidate;
   }
@@ -60,6 +70,7 @@ export async function findComfy({ current, candidates = usualComfyAddresses, pro
 let lastSearch = 0;
 let running = null;
 export function findComfyNow(current, { now = Date.now(), probe } = {}) {
+  if (!comfySearchEnabled()) return Promise.resolve("");
   if (running) return running;
   if (now - lastSearch < SEARCH_EVERY_MS) return Promise.resolve("");
   lastSearch = now;

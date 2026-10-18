@@ -3,13 +3,15 @@ import { Check, ChevronDown, Download, ExternalLink, Pause, Play, RefreshCw, Rot
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ComfyRestart } from './ComfyRestart';
 import { NodeInstall, ShellCommand } from './NodeInstall';
-import { CellBar } from './UpscaleDialogs';
+import { CellBar, Watcher } from './UpscaleDialogs';
 import { formatEta } from './UpscaleDownloadActivity';
 import { cn } from './format';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
 import type { MissingPart, ModelDownload, PartDownload, Profile } from './types';
 import { useThisComputer } from './device';
 import type { ShowToast } from './toast';
+import { openFamilySetup } from './FamilySetupDialog';
+import { apiJson } from './api';
 
 function formatBytes(bytes = 0) {
   if (!bytes) return '';
@@ -35,7 +37,7 @@ const partHint: Partial<Record<MissingPart['part'], string>> = {
 type RowState = 'idle' | 'queued' | 'downloading' | 'paused' | 'error' | 'landed' | 'manual' | 'installed';
 
 /** What a setup panel is for: a built-in model's profile, or an imported workflow. */
-export type SetupSubject = Pick<Profile, 'id' | 'missing'> & Partial<Pick<Profile, 'displayName' | 'label' | 'encoderBuiltIn' | 'source'>>;
+export type SetupSubject = Pick<Profile, 'id' | 'missing'> & Partial<Pick<Profile, 'displayName' | 'label' | 'encoderBuiltIn' | 'source' | 'setupGuide' | 'recommended'>>;
 
 const partKey = (item: MissingPart) => `${item.part}:${item.slot || item.kind || item.label}`;
 
@@ -74,7 +76,28 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const thisComputer = useThisComputer();
   // Downloads land on the computer running HEISS UI; from another device they are its job.
   const remote = remoteAnswer || state?.local === false || !thisComputer;
-  const missing = profile.missing || [];
+  const blocking = profile.missing || [];
+  // "Don't show again" hides it at once; the server keeps the answer for good (server/dismissals.js).
+  const [dismissedNow, setDismissedNow] = React.useState(false);
+  // Nothing needed, but something recommended (FLUX.3's prompt upsampler): the same rows, worded as an offer.
+  const optional = !blocking.length && Boolean(profile.recommended?.length) && !dismissedNow;
+  const missing = optional ? profile.recommended! : blocking;
+  // Waiting on ComfyUI itself (an update, a node pack and its restart) happens outside HEISS,
+  // so the panel looks again by itself until it changes, rather than waiting for a reload.
+  const waitingOnComfy = missing.some((item) => item.part === 'comfy');
+  const [lookedAt, setLookedAt] = React.useState(0);
+  const recheck = React.useRef(onInstalled);
+  recheck.current = onInstalled;
+  React.useEffect(() => {
+    if (!waitingOnComfy) return;
+    setLookedAt(Date.now());
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      recheck.current();
+      setLookedAt(Date.now());
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [waitingOnComfy]);
   const name = profile.displayName || profile.label || 'This model';
 
   // Remember every part seen missing here; the ones no longer missing are in place.
@@ -100,6 +123,22 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
     return () => window.clearTimeout(timer);
   }, [ready]);
 
+  const setRecommendation = (keys: string[], dismissed: boolean) => Promise.all(keys.map((key) => apiJson(`/api/models/recommendations/${encodeURIComponent(key)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dismissed })
+  })));
+  const dismissRecommended = (keys: string[]) => {
+    // Forget the rows it showed, or their going would read as "now in place".
+    setupMemory.delete(profile.id);
+    setDismissedNow(true);
+    setRecommendation(keys, true)
+      .then(() => {
+        onInstalled();
+        showToast('Won’t show this again', 'success', {
+          action: { label: 'Undo', onClick: () => { setRecommendation(keys, false).then(() => { setDismissedNow(false); onInstalled(); }).catch(() => null); } }
+        });
+      })
+      .catch((error) => { setDismissedNow(false); showToast(error instanceof Error ? error.message : 'Couldn’t save that', 'error'); });
+  };
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -195,10 +234,12 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const outdated = missing.some((item) => item.part === 'comfy' && !item.nodePack);
   const manual = rows.some((row) => row.rowState === 'manual');
   const title = moving ? 'Downloading'
+    : optional ? 'Recommended'
     : outdated ? 'Update ComfyUI first'
     : pack ? `Add ${pack.name} to ComfyUI`
     : fetchable === missing.length ? `Needs ${missing.length} more file${missing.length === 1 ? '' : 's'}` : 'Not ready yet';
-  const subtitle = outdated ? `${name} needs a newer ComfyUI. Update it before downloading the rest.`
+  const subtitle = optional ? (missing.length === 1 && missing[0].detail ? missing[0].detail : `${name} runs now, and works better with ${missing.length === 1 ? 'this' : 'these'}.`)
+    : outdated ? `${name} needs a newer ComfyUI. Update it before downloading the rest.`
     : pack ? `${name} needs custom nodes that don’t come with ComfyUI.`
     : alsoNeedsNodes ? `${name} needs ${missing.length === 1 ? 'this file' : 'these files'} and the custom nodes listed below.`
     : profile.encoderBuiltIn === false && profile.source === 'checkpoint'
@@ -215,6 +256,10 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
           <strong>{title}</strong>
           <span>{short && !moving ? `These need ${formatBytes(short.need)} and the disk has ${formatBytes(short.free)} free.` : subtitle}</span>
         </div>
+        {profile.setupGuide ? (
+          // A family with its own guided setup: the same parts, with the choices that come before them.
+          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!, profile.id)}>Guided setup</button>
+        ) : null}
         {startable.length > 1 && !outdated ? (
           <button type="button" className={cn('btn', short ? 'is-ghost' : 'is-primary')} onClick={getAll}>
             <Download size={14} /> Get all{remainingBytes ? ` · ${formatBytes(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}
@@ -275,7 +320,13 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
           <ComfyRestart compact onBack={onInstalled} />
         </div>
       ) : null}
-      {manual && !moving ? (
+      {optional && missing.some((item) => item.dismissKey) && !moving ? (
+        <button type="button" className="btn is-ghost model-setup-recheck" onClick={() => dismissRecommended(missing.filter((item) => item.dismissKey).map((item) => item.dismissKey!))}>Don’t Show Again</button>
+      ) : null}
+      {waitingOnComfy ? (
+        <div className="model-setup-watch"><Watcher lastChecked={lookedAt}>{outdated ? 'Watching for the ComfyUI update…' : 'Watching for the nodes…'}</Watcher></div>
+      ) : null}
+      {manual && !moving && !waitingOnComfy ? (
         <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check Again</button>
       ) : null}
       {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running HEISS UI.'}</p> : null}

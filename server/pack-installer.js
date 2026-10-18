@@ -130,19 +130,30 @@ async function installLocally(state, pack) {
   const target = path.join(customNodes, pack.folder);
   if (!fs.existsSync(target)) {
     state.step = "Downloading the nodes";
+    // A pack inside a bigger repository is checked out outside custom_nodes (ComfyUI
+    // would try to import the whole checkout), and only its own folder is copied in.
+    const checkoutDir = pack.subdir ? fs.mkdtempSync(path.join(os.tmpdir(), "heiss-pack-")) : target;
+    const checkoutTarget = pack.subdir ? path.join(checkoutDir, "repo") : target;
     try {
       // Exactly the reviewed commit, never whatever the branch says today.
-      await run(state, "git", ["clone", "--no-checkout", pack.repository, target], customNodes);
+      await run(state, "git", ["clone", "--no-checkout", pack.repository, checkoutTarget], pack.subdir ? checkoutDir : customNodes);
       if (pack.commit) {
-        await run(state, "git", ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit], target);
-        const head = (await run(state, "git", ["rev-parse", "HEAD"], target)).trim();
+        await run(state, "git", ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit], checkoutTarget);
+        const head = (await run(state, "git", ["rev-parse", "HEAD"], checkoutTarget)).trim();
         if (head !== pack.commit) throw new Error("The download isn’t the reviewed version.");
       } else {
-        await run(state, "git", ["checkout"], target);
+        await run(state, "git", ["checkout"], checkoutTarget);
+      }
+      if (pack.subdir) {
+        const inner = path.resolve(checkoutTarget, ...pack.subdir.split("/"));
+        if (!inner.startsWith(`${checkoutTarget}${path.sep}`) || !fs.existsSync(path.join(inner, "__init__.py"))) throw new Error(`${pack.name} isn’t where it was in the reviewed version.`);
+        fs.cpSync(inner, target, { recursive: true });
+        fs.rmSync(checkoutDir, { recursive: true, force: true });
       }
     } catch (error) {
       // Only what this install created goes; a folder that was already there is never touched.
       fs.rmSync(target, { recursive: true, force: true });
+      if (pack.subdir) fs.rmSync(checkoutDir, { recursive: true, force: true });
       throw new Error(/reviewed|did not match|reference is not a tree|pathspec/i.test(`${error.message}\n${state.log}`)
         ? `The reviewed version of ${pack.name} (${pack.ref || pack.commit}) is no longer on GitHub, so it wasn’t installed.`
         : error.message);

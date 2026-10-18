@@ -55,7 +55,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const create = ({ scope, owner }) => {
     const server = new McpServer({ name: 'HEISS', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
-      tool(server, 'Models', 'Browse Models', 'Discover ready profiles by kind. Supply exact profile_id for defaults, capabilities, prompting guidance, compatible LoRAs and reference slots. Fetch details before first use; imageModes.reference overrides text-only controls when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
+      tool(server, 'Models', 'Browse Models', 'Discover ready profiles by kind. Supply exact profile_id for defaults, capabilities, prompting guidance, compatible LoRAs and reference slots and native size support. Explicit width and height request native generation; 2K uses a 2048-pixel long side. Fetch details before first use; imageModes.reference overrides text-only controls when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
         let profiles = await media.profiles(kind);
         if (profile_id !== undefined) {
           profiles = profiles.filter(profile => profile.id === profile_id);
@@ -65,12 +65,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
           reviewedGuides.set(guideKey(owner, profile_id), Date.now());
         }
-        const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'options'];
+        const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native', 'options'];
         return mcpJson({ profiles: profiles.map(profile => ({ ...Object.fromEntries(fields.filter(key => key in profile).map(key => [key, profile[key]])), ...(profile_id === undefined ? {} : { defaults: { ...profile.defaults, count: defaultGenerationCount } }), prompting: prompting(profile, profile_id !== undefined) })) });
       }, { readOnlyHint: true });
       tool(server, 'Generate', 'Generate Media', 'Queue requested media immediately; return job IDs without blocking chat. Fetch Models details first. Use the saved default generation count and dimensions unless explicitly requested otherwise. Variants use separate jobs, at most four jobs per submission. Keep defaults unless requested. Never wait, poll or resubmit for progress; acknowledge the returned jobs immediately. Never switch GPUs.', {
         profile_id: z.string().min(1), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
-        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(),
+        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.literal(0).default(0), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async (args) => {

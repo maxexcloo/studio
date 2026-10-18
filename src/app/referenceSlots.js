@@ -70,3 +70,23 @@ export function withoutReferences(selected, inputs, slots) {
   const gone = new Set(slots);
   return arrangeReferences(arrangeReferences(selected, inputs).filter((item) => !gone.has(item.slot)), inputs);
 }
+
+/**
+ * What the first reference is to a run: "edit" (it is the picture changed,
+ * and frames the output) or "reference" (it only guides). Reference is only
+ * there where the composer offers the switch, on the built-in families that
+ * read an aspect from a reference; any other workflow gets the edit it was
+ * made for, whatever was last picked elsewhere. A painted mask always edits.
+ * @param {{ aspectPolicy?: string, workflow?: string } | null | undefined} profile
+ * @param {string | undefined} picked the remembered choice (prefs.referenceRole)
+ * @param {boolean} masked
+ * @returns {"edit" | "reference"}
+ */
+export function referenceRoleFor(profile, picked, masked = false) {
+  return referenceRoleOffered(profile) && !masked && picked === "reference" ? "reference" : "edit";
+}
+
+/** Whether the composer shows the Edit | Reference switch for this model. */
+export function referenceRoleOffered(profile) {
+  return profile?.aspectPolicy === "reference" && String(profile.workflow || "").startsWith("family:");
+}

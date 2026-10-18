@@ -61,7 +61,8 @@ export function galleryStats(items = [], now = new Date()) {
     videos: done.filter((item) => item.type === "video").length,
     upscales: done.filter((item) => item.upscale?.url || item.upscale?.status === "done").length,
     renderMs,
-    megapixels: Math.round(pixels / 1e6),
+    // As ComfyUI counts them, and the size menu: 1 MP is 1024 × 1024.
+    megapixels: Math.round(pixels / (1024 * 1024)),
     firstAt: first,
     activeDays: days.size,
     currentStreak: current,

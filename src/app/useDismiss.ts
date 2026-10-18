@@ -27,6 +27,8 @@ export function useDismiss(refs: Refs, open: boolean, onDismiss: () => void) {
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || dialogOpen()) return;
+      // A field that undoes its own edit on Escape (a rename) keeps it; the surface stays open.
+      if (event.target instanceof Element && event.target.closest('[data-own-escape]')) return;
       event.preventDefault();
       event.stopPropagation();
       onDismiss();

@@ -50,7 +50,20 @@ catalog, so a family that is described correctly needs no UI work.
    ComfyUI's own Python. Manager 4 cannot install by Git URL (only in its
    legacy UI, behind a config flag), so unlisted packs always take the local
    route. Manual steps (Manager or terminal) stay one tap away and are all a
-   remote ComfyUI gets.
+   remote ComfyUI gets. A pack that ships inside its makers' model repository
+   gets `subdir` (its folder there): the one-click route checks the repository
+   out outside custom_nodes and copies only that folder in, and the terminal
+   steps do the same. `requirements: false` leaves pip out for a pack with no
+   requirements.txt.
+
+   When a model runs both on ComfyUI's own nodes and on a pack, give the
+   family `runners`: per model source, the pack, its `loader` (one node that
+   loads model, encoder and VAE, standing in for the three core loaders),
+   `patches` for the model before sampling, the core nodes those need, and
+   `folders` when the loader takes a Diffusers folder by path (HEISS lists
+   matching folders in models/diffusers itself; see `server/diffusers-folders.js`).
+   MOSS-Image is the example: Comfy-Org's single files on core nodes, the
+   official folder on its makers' pack.
 
 4. **Describe the family** in `families`. Settings live on variants; the last
    variant is the fallback. `match(name, header, detail)` picks a variant, so
@@ -100,6 +113,12 @@ catalog, so a family that is described correctly needs no UI work.
    the partner from the model list and offers its download when missing.
    `promptPrefix` and `negativePrefix` put the system prompt a model was
    trained with in front of the user's text (Lumina 2 and its fine-tunes).
+   `upsampler` runs a small language model before the encoder, for models
+   made to read long captions rather than what people type (FLUX.3): its
+   own slot (missing means a Download button like any encoder), its makers'
+   system prompts verbatim in `server/prompt-upsamplers.js`, and the
+   TextGenerate settings from their workflow. With reference images it gets
+   the edit prompt and sees the images.
 
    Image-to-video is a family of its own with `imageToVideo: true`: its
    `latent` names the node that takes both conditionings, the VAE and the start
@@ -126,6 +145,13 @@ catalog, so a family that is described correctly needs no UI work.
    pair) or `ownLoaders` cannot. `canInpaint` in `server/family-profiles.js`
    decides, and the model menu shows the result.
 
+   **Guided setup.** A family that runs more than one way can have a setup
+   dialog of its own: add it to `guidedSetups` (`server/family-setup.js`)
+   and point the family at it with `setup`. Its setup panel then gets a
+   **Guided setup** button. The dialog works out the way from the file you
+   have and walks through what that needs; like everything else here, it
+   never downloads the model itself.
+
 9. **Tests** in `server/model-families.test.js`. Cover detection from a
    header, each variant's defaults, what a missing part or pack reports, and
    the graph's nodes and inputs. The fixtures write tiny fake safetensors
@@ -135,7 +161,9 @@ catalog, so a family that is described correctly needs no UI work.
    lists and ranges, links of the right type, and any node that ComfyUI
    lacks listed in the family's nodes (so it shows "Newer ComfyUI"). When a
    family needs nodes from a newer ComfyUI, record that version too with
-   `node scripts/record-object-info.mjs` while it runs.
+   `node scripts/record-object-info.mjs` while it runs. A family whose text
+   encoder type a snapshot lacks is checked against the newer one only, and
+   every family must be checked against at least one.
 
 10. **Check it against a real ComfyUI.** Save `/object_info` and
     `/system_stats`, feed them to `inferModels`, build the graph through
@@ -151,6 +179,38 @@ catalog, so a family that is described correctly needs no UI work.
 - Everything a model needs is named in its `missing` list with a way to get
   it: a Download button, node install steps, or a copyable command. A model
   that is not ready never runs.
+
+## Native 2K
+
+`native` on a family (or a variant) declares support for 2K and 4K output.
+The size menu offers only entries marked `"yes"`, within the selected model's
+dimension limits. Two choices use buttons; more than two use a dropdown.
+Models without additional supported native sizes hide the Resolution control.
+Custom dimensions and aspect ratios remain available separately.
+
+A selected 2K or 4K resolution draws the chosen shape with its long side at
+2048 or 4096 pixels, without an automatic upscale. Entries marked `"maybe"`
+record mixed or missing reports and are not offered as supported resolutions.
+Megapixel sizing still warns when a requested size exceeds known support.
+The upscale arrow (SeedVR2) remains available independently of native support.
+
+Current entries:
+
+- **Nothing:** SD 1.5 and SD 2.x (trained at 512/768, duplicated subjects at
+  large sizes are long settled), Sana 512px.
+- **2K maybe:** models documented at about 1 MP: SDXL and its finetunes,
+  Pony V7/AuraFlow (768-1536), SD 3.5, Flux.1 (BFL: 1.6 MP max), Chroma,
+  HiDream, Qwen-Image (1328), Anima, Lumina 2.0, ERNIE-Image, Krea 2 Raw
+  (trained up to 1K), Sana 1024 and Sprint. 4K (3-4x past their training) is
+  left out.
+- **2K yes:** MOSS-Image (its makers document 0.25 to 4 MP and recommend
+  1 to 2 MP). 4K is left out.
+- **2K yes, 4K maybe:** Flux.2 Dev and Klein (BFL: up to 4 MP), Qwen-Image 2.1
+  (native 2K), Z-Image (up to 2048²), Krea 2 Turbo (1K-2K), Ideogram 4 (up to
+  2048), MageFlow (512-2048, any aspect), Sana 2K. No hands-on 4K reports.
+- **2K and 4K yes:** Sana 4K, FLUX.3 Klein (BFL: up to 4K, best at 2K).
+
+A new family states its own `native`; leaving it out means none.
 
 ## Supported families
 

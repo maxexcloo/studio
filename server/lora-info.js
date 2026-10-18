@@ -8,7 +8,7 @@ import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
 
 // Imported-only model families still need precise adapter compatibility labels.
-const families = { ...modelFamilies, boogu: { label: 'Boogu' }, flux3_klein: { label: 'FLUX.3 Klein' }, moss_image: { label: 'MOSS Image' } };
+const families = { ...modelFamilies, boogu: { label: 'Boogu' }, moss_image: { label: 'MOSS Image' } };
 
 /**
  * What a LoRA was trained for and how to trigger it, read the same way model
@@ -32,7 +32,8 @@ const lastKnown = new Map();
 
 // Ordered: the more specific names first ("flux 2" before "flux", "wan 2.2 5b" before "wan").
 const metadataFamilies = [
-  [/flux[-_. ]?3(?:[-_. ]?klein)?(?:\b|[_/])/, ["flux3_klein"]],
+  [/flux[-_. ]?3(?:[-_. ]?klein)?(?:\b|[_/])/, ["flux3"]],
+  [/moss[-_ ]?image/, ["moss_image"]],
   [/flux[-_. ]?2[-_. ]?klein[-_. ]?9b|klein[-_. ]?9b/, ["flux2_klein_9b"]],
   [/flux[-_. ]?2[-_. ]?klein|klein[-_. ]?4b/, ["flux2_klein_4b"]],
   [/flux[-_. ]?2/, ["flux2_dev", "flux2_klein_4b", "flux2_klein_9b"]],
@@ -49,7 +50,6 @@ const metadataFamilies = [
   [/hidream/, ["hidream"]],
   [/lumina|neta/, ["lumina2"]],
   [/krea[-_ ]?2/, ["krea2"]],
-  [/moss[-_ ]?image/, ["moss_image"]],
   [/anima/, ["anima"]],
   [/auraflow|pony[-_ ]?v7/, ["auraflow"]],
   [/sd[-_ ]?3|stable-diffusion-v3|stable-diffusion-3/, ["sd3"]],
@@ -161,6 +161,9 @@ export function familiesFromKeys(header) {
     return [];
   }
   if (has(/joint_blocks[._]\d/)) return ["sd3"];
+  // FLUX.3's text, image and reference mode blocks; MOSS-Image's single stream of q/k/v and fused feed-forward.
+  if (has(/(content|txt)_mode_blocks[._]/)) return ["flux3"];
+  if (has(/(^|[._])layers[._]\d+[._]proj[._](q|k|v|o|qkv|ffn_up_gate|ffn_down)[._]/)) return ["moss_image"];
   if (has(/double_layers[._]\d|single_layers[._]\d/)) return ["auraflow"];
   if (has(/double_stream_blocks[._]\d|single_stream_blocks[._]\d/)) return ["hidream"];
   if (has(/(^|[._])blocks[._]\d+[._](self_attn|cross_attn|ffn)[._]/)) {

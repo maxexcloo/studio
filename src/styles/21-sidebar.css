@@ -661,6 +661,8 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup-item .upscale-steps { gap: 12px; font-size: 12px; }
 .model-setup-item .upscale-routes { width: 100%; margin: 0; }
 .model-setup-item .upscale-routes:not(.is-small) button { flex: 1; }
+/* While ComfyUI itself is what's missing, the panel watches for it and says when it last looked. */
+.model-setup-watch .upscale-watcher { margin-top: 10px; padding: 9px 12px; font-size: 12px; }
 .model-setup-recheck { justify-self: start; }
 /* One-click node pack install, used by the sidebar, the library and the upscale dialog. */
 .node-quick { display: grid; gap: 8px; justify-items: start; }

@@ -11,7 +11,8 @@ import { isInside } from "./paths.js";
 export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 // A live binding: importers see the new address as soon as setComfyUrl changes it.
-export let comfyUrl = normalizeComfyUrl(process.env.COMFY_URL || "") || "http://127.0.0.1:8188";
+// HEISS_DEFAULT_COMFY_URL: where to look before anything is saved (the Docker image's host.docker.internal).
+export let comfyUrl = normalizeComfyUrl(process.env.COMFY_URL || "") || normalizeComfyUrl(process.env.HEISS_DEFAULT_COMFY_URL || "") || "http://127.0.0.1:8188";
 
 /** "localhost:8000", "http://pc.local:8188/" or a bare port all become a clean http(s) origin. */
 export function normalizeComfyUrl(value = "") {
@@ -36,7 +37,10 @@ export function setComfyUrl(value = "") {
 }
 export const lan = resolveLan({ argv: process.argv, env: process.env, fileKeys: envFileKeys });
 export const host = lan.host;
-export const lanListening = listensBeyondThisComputer(host);
+/** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
+export const dockerHostOnly = process.env.HEISS_DOCKER_HOST_ONLY === "1";
+// Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
+export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
 /**
  * The Settings switch: remembered in .env, used from the next start. A HOST
@@ -157,7 +161,9 @@ export function setComfyFolderPaths(map = {}) {
  */
 export function modelFolders(kind, subfolders = [kind]) {
   const models = comfyModelsDir();
-  const dirs = [...(comfyFolderPaths[kind] || []), ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
+  // extra_model_paths.yaml keys are matched loosely by custom nodes (SEEDVR2: and seedvr2: are one folder kind).
+  const named = Object.keys(comfyFolderPaths).filter((key) => key.toLowerCase() === String(kind).toLowerCase()).flatMap((key) => comfyFolderPaths[key] || []);
+  const dirs = [...named, ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
   return [...new Set(dirs)].filter((dir) => {
     try { return fs.statSync(dir).isDirectory(); } catch { return false; }
   });
@@ -177,10 +183,39 @@ export const demoMode = process.env.HEISS_DEMO === "1";
  * answer from ComfyUI, and expires on its own after a few seconds.
  */
 let comfyUnreachableUntil = 0;
+// When each backend went quiet without refusing; removed whenever that backend answers.
+const comfySilentSince = new Map();
 export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
-  comfyUnreachableUntil = 0;
-  noteComfyState(true);
+  comfySilentSince.delete(currentComfyBackend());
+  if (currentComfyBackend() === "primary") {
+    comfyUnreachableUntil = 0;
+    noteComfyState(true);
+  }
+}
+
+/*
+ * Busy or stopped. A ComfyUI that has stopped refuses the connection at once;
+ * one that is loading a model, building its node list or paging memory takes
+ * the connection and answers late, and its runs carry on meanwhile. So a check
+ * that timed out reads as busy, for as long as a run would wait for it
+ * (comfy-queue.js), and only then as stopped.
+ */
+export const comfyBusyGraceMs = Number(process.env.HEISS_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.HEISS_COMFY_LOST_AFTER_MS) : 60_000;
+/** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
+export function isComfyTimeout(error) {
+  return error?.name === "AbortError" || error?.name === "TimeoutError";
+}
+/**
+ * A check sent at `sentAt` timed out: whether ComfyUI still counts as busy
+ * rather than stopped. `first` is true on the first timeout since it last answered.
+ */
+export function noteComfySilent(sentAt, now = Date.now()) {
+  const backend = currentComfyBackend();
+  const first = !comfySilentSince.has(backend);
+  if (first) comfySilentSince.set(backend, sentAt);
+  const silentForMs = now - comfySilentSince.get(backend);
+  return { busy: silentForMs < comfyBusyGraceMs, first, silentForMs };
 }
 /** Call with what a fetch to ComfyUI threw; a canceled request says nothing about ComfyUI. */
 export function noteComfyFetchError(error) {
@@ -218,7 +253,7 @@ export async function comfy(pathname, options = {}) {
     if (currentComfyBackend() === "primary") noteComfyFetchError(error);
     throw error;
   }
-  if (currentComfyBackend() === "primary") noteComfyReachable();
+  noteComfyReachable();
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;

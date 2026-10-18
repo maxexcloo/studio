@@ -53,7 +53,7 @@ const encoders = {
   clip_g: { "text_model.encoder.layers.30.mlp.fc1.weight": t([5120, 1280]) },
   t5xxl: { "encoder.block.23.layer.1.DenseReluDense.wi_1.weight": t([10240, 4096]), "shared.weight": t([32128, 4096]) },
   umt5: { "encoder.block.23.layer.1.DenseReluDense.wi_1.weight": t([10240, 4096]), "encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight": t([32, 64]) },
-  qwen3_4b: { "model.layers.0.post_attention_layernorm.weight": t([2560]), "model.layers.0.self_attn.q_norm.weight": t([128]) },
+  qwen3_4b: { "model.layers.0.post_attention_layernorm.weight": t([2560]), "model.layers.0.self_attn.q_norm.weight": t([128]), "model.layers.0.self_attn.k_proj.weight": t([1024, 2560]) },
   qwen3vl_4b: { "model.visual.deepstack_merger_list.0.norm.weight": t([1]), "model.visual.merger.linear_fc2.weight": t([2560, 1]) },
   qwen25vl: { "model.layers.0.self_attn.k_proj.bias": t([512]) }
 };
@@ -137,6 +137,8 @@ test("text encoders and VAEs are told apart by shape", () => {
   assert.equal(encoderKindFromHeader(encoders.qwen3_4b), "qwen3_4b");
   assert.equal(encoderKindFromHeader(encoders.qwen3vl_4b), "qwen3vl_4b");
   assert.equal(encoderKindFromHeader(encoders.qwen25vl), "qwen25vl_7b");
+  // MiniMax Music's encoder: Qwen3 8B's width and q_norm, but one fused qkv_proj. It can't run Flux 2 Klein 9B.
+  assert.equal(encoderKindFromHeader({ "model.layers.0.post_attention_layernorm.weight": t([4096]), "model.layers.0.self_attn.q_norm.weight": t([128]), "model.layers.0.self_attn.qkv_proj.weight": t([6144, 4096]) }), "other");
   assert.equal(vaeLayoutFromHeader(vaes.kl4), "kl4");
   assert.equal(vaeLayoutFromHeader(vaes.kl16), "kl16");
   assert.equal(vaeLayoutFromHeader(vaes.flux2), "flux2");
@@ -572,7 +574,8 @@ test("one-click pack installs only take registry ids, and run locally with Comfy
   const started = await startPackInstall("comfyui_sana");
   assert.equal(started.route, "local");
   let state = started;
-  for (let i = 0; i < 50 && state.status === "running"; i += 1) {
+  // Up to 10 s: the full suite runs files side by side, and a busy machine starts processes slowly.
+  for (let i = 0; i < 500 && state.status === "running"; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
     state = packInstallState("comfyui_sana");
   }
@@ -729,6 +732,28 @@ test("Flux 2 edits chain each reference onto both conditionings, framed by the f
   assert.equal(Object.values(plain).find((node) => node.class_type === "EmptyFlux2LatentImage").inputs.width, 1024);
 });
 
+test("a reference used as a reference, not edited, leaves the framing to the picked size", () => {
+  const flux = { family: "flux2_klein_9b", variant: "distilled", source: "unet", model: "real-dream-klein9b-1-fp8.safetensors", encoders: ["qwen_3_8b_fp8mixed.safetensors"], vae: "flux2-vae.safetensors", prompt: "hold the bag", width: 2048, height: 1152, steps: 4, cfg: 1, seed: 1, referenceImages: ["woman.png"], referenceRole: "reference" };
+  const graph = familyGraph(flux);
+  const of = (type) => Object.values(graph).filter((node) => node.class_type === type);
+  assert.equal(of("ReferenceLatent").length, 2, "the reference still guides both conditionings");
+  assert.equal(of("GetImageSize").length, 0);
+  assert.deepEqual([of("EmptyFlux2LatentImage")[0].inputs.width, of("EmptyFlux2LatentImage")[0].inputs.height], [2048, 1152]);
+  assert.deepEqual([of("Flux2Scheduler")[0].inputs.width, of("Flux2Scheduler")[0].inputs.height], [2048, 1152]);
+  assert.equal(of("ImageScaleToTotalPixels")[0].inputs.megapixels, 1.05, "a guiding reference stays at about 1 MP");
+
+  const qwen = familyGraph({ family: "qwen_image_21", variant: "standard", source: "unet", model: "qwen_image_2.1_int8_convrot.safetensors", encoders: ["qwen3vl_8b_int8_convrot.safetensors"], vae: "qwen_image_2.1_vae_bf16.safetensors", prompt: "make it night", width: 1344, height: 768, steps: 25, cfg: 1, seed: 1, referenceImages: ["street.png"], referenceRole: "reference" });
+  const sampler = Object.values(qwen).find((node) => node.class_type === "KSampler");
+  const latent = qwen[sampler.inputs.latent_image[0]];
+  assert.notEqual(latent.class_type, "TextEncodeQwenImage21", "the encoder's edit latent isn't the canvas");
+  assert.deepEqual([latent.inputs.width, latent.inputs.height], [1344, 768]);
+  const qwenEncoder = Object.values(qwen).find((node) => node.class_type === "TextEncodeQwenImage21");
+  assert.ok(qwenEncoder.inputs["images.image_1"], "the reference still goes to the encoder");
+  assert.equal(qwenEncoder.inputs.resolution, 1024, "a guiding reference stays at the template's 1024");
+  const edit = familyGraph({ family: "qwen_image_21", variant: "standard", source: "unet", model: "q.safetensors", encoders: ["e.safetensors"], vae: "v.safetensors", prompt: "x", width: 1152, height: 2048, steps: 25, cfg: 1, seed: 1, referenceImages: ["street.png"] });
+  assert.equal(Object.values(edit).find((node) => node.class_type === "TextEncodeQwenImage21").inputs.resolution, 1536, "an edit's reference comes at the output's size");
+});
+
 test("reference slots show only where this ComfyUI has the nodes to wire them", () => {
   put("diffusion_models", "klein_refs_4b.safetensors", headers.klein4b);
   const setup = { unets: ["klein_refs_4b.safetensors"], clips: ["qwen_3_4b.safetensors"], vaeFiles: ["flux2-vae.safetensors"] };
@@ -737,6 +762,200 @@ test("reference slots show only where this ComfyUI has the nodes to wire them", 
   const withNodes = slotsWith({ ImageScaleToTotalPixels: node(), ReferenceLatent: node(), GetImageSize: node() });
   assert.deepEqual(withNodes.mediaInputs.map((input) => input.id), ["reference", "reference_2", "reference_3"]);
   assert.equal(withNodes.aspectPolicy, "reference");
+});
+
+/* ------------------------------------------------------------ MOSS-Image */
+
+const mossDit = { "shared_block_modulation.weight": t([18432, 3072]), "layers.0.proj.ffn_up_gate.weight": t([16384, 3072]), "layers.0.proj.qkv.weight": t([9216, 3072]), "video_head_modulation.weight": t([6144, 3072]) };
+const qwen35 = (width) => ({ "model.language_model.layers.0.linear_attn.A_log": t([32]), "model.language_model.layers.0.input_layernorm.weight": t([width]), "model.visual.blocks.0.attn.qkv.weight": t([3456, 1152]) });
+const mossTypes = [...newTypes, "moss_image"];
+
+test("MOSS-Image is read from its weights, Qwen3.5 9B from its encoder, and Base from its name", () => {
+  assert.equal(familyFromHeader(mossDit).family, "moss_image");
+  assert.equal(encoderKindFromHeader(qwen35(4096)), "qwen35_9b");
+  assert.equal(encoderKindFromHeader(qwen35(2560)), "other");
+  const clips = [put("text_encoders", "qwen3.5_9b_int8_convrot.safetensors", qwen35(4096))];
+  const vaeFiles = [put("vae", "flux2-vae.safetensors", vaes.flux2)];
+  const unets = [put("diffusion_models", "moss_image_sft_bf16.safetensors", mossDit), put("diffusion_models", "moss_image_base_int8_convrot.safetensors", mossDit)];
+  const moss = inferModels(objectInfo({ unets, clips, vaeFiles, clipTypes: mossTypes })).profiles.filter((profile) => profile.family === "moss_image");
+  assert.deepEqual(moss.map((profile) => [profile.model, profile.variant, profile.ready, profile.defaults.steps, profile.defaults.cfg, profile.defaults.scheduler]), [
+    ["moss_image_sft_bf16.safetensors", "sft", true, 50, 3, "sgm_uniform"],
+    ["moss_image_base_int8_convrot.safetensors", "base", true, 50, 3, "sgm_uniform"]
+  ]);
+  assert.equal(moss[0].encoderSlots[0].default, "qwen3.5_9b_int8_convrot.safetensors");
+});
+
+test("MOSS-Image on ComfyUI's own nodes: Qwen3.5 through CLIPLoader, the model's own shift, the Flux.2 latent", () => {
+  const info = objectInfo({ unets: ["moss_image_sft_bf16.safetensors"], clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
+  const profile = inferModels(info).profiles.find((item) => item.family === "moss_image");
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a sign that says OPEN", negative: "blurry" }, info));
+  assert.deepEqual(byType(graph, "CLIPLoader")[0].inputs, { clip_name: "qwen3.5_9b_int8_convrot.safetensors", type: "moss_image", device: "default" });
+  // ComfyUI's own MOSS-Image samples at shift 5 by itself; ModelSamplingSD3 would scale its timesteps by 1000.
+  assert.equal(byType(graph, "ModelSamplingSD3").length, 0);
+  assert.equal(graph[byType(graph, "KSampler")[0].inputs.model[0]].class_type, "UNETLoader");
+  assert.deepEqual([byType(graph, "EmptyFlux2LatentImage").length, byType(graph, "CLIPTextEncode").length, byType(graph, "SkipLayerGuidanceDiTSimple").length], [1, 2, 0]);
+  assert.deepEqual([byType(graph, "KSampler")[0].inputs.sampler_name, byType(graph, "KSampler")[0].inputs.scheduler], ["euler", "sgm_uniform"]);
+});
+
+test("MOSS-Image says what's missing: a newer ComfyUI first, then the encoder and VAE with downloads", () => {
+  const unets = ["moss_image_sft_int8_convrot.safetensors"];
+  const old = inferModels(objectInfo({ unets, clipTypes: newTypes })).profiles.find((item) => item.family === "moss_image");
+  assert.deepEqual(old.missing.map((item) => item.part), ["comfy", "encoder", "vae"]);
+  assert.equal(old.missing[0].label, "Newer ComfyUI");
+  const current = inferModels(objectInfo({ unets, clipTypes: mossTypes })).profiles.find((item) => item.family === "moss_image");
+  const encoder = current.missing.find((item) => item.part === "encoder");
+  assert.deepEqual(encoder.downloads.map((item) => item.file), ["qwen3.5_9b_int8_convrot.safetensors", "qwen3.5_9b_w4a8_gptq.safetensors"]);
+  assert.equal(current.missing.find((item) => item.part === "vae").downloads[0].file, "flux2-vae.safetensors");
+});
+
+test("MOSS-Image's Diffusers folders run through its makers' loader, with their layer skip", () => {
+  const root = path.join(scratch, "ComfyUI", "models", "diffusers");
+  const folder = (name, transformerClass) => {
+    const dir = path.join(root, name);
+    for (const [part, files] of [["transformer", ["diffusion_pytorch_model-00001-of-00001.safetensors"]], ["text_encoder", ["model.safetensors"]], ["vae", ["diffusion_pytorch_model.safetensors"]], ["tokenizer", []]]) {
+      fs.mkdirSync(path.join(dir, part), { recursive: true });
+      for (const file of files) fs.writeFileSync(path.join(dir, part, file), "");
+    }
+    fs.writeFileSync(path.join(dir, "transformer", "config.json"), JSON.stringify({ _class_name: transformerClass }));
+    fs.writeFileSync(path.join(dir, "transformer", "diffusion_pytorch_model.safetensors.index.json"), JSON.stringify({ weight_map: { "a.weight": "diffusion_pytorch_model-00001-of-00001.safetensors" } }));
+    for (const part of ["text_encoder", "vae"]) fs.writeFileSync(path.join(dir, part, "config.json"), "{}");
+    return dir;
+  };
+  const sft = folder("MOSS-Image-SFT", "MOSImageTransformer");
+  folder("some-other-pipeline", "FluxTransformer2DModel");
+  // Half downloaded: a shard the index names isn't there yet.
+  const partial = folder("MOSS-Image-Base", "MOSImageTransformer");
+  fs.writeFileSync(path.join(partial, "transformer", "diffusion_pytorch_model.safetensors.index.json"), JSON.stringify({ weight_map: { "a.weight": "diffusion_pytorch_model-00001-of-00002.safetensors", "b.weight": "diffusion_pytorch_model-00002-of-00002.safetensors" } }));
+
+  const without = inferModels(objectInfo({ clipTypes: newTypes })).profiles.filter((item) => item.source === "moss_diffusers");
+  assert.deepEqual(without.map((item) => [item.model, item.missing.map((part) => part.label)]), [["MOSS-Image-SFT", ["MOSS-Image nodes"]]]);
+  assert.equal(without[0].missing[0].nodePack.subdir, "comfyui/moss-image");
+
+  const info = objectInfo({ clipTypes: newTypes, extra: { MOSSImageHFLoader: list({ model_path: ["STRING", {}], weight_dtype: [["default", "bf16"]], text_device: [["default", "cpu"]] }), SkipLayerGuidanceDiTSimple: node() } });
+  const profile = inferModels(info).profiles.find((item) => item.source === "moss_diffusers");
+  assert.deepEqual([profile.ready, profile.variant, profile.capabilities.textEncoder, profile.capabilities.vae], [true, "sft", false, false]);
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a fox" }, info));
+  assert.deepEqual(byType(graph, "MOSSImageHFLoader")[0].inputs, { model_path: sft, weight_dtype: "default", text_device: "default" });
+  assert.deepEqual([byType(graph, "CLIPLoader").length, byType(graph, "UNETLoader").length, byType(graph, "VAELoader").length], [0, 0, 0]);
+  const skip = byType(graph, "SkipLayerGuidanceDiTSimple")[0];
+  assert.equal(skip.inputs.single_layers, "22");
+  // The skip sits after the shift, and the sampler samples the skipped model.
+  assert.equal(graph[skip.inputs.model[0]].class_type, "ModelSamplingSD3");
+  assert.equal(graph[byType(graph, "KSampler")[0].inputs.model[0]], skip);
+});
+
+test("a pack inside a bigger repository is cloned beside its folder and only its folder is copied in", async () => {
+  const { packInstallPlan } = await import("./node-install.js");
+  const { nodePack } = await import("./node-packs.js");
+  const plan = packInstallPlan(nodePack("moss_image"), "/opt/ComfyUI", "linux");
+  const [command] = plan.commands;
+  assert.match(command.command, /git clone https:\/\/github\.com\/OpenMOSS\/MOSS-Image\.git moss-image\.src/);
+  assert.match(command.command, /cp -R "moss-image\.src\/comfyui\/moss-image" "moss-image" && rm -rf "moss-image\.src"/);
+  assert.doesNotMatch(command.command, /pip install/);
+  const windows = packInstallPlan(nodePack("moss_image"), "C:\\ComfyUI", "win32");
+  assert.match(windows.commands[0].command, /Copy-Item -Recurse -LiteralPath "moss-image\.src\\comfyui\\moss-image"/);
+  assert.match(windows.commands[1].command, /xcopy \/E \/I \/Q/);
+});
+
+test("MOSS-Image's guided setup takes the way from the file, and lists only what that way lacks", async () => {
+  const { familySetupPlan } = await import("./family-setup.js");
+  const unets = ["moss_image_sft_int8_convrot.safetensors"];
+  // Comfy-Org's single file on a ComfyUI too old for it: an update, then the encoder (the VAE is there).
+  const old = objectInfo({ unets, vaeFiles: ["flux2-vae.safetensors"], clipTypes: newTypes });
+  const oldProfiles = inferModels(old).profiles;
+  const single = oldProfiles.find((item) => item.family === "moss_image" && item.source === "unet");
+  assert.equal(single.setupGuide, "moss_image");
+  const before = familySetupPlan("moss_image", { info: old, profiles: oldProfiles, profileId: single.id });
+  assert.deepEqual([before.route, before.comfy.native, before.profile.ready], ["native", false, false]);
+  assert.deepEqual(before.parts.map((item) => [item.part, Boolean(item.have), item.download?.file || ""]), [["encoder", false, "qwen3.5_9b_int8_convrot.safetensors"], ["vae", true, ""]]);
+  // A current ComfyUI with everything in place: nothing left.
+  const current = objectInfo({ unets, clips: ["qwen3.5_9b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: mossTypes });
+  const after = familySetupPlan("moss_image", { info: current, profiles: inferModels(current).profiles, profileId: single.id });
+  assert.deepEqual([after.comfy.native, after.profile.ready, after.parts.every((item) => item.have)], [true, true, true]);
+  // The official folder runs on the makers' pack, which brings its own encoder and VAE.
+  const folder = oldProfiles.find((item) => item.source === "moss_diffusers");
+  const pack = familySetupPlan("moss_image", { info: old, profiles: oldProfiles, profileId: folder.id });
+  assert.deepEqual([pack.route, pack.parts.length, pack.comfy.pack.loaded, pack.comfy.pack.part.nodePack.subdir], ["pack", 0, false, "comfyui/moss-image"]);
+  assert.equal(familySetupPlan("sdxl", { info: current }), null);
+});
+
+/* ------------------------------------------------------------ FLUX.3 */
+
+const flux3Dit = (flowMap) => ({ "content_mode_blocks.image.0.attn_out.weight": t([3072, 3072]), "single_stream_modulations.txt.lin.weight": t([9216, 3072]), "txt_mode_blocks.0.attn_out.weight": t([3072, 3072]), ...(flowMap ? { "ref_time_in.in_layer.weight": t([3072, 256]) } : {}) });
+const flux3Types = [...mossTypes, "flux3"];
+
+test("FLUX.3 Klein and Klein Base are told apart by their weights, and run behind their prompt upsampler", () => {
+  assert.deepEqual(familyFromHeader(flux3Dit(true)), { family: "flux3", detail: { flowMap: true } });
+  // Flux.3 keeps no Flux key that would make it read as Flux.1 or 2, whatever else it carries.
+  assert.equal(familyFromHeader({ ...flux3Dit(false), "double_blocks.0.img_attn.norm.key_norm.scale": t([128]), "img_in.weight": t([3072, 128]) }).family, "flux3");
+  const unets = [put("diffusion_models", "flux3-image-klein-int8-convrot.safetensors", flux3Dit(true)), put("diffusion_models", "my-flux3-finetune.safetensors", flux3Dit(false))];
+  const clips = [put("text_encoders", "qwen3vl_4b_int8_convrot.safetensors", encoders.qwen3vl_4b), put("text_encoders", "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", qwen35(4096))];
+  const info = objectInfo({ unets, clips, vaeFiles: ["flux2-vae.safetensors"], clipTypes: flux3Types, extra: { TextGenerate: node(), BatchImagesNode: node(), ReferenceLatent: node(), ImageScaleToTotalPixels: node(), GetImageSize: node() } });
+  const flux3 = inferModels(info).profiles.filter((item) => item.family === "flux3");
+  assert.deepEqual(flux3.map((item) => [item.model, item.variant, item.ready, item.defaults.steps, item.defaults.cfg, item.capabilities.negativePrompt, item.upsampler]), [
+    ["flux3-image-klein-int8-convrot.safetensors", "distilled", true, 16, 1, false, "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"],
+    ["my-flux3-finetune.safetensors", "base", true, 50, 4, true, "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"]
+  ]);
+  assert.equal(flux3[0].mediaInputs.length, 3);
+  // MOSS-Image reads stock Qwen3.5 9B and never takes the tuned upsampler of the same shape.
+  const moss = inferModels(objectInfo({ unets: ["moss_image_sft_bf16.safetensors"], clips, vaeFiles: ["flux2-vae.safetensors"], clipTypes: flux3Types })).profiles.find((item) => item.family === "moss_image");
+  assert.deepEqual(moss.missing.map((item) => item.part), ["encoder"]);
+
+  const base = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: flux3[1].workflow, profileId: flux3[1].id, prompt: "a fox in snow", negative: "blurry", width: 1344, height: 768 }, info));
+  const generate = byType(base, "TextGenerate")[0].inputs;
+  // As BFL's own code sends it: the request alone, greedy, presence 1.5 for a picture.
+  assert.equal(generate.prompt, "a fox in snow");
+  assert.match(generate.system_prompt, /^You are the prompt upsampler of a text-to-image model/);
+  assert.deepEqual([generate.sampling_mode, generate["sampling_mode.top_k"], generate["sampling_mode.repetition_penalty"], generate["sampling_mode.presence_penalty"], generate.max_length, generate.mtp], ["on", 1, 1, 1.5, 3584, "off"]);
+  // Their time shift of 16, which ComfyUI's built-in 6.93 predates.
+  assert.deepEqual(byType(base, "ModelSamplingFlux").map((item) => [item.inputs.max_shift, item.inputs.base_shift]), [[Math.log(16), Math.log(16)]]);
+  assert.deepEqual(byType(base, "CLIPLoader").map((item) => [item.inputs.clip_name, item.inputs.type]), [["qwen3vl_4b_int8_convrot.safetensors", "flux3"], ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "flux3"]]);
+  // The positive encodes the upsampler's caption; the negative stays as typed.
+  const [positive, negative] = byType(base, "CLIPTextEncode");
+  assert.equal(base[positive.inputs.text[0]].class_type, "TextGenerate");
+  assert.equal(negative.inputs.text, "blurry");
+  assert.deepEqual([byType(base, "KSampler")[0].inputs.cfg, byType(base, "EmptyFlux2LatentImage").length], [4, 1]);
+
+  const edit = familyGraph({ family: "flux3", variant: "distilled", source: "unet", model: "flux3.safetensors", encoders: ["qwen3vl_4b.safetensors"], vae: "flux2-vae.safetensors", upsampler: "upsampler.safetensors", prompt: "make the dress red", referenceImages: ["a.png", "b.png"], steps: 16, cfg: 1, seed: 1 });
+  const editGenerate = byType(edit, "TextGenerate")[0].inputs;
+  assert.equal(editGenerate.prompt, "Reference images follow in order (the first image, the second image, ...).\nUser request: make the dress red\nOutput the caption.");
+  assert.match(editGenerate.system_prompt, /^You are the prompt upsampler of an image-editing model/);
+  assert.doesNotMatch(editGenerate.system_prompt, /\\"/);
+  assert.equal(editGenerate["sampling_mode.presence_penalty"], 0);
+  assert.deepEqual(Object.keys(byType(edit, "BatchImagesNode")[0].inputs), ["images.image0", "images.image1"]);
+  // Two references: each seen at about 724², as BFL feed them; the model itself still gets them as the shared path scales them.
+  const forUpsampler = Object.values(byType(edit, "BatchImagesNode")[0].inputs).map((link) => edit[link[0]]);
+  assert.deepEqual(forUpsampler.map((item) => [item.class_type, item.inputs.megapixels]), [["ImageScaleToTotalPixels", 0.52], ["ImageScaleToTotalPixels", 0.52]]);
+  assert.deepEqual([byType(edit, "ReferenceLatent").length, byType(edit, "ConditioningZeroOut").length], [4, 1]);
+});
+
+test("FLUX.3 runs without its prompt upsampler, which is recommended until dismissed, and gated files fall back to the open copy", async () => {
+  const info = objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clips: ["qwen3vl_4b_int8_convrot.safetensors"], vaeFiles: ["flux2-vae.safetensors"], clipTypes: flux3Types, extra: { TextGenerate: node(), BatchImagesNode: node(), ImageScaleToTotalPixels: node() } });
+  const profileOf = () => inferModels(info).profiles.find((item) => item.family === "flux3" && item.model === "flux3-image-klein-bf16.safetensors");
+  const profile = profileOf();
+  assert.deepEqual([profile.ready, profile.missing.length, profile.upsampler], [true, 0, ""]);
+  const part = profile.recommended.find((item) => item.slot === "upsampler");
+  assert.deepEqual([part.label, part.dismissKey], ["FLUX.3 prompt upsampler", "flux3:upsampler"]);
+  // BFL's gated file first, then the same file from the open copy, build by build.
+  assert.deepEqual(part.downloads.slice(0, 2).map((item) => [item.file, item.source]), [
+    ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "black-forest-labs"],
+    ["qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", "ml-resources"]
+  ]);
+  const { catalogDownload } = await import("./family-profiles.js");
+  assert.match(catalogDownload(part.downloads[0].id).alternatives[0].url, /ml-resources\/flux-3-image-klein-comfy/);
+  // Without it the plain prompt goes straight to the encoder.
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: profile.workflow, profileId: profile.id, prompt: "a fox" }, info));
+  assert.deepEqual([byType(graph, "TextGenerate").length, byType(graph, "CLIPTextEncode")[0].inputs.text], [0, "a fox"]);
+  // "Don't show again" holds for the family, and can be taken back.
+  const { setDismissed } = await import("./dismissals.js");
+  setDismissed("flux3:upsampler");
+  assert.deepEqual(profileOf().recommended, []);
+  setDismissed("flux3:upsampler", false);
+  assert.equal(profileOf().recommended.length, 1);
+  assert.throws(() => setDismissed("../etc"), /isn’t something/);
+  // An older ComfyUI: update first.
+  const old = inferModels(objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clipTypes: newTypes })).profiles.find((item) => item.family === "flux3");
+  assert.equal(old.missing[0].label, "Newer ComfyUI");
 });
 
 test("built-in image profiles preserve the latent node batch defaults", () => {

@@ -96,6 +96,7 @@ test('swipes move through previews and generation details stay accessible', asyn
     await page.setViewportSize({ width: 390, height: 844 });
   }
   for (const delta of [-200, 200, -200, 200]) {
+    await page.getByRole('button', { name: 'Fit Whole Image', exact: true }).click();
     const before = await canvas.locator('img').getAttribute('src');
     await canvas.evaluate((element, delta) => {
       const rect = element.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;

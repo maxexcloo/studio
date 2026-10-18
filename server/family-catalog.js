@@ -6,6 +6,8 @@
  * same order so the same file is never read two ways.
  */
 
+import { flux3Upsampler } from './prompt-upsamplers.js';
+
 const hf = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${file}`;
 
 /** Images per run for the built-in families: the graph renders at most this many, whatever the latent node accepts. */
@@ -47,7 +49,24 @@ export const encoderDownloads = {
   ],
   qwen3vl_4b: [
     { file: "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors", fp8: true, url: hf("DreamFast/Qwen3-VL-4b-Heretic-ComfyUI", "qwen3-vl-4b-heretic_fp8_e4m3fn.safetensors"), bytes: 4_831_492_476, sha256: "7443c2b8df026a3271b3095d5d1dc07800dc5cf460b6e3586692253c7a7bc17c" },
-    { file: "qwen3vl_4b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Krea-2", "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"), bytes: 5_242_467_968, sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094" }
+    { file: "qwen3vl_4b_fp8_scaled.safetensors", fp8: true, url: hf("Comfy-Org/Krea-2", "text_encoders/qwen3vl_4b_fp8_scaled.safetensors"), bytes: 5_242_467_968, sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094" },
+    // BFL's builds for FLUX.3, the ones a Mac can load. BFL's repository is gated (a license to
+    // accept while signed in), so each is followed by the same file from an ungated community
+    // copy, which a download falls back to when BFL's answers 401.
+    { file: "qwen3vl_4b_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_int8_convrot.safetensors"), bytes: 4_858_559_240 },
+    { file: "qwen3vl_4b_int8_convrot.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_int8_convrot.safetensors"), bytes: 4_858_559_240, sha256: "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c" },
+    { file: "qwen3vl_4b_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408 },
+    { file: "qwen3vl_4b_bf16.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3vl_4b_bf16.safetensors"), bytes: 8_875_719_408, sha256: "f0b24fc5c8d7c0ea6ca909da14c20af5cac53f22506be942c6c956f838b9630f" }
+  ],
+  // FLUX.3's prompt upsampler, a Qwen3.5 9B tuned to write its captions: gated like the model,
+  // so each build is followed by the same file from the ungated community copy (see qwen3vl_4b).
+  flux3_upsampler: [
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"), bytes: 9_748_113_996 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"), bytes: 9_748_113_996, sha256: "cb8cb9b9dcd2569509de755dca54d96fd93a16a7aabfd2f4051f0a144230620f" },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", fp8: true, url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"), bytes: 6_724_090_780 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors", fp8: true, url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"), bytes: 6_724_090_780, sha256: "e5d85a7421d197bf5a12474511936ecabce19a833252f16e9310a983194a4458" },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("black-forest-labs/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392 },
+    { file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", url: hf("ml-resources/flux-3-image-klein-comfy", "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors"), bytes: 18_819_722_392, sha256: "f5062a1fba3e63afe5c88349a311903fec06c959b362f1247127e63d5c860ed4" }
   ],
   qwen3vl_8b: [
     { file: "qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors", url: hf("DreamFast/Qwen3-VL-8B-Heretic-1.3.0", "comfyui/qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors"), bytes: 10_017_064_632, sha256: "7f8ec20de729e2d99f3a04852d4c4499c1677cda167f5ea63d21b0882a5c32b5" },
@@ -56,6 +75,11 @@ export const encoderDownloads = {
   qwen3vl_32b: [
     { file: "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors", url: hf("ethanfel/Qwen3-VL-32B-Ultra-Heretic-H3-ComfyUI-INT8-ConvRot", "qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"), bytes: 26_363_476_151, sha256: "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192" },
     { file: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", url: hf("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"), bytes: 15_687_142_551, sha256: "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6" }
+  ],
+  // Only Comfy-Org's quantized builds exist as single files so far; the w4a8 one carries fp8 scales.
+  qwen35_9b: [
+    { file: "qwen3.5_9b_int8_convrot.safetensors", url: hf("Comfy-Org/MOSS-Image", "text_encoders/qwen3.5_9b_int8_convrot.safetensors"), bytes: 9_748_121_532, sha256: "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a" },
+    { file: "qwen3.5_9b_w4a8_gptq.safetensors", fp8: true, url: hf("Comfy-Org/MOSS-Image", "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors"), bytes: 7_343_591_088, sha256: "4cc6a1543ad2061806da46f35f90cadb4801dcba246c44782cf42ec0feb6407c" }
   ],
   qwen25vl_7b: [
     { file: "qwen_2.5_vl_7b_huihui_abliterated_int8_convrot.safetensors", url: hf("ethanfel/Qwen2.5-VL-7B-Huihui-Abliterated-ComfyUI-ConvRot-INT8", "qwen_2.5_vl_7b_huihui_abliterated_int8_convrot.safetensors"), bytes: 10_064_106_602, sha256: "3dc4aae7dc34000c95de546cb220f1b67e51c86d7095fb9e3d19cec7032f5df7" },
@@ -170,9 +194,9 @@ export const starterModels = [
 
 /* ------------------------------------------------------------ Families */
 
-const square = [["1:1", 1, 1], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4], ["2.35:1", 235, 100]];
+const square = [["1:1", 1, 1], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4]];
 const portraitFirst = [["2:3", 2, 3], ["1:1", 1, 1], ["3:2", 3, 2], ["16:9", 16, 9], ["9:16", 9, 16], ["4:3", 4, 3], ["3:4", 3, 4]];
-const wide = [["16:9", 16, 9], ["9:16", 9, 16], ["1:1", 1, 1], ["4:3", 4, 3], ["3:4", 3, 4], ["2.35:1", 235, 100]];
+const wide = [["16:9", 16, 9], ["9:16", 9, 16], ["1:1", 1, 1], ["4:3", 4, 3], ["3:4", 3, 4]];
 
 const speedName = /lightning|dmd2?|hyper|turbo|lcm|pcm|\d+[-_ ]?steps?|tcd|flash/i;
 const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
@@ -199,6 +223,27 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * with the same layout, which is `as` (a knownFamilies id) instead.
  * pack: a node-packs.js id when the family runs on custom nodes. ownLoaders:
  * the pack loads encoder and VAE itself (no pickers, no LoRAs).
+ * runners: per model source, a custom node pack that runs the family another
+ * way (MOSS-Image's Diffusers folders through its makers' own loader): pack,
+ * note, ownLoaders, loras (the pack's model still takes ComfyUI's LoRAs),
+ * loader { node, path (the input that takes the folder's full path), inputs }
+ * in place of the three core loaders, modelSampling (its own shift node, in
+ * place of the family's), patches (nodes put on the model before sampling,
+ * after the shift), requiredNodes (core nodes those need) and
+ * folders { classNames }: which models/diffusers folders are this family, by
+ * their transformer/config.json.
+ * setup: a guided setup dialog for a family that runs more than one way
+ * (server/family-setup.js reads it).
+ * upsampler: a small language model the family is meant to run behind (FLUX.3),
+ * which rewrites your prompt into the long caption the model was trained on,
+ * through ComfyUI's TextGenerate: slot (an encoder slot, `only` its own build),
+ * clipType, system { text, edit } (edit when reference images go in, which it
+ * also sees), maxLength, sampling (TextGenerate's "on" settings) and
+ * editSampling (what an edit changes in them), editRequest (how an edit's
+ * request is worded, {prompt} for yours) and referenceMegapixels (how large
+ * it sees the references, by how many there are; the last covers the rest).
+ * optional: the model runs without it; a missing one is offered as recommended
+ * (the profile's `recommended`), not needed.
  * variants: first whose `match` passes wins; the last one is the fallback.
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
@@ -206,9 +251,22 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * exactly that many (see variantDefaults).
  * docs/guides/MODELS.md walks through adding a family.
  */
+/**
+ * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
+ * document that size (the size menu's 2K draws with no note), "maybe" where
+ * reports are mixed or missing (2K says the model isn't known for it). Left
+ * out only where it plainly breaks: the 1 MP generation (SD 1.5/2) at 2K, and
+ * models documented at ~1 MP at 4K.
+ * Sources per family: docs/guides/MODELS.md, "Native 2K".
+ */
+const drawsNone = {};
+const draws2kMaybe = { "2k": "maybe" };
+const draws2k = { "2k": "yes", "4k": "maybe" };
+const draws4k = { "2k": "yes", "4k": "yes" };
+
 export const families = {
   sd15: {
-    label: "SD 1.5", kind: "image", sources: ["checkpoint", "unet"],
+    label: "SD 1.5", kind: "image", native: drawsNone, sources: ["checkpoint", "unet"],
     slots: [{ slot: "clip", label: "CLIP-L", kinds: ["clip_l"] }], clipType: "stable_diffusion",
     vae: ["sd15"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true,
     aspects: portraitFirst, clipSkip: (name) => (/anything|nai|counterfeit|meina|abyss|anime/i.test(name) ? -2 : 0),
@@ -219,7 +277,7 @@ export const families = {
     size: [512, 512]
   },
   sd2: {
-    label: "SD 2.x", kind: "image", sources: ["checkpoint"],
+    label: "SD 2.x", kind: "image", native: drawsNone, sources: ["checkpoint"],
     slots: [{ slot: "clip", label: "CLIP-H", kinds: ["clip_h"] }], clipType: "stable_diffusion",
     vae: ["sd15"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true, aspects: square,
     // SD 2.0 and 2.1 come as 768 px v-prediction models and 512 px "base" ones
@@ -231,7 +289,7 @@ export const families = {
     size: [768, 768]
   },
   sdxl: {
-    label: "SDXL", kind: "image", sources: ["checkpoint", "unet"],
+    label: "SDXL", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] }, { slot: "clip_g", label: "CLIP-G", kinds: ["clip_g"] }], clipType: "sdxl",
     vae: ["sdxl"], latent: "EmptyLatentImage", sizeStep: 8, negative: "text", img2img: true, aspects: portraitFirst,
     // Pony, Illustrious and NoobAI descend from NovelAI-style training on the
@@ -253,7 +311,7 @@ export const families = {
     size: [1024, 1024]
   },
   auraflow: {
-    label: "Pony V7 / AuraFlow", kind: "image", sources: ["checkpoint", "unet"],
+    label: "Pony V7 / AuraFlow", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "t5", label: "Pile T5-XL", kinds: ["t5xl"] }], clipType: "stable_diffusion",
     vae: ["aura", "sdxl"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: [["5:6", 5, 6], ...portraitFirst],
     variants: [
@@ -265,7 +323,7 @@ export const families = {
     size: [1024, 1024]
   },
   sd3: {
-    label: "SD 3.5", kind: "image", sources: ["checkpoint", "unet"],
+    label: "SD 3.5", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [
       { slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] },
       { slot: "clip_g", label: "CLIP-G", kinds: ["clip_g"] },
@@ -279,7 +337,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux1: {
-    label: "Flux.1", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Flux.1", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "clip_l", label: "CLIP-L", kinds: ["clip_l"] }, { slot: "t5", label: "T5-XXL", kinds: ["t5xxl"] }], clipType: "flux",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "zero", img2img: true, aspects: square,
     variants: [
@@ -292,7 +350,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_dev: {
-    label: "Flux.2 Dev", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Flux.2 Dev", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Mistral 3 Small", kinds: ["mistral3_24b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "none", sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "BasicGuider", "FluxGuidance"],
@@ -304,7 +362,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_klein_4b: {
-    label: "Flux.2 Klein 4B", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Flux.2 Klein 4B", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 4B", kinds: ["qwen3_4b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "CFGGuider"],
@@ -316,7 +374,7 @@ export const families = {
     size: [1024, 1024]
   },
   flux2_klein_9b: {
-    label: "Flux.2 Klein 9B", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Flux.2 Klein 9B", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 8B", kinds: ["qwen3_8b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, sampling: "custom", scheduler: "flux2", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Flux2Scheduler", "SamplerCustomAdvanced", "CFGGuider"],
@@ -328,7 +386,7 @@ export const families = {
     size: [1024, 1024]
   },
   chroma: {
-    label: "Chroma", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Chroma", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "t5", label: "T5-XXL", kinds: ["t5xxl"] }], clipType: "chroma", t5Padding: { minPadding: 0, minLength: 0 },
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     modelSampling: { node: "ModelSamplingAuraFlow", shift: 1 },
@@ -339,7 +397,7 @@ export const families = {
     size: [1024, 1024]
   },
   hidream: {
-    label: "HiDream I1", kind: "image", sources: ["unet", "checkpoint"], neverBundledEncoder: true,
+    label: "HiDream I1", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"], neverBundledEncoder: true,
     slots: [
       // HiDream's CLIPs are its own fine-tunes with the same shapes as everyone
       // else's; Flux's clip_l gives black images (ComfyUI issue 7715).
@@ -357,7 +415,7 @@ export const families = {
     size: [1024, 1024]
   },
   qwen_image: {
-    label: "Qwen-Image", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Qwen-Image", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen2.5-VL 7B", kinds: ["qwen25vl_7b"] }], clipType: "qwen_image",
     vae: ["qwen_image", "wan21"], latent: "EmptySD3LatentImage", sizeStep: 16, img2img: true, aspects: square,
     modelSampling: { node: "ModelSamplingAuraFlow", shift: 3.1 },
@@ -370,7 +428,7 @@ export const families = {
     size: [1328, 1328]
   },
   qwen_image_21: {
-    label: "Qwen-Image 2.1", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Qwen-Image 2.1", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }], clipType: "qwen_image",
     vae: ["qwen_image_21"], latent: "EmptyLatentImage", sizeStep: 32, negative: "qwen21", aspects: square,
     requiredNodes: ["TextEncodeQwenImage21"],
@@ -383,7 +441,7 @@ export const families = {
     size: [1024, 1024]
   },
   zimage: {
-    label: "Z-Image", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Z-Image", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 4B", kinds: ["qwen3_4b"] }], clipType: "lumina2",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     variants: [
@@ -393,19 +451,20 @@ export const families = {
     size: [1024, 1024]
   },
   krea2: {
-    label: "Krea 2", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Krea 2", kind: "image", native: draws2k, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "krea2",
     vae: ["qwen_image"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     // ComfyUI-Krea2T-Enhancer, when installed, at its own default strength (0 neutral, 2 full).
     enhancer: { strength: 1 },
     variants: [
-      { id: "raw", label: "Raw", match: (name) => isKrea2Raw(name), rawShift: true, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" } },
+      // Raw is trained up to 1K (krea-ai/krea-2 README), Turbo up to 2K.
+      { id: "raw", label: "Raw", match: (name) => isKrea2Raw(name), rawShift: true, native: draws2kMaybe, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" } },
       { id: "turbo", label: "Turbo", defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" } }
     ],
     size: [1024, 1024]
   },
   anima: {
-    label: "Anima", kind: "image", sources: ["unet", "checkpoint"],
+    label: "Anima", kind: "image", native: draws2kMaybe, sources: ["unet", "checkpoint"],
     slots: [{ slot: "encoder", label: "Qwen3 0.6B", kinds: ["qwen3_06b"] }], clipType: "stable_diffusion",
     vae: ["qwen_image", "wan21"], latent: "EmptyLatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: portraitFirst,
     // The card: er_sde as the default sampler (both Comfy-Org templates use it);
@@ -559,7 +618,7 @@ export const families = {
   // system prompt before yours, as it did in training; the anime fine-tunes
   // were trained on their own, with a matching one for the negative.
   lumina2: {
-    label: "Lumina Image 2.0", kind: "image", sources: ["checkpoint", "unet"],
+    label: "Lumina Image 2.0", kind: "image", native: draws2kMaybe, sources: ["checkpoint", "unet"],
     slots: [{ slot: "encoder", label: "Gemma 2 2B", kinds: ["gemma2_2b"] }], clipType: "lumina2",
     vae: ["flux1"], latent: "EmptySD3LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: portraitFirst,
     variants: [
@@ -584,7 +643,7 @@ export const families = {
   // CFG eases off for the last 30% of steps. Its scheduler follows the steps:
   // Comfy-Org's Turbo (12), Default (20) and Quality (48) presets.
   ideogram4: {
-    label: "Ideogram 4", kind: "image", sources: ["unet"],
+    label: "Ideogram 4", kind: "image", native: draws2k, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }], clipType: "ideogram4",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "none", sampling: "ideogram4", aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage", "Ideogram4Scheduler", "DualModelGuider", "CFGOverride", "SamplerCustomAdvanced", "KSamplerSelect", "RandomNoise", "ConditioningZeroOut"],
@@ -600,7 +659,7 @@ export const families = {
   },
   // Mage-Flow encodes prompt and negative in one node that also makes the latent.
   mage_flow: {
-    label: "MageFlow", kind: "image", sources: ["unet"],
+    label: "MageFlow", kind: "image", native: draws2k, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "mage",
     vae: ["mage_flow"], latent: "TextEncodeMageFlowEdit", sizeStep: 16, negative: "text", sampling: "mage", aspects: square,
     requiredNodes: ["TextEncodeMageFlowEdit"],
@@ -612,7 +671,7 @@ export const families = {
   },
   // ERNIE-Image: Ministral 3 3B through the Flux.2 text path, the Flux.2 VAE and latent, plain KSampler.
   ernie: {
-    label: "ERNIE-Image", kind: "image", sources: ["unet"],
+    label: "ERNIE-Image", kind: "image", native: draws2kMaybe, sources: ["unet"],
     slots: [{ slot: "encoder", label: "Ministral 3 3B", kinds: ["ministral3_3b"] }], clipType: "flux2",
     vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
     requiredNodes: ["EmptyFlux2LatentImage"],
@@ -627,21 +686,90 @@ export const families = {
   // Settings follow NVlabs/Sana's ComfyUI workflows: CFG 2 for the 1.6B Sana 1.0
   // models (1K, 2K, 4K), 4.5 for SANA 1.5.
   sana: {
-    label: "Sana", kind: "image", sources: ["sana", "sana_diffusers", "checkpoint"], ownLoaders: true,
+    label: "Sana", kind: "image", native: draws2kMaybe, sources: ["sana", "sana_diffusers", "checkpoint"], ownLoaders: true,
     slots: [], clipType: null, vae: [],
     latent: "EmptyHunyuanImageLatent", sizeStep: 32, negative: "text", sampling: "sana", aspects: square,
     variants: [
       // Sprint is a consistency model: its CFG goes in through ScmModelSampling, KSampler stays at 1.
-      { id: "sprint", label: "Sprint", match: (name, header, detail) => detail?.sprint ?? /sprint/i.test(name), negative: "none", dtype: "FP32", defaults: { steps: 2, cfg: 4.5, sampler: "scm", scheduler: "sgm_uniform" } },
-      { id: "4k", label: "4K", match: (name) => /4k/i.test(name), size: [4096, 4096], defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
-      { id: "2k", label: "2K", match: (name) => /2k/i.test(name), size: [2048, 2048], defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
-      { id: "512", label: "512px", match: (name) => /512px/i.test(name), size: [512, 512], defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } },
+      { id: "sprint", label: "Sprint", match: (name, header, detail) => detail?.sprint ?? /sprint/i.test(name), native: draws2kMaybe, negative: "none", dtype: "FP32", defaults: { steps: 2, cfg: 4.5, sampler: "scm", scheduler: "sgm_uniform" } },
+      { id: "4k", label: "4K", match: (name) => /4k/i.test(name), size: [4096, 4096], native: draws4k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
+      { id: "2k", label: "2K", match: (name) => /2k/i.test(name), size: [2048, 2048], native: draws2k, defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" } },
+      { id: "512", label: "512px", match: (name) => /512px/i.test(name), size: [512, 512], native: drawsNone, defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } },
       // Sana 1.0 1.6B at 1024: 20 blocks without SANA 1.5's q/k norms.
       {
         id: "1600m", label: "1.6B", defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },
         match: (name, header, detail) => (detail?.depth ? detail.depth === 20 && !detail.qkNorm : /1600m|1[._]6b/i.test(name) && !/1[._]5/.test(name))
       },
       { id: "standard", label: "Sana", defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" } }
+    ],
+    size: [1024, 1024]
+  },
+  // Black Forest Labs' FLUX.3 Image Klein (Oct 2026): a 5.6B DiT on the Flux.2 latent and
+  // VAE, reading prompts with Qwen3-VL 4B (8 tapped layers). It edits from up to ten
+  // references; the composer offers three. Settings from BFL's reference code
+  // (black-forest-labs/flux-3-image-klein, 2026-10-17): Klein (distilled, a flow map) 16
+  // steps without guidance, Klein Base 50 steps at CFG 4, both on a time shift of 16 (ComfyUI
+  // still builds in 6.93, so the shift is set here: mu = ln 16), euler / simple. Up to 4K;
+  // BFL recommend 2K. "Do not use the model without a prompt upsampler", so every run goes
+  // through theirs first, as their code runs it.
+  flux3: {
+    label: "FLUX.3 Klein", kind: "image", native: draws4k, sources: ["unet", "checkpoint"],
+    slots: [{ slot: "encoder", label: "Qwen3-VL 4B", kinds: ["qwen3vl_4b"] }], clipType: "flux3",
+    vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, aspects: square,
+    requiredNodes: ["EmptyFlux2LatentImage", "TextGenerate", "BatchImagesNode", "ImageScaleToTotalPixels"],
+    modelSampling: { node: "ModelSamplingFlux", shift: Math.log(16) },
+    references: 3,
+    // BFL's pup.py: greedy decoding (top_k 1 here, as Comfy-Org's templates do it, since TextGenerate
+    // needs sampling on for a presence penalty), no repetition penalty, presence 1.5 for a picture
+    // and 0 for an edit. An edit's request is worded as theirs is, with its references at most
+    // 1 MP for one, 724² for two and 512² for more.
+    upsampler: {
+      // Recommended, not required: it runs without one, and long prompts lose little.
+      optional: true,
+      slot: { slot: "upsampler", label: "FLUX.3 prompt upsampler", kinds: ["qwen35_9b"], only: /upsampl/i, download: "flux3_upsampler", detail: "FLUX.3 runs without it. It was trained on long, detailed captions, and this turns a short prompt into one; BFL recommend it. With it in place, every run uses it." },
+      clipType: "flux3", system: flux3Upsampler, maxLength: 3584,
+      sampling: { temperature: 1, top_k: 1, top_p: 0.95, min_p: 0, repetition_penalty: 1, seed: 0, presence_penalty: 1.5 },
+      editSampling: { presence_penalty: 0 },
+      editRequest: "Reference images follow in order (the first image, the second image, ...).\nUser request: {prompt}\nOutput the caption.",
+      referenceMegapixels: [1, 0.52, 0.25]
+    },
+    variants: [
+      { id: "base", label: "Base", match: (name, header, detail) => (detail?.flowMap !== undefined ? !detail.flowMap : /(^|[^a-z])base([^a-z]|$)/i.test(name)), negative: "text", defaults: { steps: 50, cfg: 4, sampler: "euler", scheduler: "simple" } },
+      { id: "distilled", label: "Klein", negative: "zero", defaults: { steps: 16, cfg: 1, sampler: "euler", scheduler: "simple" } }
+    ],
+    size: [1024, 1024]
+  },
+  // OpenMOSS's MOSS-Image (Oct 2026): a 5B single-stream DiT in Flux.2's latent space that
+  // reads prompts with a stock Qwen3.5 9B. Settings from its model card and ComfyUI
+  // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
+  // Two ways to run it: ComfyUI's own nodes (master after 0.41.3, CLIPLoader type
+  // moss_image) with Comfy-Org's single files, or its makers' pack with the official
+  // Diffusers folder, which also skips layer 22 on the negative pass as they sample.
+  moss_image: {
+    label: "MOSS-Image", kind: "image", native: { "2k": "yes" }, sources: ["unet", "moss_diffusers"],
+    // Stock Qwen3.5 9B; FLUX.3's upsampler is a tuned Qwen3.5 9B with the same shapes.
+    slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"], not: /upsampl/i }], clipType: "moss_image",
+    vae: ["flux2"], latent: "EmptyFlux2LatentImage", sizeStep: 16, negative: "text", img2img: true, aspects: square,
+    // No shift node on ComfyUI's own nodes: their MOSS-Image samples at shift 5 by itself, with
+    // timesteps 0-1. ModelSamplingSD3 would scale those by 1000 and draw only noise.
+    requiredNodes: ["EmptyFlux2LatentImage"],
+    runners: {
+      moss_diffusers: {
+        pack: "moss_image", ownLoaders: true, loras: true,
+        // The makers' model is set up at shift 1 with timesteps x1000; their workflow shifts it to 5.
+        modelSampling: { node: "ModelSamplingSD3", shift: 5 },
+        note: "MOSS-Image’s makers ship these nodes. They load the official model folder.",
+        loader: { node: "MOSSImageHFLoader", path: "model_path", inputs: { weight_dtype: "default", text_device: "default" } },
+        patches: [{ node: "SkipLayerGuidanceDiTSimple", inputs: { double_layers: "", single_layers: "22", start_percent: 0, end_percent: 1 } }],
+        requiredNodes: ["SkipLayerGuidanceDiTSimple", "ModelSamplingSD3", "EmptyFlux2LatentImage"],
+        folders: { classNames: ["MOSImageTransformer", "MOSSImageTransformer"] }
+      }
+    },
+    // Two ways to run one model: a guided setup walks through the one its file needs.
+    setup: "moss_image",
+    variants: [
+      { id: "base", label: "Base", match: (name) => /(^|[^a-z])base([^a-z]|$)/i.test(name), defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" } },
+      { id: "sft", label: "SFT", defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" } }
     ],
     size: [1024, 1024]
   }
@@ -679,6 +807,12 @@ export const sanaRunners = {
 };
 
 export const sanaRunnerFor = (source) => sanaRunners[source === "sana_diffusers" ? "sana_diffusers" : "sana"];
+/** The custom-node runner a family uses for one model source (see `runners`), or null for ComfyUI's own nodes. */
+export function runnerFor(family, source) {
+  if (!family) return null;
+  if (family.sampling === "sana") return sanaRunnerFor(source);
+  return family.runners?.[source] || null;
+}
 
 /** A friendly name for a Sana preset or a diffusers folder of one. */
 export function sanaLabel(name = "") {
@@ -760,6 +894,8 @@ export function familyFromName(name = "", source = "unet") {
   const base = String(name).split(/[\\/]/).pop() || "";
   const tests = [
     ["sana", /(^|[^a-z])sana([^a-z]|$)/i],
+    ["moss_image", /moss[-_ ]?image/i],
+    ["flux3", /flux[-_. ]?3/i],
     ["ideogram4", /ideogram/i],
     ["mage_flow", /mage[-_ ]?flow/i],
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
@@ -833,6 +969,11 @@ export function familyFromHeader(header) {
     if (!has("vision_in.proj.0.weight")) return { family: "hunyuan_video" };
     return dim(keys, "img_in.proj.weight", 1) === 98 ? { family: "other" } : { family: "hunyuan15" };
   }
+  // FLUX.3, before Flux: its own text, image and reference mode blocks. A flow map (Klein,
+  // distilled) also reads the step it jumps to.
+  if (has("content_mode_blocks.image.0.attn_out.weight") && has("single_stream_modulations.txt.lin.weight")) {
+    return { family: "flux3", detail: { flowMap: has("ref_time_in.in_layer.weight") } };
+  }
   const fluxLike = (has("double_blocks.0.img_attn.norm.key_norm.weight") || has("double_blocks.0.img_attn.norm.key_norm.scale"))
     && (has("img_in.weight") || has("distilled_guidance_layer.norms.0.weight") || has("distilled_guidance_layer.norms.0.scale"));
   if (fluxLike) {
@@ -894,6 +1035,8 @@ export function familyFromHeader(header) {
     return { family: "qwen_image" };
   }
   if (has("embed_image_indicator.weight")) return { family: "ideogram4" };
+  // MOSS-Image: one shared modulation for every block, fused feed-forward up/gate.
+  if (has("shared_block_modulation.weight") && has("layers.0.proj.ffn_up_gate.weight")) return { family: "moss_image" };
   if (has("txtfusion.projector.weight")) return { family: "krea2" };
   if (has("visual_transformer_blocks.0.cross_attention.key_norm.weight")) return { family: "kandinsky5" };
   if (has("layers.0.mlp.linear_fc2.weight")) return { family: "ernie" };

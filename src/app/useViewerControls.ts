@@ -5,7 +5,7 @@ import { reusedNegative } from './composerSettings';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
 import { normalizeLoras } from './loras';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { flushSync } from 'react-dom';
 import { toast } from './toast';
@@ -41,6 +41,49 @@ export function useViewerControls(view: any) {
     setZenSelectedId, showToast, viewerDragEndRef, viewerDragRef, viewerPan,
     viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
   } = view;
+  const [viewerNativeZoom, setViewerNativeZoom] = useState(1);
+  const nativeZoomRef = useRef(1);
+  const sizeMode = useRef<'native' | 'fit' | 'manual'>('native');
+  const swipeZoom = useRef(1);
+  useLayoutEffect(() => {
+    const item = active || (prefs.zenMode ? zenItem : null);
+    if (item?.type !== 'image') {
+      if (item?.type === 'video') { nativeZoomRef.current = 1; setViewerNativeZoom(1); setViewerZoom(1); }
+      return;
+    }
+    const canvas = document.querySelector<HTMLElement>(active ? '.viewer-canvas' : '.zen-output');
+    if (!canvas) return;
+    sizeMode.current = 'native';
+    let first = true;
+    const measure = () => {
+      const image = canvas.querySelector<HTMLImageElement>('img.generation-result');
+      if (!image?.naturalWidth) return;
+      const geometry = measureViewer(canvas);
+      if (!geometry?.w) return;
+      const factor = image.naturalWidth / geometry.w;
+      if (!first && Math.abs(factor - nativeZoomRef.current) < 0.0001) return;
+      const previous = nativeZoomRef.current;
+      nativeZoomRef.current = factor;
+      setViewerNativeZoom(factor);
+      if (first || sizeMode.current === 'native') setViewerZoom(factor);
+      else if (sizeMode.current === 'fit') setViewerZoom(1);
+      else setViewerZoom((zoom: number) => zoom * factor / previous);
+      if (first) setViewerPan({ x: 0, y: 0 });
+      first = false;
+    };
+    measure();
+    canvas.addEventListener('load', measure, true);
+    const resize = new ResizeObserver(measure);
+    resize.observe(canvas);
+    const media = new MutationObserver(measure);
+    media.observe(canvas, { childList: true, subtree: true });
+    return () => { canvas.removeEventListener('load', measure, true); resize.disconnect(); media.disconnect(); };
+  }, [active?.id, active?.url, active?.upscaleActive, prefs.zenMode, zenItem?.id]);
+  function fitViewer() {
+    sizeMode.current = 'fit';
+    setViewerZoom(1);
+    setViewerPan({ x: 0, y: 0 });
+  }
   const swipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swiping = useRef(false);
   const tapPointRef = useRef<Pan | null>(null);
@@ -58,7 +101,8 @@ export function useViewerControls(view: any) {
   function resetViewer() {
     lastTapRef.current = 0;
     tapPointRef.current = null;
-    setViewerZoom(1);
+    sizeMode.current = 'native';
+    setViewerZoom(nativeZoomRef.current);
     setViewerPan({ x: 0, y: 0 });
   }
 
@@ -95,15 +139,14 @@ export function useViewerControls(view: any) {
   }
 
   /**
-   * Loads an output's prompt and settings into the composer. `vary` is for
-   * "Vary this": a new seed and no toast, since a new image follows at once.
+   * Loads an output's prompt and settings into the composer. The seed stays
+   * as it is, so "Use these settings" makes a new picture, not the same one.
    * Returns whether its model is installed.
    */
-  function applyAllSettings(item: GalleryItem, { vary = false }: { vary?: boolean } = {}) {
+  function applyAllSettings(item: GalleryItem) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const matchingProfile = outputProfile(models?.profiles || [], item);
-    if (vary && !matchingProfile) return false;
     const targetProfile: Profile | undefined = matchingProfile || models?.profiles?.find((profile: Profile) => profile.id === view.draft?.model && profile.kind === view.mode && profile.ready !== false);
     if (!targetProfile) { applyPromptsOnly(item, true); return false; }
     const nextMode = targetProfile.kind;
@@ -128,7 +171,7 @@ export function useViewerControls(view: any) {
     setSteps(settings.steps);
     setCfg(settings.cfg);
     setDenoise(settings.denoise);
-    if (itemSettings.seed && itemSettings.seed !== "Random" && !vary) setSeed(String(itemSettings.seed));
+    if (itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
     else setSeed("");
     setCount(clampProfileCount(targetProfile, itemSettings.variationCount || itemSettings.count || view.draft?.count || 1));
     setFrames(settings.frames);
@@ -150,8 +193,7 @@ export function useViewerControls(view: any) {
       setStartImageName(settings.hasImageInput ? item.referenceImageName || String(itemSettings.referenceImageName || "") : "");
     }
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === settings.width && option.h === settings.height));
-    view.onReuseOutput?.(vary ? null : item);
-    if (vary) return Boolean(matchingProfile);
+    view.onReuseOutput?.(item);
     const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
     const message = matchingProfile
       ? `Settings applied.${seedNote}`
@@ -266,11 +308,16 @@ export function useViewerControls(view: any) {
   }
 
   function zoomViewer(nextZoom: number, anchor?: { x: number; y: number; element: HTMLElement }) {
+    sizeMode.current = 'manual';
     // Three decimals, so a touchpad's small steps still add up.
-    const clamped = Math.max(0.5, Math.min(6, Math.round(nextZoom * 1000) / 1000));
+    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(nextZoom * 1000) / 1000));
     if (anchor) setViewerPan(anchoredPan(clamped, anchor.x, anchor.y, anchor.element));
     else if (clamped <= 1) setViewerPan({ x: 0, y: 0 });
     setViewerZoom(clamped);
+  }
+
+  function stepViewer(direction: number) {
+    zoomViewer(latestView.current.viewerZoom + nativeZoomRef.current * direction * 0.25);
   }
 
   // Attached natively and non-passive (useWheelRef), so preventDefault holds
@@ -307,11 +354,7 @@ export function useViewerControls(view: any) {
     // On touch a single tap only closes (outside the image); zoom is a double tap
     // or a pinch, so a stray tap never jumps the picture to 200%.
     if (Date.now() - lastTouchRef.current < 700) return;
-    if (viewerZoom > 1) {
-      zoomViewer(1);
-    } else {
-      zoomViewer(2);
-    }
+    zoomViewer(viewerZoom > nativeZoomRef.current * 1.05 ? nativeZoomRef.current : nativeZoomRef.current * 2);
   }
 
   function startViewerDrag(event: React.PointerEvent) {
@@ -383,6 +426,7 @@ export function useViewerControls(view: any) {
     // matters again once a second joins it, for a new pinch.
     if ((gesture?.mode === "done" && event.touches.length < 2) || (gesture?.mode === "pinch" && event.touches.length > 2)) return;
     // Caught mid-spring, it carries on from where it is on screen.
+    sizeMode.current = 'manual';
     const start = gesture?.mode === "pinch" ? gesture.current : gesture?.mode === "pan" ? { zoom: gesture.zoom, pan: gesture.current } : liveTransform(canvas, { zoom: viewerZoom, pan: viewerPan });
     paint(canvas, start.zoom, start.pan);
     if (event.touches.length >= 2) {
@@ -390,10 +434,11 @@ export function useViewerControls(view: any) {
       return;
     }
     const touch = event.touches[0];
-    if (start.zoom > MIN_ZOOM + 0.001) {
+    if (start.zoom > 1.001) {
       touchGestureRef.current = { mode: "pan", id: touch.identifier, x: touch.clientX, y: touch.clientY, zoom: start.zoom, pan: start.pan, geometry: measureViewer(canvas), current: start.pan, moved: false };
       return;
     }
+    swipeZoom.current = start.zoom;
     // At fit size one finger swipes: sideways for the next image, down to close.
     const velocity = new Velocity();
     velocity.add(touch.clientX, touch.clientY);
@@ -484,7 +529,7 @@ export function useViewerControls(view: any) {
       // a second picture in behind it.
       if (fromId && itemId() !== fromId) {
         swiping.current = false;
-        settleViewer(canvas, 1, { x: 0, y: 0 }, false);
+        settleViewer(canvas, swipeZoom.current, { x: 0, y: 0 }, false);
         return;
       }
       // Rendered now, so the next picture is in place before it slides in.
@@ -505,10 +550,10 @@ export function useViewerControls(view: any) {
     }, 140);
   }
 
-  /** A pinch is over: below fit it springs back; anywhere else it stays exactly where it is. */
+  /** A pinch is over: retain its scale and position within the zoom limits. */
   function endPinch(canvas: HTMLElement, gesture: Extract<TouchGesture, { mode: "pinch" }>) {
     const { zoom, pan } = gesture.current;
-    if (zoom < 1.03) settleViewer(canvas, MIN_ZOOM, { x: 0, y: 0 });
+    if (zoom < MIN_ZOOM) settleViewer(canvas, MIN_ZOOM, { x: 0, y: 0 });
     else settleViewer(canvas, zoom, pan, false);
   }
 
@@ -563,6 +608,17 @@ export function useViewerControls(view: any) {
       tapPointRef.current = doubleTap ? null : { x: endedTouch.clientX, y: endedTouch.clientY };
     }
 
+    if (!gesture.moved && doubleTap && endedTouch) {
+      event.preventDefault();
+      const current = gesture.mode === 'pan' ? gesture.zoom : swipeZoom.current;
+      const zoom = current > nativeZoomRef.current * 1.05 ? nativeZoomRef.current : Math.min(MAX_ZOOM, nativeZoomRef.current * 2.5);
+      const geometry = measureViewer(canvas);
+      const point = { x: endedTouch.clientX, y: endedTouch.clientY };
+      const pan = geometry ? clampPan(geometry, zoom, anchorPan(geometry, zoom, current, viewerPan, point, point)) : { x: 0, y: 0 };
+      settleViewer(canvas, zoom, pan);
+      return;
+    }
+
     if (gesture.mode === "swipe") {
       if (gesture.moved) {
         const { dx, dy } = gesture;
@@ -577,35 +633,15 @@ export function useViewerControls(view: any) {
           setActive(null);
           return;
         }
-        settleViewer(canvas, 1, { x: 0, y: 0 });
+        settleViewer(canvas, swipeZoom.current, { x: 0, y: 0 });
         return;
       }
-      // A tap, or the second of a double tap: zoom in on the spot tapped.
-      const touch = event.changedTouches[0];
-      if (touch && doubleTap) {
-        event.preventDefault();
-        lastTapRef.current = 0;
-        const geometry = measureViewer(canvas);
-        const zoom = 2.5;
-        const point = { x: touch.clientX, y: touch.clientY };
-        const pan = geometry ? clampPan(geometry, zoom, anchorPan(geometry, zoom, 1, { x: 0, y: 0 }, point, point)) : { x: 0, y: 0 };
-        settleViewer(canvas, zoom, pan);
-        return;
-      }
-      settleViewer(canvas, 1, { x: 0, y: 0 }, false);
+      settleViewer(canvas, swipeZoom.current, { x: 0, y: 0 }, false);
       return;
     }
 
-    // A pan ends where the finger left it; a double tap zooms back to fit.
-    if (!gesture.moved) {
-      if (doubleTap) {
-        event.preventDefault();
-        lastTapRef.current = 0;
-        settleViewer(canvas, 1, { x: 0, y: 0 });
-        return;
-      }
-    }
+    // A pan ends where the finger left it.
     settleViewer(canvas, gesture.zoom, gesture.current, false);
   }
-  return { resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
+  return { fitViewer, stepViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
 }

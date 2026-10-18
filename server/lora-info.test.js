@@ -115,7 +115,7 @@ test('Boogu provider metadata identifies its imported family precisely', () => {
 
 
 test('FLUX.3 Klein provider and training metadata do not fall back to FLUX.1', () => {
-  assert.deepEqual(familiesFromMetadata({ base_model: 'Flux.3 Klein-base' }), ['flux3_klein']);
-  assert.deepEqual(familiesFromMetadata({ ss_base_model_version: 'flux3' }), ['flux3_klein']);
+  assert.deepEqual(familiesFromMetadata({ base_model: 'Flux.3 Klein-base' }), ['flux3']);
+  assert.deepEqual(familiesFromMetadata({ ss_base_model_version: 'flux3' }), ['flux3']);
   assert.deepEqual(familiesFromMetadata({ base_model: 'Flux.1 Dev' }), ['flux1']);
 });

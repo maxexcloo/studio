@@ -1,3 +1,5 @@
+import React from "react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiJson } from "./api";
 import { useThisComputer } from "./device";
@@ -6,6 +8,9 @@ import type { UpdatePrefs, UpdateStatus } from "./types";
 import type { ConfirmAction } from "./useConfirmation";
 
 const updateInstalledKey = "heiss-ui:update-installed";
+// A restart this page asked for, so the page it reloads into can say how it went.
+const restartedKey = "heiss-ui:restarted";
+const restartToastId = "heiss-restart";
 const formatUpdateBytes = (bytes = 0) => `${(bytes / 1024 ** 2).toFixed(bytes > 100 * 1024 ** 2 ? 0 : 1)} MB`;
 
 export function useAppUpdates(confirmAction: ConfirmAction) {
@@ -30,6 +35,30 @@ export function useAppUpdates(confirmAction: ConfirmAction) {
       else if (status?.release) setJustUpdated(result?.to || status.current || "");
       else showToast("HEISS UI updated", "success");
     }).catch(() => null);
+  }, []);
+
+  // After any restart from here: say HEISS UI is back, and for the LAN switch, whether
+  // other devices can now reach it. An update says its own thing above.
+  useEffect(() => {
+    let pending: { at: number; lan?: boolean } | null = null;
+    try { pending = JSON.parse(localStorage.getItem(restartedKey) || "null"); } catch { pending = null; }
+    if (!pending?.at) return;
+    try { localStorage.removeItem(restartedKey); } catch { /* nothing to clear */ }
+    // An old marker (the restart never came back here) says nothing about this page.
+    if (Date.now() - pending.at > 10 * 60 * 1000) return;
+    if (typeof pending.lan !== "boolean") {
+      showToast("HEISS UI restarted", "success");
+      return;
+    }
+    const wanted = pending.lan;
+    apiJson<{ listening: boolean; addresses: string[]; port: number }>("/api/network").then((network) => {
+      if (network.listening === wanted) {
+        const address = network.addresses[0];
+        showToast(wanted ? "Open on other devices" : "Closed to other devices", "success", wanted && address ? { description: `On this network: ${window.location.protocol}//${address}:${window.location.port || network.port}` } : undefined);
+      } else {
+        showToast(wanted ? "Still closed to other devices" : "Still open to other devices", "error", { description: "HEISS UI restarted, but the setting didn’t take. Settings › Connection says why.", duration: Infinity });
+      }
+    }).catch(() => showToast("HEISS UI restarted", "success"));
   }, []);
 
   // A release download runs on the server; follow it while it is in flight.
@@ -129,18 +158,21 @@ export function useAppUpdates(confirmAction: ConfirmAction) {
    * Restarts HEISS UI through its launcher (which also swaps in a downloaded
    * update), then reloads the page once the new server answers.
    */
-  async function restartHeiss({ update = false } = {}) {
+  async function restartHeiss({ update = false, lan }: { update?: boolean; lan?: boolean } = {}) {
     const at = Date.now();
     try {
       await apiJson("/api/update/restart", { method: "POST" });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Couldn’t restart HEISS UI", "error", { action: { label: "Try again", onClick: () => restartHeiss({ update }) } });
+      showToast(error instanceof Error ? error.message : "Couldn’t restart HEISS UI", "error", { id: restartToastId, duration: Infinity, action: { label: "Try again", onClick: () => restartHeiss({ update, lan }) } });
       return false;
     }
     // A downloaded update goes in with any restart, so say so when the page comes back.
-    if (update || updateStatus?.download?.status === "ready") {
-      try { localStorage.setItem(updateInstalledKey, JSON.stringify({ at })); } catch { /* the toast just won't show */ }
-    }
+    const withUpdate = update || updateStatus?.download?.status === "ready";
+    try {
+      if (withUpdate) localStorage.setItem(updateInstalledKey, JSON.stringify({ at }));
+      else localStorage.setItem(restartedKey, JSON.stringify({ at, ...(typeof lan === "boolean" ? { lan } : {}) }));
+    } catch { /* the toast just won't show */ }
+    showToast(withUpdate ? "Installing the update…" : "Restarting HEISS UI…", "default", { id: restartToastId, duration: Infinity, description: "This page reloads when it’s back.", glyph: React.createElement(RefreshCw, { size: 16, className: "spin" }) });
     setRestarting(true);
     // Wait for a server that started after the restart, then load its new page.
     const deadline = at + 3 * 60 * 1000;
@@ -149,7 +181,8 @@ export function useAppUpdates(confirmAction: ConfirmAction) {
       if (data?.startedAt && data.startedAt >= at) { window.location.reload(); return; }
       if (Date.now() > deadline) {
         setRestarting(false);
-        showToast("HEISS UI didn’t come back. Start it again with its launcher.", "error", { duration: Infinity, action: { label: "Reload", onClick: () => window.location.reload() } });
+        try { localStorage.removeItem(restartedKey); } catch { /* nothing to clear */ }
+        showToast("HEISS UI didn’t come back", "error", { id: restartToastId, description: "Start it again with its launcher, then reload.", duration: Infinity, action: { label: "Reload", onClick: () => window.location.reload() } });
         return;
       }
       window.setTimeout(poll, 1000);

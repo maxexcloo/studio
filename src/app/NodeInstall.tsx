@@ -200,12 +200,15 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
                 ? pack.search
                   ? <>In ComfyUI, open <strong>Manager</strong>, search the node list for <strong>{pack.search}</strong> and install it.</>
                   : <>ComfyUI-Manager {manager?.version} can’t install from a Git URL in its main view, and {pack.name} isn’t in its list. Use the <strong>Terminal</strong> tab instead.</>
-                : <>In ComfyUI, open <strong>Manager</strong> and choose <strong>Install via Git URL</strong>.{pack.search ? <> Searching the node list for <strong>{pack.search}</strong> works too.</> : null}</>}
+                : pack.subdir && pack.search
+                  // A pack inside a bigger repository can't come in by Git URL: only its own folder belongs in custom_nodes.
+                  ? <>In ComfyUI, open <strong>Manager</strong>, search the node list for <strong>{pack.search}</strong> and install it.</>
+                  : <>In ComfyUI, open <strong>Manager</strong> and choose <strong>Install via Git URL</strong>.{pack.search ? <> Searching the node list for <strong>{pack.search}</strong> works too.</> : null}</>}
               {pack.note ? <p className="upscale-fine">{pack.note}</p> : null}
               {!hasManager ? <p className="upscale-fine">ComfyUI-Manager is off. Start ComfyUI with <code>--enable-manager</code>, or use the terminal.</p> : null}
             </div>
           </li>
-          {managerV4 ? null : (
+          {managerV4 || pack.subdir ? null : (
             <li>
               <span className="upscale-step-n">2</span>
               <div>
@@ -214,7 +217,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
               </div>
             </li>
           )}
-          {managerV4 && !pack.search ? null : restartStep(managerV4 ? 2 : 3)}
+          {managerV4 && !pack.search ? null : restartStep(managerV4 || pack.subdir ? 2 : 3)}
         </ol>
       ) : (
         <ol className="upscale-steps">

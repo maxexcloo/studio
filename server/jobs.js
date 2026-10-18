@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { withComfyBackend } from './comfy-backends.js';
-import { activeComfyUrl, comfy, normalizeComfyError } from './comfy.js';
+import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
 import { describeFailure } from './failures.js';
 import { withFixes } from './failure-fixes.js';
@@ -323,6 +323,7 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       if (data.prompt_id && run.promptId && data.prompt_id !== run.promptId) return;
       // Anything ComfyUI says on this socket shows it is still there.
       run.alive?.();
+      noteComfyReachable();
       const timing = runTimings.get(id);
       if (timing?.timer) {
         timing.timer.note(message);

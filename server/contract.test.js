@@ -139,7 +139,9 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
     vae: source === "checkpoint" ? "" : "vae.safetensors",
     audioVae: family.audioVae ? "audio-vae.safetensors" : "",
     pairModel: family.pair ? "partner.safetensors" : "",
+    modelPath: family.runners?.[source]?.loader ? `/ComfyUI/models/diffusers/${familyId}` : "",
     clipVision: family.clipVision ? "vision.safetensors" : "",
+    upsampler: family.upsampler ? "upsampler.safetensors" : "",
     prompt: "a lighthouse in fog",
     negative: "blurry",
     width,
@@ -160,8 +162,20 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
   };
 }
 
+/**
+ * Whether this ComfyUI can run the family at all. One without its text encoder
+ * type gets "Newer ComfyUI" before any run, so its graphs are checked against
+ * a newer snapshot instead (and every family against at least one).
+ */
+function runsOn(family, info) {
+  if (!family.clipType || family.slots.length > 2) return true;
+  const loader = family.slots.length === 2 ? "DualCLIPLoader" : "CLIPLoader";
+  return (info[loader]?.input?.required?.type?.[0] || []).includes(family.clipType);
+}
+
 function* cases(info) {
   for (const [familyId, family] of Object.entries(families)) {
+    if (!runsOn(family, info)) continue;
     for (const variant of family.variants) {
       for (const source of family.sources) {
         const name = `${familyId}/${variant.id} from ${source}`;
@@ -230,4 +244,22 @@ for (const snapshot of snapshots) {
 
 test("there is at least one ComfyUI snapshot to check against", () => {
   assert.ok(snapshots.length >= 1);
+});
+
+test("every family's graphs are checked against at least one ComfyUI snapshot", () => {
+  const infos = snapshots.map((snapshot) => JSON.parse(fs.readFileSync(path.join(fixtures, snapshot), "utf8")));
+  const unchecked = Object.entries(families).filter(([, family]) => !infos.some((info) => runsOn(family, info))).map(([id]) => id);
+  assert.deepEqual(unchecked, []);
+});
+
+test("every image family says which sizes it draws itself, and SD 1.5/2 draw neither", () => {
+  for (const [id, family] of Object.entries(families)) {
+    if (family.kind !== "image") continue;
+    assert.equal(typeof family.native, "object", `${id} states native`);
+    for (const [size, level] of Object.entries(family.native)) assert.ok(["2k", "4k"].includes(size) && ["yes", "maybe"].includes(level), `${id}: ${size} ${level}`);
+  }
+  assert.deepEqual(families.sd15.native, {});
+  assert.deepEqual(families.sd2.native, {});
+  assert.deepEqual(families.flux2_klein_9b.native, { "2k": "yes", "4k": "maybe" });
+  assert.deepEqual(families.sdxl.native, { "2k": "maybe" });
 });

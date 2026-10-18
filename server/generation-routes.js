@@ -15,7 +15,7 @@ import { forgetComfyRun } from './hidden-traces.js';
 import { inpaintInputNames, prepareInpaint } from './inpaint.js';
 import { stageReferenceAssets } from './reference-assets.js';
 import { comfyRestarting } from './comfy-restart.js';
-import { upscaleQualities } from './upscale.js';
+import { upscaleQualities, upscaleTargets } from './upscale.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
@@ -130,7 +130,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
-      ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail) }
+      ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
       : null;
     // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
     if (!body.privateVault) try { recordPrompt(body.prompt); recordPrompt(body.negative, "negative"); } catch { /* a run matters more than its history */ }
@@ -188,7 +188,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       body.width = startSize.width;
       body.height = startSize.height;
     }
-    if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize) })) body.autoUpscale = null;
+    if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize), referenceRole: body.referenceRole })) body.autoUpscale = null;
     // Every image this run handed ComfyUI: all of them go after a Hidden run, and
     // after a normal one, temporary resized copies and any Hidden references.
     const staged = (body.referenceAssets || []).filter((item) => item.comfyName);

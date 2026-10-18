@@ -124,7 +124,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           <PhoneSlider label="Width" value={width} min={Math.max(widthMeta.min ?? 64, 256)} max={sizeMax(widthMeta)} step={sizeStep} onChange={setWidth} format={(value) => `${value}px`} />
           <PhoneSlider label="Height" value={height} min={Math.max(heightMeta.min ?? 64, 256)} max={sizeMax(heightMeta)} step={heightMeta.step || sizeStep} onChange={setHeight} format={(value) => `${value}px`} />
         </>
-      ) : aspectLocked ? <p className="phone-note">The size follows the reference image ({width}×{height}).</p> : null}
+      ) : aspectLocked ? <p className="phone-note">The size follows the image being edited ({width}×{height}).</p> : null}
 
       {parts ? (
         <>
@@ -245,7 +245,7 @@ export function SidebarControls({ view }: { view: any }) {
               </div>
             ) : null}
             {aspectLocked ? (
-              <p className="sidebar-hint">Output size follows the reference image ({width}&times;{height}).</p>
+              <p className="sidebar-hint">Output size follows the image being edited ({width}&times;{height}).</p>
             ) : null}
             {backToRecommended}
           </>

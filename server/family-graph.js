@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { MAX_BATCH, families, sanaConf, sanaLatentNode } from './family-catalog.js';
+import { MAX_BATCH, families, runnerFor, sanaConf, sanaLatentNode } from './family-catalog.js';
 import { krea2RawShift } from './model-families.js';
 
 /**
@@ -72,12 +72,21 @@ export function familyGraph(body) {
   const frames = Number(body.frames || family.frames || 33);
   const bundled = body.source === "checkpoint" ? (body.bundled || { encoder: true, vae: true }) : { encoder: false, vae: false };
   if (family.sampling === "sana") return sanaGraph({ add, graph, body, variant, seed, width, height, count });
+  // A custom-node runner for this source (MOSS-Image's own pack for its Diffusers folders).
+  const runner = runnerFor(family, body.source);
 
   // ---- Load
   let model;
   let clip = null;
   let vae = null;
-  if (body.source === "checkpoint") {
+  if (runner?.loader) {
+    // One node loads the whole folder: model, text encoder and VAE.
+    if (!body.modelPath) throw new Error(`${family.label} can’t find that model folder on this computer anymore.`);
+    const id = add(runner.loader.node, { [runner.loader.path]: body.modelPath, ...runner.loader.inputs, ...(body.weightDtype && "weight_dtype" in runner.loader.inputs ? { weight_dtype: body.weightDtype } : {}) });
+    model = [id, 0];
+    clip = [id, 1];
+    vae = [id, 2];
+  } else if (body.source === "checkpoint") {
     const id = add(body.checkpointLoader || "CheckpointLoaderSimple", { ckpt_name: body.model });
     model = [id, 0];
     if (bundled.encoder && !family.neverBundledEncoder) clip = [id, 1];
@@ -123,7 +132,8 @@ export function familyGraph(body) {
   ({ model, clip } = chainLoras(add, body, model, clip));
   if (lowModel) lowModel = chainLoras(add, body, lowModel, clip).model;
 
-  const sampling = variant.modelSampling || family.modelSampling;
+  // A runner's own model may want another shift node than ComfyUI's (MOSS-Image's pack).
+  const sampling = runner?.modelSampling || variant.modelSampling || family.modelSampling;
   model = modelSamplingPatch(add, sampling, model, body);
   if (lowModel) lowModel = modelSamplingPatch(add, sampling, lowModel, body);
   if (variant.vpred && body.vpredPatch) {
@@ -131,6 +141,8 @@ export function familyGraph(body) {
   }
   // Krea 2 Raw's shift follows the image size (Turbo keeps ComfyUI's fixed 1.15).
   if (variant.rawShift) model = modelSamplingPatch(add, { node: "ModelSamplingFlux", shift: krea2RawShift(width, height) }, model, body);
+  // A runner's own patches go after the shift, so they see the same schedule (MOSS-Image's layer skip).
+  for (const patch of runner?.patches || []) model = [add(patch.node, { model, ...patch.inputs }), 0];
 
   // ---- MiniMax H3: its own conditioning + latent node, guidance-free, video with audio
   if (family.sampling === "h3") {
@@ -198,13 +210,18 @@ export function familyGraph(body) {
     const references = family.references ? (body.referenceImages || []).slice(0, family.references) : [];
     // Its growable "images" input takes images.image_1, images.image_2, …; the picked size sets the pixel count.
     const images = Object.fromEntries(references.map((name, index) => [`images.image_${index + 1}`, [add("LoadImage", { image: name }), 0]]));
-    const resolution = references.length ? Math.max(256, Math.round(Math.sqrt(width * height) / 32) * 32) : 1024;
+    // An edit frames the output on the first reference, so references come at the output's size. One that
+    // only guides needs no more than ComfyUI's templates give it (1024), however large the output.
+    const outputSide = Math.max(256, Math.round(Math.sqrt(width * height) / 32) * 32);
+    const resolution = !references.length ? 1024 : body.referenceRole === "reference" ? Math.min(1024, outputSide) : outputSide;
     const encoded = add("TextEncodeQwenImage21", { clip, prompt: body.prompt || "", negative_prompt: body.negative || "", vae, resolution, ...images });
     positive = [encoded, 0];
     negative = [encoded, 1];
-    if (references.length) editLatent = [encoded, 2];
+    if (references.length && body.referenceRole !== "reference") editLatent = [encoded, 2];
   } else {
-    positive = [add("CLIPTextEncode", { text: promptText, clip }), 0];
+    // A model meant to run behind a prompt upsampler (FLUX.3) encodes the caption that writes.
+    const text = family.upsampler && body.upsampler ? upsamplePrompt(add, family, body) : promptText;
+    positive = [add("CLIPTextEncode", { text, clip }), 0];
     if (variant.guidance) positive = [add("FluxGuidance", { conditioning: positive, guidance: variant.guidance }), 0];
     if (negativeMode === "text") negative = [add("CLIPTextEncode", { text: negativeText, clip }), 0];
     else if (negativeMode === "zero") negative = [add("ConditioningZeroOut", { conditioning: positive }), 0];
@@ -217,10 +234,12 @@ export function familyGraph(body) {
   let firstReference = null;
   if (family.references && family.referenceVia !== "encoder") {
     const references = (body.referenceImages || []).slice(0, family.references);
-    const megapixels = Math.max(0.01, Math.round(width * height / 10_000) / 100);
+    // As with Qwen above: an edit's references come at the output's size, guiding ones at most 1 MP.
+    const outputMegapixels = Math.max(0.01, Math.round(width * height / 10_000) / 100);
+    const megapixels = body.referenceRole === "reference" ? Math.min(1.05, outputMegapixels) : outputMegapixels;
     references.forEach((name, index) => {
       const scaled = [add("ImageScaleToTotalPixels", { image: [add("LoadImage", { image: name }), 0], upscale_method: "lanczos", megapixels, resolution_steps: 1 }), 0];
-      if (index === 0) editSize = add("GetImageSize", { image: scaled });
+      if (index === 0 && body.referenceRole !== "reference") editSize = add("GetImageSize", { image: scaled });
       const encoded = [add("VAEEncode", { pixels: scaled, vae }), 0];
       if (index === 0) firstReference = encoded;
       positive = [add("ReferenceLatent", { conditioning: positive, latent: encoded }), 0];
@@ -362,6 +381,39 @@ function sanaGraph({ add, graph, body, variant, seed, width, height, count }) {
   const images = [add("VAEDecode", { samples, vae }), 0];
   add("SaveImage", { images, filename_prefix: "heiss-ui/image" });
   return graph;
+}
+
+/**
+ * The family's prompt upsampler through ComfyUI's TextGenerate, with its makers'
+ * system prompt and sampling: your request goes in, the long caption comes out.
+ * With reference images it takes the edit prompt, its makers' wording of the
+ * request, and sees the images too, scaled as they scale them.
+ */
+function upsamplePrompt(add, family, body) {
+  const spec = family.upsampler;
+  const clip = [add("CLIPLoader", { clip_name: body.upsampler, type: spec.clipType, device: "default" }), 0];
+  const references = family.references ? (body.referenceImages || []).slice(0, family.references) : [];
+  const edit = references.length > 0;
+  const prompt = String(body.prompt || "");
+  const sampling = { ...spec.sampling, ...(edit ? spec.editSampling : null) };
+  const inputs = {
+    clip, prompt: edit && spec.editRequest ? spec.editRequest.replace("{prompt}", () => prompt) : prompt, max_length: spec.maxLength,
+    sampling_mode: "on", ...Object.fromEntries(Object.entries(sampling).map(([key, value]) => [`sampling_mode.${key}`, value])),
+    thinking: false, use_default_template: true, mtp: "off",
+    system_prompt: edit ? spec.system.edit : spec.system.text
+  };
+  if (edit) {
+    // It reads the references smaller the more there are, as its makers feed them.
+    const sizes = spec.referenceMegapixels || [];
+    const megapixels = sizes[Math.min(references.length, sizes.length) - 1];
+    const images = Object.fromEntries(references.map((name, index) => {
+      let image = [add("LoadImage", { image: name }), 0];
+      if (megapixels) image = [add("ImageScaleToTotalPixels", { image, upscale_method: "lanczos", megapixels, resolution_steps: 32 }), 0];
+      return [`images.image${index}`, image];
+    }));
+    inputs.image = [add("BatchImagesNode", images), 0];
+  }
+  return [add("TextGenerate", inputs), 0];
 }
 
 /**

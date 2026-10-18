@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { comfy, comfyModelsDir, comfyOutputDir, localOutputFile, optionsFor } from "./comfy.js";
+import { comfy, comfyModelsDir, comfyOutputDir, localOutputFile, modelFolders, optionsFor } from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
@@ -149,8 +149,12 @@ function available(info, dir) {
   const vaeOptions = optionsFor(info, "SeedVR2LoadVAEModel", "model").map(String);
   if (!dir) return { dit: ditOptions.filter((name) => /seedvr2/i.test(name)), vae: vaeOptions, remote: true };
   const discovered = (options) => options.filter((name) => !nodeRegistryNames.has(path.basename(name)));
-  const dit = [...new Set([...diskDitFiles(dir), ...discovered(ditOptions).filter((name) => /seedvr2/i.test(name))])];
-  const vae = [...new Set([...(onDisk(dir, vaeFile) ? [vaeFile] : []), ...discovered(vaeOptions)])];
+  // Every folder ComfyUI reads for SeedVR2 (extra_model_paths.yaml included), not just ComfyUI/models/SEEDVR2.
+  const dirs = [...new Set([dir, ...modelFolders("seedvr2", ["SEEDVR2"])])];
+  const dit = [...new Set([...dirs.flatMap(diskDitFiles), ...discovered(ditOptions).filter((name) => /seedvr2/i.test(name))])]
+    // The node can't load int8 builds (ConvRot and the like): "Only Tensors of floating point ... require gradients".
+    .filter((name) => !/int8|convrot/i.test(name));
+  const vae = [...new Set([...(dirs.some((folder) => onDisk(folder, vaeFile)) ? [vaeFile] : []), ...discovered(vaeOptions)])];
   return { dit, vae, remote: false };
 }
 
@@ -474,12 +478,16 @@ function roundTo(value, step = 16) {
   return Math.max(step, Math.round(value / step) * step);
 }
 
+/** The long sides the size menu's 2K and 4K reach. */
+export const upscaleTargets = [2048, 4096];
+
 /**
  * Works from whatever the source happens to be: the short side sets the target,
  * the pre-scale keeps the model input inside a sane VRAM budget, and the output
- * is capped so a very large source cannot queue an impossible job.
+ * is capped so a very large source cannot queue an impossible job. A `target`
+ * (the size menu's 2K/4K) is the long side to reach instead, whatever the scale.
  */
-export function upscalePlan({ width, height, quality = "balanced" }) {
+export function upscalePlan({ width, height, quality = "balanced", target = 0 }) {
   const normalized = normalizeQuality(quality);
   const preset = presets[normalized];
   const sourceWidth = Math.max(1, Math.round(Number(width) || 0));
@@ -487,8 +495,10 @@ export function upscalePlan({ width, height, quality = "balanced" }) {
   const shortSide = Math.min(sourceWidth, sourceHeight);
   const longSide = Math.max(sourceWidth, sourceHeight);
   const aspect = longSide / shortSide;
-  const target = Math.min(roundTo(shortSide * preset.targetScale), preset.maxShort);
-  const resolution = Math.max(target, roundTo(shortSide));
+  const goal = upscaleTargets.includes(Number(target))
+    ? roundTo(shortSide * Number(target) / longSide)
+    : Math.min(roundTo(shortSide * preset.targetScale), preset.maxShort);
+  const resolution = Math.max(goal, roundTo(shortSide));
   // Never hand the model an input so small that it has nothing to restore.
   const preScale = Math.min(1, Math.max(preset.preScale, 256 / shortSide));
   return {
