@@ -128,13 +128,13 @@ export function GalleryManagement({ children, items, modeSelector, onAnimate, on
     }
   }), [items, selection]); // eslint-disable-line react-hooks/exhaustive-deps
   return <GallerySelectionContext.Provider value={context}>
-    {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions"><div className={selection ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
+    {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{tools}<div className={selection ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       <button type="button" className="gallery-select-toggle" aria-label={selection ? 'Stop Selecting' : 'Select'} aria-expanded={Boolean(selection)} title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => selection ? end() : setSelection(new Set())}>{selection ? <X size={16} /> : <CheckSquare size={16} />}<span role={selection ? 'status' : undefined}>{selection ? `${selected.length} Selected` : 'Select'}</span></button>
       <AnimatePresence initial={false}>{selection ? <motion.div className="gallery-selection-actions" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <button type="button" title={selected.length === selectable.length && selectable.length ? "Deselect All" : "Select All Loaded"} onClick={() => selected.length === selectable.length ? setSelection(new Set()) : all()}><CheckSquare size={16} />{selected.length === selectable.length && selectable.length ? 'Deselect All' : 'Select All Loaded'}</button>
         {actions(false)}
       </motion.div> : null}</AnimatePresence>
-    </div>{tools}</div></header> : null}
+    </div></div></header> : null}
     {children}
     {menu ? createPortal(<div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y }} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];

@@ -74,6 +74,11 @@ Changes span `heiss-ui`, `../ai` and `../kubelab`. The linked private conversati
 56. [x] Merge LoRA selection & stack editing into one seamless list, remove the long compatibility hint and align selection animations with Reference Image. Inline options retain strength, enable/disable, ordering, saved stacks & undo; 707 source checks and 17 browser checks passed with three layout skips.
 57. [x] Forward each signed-in LibreChat user's identity through the gateway to native HEISS MCP. Verify the rendered client/gateway contract; Kubelab checks passed with 98 tests, 504 valid resources & zero schema errors. The pinned LibreChat chart rendered successfully.
 
+58. [x] Keep filter dropdown scrolling independent, add compact option search and remove the separate Workflow filter.
+59. [x] Dim unselected gallery photos in Select mode, keeping selected photos & selection controls clear.
+60. [x] Order the studio’s top-right actions Play/Pause, Grouping, Select.
+61. [x] Use Search as the gallery input placeholder and remove its selected highlight.
+
 ## Delivery
 
 - [x] Finish final browser checks and the required AI configuration check on Bento. Initial HEISS checks: 656 tests passed; browser checks: 108 passed with 10 intentional skips. Bento's isolated `mise run check --ci`: passed, including 234 Python tests. Production builds were reserved for verifying bundled UI changes.
