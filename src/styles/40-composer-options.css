@@ -205,3 +205,14 @@
 .composer-loras .lora-library-order .prompt-action { width: 28px; height: 28px; }
 .composer-loras .lora-library-settings .lora-strength { min-width: 100px; }
 .composer-loras .lora-library-footer .lora-undo { flex-basis: 100%; margin: 0; }
+
+.composer-loras .lora-library-grip { position: absolute; top: 7px; left: 0; display: grid; place-items: center; width: 28px; height: 44px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
+.composer-loras .lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 30px; }
+.composer-loras .lora-library-grip:focus-visible { outline: 1px solid hsl(var(--foreground)); }
+.composer-loras .lora-details { margin: 0 2px 0 30px; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.composer-loras .lora-details summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 44px; cursor: pointer; }
+.composer-loras .lora-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.composer-loras .lora-details a { display: inline-flex; align-items: center; min-height: 44px; color: hsl(var(--foreground)); }
+
+.composer-loras .lora-library-row.is-dragging { opacity: .6; }
+.composer-loras .lora-library-row.is-drop-target { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }

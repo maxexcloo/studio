@@ -356,7 +356,7 @@ export function ComposerBar(props: ComposerBarProps) {
 
   const loraPill = (density: ControlDensity) => onOpenLoras ? (
     <Tip content={loraActiveCount ? `${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit` : "LoRAs"}>
-      <button type="button" className={cn("lora-pill composer-resource-add", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={lorasOpen}>
+      <button type="button" className={cn("lora-pill composer-resource-add", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={lorasOpen}>
         <Plus size={13} /><span>LoRAs</span>
         {loraActiveCount ? <AnimatedNumber value={loraActiveCount} /> : null}
       </button>

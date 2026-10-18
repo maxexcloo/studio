@@ -7,7 +7,7 @@ import { useDismiss } from './useDismiss';
 function Surface({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   const present = useIsPresent();
   const surface = React.useRef<HTMLDivElement>(null);
-  const opener = React.useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const opener = React.useRef(document.querySelector<HTMLElement>('[data-open-trigger][aria-label="LoRAs"][aria-expanded="true"]') || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   const anchor = opener.current?.closest('.zen-prompt, .phone-create') || document.querySelector('.phone-create, .zen-prompt');
   const asSheet = Boolean(anchor?.classList.contains('phone-create'));
   const [box, setBox] = React.useState<React.CSSProperties>();

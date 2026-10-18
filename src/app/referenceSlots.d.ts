@@ -1,6 +1,6 @@
 import type { MediaInput, ReferenceAsset, SelectedReferenceAsset } from './types';
 
-type Slots = ReadonlyArray<Pick<MediaInput, 'id' | 'follows'>>;
+type Slots = ReadonlyArray<Pick<MediaInput, 'id' | 'follows'> & { role?: string }>;
 
 export function arrangeReferences(selected: readonly SelectedReferenceAsset[] | null | undefined, inputs: Slots): SelectedReferenceAsset[];
 export function withReference(selected: readonly SelectedReferenceAsset[] | null | undefined, inputs: Slots, slot: string, asset: ReferenceAsset): SelectedReferenceAsset[];

@@ -64,7 +64,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await page.route('**/api/models', route => route.fulfill({ json: models }));
   await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
   await page.route('**/api/loras/info', route => route.fulfill({ json: { loras: {
-    'cards-one.safetensors': { title: 'Cards One', families: [], base: '', triggers: [] },
+    'cards-one.safetensors': { title: 'Cards One', families: [], base: '', triggers: ['ink'], description: 'Use for printed card illustrations.', sourceUrl: 'https://example.com/cards' },
     'cards-two.safetensors': { title: 'Cards Two', families: [], base: '', triggers: [] }
   } } }));
   await page.goto('/');
@@ -130,8 +130,18 @@ test('LoRA library offers direct list selection with inline strengths and access
   await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
   await other.click();
+  await picker.getByLabel('Information About Cards One', { exact: true }).click();
+  await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
+  await expect(picker.getByRole('link', { name: 'View Source' })).toHaveAttribute('href', 'https://example.com/cards');
+  await expect(other).toHaveAttribute('aria-checked', 'true');
+  await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).press('ArrowUp');
+  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
+  await picker.getByRole('button', { name: 'Move Cards One Down', exact: true }).click();
   await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
+  await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).dragTo(picker.getByRole('checkbox', { name: 'Select Cards Two', exact: true }));
+  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards Two');
+  await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
   await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();

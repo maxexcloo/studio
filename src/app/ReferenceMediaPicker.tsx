@@ -45,14 +45,16 @@ function assetImage(asset: ReferenceAsset) {
  * The reference library as a popover that rises out of the composer: recent
  * generations and uploads in a grid, an upload button, drop and paste.
  */
-function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
   memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
   popRef: React.RefObject<HTMLDivElement | null>;
   dropActive: boolean;
   dropped: { asset: ReferenceAsset; nonce: number } | null;
-  selected: ReferenceAsset | null;
+  selected: ReferenceAsset[];
+  atCapacity: boolean;
+  onDeselect: (asset: ReferenceAsset) => void;
   onClose: () => void;
   onSelect: (asset: ReferenceAsset) => void;
   /** An upload was deleted for good: whichever slots hold it let it go. */
@@ -67,7 +69,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   const hidden = useHiddenActions();
   const hiddenShelf = Boolean(hidden?.enabled);
   const hiddenOpen = Boolean(hidden?.unlocked);
-  const [tab, setTab] = React.useState<PickerTab>(() => memory.tab && (memory.tab !== "hidden" || hiddenShelf && hiddenOpen) ? memory.tab : hiddenShelf && (selected?.source === "vault" || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
+  const [tab, setTab] = React.useState<PickerTab>(() => memory.tab && (memory.tab !== "hidden" || hiddenShelf && hiddenOpen) ? memory.tab : hiddenShelf && (selected.some(asset => asset.source === "vault") || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
   const [pages, setPages] = React.useState<Record<PickerTab, PageState>>(() => memory.pages);
   const [selectingId, setSelectingId] = React.useState("");
   const active = React.useRef(true);
@@ -200,12 +202,13 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
 
   async function choose(asset: ReferenceAsset) {
     if (selectingId || upload.busy) return;
+    if (selected.some(item => item.id === asset.id)) { onDeselect(asset); return; }
+    if (atCapacity) return;
     setSelectingId(asset.id);
     try {
       const resolved = asset.source === "generation" && asset.galleryItemId ? await referenceAssetFromGallery(asset.galleryItemId) : asset;
       if (!active.current) return;
       onSelect(resolved);
-      onClose();
     } catch (error) {
       onError?.(error instanceof Error ? error.message : "Couldn’t use this image");
     } finally {
@@ -227,6 +230,8 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
   }
 
   const page = pages[tab];
+  // Selected references remain available across source tabs and filtered server pages.
+  const items = [...new Map([...selected, ...page.items].map(asset => [asset.id, asset])).values()];
   React.useEffect(() => {
     if (!page.hasMore || page.loading || page.error || search.trim() !== query || !moreRef.current) return;
     const observer = new IntersectionObserver(([entry]) => {
@@ -288,13 +293,13 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
             <p>Unlock it to use a hidden image. The image stays in Hidden.</p>
             <button className="btn is-primary" onClick={() => hidden?.unlock()}><LockKeyhole size={14} /> Unlock</button>
           </div>
-        ) : page.loading && !page.items.length ? (
+        ) : page.loading && !items.length ? (
           <div className="reference-grid is-loading" aria-label="Loading Images">
             {Array.from({ length: 12 }, (_, index) => <div className="reference-skeleton" key={index} />)}
           </div>
-        ) : page.error && !page.items.length ? (
+        ) : page.error && !items.length ? (
           <div className="reference-empty"><ImageIcon size={22} /><strong>Images Unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(tab)}>Try Again</button></div>
-        ) : !page.items.length ? (
+        ) : !items.length ? (
           <div className="reference-empty">
             <ImageIcon size={22} />
             <strong>{query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : tab === "hidden" ? "Nothing Hidden Yet" : "No Uploads Yet"}</strong>
@@ -303,8 +308,8 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
         ) : (
           <>
             {tab === "hidden" && hidden?.space !== "hidden" ? <p className="reference-shelf-note"><LockKeyhole size={12} /> What you make from a hidden image goes to Hidden too.</p> : null}
-            <ReferenceGrid items={page.items} render={(asset, index, style, tabIndex) => {
-                const isSelected = selected?.id === asset.id;
+            <ReferenceGrid items={items} render={(asset, index, style, tabIndex) => {
+                const isSelected = selected.some(item => item.id === asset.id);
                 return (
                   <div
                     key={asset.id}
@@ -319,7 +324,7 @@ function ReferencePopover({ memory, input, selected, anchor, popRef, dropActive,
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? "Selected: " : ""}${asset.name}`}
                       onClick={() => choose(asset)}
-                      disabled={Boolean(selectingId || upload.busy)}
+                      disabled={Boolean(selectingId || upload.busy) || (!isSelected && atCapacity)}
                     >
                       <SafeImg src={assetImage(asset)} loading="lazy" draggable={false} fallback={<ImageIcon size={16} />} />
                       {isSelected ? <i className="reference-tile-check"><Check size={12} strokeWidth={3} /></i> : null}
@@ -871,6 +876,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   const count = inputs.filter((input) => assetFor(input.id)).length;
   const revision = context.current.revision;
   const openInput = inputs.find((input) => input.id === openSlot) || null;
+  // Start/end frames have distinct meanings; a reference stack shares one selection pool.
+  const pickerInputs = usable.filter(input => !openInput || input.role === openInput.role);
   const openFor = (id: string) => () => { setPainting(false); setOpenSlot((current) => current === id ? "" : id); };
   // Undo puts every picture back where it was: the ones after it closed up into its slot. Only onto
   // what the removal left, though: a picture added since (or another model's slots) would be overwritten.
@@ -952,13 +959,19 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             key={scope}
             memory={memory}
             input={openInput}
-            selected={assetFor(openInput.id)}
+            selected={selected.filter(item => pickerInputs.some(input => input.id === item.slot)).map(item => item.asset)}
+            atCapacity={pickerInputs.every(input => assetFor(input.id))}
+            onDeselect={asset => onRemove(selected.filter(item => item.asset.id === asset.id && pickerInputs.some(input => input.id === item.slot)).map(item => item.slot))}
             anchor={host}
             popRef={popRef}
             dropActive={dropTarget === "popover"}
             dropped={dropped}
             onClose={() => { if (context.current.revision === revision) close(); }}
-            onSelect={(asset) => { if (context.current.active && context.current.revision === revision) onSelect(openInput.id, asset); }}
+            onSelect={(asset) => {
+              if (!context.current.active || context.current.revision !== revision) return;
+              const target = !assetFor(openInput.id) && pickerInputs.some(input => input.id === openInput.id) ? openInput : pickerInputs.find(input => !assetFor(input.id));
+              if (target) onSelect(target.id, asset);
+            }}
             onDeleted={(asset) => {
               const holding = selected.filter((item) => item.asset.id === asset.id).map((item) => item.slot);
               if (holding.length) onRemove(holding);

@@ -14,8 +14,16 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
     ...(title ? { title, about: title } : {}),
     families: ids,
     base: ids.length ? [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(' / ') : info?.base || '',
+    ...loraDescriptionMetadata(entry),
     ...loraRoleMetadata(entry),
     ...loraPolicyMetadata(entry),
+  };
+}
+
+function loraDescriptionMetadata(entry) {
+  return {
+    ...(typeof entry.description === 'string' ? { description: entry.description.trim().slice(0, 10000) } : {}),
+    ...(typeof entry.sourceUrl === 'string' && /^https?:\/\//i.test(entry.sourceUrl) ? { sourceUrl: entry.sourceUrl } : {}),
   };
 }
 
@@ -43,13 +51,13 @@ export function enrichLoraInfo(info, name, sources, familiesFromMetadata, famili
   const triggers = Array.isArray(source.trainedWords) ? source.trainedWords.filter((value) => typeof value === 'string' && value.trim()).slice(0, 30) : [];
   return {
     ...info,
+    ...loraDescriptionMetadata(source),
     ...loraRoleMetadata(source),
     ...loraPolicyMetadata(source),
     ...(title ? { title, about: title } : {}),
     families: ids,
     base: ids.length ? [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(' / ') : info?.base || '',
     triggers: triggers.length ? triggers : info?.triggers || [],
-    ...(source.sourceUrl ? { sourceUrl: source.sourceUrl } : {}),
   };
 }
 

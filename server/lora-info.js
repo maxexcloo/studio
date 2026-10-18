@@ -242,7 +242,8 @@ function describe(header, metadata) {
   const ids = withRefinements(found);
   const about = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).filter((value) => typeof value === "string").join(" ");
   const title = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).find((value) => typeof value === "string" && value.trim())?.trim().slice(0, 200);
-  return { ...(title ? { title } : {}), families: ids, base, triggers: triggersFromMetadata(metadata || {}), ...(about ? { about: about.slice(0, 200) } : {}) };
+  const description = metadata?.["modelspec.description"];
+  return { ...(typeof description === "string" ? { description: description.trim().slice(0, 10000) } : {}), ...(title ? { title } : {}), families: ids, base, triggers: triggersFromMetadata(metadata || {}), ...(about ? { about: about.slice(0, 200) } : {}) };
 }
 
 /** What one LoRA file on this computer is, cached by size and date; null when out of reach. */

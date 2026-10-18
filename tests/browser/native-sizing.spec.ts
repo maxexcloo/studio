@@ -56,6 +56,8 @@ test('Edit and Reference preserve their framing rules when submitting', async ({
   await open();
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
   await page.getByRole('button', { name: 'Role Reference', exact: true }).click();
+  await expect(page.locator('.reference-popover')).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A painted mountain');
   const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt').filter({ visible: true });
   await root.locator('.composer-submit-actions button').click();

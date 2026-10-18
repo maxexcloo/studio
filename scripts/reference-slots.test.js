@@ -63,3 +63,12 @@ test("Reference only applies where the switch is offered; elsewhere, and with a 
   assert.equal(referenceRoleFor({ workflow: "family:sdxl" }, "reference"), "edit");
   assert.equal(referenceRoleFor(null, "reference"), "edit");
 });
+
+
+test('removing a start frame preserves the end frame in its semantic slot', () => {
+  const inputs = [{ id: 'start', role: 'start' }, { id: 'end', follows: 'start', role: 'end' }];
+  const asset = { id: 'same-picture' };
+  const selected = [{ slot: 'start', asset }, { slot: 'end', asset }];
+  assert.deepEqual(withoutReferences(selected, inputs, ['start']), [{ slot: 'end', asset }]);
+  assert.deepEqual(withReference([{ slot: 'end', asset }], inputs, 'start', { id: 'replacement' }), [{ slot: 'start', asset: { id: 'replacement' } }, { slot: 'end', asset }]);
+});

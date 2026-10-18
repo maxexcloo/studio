@@ -20,10 +20,11 @@
  * The picked pictures matched to `inputs`, one per slot, in slot order. With no
  * slots at all nothing can be shown, so nothing is kept.
  * @param {Array<{ slot: string, asset: any }>} selected
- * @param {Array<{ id: string, follows?: string }>} inputs
+ * @param {Array<{ id: string, follows?: string, role?: string }>} inputs
  */
 export function arrangeReferences(selected, inputs) {
   const slots = new Set(inputs.map((input) => input.id));
+  const roles = new Map(inputs.map(input => [input.id, input.role]));
   const placed = new Map();
   const strays = [];
   for (const item of selected || []) {
@@ -40,6 +41,8 @@ export function arrangeReferences(selected, inputs) {
     moved = false;
     for (const input of inputs) {
       if (!input.follows || !slots.has(input.follows) || !placed.has(input.id) || placed.has(input.follows)) continue;
+      // Removing a start frame must never turn an end frame into the start.
+      if (input.role && roles.get(input.follows) && input.role !== roles.get(input.follows)) continue;
       placed.set(input.follows, placed.get(input.id));
       placed.delete(input.id);
       moved = true;
@@ -51,7 +54,7 @@ export function arrangeReferences(selected, inputs) {
 /**
  * `selected` with `slot` holding `asset`, replacing whatever was there.
  * @param {Array<{ slot: string, asset: any }>} selected
- * @param {Array<{ id: string, follows?: string }>} inputs
+ * @param {Array<{ id: string, follows?: string, role?: string }>} inputs
  * @param {string} slot
  * @param {any} asset
  */
@@ -63,7 +66,7 @@ export function withReference(selected, inputs, slot, asset) {
 /**
  * `selected` without the pictures in `slots`, the rest closed up.
  * @param {Array<{ slot: string, asset: any }>} selected
- * @param {Array<{ id: string, follows?: string }>} inputs
+ * @param {Array<{ id: string, follows?: string, role?: string }>} inputs
  * @param {Iterable<string>} slots
  */
 export function withoutReferences(selected, inputs, slots) {

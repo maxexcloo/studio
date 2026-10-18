@@ -49,6 +49,8 @@ async function choose(page: Page, phone: boolean, name: string) {
 async function attach(page: Page, name: string) {
   await page.locator('.ref-add').first().click();
   await page.getByRole('button', { name: `${name}.png`, exact: true }).click();
+  await expect(page.locator('.reference-popover')).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.reference-popover')).toHaveCount(0);
 }
 

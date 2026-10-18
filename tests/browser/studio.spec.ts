@@ -134,6 +134,8 @@ for (const kind of ['image', 'video']) {
     await openComposer(page, isMobile);
     await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
     await page.getByRole('button', { name: 'Aspect Reference', exact: true }).click();
+    await expect(page.locator('.reference-popover')).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.locator('.reference-popover')).toHaveCount(0);
     await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Follow the reference framing');
     const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
@@ -175,8 +177,10 @@ for (const selection of ['empty', 'previous', 'manual']) {
       await openComposer(page, isMobile);
       await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
       await page.getByRole('button', { name: previous.name, exact: true }).click();
+      await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Add End Image', exact: true }).click();
       await page.getByRole('button', { name: previous.name, exact: true }).click();
+      await page.keyboard.press('Escape');
       if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
       await controls(page, isMobile).switchMode('image');
     }
@@ -203,7 +207,9 @@ for (const selection of ['empty', 'previous', 'manual']) {
     await expect(pendingGenerate).toBeDisabled();
     if (selection === 'manual') {
       await page.getByRole('button', { name: `Change reference image, currently ${previous.name}`, exact: true }).click();
+      await page.getByRole('button', { name: `Selected: ${previous.name}`, exact: true }).click();
       await page.getByRole('button', { name: manual.name, exact: true }).click();
+      await page.keyboard.press('Escape');
     }
     releaseReference();
     const expected = selection === 'manual' ? manual : reference;
@@ -603,6 +609,8 @@ test('attaching a reference activates that mode’s controls without losing the 
   const generate = () => isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
   await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
   await page.getByRole('button', { name: 'Mode Reference', exact: true }).click();
+  await expect(page.locator('.reference-popover')).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.reference-popover')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('blur');
   await generate().click();

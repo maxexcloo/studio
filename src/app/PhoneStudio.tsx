@@ -588,7 +588,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
           <div className="phone-creation-resources">
-            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}><Plus size={16} /><span>LoRAs</span>{view.loraActiveCount ? <b>{view.loraActiveCount}</b> : null}</button></div>
+            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}><Plus size={16} /><span>LoRAs</span>{view.loraActiveCount ? <b>{view.loraActiveCount}</b> : null}</button></div>
             <button type="button" className="phone-model-browse" aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')}><SlidersHorizontal size={16} /><span>{currentProfile?.recipe?.modelLabel || currentProfile?.displayName || currentProfile?.label || 'Model'}</span></button>
           </div>
           <div className="phone-creation-toolbar phone-creation-submit-row">

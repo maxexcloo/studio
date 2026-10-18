@@ -77,3 +77,15 @@ test('generation refuses infrastructure in optional stacks without modifying sav
   assert.equal(optionalLoraIssue(stack, {}), '');
   assert.deepEqual(stack, before);
 });
+
+
+test('existing descriptions and safe source links survive local and provider enrichment', () => {
+  const entry = { title: 'Effect', description: 'Use at 0.5 for subtle detail.', sourceUrl: 'https://example.com/model' };
+  const local = enrichLocalLoraInfo(info, source.file, { [source.file]: entry }, detect, families);
+  const provider = enrich(info, source.file, { source: { ...source, ...entry } });
+  for (const result of [local, provider]) {
+    assert.equal(result.description, entry.description);
+    assert.equal(result.sourceUrl, entry.sourceUrl);
+  }
+  assert.equal(enrich(info, source.file, { source: { ...source, sourceUrl: 'javascript:alert(1)' } }).sourceUrl, undefined);
+});
