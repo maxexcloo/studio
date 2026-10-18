@@ -28,7 +28,10 @@ test('imported video previews use media URLs and recover after exhausting retrie
     await page.clock.fastForward(delay);
     await expect.poll(() => attempts.has(index + 1)).toBe(true);
   }
-  await expect(tile.locator('.video-preview-placeholder').getByRole('button', { name: 'Retry Preview', exact: true })).toBeVisible();
+  // Poster and video errors arrive independently; wait for the poster itself to stop.
+  await expect(tile.locator('.video-preview-poster')).toHaveCount(0);
+  await page.clock.fastForward(60000);
+  await expect(tile.locator('.video-preview-poster')).toHaveCount(0);
   online = true;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(tile.locator('.video-preview-poster')).toBeVisible();
