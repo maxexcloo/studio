@@ -579,9 +579,10 @@ async function mediaModels(force = false) {
   return { primary, video, models: mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})) };
 }
 
-app.get("/api/models", async (_req, res) => {
+app.get("/api/models", async (req, res) => {
   try {
-    res.json((await mediaModels(true)).models);
+    // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
+    res.json((await mediaModels(req.query.cached !== "1")).models);
   } catch {
     res.json(demoMode ? mockModelResult() : offlineModelResult(comfyUrl));
   }

@@ -56,6 +56,10 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
   app.get('/api/jobs/:id', (req, res) => jobLookupFails ? res.status(503).json({ error: 'Fixture result retrieval offline' }) : res.json(jobs.get(req.params.id) || { status: 'missing' }));
   app.post('/api/jobs/:id/cancel', (req, res) => { const job = jobs.get(req.params.id); if (job) job.status = 'cancelled'; res.json({ ok: true }); });
   app.get('/api/gallery', (_req, res) => res.json({ items: [...jobs.values()].flatMap(job => job.gallery ?? (job.status === 'done' && !job.privateVault ? job.outputs.map((output, index) => ({ id: `${job.id}:${index}`, jobId: job.id, index, status: 'done', type: job.kind, ...output })) : [])), hasMore: false, nextCursor: '' }));
+  app.get('/api/gallery/jobs/:id', (req, res) => {
+    const job = jobs.get(req.params.id);
+    res.json({ items: !job || job.privateVault ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...output })) : []) });
+  });
   app.post('/api/reference-assets/upload', async (req, res) => {
     for await (const _chunk of req) { /* Consume the multipart body. */ }
     const asset = { id: deduplicateUploads ? 'fixture-shared-asset' : `fixture-asset-${assets.size + 1}`, name: 'reference.png', source: 'upload', mime: 'image/png', privacyDomain: 'gallery', url: '/fixture-reference.png' };
@@ -256,8 +260,10 @@ test('image Result attaches a preview and a signed private download of the uncha
   const client = await f.client();
   const id = jobId(await generate(client));
   Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=fixture.png' }] });
+  const before = f.requests.length;
   const result = await call(client, 'Result', { job_id: id });
   assert.notEqual(result.isError, true);
+  assert.deepEqual(f.requests.slice(before).map(request => request.path), [`/jobs/${id}`, `/gallery/jobs/${id}`]);
   assert.ok(result.content.some(item => item.type === 'image'));
   const [link] = links(result);
   assert.ok(link);
@@ -337,8 +343,10 @@ test('owned completed results remain available after the transient job expires',
   const client = await f.client();
   const id = jobId(await generate(client));
   Object.assign(f.jobs.get(id), { status: 'missing', outputs: [], gallery: [{ id: 'retained-gallery-output', jobId: id, index: 0, status: 'done', type: 'image', url: '/comfy/view?filename=retained.png' }] });
+  const before = f.requests.length;
   const result = await call(client, 'Result', { job_id: id });
   assert.notEqual(result.isError, true);
+  assert.deepEqual(f.requests.slice(before).map(request => request.path), [`/jobs/${id}`, `/gallery/jobs/${id}`]);
   assert.ok(result.content.some(item => item.type === 'image'));
   assert.equal(links(result).length, 1);
   const reused = data(await call(client, 'Reuse', { job_id: id }));
@@ -380,7 +388,7 @@ test('invalid uploads and unsupported waits are refused without accessing anothe
   assert.equal(f.assets.size, 0);
   const id = jobId(await generate(client));
   const before = f.requests.length;
-  for (const name of ['Status', 'Result']) for (const wait_seconds of [-1, 21]) await failure(client, name, { job_id: id, wait_seconds });
+  for (const [name, maximum] of [['Status', 20], ['Result', 1800]]) for (const wait_seconds of [-1, maximum + 1]) await failure(client, name, { job_id: id, wait_seconds });
   assert.equal(f.requests.length, before);
 });
 
@@ -423,22 +431,30 @@ test('an interrupted generation acknowledgement retains its client job ownership
   await failure(await f.client('bob'), 'Status', { job_id: id });
 });
 
-test('explicit Generate waiting can attach a completed preview while failed retrieval keeps the submitted job', async t => {
+test('Generate never waits or fetches completed results, including when retrieval is unavailable', async t => {
   const f = await fixture(t);
   f.completeOnSubmit();
+  f.jobLookupFails(true);
   const client = await f.client();
-  const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 1 });
+  await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 1 });
+  assert.equal(f.submitted.length, 0);
+  const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'] });
+  assert.notEqual(result.isError, true);
+  assert.equal(result.content.some(item => item.type === 'image'), false);
+  assert.equal(f.submitted.length, 1);
+  assert.equal(f.requests.some(request => request.path.startsWith('/jobs/') || request.path.startsWith('/gallery')), false);
+  assert.equal(f.downloads.length, 0);
+});
+
+test('background Result collects a later completion without another submission', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
+  const result = await call(client, 'Result', { job_id: id, wait_seconds: 1800 });
   assert.notEqual(result.isError, true);
   assert.ok(result.content.some(item => item.type === 'image'));
   assert.equal(f.submitted.length, 1);
-  f.jobLookupFails(true);
-  const interrupted = await generate(client, { wait_seconds: 1 });
-  const id = jobId(interrupted);
-  assert.match(interrupted.jobs[0].retrieval_error, /do not resubmit/i);
-  assert.equal(f.submitted.length, 2);
-  f.jobLookupFails(false);
-  assert.equal(data(await call(client, 'Status', { job_id: id })).status, 'done');
-  assert.equal(f.submitted.length, 2);
 });
 
 test('explicit status waiting has a bounded deadline and terminal jobs return without waiting', async t => {
@@ -604,7 +620,9 @@ test('maintained profile guidance reaches the real model API and native MCP with
   }));
   const info = { FixtureImage: { input: { required: { prompt: ['STRING'] } }, output: ['IMAGE'] }, SaveImage: { input: { required: { images: ['IMAGE'], filename_prefix: ['STRING'] } }, output: [] } };
   for (const name of ['KSampler', 'CLIPTextEncode', 'VAEDecode']) info[name] = { input: { required: {} } };
+  let catalogueReads = 0;
   const backend = http.createServer((req, res) => {
+    if (req.url === '/object_info') catalogueReads++;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(req.url === '/object_info' ? info : req.url === '/system_stats' ? { devices: [] } : req.url === '/queue' ? { queue_running: [], queue_pending: [] } : {}));
   });
@@ -634,4 +652,10 @@ test('maintained profile guidance reaches the real model API and native MCP with
   await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { Authorization: `Bearer ${mediaKey}` } } }));
   const profile = data(await call(client, 'Models', { profile_id: 'custom:owned-api-guide' })).profiles[0];
   assert.deepEqual(profile.prompting, guide);
+  const cachedReads = catalogueReads;
+  await call(client, 'Models', { profile_id: 'custom:owned-api-guide' });
+  await call(client, 'Models', { profile_id: 'custom:owned-api-guide' });
+  assert.equal(catalogueReads, cachedReads, 'MCP reads reuse backend metadata');
+  await fetch(new URL('/api/models', base));
+  assert.equal(catalogueReads, cachedReads + 1, 'an explicit studio rescan still refreshes metadata');
 });

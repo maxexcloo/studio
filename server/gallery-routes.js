@@ -88,6 +88,15 @@ export function registerGalleryReadRoutes(app) {
     return { items, nextCursor, hasMore: Boolean(nextCursor), revision: galleryRevisionValue(), totalApprox: collapsed.length };
   }
 
+  // Exact job reads avoid sorting and paging the full gallery for MCP results.
+  app.get("/api/gallery/jobs/:id", (req, res) => {
+    cleanupGalleryState(jobs);
+    const items = filterVisibleGallery(gallery.filter((item) => item.jobId === req.params.id));
+    res.json({ items: revealGalleryItemsForRequest(items).map((item) => Object.fromEntries(
+      ["jobId", "index", "status", "type", "url", "privateVault", "vaultLocked", "promptProtected", "promptEncrypted", "hidden"].filter((key) => key in item).map((key) => [key, item[key]])
+    )) });
+  });
+
   app.get("/api/gallery", (req, res) => {
     cleanupGalleryState(jobs);
     const type = String(req.query.type || "");
