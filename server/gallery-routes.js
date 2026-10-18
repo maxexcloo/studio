@@ -8,7 +8,14 @@ import { encryptionKeyFromRequest, revealGalleryItemsForRequest } from './privac
 import { deleteVaultItems, vaultConfigured } from './vault.js';
 import { sendGalleryExport } from './gallery-export.js';
 import { ownerIdForRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
+import { mayUseFeature } from './account-policy.js';
 import { requireAdmin, requireLocal } from "./route-access.js";
+
+function requireGalleryAccess(req, res) {
+  if (!req.heissAccount || mayUseFeature(req.heissAccount, 'gallery')) return true;
+  res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' });
+  return false;
+}
 
 export function registerGalleryBundleRoutes(app) {
   function bundleOptions(source = {}) {
@@ -24,11 +31,13 @@ export function registerGalleryBundleRoutes(app) {
   }
 
   app.get("/api/gallery/bundles", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     const options = bundleOptions(req.query);
     res.json({ bundles: req.heissAccount ? [] : listBundles(), pending: pendingSummary(bundleSourceItems(req), options), ...options });
   });
 
   app.post("/api/gallery/bundles/compact", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireLocal(req, res)) return;
     const options = bundleOptions(req.body || {});
     const created = createBundles(bundleSourceItems(req), options);
@@ -45,6 +54,7 @@ export function registerGalleryBundleRoutes(app) {
 
 export function registerGalleryBundleActions(app) {
   app.post("/api/gallery/bundles/:id/cover", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireLocal(req, res)) return;
     if (req.heissAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
     try {
@@ -55,6 +65,7 @@ export function registerGalleryBundleActions(app) {
   });
 
   app.delete("/api/gallery/bundles/:id", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireLocal(req, res)) return;
     if (req.heissAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
     try {
@@ -93,6 +104,7 @@ export function registerGalleryReadRoutes(app) {
 
   // Exact job reads avoid sorting and paging the full gallery for MCP results.
   app.get("/api/gallery/jobs/:id", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return res.json({ items: [] });
     cleanupGalleryState(jobs);
     const items = filterVisibleGallery(recordsForRequest(gallery, req).filter((item) => item.jobId === req.params.id));
     res.json({ items: revealGalleryItemsForRequest(items).map((item) => Object.fromEntries(
@@ -101,6 +113,7 @@ export function registerGalleryReadRoutes(app) {
   });
 
   app.get("/api/gallery", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return res.json({ items: [], outputs: [], nextCursor: '', hasMore: false, totalApprox: 0, revision: 0 });
     cleanupGalleryState(jobs);
     const type = String(req.query.type || "");
     const limit = Number(req.query.limit || 0);
@@ -120,6 +133,7 @@ export function registerGalleryReadRoutes(app) {
   });
 
   app.get("/api/gallery/delta", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return res.json({ revision: 0, reset: false, upserts: [], removes: [] });
     const since = Number(req.query.since || 0);
     if (req.heissAccount) {
       res.json({ revision: galleryRevisionValue(), reset: since !== galleryRevisionValue(), upserts: [], removes: [] });
@@ -142,6 +156,7 @@ export function registerGalleryReadRoutes(app) {
 
 export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory }) {
   app.get("/api/gallery/export", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' });
     const date = new Date().toISOString().slice(0, 10);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-gallery-${date}.zip"`);
@@ -158,6 +173,7 @@ export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory })
   /* ------------------------------------------ Favourites, prompts, earlier work */
 
   app.post("/api/gallery/favorite", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     const requested = new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500));
     const ids = recordsForRequest(gallery, req).filter((item) => [item.id, item.url, galleryKey(item)].some((key) => requested.has(String(key)))).flatMap((item) => [item.id, item.url, galleryKey(item)]);
     const changed = setGalleryFavorites(ids, Boolean(req.body?.favorite));
@@ -167,6 +183,7 @@ export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory })
 
 export function registerGalleryTrashRoutes(app) {
   app.post("/api/gallery/clear", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireAdmin(req, res)) return;
     // Clearing the gallery never touches Hidden; that has its own erase. Nor images
     // shown from another folder (library.js): their files are not in the output
@@ -182,12 +199,14 @@ export function registerGalleryTrashRoutes(app) {
   });
 
   app.get("/api/gallery/trash", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireAdmin(req, res)) return;
     res.json({ ok: true, ...trashSummary(undefined, ownerIdForRequest(req)) });
   });
 
   // Undo for a clear, or Settings' Restore: the newest batch unless one is named.
   app.post("/api/gallery/trash/restore", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireAdmin(req, res)) return;
     try {
       const { restored, missing } = restoreTrash(String(req.body?.batch || ""), undefined, ownerIdForRequest(req));
@@ -199,6 +218,7 @@ export function registerGalleryTrashRoutes(app) {
   });
 
   app.post("/api/gallery/trash/empty", async (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     if (!requireAdmin(req, res)) return;
     try {
       const removed = await emptyTrash(undefined, ownerIdForRequest(req));
@@ -209,6 +229,7 @@ export function registerGalleryTrashRoutes(app) {
   });
 
   app.post("/api/gallery/errors/clear", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     const clears = (item) => recordBelongsToRequest(item, req) && (item.status === "error" || item.status === "canceled");
     const cleared = gallery.filter(clears);
     hideGalleryItems(cleared);
@@ -220,6 +241,7 @@ export function registerGalleryTrashRoutes(app) {
 
 export function registerGalleryDeleteRoute(app) {
   app.delete("/api/gallery/:id", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
     const id = decodeURIComponent(req.params.id);
     const inGallery = gallery.some((item) => item.id === id || item.url === id);
     const owned = recordsForRequest(gallery, req);

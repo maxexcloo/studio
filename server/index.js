@@ -80,7 +80,7 @@ import { accountForRequest, multiUserEnabled, registerMultiUserAuthRoutes } from
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
-import { verifyAccountMcpToken } from './account-store.js';
+import { accountAccessForId, verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -89,6 +89,7 @@ const app = express();
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
 async function resolveSignedMcpResult(owner, jobId, index) {
+  if (!mayUseFeature(accountAccessForId(owner), 'gallery')) return null;
   const item = gallery.find((entry) => entry.ownerId === owner && entry.jobId === jobId && entry.index === index
     && entry.status === 'done' && !entry.privateVault && !entry.hidden);
   if (!item || !mcpOutputPath(item.url)) return null;
@@ -937,25 +938,30 @@ registerHiddenFavoriteRoute(app);
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.json({ prompts: [], enabled: false });
   const ownerId = ownerIdForRequest(req);
   res.json({ prompts: listPrompts(req.query.kind, ownerId), enabled: promptHistoryEnabled(req.query.kind, ownerId) });
 });
 
 app.post("/api/prompts/enabled", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   const ownerId = ownerIdForRequest(req);
   const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
   res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
 });
 
 app.post("/api/prompts/pin", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")], new Set(), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/clear", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind, ownerIdForRequest(req)) });
 });
 
@@ -1351,6 +1357,10 @@ app.post("/api/upscale/toggle", (req, res) => {
 });
 
 app.get("/api/jobs/:id", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'gallery')) {
+    res.json({ status: 'missing' });
+    return;
+  }
   const job = jobs.get(req.params.id);
   if (!job || req.heissAccount && job.ownerId !== req.heissAccount.userId) {
     res.json({ status: "missing" });
@@ -1642,7 +1652,7 @@ app.get('/comfy/video-preview', async (req, res) => {
   const filename = String(req.query.filename || '');
   const subfolder = String(req.query.subfolder || '');
   const type = String(req.query.type || 'output');
-  if (req.heissAccount && (type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
+  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
   if (!['output', 'input', 'temp'].includes(type) || !/\.(mp4|webm|mov|mkv)$/i.test(filename) || filename !== path.basename(filename) || /[\\/]/.test(filename) || inDotFolder(subfolder)) {
     res.status(404).end(); return;
   }
@@ -1659,7 +1669,7 @@ app.get("/comfy/thumb", async (req, res) => {
   const subfolder = String(req.query.subfolder || "");
   const type = String(req.query.type || "output");
   if (!filename) { res.status(400).json({ error: "filename is required." }); return; }
-  if (req.heissAccount && (type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
+  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
   // The same outputs /comfy/view serves, and nothing else.
   if (!["output", "input", "temp"].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
@@ -1721,7 +1731,7 @@ app.get("/comfy/*path", async (req, res) => {
     const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
     const proxyPath = Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path;
     const filename = String(req.query.filename || "");
-    if (req.heissAccount && (proxyPath !== "view" || String(req.query.type || "output") !== "output" || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
+    if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || proxyPath !== "view" || String(req.query.type || "output") !== "output" || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
       res.status(404).json({ ok: false, error: "Not an output." });
       return;
     }

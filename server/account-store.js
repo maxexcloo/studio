@@ -62,6 +62,12 @@ export function listAccounts() {
   return accountStoreSnapshot().accounts;
 }
 
+export function accountAccessForId(accountId) {
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  return account ? effectiveAccountAccess(account, store.profiles) : null;
+}
+
 export function listAccessProfiles(availableProfiles = []) {
   return Object.values(readStore().profiles).map((profile) => normaliseAccessProfile(profile, availableProfiles));
 }

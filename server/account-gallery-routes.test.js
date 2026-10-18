@@ -19,6 +19,7 @@ registerGalleryReadRoutes({ get: (route, handler) => { routes[route] = handler; 
 function call(handler, req) {
   const res = {
     body: null,
+    status() { return this; },
     json(value) { this.body = value; return this; }
   };
   handler(req, res);
@@ -35,11 +36,18 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   const first = item("account-a", "job-a");
   const second = item("account-b", "job-b");
   galleryStore.setGallery([first, second]);
-  const request = { heissAccount: { userId: "account-a", role: "user" }, query: {} };
+  const request = { heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: {} };
 
   const page = call(routes["/api/gallery"], request);
   assert.deepEqual(page.items.map((record) => record.id), [first.id]);
   assert.deepEqual(page.outputs.map((record) => record.id), [first.id]);
   assert.deepEqual(call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } }).items, []);
   assert.deepEqual(call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items.map((record) => record.jobId), ["job-a"]);
+});
+
+test("access profiles without gallery permission cannot read pages or exact job outputs", () => {
+  galleryStore.setGallery([item("account-a", "job-a")]);
+  const request = { heissAccount: { userId: "account-a", role: "user", authenticated: true, generationProfiles: [], features: { gallery: false } }, query: {} };
+  assert.deepEqual(call(routes["/api/gallery"], request).items, []);
+  assert.deepEqual(call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items, []);
 });
