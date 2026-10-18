@@ -308,13 +308,13 @@ export function gallerySearchText(item) {
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
-export function galleryFilter({ q = "", favorites = false, lora = "", model = "", workflow = "" } = {}) {
+export function galleryFilter({ q = "", favorites = false, lora = "", model = "", workflow = "", size = "", aspect = "" } = {}) {
   const terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean).slice(0, 12);
-  if (!terms.length && !favorites && !lora && !model && !workflow) return null;
+  if (!terms.length && !favorites && !lora && !model && !workflow && !size && !aspect) return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;
-    if (!matchesGalleryFilters(item, { lora, model, workflow })) return false;
+    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect })) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
     return terms.every((term) => text.includes(term));

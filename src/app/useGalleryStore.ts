@@ -247,11 +247,11 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
     const current = searchRef.current;
     if (hidden || !searchActive(current)) return "";
     const q = current.q.trim();
-    return `${q ? `&q=${encodeURIComponent(q)}` : ""}${current.favorites ? "&favorites=1" : ""}${["lora", "model", "workflow"].map((key) => { const value = current[key as keyof GallerySearch]; return value ? `&${key}=${encodeURIComponent(String(value))}` : ""; }).join("")}`;
+    return `${q ? `&q=${encodeURIComponent(q)}` : ""}${current.favorites ? "&favorites=1" : ""}${["lora", "model", "workflow", "size", "aspect"].map((key) => { const value = current[key as keyof GallerySearch]; return value ? `&${key}=${encodeURIComponent(String(value))}` : ""; }).join("")}`;
   };
   // A slower answer to an earlier search must not replace a newer one.
   const loadSeq = useRef(0);
-  const searchKey = hidden || !searchActive(search) ? "" : JSON.stringify([search.q.trim(), search.favorites, search.lora, search.model, search.workflow]);
+  const searchKey = hidden || !searchActive(search) ? "" : JSON.stringify([search.q.trim(), search.favorites, search.lora, search.model, search.workflow, search.size, search.aspect]);
   const requestKey = JSON.stringify([mode, space, includeFailed, searchKey]);
   const requestKeyRef = useRef(requestKey);
   const pageSnapshots = useRef(new Map<string, GalleryState>());
@@ -286,7 +286,7 @@ export function useGalleryStore({ mode, showFailedItems, space = "gallery", onLo
 
   const gallery = useMemo(() => state.sortedIds.map((id) => state.itemsById[id]).filter(Boolean), [state.itemsById, state.sortedIds]);
   const hiddenSearch = hidden && searchActive(search) ? search : null;
-  const visibleGallery = useMemo(() => gallery.filter((item) => item.type === mode && (!hiddenSearch || matchesSearch(item, hiddenSearch))), [gallery, mode, hiddenSearch?.q, hiddenSearch?.favorites, hiddenSearch?.lora, hiddenSearch?.model, hiddenSearch?.workflow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const visibleGallery = useMemo(() => gallery.filter((item) => item.type === mode && (!hiddenSearch || matchesSearch(item, hiddenSearch))), [gallery, mode, hiddenSearch?.q, hiddenSearch?.favorites, hiddenSearch?.lora, hiddenSearch?.model, hiddenSearch?.workflow, hiddenSearch?.size, hiddenSearch?.aspect]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadGallery = useCallback(async () => {
     const seq = ++loadSeq.current;

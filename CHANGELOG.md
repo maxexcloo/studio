@@ -14,6 +14,7 @@ version opens with a `> ` summary line, which the update pill shows.
 > Reliable selections and fork release safeguards
 
 ### Added
+- **Gallery size & aspect filters:** filter Images, Videos and Hidden by long-edge size (Up to 1K, 1K–1.5K, 1.5K–2K, Over 2K) and common aspect ratios or Other. Pending jobs stay visible, and items without known dimensions only drop out while one of these filters is on.
 - **Optional multi-user mode (`HEISS_MULTI_USER=1`):** local accounts with a recovery administrator, access profiles that grant generation profiles and features, private per-account galleries, prompt history, LoRA stacks, references and jobs, personal MCP tokens, a per-account outstanding-job limit, Pocket ID/OpenID Connect sign-in with administrator approval, trusted chat-gateway user links, readiness probes and an **Accounts & MCP** settings section. Single-user mode is unchanged.
 - **LoRA details & ordering:** existing descriptions, trigger words and safe source links are available in the picker; selected effects support drag, keyboard and button reordering.
 - **Reference search:** find images by prompt, model or filename across the full library.

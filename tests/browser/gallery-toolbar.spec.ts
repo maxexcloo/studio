@@ -60,6 +60,34 @@ test('gallery tools expand independently and clear every active filter', async (
   }
 });
 
+test('size and aspect filters reach the server and clear with the others', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phone filters are covered by the compact header test.');
+  const queries: string[] = [];
+  await page.route('**/api/gallery?*', route => { queries.push(new URL(route.request().url()).search); return route.fulfill({ json: { items, revision: 1, hasMore: false } }); });
+  // Clearing restores the unfiltered page from cache, which only syncs through the delta route.
+  await page.route('**/api/gallery/delta?*', route => { queries.push(new URL(route.request().url()).search); return route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }); });
+  await page.goto('/');
+  const toolbar = page.locator('.gallery-toolbar');
+  await toolbar.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'Filter By Size', exact: true }).click();
+  // Short fixed lists need no search field; the bands say exactly where they start and end.
+  await expect(page.getByRole('textbox', { name: /^Search/ }).filter({ visible: true })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: '1K–1.5K (1025–1536 px)', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: 'Up to 1K (1024 px or less)', exact: true }).click();
+  await expect.poll(() => queries.some((query) => query.includes('size=up-to-1k'))).toBe(true);
+  await toolbar.getByRole('button', { name: 'Filter By Aspect Ratio', exact: true }).click();
+  await page.getByRole('option', { name: 'Other', exact: true }).click();
+  await expect.poll(() => queries.some((query) => query.includes('size=up-to-1k') && query.includes('aspect=other'))).toBe(true);
+  await expect(toolbar.getByRole('button', { name: 'Filter By Size', exact: true })).toHaveText('Up to 1K');
+  for (const width of [1440, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await toolbar.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+  }
+  await toolbar.getByRole('button', { name: 'Clear Filters', exact: true }).click();
+  await expect(toolbar.getByRole('button', { name: 'Filter By Size', exact: true })).toHaveText('Size');
+  await expect.poll(() => queries.at(-1)?.includes('size=') ?? true).toBe(false);
+});
+
 test('phone opens inline filters from its header without a separate Hidden control', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Compact phone header.');
   await page.goto('/');
@@ -70,7 +98,7 @@ test('phone opens inline filters from its header without a separate Hidden contr
   await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   await expect(page.locator('.phone-bar:not(.is-behind)').getByRole('button', { name: 'Search Gallery', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await expect(tools.getByRole('button', { name: 'Show Hidden', exact: true })).toBeVisible();
-  for (const label of ['Model', 'LoRA']) {
+  for (const label of ['Model', 'LoRA', 'Size', 'Aspect Ratio']) {
     const select = tools.getByRole('button', { name: `Filter By ${label}`, exact: true });
     await select.scrollIntoViewIfNeeded();
     await expect(select).toBeInViewport();

@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Boxes, ChevronDown, Eye, EyeOff, Layers, Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { Boxes, ChevronDown, Eye, EyeOff, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { galleryAspects, gallerySizeBands, otherAspect } from '../../server/gallery-filters.js';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
@@ -9,7 +10,11 @@ import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
 
-function GalleryFilterPicker({ name, value, values, icon: Icon, onChange, floatingRef }: { name: string; value: string; values: string[]; icon: typeof Boxes; onChange: (value: string) => void; floatingRef: React.RefObject<HTMLDivElement | null> }) {
+const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.label} (${band.detail})`]));
+const aspectLabels = new Map([...galleryAspects.map((aspect) => [aspect.id, aspect.id] as const), [otherAspect, 'Other']]);
+export const filterLabel = (key: 'size' | 'aspect', value?: string) => (value ? (key === 'size' ? sizeLabels : aspectLabels).get(value) || value : '');
+
+function GalleryFilterPicker({ name, value, values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; value: string; values: string[]; icon: typeof Boxes; onChange: (value: string) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 240 });
@@ -53,9 +58,9 @@ function GalleryFilterPicker({ name, value, values, icon: Icon, onChange, floati
   }, [open, focusOption]);
   const choose = (next: string) => { onChange(next); close(); };
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const matches = values.filter(option => terms.every(term => option.toLocaleLowerCase().includes(term)));
+  const matches = values.filter(option => terms.every(term => labelFor(option).toLocaleLowerCase().includes(term)));
   return <>
-    <button ref={anchor} type="button" className={cn('gallery-filter-select', value && 'is-on')} aria-label={`Filter By ${name}`} title={`${name}: ${value || 'Any'}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{value || name}</span><ChevronDown size={12} /></button>
+    <button ref={anchor} type="button" className={cn('gallery-filter-select', value && 'is-on')} aria-label={`Filter By ${name}`} title={`${name}: ${value ? labelFor(value) : 'Any'}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{value ? (searchable ? value : labelFor(value).replace(/ \(.*\)$/, '')) : name}</span><ChevronDown size={12} /></button>
     {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={position} onKeyDown={event => {
       const options = [...list.current!.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const index = options.indexOf(document.activeElement as HTMLButtonElement);
@@ -67,8 +72,8 @@ function GalleryFilterPicker({ name, value, values, icon: Icon, onChange, floati
       if (typing && event.key === 'Enter' && matches.length) { event.preventDefault(); choose(matches[0]); }
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
-      <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${name === 'LoRA' ? 'LoRAs' : 'Models'}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div>
-      <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-label={`${name} Filter`}>{['', ...matches].map(option => <button type="button" key={option} className={cn('aspect-option', option === value && 'active')} role="option" tabIndex={option === value ? 0 : -1} aria-selected={option === value} onClick={() => choose(option)}>{option || `Any ${name}`}</button>)}{!matches.length && query ? <p className="gallery-filter-empty" role="status">No Matches</p> : null}</div>
+      {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${name === 'LoRA' ? 'LoRAs' : 'Models'}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
+      <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-label={`${name} Filter`}>{['', ...matches].map(option => <button type="button" key={option} className={cn('aspect-option', option === value && 'active')} role="option" tabIndex={option === value ? 0 : -1} aria-selected={option === value} onClick={() => choose(option)}>{option ? labelFor(option) : `Any ${name}`}</button>)}{!matches.length && query ? <p className="gallery-filter-empty" role="status">No Matches</p> : null}</div>
     </div>, document.body) : null}
   </>;
 }
@@ -122,7 +127,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
   const filterControlsRef = React.useRef<HTMLDivElement>(null);
   const [filterHeight, setFilterHeight] = React.useState(0);
   const [localFiltersOpen, setLocalFiltersOpen] = React.useState(false);
-  const filterCount = [search.lora, search.model, search.workflow].filter((value) => value?.trim()).length + Number(search.favorites);
+  const filterCount = [search.lora, search.model, search.workflow, search.size, search.aspect].filter((value) => value?.trim()).length + Number(search.favorites);
   const filterActive = filterCount > 0 || hiddenSpace;
   const queryActive = Boolean(search.q.trim());
   const active = queryActive || filterActive;
@@ -184,7 +189,9 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
             const Icon = key === 'model' ? Boxes : Layers;
             return <GalleryFilterPicker key={key} name={name} value={search[key] || ''} values={suggestions([search[key], ...options[key]])} icon={Icon} onChange={value => setSearch({ ...search, [key]: value })} floatingRef={floatingRef} />;
           })}
-          {filterCount || hiddenSpace ? <button type="button" className="gallery-filter-icon" aria-label="Clear Filters" title="Clear Filters" onClick={() => { setSearch({ ...search, favorites: false, lora: '', model: '', workflow: '' }); if (hiddenSpace) onToggleHidden?.(); }}><X size={16} /></button> : null}
+          <GalleryFilterPicker name="Size" value={search.size || ''} values={gallerySizeBands.map((band) => band.id)} icon={Ruler} labelFor={(value) => filterLabel('size', value)} searchable={false} onChange={value => setSearch({ ...search, size: value })} floatingRef={floatingRef} />
+          <GalleryFilterPicker name="Aspect Ratio" value={search.aspect || ''} values={[...galleryAspects.map((aspect) => aspect.id), otherAspect]} icon={Ratio} labelFor={(value) => filterLabel('aspect', value)} searchable={false} onChange={value => setSearch({ ...search, aspect: value })} floatingRef={floatingRef} />
+          {filterCount || hiddenSpace ? <button type="button" className="gallery-filter-icon" aria-label="Clear Filters" title="Clear Filters" onClick={() => { setSearch({ ...search, favorites: false, lora: '', model: '', workflow: '', size: '', aspect: '' }); if (hiddenSpace) onToggleHidden?.(); }}><X size={16} /></button> : null}
           </div>
         </motion.div> : null}
       </AnimatePresence>
@@ -195,7 +202,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
 
 /** What an empty result says, and the one way back. */
 export function SearchEmpty({ search, onClear, hiddenSpace = false }: { search: GallerySearch; onClear: () => void; hiddenSpace?: boolean }) {
-  const words = search.q.trim() || [search.model, search.workflow, search.lora].filter(Boolean).join(" · ");
+  const words = search.q.trim() || [search.model, search.workflow, search.lora, filterLabel('size', search.size), filterLabel('aspect', search.aspect)].filter(Boolean).join(" · ");
   const onlyStars = search.favorites && !words;
   return (
     <section className="gallery">
