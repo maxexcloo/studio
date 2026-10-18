@@ -35,6 +35,7 @@ export function modelName(profile) {
 }
 
 const familyNames = {
+  boogu: 'Boogu',
   checkpoint: 'Checkpoint',
   flux2_klein_9b: 'FLUX',
   flux3_klein: 'FLUX',
@@ -42,6 +43,7 @@ const familyNames = {
   ideogram4: 'Ideogram',
   krea2: 'Krea',
   minimax_h3: 'MiniMax',
+  moss_image: 'MOSS',
   qwen_image_21: 'Qwen',
   wan: 'Wan',
   z_image: 'Z-Image',
@@ -52,9 +54,21 @@ export function modelFamily(profile) {
   if (!profile) return '';
   const family = String(profile.family || '').replace(/-/g, '_');
   const name = familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
-  const variant = [profile.baseModel, profile.displayName, profile.label].filter(Boolean).join(' ');
+  const variant = profile.baseModel || [profile.displayName, profile.label].filter(Boolean).join(' ');
   const fineTune = { krea2: /tessera|serendipity/i, qwen_image_21: /noct[ _-]*q/i, minimax_h3: /singularity|fused|dmad/i }[family];
   return fineTune?.test(variant) ? name + ' (Fine Tunes)' : name;
+}
+
+/** Specific family names for adapter filters, independent of broader model group headings. */
+export function modelFamilyLabel(profile) {
+  const family = String(profile?.family || '').replace(/-/g, '_');
+  const labels = {
+    boogu: 'Boogu', flux2_klein_4b: 'FLUX.2 Klein 4B', flux2_klein_9b: 'FLUX.2 Klein 9B',
+    flux3_klein: 'FLUX.3 Klein', ideogram4: 'Ideogram 4', krea2: 'Krea 2',
+    minimax_h3: 'MiniMax H3', moss_image: 'MOSS Image', qwen_image_21: 'Qwen-Image 2.1',
+    z_image: 'Z-Image', zimage: 'Z-Image',
+  };
+  return profile?.familyName || labels[family] || familyNames[family] || (family && family !== 'custom' ? family : '');
 }
 
 const catalogueCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
