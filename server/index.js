@@ -848,18 +848,18 @@ registerVaultMediaRoutes(app);
 
 app.delete("/api/loras", (req, res) => {
   if (!requireLocal(req, res)) return;
-  clearLoraState();
+  clearLoraState(ownerIdForRequest(req));
   res.json({ ok: true });
 });
 
-app.get("/api/loras/library", (_req, res) => {
-  const library = lorasEnabled ? loadLoraLibrary() : null;
+app.get("/api/loras/library", (req, res) => {
+  const library = lorasEnabled ? loadLoraLibrary(ownerIdForRequest(req)) : null;
   res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
 });
 
 app.put("/api/loras/library", (req, res) => {
   try {
-    res.json({ ok: true, library: saveLoraLibrary(req.body?.library) });
+    res.json({ ok: true, library: saveLoraLibrary(req.body?.library, ownerIdForRequest(req)) });
   } catch (error) {
     res.status(500).json({ ok: false, error: `Couldn’t save the LoRA library: ${error.message}` });
   }
@@ -868,7 +868,7 @@ app.put("/api/loras/library", (req, res) => {
 // Clients send edits, not whole copies, so two devices never overwrite each other.
 app.post("/api/loras/library/ops", (req, res) => {
   try {
-    res.json({ ok: true, library: applyLoraOps(req.body?.ops) });
+    res.json({ ok: true, library: applyLoraOps(req.body?.ops, ownerIdForRequest(req)) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
@@ -886,13 +886,13 @@ app.get("/api/loras/info", async (_req, res) => {
 });
 
 app.get("/api/loras/:workflowId", (req, res) => {
-  const loras = lorasEnabled ? loadLoraStack(req.params.workflowId) : null;
+  const loras = lorasEnabled ? loadLoraStack(req.params.workflowId, ownerIdForRequest(req)) : null;
   res.json({ found: loras !== null, loras: loras || [] });
 });
 
 app.put("/api/loras/:workflowId", (req, res) => {
   try {
-    res.json({ ok: true, loras: saveLoraStack(req.params.workflowId, req.body?.loras) });
+    res.json({ ok: true, loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
@@ -904,24 +904,26 @@ registerHiddenFavoriteRoute(app);
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.json({ prompts: listPrompts(req.query.kind), enabled: promptHistoryEnabled(req.query.kind) });
+  const ownerId = ownerIdForRequest(req);
+  res.json({ prompts: listPrompts(req.query.kind, ownerId), enabled: promptHistoryEnabled(req.query.kind, ownerId) });
 });
 
 app.post("/api/prompts/enabled", (req, res) => {
-  const prompts = setPromptHistoryEnabled(req.body?.enabled !== false);
-  res.json({ ok: true, prompts, enabled: promptHistoryEnabled() });
+  const ownerId = ownerIdForRequest(req);
+  const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
+  res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
 });
 
 app.post("/api/prompts/pin", (req, res) => {
-  res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind) });
+  res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {
-  res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")], new Set(), req.body?.kind) });
+  res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")], new Set(), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/clear", (req, res) => {
-  res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind) });
+  res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.get("/api/civitai", (_req, res) => {

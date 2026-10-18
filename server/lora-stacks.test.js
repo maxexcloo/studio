@@ -19,6 +19,16 @@ test("two devices adding stacks both keep theirs", () => {
   assert.deepEqual(library.snapshots[key].map((item) => item.id), ["mac", "phone"]);
 });
 
+test("account LoRA stacks and library state use separate files from each other and legacy state", () => {
+  clearLoraState("account-a");
+  clearLoraState("account-b");
+  saveLoraLibrary({ favorites: ["private-a.safetensors"], snapshots: { [key]: [stack("a", "A")] } }, "account-a");
+  saveLoraLibrary({ favorites: ["private-b.safetensors"], snapshots: { [key]: [stack("b", "B")] } }, "account-b");
+  assert.deepEqual(loadLoraLibrary("account-a").favorites, ["private-a.safetensors"]);
+  assert.deepEqual(loadLoraLibrary("account-b").favorites, ["private-b.safetensors"]);
+  assert.equal(loadLoraLibrary().favorites.includes("private-a.safetensors"), false);
+});
+
 test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () => {
   clearLoraState();
   const add = { op: "stack.add", key, stack: stack("x", "Krea") };

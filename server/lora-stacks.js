@@ -1,17 +1,20 @@
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from './json-store.js';
+import crypto from "node:crypto";
 
-const stacksPath = path.join(dataDir, "lora-stacks.json");
+const stacksPath = (ownerId = "") => ownerId
+  ? path.join(dataDir, "accounts", crypto.createHash("sha256").update(String(ownerId)).digest("hex"), "lora-stacks.json")
+  : path.join(dataDir, "lora-stacks.json");
 
 // Generous caps: enough for anyone, small enough that a bad client cannot bloat the file.
 const maxLorasPerStack = 8;
 const maxStacksPerFamily = 200;
 const maxOpsPerRequest = 500;
 
-function readState() {
+function readState(ownerId = "") {
   try {
-    const value = readJsonFile(stacksPath);
+    const value = readJsonFile(stacksPath(ownerId));
     if (value?.stacks && typeof value.stacks === "object") return { stacks: value.stacks, library: value.library || null };
     return { stacks: value && typeof value === "object" ? value : {}, library: null };
   } catch {
@@ -19,8 +22,8 @@ function readState() {
   }
 }
 
-function writeState(state) {
-  writeJsonFile(stacksPath, state);
+function writeState(state, ownerId = "") {
+  writeJsonFile(stacksPath(ownerId), state);
 }
 
 function cleanStack(value) {
@@ -72,22 +75,22 @@ function cleanLibrary(value) {
   };
 }
 
-export function loadLoraStack(workflowId) {
-  const value = readState().stacks[String(workflowId || "")];
+export function loadLoraStack(workflowId, ownerId = "") {
+  const value = readState(ownerId).stacks[String(workflowId || "")];
   return Array.isArray(value) ? cleanStack(value) : null;
 }
 
-export function saveLoraStack(workflowId, stack) {
+export function saveLoraStack(workflowId, stack, ownerId = "") {
   const id = String(workflowId || "").trim();
   if (!id) throw new Error("A workflow is required to save a LoRA stack.");
-  const state = readState();
+  const state = readState(ownerId);
   state.stacks[id] = cleanStack(stack);
-  writeState(state);
+  writeState(state, ownerId);
   return state.stacks[id];
 }
 
-export function loadLoraLibrary() {
-  const library = readState().library;
+export function loadLoraLibrary(ownerId = "") {
+  const library = readState(ownerId).library;
   return library ? cleanLibrary(library) : null;
 }
 
@@ -174,22 +177,22 @@ function applyOp(state, library, op) {
 }
 
 /** Applies a batch of edits in order and returns the library as it now stands. */
-export function applyLoraOps(ops) {
+export function applyLoraOps(ops, ownerId = "") {
   if (!Array.isArray(ops)) throw new Error("Expected a list of LoRA library changes.");
-  const state = readState();
+  const state = readState(ownerId);
   const library = cleanLibrary(state.library);
   for (const op of ops.slice(0, maxOpsPerRequest)) applyOp(state, library, op);
   state.library = cleanLibrary(library);
-  writeState(state);
+  writeState(state, ownerId);
   return state.library;
 }
 
 /** Whole-library saves merge rather than replace, so a stale device cannot erase another's stacks. */
-export function saveLoraLibrary(library) {
-  return applyLoraOps([{ op: "merge", library }]);
+export function saveLoraLibrary(library, ownerId = "") {
+  return applyLoraOps([{ op: "merge", library }], ownerId);
 }
 
 /** Forgets every saved stack and the strength/snapshot library (used by "Reset all settings"). */
-export function clearLoraState() {
-  writeState({ stacks: {}, library: null });
+export function clearLoraState(ownerId = "") {
+  writeState({ stacks: {}, library: null }, ownerId);
 }

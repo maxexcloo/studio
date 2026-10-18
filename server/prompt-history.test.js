@@ -23,6 +23,14 @@ test("the first list starts from the gallery, never from Hidden", () => {
   assert.ok(fs.existsSync(history.promptHistoryPath));
 });
 
+test("account prompt histories are stored separately from each other and legacy history", () => {
+  history.recordPrompt("account a secret", "positive", "account-a");
+  history.recordPrompt("account b secret", "positive", "account-b");
+  assert.deepEqual(history.listPrompts("positive", "account-a").map((entry) => entry.text), ["account a secret"]);
+  assert.deepEqual(history.listPrompts("positive", "account-b").map((entry) => entry.text), ["account b secret"]);
+  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["A  red fox", "a blue owl"]);
+});
+
 test("using a prompt again moves it to the top instead of repeating it", () => {
   history.recordPrompt("a blue owl ");
   history.recordPrompt("a green frog");

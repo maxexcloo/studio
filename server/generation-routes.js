@@ -153,7 +153,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
       : null;
     // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
-    if (!body.privateVault) try { recordPrompt(body.prompt); recordPrompt(body.negative, "negative"); } catch { /* a run matters more than its history */ }
+    if (!body.privateVault) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
