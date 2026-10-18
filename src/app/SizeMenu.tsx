@@ -2,7 +2,7 @@ import React from 'react';
 import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
-import { Tip } from './components';
+import { StudioSelect, Tip } from './components';
 import { fitRatio, formatMp, MEGAPIXEL, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
 import type { AspectPreset, NativeSupport, SavedSize } from './types';
@@ -19,7 +19,7 @@ import type { AspectPreset, NativeSupport, SavedSize } from './types';
      typing, arrow keys, or a drag on its W/H label, like a design tool.
 --------------------------------------------------------------------------- */
 
-export type SizeTier = "none" | "2k" | "custom";
+export type SizeTier = "none" | "2k" | "4k" | "custom";
 
 export type SizeRow = { key: string; value: string; label: string; small?: string; shape: AspectPreset; size: Size };
 
@@ -51,7 +51,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // No model picked (ComfyUI off, or none listed): sizes still work, but there is no model to warn about.
   const native = modelNative || {};
   const picked = parseSize(currentSize);
-  const plan = sizePlan(tier === "2k" ? "2k" : "none", picked.width, picked.height, native, sizeMax, custom ? 0 : targetArea, limits?.width.step);
+  const plan = sizePlan(tier === "2k" || tier === "4k" ? tier : "none", picked.width, picked.height, native, sizeMax, custom ? 0 : targetArea, limits?.width.step);
   const shown = custom ? picked : plan.final;
   const selected = options.find((item) => item.value === value);
   const isDefault = value === "default";
@@ -63,7 +63,7 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
   const rowSize = (shape: AspectPreset) => custom && limits
     ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
-    : tier === "2k" ? sizePlan("2k", shape.w, shape.h, native, sizeMax).final
+    : (tier === "2k" || tier === "4k") ? sizePlan(tier, shape.w, shape.h, native, sizeMax).final
     : targetArea > 0 ? sizePlan("none", shape.w, shape.h, native, sizeMax, targetArea, limits?.width.step).final : { width: shape.w, height: shape.h };
   const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
   const rows: SizeRow[] = [
@@ -84,21 +84,21 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   // Megapixels: an MP tag, the way 2K says its size. The count is in the menu, its preview and the
   // tip: as a tag it would change width with every step of a drag, under a button held at its width.
   const mpTag = !custom && targetArea > 0 ? "MP" : "";
-  const badge = tier === "2k" ? "2K" : custom ? "C" : mpTag;
-  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" ? ", 2K" : custom ? ", custom size" : mpTag ? `, ${formatMp(targetArea / MEGAPIXEL)} megapixels` : ""}`;
+  const badge = tier === "2k" || tier === "4k" ? tier.toUpperCase() : custom ? "C" : mpTag;
+  const what = `${label}, ${shown.width} × ${shown.height}${tier === "2k" || tier === "4k" ? `, ${tier.toUpperCase()}` : custom ? ", custom size" : mpTag ? `, ${formatMp(targetArea / MEGAPIXEL)} megapixels` : ""}`;
   /** The preview's caption for a row, or for the size chosen: "Name · ratio" where the name isn't the ratio itself. */
   const captionFor = (row: SizeRow | null) => row
     ? (row.small ? `${row.label} · ${row.small}` : row.label)
     : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
   const note = !modelNative ? ""
-    : (tier === "2k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
-    : tier === "2k" && plan.untested ? "This model isn’t known for 2K. Some pictures may repeat or warp."
+    : (tier === "2k" || tier === "4k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
+    : (tier === "2k" || tier === "4k") && plan.untested ? `This model isn’t known for ${tier.toUpperCase()}. Some pictures may repeat or warp.`
     : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";
   return { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note };
 }
 
-const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", custom: "Custom" };
+const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", "4k": "4K", custom: "Custom" };
 
 /**
  * The frame on its own window beside the menu. The window is the stage: the
@@ -151,31 +151,29 @@ export function SizePreview({ size, label, sub, accent = false, shown = true, in
 }
 
 export function SizeTabs({ tiers, value, onChange }: { tiers: SizeTier[]; value: SizeTier; onChange: (tier: SizeTier) => void }) {
-  const index = Math.max(0, tiers.indexOf(value));
-  return (
-    <div className="aspect-upscale-tabs" role="radiogroup" aria-label="Size" style={{ "--tab-index": index, "--tab-count": tiers.length } as React.CSSProperties} onKeyDown={(event) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      event.preventDefault();
-      event.stopPropagation();
-      const next = tiers[(index + (event.key === "ArrowRight" ? 1 : -1) + tiers.length) % tiers.length];
-      onChange(next);
-      requestAnimationFrame(() => event.currentTarget.querySelector<HTMLButtonElement>(`[data-tier="${next}"]`)?.focus());
-    }}>
-      <i aria-hidden="true" />
-      {tiers.map((tier) => (
-        <button
-          key={tier}
-          type="button"
-          role="radio"
-          data-tier={tier}
-          aria-checked={tier === value}
-          tabIndex={tier === value ? 0 : -1}
-          className={cn(tier === value && "is-active")}
-          onClick={() => onChange(tier)}
-        >{tierLabels[tier]}</button>
-      ))}
-    </div>
-  );
+  const resolutions = tiers.filter((tier) => tier !== 'custom');
+  const selected = value === 'custom' ? 'none' : value;
+  const index = Math.max(0, resolutions.indexOf(selected));
+  return <div className="size-tier-controls">
+    {resolutions.length > 1 ? <div className="size-resolution">
+      <span className="aspect-upscale-head">Resolution</span>
+      {resolutions.length > 2
+        ? <StudioSelect ariaLabel="Resolution" value={selected} options={resolutions.map(tier => ({ label: tierLabels[tier], value: tier }))} onChange={next => onChange(next as SizeTier)} />
+        : <div className="aspect-upscale-tabs" role="radiogroup" aria-label="Resolution" style={{ '--tab-index': index, '--tab-count': resolutions.length } as React.CSSProperties} onKeyDown={event => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const next = resolutions[(index + (event.key === 'ArrowRight' ? 1 : -1) + resolutions.length) % resolutions.length];
+          const group = event.currentTarget;
+          onChange(next);
+          requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-tier="${next}"]`)?.focus());
+        }}>
+          <i aria-hidden="true" />
+          {resolutions.map(tier => <button key={tier} type="button" role="radio" data-tier={tier} tabIndex={tier === selected ? 0 : -1} aria-checked={tier === selected && value !== 'custom'} className={cn(tier === selected && value !== 'custom' && 'is-active')} onClick={() => onChange(tier)}>{tierLabels[tier]}</button>)}
+        </div>}
+    </div> : null}
+    <button type="button" className={cn('size-custom-action', value === 'custom' && 'is-active')} aria-pressed={value === 'custom'} onClick={() => onChange(value === 'custom' ? 'none' : 'custom')}>Custom Size</button>
+  </div>;
 }
 
 /**

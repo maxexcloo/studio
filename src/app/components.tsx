@@ -429,9 +429,6 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && (tier !== "none" || targetArea > 0)} shown={peek} />
           <div className="size-menu-side">
             <div className="aspect-upscale">
-              <div className="aspect-upscale-head">
-                <span>Resolution</span>
-              </div>
               {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
               {/* Its space above is its own padding, so it folds with it and closing ends without a jump. */}
               <AnimatePresence initial={false}>

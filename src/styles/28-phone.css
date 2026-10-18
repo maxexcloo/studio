@@ -492,22 +492,31 @@
 @keyframes phoneRoleNote { from { opacity: 0; transform: translateY(3px); } }
 @media (prefers-reduced-motion: reduce) { .phone-ref-role small { animation: none; } }
 .phone-create .ref-menu { max-width: calc(100vw - 72px); }
-/* The desktop menu opens leftwards on hover; touch controls stay in the row. */
-.phone-create .ref-selected { display: inline-flex; max-width: 100%; }
-.phone-create .ref-thumb { flex: none; order: -1; }
+/* The footer has room for the thumbnail; its paint action sits on the lower corner. */
+.phone-create .ref-selected { display: block; }
 .phone-create .ref-menu {
-  position: static;
+  position: absolute;
+  z-index: 3;
+  top: auto;
+  right: auto;
+  bottom: -5px;
+  left: -5px;
+  width: 28px;
+  height: 28px;
   min-width: 0;
-  max-width: calc(100vw - 120px);
-  height: 44px;
-  padding: 0 4px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
   opacity: 1;
   pointer-events: auto;
   clip-path: none;
 }
 .phone-create .ref-selected .ref-menu > * { opacity: 1; translate: none; }
-.phone-create .ref-menu-name { min-width: 0; }
-.phone-create .ref-menu-remove { width: 44px; height: 44px; }
+.phone-create .ref-menu-paint-slot:not(.is-hidden) { display: contents; }
+.phone-create .ref-menu-paint { justify-content: center; width: 28px; height: 28px; min-width: 28px; border-radius: 50%; }
+.phone-create .ref-menu-paint > svg { width: 15px; height: 15px; margin: 0; }
+.phone-create .ref-menu-paint-label { display: none; }
 
 .phone-field {
   display: grid;

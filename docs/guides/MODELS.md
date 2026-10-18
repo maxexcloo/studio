@@ -182,19 +182,17 @@ catalog, so a family that is described correctly needs no UI work.
 
 ## Native 2K
 
-`native` on a family (or a variant) says, per size, whether the model draws 2K
-or 4K itself. The size menu's **2K** tab draws the picked shape with its long
-side at 2048 on every image model; `native` decides what the menu says about it:
+`native` on a family (or a variant) declares support for 2K and 4K output.
+The size menu offers only entries marked `"yes"`, within the selected model's
+dimension limits. Two choices use buttons; more than two use a dropdown.
+Models without additional supported native sizes hide the Resolution control.
+Custom dimensions and aspect ratios remain available separately.
 
-- **`"yes"`**: its makers document that size. 2K draws with no note.
-- **`"maybe"`**: reports are mixed or missing. The menu says the model isn't
-  known for 2K and some pictures may repeat or warp.
-- **Left out**: the model plainly breaks there. Same note.
-
-The same note shows for a Megapixels count past about 2.5 MP on a model without
-`"2k": "yes"`. 4K is recorded for the families that document it but isn't
-drawn from the size menu; the upscale arrow (SeedVR2) gives 2K and 4K for any
-picture.
+A selected 2K or 4K resolution draws the chosen shape with its long side at
+2048 or 4096 pixels, without an automatic upscale. Entries marked `"maybe"`
+record mixed or missing reports and are not offered as supported resolutions.
+Megapixel sizing still warns when a requested size exceeds known support.
+The upscale arrow (SeedVR2) remains available independently of native support.
 
 Current entries:
 

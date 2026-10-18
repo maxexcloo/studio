@@ -1,3 +1,4 @@
+import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos } from './AnimatePhotos';
 import { PromptField } from './PromptField';
@@ -582,6 +583,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </>
   );
 
+  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={resetViewer} onFit={view.fitViewer} />;
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
@@ -757,9 +759,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           ) : null}
           {zenItem && !zenItem.run ? (
             <div className={cn("zen-zoom-dock", zenControls && "with-side")}>
-              <Tip content="Zoom Out (-)"><button className="icon-button" aria-label="Zoom Out" onClick={() => zoomViewer(viewerZoom - 0.25)} disabled={viewerZoom <= 0.5}><ZoomOut size={15} /></button></Tip>
-              <Tip content="Reset zoom (0)"><button className="text-button viewer-zoom" aria-label={`Reset zoom, now ${Math.round(viewerZoom * 100)}%`} onClick={resetViewer}>{viewerZoom !== 1 ? <RotateCcw size={13} /> : null} {Math.round(viewerZoom * 100)}%</button></Tip>
-              <Tip content="Zoom In (+)"><button className="icon-button" aria-label="Zoom In" onClick={() => zoomViewer(viewerZoom + 0.25)} disabled={viewerZoom >= 6}><ZoomIn size={15} /></button></Tip>
+              {zenDisplayItem.type === "image" ? imageZoomControls : null}
             </div>
           ) : null}
           {zenGallery.length && !zenGalleryOpen ? (
@@ -880,7 +880,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onTouchEnd={endViewerTouch}
                   onTouchCancel={endViewerTouch}
                   onClick={clickViewer}
-                  onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > 1 ? 1 : 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
+                  onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > view.viewerNativeZoom * 1.05 ? view.viewerNativeZoom : view.viewerNativeZoom * 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
                   {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain">
@@ -963,6 +963,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     {upscaleNotices?.get(active.id) ? (
                       <div className="viewer-phone-notice"><UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /></div>
                     ) : null}
+                    {active.type === "image" && !showDetails ? <div className="viewer-phone-zoom">{imageZoomControls}</div> : null}
                     <PhoneViewerBar
                       item={active}
                       actions={phoneItemActions}
@@ -974,9 +975,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   </>
                 ) : (
                 <div data-open-trigger className={cn("viewer-dock", showDetails && "with-side")}>
-                  <Tip content="Zoom Out (-)"><button className="icon-button is-zoom-control" aria-label="Zoom Out" onClick={() => zoomViewer(viewerZoom - 0.25)} disabled={viewerZoom <= 0.5}><ZoomOut size={15} /></button></Tip>
-                  <Tip content="Reset zoom (0)"><button className="text-button viewer-zoom is-zoom-control" aria-label={`Reset zoom, now ${Math.round(viewerZoom * 100)}%`} onClick={resetViewer}>{viewerZoom > 1 ? <RotateCcw size={13} /> : null} {Math.round(viewerZoom * 100)}%</button></Tip>
-                  <Tip content="Zoom In (+)"><button className="icon-button is-zoom-control" aria-label="Zoom In" onClick={() => zoomViewer(viewerZoom + 0.25)} disabled={viewerZoom >= 6}><ZoomIn size={15} /></button></Tip>
+                  {active.type === "image" ? imageZoomControls : null}
                   <span className="viewer-divider is-zoom-control" />
                   <Tip content={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"}><button className="icon-button" aria-label={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"} onClick={() => viewerCopy.copyWith(() => copyItemToClipboard(active), "item")}><CopyIcon copied={viewerCopy.copied === "item"} size={15} /></button></Tip>
                   {canStar(active) ? (

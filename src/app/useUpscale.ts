@@ -91,9 +91,9 @@ export const autoUpscaleTiers: { value: AutoUpscale; label: string }[] = [
   { value: "2k", label: "2K" }
 ];
 
-/** A tab's size from a saved pick: an older "4k" (or "2k-native"…) reads as 2K. */
-export function upscaleSize(tier: AutoUpscale | undefined): "none" | "2k" {
-  return tier && tier !== "none" ? "2k" : "none";
+/** The native size from a saved pick, including legacy tier suffixes. */
+export function upscaleSize(tier: AutoUpscale | undefined): "none" | "2k" | "4k" {
+  return tier?.startsWith("4k") ? "4k" : tier && tier !== "none" ? "2k" : "none";
 }
 
 type Size = { width: number; height: number };
@@ -106,7 +106,7 @@ function drawnAt({ width, height }: Size, long: number, max: number): Size {
 }
 
 export type SizePlan = {
-  size: "none" | "2k";
+  size: "none" | "2k" | "4k";
   /** The size the model draws at, when it isn't the picked one. */
   draw: Size | null;
   /** The size the run's picture comes out at. */
@@ -142,9 +142,10 @@ export function sizePlan(tier: AutoUpscale | undefined, width: number, height: n
     const untested = draw.width * draw.height > 2.5 * 1024 * 1024 && native["2k"] !== "yes";
     return { size, draw, final: draw, untested, capped, maxSide: side.max };
   }
-  if (size === "none" || !(width > 0) || !(height > 0) || Math.max(width, height) >= 2048) return plain;
-  const draw = drawnAt(picked, 2048, max);
-  return { size, draw, final: draw, untested: native["2k"] !== "yes", capped: Math.max(draw.width, draw.height) < 2048, maxSide: max };
+  if (size === "none" || !(width > 0) || !(height > 0)) return plain;
+  const target = size === "4k" ? 4096 : 2048;
+  const draw = drawnAt(picked, target, max);
+  return { size, draw, final: draw, untested: native[size] !== "yes", capped: Math.max(draw.width, draw.height) < target, maxSide: max };
 }
 
 /**
@@ -154,7 +155,7 @@ export function sizePlan(tier: AutoUpscale | undefined, width: number, height: n
  */
 export function tiledDecodeFor(plan: SizePlan | null) {
   if (!plan?.draw) return false;
-  return plan.size === "2k" || plan.draw.width * plan.draw.height >= 2048 * 1152;
+  return plan.size === "2k" || plan.size === "4k" || plan.draw.width * plan.draw.height >= 2048 * 1152;
 }
 
 export function upscaleQualityLabel(quality = "balanced") {

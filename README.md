@@ -41,7 +41,7 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 
 - **28 model families, ready to go.** From SD 1.5 and SDXL to Flux.2, Qwen-Image, Krea 2 and Wan 2.2, each with its makers' recommended settings. [The full list ↓](#supported-models)
 - **Missing parts, one click away.** Pick a model and see what it still needs, with a Download button for each part and **Get all** for the lot.
-- **Native 2K.** Pick 2K and the model draws the picture at 2048 itself, in one run, with no upscale in between. Or set any size of your own, in pixels or megapixels, and save it for every device. [Sizes ↓](#native-2k-and-sizes)
+- **Native Resolution.** Pick a supported 2K or 4K resolution and the model draws it in one run, with no upscale in between. Or set any size of your own, in pixels or megapixels, and save it for every device. [Sizes ↓](#native-2k-and-sizes)
 - **Smart upscale.** Any picture goes to 2K or 4K with SeedVR2 in one click, with a countdown. [How ↓](#smart-upscale)
 - **Bring your own workflow.** Import a ComfyUI workflow and it becomes a clean set of controls, with your graph running underneath. [How it works ↓](#bring-your-own-workflow)
 - **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
@@ -196,13 +196,15 @@ Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no 
 
 ## Native 2K and sizes
 
-- **2K drawn by the model.** The size menu has **Default**, **2K** and **Custom**. 2K draws your shape with its long side at 2048 in one run, faster than an upscale and with nothing in between. Flux.2, Qwen-Image 2.1, Z-Image, Krea 2 Turbo, Ideogram 4, MageFlow and Sana 2K/4K are made for it; on other models the menu says when a model isn't known for 2K. [Which models ↗](./docs/guides/MODELS.md#native-2k)
+- **Supported native resolutions.** The size menu offers only documented native sizes within the model's limits: 2K draws a 2048-pixel long side and 4K draws 4096, without automatic upscaling. Two choices use buttons; more than two use a dropdown. Models without an additional supported resolution hide that control. [Which models ↗](./docs/guides/MODELS.md#native-2k)
 - **See the size before you run.** A live frame shows the shape and pixels you'll get, and hovering a shape previews it.
 - **Custom, linked or not.** Width and height move together and keep the shape, or unlink them. Type, use the arrow keys or drag the label, from 256 to 4096.
 - **Saved sizes on every device.** **Save size** keeps a size of your own, to rename or remove later. Your phone and every other device see the same list.
 - **Or count in megapixels.** **Settings › Generation › Size in megapixels** puts a Megapixels field in the menu, and every shape is drawn at that many pixels.
 
 A reference being edited or a painted mask sets the size itself, and your 2K pick comes back afterwards.
+
+Images open at 1:1, with one image pixel per CSS pixel. Zoom In, Zoom Out, 1:1 and Fit Whole Image controls are available on desktop and phone. Fit Whole Image shows the entire picture within the viewer without cropping or changing its aspect ratio.
 
 ## Smart upscale
 

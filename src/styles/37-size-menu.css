@@ -428,3 +428,8 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 /* Reset at thumb size: the hit area grows, the word doesn't. */
 .phone-size-mp .size-mp-reset { position: relative; }
 .phone-size-mp .size-mp-reset::after { content: ""; position: absolute; inset: -11px -8px; }
+
+.size-tier-controls, .size-resolution { display: grid; gap: 6px; min-width: 0; }
+.size-custom-action { min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.size-custom-action:hover, .size-custom-action.is-active { background: var(--selected); color: hsl(var(--foreground)); }
+.phone-size .size-custom-action { min-height: 44px; }
