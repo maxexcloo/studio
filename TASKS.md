@@ -71,6 +71,7 @@ Changes span `heiss-ui`, `../ai` and `../kubelab`. The linked private conversati
 54. [x] Preserve per-user MCP ownership, separate studio & AI Control credentials, non-blocking submission, revocable signed results and an explicit offline legacy-ownership importer.
 
 55. [x] Match LoRAs to Reference Image’s composer width, toggle & outside-click behaviour; align its list controls and refine the expanded prompt Clear action. Final checks: 707 tests passed, six LoRA browser checks passed; composer checks passed with layout-specific skips.
+56. [x] Merge LoRA selection & stack editing into one seamless list, remove the long compatibility hint and align selection animations with Reference Image. Inline options retain strength, enable/disable, ordering, saved stacks & undo; 707 source checks and 17 browser checks passed with three layout skips.
 
 ## Delivery
 

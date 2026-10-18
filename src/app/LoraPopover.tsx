@@ -27,7 +27,7 @@ function Surface({ onClose, children }: { onClose: () => void; children: React.R
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
   }, [anchor]);
-  return createPortal(<motion.div ref={surface} className={`reference-popover composer-loras${asSheet ? ' is-sheet' : ''}`} style={asSheet ? undefined : box} role={present ? 'dialog' : undefined} aria-label="LoRAs" aria-hidden={!present || undefined} inert={!present} data-open-surface initial={{ opacity: 0, y: 10, scale: .97, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, y: 8, scale: .98, filter: 'blur(3px)' }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
+  return createPortal(<motion.div ref={surface} className={`reference-popover composer-loras${asSheet ? ' is-sheet' : ''}`} style={asSheet ? undefined : box} role={present ? 'dialog' : undefined} aria-label="LoRAs" aria-hidden={!present || undefined} inert={!present} data-open-surface initial={{ opacity: 0, y: 10, scale: .97, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, y: 8, scale: .98, filter: 'blur(3px)' }} transition={{ type: 'spring', duration: .38, bounce: .12 }}>
     <header className="reference-popover-head"><Layers size={16} /><strong>LoRAs</strong><button type="button" className="reference-popover-close" aria-label="Close LoRAs" onClick={close}><X size={15} /></button></header>
     <div className="reference-popover-body lora-popover-body">{children}</div>
   </motion.div>, document.body);
