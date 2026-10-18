@@ -166,3 +166,16 @@ test("a stray console stop restarts the server, a meant one or a run of them doe
   stopping = true;
   assert.equal(await shouldRestart(), false);
 });
+
+
+test('a fork installation refuses an old pending upstream archive before moving files', () => {
+  const root = fixture();
+  const manifestFile = path.join(root, 'release.json');
+  const manifest = JSON.parse(read(manifestFile));
+  write(manifestFile, JSON.stringify({ ...manifest, repository: 'maxexcloo/heiss-ui' }));
+  assert.equal(applyPending(root), null);
+  assert.match(takeResult(root).error, /fork/);
+  assert.equal(read(path.join(root, 'server', 'index.js')), '// 0.3.0');
+  assert.equal(read(path.join(root, 'data', 'gallery.json')), 'my gallery');
+  assert.equal(readPending(root), null);
+});

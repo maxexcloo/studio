@@ -19,12 +19,13 @@ import { promisify } from "node:util";
 import { fetchRuntime, needsRuntime } from "./node-runtime.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { signingConfigured, verifyReleaseSignature } from "./release-signing.js";
+import { defaultReleaseApi, releasesUrl, validateReleaseSource, validateStagedReleaseIdentity } from './release-identity.js';
 import { RESTART_CODE, checkStaged, clearStaging, readPending, takeResult, updateDir, writePending } from "./release-swap.js";
 
 const execFileAsync = promisify(execFile);
-export const releasesUrl = "https://github.com/tristmeister/HEISS-UI/releases";
+export { releasesUrl } from './release-identity.js';
 // HEISS_RELEASE_API points the updater at a test feed with the same shape.
-const latestApi = process.env.HEISS_RELEASE_API || "https://api.github.com/repos/tristmeister/HEISS-UI/releases/latest";
+const latestApi = process.env.HEISS_RELEASE_API || defaultReleaseApi;
 
 /** Newer by dotted numbers: 0.10.0 beats 0.9.9. */
 export function isNewer(candidate, current) {
@@ -39,7 +40,8 @@ export function isNewer(candidate, current) {
 export function pickAsset(release) {
   const version = String(release?.tag_name || "").replace(/^v/, "");
   const assets = Array.isArray(release?.assets) ? release.assets : [];
-  const zip = assets.find((asset) => asset.name === `heiss-ui-${version}.zip`) || assets.find((asset) => /^heiss-ui-.*\.zip$/.test(asset.name));
+  const zip = /^\d+\.\d+\.\d+$/.test(version) && !release.draft && !release.prerelease
+    ? assets.find((asset) => asset.name === `heiss-ui-${version}.zip`) : null;
   if (!zip) return null;
   const sumAsset = assets.find((asset) => asset.name === `${zip.name}.sha256`);
   const sigAsset = assets.find((asset) => asset.name === `${zip.name}.sig`);
@@ -77,7 +79,9 @@ async function latestRelease(fresh = false, maxAge = 10 * MINUTE) {
     // No release published yet counts as up to date, not as a failure.
     if (response.status === 404) return (cachedRelease = { at: Date.now(), response: { release: null } }).response;
     if (!response.ok) throw new Error(`GitHub answered ${response.status} when checking for a new release.`);
-    return (cachedRelease = { at: Date.now(), response: { release: await response.json() } }).response;
+    const release = await response.json();
+    if (!process.env.HEISS_RELEASE_API) validateReleaseSource(release);
+    return (cachedRelease = { at: Date.now(), response: { release } }).response;
   } catch (error) {
     failedAt = Date.now();
     throw error;
@@ -246,6 +250,7 @@ async function download(root, asset, notesUrl) {
     const unpacked = top.length === 1 ? path.join(staged, top[0]) : staged;
     const problem = checkStaged(unpacked, asset.version);
     if (problem) throw new Error(problem);
+    if (!process.env.HEISS_RELEASE_API) validateStagedReleaseIdentity(JSON.parse(fs.readFileSync(path.join(unpacked, "release.json"), "utf8")));
 
     // A Windows download runs its own Node; a release that wants a newer one
     // gets it fetched beside the current one, switched to once it has started.

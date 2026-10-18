@@ -5,10 +5,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tristmeister/HEISS-UI.git"
+    "url": "git+https://github.com/maxexcloo/heiss-ui.git"
   },
   "bugs": {
-    "url": "https://github.com/tristmeister/HEISS-UI/issues"
+    "url": "https://github.com/maxexcloo/heiss-ui/issues"
   },
   "homepage": "https://heiss-ui.vercel.app/",
   "type": "module",

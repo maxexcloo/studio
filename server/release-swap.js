@@ -124,9 +124,10 @@ export function takeResult(root) {
 }
 
 /** Checks an unpacked release looks whole before anything is moved. */
-export function checkStaged(dir, version) {
+export function checkStaged(dir, version, repository = "") {
   const manifest = readJson(path.join(dir, "release.json"));
   if (!manifest) return "The download has no release.json.";
+  if (repository && manifest.repository !== repository) return "The staged archive does not belong to this fork.";
   if (version && manifest.version !== version) return `The download says it is ${manifest.version}, not ${version}.`;
   for (const file of ["package.json", "server/index.js", "dist/index.html", "scripts/start.mjs"]) {
     if (!fs.existsSync(path.join(dir, file))) return `The download is missing ${file}.`;
@@ -217,7 +218,8 @@ export function applyPending(root, log = () => {}) {
   if (!pending) return null;
   const dir = updateDir(root);
   const from = readJson(path.join(root, "release.json"))?.version || "";
-  const problem = checkStaged(pending.dir, pending.version);
+  const repository = readJson(path.join(root, "release.json"))?.repository || "";
+  const problem = checkStaged(pending.dir, pending.version, repository);
   if (problem) {
     clearStaging(root);
     writeResult(root, { ok: false, from, to: pending.version, error: problem });

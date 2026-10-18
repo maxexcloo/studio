@@ -1,3 +1,4 @@
+import { githubUrl } from './constants';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ARROW } from './UpscaleHero';
@@ -22,7 +23,7 @@ const UPDATED_HOLD_MS = 6500;
 const ROWS = ARROW.length;
 const CELLS = ARROW.flatMap((row, y) => [...row].map((bit, x) => (bit === 'X' ? { x, y } : null)).filter(Boolean)) as Array<{ x: number; y: number }>;
 const isEdge = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => ARROW[y + dy]?.[x + dx] !== 'X');
-const releaseNotesUrl = (version: string) => `https://github.com/tristmeister/HEISS-UI/releases/tag/v${version}`;
+const releaseNotesUrl = (version: string) => `${githubUrl}/releases/tag/v${version}`;
 
 /** The arrow at rest (a pulse of heat rising through it) or just updated (lit bottom to top). */
 function RisingArrow({ mode }: { mode: 'available' | 'updated' }) {

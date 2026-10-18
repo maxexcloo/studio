@@ -5,10 +5,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { repositoryUrl as repoUrl } from '../server/release-identity.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const changelogPath = path.join(root, "CHANGELOG.md");
-const repoUrl = "https://github.com/tristmeister/HEISS-UI";
 
 const heading = /^## \[([^\]]+)\][^\n]*$/gm;
 
@@ -44,7 +44,7 @@ export function cutRelease(text, version, date) {
   if (section(text, version) !== null) throw new Error(`CHANGELOG.md already has a ${version} section.`);
   // The newest version that was actually tagged (it has a link); 0.1.0 never was.
   const previous = [...text.matchAll(heading)].map((match) => match[1])
-    .find((name) => /^\d+\.\d+\.\d+$/.test(name) && text.includes(`\n[${name}]: `));
+    .find((name) => /^\d+\.\d+\.\d+$/.test(name) && text.includes(`\n[${name}]: ${repoUrl}/`));
   let next = text.replace(/^## \[Unreleased\][^\n]*$/m, `## [Unreleased]\n\n## [${version}] - ${date}`);
   const links = [
     `[Unreleased]: ${repoUrl}/compare/v${version}...HEAD`,

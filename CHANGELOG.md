@@ -11,10 +11,15 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+> Reliable selections and fork release safeguards
+
 ### Added
+- **LoRA details & ordering:** existing descriptions, trigger words and safe source links are available in the picker; selected effects support drag, keyboard and button reordering.
 - **Reference search:** find images by prompt, model or filename across the full library.
 
 ### Changed
+- **Fork release safety:** release/update links use the fork repository, upstream metadata is tracked separately, and publication waits for browser, platform-launcher and container checks before promoting draft assets. Signing ownership remains an explicit publication gate.
+- **Reference selection:** click to select or deselect without closing the picker; selected images remain first across searches and tabs, including at capacity.
 - **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
 - **Reference browsing:** scrolling near the end loads another page automatically; the fixed search row blends into the picker with a softer scrolling edge.
 - **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
@@ -22,6 +27,10 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
+- **Video frame references:** deselecting a start frame preserves the end frame in its own slot, including when both use the same image.
+- **LoRA trigger:** opening the picker preserves the composer and reliably tracks its opener on touch devices.
+- **Saved variant counts:** preference migration preserves explicit image counts of 1 and 4.
+- **Updater archive selection:** mismatched, platform, draft and prerelease archives cannot substitute for the version’s generic updater archive; default-feed pages, assets and staged packages must belong to the fork.
 - **Reliable AMD upscales:** use wavelet colour correction for manual and automatic SeedVR2 upscales, avoiding the red bands and black regions produced by LAB on Radeon GPUs.
 - **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
 - **Reference library recovery:** failed pages keep the loaded images and show an inline retry; keyboard navigation uses one thumbnail Tab stop, Home/End and focus restoration.
@@ -1167,7 +1176,7 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/tristmeister/HEISS-UI/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/heiss-ui/commits/main
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0

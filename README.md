@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tristmeister/HEISS-UI/releases/latest"><img src="https://img.shields.io/github/v/release/tristmeister/HEISS-UI?style=for-the-badge&label=download&labelColor=1a1a1a&color=ff7a3d" alt="Download the latest release" /></a>
+  <a href="https://github.com/maxexcloo/heiss-ui/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/heiss-ui?style=for-the-badge&label=download&labelColor=1a1a1a&color=ff7a3d" alt="Download the latest release" /></a>
   <a href="https://heiss-ui.vercel.app/"><img src="https://img.shields.io/badge/website-heiss--ui-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Website" /></a>
   <a href="https://discord.gg/Hf7ysvDeGa"><img src="https://img.shields.io/badge/discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=1a1a1a" alt="Join the Discord" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-444?style=for-the-badge&labelColor=1a1a1a" alt="MIT license" /></a>
@@ -32,6 +32,8 @@
 </p>
 
 ---
+
+This is the [maxexcloo/heiss-ui fork](https://github.com/maxexcloo/heiss-ui), based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0), commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions follow an independent numeric Semantic Versioning stream; the upstream base is recorded separately in `server/release-identity.json`. Updates and release links use this fork. Release publication is blocked until fork signing-key ownership and the transition for existing installations have been verified.
 
 HEISS UI sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
 
@@ -52,6 +54,8 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links.
 - **Zen mode.** Just the prompt and the picture, fullscreen.
 
+Open **LoRAs** in the composer to select effects and adjust their strengths. Drag the selected effects by their grips to change the applied order, or use the Up/Down buttons or arrow keys on a grip. **Info** shows available descriptions, trigger words and source links without fetching extra metadata.
+
 LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [website](https://heiss-ui.vercel.app/#features).
 
 <p align="center">
@@ -60,11 +64,11 @@ LoRA stacks, live previews, video previews, recent prompts and gallery search ar
 
 ## Quick start
 
-**1. Download** the zip for your system from the [latest release](https://github.com/tristmeister/HEISS-UI/releases/latest):
+**1. Download** the zip for your system from the [latest release](https://github.com/maxexcloo/heiss-ui/releases/latest):
 
 | Windows                                                                                  | macOS (Apple Silicon)                                                                    | Linux                                                                                  |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [`heiss-ui-*-windows-x64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) | [`heiss-ui-*-macos-arm64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) | [`heiss-ui-*-linux-x64.zip`](https://github.com/tristmeister/HEISS-UI/releases/latest) |
+| [`heiss-ui-*-windows-x64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) | [`heiss-ui-*-macos-arm64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) | [`heiss-ui-*-linux-x64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) |
 
 The plain `heiss-ui-*.zip` (no system in its name) is for in-app updates; you can skip it.
 
@@ -87,7 +91,7 @@ Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and HEI
 To follow `main` or change the code. This needs **Node.js 20.9+** (22 LTS or newer recommended); the downloads bring their own.
 
 ```bash
-git clone https://github.com/tristmeister/HEISS-UI.git heiss-ui
+git clone https://github.com/maxexcloo/heiss-ui.git heiss-ui
 cd heiss-ui
 npm install
 npm start
@@ -174,7 +178,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 
 - **Slots as you need them.** The composer opens a new reference slot each time you fill one. Several references stack into one chip that fans out on hover.
 - **Edit or Reference.** On Flux.2 and Qwen-Image 2.1 the first reference is **Edit** (the result keeps its size and changes that picture) or **Reference** (it only guides, and the size and shape stay yours, 2K included).
-- **A reference library in the composer.** Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; it replaces the primary video reference and preserves a separate end frame. An upscaled image is used upscaled.
+- **A reference library in the composer.** Click images to select or deselect them immediately; the picker stays open. Selected images stay first across searches and source tabs, and can still be removed when every slot is filled. Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; it replaces the primary video reference and preserves a separate end frame. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
 
 </details>

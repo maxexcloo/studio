@@ -1,3 +1,4 @@
+import releaseIdentity from '../../server/release-identity.json';
 import { defaultGenerationCount } from '../../server/generation-defaults.js';
 import type { AspectPreset, Mode, Preferences } from './types';
 
@@ -59,5 +60,5 @@ export const fallbackAspectPresets: Record<Mode, AspectPreset[]> = {
 
 export const fallbackSamplers = ["euler_ancestral", "euler", "uni_pc", "dpmpp_2m", "dpmpp_sde"];
 export const fallbackSchedulers = ["beta", "simple", "normal", "karras", "sgm_uniform"];
-export const githubUrl = "https://github.com/tristmeister/HEISS-UI";
+export const githubUrl = `https://github.com/${releaseIdentity.repository}`;
 export const discordUrl = "https://discord.gg/Hf7ysvDeGa";

@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { downloadVerified, publishedSha256, runtimeArchive, runtimeFolder } from "../server/node-runtime.js";
 import { DESKTOP_ENTRY, foreignLauncher, LAUNCHER_FILES, LAUNCHERS } from "../server/release-swap.js";
 import { desktopEntry, shellLauncher, windowsLauncher } from "./launchers.mjs";
+import { releaseIdentity, requireForkSigningOwnership } from '../server/release-identity.js';
 import { publicKeyLine, releasePublicKey, signRelease, verifyReleaseSignature } from "../server/release-signing.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,6 +44,7 @@ const signingKey = (() => {
 })();
 const trustedKey = releasePublicKey();
 const publishing = /^refs\/tags\//.test(process.env.GITHUB_REF || "");
+if (publishing) requireForkSigningOwnership(process.env.GITHUB_REPOSITORY);
 if (signingKey && trustedKey && publicKeyLine(signingKey) !== trustedKey) {
   console.error("The signing key does not match RELEASE_PUBLIC_KEY in server/release-signing.js; installed copies would refuse this release.");
   process.exit(1);
@@ -109,7 +111,7 @@ async function bundledNodeVersion() {
 const nodeVersion = await bundledNodeVersion();
 
 let commit = "";
-try { commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root }).toString().trim(); } catch { /* not a checkout */ }
+try { commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root }).toString().trim(); } catch { /* not a checkout */ }
 // Double-click launchers, one per system (Linux also gets a desktop entry).
 // This folder (the update zip) keeps all of them; each download below keeps
 // only its own, and an update skips the others (see LAUNCHER_FILES in
@@ -124,7 +126,7 @@ fs.writeFileSync(path.join(target, LAUNCHERS.win32), windowsLauncher());
 const files = [...fs.readdirSync(target), "release.json"].sort();
 // `node`: the Node.js a download runs; an update to a release that wants a
 // newer one fetches it (see server/node-runtime.js).
-fs.writeFileSync(path.join(target, "release.json"), `${JSON.stringify({ version: pkg.version, commit, builtAt: new Date().toISOString(), node: nodeVersion, files }, null, 2)}\n`);
+fs.writeFileSync(path.join(target, "release.json"), `${JSON.stringify({ builtAt: new Date().toISOString(), commit, node: nodeVersion, repository: releaseIdentity.repository, version: pkg.version, files, upstream: releaseIdentity.upstream }, null, 2)}\n`);
 
 // Windows has no zip command, but its tar (bsdtar) writes zips; CI packages there too.
 // Name System32's copy: a GNU tar from Git may come first on PATH and cannot.
@@ -165,6 +167,7 @@ function runNpm(args, cwd, extraEnv = {}) {
 // never touches node_modules. GitHub publishes its digest, which the updater checks.
 const zip = path.join(outDir, `${name}.zip`);
 const zipSha256 = zipFolder(zip, outDir);
+fs.writeFileSync(`${zip}.sha256`, `${zipSha256}  ${path.basename(zip)}\n`);
 console.log(`Packaged${signZip(zip, zipSha256)} ${path.relative(root, zip)} (sha256 ${zipSha256})`);
 
 // The downloads: the same app with its runtime packages already installed for

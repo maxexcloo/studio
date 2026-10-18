@@ -16,6 +16,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changelogPath, cutRelease, section, SUMMARY_MAX, summaryOf } from "./changelog.mjs";
+import { releaseChanges } from './release-plan.mjs';
+import { releaseIdentity, requireForkSigningOwnership } from '../server/release-identity.js';
 import { releasePublicKey } from "../server/release-signing.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -55,14 +57,21 @@ console.log(`Releasing HEISS UI ${current} -> ${version}${dryRun ? " (dry run)" 
 
 // Only ever release what is on origin/main, committed.
 if (git("rev-parse", "--abbrev-ref", "HEAD") !== "main") fail("Releases are cut from main.");
-if (git("status", "--porcelain")) fail("The working tree has uncommitted changes. Commit or stash them first.");
+if (releaseChanges(git("status", "--porcelain")).length) fail("The working tree has uncommitted changes. Commit or stash them first.");
 if (git("tag", "--list", tag)) fail(`The tag ${tag} already exists.`);
-run("git", ["fetch", "--quiet", "origin", "main", "--tags"]);
+if (!dryRun) run("git", ["fetch", "--quiet", "origin", "main", "--tags"]);
 if (git("rev-list", "--count", "HEAD..origin/main") !== "0") fail("origin/main has commits this checkout lacks. Pull first.");
+
+const repository = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git('remote', 'get-url', 'origin'))?.[1];
+if (repository !== releaseIdentity.repository) fail('origin does not match the configured fork release repository.');
+if (dryRun && push) fail('--dry-run and --push cannot be combined.');
+if (!dryRun) {
+  try { requireForkSigningOwnership(repository); } catch (error) { fail(error.message); }
+}
 
 // Once installed copies trust a release key, CI must be able to sign with it,
 // or the release it publishes would be refused by every one of them.
-if (releasePublicKey()) {
+if (releasePublicKey() && !dryRun) {
   // The repository origin points at: a checkout with more remotes leaves gh guessing otherwise.
   const repo = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git("remote", "get-url", "origin"))?.[1] || "";
   const repoArgs = repo ? ["-R", repo] : [];
@@ -83,11 +92,13 @@ const today = new Date().toISOString().slice(0, 10);
 const nextChangelog = cutRelease(changelog, version, today);
 
 console.log("\nRunning the tests and the build…");
-run(npm, ["test"], { stdio: "inherit" });
-run(npm, ["run", "build"], { stdio: "inherit" });
+run("mise", ["run", "check"], { stdio: "inherit" });
+run("mise", ["run", "build"], { stdio: "inherit" });
+run(npm, ["run", "test:browser", "--", "--workers=2"], { stdio: "inherit" });
 
 if (dryRun) {
   console.log(`\nThe update pill will read:\n\n  HEISS UI ${version} is here\n  ${summary}\n`);
+  console.log(`\nPublication remains gated on fork signing ownership and CI platform/container checks.`);
   console.log(`\nWould release ${tag} with these notes:\n\n${notes}\n`);
   process.exit(0);
 }

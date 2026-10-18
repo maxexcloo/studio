@@ -7,6 +7,15 @@ on:
     branches: [main]
     tags: ["v*"]
 
+  workflow_call:
+    outputs:
+      image_digest:
+        description: Verified container image digest
+        value: ${{ jobs.container.outputs.image_digest }}
+    secrets:
+      HEISS_RELEASE_SIGNING_KEY:
+        required: false
+
 permissions:
   contents: read
 
@@ -23,6 +32,9 @@ jobs:
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
           tools: actionlint node python updatecli
+      - name: Check Release Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node --input-type=module -e "import { validateReleaseTag } from './scripts/release-plan.mjs'; import fs from 'node:fs'; validateReleaseTag(JSON.parse(fs.readFileSync('package.json')).version, process.env.GITHUB_REF)"
       - name: Install Dependencies
         run: mise run setup
       - name: Run Checks
@@ -67,6 +79,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run package
+        env:
+          HEISS_RELEASE_SIGNING_KEY: ${{ secrets.HEISS_RELEASE_SIGNING_KEY }}
       - name: Start the release from a hard path
         shell: bash
         env:
@@ -109,6 +123,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run package
+        env:
+          HEISS_RELEASE_SIGNING_KEY: ${{ secrets.HEISS_RELEASE_SIGNING_KEY }}
       - name: Start the release from a hard path
         shell: pwsh
         run: |
@@ -137,7 +153,7 @@ jobs:
   container:
     name: Container
     if: github.event_name != 'pull_request'
-    needs: build
+    needs: [build, unix, windows]
     uses: ./.github/workflows/container.yaml
     permissions:
       contents: read

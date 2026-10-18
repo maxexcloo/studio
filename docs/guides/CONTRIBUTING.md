@@ -91,7 +91,7 @@ Every release zip is signed in CI (`<zip>.sig` beside it), and copies that know 
 
 ```bash
 node scripts/release-keygen.mjs   # writes ~/.config/heiss-ui/release-signing-key.pem (mode 600), prints the public key
-gh secret set HEISS_RELEASE_SIGNING_KEY -R tristmeister/HEISS-UI < ~/.config/heiss-ui/release-signing-key.pem
+gh secret set HEISS_RELEASE_SIGNING_KEY -R maxexcloo/heiss-ui < ~/.config/heiss-ui/release-signing-key.pem
 ```
 
 Then paste the printed public key into `RELEASE_PUBLIC_KEY` in `server/release-signing.js` and release as usual. Until that constant is filled in, updates are checked by SHA-256 alone. Once it is, a tag build without the secret fails, `npm run release` checks the secret exists, and an unsigned release tells people to download it by hand instead of installing itself. Keep a backup of the private key offline: installed copies trust only that key.
@@ -100,7 +100,7 @@ Between releases a source checkout shows how far it is past its tag in **Setting
 
 ## Found a bug?
 
-Post it on the [feedback board](https://heiss-ui.vercel.app/board/), from the website or from the app (**Idea or bug?** at the bottom of the Settings sidebar, **Settings › About**, or **Report bug** on a failed card), or [open an issue](https://github.com/tristmeister/HEISS-UI/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. Ideas and questions go on the same board. To talk something through first, there's the [Discord](https://discord.gg/Hf7ysvDeGa).
+Post it on the [feedback board](https://heiss-ui.vercel.app/board/), from the website or from the app (**Idea or bug?** at the bottom of the Settings sidebar, **Settings › About**, or **Report bug** on a failed card), or [open an issue](https://github.com/maxexcloo/heiss-ui/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. Ideas and questions go on the same board. To talk something through first, there's the [Discord](https://discord.gg/Hf7ysvDeGa).
 
 ## The feedback board
 
@@ -115,3 +115,16 @@ On Vercel it needs:
 - Optional: `BOARD_SESSION_SECRET` to sign admin sessions with a key of its own, `BOARD_ADMIN_NAME` for the name on your replies (default "Maintainer"), `BOARD_PREFIX` for the Redis key prefix (default `board:`).
 
 As admin, drag cards to set their order or move them to another column, and open one to set its status (Open, Planned, In progress, Done, Closed), the version it shipped in, fix its text, reply, or delete it.
+
+
+### Fork Integration & Release Gates
+
+Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Integrate new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Review external profiles, image/video routing, MCP, picker behaviour, launchers and updater paths before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
+
+Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, signing, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks; tracked or modified copies are rejected, and neither belongs in release archives. The next feature release after the integrated 0.18.0 base is 0.19.0 if still unused. Do not create 1.0 implicitly or reuse upstream tags.
+
+Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions, Windows/Linux/macOS packaged-launcher smoke tests and the container smoke/security checks for that commit. The container candidate is verified before promotion. GitHub assets are staged in a draft and promoted only after successful upload, with a provenance record containing the full source commit, upstream base and immutable image digest. Package archives contain their own fork repository/upstream metadata; the updater selects only the exact generic archive for the release version and verifies its checksum, signature and fork identity before staging.
+
+The bundled signing key is currently inherited from upstream. `signingOwner: "unverified"` deliberately blocks publication. Resolve the fork private key through existing credential tooling, compare its public key locally with the bundled key and verify the repository secret configuration without logging secret values. Verify or replace the bundled public key and set `signingOwner` to the fork repository only after this ownership check and an installed-key transition have been reviewed. Existing installations trusting another key require a manual verified package replacement unless a separately verified transition release is available; do not remove signature checks or assume an old key can sign the transition. Local unsigned packages remain available for smoke tests and cannot be installed automatically.
+
+Publication does not authorise deployment. Deployment configuration belongs in `../ai` and must pin a verified published fork image by digest. Account/data migration and retirement of old services require protected backups, explicit ownership mapping, a recovery procedure and live image/video and cross-account verification. Those gates have not been established by local demo tests.
