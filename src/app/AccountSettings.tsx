@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, UserPlus, X } from 'lucide-react';
 import { apiJson } from './api';
 import { Group, Row } from './SettingsControls';
 import type { ShowToast } from './toast';
@@ -87,6 +87,17 @@ export function AccountSettings({ showToast, copyToClipboard, isAdmin }: { showT
     finally { setBusy(false); }
   };
 
+  const signOut = async () => {
+    setBusy(true);
+    try {
+      await apiJson('/api/accounts/sign-out', { method: 'POST' });
+      window.location.reload();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not sign out.', 'error');
+      setBusy(false);
+    }
+  };
+
   const assign = async (account: Account, accessProfileId: string) => {
     try {
       await apiJson(`/api/accounts/users/${encodeURIComponent(account.id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessProfileId }) });
@@ -139,5 +150,9 @@ export function AccountSettings({ showToast, copyToClipboard, isAdmin }: { showT
       <Row label="Access Profile"><select value={assignedProfile} onChange={(event) => setAssignedProfile(event.target.value)}><option value="">Choose a profile</option>{admin?.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || password.length < 12 || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
+
+    <Group title="Account Session" note="Sign out of this browser before handing it to someone else.">
+      <Row label="Signed in on this device"><button className="btn is-ghost" disabled={busy} onClick={() => void signOut()}><LogOut size={14} /> Sign Out</button></Row>
+    </Group>
   </>;
 }

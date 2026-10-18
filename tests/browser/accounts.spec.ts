@@ -4,6 +4,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   const otherAccountText = 'private-draft-from-another-account';
   const posts: { url: string; body: unknown }[] = [];
   const loraOps: string[] = [];
+  let signedIn = true;
   const profiles = [{ id: 'artists', name: 'Artists', generationProfiles: ['image-fast'], features: { loras: true } }];
   const accounts = [
     { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator', disabled: false },
@@ -11,7 +12,11 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   ];
   const route = async (request: import('@playwright/test').Route) => {
     const url = new URL(request.request().url());
-    if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn: true, account: { id: 'admin-id', role: 'administrator' } } });
+    if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn, account: signedIn ? { id: 'admin-id', role: 'administrator' } : null } });
+    if (url.pathname === '/api/accounts/sign-out' && request.request().method() === 'POST') {
+      signedIn = false;
+      return request.fulfill({ json: { ok: true } });
+    }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
     if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'] } });
     if (url.pathname === '/api/accounts/profiles' && request.request().method() === 'POST') {
@@ -80,4 +85,6 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByPlaceholder('At least 12 characters').fill('a secure temporary password');
   await page.getByRole('button', { name: 'Create User', exact: true }).click();
   await expect.poll(() => posts.some((post) => post.url === '/api/accounts/users')).toBe(true);
+  await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
 });
