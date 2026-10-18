@@ -1,3 +1,4 @@
+import { compatibilityNote, strengthRange as publishedStrengthRange } from './loraPolicy';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -47,13 +48,17 @@ const round = (value: number) => Math.round(value * 100) / 100;
 
 /* ------------------------------------------------------------------ Card */
 
-function StrengthControl({ value, onChange, disabled, label }: { value: number; onChange: (next: number) => void; disabled?: boolean; label: string }) {
+function StrengthControl({ value, onChange, disabled, label, info }: { value: number; onChange: (next: number) => void; disabled?: boolean; label: string; info?: LoraInfo }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const fill = Math.max(0, Math.min(1, (value - strengthMin) / (strengthMax - strengthMin)));
+  const bounds = publishedStrengthRange(info);
+  const min = bounds?.min ?? strengthMin;
+  const max = bounds?.max ?? strengthMax;
+  const clamp = (next: number) => Math.max(bounds?.min ?? -4, Math.min(bounds?.max ?? 4, next));
+  const fill = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const commit = () => {
     if (draft === null) return;
     const next = Number(draft.replace(',', '.'));
-    if (Number.isFinite(next)) onChange(round(Math.max(-4, Math.min(4, next))));
+    if (Number.isFinite(next)) onChange(round(clamp(next)));
     setDraft(null);
   };
   return (
@@ -61,13 +66,13 @@ function StrengthControl({ value, onChange, disabled, label }: { value: number; 
       <input
         type="range"
         aria-label={`${label} strength`}
-        min={strengthMin}
-        max={strengthMax}
-        step={0.05}
-        value={Math.max(strengthMin, Math.min(strengthMax, value))}
+        min={min}
+        max={max}
+        step={bounds?.step ?? 0.05}
+        value={Math.max(min, Math.min(max, value))}
         style={{ '--fill': `${fill * 100}%` } as React.CSSProperties}
         onChange={(event) => onChange(round(Number(event.target.value)))}
-        onDoubleClick={() => onChange(defaultLoraStrength)}
+        onDoubleClick={() => onChange(clamp(bounds?.default ?? defaultLoraStrength))}
       />
       <Tip content="Type a value. Arrow keys nudge by 0.01, Shift by 0.1">
         <input
@@ -84,7 +89,8 @@ function StrengthControl({ value, onChange, disabled, label }: { value: number; 
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
               event.preventDefault();
               const step = event.shiftKey ? 0.1 : 0.01;
-              const next = round(value + (event.key === 'ArrowUp' ? step : -step));
+              const moved = value + (event.key === 'ArrowUp' ? step : -step);
+              const next = round(bounds ? clamp(moved) : moved);
               onChange(next);
               setDraft(next.toFixed(2));
             }
@@ -121,7 +127,7 @@ function TriggerWords({ words }: { words: string[] }) {
   );
 }
 
-function LoraCard({ item, index, count, missing, overLimit, info, otherModel, onChange, onRemove, onSwap, onMove }: {
+function LoraCard({ item, index, count, missing, overLimit, info, otherModel, policyNote, onChange, onRemove, onSwap, onMove }: {
   item: LoraSelection;
   index: number;
   count: number;
@@ -130,6 +136,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
   info?: LoraInfo;
   /** Made for another model than this one: its name for it, else empty. */
   otherModel: string;
+  policyNote: string;
   onChange: (patch: Partial<LoraSelection>) => void;
   onRemove: () => void;
   onSwap: () => void;
@@ -160,12 +167,13 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
         <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={13} /></button></Tip>
         <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={(enabled) => onChange({ enabled })} />
       </div>
-      <StrengthControl label={label} value={item.strength} disabled={!item.enabled} onChange={(strength) => onChange({ strength })} />
+      <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={(strength) => onChange({ strength })} />
       {!missing && item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
       {missing ? <p className="lora-warning"><AlertTriangle size={12} /> Not in ComfyUI’s LoRA folder</p> : null}
       {!missing && overLimit ? <p className="lora-warning"><AlertTriangle size={12} /> Over this workflow’s limit, so it isn’t used</p> : null}
       {!missing && info?.role && info.role !== 'effect' ? <p className="lora-warning is-soft"><AlertTriangle size={12} />{info.role === 'acceleration' ? 'Use its prepared recipe instead of stacking accelerators.' : 'Supporting file; not an optional generation effect.'} {info.note || ''}</p> : null}
-      {!missing && !overLimit && otherModel ? <p className="lora-warning is-soft"><AlertTriangle size={12} /> Made for {otherModel}, so it may not work here</p> : null}
+      {!missing && policyNote ? <p className="lora-warning is-soft"><AlertTriangle size={12} />{policyNote}</p> : null}
+      {!missing && !overLimit && otherModel && !policyNote ? <p className="lora-warning is-soft"><AlertTriangle size={12} /> Made for {otherModel}, so it may not work here</p> : null}
     </Reorder.Item>
   );
 }
@@ -175,13 +183,14 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, nameOf, current, favorites, recents, remaining, swapping, onToggleFavorite, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, swapping, onToggleFavorite, onAdd, onSwap, onClose }: {
   options: string[];
   profile: Profile | null;
   fitOf: FitOf;
   /** What a LoRA was made for, as people call it. */
   baseOf: (name: string) => string;
   nameOf: (name: string) => string;
+  policyNoteOf: (name: string) => string;
   current: string[];
   favorites: string[];
   recents: string[];
@@ -299,6 +308,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, current, favorite
                     <span className="lora-option-copy">
                       <strong>{nameOf(row.name)}</strong>
                       <span title={row.name}>{row.name}</span>
+                      {policyNoteOf(row.name) ? <span>{policyNoteOf(row.name)}</span> : null}
                       {folderOf(row.name) && (query || !section.collapsible) ? <span>{folderOf(row.name)}</span> : null}
                     </span>
                     {added ? <em>Added</em> : fitOf(row.name) === 'other' && baseOf(row.name) ? <em className="lora-fit" title={`Made for ${baseOf(row.name)}`}>{baseOf(row.name)}</em> : null}
@@ -530,6 +540,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           fitOf={fitOf}
           baseOf={baseOf}
           nameOf={(name) => loraName(name, infos[name])}
+          policyNoteOf={(name) => compatibilityNote(infos[name], profile)}
           current={loras.map((item) => item.name)}
           favorites={library.favorites}
           recents={library.recents}
@@ -574,6 +585,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
               overLimit={index >= cap}
               info={infos[item.name]}
               otherModel={fitOf(item.name) === 'other' ? baseOf(item.name) : ''}
+              policyNote={compatibilityNote(infos[item.name], profile)}
               onChange={(patch) => update(index, patch)}
               onRemove={() => remove(index)}
               onSwap={() => setPicker({ swap: item.name })}

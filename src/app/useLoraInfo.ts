@@ -4,7 +4,7 @@ import { apiJson } from './api';
 import type { Profile } from './types';
 
 /** What a LoRA was trained for and its trigger words, as the server read them from the file. */
-export type LoraInfo = { families: string[]; base: string; triggers: string[]; about?: string; title?: string; role?: 'effect' | 'acceleration' | 'supporting'; note?: string };
+export type LoraInfo = { families: string[]; base: string; triggers: string[]; about?: string; title?: string; role?: 'effect' | 'acceleration' | 'supporting'; note?: string; compatibility?: import('./loraPolicy').LoraCompatibility; strengthRange?: import('./loraPolicy').LoraStrengthRange };
 export type LoraFit = 'fits' | 'other' | 'unknown';
 
 // One answer shared by every panel, asked again only when ComfyUI's LoRA list changes.

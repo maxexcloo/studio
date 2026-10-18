@@ -8,7 +8,7 @@ import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
 
 // Imported-only model families still need precise adapter compatibility labels.
-const families = { ...modelFamilies, moss_image: { label: 'MOSS Image' } };
+const families = { ...modelFamilies, boogu: { label: 'Boogu' }, flux3_klein: { label: 'FLUX.3 Klein' }, moss_image: { label: 'MOSS Image' } };
 
 /**
  * What a LoRA was trained for and how to trigger it, read the same way model
@@ -32,11 +32,12 @@ const lastKnown = new Map();
 
 // Ordered: the more specific names first ("flux 2" before "flux", "wan 2.2 5b" before "wan").
 const metadataFamilies = [
-  [/flux[-_. ]?3/, ["flux3"]],
+  [/flux[-_. ]?3(?:[-_. ]?klein)?(?:\b|[_/])/, ["flux3"]],
   [/moss[-_ ]?image/, ["moss_image"]],
   [/flux[-_. ]?2[-_. ]?klein[-_. ]?9b|klein[-_. ]?9b/, ["flux2_klein_9b"]],
   [/flux[-_. ]?2[-_. ]?klein|klein[-_. ]?4b/, ["flux2_klein_4b"]],
   [/flux[-_. ]?2/, ["flux2_dev", "flux2_klein_4b", "flux2_klein_9b"]],
+  [/boogu/, ["boogu"]],
   [/chroma/, ["chroma"]],
   [/flux/, ["flux1"]],
   [/z[-_ ]?image/, ["zimage"]],
@@ -297,13 +298,19 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
-  let sources = {};
-  try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
-  let catalogue = {};
-  try { catalogue = JSON.parse(fs.readFileSync(path.join(dataDir, 'lora-catalogue.json'), 'utf8')); } catch { /* Optional local display metadata. */ }
   for (const [name, info] of Object.entries(result)) {
-    result[name] = enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
+    result[name] = catalogueLoraInfo(name, info);
     lastKnown.set(name, result[name]);
   }
   return result;
+}
+
+
+/** Provider and local policy metadata can be checked before submitting an optional stack. */
+export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [], triggers: [] }) {
+  let sources = {};
+  let catalogue = {};
+  try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
+  try { catalogue = JSON.parse(fs.readFileSync(path.join(dataDir, 'lora-catalogue.json'), 'utf8')); } catch { /* Optional local display metadata. */ }
+  return enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
 }

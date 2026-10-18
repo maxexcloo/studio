@@ -96,3 +96,24 @@ test('recipe-owned graph adapters are not inspected as optional stack entries', 
   const finalGraph = await customWorkflowGraph(body);
   assert.equal(finalGraph['90'].inputs.lora_name, 'recipe-accelerator.safetensors');
 });
+
+
+test('trusted optional adapter policy validates conditioning and full publisher strength before generation', () => {
+  const prepared = structuredClone(raw);
+  prepared.heissUi.id = 'effect-policy';
+  prepared.heissUi.family = 'minimax_h3';
+  prepared.heissUi.recipe = { modelLabel: 'H3', label: 'Standard', conditioning: 'FL2VA' };
+  saveCustomWorkflow(prepared);
+  const catalogue = { 'style.safetensors': { baseModel: 'MiniMax H3', compatibility: { conditionings: ['FL2VA'], unlisted: 'other' }, strengthRange: { min: -3, max: 10, step: 0.05 } } };
+  fs.writeFileSync(path.join(scratch, 'lora-catalogue.json'), JSON.stringify(catalogue));
+  const request = { kind: 'image', workflow: 'custom:effect-policy', model: 'custom:effect-policy', prompt: 'A scene', loras: [{ name: 'style.safetensors', strength: 10 }] };
+  assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
+  assert.throws(() => sanitizeGenerateBody({ ...request, loras: [{ name: 'style.safetensors', strength: 11 }] }, info), /published range/);
+  prepared.heissUi.recipe.conditioning = 'Ref2VA';
+  saveCustomWorkflow(prepared);
+  assert.throws(() => sanitizeGenerateBody(request, info), /conditioning variant/);
+  assert.deepEqual(sanitizeGenerateBody({ ...request, loras: [{ name: 'style.safetensors', strength: 10, enabled: false }] }, info).loras, []);
+  delete catalogue['style.safetensors'].compatibility.unlisted;
+  fs.writeFileSync(path.join(scratch, 'lora-catalogue.json'), JSON.stringify(catalogue));
+  assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
+});

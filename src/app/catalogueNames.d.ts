@@ -4,7 +4,7 @@ export function modelFamily(profile?: Partial<Profile> | null): string;
 export function modelGroups(profiles: Profile[]): { id: string; label: string; rows: Profile[] }[];
 export function loraName(name: string, info?: { title?: string }): string;
 export function modelLoras(options: string[], fitOf: (name: string) => 'fits' | 'unknown' | 'other', all?: boolean): string[];
-export function loraCompatibility(info: { families: string[] } | undefined, profile: Partial<Profile> | null): 'fits' | 'unknown' | 'other';
+export function loraCompatibility(info: import('./loraPolicy').LoraPolicyInfo | undefined, profile: Partial<Profile> | null): 'fits' | 'unknown' | 'other';
 export function workflowSpeed(workflow: WorkflowSummary, profile?: Profile): 'standard' | 'flash';
 export function profileMatchesFilters(profile: Profile, filters: import('./CatalogueFilters').CatalogueFilter, favourites?: string[]): boolean;
 export function compareModelNames(a: Partial<Profile> | Partial<WorkflowSummary>, b: Partial<Profile> | Partial<WorkflowSummary>): number;

@@ -92,12 +92,7 @@ export function modelLoras(options, fitOf, all = false) {
   return all ? options : options.filter((name) => fitOf(name) !== 'other');
 }
 
-/** Compare explicit family identifiers, including hyphen/underscore aliases. */
-export function loraCompatibility(info, profile) {
-  const family = String(profile?.family || '').replace(/-/g, '_');
-  if (!info?.families?.length || !family || family === 'custom') return 'unknown';
-  return info.families.some((value) => value.replace(/-/g, '_') === family) ? 'fits' : 'other';
-}
+export { loraCompatibility } from './loraPolicy.js';
 
 /** Prefer model variant metadata; imported recipes can identify acceleration by name or step count. */
 export function workflowSpeed(workflow, profile) {
