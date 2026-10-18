@@ -474,9 +474,13 @@ test('background Result collects a later completion without another submission',
   const client = await f.client();
   const id = jobId(await generate(client));
   setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
-  const result = await call(client, 'Result', { job_id: id, wait_seconds: 1800 });
+  const result = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 1800 });
   assert.notEqual(result.isError, true);
-  assert.ok(result.content.some(item => item.type === 'image'));
+  assert.equal(data(result).status, 'done');
+  assert.ok(result.content.every(item => item.type === 'text'));
+  assert.equal(f.downloads.length, 0);
+  const preview = await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 0 });
+  assert.ok(preview.content.some(item => item.type === 'image'));
   assert.equal(f.submitted.length, 1);
 });
 
