@@ -1,3 +1,28 @@
+// Local catalogue entries describe installed files; they never become download records.
+export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata, families) {
+  const entry = Object.hasOwn(catalogue || {}, name) ? catalogue[name] : null;
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return info;
+  const requested = familiesFromMetadata({ base_model: String(entry.baseModel || '') });
+  const detected = info?.families || [];
+  const compatible = !detected.length || requested.some((id) => detected.includes(id));
+  const ids = requested.length && compatible ? requested : detected;
+  const title = typeof entry.title === 'string' ? entry.title.trim().slice(0, 300) : '';
+  return {
+    ...info,
+    ...(title ? { title, about: title } : {}),
+    families: ids,
+    base: ids.length ? [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(' / ') : info?.base || '',
+    ...loraRoleMetadata(entry),
+  };
+}
+
+function loraRoleMetadata(entry) {
+  return {
+    ...(['effect', 'acceleration', 'supporting'].includes(entry.role) ? { role: entry.role } : {}),
+    ...(typeof entry.note === 'string' ? { note: entry.note.trim().slice(0, 500) } : {}),
+  };
+}
+
 // Provider metadata refines architecture detection without changing model filenames.
 export function enrichLoraInfo(info, name, sources, familiesFromMetadata, families) {
   const matches = Object.values(sources || {}).filter((source) =>
@@ -15,10 +40,18 @@ export function enrichLoraInfo(info, name, sources, familiesFromMetadata, famili
   const triggers = Array.isArray(source.trainedWords) ? source.trainedWords.filter((value) => typeof value === 'string' && value.trim()).slice(0, 30) : [];
   return {
     ...info,
+    ...loraRoleMetadata(source),
     ...(title ? { title, about: title } : {}),
     families: ids,
     base: ids.length ? [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(' / ') : info?.base || '',
     triggers: triggers.length ? triggers : info?.triggers || [],
     ...(source.sourceUrl ? { sourceUrl: source.sourceUrl } : {}),
   };
+}
+
+/** Saved stacks remain intact, but infrastructure weights must not enter the optional effect stack. */
+export function optionalLoraIssue(loras, infos) {
+  const item = (loras || []).find((lora) => lora.enabled !== false && ['acceleration', 'supporting'].includes(infos[lora.name]?.role));
+  if (!item) return '';
+  return `${infos[item.name].title || item.name} is ${infos[item.name].role === 'acceleration' ? 'an acceleration adapter; choose its prepared recipe' : 'a supporting file'} and cannot be used as an optional LoRA. Remove it from this stack to generate. Saved stacks have not been changed.`;
 }

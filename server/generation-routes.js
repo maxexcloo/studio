@@ -1,3 +1,5 @@
+import { loraInfos } from './lora-info.js';
+import { optionalLoraIssue } from './lora-catalogue.js';
 import { configuredBackends, currentComfyBackend, isLocalVideoProfile, withComfyBackend } from "./comfy-backends.js";
 import crypto from "node:crypto";
 import { demoMode } from './comfy.js';
@@ -58,6 +60,11 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (context) {
       try {
         body = sanitizeGenerateBody(req.body, context.info, context.stats);
+        const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
+        if (enabledLoras.length) {
+          const issue = optionalLoraIssue(enabledLoras, await loraInfos(enabledLoras.map((item) => item.name)));
+          if (issue) throw new Error(issue);
+        }
       } catch (error) {
         res.status(400).json({ ok: false, error: error.message });
         return;

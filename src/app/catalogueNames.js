@@ -110,8 +110,7 @@ export function workflowSpeed(workflow, profile) {
 }
 
 export function profileMatchesFilters(profile, filters, favourites = []) {
-  if (filters.favourites && !favourites.includes(profile.id)) return false;
-  const workflow = { ...profile, name: profile.displayName || profile.label };
-  if (filters.speed && workflowSpeed(workflow, profile) !== filters.speed) return false;
+  if (filters.favourites && !(profile.recipeProfiles || [profile]).some((item) => favourites.includes(item.id))) return false;
+  if (filters.speed && !(profile.recipeProfiles || [profile]).some((item) => workflowSpeed({ ...item, name: item.displayName || item.label }, item) === filters.speed)) return false;
   return true;
 }
