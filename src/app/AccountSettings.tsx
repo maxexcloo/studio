@@ -7,7 +7,7 @@ import type { ShowToast } from './toast';
 
 type Feature = 'loras' | 'imageGeneration' | 'videoGeneration' | 'imageReferences' | 'videoReferences' | 'gallery' | 'promptHistory';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; features: Record<Feature, boolean> };
-type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string } };
+type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
 type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
 type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; gateway?: GatewayIdentities };
 type TokenStatus = { enabled: boolean; createdAt: string; endpoint: string };
@@ -183,7 +183,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
     </Group> : null}
 
     {isAdmin ? <Group title="Accounts">
-      {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role === 'administrator' ? 'Administrator' : 'User'}${account.disabled ? ' · Disabled' : ''}`}>
+      {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role === 'administrator' ? 'Administrator' : 'User'}${account.pending ? ' · Pending Approval: assign a profile to approve' : ''}${account.signInLinked ? ' · Single Sign-On' : ''}${account.disabled ? ' · Disabled' : ''}`}>
         {account.role === 'user' ? <>
           <select aria-label={`Access profile for ${account.username}`} disabled={busy} value={account.accessProfileId || ''} onChange={(event) => void patchAccount(account, { accessProfileId: event.target.value })}><option value="" disabled>Choose a Profile</option>{admin.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
           <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? 'Enable' : 'Disable'}</button>

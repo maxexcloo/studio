@@ -1,16 +1,18 @@
 import crypto from "node:crypto";
-import { accountAccessForId, listGatewayIdentities, setGatewayLink, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
+import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
 export const multiUserEnabled = process.env.HEISS_MULTI_USER === "1";
 export const accountCookieName = process.env.HEISS_ACCOUNT_COOKIE_NAME || "heiss_account";
+const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
 
-function cookieToken(req) {
+function cookieToken(req, name = accountCookieName) {
   for (const part of String(req?.headers?.cookie || "").split(";")) {
     const index = part.indexOf("=");
-    if (index < 0 || part.slice(0, index).trim() !== accountCookieName) continue;
+    if (index < 0 || part.slice(0, index).trim() !== name) continue;
     try { return decodeURIComponent(part.slice(index + 1).trim()); } catch { return ""; }
   }
   return "";
@@ -81,7 +83,8 @@ function publicStatus(req) {
     signedIn: Boolean(account),
     account: account ? { id: account.userId, role: account.role, generationProfiles: account.generationProfiles, features: account.features } : null,
     needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0,
-    ...(accountStoreSnapshot().accounts.length === 0 && process.env.HEISS_SETUP_TOKEN ? { setupTokenAccepted: true } : {})
+    ...(accountStoreSnapshot().accounts.length === 0 && process.env.HEISS_SETUP_TOKEN ? { setupTokenAccepted: true } : {}),
+    ...(oidc ? { oidc: { label: oidc.label } } : {})
   };
 }
 
@@ -91,7 +94,10 @@ function requireAccountAdmin(req, res) {
   return false;
 }
 
-export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [] } = {}) {
+let oidc = null;
+
+export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], oidcClient } = {}) {
+  oidc = oidcClient !== undefined ? oidcClient : multiUserEnabled && oidcConfigFromEnv() ? createOidcClient(oidcConfigFromEnv()) : null;
   // Single-user mode answers only the status route, even if an old account store remains.
   const route = (method) => (path, handler) => app[method](path, (req, res) => (multiUserEnabled || path === "/api/accounts/status"
     ? handler(req, res)
@@ -157,6 +163,41 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     appendCookie(res, accountCookie(req, session.token, session.maxAge));
     req.heissAccount = result.value;
     res.json(publicStatus(req));
+  });
+
+  // The provider's redirect back is a cross-site navigation, so this short-lived state cookie is Lax.
+  const stateCookie = (req, value, maxAge) => [`${oidcStateCookie}=${value}`, "Path=/api/accounts/oidc", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Lax", ...(secureRequest(req) ? ["Secure"] : [])].join("; ");
+
+  get("/api/accounts/oidc/start", async (req, res) => {
+    if (!oidc) return res.status(404).json({ ok: false, error: "Single sign-on is not configured." });
+    try {
+      const { url, state } = await oidc.start();
+      appendCookie(res, stateCookie(req, state, 600));
+      res.setHeader("Cache-Control", "no-store");
+      res.redirect(302, url);
+    } catch (error) {
+      console.warn(`[HEISS] Single sign-on could not start: ${error.message}`);
+      res.redirect(302, "/?sign-in=unavailable");
+    }
+  });
+
+  get("/api/accounts/oidc/callback", async (req, res) => {
+    if (!oidc) return res.status(404).json({ ok: false, error: "Single sign-on is not configured." });
+    appendCookie(res, stateCookie(req, "", 0));
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (req.query?.error) throw new Error(`The provider declined: ${String(req.query.error).slice(0, 80)}`);
+      const identity = await oidc.finish({ code: String(req.query?.code || ""), state: String(req.query?.state || ""), expectedState: cookieToken(req, oidcStateCookie) });
+      const result = signInWithOidcIdentity(identity);
+      if (result.refused) return res.redirect(302, "/?sign-in=refused");
+      if (result.pending) return res.redirect(302, "/?sign-in=pending");
+      const session = createAccountSession(result.access.userId);
+      appendCookie(res, accountCookie(req, session.token, session.maxAge));
+      res.redirect(302, "/");
+    } catch (error) {
+      console.warn(`[HEISS] Single sign-on failed: ${error.message}`);
+      res.redirect(302, "/?sign-in=failed");
+    }
   });
 
   post("/api/accounts/sign-out", (req, res) => {

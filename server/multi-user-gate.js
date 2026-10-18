@@ -5,7 +5,9 @@ const publicAccountPaths = new Set([
   "/api/accounts/status",
   "/api/accounts/sign-in",
   "/api/accounts/sign-out",
-  "/api/accounts/bootstrap"
+  "/api/accounts/bootstrap",
+  "/api/accounts/oidc/start",
+  "/api/accounts/oidc/callback"
 ]);
 
 /**

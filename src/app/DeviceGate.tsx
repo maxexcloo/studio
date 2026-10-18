@@ -17,7 +17,7 @@ type GateState =
   | { kind: 'checking' }
   | { kind: 'in' }
   | { kind: 'sign-in'; status: AccessStatus }
-  | { kind: 'account-sign-in'; recovery: boolean; setupToken: boolean }
+  | { kind: 'account-sign-in'; recovery: boolean; setupToken: boolean; oidcLabel: string }
   | { kind: 'refused'; title: string; text: string };
 
 /**
@@ -32,13 +32,13 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
 
   const check = useCallback(async () => {
     try {
-      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; setupTokenAccepted?: boolean; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
+      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; setupTokenAccepted?: boolean; oidc?: { label: string }; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
       if (accountMode.mode === 'multi-user') {
         const signedIn = accountMode.signedIn === true;
         setAccountStorageScope(signedIn ? accountMode.account?.id : undefined);
         setThisComputer(signedIn && accountMode.account?.role === 'administrator');
         setAtComputer(false);
-        setState(signedIn ? { kind: 'in' } : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true, setupToken: accountMode.setupTokenAccepted === true });
+        setState(signedIn ? { kind: 'in' } : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true, setupToken: accountMode.setupTokenAccepted === true, oidcLabel: accountMode.oidc?.label || '' });
         return;
       }
       setAccountStorageScope();
@@ -68,7 +68,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'in') return <>{children}</>;
   if (state.kind === 'checking') return <div className="device-gate" aria-busy="true" />;
   if (state.kind === 'refused') return <GateMessage title={state.title} text={state.text} />;
-  if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} onSignedIn={() => { window.location.reload(); }} />;
+  if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} oidcLabel={state.oidcLabel} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
   if (!studioPassword.set && !studioPassword.hidden) {
     return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running HEISS UI in Settings › Connection, then reload this page." />;
@@ -76,7 +76,20 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   return <SignIn legacy={studioPassword.hidden} onSignedIn={() => { window.location.reload(); }} />;
 }
 
-function AccountSignIn({ recovery, setupToken, onSignedIn }: { recovery: boolean; setupToken: boolean; onSignedIn: () => void }) {
+/** What a single sign-on redirect came back with (server/multi-user-auth.js). */
+const signInOutcomes: Record<string, string> = {
+  pending: 'Your sign-in worked. An administrator needs to approve this account before it can open the studio.',
+  refused: 'This account is disabled. Ask an administrator.',
+  failed: 'Single sign-on did not complete. Try again.',
+  unavailable: 'Single sign-on is unavailable right now. Try again shortly.'
+};
+
+function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recovery: boolean; setupToken: boolean; oidcLabel: string; onSignedIn: () => void }) {
+  const [outcome] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('sign-in') || '';
+    if (value) window.history.replaceState(null, '', window.location.pathname);
+    return signInOutcomes[value] || '';
+  });
   const [username, setUsername] = useState('');
   const [token, setToken] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -114,9 +127,10 @@ function AccountSignIn({ recovery, setupToken, onSignedIn }: { recovery: boolean
             {recovery && setupToken && <label>Setup Token<input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} disabled={working} /></label>}
             {recovery && <label>Display Name<input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={working} /></label>}
             <label>Password<input type="password" autoComplete={recovery ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} disabled={working} /></label>
-            {error && <p role="alert">{error}</p>}
+            {(error || outcome) && <p role="alert">{error || outcome}</p>}
             <button className="reconnect-btn primary" type="submit" disabled={!username || !password || working}>{working ? 'Please Wait…' : recovery ? 'Create Administrator' : 'Sign In'}</button>
           </form>
+          {!recovery && oidcLabel ? <div className="empty-actions"><a className="reconnect-btn" href="/api/accounts/oidc/start">Sign In With {oidcLabel}</a></div> : null}
         </div>
       </div>
     </section>

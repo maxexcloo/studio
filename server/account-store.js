@@ -17,6 +17,8 @@ const emptyStore = () => ({ version: 1, accounts: [], profiles: {}, sessions: []
 const maxPendingGatewayIdentities = 100;
 const validGatewayIdentity = (value) => typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value);
 const tokenHash = (token) => crypto.createHash("sha256").update(String(token)).digest("base64url");
+// Email addresses are valid usernames, so a verified sign-in can match them.
+const validUsername = (value) => /^[\p{L}\p{N}][\p{L}\p{N}._@+-]{1,127}$/u.test(String(value || "").trim());
 const usernameKey = (value) => String(value || "").trim().normalize("NFKC").toLocaleLowerCase("en-AU");
 
 function readStore() {
@@ -56,7 +58,7 @@ export function accountStoreSnapshot() {
   const store = readStore();
   return {
     version: store.version,
-    accounts: store.accounts.map(({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity }) => ({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity })),
+    accounts: store.accounts.map(({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity, pending, oidc }) => ({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity, ...(pending ? { pending: true } : {}), ...(oidc ? { signInLinked: true } : {}) })),
     profiles: structuredClone(store.profiles),
     sessions: store.sessions.length
   };
@@ -94,13 +96,15 @@ export function assignAccessProfile(accountId, profileId) {
   if (!account) throw new Error("That ordinary user account was not found.");
   if (!validAccountKey(profileId) || !store.profiles[profileId]) throw new Error("Choose an existing access profile.");
   account.accessProfileId = profileId;
+  // Assigning a profile is how an administrator approves a pending sign-in.
+  delete account.pending;
   saveStore();
   return { id: account.id, accessProfileId: account.accessProfileId };
 }
 
 export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
-  if (!/^[\p{L}\p{N}][\p{L}\p{N}._-]{1,63}$/u.test(String(username || "").trim())) throw new Error("Use a 2–64 character username containing letters, numbers, dots, underscores or hyphens.");
+  if (!validUsername(username)) throw new Error("Use a 2–128 character username containing letters, numbers, dots, underscores, hyphens, plus signs or @.");
   if (String(password || "").length < 12) throw new Error("Use a password with at least 12 characters.");
   if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
   if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign an existing access profile to this user.");
@@ -283,4 +287,48 @@ export function setGatewayLink(identity, accountId) {
   }
   saveStore({ scrubBackup: !accountId });
   return listGatewayIdentities();
+}
+
+/* ------------------------------------------------------- OpenID Connect sign-in */
+
+/**
+ * A verified provider identity: its linked account, else the account whose
+ * username is the identity's verified email, else a new pending account an
+ * administrator approves by assigning an access profile. The provider never
+ * decides roles or access.
+ */
+export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerified = false, name = "" } = {}) {
+  if (!issuer || !subject) throw new Error("The sign-in identity is incomplete.");
+  const store = readStore();
+  let account = store.accounts.find((item) => item.oidc?.issuer === issuer && item.oidc?.subject === subject);
+  if (!account && emailVerified && email) {
+    const key = usernameKey(email);
+    const match = store.accounts.find((item) => usernameKey(item.username) === key);
+    if (match && !match.oidc) {
+      match.oidc = { issuer, subject, linkedAt: new Date().toISOString() };
+      account = match;
+      saveStore();
+    }
+  }
+  if (!account) {
+    const base = validUsername(email) && emailVerified ? email : `oidc-${crypto.createHash("sha256").update(`${issuer}|${subject}`).digest("hex").slice(0, 12)}`;
+    let username = base;
+    for (let suffix = 2; store.accounts.some((item) => usernameKey(item.username) === usernameKey(username)); suffix += 1) username = `${base}-${suffix}`;
+    account = {
+      id: crypto.randomBytes(18).toString("base64url"),
+      username,
+      displayName: (name || username).slice(0, 80),
+      role: accountRoles.user,
+      identity: { provider: "pocket-id" },
+      oidc: { issuer, subject, linkedAt: new Date().toISOString() },
+      pending: true,
+      disabled: false,
+      createdAt: new Date().toISOString()
+    };
+    store.accounts.push(account);
+    saveStore();
+  }
+  if (account.disabled) return { refused: true };
+  const access = effectiveAccountAccess(account, store.profiles);
+  return access.authenticated ? { access } : { pending: true };
 }
