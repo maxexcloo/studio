@@ -26,7 +26,7 @@ const imageProfile = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null } = {}) {
+async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, resolveSignedResult } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -76,6 +76,7 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     environment,
     accountMode,
     authenticateAccountToken,
+    resolveSignedResult,
     fetchImpl: async (url, init) => {
       if (String(url).startsWith('http://fixture-control.invalid')) {
         controlRequests.push({ url: String(url), method: init?.method || 'GET', body: init?.body ? JSON.parse(init.body) : undefined });
@@ -129,6 +130,31 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
   assert.ok(f.downloads.includes('/comfy/view?filename=account-result.png'));
   const rejected = await fetch(`${f.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   assert.equal(rejected.status, 401);
+});
+
+test('account signed result links survive restart without persisting bearer tokens and recheck output availability', async t => {
+  const token = 'account-mcp-token-for-restart-fixture';
+  const account = { userId: 'stable-account-restart', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const first = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null });
+  const client = await first.client('', token);
+  const id = jobId(await generate(client));
+  Object.assign(first.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=restart-result.png' }] });
+  const result = await call(client, 'Result', { job_id: id });
+  const [link] = links(result);
+  assert.ok(link);
+
+  let available = true;
+  const restarted = await fixture(t, {
+    dataDir: first.dataDir,
+    enabled: false,
+    accountMode: true,
+    resolveSignedResult: async (owner, jobId, index) => available && owner === account.userId && jobId === id && index === 0 ? { content: png, mime: 'image/png' } : null
+  });
+  const response = await fetch(localLink(restarted, link));
+  assert.equal(response.status, 200);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+  available = false;
+  assert.equal((await fetch(localLink(restarted, link))).status, 404);
 });
 
 function data(result) {

@@ -23,10 +23,11 @@ export function mcpOutputPath(value) {
 }
 
 export class McpMedia {
-  constructor({ dataDir, baseUrl, publicUrl, signingKey, fetchImpl = fetch }) {
+  constructor({ dataDir, baseUrl, publicUrl, signingKey, fetchImpl = fetch, resolveSignedResult }) {
     this.baseUrl = baseUrl;
     this.publicBase = publicUrl;
     this.fetch = fetchImpl;
+    this.resolveSignedResult = resolveSignedResult;
     this.credentials = new Map();
     this.profileRequests = new Map();
     this.file = path.join(dataDir, 'mcp-ownership.json');
@@ -186,6 +187,12 @@ export class McpMedia {
     const job = await this.job(owner, jobId);
     const output = this.available(job, index);
     return this.readOutput(output, owner);
+  }
+  async signedResult(owner, jobId, index) {
+    if (!this.resolveSignedResult) throw new Error('The signed result is unavailable.');
+    const result = await this.resolveSignedResult(owner, jobId, index);
+    if (!result?.content || !result?.mime) throw new Error('The signed result is unavailable.');
+    return result;
   }
   async readOutput(output, owner = "") {
     const response = await this.response('GET', output.url, undefined, owner);

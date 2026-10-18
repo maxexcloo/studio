@@ -30,6 +30,7 @@ import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.j
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
+import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
@@ -87,12 +88,31 @@ addProbe("thumbs", () => buildStats());
 const app = express();
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
+async function resolveSignedMcpResult(owner, jobId, index) {
+  const item = gallery.find((entry) => entry.ownerId === owner && entry.jobId === jobId && entry.index === index
+    && entry.status === 'done' && !entry.privateVault && !entry.hidden);
+  if (!item || !mcpOutputPath(item.url)) return null;
+  const source = new URL(item.url, 'http://localhost');
+  const filename = source.searchParams.get('filename') || '';
+  const subfolder = source.searchParams.get('subfolder') || '';
+  const type = source.searchParams.get('type') || 'output';
+  const request = { heissAccount: { userId: owner } };
+  if (type !== 'output' || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
+  try {
+    const file = localOutputFile(filename, subfolder, type);
+    const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(item.settings?.comfyBackend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
+    const extension = path.extname(filename).toLowerCase();
+    const mime = ({ '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.png': 'image/png', '.webm': 'video/webm', '.webp': 'image/webp' })[extension];
+    return mime ? { content: Buffer.from(bytes), mime } : null;
+  } catch { return null; }
+}
 registerMcpRoutes(app, {
   dataDir,
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
   accountMode: multiUserEnabled,
-  authenticateAccountToken: verifyAccountMcpToken
+  authenticateAccountToken: verifyAccountMcpToken,
+  resolveSignedResult: resolveSignedMcpResult
 });
 app.use(express.json({ limit: "25mb" }));
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.

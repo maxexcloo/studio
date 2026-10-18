@@ -18,7 +18,7 @@ const output = { ...job, output_index: z.number().int().min(0).max(999).default(
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, resolveSignedResult } = {}) {
   const mediaKey = environment.HEISS_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
@@ -26,7 +26,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const publicUrl = environment.MCP_PUBLIC_URL?.replace(/\/+$/, '') || (typeof baseUrl === 'function' ? baseUrl() : baseUrl);
   const parsedPublic = new URL(publicUrl);
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
-  const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl }) : null;
+  const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl, resolveSignedResult }) : null;
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
   const reviewedGuides = new Map();
   const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
@@ -132,7 +132,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');
       const claims = media.claims(req.params.token);
-      const result = await media.download(claims.owner, claims.jobId, claims.index);
+      const result = accountMode
+        ? await media.signedResult(claims.owner, claims.jobId, claims.index)
+        : await media.download(claims.owner, claims.jobId, claims.index);
       res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline', 'Content-Type': result.mime }).send(result.content);
     } catch { res.status(404).json({ error: 'The result link is invalid, unavailable or expired.' }); }
   });
