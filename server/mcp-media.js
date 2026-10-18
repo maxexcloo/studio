@@ -27,6 +27,8 @@ export class McpMedia {
     this.baseUrl = baseUrl;
     this.publicBase = publicUrl;
     this.fetch = fetchImpl;
+    this.credentials = new Map();
+    this.profileRequests = new Map();
     this.file = path.join(dataDir, 'mcp-ownership.json');
     try { this.state = readJsonFile(this.file); } catch (error) {
       if (error.code !== 'ENOENT') throw new Error('MCP ownership data could not be read. Restore it before enabling MCP.');
@@ -43,11 +45,13 @@ export class McpMedia {
   own(owner, id, kind = 'jobs') {
     if (typeof id !== 'string' || !Object.hasOwn(this.state[kind], id) || !(kind === 'assets' ? [this.state[kind][id]].flat().includes(owner) : this.state[kind][id] === owner)) throw new Error(`Choose ${kind === 'jobs' ? 'a job' : 'a reference'} submitted by this account to this studio.`);
   }
-  async response(method, route, body) {
+  async response(method, route, body, owner = "") {
     const base = new URL(typeof this.baseUrl === 'function' ? this.baseUrl() : this.baseUrl);
     if (!['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname) || base.protocol !== 'http:') throw new Error('MCP requires the studio’s private HTTP loopback endpoint.');
     let response;
-    try { response = await this.fetch(new URL(route, base), { method, headers: body instanceof FormData ? { 'X-Heiss': '1' } : { 'Content-Type': 'application/json', 'X-Heiss': '1' }, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(60000) }); } catch {
+    const credential = this.credentials.get(owner);
+    const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Heiss': '1', ...(credential ? { Authorization: `Bearer ${credential}` } : {}) };
+    try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(60000) }); } catch {
       const error = new Error('The studio connection was interrupted. Check the returned job before retrying.');
       error.submissionUncertain = true;
       throw error;
@@ -55,23 +59,27 @@ export class McpMedia {
     if (!response.ok) throw new Error(`HEISS refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
     return response;
   }
-  async request(method, route, body) {
-    const response = await this.response(method, route, body);
+  async request(method, route, body, owner = "") {
+    const response = await this.response(method, route, body, owner);
     try { return await response.json(); } catch {
       const error = new Error('HEISS returned an invalid response. Check job status before retrying.');
       error.submissionUncertain = true;
       throw error;
     }
   }
-  async profiles(kind = 'all') {
+  async profiles(kind = 'all', owner = "") {
     // Concurrent submissions share discovery; do not queue repeated catalogue scans.
-    this.profileRequest ||= this.request('GET', '/api/models?cached=1').finally(() => { this.profileRequest = null; });
-    const models = await this.profileRequest;
+    this.profileRequests ||= new Map();
+    if (!this.profileRequests.has(owner)) {
+      const pending = this.request('GET', '/api/models?cached=1', undefined, owner).finally(() => this.profileRequests.delete(owner));
+      this.profileRequests.set(owner, pending);
+    }
+    const models = await this.profileRequests.get(owner);
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
     const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
-    let profile = (await this.profiles()).find(item => item.id === profile_id);
+    let profile = (await this.profiles('all', owner)).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
     const caps = profile.capabilities || {};
@@ -114,7 +122,7 @@ export class McpMedia {
         // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
         this.state.jobs[id] = owner;
         this.save();
-        const result = await this.request('POST', '/api/generate', { ...body, clientJobId: id, prompt, seed: seed === undefined ? '' : String(seed + queued.length) });
+        const result = await this.request('POST', '/api/generate', { ...body, clientJobId: id, prompt, seed: seed === undefined ? '' : String(seed + queued.length) }, owner);
         if (!result.jobId) throw new Error('HEISS did not return a job ID.');
         if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('HEISS returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
@@ -131,8 +139,8 @@ export class McpMedia {
     }
     return { status: 'queued', jobs: queued };
   }
-  async galleryJob(jobId) {
-    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`);
+  async galleryJob(jobId, owner = "") {
+    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`, undefined, owner);
     const outputs = new Map();
     let kind;
     for (const item of items) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
@@ -145,11 +153,11 @@ export class McpMedia {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
-      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`);
+      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner);
       if (hidden(job)) throw new Error('Hidden outputs are unavailable to MCP.');
       if (job.status === 'missing' || finished.has(job.status)) {
         // A subsequently hidden/deleted output is revoked even while its terminal job remains cached.
-        const visible = await this.galleryJob(jobId);
+        const visible = await this.galleryJob(jobId, owner);
         job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind };
       }
       if (terminal.has(job.status) || Date.now() >= deadline) return job;
@@ -177,10 +185,10 @@ export class McpMedia {
   async download(owner, jobId, index) {
     const job = await this.job(owner, jobId);
     const output = this.available(job, index);
-    return this.readOutput(output);
+    return this.readOutput(output, owner);
   }
-  async readOutput(output) {
-    const response = await this.response('GET', output.url);
+  async readOutput(output, owner = "") {
+    const response = await this.response('GET', output.url, undefined, owner);
     const chunks = [];
     let bytes = 0;
     for await (const chunk of response.body) {
@@ -199,7 +207,7 @@ export class McpMedia {
     if (!['png', 'jpeg', 'webp'].includes(metadata.format)) throw new Error('Use a PNG, JPEG or WebP reference image.');
     const form = new FormData();
     form.append('image', new Blob([content], { type: `image/${metadata.format}` }), path.basename(filename));
-    const result = await this.request('POST', '/api/reference-assets/upload', form);
+    const result = await this.request('POST', '/api/reference-assets/upload', form, owner);
     if (!result.asset?.id || hidden(result.asset) || result.asset.privacyDomain === 'hidden') throw new Error('HEISS could not accept this reference image.');
     this.state.assets[result.asset.id] = [...new Set([...(this.state.assets[result.asset.id] ? [this.state.assets[result.asset.id]].flat() : []), owner])];
     this.save();

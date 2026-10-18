@@ -26,7 +26,7 @@ const imageProfile = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true } = {}) {
+async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -43,7 +43,7 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
   let deduplicateUploads = false;
   let profiles = [structuredClone(imageProfile), structuredClone(videoProfile), { ...imageProfile, id: 'not-ready', ready: false }];
   let base;
-  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body }); next(); });
+  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
   app.get('/api/models', (_req, res) => res.json({ profiles, defaults: { imageModel: imageProfile.id, videoModel: videoProfile.id } }));
   app.post('/api/generate', (req, res) => {
@@ -74,6 +74,8 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     baseUrl: () => base,
     dataDir,
     environment,
+    accountMode,
+    authenticateAccountToken,
     fetchImpl: async (url, init) => {
       if (String(url).startsWith('http://fixture-control.invalid')) {
         controlRequests.push({ url: String(url), method: init?.method || 'GET', body: init?.body ? JSON.parse(init.body) : undefined });
@@ -110,6 +112,20 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     }
   };
 }
+
+test('account MCP tokens map requests and jobs to the stable account identity', async t => {
+  const token = 'account-mcp-token-that-is-long-enough-for-the-fixture';
+  const account = { userId: 'stable-account-a', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null });
+  const client = await f.client('', token);
+  const result = await generate(client);
+  const id = jobId(result);
+  assert.equal(f.requests.find(request => request.path === '/generate')?.authorization, `Bearer ${token}`);
+  const saved = JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8'));
+  assert.equal(saved.jobs[id], 'stable-account-a');
+  const rejected = await fetch(`${f.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
+  assert.equal(rejected.status, 401);
+});
 
 function data(result) {
   assert.notEqual(result.isError, true, JSON.stringify(result.content));

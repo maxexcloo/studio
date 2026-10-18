@@ -148,6 +148,36 @@ export function accountSession(token) {
   return access.authenticated ? access : null;
 }
 
+export function verifyAccountMcpToken(token) {
+  if (typeof token !== "string" || token.length < 32) return null;
+  const hash = tokenHash(token);
+  const account = readStore().accounts.find((item) => item.mcpTokenHash === hash && item.disabled !== true);
+  return account ? effectiveAccountAccess(account, readStore().profiles) : null;
+}
+
+export function rotateAccountMcpToken(accountId) {
+  const account = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  if (!account) throw new Error("That account is unavailable.");
+  const token = crypto.randomBytes(32).toString("base64url");
+  account.mcpTokenHash = tokenHash(token);
+  account.mcpTokenCreatedAt = new Date().toISOString();
+  saveStore();
+  return { token, createdAt: account.mcpTokenCreatedAt };
+}
+
+export function revokeAccountMcpToken(accountId) {
+  const account = readStore().accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error("That account was not found.");
+  delete account.mcpTokenHash;
+  delete account.mcpTokenCreatedAt;
+  saveStore({ scrubBackup: true });
+}
+
+export function accountMcpTokenStatus(accountId) {
+  const account = readStore().accounts.find((item) => item.id === accountId);
+  return { enabled: Boolean(account?.mcpTokenHash), createdAt: account?.mcpTokenCreatedAt || "" };
+}
+
 export function revokeAccountSession(token) {
   if (!token) return false;
   const store = readStore();

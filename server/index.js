@@ -79,6 +79,7 @@ import { accountForRequest, multiUserEnabled, registerMultiUserAuthRoutes } from
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
+import { verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -86,16 +87,12 @@ addProbe("thumbs", () => buildStats());
 const app = express();
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
-// Native MCP currently uses deployment-level forwarded identity. Until personal
-// account tokens are implemented, refuse that older privilege path in account mode.
-app.use((req, res, next) => {
-  if (multiUserEnabled && (req.path === "/mcp" || req.path.startsWith("/mcp/"))) return res.status(503).json({ error: "Personal MCP credentials are not configured for this studio." });
-  next();
-});
 registerMcpRoutes(app, {
   dataDir,
   baseUrl: () => `http://127.0.0.1:${port}`,
-  allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() })
+  allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
+  accountMode: multiUserEnabled,
+  authenticateAccountToken: verifyAccountMcpToken
 });
 app.use(express.json({ limit: "25mb" }));
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
@@ -640,7 +637,15 @@ async function mediaModels(force = false) {
 
 function modelsForAccount(models, req) {
   if (!req.heissAccount) return models;
-  return { ...models, profiles: visibleGenerationProfiles(models.profiles || [], req.heissAccount) };
+  const profiles = visibleGenerationProfiles(models.profiles || [], req.heissAccount).map((profile) => {
+    if (mayUseFeature(req.heissAccount, "loras")) return profile;
+    return { ...profile, capabilities: { ...profile.capabilities, lora: false }, options: { ...profile.options, loras: [] } };
+  });
+  return { ...models, loras: mayUseFeature(req.heissAccount, "loras") ? models.loras : [], profiles };
+}
+
+function accountMayUseLoras(req) {
+  return !req.heissAccount || mayUseFeature(req.heissAccount, "loras");
 }
 
 app.get("/api/models", async (req, res) => {
@@ -853,11 +858,13 @@ app.delete("/api/loras", (req, res) => {
 });
 
 app.get("/api/loras/library", (req, res) => {
+  if (!accountMayUseLoras(req)) return res.json({ found: false, library: { strengths: {}, snapshots: {} } });
   const library = lorasEnabled ? loadLoraLibrary(ownerIdForRequest(req)) : null;
   res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
 });
 
 app.put("/api/loras/library", (req, res) => {
+  if (!accountMayUseLoras(req)) return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
   try {
     res.json({ ok: true, library: saveLoraLibrary(req.body?.library, ownerIdForRequest(req)) });
   } catch (error) {
@@ -867,6 +874,7 @@ app.put("/api/loras/library", (req, res) => {
 
 // Clients send edits, not whole copies, so two devices never overwrite each other.
 app.post("/api/loras/library/ops", (req, res) => {
+  if (!accountMayUseLoras(req)) return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
   try {
     res.json({ ok: true, library: applyLoraOps(req.body?.ops, ownerIdForRequest(req)) });
   } catch (error) {
@@ -876,6 +884,7 @@ app.post("/api/loras/library/ops", (req, res) => {
 
 // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
 app.get("/api/loras/info", async (_req, res) => {
+  if (!accountMayUseLoras(_req)) return res.json({ ok: true, loras: {} });
   if (!lorasEnabled) return res.json({ ok: true, loras: {} });
   try {
     const { info } = await loadComfyContext();
@@ -886,11 +895,13 @@ app.get("/api/loras/info", async (_req, res) => {
 });
 
 app.get("/api/loras/:workflowId", (req, res) => {
+  if (!accountMayUseLoras(req)) return res.json({ found: false, loras: [] });
   const loras = lorasEnabled ? loadLoraStack(req.params.workflowId, ownerIdForRequest(req)) : null;
   res.json({ found: loras !== null, loras: loras || [] });
 });
 
 app.put("/api/loras/:workflowId", (req, res) => {
+  if (!accountMayUseLoras(req)) return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
   try {
     res.json({ ok: true, loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)) });
   } catch (error) {

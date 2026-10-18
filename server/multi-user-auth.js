@@ -1,4 +1,4 @@
-import { accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountSession, saveAccessProfile, setAccountDisabled, verifyLocalAccount } from "./account-store.js";
+import { accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 
@@ -17,7 +17,8 @@ function cookieToken(req) {
 
 export function accountForRequest(req) {
   if (req?.heissAccount !== undefined) return req.heissAccount;
-  const account = accountSession(cookieToken(req));
+  const bearer = /^Bearer ([^\s]+)$/i.exec(String(req?.headers?.authorization || ""))?.[1] || "";
+  const account = accountSession(cookieToken(req)) || verifyAccountMcpToken(bearer);
   if (req) req.heissAccount = account;
   return account;
 }
@@ -102,6 +103,32 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     appendCookie(res, accountCookie(req, ""));
     req.heissAccount = null;
     res.json({ ok: true });
+  });
+
+  app.get("/api/accounts/mcp-token", (req, res) => {
+    const account = accountForRequest(req);
+    if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
+    res.setHeader("Cache-Control", "no-store");
+    const endpointBase = process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+    res.json({ ok: true, endpoint: `${endpointBase}/mcp`, ...accountMcpTokenStatus(account.userId) });
+  });
+
+  app.post("/api/accounts/mcp-token", (req, res) => {
+    const account = accountForRequest(req);
+    if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
+    try {
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true, ...rotateAccountMcpToken(account.userId) });
+    } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
+  });
+
+  app.post("/api/accounts/mcp-token/revoke", (req, res) => {
+    const account = accountForRequest(req);
+    if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
+    try {
+      revokeAccountMcpToken(account.userId);
+      res.json({ ok: true, ...accountMcpTokenStatus(account.userId) });
+    } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   });
 
   app.get("/api/accounts/admin", async (req, res) => {

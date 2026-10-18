@@ -28,6 +28,15 @@ test("local account passwords and bearer sessions are stored only as verifiers",
   store.revokeAccountSession(session.token);
   assert.equal(store.accountSession(session.token), null);
   assert.equal(JSON.parse(fs.readFileSync(path.join(temporary, "data", "accounts.json.bak"), "utf8")).sessions.length, 0);
+
+  const mcp = store.rotateAccountMcpToken(account.id);
+  assert.equal(store.verifyAccountMcpToken(mcp.token).userId, account.id);
+  assert.equal(fs.readFileSync(path.join(temporary, "data", "accounts.json"), "utf8").includes(mcp.token), false);
+  const rotated = store.rotateAccountMcpToken(account.id);
+  assert.equal(store.verifyAccountMcpToken(mcp.token), null);
+  assert.equal(store.verifyAccountMcpToken(rotated.token).userId, account.id);
+  store.revokeAccountMcpToken(account.id);
+  assert.equal(store.verifyAccountMcpToken(rotated.token), null);
 });
 
 test("profile assignment, duplicate names and account disabling fail closed", async () => {

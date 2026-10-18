@@ -18,15 +18,15 @@ const output = { ...job, output_index: z.number().int().min(0).max(999).default(
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host) } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null } = {}) {
   const mediaKey = environment.HEISS_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
-  if (!mediaKey && !controlKey) return false;
+  if (!mediaKey && !controlKey && !accountMode) return false;
   if (controlKey && (!environment.CONTROL_URL || !environment.CONTROL_API_KEY || equal(controlKey, mediaKey) || equal(controlKey, environment.CONTROL_API_KEY) || equal(mediaKey, environment.CONTROL_API_KEY))) throw new Error('AI Control requires separate MCP/media/upstream credentials and CONTROL_URL.');
   const publicUrl = environment.MCP_PUBLIC_URL?.replace(/\/+$/, '') || (typeof baseUrl === 'function' ? baseUrl() : baseUrl);
   const parsedPublic = new URL(publicUrl);
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
-  const media = mediaKey ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl }) : null;
+  const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl }) : null;
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
   const reviewedGuides = new Map();
   const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
@@ -40,11 +40,13 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (!own) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
     }
     const token = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ''))?.[1];
-    const scope = equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
+    const account = accountMode ? authenticateAccountToken(token) : null;
+    const scope = accountMode ? (account ? 'media' : '') : equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
     if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="HEISS MCP"').json({ error: 'A valid MCP bearer credential is required.' });
+    if (account) media.credentials.set(account.userId, token);
     const user = String(req.headers['x-bento-user-id'] || '');
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user)) return res.status(400).json({ error: 'Invalid forwarded user identity.' });
-    req.mcpActor = { scope, owner: scope === 'media' ? media.owner(user, token) : null };
+    req.mcpActor = { scope, owner: account?.userId || (scope === 'media' ? media.owner(user, token) : null) };
     next();
   };
   const tool = (server, name, title, description, inputSchema, action, annotations = {}) => server.registerTool(name, { title, description, inputSchema, annotations: { readOnlyHint: false, destructiveHint: false, ...annotations } }, async (args) => {
@@ -56,7 +58,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     const server = new McpServer({ name: 'HEISS', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
       tool(server, 'Models', 'Browse Models', 'Discover ready profiles by kind. Supply exact profile_id for defaults, capabilities, prompting guidance, compatible LoRAs and reference slots and native size support. Explicit width and height request native generation; 2K uses a 2048-pixel long side. Fetch details before first use; imageModes.reference overrides text-only controls when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
-        let profiles = await media.profiles(kind);
+        let profiles = await media.profiles(kind, owner);
         if (profile_id !== undefined) {
           profiles = profiles.filter(profile => profile.id === profile_id);
           if (!profiles.length) throw new Error('Choose a ready profile from Models.');
@@ -87,7 +89,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       tool(server, 'Cancel', 'Cancel Generation', 'Cancel only this account’s exact job when the user requests cancellation.', job, async ({ job_id }) => {
         media.own(owner, job_id);
         await media.job(owner, job_id);
-        return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(job_id)}/cancel`, {}));
+        return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(job_id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
       tool(server, 'Upload', 'Upload Reference', 'Upload a user-supplied PNG, JPEG or WebP image as base64, at most 20 MB. The returned reference asset belongs to this account; supply its id to Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
       tool(server, 'Reuse', 'Reuse Image', 'Reuse this account’s completed image as a reference without reattachment. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
