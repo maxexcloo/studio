@@ -183,13 +183,15 @@ export const demoMode = process.env.HEISS_DEMO === "1";
  * answer from ComfyUI, and expires on its own after a few seconds.
  */
 let comfyUnreachableUntil = 0;
-// When ComfyUI went quiet without refusing (a check timed out); 0 while it answers.
-let comfySilentSince = 0;
+// When each backend went quiet without refusing; removed whenever that backend answers.
+const comfySilentSince = new Map();
 export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
-  comfyUnreachableUntil = 0;
-  comfySilentSince = 0;
-  noteComfyState(true);
+  comfySilentSince.delete(currentComfyBackend());
+  if (currentComfyBackend() === "primary") {
+    comfyUnreachableUntil = 0;
+    noteComfyState(true);
+  }
 }
 
 /*
@@ -209,9 +211,11 @@ export function isComfyTimeout(error) {
  * rather than stopped. `first` is true on the first timeout since it last answered.
  */
 export function noteComfySilent(sentAt, now = Date.now()) {
-  const first = !comfySilentSince;
-  if (first) comfySilentSince = sentAt;
-  return { busy: now - comfySilentSince < comfyBusyGraceMs, first, silentForMs: now - comfySilentSince };
+  const backend = currentComfyBackend();
+  const first = !comfySilentSince.has(backend);
+  if (first) comfySilentSince.set(backend, sentAt);
+  const silentForMs = now - comfySilentSince.get(backend);
+  return { busy: silentForMs < comfyBusyGraceMs, first, silentForMs };
 }
 /** Call with what a fetch to ComfyUI threw; a canceled request says nothing about ComfyUI. */
 export function noteComfyFetchError(error) {
@@ -249,7 +253,7 @@ export async function comfy(pathname, options = {}) {
     if (currentComfyBackend() === "primary") noteComfyFetchError(error);
     throw error;
   }
-  if (currentComfyBackend() === "primary") noteComfyReachable();
+  noteComfyReachable();
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;

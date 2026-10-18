@@ -62,3 +62,17 @@ test("a bug report tells a busy ComfyUI from one that is not answering", () => {
   assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null, comfyBusy: true })), /ComfyUI: busy, no answer within 10 s \(on this computer\)/);
   assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null })), /ComfyUI: not answering \(on this computer\)/);
 });
+
+test("one backend answering does not reset another backend's busy grace", async () => {
+  const { withComfyBackend } = await import('./comfy-backends.js');
+  const at = 3_000_000;
+  withComfyBackend('video', () => {
+    noteComfyReachable();
+    assert.equal(noteComfySilent(at, at + 100).first, true);
+  });
+  withComfyBackend('primary', () => noteComfyReachable());
+  withComfyBackend('video', () => {
+    assert.equal(noteComfySilent(at + 1000, at + comfyBusyGraceMs).busy, false);
+    noteComfyReachable();
+  });
+});

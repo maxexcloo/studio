@@ -1,4 +1,5 @@
 import { ImagePlus, Layers, Wand2 } from 'lucide-react';
+import { cn } from './format';
 import { Tip } from './components';
 import { normalizeLoras } from './loras';
 import type { GalleryItem } from './types';
@@ -24,10 +25,9 @@ export function ViewerReuseAction({ compact = false, onUseSettings }: {
  * Short visible labels keep three to a row in the 380px panel; the hidden
  * words give each button its full name ("Use as reference") for a screen reader.
  */
-export function ViewerActions({ item, copied, onUseSettings, onCopySettings, onUseLoras, onUseAsReference }: {
+export function ViewerActions({ item, onUseSettings, onUseLoras, onUseAsReference }: {
   item: GalleryItem;
   onUseSettings: () => void;
-  onCopySettings: () => void;
   onUseLoras: () => void;
   /** Left out when this output can't be a reference (not an image, locked, from another folder). */
   onUseAsReference?: () => void;

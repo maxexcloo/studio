@@ -27,7 +27,7 @@ import { releaseStatus, requestRestart, saveUpdatePrefs, startReleaseUpdate, war
 import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
 import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
-import { limitedCheck, registerAccessRoutes } from './access-routes.js';
+import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
 import { stripMetadata } from './metadata-strip.js';
@@ -445,21 +445,32 @@ function adoptFoundComfy(found) {
 
 // What the last answer said, for the status while ComfyUI is busy.
 let lastComfyAnswer = { url: "", version: "", device: "" };
+const backendAnswers = new Map();
 
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
   if (configuredBackends().length > 1) {
     const started = performance.now();
     const names = configuredBackends();
-    const results = await Promise.allSettled(names.map((backend) => withComfyBackend(backend, () => comfy("/system_stats", { timeout: 1500 }))));
-    const backends = Object.fromEntries(results.map((result, index) => [names[index], {
-      connected: result.status === "fulfilled",
-      device: result.status === "fulfilled" ? result.value?.devices?.[0]?.name || "" : "",
-      url: withComfyBackend(names[index], () => activeComfyUrl()),
-      ...(result.status === "rejected" ? { error: "Not connected" } : {})
-    }]));
+    const sentAt = Date.now();
+    const results = await Promise.all(names.map((backend) => withComfyBackend(backend, async () => {
+      const url = activeComfyUrl();
+      try {
+        const stats = await comfy("/system_stats", { timeout: 1500 });
+        const answer = { busy: false, connected: true, device: stats?.devices?.[0]?.name || "", url, version: stats?.system?.comfyui_version || "" };
+        backendAnswers.set(backend, answer);
+        return answer;
+      } catch (error) {
+        const restarting = backend === "primary" && comfyRestarting();
+        const busy = !restarting && isComfyTimeout(error) && noteComfySilent(sentAt).busy;
+        const known = backendAnswers.get(backend);
+        return { busy: Boolean(busy), connected: Boolean(busy), device: busy && known?.url === url ? known.device : "", version: busy && known?.url === url ? known.version : "", url, ...(busy ? {} : { error: "Not connected" }) };
+      }
+    })));
+    const backends = Object.fromEntries(results.map((result, index) => [names[index], result]));
     return res.json({
       connected: Object.values(backends).some((backend) => backend.connected),
       backends,
+      ...restartFields(),
       device: Object.entries(backends).filter(([, backend]) => backend.connected).map(([name, backend]) => `${name === "video" ? "Video" : "Images"}: ${backend.device}`).join(" · "),
       latencyMs: Math.round(performance.now() - started),
       url: comfyUrl

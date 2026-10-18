@@ -174,6 +174,7 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     // The size of the picture shown: an upscale's own size when that's the one on screen.
     const upscaled = item.upscaleActive && item.upscale?.status === "done" && item.upscale.width && item.upscale.height ? item.upscale : null;
     add("Size", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
+    if (settings.resolution) add("Resolution", settings.resolution);
     if (upscaled) add("Drawn at", `${item.width || "?"} × ${item.height || "?"}`);
     if (settings.duration) add("Duration", `${settings.duration} Seconds`);
     if (item.type === "image") {

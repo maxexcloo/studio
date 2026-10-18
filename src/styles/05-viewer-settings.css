@@ -250,7 +250,8 @@
 }
 /* The viewer shows its settings outright, so the heading stands where the
    old expander's summary did. */
-.settings-disclosure > h3 {
+.settings-disclosure > h3,
+.settings-disclosure > .detail-heading > h3 {
   margin: 0;
   min-height: 38px;
   display: flex;
@@ -276,6 +277,7 @@
 .settings-disclosure summary { gap: 8px; }
 .settings-disclosure summary > span:first-child { flex: 1; }
 /* "Copy as text" in the header: a quiet pill that copies without opening or closing it. */
+.detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .detail-copy {
   flex: none;
   display: inline-flex;

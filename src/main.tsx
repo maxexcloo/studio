@@ -953,7 +953,7 @@ function App() {
   function applyProfile(profile: Profile, setModelId = true) {
     if (setModelId) setModel(profile.id);
     // A custom size is yours, so it stays across models of the same kind, fitted to the new one's limits.
-    const keepCustom = customSize && profile.kind === mode;
+    const keepCustom = customSize && profile.kind === mode && (!referenceAssets.length || referenceRoleOffered(currentProfile));
     if (!keepCustom) setCustomSize(false);
     if (profile.capabilities.duration) setDuration(Number(profile.defaults.duration || 6));
     if (profile.capabilities.resolution) setResolution(String(profile.defaults.resolution || ""));
@@ -1357,6 +1357,17 @@ function App() {
     if (size) { setWidth(size.width); setHeight(size.height); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aspectLocked, referenceForAspect?.id, referenceForAspect?.width, referenceForAspect?.height, model, prefs.autoResizeInputs]);
+  const manualReference = composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null;
+  useEffect(() => {
+    if (aspectLocked || activeInpaintMask || referenceRoleOffered(currentProfile)) return;
+    const size = referenceImageSize(currentProfile, manualReference, { pixels: width * height, resize: prefs.autoResizeInputs !== false });
+    if (!size) return;
+    setCustomSize(!aspectOptions.some((item) => item.w === size.width && item.h === size.height));
+    setWidth(size.width);
+    setHeight(size.height);
+    // Adopt framing when a reference or model changes, preserving later manual choices.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspectLocked, manualReference?.id, manualReference?.width, manualReference?.height, model, prefs.autoResizeInputs]);
   /* A reference that dictates the framing, or a painted mask, takes the size
      tabs off the composer and the run skips 2K/4K (useGenerationActions). The
      saved pick stays, so it is back once the reference is gone or only guides. */
@@ -1802,7 +1813,7 @@ function App() {
     locked: Boolean(activeInpaintMask),
     onChange: (value: ReferenceRole) => { if (!activeInpaintMask) setPrefs({ referenceRole: value }); }
   } : null;
-  const view = { ...baseView, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs: visibleReferenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  const view = { ...baseView, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />

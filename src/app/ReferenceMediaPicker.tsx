@@ -516,6 +516,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
     hoverTimer.current = window.setTimeout(() => setHover(next), next ? hoverOpenDelay : hoverCloseDelay);
   };
 
+  const label = isStart ? "Reference Image" : input.label || "Reference image";
+
   if (busy) {
     return (
       <div className="ref-chip is-busy" aria-live="polite">
@@ -734,7 +736,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     if (chain) chain.push(input); else chains.push([input]);
   }
   // A phone, or a screen without hover, lays the stack out in a row: there's nothing to hover open.
-  const phone = Boolean(host?.classList.contains("phone-compose"));
+  const phone = Boolean(host?.classList.contains("phone-create"));
   const inline = phone || noHover;
   // New images go to the slot that's open, else the first empty one. With every one of several
   // references used, a new one replaces none of them (least of all the picture being edited);
@@ -911,12 +913,14 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   const tools = host?.querySelector(".composer-reference-tools");
   const slots = (
       <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef} role="group" aria-label="Reference Images">
+        {inputs.length > 1 ? <span className="reference-count" aria-live="polite">{count}/{inputs.length} References</span> : null}
+        <div className="reference-slot-list">
         {/* No hover to open the strip (a tablet, the full studio on a phone): Edit | Reference in plain
             sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
         {inline && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
         {chains.flatMap((chain) => {
           const [lead, ...rest] = chain;
-          const stacked = !inline && rest.length > 0 && Boolean(assetFor(lead.id));
+          const stacked = Boolean(role) && !inline && rest.length > 0 && Boolean(assetFor(lead.id));
           const filled = rest.filter((input) => assetFor(input.id));
           const next = rest.find((input) => !assetFor(input.id)) || null;
           const stack: ReferenceStack | null = stacked ? {
@@ -936,6 +940,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             ...(full ? [<Fold key={`${lead.id}:full`} shown={!editOnly}><AddMore max={chain.length} add={null} className="ref-chip ref-add" /></Fold>] : [])
           ];
         })}
+        </div>
       </div>
   );
   return (

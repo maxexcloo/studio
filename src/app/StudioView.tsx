@@ -921,16 +921,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        copied={viewerCopy.copied === "settings"}
                         onUseSettings={() => applyAllSettings(active)}
-                        onCopySettings={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
                         <section className="settings-disclosure">
-                          <h3>Generation Settings</h3>
-                          {generationDetailEntries(active).map((section: { title: string; rows: Array<[string, string]> }) => (
+                          <div className="detail-heading"><h3>Generation Settings</h3><button type="button" className="detail-copy" aria-label="Copy Generation Settings" onClick={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}><CopyIcon copied={viewerCopy.copied === "settings"} size={13} /><span>{viewerCopy.copied === "settings" ? "Copied" : "Copy as Text"}</span></button></div>
+                          {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
                               {section.rows.length ? (

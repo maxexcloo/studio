@@ -8,7 +8,7 @@ import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
 
 // Imported-only model families still need precise adapter compatibility labels.
-const families = { ...modelFamilies, boogu: { label: 'Boogu' }, flux3_klein: { label: 'FLUX.3 Klein' }, moss_image: { label: 'MOSS Image' } };
+const families = { ...modelFamilies, boogu: { label: 'Boogu' }, moss_image: { label: 'MOSS Image' } };
 
 /**
  * What a LoRA was trained for and how to trigger it, read the same way model
@@ -50,7 +50,6 @@ const metadataFamilies = [
   [/hidream/, ["hidream"]],
   [/lumina|neta/, ["lumina2"]],
   [/krea[-_ ]?2/, ["krea2"]],
-  [/moss[-_ ]?image/, ["moss_image"]],
   [/anima/, ["anima"]],
   [/auraflow|pony[-_ ]?v7/, ["auraflow"]],
   [/sd[-_ ]?3|stable-diffusion-v3|stable-diffusion-3/, ["sd3"]],

@@ -11,6 +11,27 @@ version opens with a `> ` summary line, which the update pill shows.
 
 ## [Unreleased]
 
+### Added
+- **Reference search:** find images by prompt, model or filename across the full library.
+
+### Changed
+- **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
+- **Reference browsing:** scrolling near the end loads another page automatically; the fixed search row blends into the picker with a softer scrolling edge.
+- **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
+- **Faster studio loading:** settings, workflows and the image editor load when needed.
+- **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
+
+### Fixed
+- **Reliable AMD upscales:** use wavelet colour correction for manual and automatic SeedVR2 upscales, avoiding the red bands and black regions produced by LAB on Radeon GPUs.
+- **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
+- **Reference library recovery:** failed pages keep the loaded images and show an inline retry; keyboard navigation uses one thumbnail Tab stop, Home/End and focus restoration.
+- **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
+- **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
+- **Generation reveal:** starting a run goes straight to the top, without an animated scroll being interrupted by the new tiles.
+- **Phone negative prompts:** the saved field has a stable accessible label, including when the current profile does not use it.
+- **Settings › Features › Inpainting says where its two dials are:** in the
+  sidebar's Basics, under the image, not under Advanced.
+
 ## [0.18.0] - 2026-10-17
 
 > Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
@@ -47,16 +68,6 @@ version opens with a `> ` summary line, which the update pill shows.
 - Automatic upscaling of every new picture (see above).
 - The viewer's "Vary with a new seed" button.
 
-### Added
-- **Reference search:** find images by prompt, model or filename across the full library.
-
-### Changed
-- **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
-- **Reference browsing:** scrolling near the end loads another page automatically; the fixed search row blends into the picker with a softer scrolling edge.
-- **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
-- **Faster studio loading:** settings, workflows and the image editor load when needed.
-- **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
-
 ### Fixed
 - A busy ComfyUI no longer shows as offline.
 - Translators and browser extensions no longer crash the studio.
@@ -65,15 +76,6 @@ version opens with a `> ` summary line, which the update pill shows.
   model.
 - 4K upscales and restarts on Windows work again.
 - Smaller fixes to references and saved sizes.
-- **Reliable AMD upscales:** use wavelet colour correction for manual and automatic SeedVR2 upscales, avoiding the red bands and black regions produced by LAB on Radeon GPUs.
-- **Lighter generation previews:** software GPUs and unavailable WebGL use the existing 2D effect, and the GPU check waits until a preview is needed.
-- **Reference library recovery:** failed pages keep the loaded images and show an inline retry; keyboard navigation uses one thumbnail Tab stop, Home/End and focus restoration.
-- **Separate image and video connections:** queue estimates and connection indicators now follow the backend used by the selected profile.
-- **Quick gallery scrolling:** user scrolling takes precedence over a pending restored position.
-- **Generation reveal:** starting a run goes straight to the top, without an animated scroll being interrupted by the new tiles.
-- **Phone negative prompts:** the saved field has a stable accessible label, including when the current profile does not use it.
-- **Settings › Features › Inpainting says where its two dials are:** in the
-  sidebar's Basics, under the image, not under Advanced.
 
 ## [0.17.0] - 2026-10-09
 

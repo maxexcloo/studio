@@ -1,5 +1,8 @@
 const constraintKeys = ['baseModels', 'conditionings', 'profileIds'];
-const familyId = (value) => String(value || '').replace(/-/g, '_');
+const familyId = (value) => {
+  const id = String(value || '').replace(/-/g, '_');
+  return id === 'flux3_klein' ? 'flux3' : id;
+};
 const basename = (value) => String(value || '').split(/[\\/]/).pop();
 
 /** Explicit publisher targets refine family compatibility; unverified variants stay unknown. */

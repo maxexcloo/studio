@@ -38,6 +38,7 @@ const familyNames = {
   boogu: 'Boogu',
   checkpoint: 'Checkpoint',
   flux2_klein_9b: 'FLUX',
+  flux3: 'FLUX',
   flux3_klein: 'FLUX',
   grok: 'Grok',
   ideogram4: 'Ideogram',
@@ -64,7 +65,7 @@ export function modelFamilyLabel(profile) {
   const family = String(profile?.family || '').replace(/-/g, '_');
   const labels = {
     boogu: 'Boogu', flux2_klein_4b: 'FLUX.2 Klein 4B', flux2_klein_9b: 'FLUX.2 Klein 9B',
-    flux3_klein: 'FLUX.3 Klein', ideogram4: 'Ideogram 4', krea2: 'Krea 2',
+    flux3: 'FLUX.3 Klein', flux3_klein: 'FLUX.3 Klein', ideogram4: 'Ideogram 4', krea2: 'Krea 2',
     minimax_h3: 'MiniMax H3', moss_image: 'MOSS Image', qwen_image_21: 'Qwen-Image 2.1',
     z_image: 'Z-Image', zimage: 'Z-Image',
   };

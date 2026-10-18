@@ -739,13 +739,6 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
               {!flat.length ? <div className="model-menu-none">{query ? `Nothing matches “${query.trim()}”.` : "No Models Match These Filters."}</div> : null}
             </div>
           ) : null}
-          {onFindModels && profiles.length ? (
-            // Always one tap from where people notice a model is missing.
-            <button type="button" className={cn("model-menu-find", strayCount > 0 && "has-found")} onClick={() => { close(); onFindModels(); }}>
-              <span>{strayCount ? `${strayCount} model${strayCount === 1 ? "" : "s"} found` : "Find More Models"}</span>
-              <em>{strayCount ? "Add" : "Search"}</em>
-            </button>
-          ) : null}
           {onBrowseModels ? <button type="button" className="model-option model-menu-browse" aria-label="Browse Models" onClick={() => { close(); onBrowseModels(); }}><span className="model-copy"><strong>Browse Models</strong><em>View Models & Workflows</em></span><SlidersHorizontal size={15} /></button> : null}
 
         </div>

@@ -33,46 +33,12 @@
 .ref-chip.is-busy { flex-direction: column; gap: 5px; background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
 @keyframes ref-pop { from { opacity: .5; } to { opacity: 1; } }
 
-/* ------------------------------------------------------------------ Chip */
-
-.ref-chip {
-  display: inline-flex;
-  align-items: center;
-  height: 40px;
-  border-radius: var(--r-pill);
-  color: hsl(var(--foreground));
-  font-size: 12.5px;
-  font-weight: 550;
-  white-space: nowrap;
-}
-
-/* Empty slots keep a visible label so the action does not change after mounting. */
-.ref-add {
-  gap: 5px;
-  height: 28px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast), scale 100ms;
-}
-.ref-add > svg { flex: none; transition: rotate 320ms var(--ease-out); }
-.ref-add.is-open > svg { rotate: 45deg; }
-.ref-add-label, .ref-add-label > span { display: inline-flex; align-items: center; gap: 4px; }
-.ref-add-label em { color: var(--ember); font-size: 15px; line-height: 1; font-style: normal; }
-.ref-add:hover { color: hsl(var(--foreground)); }
-.ref-add:active { scale: .96; }
-.ref-add.is-open { color: hsl(var(--foreground)); }
-.ref-add:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
-
 /* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
    clip-path wipes open to the left, so nothing reflows while it animates. */
 /* Each chip stacks on its own, and the one whose menu is open sits over its
    neighbours, so their thumbnails can't cover its × (until the menu has wiped shut). */
 /* The deck's room (padding-left) grows and shrinks with it, rather than snapping. */
-.ref-selected { position: relative; z-index: 0; display: block; height: 28px; transition: z-index 0s 420ms, padding-left 320ms var(--ease-out); }
+.ref-selected { position: relative; z-index: 0; display: block; transition: z-index 0s 420ms, padding-left 320ms var(--ease-out); }
 .ref-selected.is-hover,
 .ref-selected.is-intro,
 .ref-selected:focus-within,
@@ -80,8 +46,8 @@
 .ref-thumb {
   position: relative;
   z-index: 2;
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   padding: 0;
@@ -101,11 +67,11 @@
   top: -3px;
   right: -3px;
   width: max-content; /* its parent is only the thumbnail */
-  height: 34px;
+  height: calc(100% + 6px);
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 38px 0 6px;
+  padding: 0 74px 0 6px;
   border-radius: 18px;
   /* Opaque enough that the prompt it slides over never reads through, blurred for the rest. */
   background: var(--surface-grain), rgb(30 30 30 / .97);
@@ -710,7 +676,7 @@
 /* Touch: the ×'s finger-sized hit area leans out past the corner, off the thumbnail it sits on,
    so a tap on the picture opens the picker rather than removing it. */
 @media (pointer: coarse) {
-  .ref-thumb-remove::after { width: 34px; height: 34px; translate: -30% -70%; }
+  .composer-reference-slots .ref-selected .ref-thumb-remove::after { width: 34px; height: 34px; translate: -30% -70%; }
 }
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }

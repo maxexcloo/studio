@@ -103,7 +103,6 @@ export function useViewerControls(view: any) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const matchingProfile = outputProfile(models?.profiles || [], item);
-    if (vary && !matchingProfile) return false;
     const targetProfile: Profile | undefined = matchingProfile || models?.profiles?.find((profile: Profile) => profile.id === view.draft?.model && profile.kind === view.mode && profile.ready !== false);
     if (!targetProfile) { applyPromptsOnly(item, true); return false; }
     const nextMode = targetProfile.kind;

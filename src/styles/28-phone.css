@@ -474,9 +474,9 @@
 /* Edit or Ref sits under the chips (below), so the chip's menu leaves it out,
    with the line that would set the brush apart from it; with no brush either,
    there is no menu to open. */
-.phone-compose .ref-menu > .ref-menu-role,
-.phone-compose .ref-menu-paint-slot > .ref-menu-divider { display: none; }
-.phone-compose .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
+.phone-create .ref-menu > .ref-menu-role,
+.phone-create .ref-menu-paint-slot > .ref-menu-divider { display: none; }
+.phone-create .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
 .phone-ref-role { order: -1; display: flex; align-items: center; gap: 12px; overflow: hidden; }
 .phone-ref-role .ref-menu-role { flex: none; padding: 4px; }
 .phone-ref-role .ref-menu-role > i { top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); }
@@ -491,11 +491,11 @@
 }
 @keyframes phoneRoleNote { from { opacity: 0; transform: translateY(3px); } }
 @media (prefers-reduced-motion: reduce) { .phone-ref-role small { animation: none; } }
-.phone-compose .ref-menu { max-width: calc(100vw - 72px); }
+.phone-create .ref-menu { max-width: calc(100vw - 72px); }
 /* The desktop menu opens leftwards on hover; touch controls stay in the row. */
-.phone-compose .ref-selected { display: inline-flex; max-width: 100%; }
-.phone-compose .ref-thumb { flex: none; order: -1; }
-.phone-compose .ref-menu {
+.phone-create .ref-selected { display: inline-flex; max-width: 100%; }
+.phone-create .ref-thumb { flex: none; order: -1; }
+.phone-create .ref-menu {
   position: static;
   min-width: 0;
   max-width: calc(100vw - 120px);
@@ -505,9 +505,9 @@
   pointer-events: auto;
   clip-path: none;
 }
-.phone-compose .ref-selected .ref-menu > * { opacity: 1; translate: none; }
-.phone-compose .ref-menu-name { min-width: 0; }
-.phone-compose .ref-menu-remove { width: 44px; height: 44px; }
+.phone-create .ref-selected .ref-menu > * { opacity: 1; translate: none; }
+.phone-create .ref-menu-name { min-width: 0; }
+.phone-create .ref-menu-remove { width: 44px; height: 44px; }
 
 .phone-field {
   display: grid;
