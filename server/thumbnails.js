@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { mediaType } from './media-paths.js';
 import fs from "node:fs";
 import path from "node:path";
 import { comfyRecentlyUnreachable, comfyUrl, localOutputFile, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
@@ -176,6 +177,8 @@ async function sourceBytes(filename, subfolder, type) {
     const file = localOutputFile(filename, subfolder, type);
     return file ? fs.promises.readFile(file) : undefined;
   };
+  // HEISS media is only ever on this computer.
+  if (type === mediaType) return (await local()) || null;
   // ComfyUI just failed to answer: skip the slow refused connection when the file is here.
   if (comfyRecentlyUnreachable()) {
     const bytes = await local();
@@ -206,6 +209,8 @@ const checkedLocal = new Map();
 export async function trustedLocalOutput(filename, subfolder = "", type = "output") {
   const file = localOutputFile(filename, subfolder, type);
   if (!file) return null;
+  // HEISS media is the file itself; there is no ComfyUI copy to compare it with.
+  if (type === mediaType) return file;
   let stat;
   try { stat = fs.statSync(file); } catch { return null; }
   const version = `${file}:${stat.size}:${stat.mtimeMs}`;

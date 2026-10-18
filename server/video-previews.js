@@ -13,6 +13,7 @@ import { comfyUrl } from './comfy.js';
 import { renameWithRetry } from './json-store.js';
 import { sendMediaBuffer } from './media-response.js';
 import { trustedLocalOutput } from './thumbnails.js';
+import { mediaType } from './media-paths.js';
 
 const require = createRequire(import.meta.url);
 let encoder = process.env.HEISS_FFMPEG_PATH;
@@ -181,6 +182,7 @@ export async function getComfyVideoPoster(filename, subfolder, type) {
   const source = comfySource(filename, subfolder, type);
   const local = await trustedLocalOutput(filename, subfolder, type);
   if (local) return getFileVideoPoster(local, source);
+  if (type === mediaType) throw new Error('Source video is unavailable.');
   return getVideoPoster(await getComfyVideoPreview(filename, subfolder, type));
 }
 
@@ -188,6 +190,8 @@ export async function getComfyVideoPreview(filename, subfolder, type) {
   const source = comfySource(filename, subfolder, type);
   const local = await trustedLocalOutput(filename, subfolder, type);
   if (local) return getFileVideoPreview(local, source);
+  // HEISS media is never fetched from ComfyUI.
+  if (type === mediaType) throw new Error('Source video is unavailable.');
   const key = identityKey(source);
   const known = remoteVersions.get(key);
   if (known && Date.now() - known.checked < 60_000 && fs.existsSync(known.file)) return known.file;

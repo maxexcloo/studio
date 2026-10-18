@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { isMediaUrl, mediaFile, mediaParams, mediaPath, mediaRoot, mediaStorageEnabled, mediaType } from './media-paths.js';
 import fs from "node:fs";
 import path from "node:path";
 import { comfy, comfyOutputDir, comfyRecentlyUnreachable } from "./comfy.js";
@@ -119,6 +120,8 @@ function mimeFor(filename, type) {
  */
 export function outputFileOf(output) {
   const source = String(output?.url || "");
+  const media = mediaParams(source);
+  if (media) return mediaPath(media.filename, media.subfolder) || "";
   if (!comfyOutputDir || !source || source.startsWith("data:")) return "";
   const parsed = new URL(source, "http://heiss.local");
   const filename = String(parsed.searchParams.get("filename") || "");
@@ -148,6 +151,11 @@ export async function sourceFromOutput(output) {
   const outputType = String(parsed.searchParams.get("type") || "output");
   if (!filename || path.basename(filename) !== filename) throw new Error("Only generated images can go into Hidden.");
   const mime = mimeFor(filename, output.type);
+  if (outputType === mediaType) {
+    const file = mediaFile(filename, subfolder);
+    if (!file) throw new Error("The original file is gone.");
+    return { buffer: fs.readFileSync(file), sourcePath: file, mime };
+  }
   if (comfyOutputDir && outputType === "output") {
     const base = path.resolve(comfyOutputDir);
     const candidate = path.resolve(base, subfolder, filename);
@@ -164,7 +172,7 @@ async function galleryItemBytes(item, url) {
   const imported = url === item.url && importedImageFile(item);
   if (imported && fs.existsSync(imported)) return { buffer: fs.readFileSync(imported), sourcePath: imported, mime: "image/png" };
   const candidates = outputFileCandidates({ ...item, url, id: url, outputName: url === item.url ? item.outputName : item.upscale?.outputName });
-  const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
+  const base = isMediaUrl(url) ? mediaRoot : comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const file = candidates.find((candidate) => {
     const resolved = path.resolve(candidate);
     if (!base || !isInside(base, resolved)) return false;
@@ -172,6 +180,7 @@ async function galleryItemBytes(item, url) {
   });
   const name = url === item.url ? item.outputName || item.filename : item.upscale?.outputName;
   if (file) return { buffer: fs.readFileSync(file), sourcePath: file, mime: mimeFor(file, item.type) };
+  if (isMediaUrl(url)) throw new Error("The original file is gone.");
   if (String(url).startsWith("/comfy/")) {
     const data = await comfy(String(url).replace(/^\/comfy/, ""));
     return { buffer: Buffer.from(data), sourcePath: "", mime: mimeFor(name, item.type) };
@@ -548,6 +557,14 @@ function viewParams(file, base) {
  */
 async function putBackInOutput(buffer, name, mime) {
   const safe = safeOutputName(name);
+  // With HEISS media storage, an unhidden file goes back into HEISS media, not ComfyUI.
+  if (mediaStorageEnabled) {
+    const folder = path.join(mediaRoot, "heiss-ui");
+    fs.mkdirSync(folder, { recursive: true });
+    const file = uniqueOutputPath(folder, safe);
+    fs.writeFileSync(file, buffer);
+    return { params: new URLSearchParams({ filename: path.basename(file), subfolder: "heiss-ui", type: mediaType }), written: file };
+  }
   let refused = "";
   if (!comfyRecentlyUnreachable()) {
     try {

@@ -1,4 +1,5 @@
 import { matchesGalleryFilters } from './gallery-filters.js';
+import { mediaFile, mediaParams, mediaPath } from './media-paths.js';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -420,6 +421,12 @@ export function importedImageFile(item) {
 }
 
 export function outputFileCandidates(item, baseDir = comfyOutputDir) {
+  // HEISS-owned media has exactly one place, whatever folder ComfyUI uses.
+  const media = mediaParams(item?.url);
+  if (media) {
+    const file = mediaPath(media.filename, media.subfolder);
+    return file ? [file] : [];
+  }
   // An image added from another folder is never in the output folder, whatever its name.
   if (!baseDir || item?.library) return [];
   const keys = [item?.url, item?.id, item?.outputName, item?.filename].filter(Boolean);
@@ -464,6 +471,12 @@ export function deleteGalleryFiles(items) {
     }
     // An image added from another folder is only shown here; its file is not ours to delete.
     if (item.library) continue;
+    const media = mediaParams(item.url);
+    if (media) {
+      const file = mediaFile(media.filename, media.subfolder);
+      try { if (file) { fs.unlinkSync(file); deleted += 1; } } catch { skipped += 1; }
+      continue;
+    }
     if (!base) continue;
     for (const file of outputFileCandidates(item)) {
       const resolved = path.resolve(file);
@@ -605,6 +618,14 @@ function markFreshOutputs(items) {
 }
 
 export function hasExistingOutputFile(item) {
+  const media = mediaParams(item?.url);
+  if (media) {
+    const file = mediaPath(media.filename, media.subfolder);
+    if (!file) return false;
+    if (folderListing(path.dirname(file))?.has(listedName(path.basename(file)))) return true;
+    const freshAt = freshOutputs.get(galleryKey(item));
+    return Boolean(freshAt && Date.now() - freshAt < freshOutputMs && fs.existsSync(file));
+  }
   if (!comfyOutputDir || !outputFolderTrusted()) return true;
   const base = path.resolve(comfyOutputDir);
   const paths = outputPathsFor(item, base);

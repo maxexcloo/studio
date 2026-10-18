@@ -7,6 +7,7 @@ import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
 import { saveIntoHeissFolder } from "./graphs.js";
+import { ingestRunResults, mediaStorageEnabled, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./hidden-traces.js";
 import { releaseHiddenRun, rememberHiddenRun } from "./hidden-runs.js";
 import { attachVaultUpscale, patchVaultItem, setRuntimeUpscale } from "./vault.js";
@@ -202,13 +203,24 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
       }
       if (checked.state === "done") {
         const outputs = outputsFrom({ outputs: { "9": checked.entry?.outputs?.["9"] || {} } });
-        const output = outputs.find((item) => item.type === (body.mediaType || "image"));
+        let output = outputs.find((item) => item.type === (body.mediaType || "image"));
         if (!output) throw new Error("The upscale ended without a saved result.");
+        // ComfyUI as a worker: the upscale moves into HEISS media beside its source.
+        let comfyCopies = [];
+        if (mediaStorageEnabled && !target.hidden) {
+          const moved = await ingestRunResults([{ output }], body.ownerId || "");
+          output = moved.results[0].output;
+          comfyCopies = moved.comfyFiles;
+        }
         // Learned from, unless it is Hidden's or its start was never heard.
         const startAt = clock.startAt();
         if (startAt && !target.hidden) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
         await target.finish(output, plan);
         setTerminalJob(jobId, { status: "done", outputs: target.hidden ? [] : [output] });
+        if (comfyCopies.length) {
+          await removeComfyFiles(comfyCopies);
+          await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
+        }
         socket?.close();
         return;
       }

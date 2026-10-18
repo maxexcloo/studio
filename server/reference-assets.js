@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { mediaFile, mediaParams } from './media-paths.js';
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
@@ -277,6 +278,12 @@ function findGalleryItem(id = "", req = null) {
 async function publicGalleryBuffer(item) {
   const imported = importedImageFile(item);
   if (imported && fs.existsSync(imported)) return { buffer: fs.readFileSync(imported), mime: "image/png", name: item.outputName };
+  const media = mediaParams(item.url);
+  if (media) {
+    const file = mediaFile(media.filename, media.subfolder);
+    if (!file) throw new Error("That image is no longer in the gallery.");
+    return { buffer: fs.readFileSync(file), mime: mimeFromName(file), name: item.outputName || path.basename(file) };
+  }
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const file = outputFileCandidates(item).find((candidate) => {
     const resolved = path.resolve(candidate);

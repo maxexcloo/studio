@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { isMediaUrl, mediaRoot } from './media-paths.js';
 import path from "node:path";
 import zlib from "node:zlib";
 import { comfyOutputDir } from "./comfy.js";
@@ -89,9 +90,11 @@ function archiveEntries(privateAssets, includeGallery = true, req = null) {
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.HEISS_MULTI_USER === "1" ? [] : gallery;
   for (const item of includeGallery ? filterVisibleGallery(sourceGallery) : []) {
-    if (item.status !== "done" || !base) continue;
+    // HEISS media lives in its own folder; everything else in ComfyUI's.
+    const itemBase = isMediaUrl(item.url) ? mediaRoot : base;
+    if (item.status !== "done" || !itemBase) continue;
     const file = outputFileCandidates(item).map((candidate) => path.resolve(candidate)).find((resolved) => {
-      if (!isInside(base, resolved, { orSame: true })) return false;
+      if (!isInside(itemBase, resolved, { orSame: true })) return false;
       try { return fs.statSync(resolved).isFile(); } catch { return false; }
     });
     if (file) add("gallery", item, { file });

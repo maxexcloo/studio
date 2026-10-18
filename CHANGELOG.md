@@ -19,6 +19,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Reference search:** find images by prompt, model or filename across the full library.
 
 ### Changed
+- **ComfyUI as a worker:** with HEISS media storage (default in multi-user mode, or `HEISS_OUTPUT_STORAGE=heiss`), finished outputs move into HEISS's own per-account folders, and the new HEISS worker ComfyUI node removes ComfyUI's copies, so HEISS no longer needs ComfyUI's output folder.
 - **Signed MCP result links no longer expire:** they keep working until the output is hidden or deleted.
 - **Multi-user migration:** existing single-user galleries, history and MCP ownership have no account owner and stay hidden in multi-user mode until migrated explicitly. In multi-user mode, a trusted gateway's shared MCP key works only for forwarded user IDs that an administrator has linked to an account, and the AI Control MCP key keeps only its control tools.
 - **Fork release safety:** release/update links use the fork repository, upstream metadata is tracked separately, and publication waits for browser, platform-launcher and container checks before promoting draft assets. Signing ownership remains an explicit publication gate.

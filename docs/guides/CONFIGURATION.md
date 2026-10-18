@@ -20,6 +20,18 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `HEISS_DEVICE_COOKIE_NAME` optionally gives each studio on the same hostname a distinct device sign-in cookie. The default remains `heiss_device`.
 
+## HEISS Media Storage (ComfyUI as a Worker)
+
+With media storage, HEISS keeps every finished output in its own folder and treats ComfyUI as a stateless worker:
+
+- HEISS fetches each output over ComfyUI's HTTP API into `HEISS_MEDIA_DIR` (`<HEISS_DATA_DIR>/media` by default), with a folder per account.
+- The [HEISS worker node](../../comfyui/heiss_worker/README.md) then removes ComfyUI's copy, the run's staged inputs and its history entry.
+- HEISS and ComfyUI no longer need to share a folder, so they can run on different servers.
+
+Media storage is on by default in multi-user mode. `HEISS_OUTPUT_STORAGE=heiss` turns it on for a single-user studio, and `HEISS_OUTPUT_STORAGE=comfy` keeps ComfyUI's output folder. Set the same `HEISS_WORKER_TOKEN` in HEISS and ComfyUI to protect the worker node's endpoints.
+
+Existing ComfyUI outputs stay where they are; only new runs, upscales and recovered runs move. If an output cannot be fetched, it keeps its ComfyUI address instead of being lost. Without the worker node, ComfyUI keeps its copies and HEISS logs a warning.
+
 ## Multi-User Mode
 
 `HEISS_MULTI_USER=1` turns on optional accounts. It is off by default; single-user mode, the launcher and device sign-in behave exactly as before.

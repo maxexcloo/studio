@@ -18,7 +18,8 @@ export function mcpOutputPath(value) {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return false;
   try {
     const url = new URL(value, 'http://localhost');
-    return url.origin === 'http://localhost' && url.pathname === '/comfy/view' && Boolean(url.searchParams.get('filename')) && (!url.searchParams.has('type') || url.searchParams.get('type') === 'output');
+    // ComfyUI outputs, or HEISS-owned media (media-paths.js), which the studio serves itself.
+    return url.origin === 'http://localhost' && url.pathname === '/comfy/view' && Boolean(url.searchParams.get('filename')) && (!url.searchParams.has('type') || ['output', 'media'].includes(url.searchParams.get('type')));
   } catch { return false; }
 }
 

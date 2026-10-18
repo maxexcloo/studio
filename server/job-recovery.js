@@ -1,5 +1,5 @@
 // Reattach persisted tiles to their existing prompts; never submit replacement work.
-export function createJobRecovery({ backends, filterHistory, finishJob, getGallery, jobs, recordsFromHistory, request, setGallery, visible, withBackend }) {
+export function createJobRecovery({ backends, filterHistory, finishJob, getGallery, jobs, recordsFromHistory, request, setGallery, visible, withBackend, ingest = async (records) => records }) {
   let active;
   const missing = new Map();
   function replace(items) {
@@ -64,7 +64,8 @@ export function createJobRecovery({ backends, filterHistory, finishJob, getGalle
           if (done) {
             untracked.delete(id);
             missing.delete(id);
-            const outputs = visible(recordsFromHistory({ [done.promptId]: done.entry }));
+            // With HEISS media storage, recovered outputs move out of ComfyUI like delivered ones.
+            const outputs = visible(await ingest(recordsFromHistory({ [done.promptId]: done.entry }), done.promptId));
             if (outputs.length) {
               const urls = new Set(getGallery().filter((item) => item.status === 'done').map((item) => item.url));
               setGallery([...outputs.filter((item) => !urls.has(item.url)), ...getGallery().filter((item) => item.jobId !== id || item.url)]);

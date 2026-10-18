@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { mediaRoot, mediaStorageEnabled } from './media-paths.js';
 import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir } from "./comfy.js";
@@ -27,7 +28,12 @@ export const trashDays = (() => {
 })();
 const dayMs = 24 * 60 * 60 * 1000;
 
-export function trashDir(baseDir = comfyOutputDir) {
+/** With HEISS media storage the trash sits in the media folder; otherwise in ComfyUI's output folder. */
+function trashBase() {
+  return mediaStorageEnabled ? mediaRoot : comfyOutputDir;
+}
+
+export function trashDir(baseDir = trashBase()) {
   return baseDir ? path.join(path.resolve(baseDir), trashFolderName) : "";
 }
 
@@ -68,7 +74,7 @@ function readBatch(dir) {
  * Moves the files of these gallery items into a new trash batch. Returns
  * { batch, moved, skipped } like the old delete returned { deleted, skipped }.
  */
-export function trashGalleryItems(items, baseDir = comfyOutputDir) {
+export function trashGalleryItems(items, baseDir = trashBase()) {
   if (!baseDir) return { batch: "", moved: 0, skipped: 0 };
   const base = path.resolve(baseDir);
   const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${crypto.randomBytes(3).toString("hex")}`;
@@ -99,7 +105,7 @@ export function trashGalleryItems(items, baseDir = comfyOutputDir) {
 }
 
 /** The batches in the trash, newest first. */
-export function trashBatches(baseDir = comfyOutputDir, ownerId = "") {
+export function trashBatches(baseDir = trashBase(), ownerId = "") {
   const root = trashDir(baseDir);
   if (!root) return [];
   let names = [];
@@ -115,7 +121,7 @@ export function trashBatches(baseDir = comfyOutputDir, ownerId = "") {
 }
 
 /** What Settings shows: how much is in the trash, and when the oldest goes for good. */
-export function trashSummary(baseDir = comfyOutputDir, ownerId = "") {
+export function trashSummary(baseDir = trashBase(), ownerId = "") {
   const batches = trashBatches(baseDir, ownerId);
   const oldest = batches.at(-1);
   return {
@@ -133,7 +139,7 @@ export function trashSummary(baseDir = comfyOutputDir, ownerId = "") {
  * been taken since stays in the trash rather than overwrite anything.
  * Returns the gallery records whose output is back on disk.
  */
-export function restoreTrash(batchId = "", baseDir = comfyOutputDir, ownerId = "") {
+export function restoreTrash(batchId = "", baseDir = trashBase(), ownerId = "") {
   if (!baseDir) return { restored: [], missing: 0 };
   const base = path.resolve(baseDir);
   const found = trashBatches(base, ownerId).find((batch) => (batchId ? batch.id === batchId : Boolean(batch.batch)));
@@ -172,7 +178,7 @@ async function removeBatch(batch) {
 }
 
 /** Deletes batches older than the retention for good. Returns how many went. */
-export async function purgeTrash({ baseDir = comfyOutputDir, now = Date.now() } = {}) {
+export async function purgeTrash({ baseDir = trashBase(), now = Date.now() } = {}) {
   let purged = 0;
   for (const batch of trashBatches(baseDir)) {
     if (now - Date.parse(batch.createdAt) < trashDays * dayMs) continue;
@@ -187,7 +193,7 @@ export async function purgeTrash({ baseDir = comfyOutputDir, now = Date.now() } 
 }
 
 /** "Empty trash": everything in it, now. */
-export async function emptyTrash(baseDir = comfyOutputDir, ownerId = "") {
+export async function emptyTrash(baseDir = trashBase(), ownerId = "") {
   let removed = 0;
   for (const batch of trashBatches(baseDir, ownerId)) {
     try {

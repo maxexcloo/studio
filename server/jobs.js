@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { comfyFileRef, ingestRunResults, mediaStorageEnabled, removeComfyFiles, temporaryInputFiles } from './media-store.js';
 import { withComfyBackend } from './comfy-backends.js';
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
@@ -519,6 +520,13 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
      * saved; they are kept at their generated size and the toast says so.
      */
     const deliver = async (results, missed = null) => {
+      // ComfyUI as a worker: the pictures move into HEISS media before anything shows them.
+      let comfyCopies = [];
+      if (mediaStorageEnabled && !body.privateVault) {
+        const moved = await ingestRunResults(results, body.ownerId || "");
+        results = moved.results;
+        comfyCopies = moved.comfyFiles;
+      }
       const upscaled = (result) => (result.upscale && !missed ? runUpscaleState(embed, result.upscale) : null);
       const missedState = (result) => (result.paired && (missed || !result.upscale) ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image" }) : null);
       const outputs = results.map((result) => result.output);
@@ -551,6 +559,8 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         setTerminalJob(id, { status: "done", outputs: items, leftBehind, ...(kept ? { kept } : {}) });
         // A copy that could not be removed is marked, so no import of the output folder brings it in.
         if (leftBehind) hideGalleryItems(outputs);
+        // Without a shared folder, the worker node removes ComfyUI's copies of what went into Hidden.
+        if (mediaStorageEnabled && leftBehind) await removeComfyFiles(outputs.map((output) => comfyFileRef(output?.url)).filter(Boolean));
         const historyGone = await forgetComfyRun({ promptIds: [queued.prompt_id], inputNames: body.stagedInputNames });
         hiddenDone = { stored: true, clean: historyGone };
       } else {
@@ -567,6 +577,11 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
         // A Hidden image used as the reference for a normal run: only its staged copy goes.
         if (body.hiddenInputNames?.length) await forgetComfyRun({ inputNames: body.hiddenInputNames });
+        // The gallery has HEISS's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
+        if (mediaStorageEnabled) {
+          await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
+          if (comfyCopies.length) await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
+        }
       }
       socket?.close();
     };

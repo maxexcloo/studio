@@ -23,6 +23,8 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/server ./server
 COPY --from=build /app/workflows ./workflows
+# The HEISS worker ComfyUI node, for ComfyUI images to copy from the matching HEISS release.
+COPY --from=build /app/comfyui/heiss_worker/__init__.py /app/comfyui/heiss_worker/files.py /app/comfyui/heiss_worker/README.md ./comfyui/heiss_worker/
 
 # Slim may omit a system CA bundle; retain TLS verification using Node's bundled roots.
 RUN node -e 'const fs = require("node:fs"); const file = "/etc/ssl/certs/ca-certificates.crt"; if (!fs.existsSync(file)) { fs.mkdirSync("/etc/ssl/certs", { recursive: true }); fs.writeFileSync(file, require("node:tls").rootCertificates.join("\n")); }' \

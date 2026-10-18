@@ -76,6 +76,9 @@ import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoic
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
+import { mediaStorageEnabled, mediaType } from './media-paths.js';
+import { ingestRecords, removeComfyFiles } from './media-store.js';
+import { forgetComfyRun } from './hidden-traces.js';
 import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
@@ -98,10 +101,12 @@ async function resolveSignedMcpResult(owner, jobId, index) {
   const subfolder = source.searchParams.get('subfolder') || '';
   const type = source.searchParams.get('type') || 'output';
   const request = { heissAccount: { userId: owner } };
-  if (type !== 'output' || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
+  if (!ownerMediaTypes.has(type) || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
   try {
     const backend = item.settings?.comfyBackend === 'video' ? 'video' : 'primary';
-    const file = backend === 'primary' ? localOutputFile(filename, subfolder, type) : null;
+    // HEISS media is read from its folder only, whichever backend made it.
+    const file = type === mediaType || backend === 'primary' ? localOutputFile(filename, subfolder, type) : null;
+    if (type === mediaType && !file) return null;
     const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(backend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
     const extension = path.extname(filename).toLowerCase();
     const mime = ({ '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.m4v': 'video/mp4', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.png': 'image/png', '.webm': 'video/webm', '.webp': 'image/webp' })[extension];
@@ -173,8 +178,21 @@ function refreshComfyContextSoon() {
 const recoverRunningJobs = createJobRecovery({
   backends: configuredBackends, filterHistory: withoutHiddenRuns, finishJob: setTerminalJob,
   getGallery: () => gallery, jobs, recordsFromHistory: recordsFromComfyHistory,
-  request: comfy, setGallery, visible: filterVisibleGallery, withBackend: withComfyBackend
+  request: comfy, setGallery, visible: filterVisibleGallery, withBackend: withComfyBackend,
+  ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : [])
 });
+
+/** With HEISS media storage, recovered ComfyUI outputs move into HEISS media and leave ComfyUI. */
+async function ingestRecoveredRecords(records, promptIds = []) {
+  if (!mediaStorageEnabled || !records.length) return records;
+  const moved = await ingestRecords(records);
+  if (moved.comfyFiles.length) {
+    await removeComfyFiles(moved.comfyFiles);
+    const ids = [...new Set([...promptIds, ...records.map((item) => item.promptId).filter(Boolean)])];
+    if (ids.length) await forgetComfyRun({ promptIds: ids }).catch(() => false);
+  }
+  return moved.records;
+}
 setInterval(() => recoverRunningJobs(), 5000).unref();
 
 async function recoverGalleryFromHistory() {
@@ -187,7 +205,10 @@ async function recoverGalleryFromHistory() {
     await withComfyBackend(backend, async () => {
       const history = withoutHiddenRuns(await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({})));
       const records = recordsFromComfyHistory(history);
-      recovered.push(...(multiUserEnabled ? records.filter((item) => item.ownerId) : records));
+      const owned = multiUserEnabled ? records.filter((item) => item.ownerId) : records;
+      // Already delivered (and so already in HEISS media): never imported a second time.
+      const delivered = new Set(gallery.filter((item) => item.status === "done").map((item) => `${item.jobId}:${item.index}`));
+      recovered.push(...await ingestRecoveredRecords(mediaStorageEnabled ? owned.filter((item) => !delivered.has(`${item.jobId}:${item.index}`)) : owned));
     });
   }
   if (!recovered.length) return;
@@ -502,6 +523,9 @@ function adoptFoundComfy(found) {
 // What the last answer said, for the status while ComfyUI is busy.
 let lastComfyAnswer = { url: "", version: "", device: "" };
 const backendAnswers = new Map();
+
+// Accounts read their own outputs: ComfyUI's output folder, or HEISS-owned media.
+const ownerMediaTypes = new Set(["output", mediaType]);
 
 /** Ordinary accounts see whether backends answer, never their addresses or nearby hosts. */
 function withoutBackendAddresses(status) {
@@ -1717,8 +1741,8 @@ app.get('/comfy/video-preview', async (req, res) => {
   const filename = String(req.query.filename || '');
   const subfolder = String(req.query.subfolder || '');
   const type = String(req.query.type || 'output');
-  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
-  if (!['output', 'input', 'temp'].includes(type) || !/\.(mp4|webm|mov|mkv)$/i.test(filename) || filename !== path.basename(filename) || /[\\/]/.test(filename) || inDotFolder(subfolder)) {
+  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
+  if (!['output', 'input', 'temp', mediaType].includes(type) || !/\.(mp4|webm|mov|mkv)$/i.test(filename) || filename !== path.basename(filename) || /[\\/]/.test(filename) || inDotFolder(subfolder)) {
     res.status(404).end(); return;
   }
   try {
@@ -1734,9 +1758,9 @@ app.get("/comfy/thumb", async (req, res) => {
   const subfolder = String(req.query.subfolder || "");
   const type = String(req.query.type || "output");
   if (!filename) { res.status(400).json({ error: "filename is required." }); return; }
-  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
+  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
   // The same outputs /comfy/view serves, and nothing else.
-  if (!["output", "input", "temp"].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
+  if (!["output", "input", "temp", mediaType].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
     const thumbnail = await getThumbnail(filename, subfolder, type);
     if (!thumbnail) { res.status(404).json({ error: "Source image is unavailable." }); return; }
@@ -1796,14 +1820,14 @@ app.get("/comfy/*path", async (req, res) => {
     const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
     const proxyPath = Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path;
     const filename = String(req.query.filename || "");
-    if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || proxyPath !== "view" || String(req.query.type || "output") !== "output" || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
+    if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || proxyPath !== "view" || !ownerMediaTypes.has(String(req.query.type || "output")) || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
       res.status(404).json({ ok: false, error: "Not an output." });
       return;
     }
     // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
     // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
     // and neither are dot folders among the outputs (the gallery's trash, gallery-trash.js).
-    if (proxyPath !== "view" || !["output", "input", "temp"].includes(String(req.query.type || "output")) || !outputMediaPattern.test(String(req.query.filename || "")) || inDotFolder(req.query.subfolder)) {
+    if (proxyPath !== "view" || !["output", "input", "temp", mediaType].includes(String(req.query.type || "output")) || !outputMediaPattern.test(String(req.query.filename || "")) || inDotFolder(req.query.subfolder)) {
       res.status(404).json({ ok: false, error: "Not an output." });
       return;
     }
@@ -1817,6 +1841,20 @@ app.get("/comfy/*path", async (req, res) => {
     // ComfyUI is stopped or restarting: outputs still open from the output folder.
     const localFile = () => (proxyPath === "view" ? localOutputFile(String(req.query.filename || ""), String(req.query.subfolder || ""), String(req.query.type || "output")) : null);
     const sendLocal = (file) => res.sendFile(file, { headers: { "Cache-Control": "private, max-age=0, must-revalidate" } });
+    // HEISS-owned media is served from its folder only, never forwarded to ComfyUI.
+    if (String(req.query.type || "") === mediaType) {
+      const file = localFile();
+      if (!file) { res.status(404).json({ ok: false, error: "This file is no longer available." }); return; }
+      if (req.query.clean === "1") {
+        res.setHeader("Cache-Control", "private, no-store, max-age=0");
+        res.type(path.extname(file) || "application/octet-stream");
+        res.send(stripMetadata(fs.readFileSync(file)).buffer);
+        return;
+      }
+      if (req.query.download === "1") res.attachment(path.basename(file));
+      sendLocal(file);
+      return;
+    }
     if (req.query.clean === "1") {
       await sendWithoutSettings(req, res, localFile);
       return;
