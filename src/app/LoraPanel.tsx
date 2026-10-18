@@ -1,6 +1,6 @@
 import { compatibilityNote, strengthRange as publishedStrengthRange } from '../../server/lora-policy';
 import { optionalLoras } from './modelRecipes';
-import { loraName, modelLoras } from './catalogueNames';
+import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, GripVertical, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
@@ -221,7 +221,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     const suggested = recommendedLoras(filteredOptions, profile, '', fitOf).filter((name) => !fav.includes(name) && !rec.includes(name)).slice(0, 6);
     if (fav.length) out.push({ id: 'favorites', label: 'Favorites', rows: fav.map((name) => ({ key: `f:${name}`, name })) });
     if (rec.length) out.push({ id: 'recents', label: 'Recent', rows: rec.map((name) => ({ key: `r:${name}`, name })) });
-    if (suggested.length) out.push({ id: 'suggested', label: profile?.familyName || profile?.family ? `Suggested for ${profile.familyName || profile.family}` : 'Suggested', rows: suggested.map((name) => ({ key: `s:${name}`, name })) });
+    if (suggested.length) out.push({ id: 'suggested', label: modelFamilyLabel(profile) ? `Suggested for ${modelFamilyLabel(profile)}` : 'Suggested', rows: suggested.map((name) => ({ key: `s:${name}`, name })) });
     for (const group of loraGroups(filteredOptions, profile, '', fitOf)) {
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }

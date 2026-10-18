@@ -39,3 +39,47 @@ test('optional LoRAs show unverified variants and expose full published strength
   await value.press('ArrowUp');
   await expect(value).toHaveValue('10.00');
 });
+
+
+test('fine-tunes retain their family, version and format while optional LoRAs filter by architecture', async ({ page, isMobile }) => {
+  const models = await (await page.request.get('/api/models')).json();
+  const original = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
+  const fineTune = { ...original, family: 'krea2', baseModel: 'tesserafineTurboBF16FP8_v10_3291478.safetensors', label: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', displayName: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', recipe: { modelLabel: 'Tesserafine Turbo', conditioning: 'Image', label: 'Turbo · 8 Steps', adapters: [] }, options: { ...original.options, loras: ['krea.safetensors', 'flux3.safetensors', 'unknown.safetensors'] } };
+  models.profiles = [...models.profiles.filter((profile: any) => profile.kind !== 'image'), fineTune];
+  models.loras = fineTune.options.loras;
+  await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  await page.route('**/api/loras/info', (route) => route.fulfill({ json: { loras: {
+    'krea.safetensors': { title: 'Krea Effect', families: ['krea2'], base: 'Krea 2', triggers: [] },
+    'flux3.safetensors': { title: 'FLUX.3 Effect', families: ['flux3_klein'], base: 'FLUX.3 Klein', triggers: [] },
+    'unknown.safetensors': { title: 'Unknown Effect', families: [], base: '', triggers: [] },
+  } } }));
+  await page.goto('/');
+  if (isMobile) {
+    await page.locator('.phone-create-open').click();
+    await page.locator('.phone-create .phone-row').filter({ hasText: 'Tesserafine Turbo' }).first().click();
+  } else {
+    await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+    await page.locator('.model-trigger').filter({ visible: true }).click();
+  }
+  const menu = page.locator(isMobile ? '.phone-model-sheet' : '.model-menu');
+  await expect(menu.getByText('Krea (Fine Tunes)', { exact: true })).toBeVisible();
+  const row = menu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Tesserafine Turbo' }).first();
+  await expect(row).toContainText('V1.0');
+  await expect(row).toContainText('INT8 ConvRot');
+  await row.click();
+  if (isMobile) {
+    const open = page.locator('.phone-create').getByRole('button', { name: /^LoRAs/ });
+    if (await open.count()) await open.click();
+  } else {
+    const open = page.locator('.composer-options').getByRole('button', { name: 'LoRAs', exact: true });
+    if (await open.count()) await open.click();
+    else await page.getByRole('button', { name: 'Controls', exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Add LoRA', exact: true }).filter({ visible: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
+  await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
+  await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
+  await picker.getByLabel('LoRA Model Filter', { exact: true }).selectOption('all');
+  await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
+});

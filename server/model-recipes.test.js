@@ -46,3 +46,14 @@ test('grouping preserves original favourite identities and exposes every availab
   assert.equal(profileMatchesFilters(model, { speed: 'flash' }), true);
   assert.equal(profileMatchesFilters(model, { speed: 'standard' }), true);
 });
+
+
+test('model recipe projection preserves model version and precision on the second line', async () => {
+  const { modelName } = await import('../src/app/catalogueNames.js');
+  const model = { ...profile('fine-tune'), kind: 'image', family: 'krea2', label: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', recipe: { modelLabel: 'Tesserafine Turbo', conditioning: 'Image', label: 'Turbo · 8 Steps' } };
+  const projected = modelRecipeOptions([model], model.id)[0];
+  assert.equal(modelName(projected).name, 'Tesserafine Turbo');
+  assert.match(modelName(projected).detail, /V1[.]0/);
+  assert.match(modelName(projected).detail, /INT8 ConvRot/);
+  assert.equal(projected.id, model.id);
+});

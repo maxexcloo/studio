@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareModelNames, loraCompatibility, loraName, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowSpeed } from '../src/app/catalogueNames.js';
+import { compareModelNames, loraCompatibility, loraName, modelFamily, modelFamilyLabel, modelGroups, modelLoras, modelName, profileMatchesFilters, workflowSpeed } from '../src/app/catalogueNames.js';
 
 test('imported workflows share stock family headings, including aliases and cloud models', () => {
   const profiles = [
@@ -118,4 +118,24 @@ test('fine tunes share parent headings without changing workflow identities', ()
   ];
   assert.deepEqual(modelGroups(profiles).map(({label}) => label), ['Krea (Fine Tunes)', 'Qwen', 'Qwen (Fine Tunes)']);
   assert.deepEqual(profiles.map(({id}) => id), ['tessera', 'noct', 'noct-lite', 'stock']);
+});
+
+
+test('imported Boogu and MOSS profiles use readable model groups and specific adapter family labels', () => {
+  const profiles = [{ id: 'boogu', family: 'boogu', label: 'Boogu Edit' }, { id: 'moss', family: 'moss_image', label: 'MOSS Image SFT' }];
+  assert.deepEqual(modelGroups(profiles).map((group) => group.label), ['Boogu', 'MOSS']);
+  assert.equal(modelFamilyLabel(profiles[0]), 'Boogu');
+  assert.equal(modelFamilyLabel(profiles[1]), 'MOSS Image');
+  assert.equal(modelFamilyLabel({ family: 'flux3_klein' }), 'FLUX.3 Klein');
+});
+
+test('actual model weights distinguish fine-tunes from accelerator recipe names', () => {
+  assert.equal(modelFamily({ family: 'minimax_h3', baseModel: 'minimax_h3_fl2va_pruned_int8_convrot.safetensors', label: 'MiniMax H3 · DMAD · 4 Steps' }), 'MiniMax');
+  assert.equal(modelFamily({ family: 'minimax_h3', baseModel: 'Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors', label: 'Reference' }), 'MiniMax (Fine Tunes)');
+  for (const baseModel of ['lumenTESSERAKrea2Fp8Bf16_krea2Fp8.safetensors', 'serendipityV5INT8C_rays.safetensors', 'tesserafineTurboBF16FP8_v10_3291478.safetensors']) {
+    const profile = { family: 'krea2', baseModel, label: 'Quality · 8 Steps' };
+    assert.equal(modelFamily(profile), 'Krea (Fine Tunes)');
+    assert.equal(loraCompatibility({ families: ['krea2'] }, profile), 'fits');
+    assert.equal(loraCompatibility({ families: ['flux3_klein'] }, profile), 'other');
+  }
 });

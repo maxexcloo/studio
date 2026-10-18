@@ -1,3 +1,5 @@
+import { modelName } from './catalogueNames.js';
+
 /** Only explicit recipe metadata groups workflows; a family match alone proves no shared recipe. */
 export function recipeKey(profile) {
   if (!profile?.recipe?.modelLabel || !profile.recipe.label || !profile.recipe.conditioning || !profile.baseModel) return `profile:${profile?.id}`;
@@ -14,7 +16,9 @@ export function modelRecipeOptions(profiles, selectedId) {
   }
   return [...groups.values()].map((group) => {
     const selected = group.find((profile) => profile.id === selectedId) || group[0];
-    return selected.recipe ? { ...selected, displayName: selected.recipe.modelLabel, label: selected.recipe.modelLabel, recipeProfiles: group } : selected;
+    const detail = modelName(selected).detail;
+    const label = selected.recipe ? [selected.recipe.modelLabel, detail !== (selected.familyName || selected.family) ? detail : ''].filter(Boolean).join(' · ') : selected.label;
+    return selected.recipe ? { ...selected, displayName: label, label, recipeProfiles: group } : selected;
   });
 }
 
