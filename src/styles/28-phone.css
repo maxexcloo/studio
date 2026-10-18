@@ -860,18 +860,15 @@
 .viewer-phone-bar button:active { background: rgb(255 255 255 / .08); }
 .viewer-phone-bar button:disabled { opacity: .45; }
 .viewer-phone-bar button.is-on { color: #0b0b0b; background: #f2f2f2; }
-.viewer-phone-bar:has(.viewer-reuse-split) { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); }
-.viewer-phone-bar .viewer-reuse-split { grid-column: span 2; min-width: 90px; }
-.viewer-phone-bar .viewer-reuse-split > button { min-width: 44px; min-height: 60px; color: hsl(var(--foreground)); background: transparent; }
-.viewer-phone-bar .viewer-reuse-split .viewer-action-main { min-width: 0; white-space: normal; line-height: 1.15; }
-.viewer-phone-bar .viewer-reuse-split .viewer-reuse-more { width: 44px; padding: 0; }
-.viewer-phone-bar .viewer-reuse-menu { top: auto; bottom: calc(100% + 4px); }
-.viewer-phone-bar .viewer-reuse-menu button { display: block; min-height: 44px; padding: 8px 12px; text-align: left; }
+.viewer-phone-bar:has(.viewer-reuse) { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); }
+.viewer-phone-bar .viewer-reuse { grid-column: span 2; min-width: 90px; }
+.viewer-phone-bar .viewer-reuse > button { min-width: 44px; min-height: 60px; color: hsl(var(--foreground)); background: transparent; }
+.viewer-phone-bar .viewer-reuse .viewer-action-main { min-width: 0; white-space: normal; line-height: 1.15; }
 @media (max-width: 339px) {
-  .viewer-phone-bar:has(.viewer-reuse-split) { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
-  .viewer-phone-bar .viewer-reuse-split { grid-column: span 1; }
-  .scrim .viewer-stage:has(.viewer-reuse-split.is-compact) .viewer-canvas { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
-  .scrim .viewer-stage:has(.viewer-reuse-split.is-compact) .viewer-side { bottom: calc(156px + env(safe-area-inset-bottom)); }
+  .viewer-phone-bar:has(.viewer-reuse) { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
+  .viewer-phone-bar .viewer-reuse { grid-column: span 1; }
+  .scrim .viewer-stage:has(.viewer-reuse.is-compact) .viewer-canvas { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
+  .scrim .viewer-stage:has(.viewer-reuse.is-compact) .viewer-side { bottom: calc(156px + env(safe-area-inset-bottom)); }
 }
 /* Upscale: the icon in a 30px circle that carries the progress ring while it runs, as on desktop tiles. */
 .viewer-phone-upscale {

@@ -80,6 +80,7 @@ export function RunLeft({ progress }: { progress?: Progress | null }) {
 
 /** The overlay on a running generation: what it is doing, how far, and how long is left (or how long it has been). */
 export function GenerationProgress({ item, formatElapsed }: { item: GalleryItem; formatElapsed: (value: number) => string }) {
+  const model = String(item.settings?.modelName || item.model || "");
   const reading = progressReading(item.progress);
   const clock = useRunClock(item.progress);
   // With an estimate the bar follows the whole run, setup and decoding too, instead of steps alone.
@@ -114,6 +115,7 @@ export function GenerationProgress({ item, formatElapsed }: { item: GalleryItem;
         </span>
         <span className="generate-elapsed">{clock.leftMs !== null ? formatLeft(clock.leftMs) : <ElapsedTime startedAt={item.createdAt} format={formatElapsed} />}</span>
       </div>
+      {model ? <span className="generate-model" title={model}>{model}</span> : null}
       {/* Only steps (or a timed run) fill the bar; a phase's own count would fill and reset it. */}
       <div className={cn('generate-bar', timed ? 'is-timed' : reading.kind !== 'steps' && !upscaling && 'is-indeterminate')}>
         <div className="generate-bar-fill" />

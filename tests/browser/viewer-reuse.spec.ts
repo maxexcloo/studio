@@ -42,8 +42,8 @@ for (const kind of ['image', 'video'] as const) {
       const media = viewer.locator(`.viewer-canvas ${kind === 'video' ? 'video' : 'img'}`).first();
       const source = failed ? null : await media.getAttribute('src');
       const reuse = isMobile
-        ? viewer.locator('.viewer-phone-bar').getByRole('button', { name: 'Use This Model', exact: true })
-        : (failed ? viewer.locator('.failure-panel') : viewer).getByRole('button', { name: failed ? /Use (?:This Model|these settings)/ : 'Use This Model', exact: true });
+        ? viewer.locator('.viewer-phone-bar').getByRole('button', { name: 'Use This Prompt', exact: true })
+        : (failed ? viewer.locator('.failure-panel') : viewer.locator('.viewer-actions')).getByRole('button', { name: failed ? /Use (?:This Prompt|these settings)/ : 'Use This Prompt', exact: true });
 
       for (const dismiss of isMobile ? ['button', 'escape', 'back'] : ['viewer']) {
         await reuse.click();
@@ -97,22 +97,12 @@ for (const promptsOnly of [false, true]) {
     await page.locator(`[data-tile-id="${item.id}"]`).click();
     const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
     if (promptsOnly) {
-      const actions = viewer.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions');
-      if (isMobile) {
-        for (const width of [320, 390]) {
-          await page.setViewportSize({ width, height: 844 });
-          for (const button of await actions.locator('.viewer-reuse-split > button').all()) {
-            const box = await button.boundingBox();
-            expect(box!.width).toBeGreaterThanOrEqual(44);
-            expect(box!.height).toBeGreaterThanOrEqual(44);
-            expect(box!.x).toBeGreaterThanOrEqual(0);
-            expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-          }
-        }
-      }
-      await actions.getByRole('button', { name: 'Reuse Options', exact: true }).click();
-      await actions.getByRole('menuitem', { name: 'Prompts Only', exact: true }).click();
-    } else await viewer.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions').getByRole('button', { name: 'Use This Model', exact: true }).click();
+      await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
+      if (isMobile) await viewer.getByRole('button', { name: 'Details', exact: true }).click();
+      const readouts = viewer.locator('.prompt-readout');
+      await readouts.getByRole('button', { name: 'Use This Prompt', exact: true }).click();
+      await readouts.getByRole('button', { name: 'Use This Negative Prompt', exact: true }).click();
+    } else await viewer.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions').getByRole('button', { name: 'Use This Prompt', exact: true }).click();
     if (isMobile && await page.locator('.phone-create').isVisible()) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
     await expect(viewer).toBeVisible();
     await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
@@ -142,3 +132,39 @@ for (const promptsOnly of [false, true]) {
     }
   });
 }
+
+for (const field of ['prompt', 'negative'] as const) {
+  test(`reusing only ${field} text preserves the other draft`, async ({ page, isMobile }) => {
+    const item = { id: 'text-reuse', url: picture, filename: 'text.png', type: 'image', status: 'done', prompt: 'Saved positive text', negative: 'Saved negative text', model: 'flux1-schnell.safetensors', createdAt: new Date().toISOString(), width: 512, height: 512 };
+    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
+    await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+    await page.goto('/');
+    if (isMobile) await page.locator('.phone-create-open').click();
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Positive draft');
+    await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('Negative draft');
+    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+    await page.locator('[data-tile-id="text-reuse"]').click();
+    const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
+    if (isMobile) await viewer.getByRole('button', { name: 'Details', exact: true }).click();
+    const readout = viewer.locator('.prompt-readout').nth(field === 'prompt' ? 0 : 1);
+    const copy = readout.getByRole('button', { name: /^Copy/ });
+    const reuse = readout.getByRole('button', { name: /^Use This/ });
+    const copyBox = await copy.boundingBox();
+    const reuseBox = await reuse.boundingBox();
+    expect(reuseBox!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);
+    await reuse.click();
+    await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
+    if (isMobile) await page.locator('.phone-create-open').click();
+    else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+    await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(field === 'prompt' ? item.prompt : 'Positive draft');
+    await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue(field === 'negative' ? item.negative : 'Negative draft');
+  });
+}
+
+test('queued cards show each saved model', async ({ page }) => {
+  const items = ['First Model.safetensors', 'Second Model.safetensors'].map((model, index) => ({ id: `queued-${index}`, url: '', filename: '', type: 'image', status: 'pending', prompt: 'Queued image', model: 'fallback.safetensors', settings: { modelName: model }, createdAt: new Date().toISOString(), width: 512, height: 512 }));
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.goto('/');
+  for (const item of items) await expect(page.locator(`[data-tile-id="${item.id}"] .generate-model`)).toHaveText(item.settings.modelName);
+});

@@ -180,9 +180,9 @@ for (const selection of ['empty', 'previous', 'manual']) {
       await controls(page, isMobile).switchMode('image');
     }
     await page.locator(`[data-tile-id="${images[0].id}"]`).click();
-    if (isMobile) await page.getByRole('button', { name: 'Use This Model', exact: true }).click();
+    if (isMobile) await page.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions').getByRole('button', { name: 'Use This Prompt', exact: true }).click();
     else {
-      await page.getByRole('button', { name: 'Use This Model', exact: true }).click();
+      await page.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions').getByRole('button', { name: 'Use This Prompt', exact: true }).click();
       await page.keyboard.press('Escape');
       await expect(page.locator('.viewer-stage')).toHaveCount(0);
     }

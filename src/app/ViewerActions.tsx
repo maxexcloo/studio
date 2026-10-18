@@ -1,35 +1,17 @@
-import { ChevronDown, ImagePlus, Layers, Wand2 } from 'lucide-react';
-import { useId, useRef, useState } from 'react';
+import { ImagePlus, Layers, Wand2 } from 'lucide-react';
 import { Tip } from './components';
 import { normalizeLoras } from './loras';
-import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 
-export function ViewerReuseAction({ compact = false, onUseSettings, onUsePrompts }: {
+export function ViewerReuseAction({ compact = false, onUseSettings }: {
   compact?: boolean;
   onUseSettings: () => void;
-  onUsePrompts: () => void;
 }) {
-  const [reuseOpen, setReuseOpen] = useState(false);
-  const reuseRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
-  const dismiss = () => { setReuseOpen(false); triggerRef.current?.focus(); };
-  useDismiss(reuseRef, reuseOpen, dismiss);
   return (
-    <div className={cn('viewer-reuse-split', compact && 'is-compact')} ref={reuseRef}>
+    <div className={cn('viewer-reuse', compact && 'is-compact')}>
       <Tip content="Load its model, prompts and compatible settings. You can undo this.">
-        <button type="button" className="btn is-primary viewer-action-main" onClick={onUseSettings}><Wand2 size={compact ? 21 : 15} /><span>Use This Model</span></button>
+        <button type="button" className="btn is-primary viewer-action-main" onClick={onUseSettings}><Wand2 size={compact ? 21 : 15} /><span>Use This Prompt</span></button>
       </Tip>
-      <button ref={triggerRef} type="button" className="btn is-primary viewer-reuse-more" aria-label="Reuse Options" aria-controls={menuId} aria-expanded={reuseOpen} aria-haspopup="menu" onClick={() => setReuseOpen(!reuseOpen)} onKeyDown={(event) => {
-        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-        event.preventDefault(); setReuseOpen(true);
-        requestAnimationFrame(() => reuseRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus());
-      }}><ChevronDown size={16} /></button>
-      {reuseOpen ? <div className="viewer-reuse-menu" role="menu" id={menuId} aria-label="Reuse Options" onKeyDown={(event) => {
-        if (event.key === 'Tab') setReuseOpen(false);
-        if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); reuseRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus(); }
-      }}><button type="button" role="menuitem" onClick={() => { dismiss(); onUsePrompts(); }}>Prompts Only</button></div> : null}
     </div>
   );
 }
@@ -42,10 +24,9 @@ export function ViewerReuseAction({ compact = false, onUseSettings, onUsePrompts
  * Short visible labels keep three to a row in the 380px panel; the hidden
  * words give each button its full name ("Use as reference") for a screen reader.
  */
-export function ViewerActions({ item, copied, onUseSettings, onUsePrompts, onCopySettings, onUseLoras, onUseAsReference }: {
+export function ViewerActions({ item, copied, onUseSettings, onCopySettings, onUseLoras, onUseAsReference }: {
   item: GalleryItem;
   onUseSettings: () => void;
-  onUsePrompts: () => void;
   onCopySettings: () => void;
   onUseLoras: () => void;
   /** Left out when this output can't be a reference (not an image, locked, from another folder). */
@@ -59,7 +40,7 @@ export function ViewerActions({ item, copied, onUseSettings, onUsePrompts, onCop
   return (
     <div className="viewer-actions">
       {canUse ? (
-        <ViewerReuseAction onUseSettings={onUseSettings} onUsePrompts={onUsePrompts} />
+        <ViewerReuseAction onUseSettings={onUseSettings} />
       ) : null}
       {hasSecondary ? (
         <div className="viewer-action-row">
