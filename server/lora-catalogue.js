@@ -1,7 +1,8 @@
 // Provider metadata refines architecture detection without changing model filenames.
 export function enrichLoraInfo(info, name, sources, familiesFromMetadata, families) {
   const matches = Object.values(sources || {}).filter((source) =>
-    /^civitai:\d+:\d+$/.test(source?.id || '') && source.folder === 'loras' && source.file === name);
+    /^(?:civitai:\d+:\d+|hf:[^:/\s]+\/[^:/\s]+:[a-f0-9]{40}:[^\r\n]+)$/i.test(source?.id || '')
+    && source.folder === 'loras' && source.file === name);
   if (matches.length !== 1) return info;
   const source = matches[0];
   const title = [source.label, source.version].filter((value) => typeof value === 'string' && value.trim()).join(' · ');
