@@ -1081,8 +1081,12 @@ app.post("/api/start-image", (req, res) => {
 
 app.get("/api/reference-assets", (req, res) => {
   try {
+    const source = ["generation", "hidden"].includes(req.query.source) ? req.query.source : "upload";
+    const canReference = !req.heissAccount || mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences');
+    if (req.heissAccount && source === 'hidden') return res.json({ items: [], hasMore: false, locked: true });
+    if (req.heissAccount && (!canReference || source === 'generation' && !mayUseFeature(req.heissAccount, 'gallery'))) return res.json({ items: [], hasMore: false });
     res.json(listReferenceAssets(req, {
-      source: ["generation", "hidden"].includes(req.query.source) ? req.query.source : "upload",
+      source,
       cursor: String(req.query.cursor || ""),
       limit: Number(req.query.limit || 60),
       q: String(req.query.q || "")
@@ -1093,7 +1097,8 @@ app.get("/api/reference-assets", (req, res) => {
 });
 
 app.post("/api/reference-assets/upload", async (req, res) => {
-  if (!requireLocal(req, res)) return;
+  const canReference = req.heissAccount && (mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences'));
+  if (!canReference && !requireLocal(req, res)) return;
   try {
     const upload = await readMultipartImage(req);
     const asset = await saveUploadedReference(upload, ownerIdForRequest(req));
@@ -1104,7 +1109,9 @@ app.post("/api/reference-assets/upload", async (req, res) => {
 });
 
 app.post("/api/reference-assets/from-gallery", (req, res) => {
-  if (!requireLocal(req, res)) return;
+  const canReference = req.heissAccount && (mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences'));
+  if (req.heissAccount && (!canReference || !mayUseFeature(req.heissAccount, 'gallery'))) return res.status(403).json({ ok: false, error: 'Gallery references are disabled for this account.' });
+  if (!canReference && !requireLocal(req, res)) return;
   try {
     const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""));
     res.json({ ok: true, asset });
@@ -1114,6 +1121,7 @@ app.post("/api/reference-assets/from-gallery", (req, res) => {
 });
 
 app.get("/api/reference-assets/:id/media", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'imageReferences') && !mayUseFeature(req.heissAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
   const asset = readUploadedReference(req.params.id, "media", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=3600");
@@ -1121,6 +1129,7 @@ app.get("/api/reference-assets/:id/media", (req, res) => {
 });
 
 app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
+  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'imageReferences') && !mayUseFeature(req.heissAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
   const asset = readUploadedReference(req.params.id, "thumbnail", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=86400");
@@ -1128,7 +1137,7 @@ app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
 });
 
 app.delete("/api/reference-assets/:id", (req, res) => {
-  if (!requireLocal(req, res)) return;
+  if (!req.heissAccount && !requireLocal(req, res)) return;
   try {
     res.json(deleteUploadedReference(req.params.id, ownerIdForRequest(req)));
   } catch (error) {
