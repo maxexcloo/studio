@@ -13,8 +13,7 @@ export const accessFeatures = Object.freeze([
   "imageReferences",
   "videoReferences",
   "gallery",
-  "promptHistory",
-  "mcp"
+  "promptHistory"
 ]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;

@@ -15,7 +15,7 @@ test("access profiles contain only currently available generation profiles and k
     id: "artists",
     name: " Artists ",
     generationProfiles: ["image-fast", "unapproved", "image-fast", 3],
-    features: { loras: true, admin: true, mcp: "yes" }
+    features: { loras: true, admin: true, unknown: true }
   }, available), {
     id: "artists",
     name: "Artists",
@@ -27,8 +27,7 @@ test("access profiles contain only currently available generation profiles and k
       imageReferences: false,
       videoReferences: false,
       gallery: false,
-      promptHistory: false,
-      mcp: false
+      promptHistory: false
     }
   });
 });
@@ -37,14 +36,12 @@ test("administrators receive current full access and ordinary users receive one 
   const profiles = { artists: { name: "Artists", generationProfiles: ["image-fast"], features: { loras: true, gallery: true } } };
   const admin = effectiveAccountAccess({ id: "admin", role: "administrator" }, profiles, available);
   assert.equal(mayUseGenerationProfile(admin, "video"), true);
-  assert.equal(mayUseFeature(admin, "mcp"), true);
 
   const user = effectiveAccountAccess({ id: "user-1", role: "user", accessProfileId: "artists" }, profiles, available);
   assert.equal(user.userId, "user-1");
   assert.equal(mayUseGenerationProfile(user, "image-fast"), true);
   assert.equal(mayUseGenerationProfile(user, "image-quality"), false);
   assert.equal(mayUseFeature(user, "loras"), true);
-  assert.equal(mayUseFeature(user, "mcp"), false);
   assert.deepEqual(visibleGenerationProfiles(available.map((id) => ({ id })), user), [{ id: "image-fast" }]);
 });
 

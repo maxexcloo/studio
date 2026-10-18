@@ -26,6 +26,7 @@ import { AdapterLibraryGroup, CivitaiRow, EarlierImagesGroup, PromptHistoryRow }
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { boardUrl, openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
+import { AccountSettings } from './AccountSettings';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
 import type { ShowToast } from './toast';
@@ -38,6 +39,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'library', label: 'Library', icon: Library, description: 'Where images are saved and what the gallery shows.' },
   { id: 'privacy', label: 'Hidden', icon: LockKeyhole, description: 'Images you keep to yourself, encrypted and unlocked with a password, Touch ID or Windows Hello.' },
   { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
+  { id: 'accounts', label: 'Accounts & MCP', icon: LockKeyhole, description: 'Manage account access profiles and personal MCP connections.' },
   { id: 'about', label: 'About', icon: Info, description: 'Version, stats, updates, feedback and credits.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
@@ -662,6 +664,19 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   // Models nothing picked up, ones still missing a part, and ones you assigned by hand (so they can be undone).
   const typedModels = (modelList?.modelFiles || []).filter((file) => !file.supported || file.via === 'choice' || (file.missing?.length || 0) > 0);
   const [typeBusy, setTypeBusy] = React.useState('');
+  const [accountMode, setAccountMode] = React.useState(false);
+  const [accountRole, setAccountRole] = React.useState('');
+  React.useEffect(() => {
+    if (!open) return;
+    let live = true;
+    apiJson<{ mode: string; account?: { role: string } | null }>('/api/accounts/status', { cache: 'no-store' }).then((status) => {
+      if (!live) return;
+      setAccountMode(status.mode === 'multi-user');
+      setAccountRole(status.account?.role || '');
+      if (status.mode !== 'multi-user' && section === 'accounts') onSectionChange('general');
+    }).catch(() => { if (live) setAccountMode(false); });
+    return () => { live = false; };
+  }, [open, section, onSectionChange]);
   const setModelType = async (file: ModelFile, type: string) => {
     const key = `${file.source}:${file.name}`;
     setTypeBusy(key);
@@ -748,7 +763,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   return (
     <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" className="settings-modal" bodyClassName="set-layout" title="Settings">
       <nav className="set-nav" aria-label="Settings sections">
-        {SETTINGS_SECTIONS.filter((item) => thisComputer || item.id !== 'models').map((item) => {
+        {SETTINGS_SECTIONS.filter((item) => (thisComputer || item.id !== 'models') && (item.id !== 'accounts' || accountMode)).map((item) => {
           const Icon = item.icon;
           return (
             <button key={item.id} type="button" className={cn('set-nav-item', section === item.id && 'active')} aria-current={section === item.id ? 'page' : undefined} aria-controls="settings-panel" data-section={item.id} onClick={() => onSectionChange(item.id)}>
@@ -943,6 +958,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
         {section === 'privacy' ? (
           <HiddenSettings hidden={hidden} prefs={prefs} setPrefs={setPrefs} showToast={showToast} confirmAction={confirmAction} Group={Group} Row={Row} Status={Status} Switch={Switch} />
         ) : null}
+
+        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} isAdmin={accountRole === 'administrator'} /> : null}
 
         {section === 'connection' ? (
           <>

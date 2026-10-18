@@ -81,4 +81,13 @@ test("only an authenticated administrator can create profiles and approve ordina
 
   const anonymous = await call(routes["GET /api/accounts/admin"], local());
   assert.equal(anonymous.statusCode, 403);
+
+  const endpoint = await call(routes["GET /api/accounts/mcp-token"], { ...admin, protocol: "https", get: () => "studio.example.test" });
+  assert.equal(endpoint.body.endpoint, "https://studio.example.test/mcp");
+  const createdToken = await call(routes["POST /api/accounts/mcp-token"], admin);
+  const token = createdToken.body.token;
+  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, authorization: `Bearer ${token}` } }).userId, accountForRequest(admin).userId);
+  const revoked = await call(routes["POST /api/accounts/mcp-token/revoke"], admin);
+  assert.equal(revoked.body.enabled, false);
+  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, authorization: `Bearer ${token}` } }), null);
 });
