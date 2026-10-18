@@ -20,6 +20,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Reference search:** find images by prompt, model or filename across the full library.
 
 ### Changed
+- **Deployment-aware Settings:** Connections show image and video backends in one layout with status, routing, address and source, and the video connection can now be set from Settings. Models adds default profiles and catalogue switches, and a new Integrations section gathers Civitai, Hugging Face, model downloads and output storage. Every value shows whether it comes from the deployment, this studio or the default; deployment values are locked, so saved changes no longer silently revert at restart.
 - **ComfyUI as a worker:** with HEISS media storage (default in multi-user mode, or `HEISS_OUTPUT_STORAGE=heiss`), finished outputs move into HEISS's own per-account folders, and the new HEISS worker ComfyUI node removes ComfyUI's copies, so HEISS no longer needs ComfyUI's output folder.
 - **Signed MCP result links no longer expire:** they keep working until the output is hidden or deleted.
 - **Studio import:** `scripts/import-studio.mjs` copies an existing single-user studio into one account. It runs as a dry run by default, backs up changed files, and can be undone; the source studio is never changed.

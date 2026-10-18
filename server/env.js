@@ -70,5 +70,8 @@ export function writeLocalEnvValue(key, value) {
   });
   if (!replaced) lines.push(`${safeKey}=${safeValue}`);
   writeLines(lines);
+  // Saved here, it now comes from .env, unless the environment set it first (that still wins at the next start).
+  const fromEnvironment = safeKey in process.env && !envFileKeys.has(safeKey);
   process.env[safeKey] = safeValue;
+  if (!fromEnvironment) envFileKeys.add(safeKey);
 }

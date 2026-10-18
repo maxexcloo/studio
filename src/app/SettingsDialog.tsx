@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library } from 'lucide-react';
+import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -27,6 +27,7 @@ import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnos
 import { boardUrl, openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { AccountSettings } from './AccountSettings';
+import { ConnectionsGroup, DefaultsCatalogueGroups, DeploymentSettingsError, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
 import type { ShowToast } from './toast';
@@ -36,6 +37,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'generation', label: 'Generation', icon: Wand2, description: 'The composer, previews and starting values.' },
   { id: 'features', label: 'Features', icon: Puzzle, description: 'Upscaling and inpainting.' },
   { id: 'models', label: 'Models', icon: Boxes, description: 'What ComfyUI has installed and where it finds models.' },
+  { id: 'integrations', label: 'Integrations', icon: Cable, description: 'Civitai, Hugging Face, model downloads and output storage.' },
   { id: 'library', label: 'Library', icon: Library, description: 'Where images are saved and what the gallery shows.' },
   { id: 'privacy', label: 'Hidden', icon: LockKeyhole, description: 'Images you keep to yourself, encrypted and unlocked with a password, Touch ID or Windows Hello.' },
   { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
@@ -44,7 +46,7 @@ export const SETTINGS_SECTIONS = [
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
-const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'library', 'privacy', 'connection']);
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'integrations', 'library', 'privacy', 'connection']);
 
 /* ------------------------------------------------------------ Primitives */
 
@@ -66,41 +68,6 @@ function RunStyleGlyph({ kind }: { kind: 'burst' | 'flow' }) {
         </>
       )}
     </svg>
-  );
-}
-
-/** Where HEISS UI looks for ComfyUI: test an address, then keep it. */
-function ComfyAddressRow({ current, search, showToast, onSaved }: { current: string; search: boolean; showToast: ShowToast; onSaved: () => void }) {
-  const [value, setValue] = React.useState(current);
-  const [busy, setBusy] = React.useState(false);
-  const [note, setNote] = React.useState('');
-  React.useEffect(() => { setValue(current); }, [current]);
-  const submit = async (save: boolean) => {
-    setBusy(true);
-    setNote('');
-    try {
-      const response = await apiFetch('/api/comfy-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: value, save }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) { setNote(data.error || 'Couldn’t check that address.'); return; }
-      setValue(data.url);
-      if (!data.reachable) { setNote(`${data.detail || 'ComfyUI didn’t respond at that address.'}${save ? ' The address wasn’t saved.' : ''}`); return; }
-      if (data.saved) { setNote('Saved. Connected to ComfyUI.'); onSaved(); }
-      else setNote('ComfyUI responds at that address.');
-    } catch {
-      setNote('Can’t reach HEISS UI. Make sure it’s running.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const changed = value.trim() && value.trim() !== current;
-  return (
-    <Row label="Address" description={note || `Where ComfyUI runs. ComfyUI Desktop usually uses port 8000, a manual install 8188${search ? '; on this computer both are tried' : ''}.`}>
-      <div className="set-address">
-        <input className="set-path-input" value={value} onChange={(event) => setValue(event.target.value)} aria-label="ComfyUI address" spellCheck={false} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Enter' && changed) submit(true); }} />
-        <button className="btn" onClick={() => submit(false)} disabled={busy || !value.trim()}>Test</button>
-        <button className="btn is-primary" onClick={() => submit(true)} disabled={busy || !changed}>{busy ? 'Checking…' : 'Save'}</button>
-      </div>
-    </Row>
   );
 }
 
@@ -742,10 +709,17 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   const effort = upscaleEfforts.find((item) => item.value === (prefs.upscaleQuality || 'balanced')) || upscaleEfforts[1];
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
   const connected = Boolean(view.comfyStatus?.backends?.primary?.connected ?? health?.ok);
+  const thisComputer = useThisComputer();
+  const deployment = useDeploymentSettings(open && thisComputer);
+  const backendStatus = (backend: 'primary' | 'video') => {
+    const reported = view.comfyStatus?.backends?.[backend] as { connected: boolean; device?: string } | undefined;
+    if (reported) return reported;
+    return backend === 'primary' && health ? { connected, device: '', restarting: comfyRestarting } : null;
+  };
   const comfyRestarting = useComfyRestarting();
   const restartEta = useComfyRestartEta();
   // Folders, models, updates and wiping the gallery are looked after at the computer itself.
-  const thisComputer = useThisComputer();
+
   // Earlier images opens a folder picker on the computer itself; the server takes it from nowhere else.
   const atComputer = useAtComputer();
   const phoneDevice = usePhone();
@@ -766,7 +740,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   return (
     <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" className="settings-modal" bodyClassName="set-layout" title="Settings">
       <nav className="set-nav" aria-label="Settings sections">
-        {SETTINGS_SECTIONS.filter((item) => (thisComputer || item.id !== 'models') && (item.id !== 'accounts' || accountMode)
+        {SETTINGS_SECTIONS.filter((item) => (thisComputer || !['models', 'integrations'].includes(item.id)) && (item.id !== 'accounts' || accountMode)
           && !(accountMode && accountRole !== 'administrator' && ADMINISTRATION_SECTIONS.has(item.id))).map((item) => {
           const Icon = item.icon;
           return (
@@ -948,7 +922,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               <Row label="Export gallery" description="Every finished image in one ZIP file. Hidden has its own export.">
                 <a className="btn" href="/api/gallery/export" download><Download size={14} /> Export</a>
               </Row>
-              <CivitaiRow Row={Row} Switch={Switch} showToast={showToast} canChange={thisComputer} />
             </Group>
             <Group title="Clean up">
               <Row label="Clear failed items" description="Removes failed and interrupted cards.">
@@ -967,7 +940,9 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
         {section === 'connection' ? (
           <>
-            {view.comfyStatus?.backends ? <Group title="Generation Connections">
+            {thisComputer && deployment.settings ? <ConnectionsGroup settings={deployment.settings} status={backendStatus} showToast={showToast} Status={Status} onSaved={() => { void deployment.refresh(); refreshHealth(); refreshModels(false); refreshWorkflows(); }} /> : null}
+            {thisComputer && deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
+            {!thisComputer && view.comfyStatus?.backends ? <Group title="Generation Connections">
               {Object.entries(view.comfyStatus.backends).map(([name, value]) => {
                 const backend = value as { connected: boolean; device: string; url?: string };
                 return <Row key={name} label={name === 'video' ? 'Video' : 'Images'} description={backend.connected ? backend.device || 'Ready to generate' : 'Not connected'}>
@@ -986,10 +961,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                   : <button className="btn is-primary" onClick={refreshHealth} disabled={comfyRestarting}>{comfyRestarting ? 'Waiting…' : 'Check Again'}</button>}
               </Row>
               {thisComputer ? (
-                <SettingsDrawer key={health && !connected ? 'off' : 'on'} id="set-comfy-address" title="Change address" description="If ComfyUI runs on another port or computer" defaultOpen={Boolean(health && !connected && !comfyRestarting)}>
-                  <ComfyAddressRow current={health?.comfyUrl || 'http://127.0.0.1:8188'} search={health?.comfySearch !== false} showToast={showToast} onSaved={() => { refreshHealth(); refreshModels(false); refreshWorkflows(); }} />
-                  <ComfySearchRow enabled={health?.comfySearch !== false} onSaved={refreshHealth} />
-                </SettingsDrawer>
+                <ComfySearchRow enabled={health?.comfySearch !== false} onSaved={refreshHealth} />
               ) : (
                 <Row label="Restart ComfyUI" description="Loads new custom nodes and files, and frees memory.">
                   <ComfyRestart className="is-end" onBack={() => { refreshModels(false); refreshWorkflows(); }} confirm={() => confirmAction({ title: 'Restart ComfyUI?', description: 'Running and queued generations stop. It takes a few seconds.', action: 'Restart ComfyUI', destructive: true })} />
@@ -1014,6 +986,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
         {section === 'models' ? (
           <>
+            {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {typedModels.length ? (
               <Group title="Model types" note="Set the type for models that weren’t recognized or were detected wrong.">
                 {typedModels.map((file) => {
@@ -1045,6 +1018,15 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </Row>
             </Group>
             {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints !== false} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
+          </>
+        ) : null}
+        {section === 'integrations' && thisComputer ? (
+          <>
+            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} Status={Status} /> : null}
+            {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
+            <Group title="Civitai">
+              <CivitaiRow Row={Row} Switch={Switch} showToast={showToast} canChange={thisComputer} />
+            </Group>
             <HuggingFaceTokenSettings showToast={showToast} />
           </>
         ) : null}

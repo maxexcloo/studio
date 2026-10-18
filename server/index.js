@@ -36,7 +36,10 @@ import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
 import { envFileKeys, writeLocalEnvValue } from './env.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
-import { lorasEnabled } from './features.js';
+import { lorasEnabled, presetsEnabled } from './features.js';
+import { catalogueFlags, describeFlag, isCatalogueFlag, saveDeploymentSetting, settingSource } from './deployment-settings.js';
+import { civitaiTokenStatus } from './civitai-access.js';
+import { hfTokenStatus } from './hf-access.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { dedupeGallery, filterVisibleGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
 import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
@@ -1223,6 +1226,20 @@ app.delete("/api/reference-assets/:id", (req, res) => {
  */
 app.post("/api/comfy-url", async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  const backend = req.body?.backend === "video" ? "video" : "primary";
+  const key = backend === "video" ? "COMFY_VIDEO_URL" : "COMFY_URL";
+  // A deployment-owned address would come back at the next start; it is changed there, not here.
+  if (req.body?.save && settingSource(key).locked) {
+    res.status(409).json({ ok: false, reason: "locked", error: "This address comes from the deployment configuration. Change it there." });
+    return;
+  }
+  // An empty video address hands local video workflows back to the image connection.
+  if (backend === "video" && req.body?.save && !String(req.body?.url || "").trim()) {
+    saveDeploymentSetting(key, "");
+    videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+    res.json({ ok: true, url: "", reachable: false, saved: true, current: "" });
+    return;
+  }
   const candidate = normalizeComfyUrl(req.body?.url);
   if (!candidate) {
     res.status(400).json({ ok: false, error: "That doesn’t look like an address. Try something like 127.0.0.1:8188." });
@@ -1239,14 +1256,74 @@ app.post("/api/comfy-url", async (req, res) => {
   }
   if (req.body?.save && reachable) {
     try {
-      setComfyUrl(candidate);
-      comfyCache = { info: null, stats: null, fetchedAt: 0 };
+      if (backend === "video") {
+        saveDeploymentSetting(key, candidate);
+        videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+      } else {
+        setComfyUrl(candidate);
+        comfyCache = { info: null, stats: null, fetchedAt: 0 };
+      }
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
       return;
     }
   }
-  res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: comfyUrl });
+  res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: backend === "video" ? process.env.COMFY_VIDEO_URL || "" : comfyUrl });
+});
+
+/**
+ * What the deployment decides, for Settings: each value with its source
+ * (deployment, this studio's .env, or the default) and whether it is locked.
+ */
+app.get("/api/settings/deployment", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.setHeader("Cache-Control", "no-store");
+  const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+  const profiles = (models.profiles || []).map((profile) => ({ id: profile.id, label: profile.displayName || profile.label || profile.id, kind: profile.kind, ready: profile.ready !== false }));
+  const defaultFor = (key, effective) => ({ key, configured: process.env[key] || "", effective: effective || "", ...settingSource(key) });
+  res.json({
+    ok: true,
+    connections: [
+      { backend: "primary", label: "Images", key: "COMFY_URL", value: comfyUrl, ...settingSource("COMFY_URL"), routes: process.env.COMFY_VIDEO_URL ? "Image workflows and provider-backed video" : "All workflows" },
+      { backend: "video", label: "Videos", key: "COMFY_VIDEO_URL", value: process.env.COMFY_VIDEO_URL || "", ...settingSource("COMFY_VIDEO_URL"), routes: process.env.COMFY_VIDEO_URL ? "Local video workflows" : "Uses the image connection" }
+    ],
+    defaults: {
+      image: defaultFor("HEISS_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
+      video: defaultFor("HEISS_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
+      profiles
+    },
+    catalogue: catalogueFlags.map(describeFlag),
+    integrations: {
+      civitai: { browsing: civitaiPrefs().enabled === true, token: civitaiTokenStatus(), presets: presetsEnabled() },
+      huggingFace: { token: hfTokenStatus() },
+      modelDownloads: { routed: Boolean(process.env.HEISS_MODEL_DOWNLOAD_URL), ...settingSource("HEISS_MODEL_DOWNLOAD_URL") }
+    },
+    storage: { outputs: mediaStorageEnabled ? "heiss" : "comfy", ...settingSource("HEISS_OUTPUT_STORAGE"), workerToken: Boolean(process.env.HEISS_WORKER_TOKEN), multiUser: multiUserEnabled }
+  });
+});
+
+app.post("/api/settings/deployment", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const key = String(req.body?.key || "");
+  const value = req.body?.value;
+  try {
+    if (isCatalogueFlag(key)) {
+      if (typeof value !== "boolean") throw new Error("Choose on or off.");
+      const item = catalogueFlags.find((entry) => entry.key === key);
+      // Back to the default is no line at all, so a later default change still applies.
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"), key, applies: item.applies } });
+      return;
+    }
+    if (key === "HEISS_DEFAULT_IMAGE_PROFILE" || key === "HEISS_DEFAULT_VIDEO_PROFILE") {
+      const id = String(value || "").trim();
+      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key, applies: "now" } });
+      return;
+    }
+    res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
+  } catch (error) {
+    res.status(error.message.includes("deployment configuration") ? 409 : 400).json({ ok: false, error: error.message });
+  }
 });
 
 /** The Settings switch for looking on the usual ports when the saved address doesn't answer. */
