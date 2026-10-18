@@ -22,9 +22,10 @@ test('optional LoRAs show unverified variants and expose full published strength
     const openLoras = page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
     await openLoras.click();
   }
-  const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
   await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
-  await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toBeVisible();
+  await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
+  await expect(picker.getByText('Uses file metadata.', { exact: false })).toHaveCount(0);
   await expect(picker.getByRole('button', { name: 'This Model', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
   await expect(picker.getByText('Compatibility has not been verified for this model variant.', { exact: true }).first()).toBeVisible();
@@ -52,6 +53,10 @@ test('optional LoRAs show unverified variants and expose full published strength
 });
 
 test('LoRA library offers direct list selection with inline strengths and accessible dismissal', async ({ page, isMobile }) => {
+  await page.route('**/api/loras/library/ops', async route => {
+    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-lora-library') || '{}'));
+    await route.fulfill({ json: { library } });
+  });
   const models = await (await page.request.get('/api/models')).json();
   const profile = models.profiles.find((item: any) => item.id === models.defaults.imageModel);
   profile.options.loras = ['cards-one.safetensors', 'cards-two.safetensors'];
@@ -72,7 +77,7 @@ test('LoRA library offers direct list selection with inline strengths and access
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
-  const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
   const search = picker.getByRole('textbox', { name: 'Search LoRAs', exact: true });
   await expect(search).toBeVisible();
   await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
@@ -108,8 +113,26 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await expect(strength).toHaveCount(0);
   await row.click();
-  await picker.getByRole('button', { name: 'Manage Stack', exact: true }).click();
+  await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Cards Two strength value', { exact: true })).toBeVisible();
+  await picker.getByRole('button', { name: /^Save Stack/ }).click();
+  await picker.getByRole('textbox', { name: 'Stack name', exact: true }).fill('Inline Stack');
+  await picker.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
+  await picker.getByRole('button', { name: 'Disable All', exact: true }).click();
+  await expect(strength).toBeDisabled();
+  await picker.getByRole('button', { name: 'Enable All', exact: true }).click();
+  await expect(strength).toBeEnabled();
+  await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
+  await expect(row).toHaveAttribute('aria-checked', 'false');
+  await picker.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(row).toHaveAttribute('aria-checked', 'true');
+  await search.clear();
+  const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
+  await other.click();
+  await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
+  await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
+  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
   const open = page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
@@ -181,7 +204,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
-  const picker = page.getByRole('dialog', { name: 'Add LoRAs', exact: true });
+  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
   await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
