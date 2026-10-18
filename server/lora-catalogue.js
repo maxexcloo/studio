@@ -1,4 +1,4 @@
-import { loraCompatibility, strengthRange } from '../src/app/loraPolicy.js';
+import { loraCompatibility, strengthRange } from './lora-policy.js';
 
 // Local catalogue entries describe installed files; they never become download records.
 export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata, families) {

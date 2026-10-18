@@ -1,4 +1,4 @@
-import type { Profile } from './types';
+import type { Profile } from '../src/app/types';
 export type LoraCompatibility = { baseModels?: string[]; conditionings?: string[]; profileIds?: string[]; unlisted?: 'unknown' | 'other' };
 export type LoraStrengthRange = { min: number; max: number; step: number; default?: number };
 export type LoraPolicyInfo = { families?: string[]; compatibility?: LoraCompatibility; strengthRange?: LoraStrengthRange };
