@@ -146,7 +146,7 @@ export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory })
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-gallery-${date}.zip"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    sendGalleryExport(res, []);
+    sendGalleryExport(res, [], { req });
   });
 
   app.post("/api/gallery/recover", async (req, res) => {

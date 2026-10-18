@@ -4,6 +4,7 @@ import zlib from "node:zlib";
 import { comfyOutputDir } from "./comfy.js";
 import { isInside } from "./paths.js";
 import { filterVisibleGallery, gallery, outputFileCandidates } from "./gallery-store.js";
+import { recordsForRequest } from "./account-ownership.js";
 
 const crcTable = Uint32Array.from({ length: 256 }, (_, index) => {
   let value = index;
@@ -70,7 +71,7 @@ function zipEnd(count, centralSize, centralOffset) {
  * gallery file is read only when its turn comes, so exporting a gallery of
  * tens of thousands never holds more than one file in memory.
  */
-function archiveEntries(privateAssets, includeGallery = true) {
+function archiveEntries(privateAssets, includeGallery = true, req = null) {
   const entries = [];
   const names = new Set();
   const add = (folder, item, source) => {
@@ -86,7 +87,8 @@ function archiveEntries(privateAssets, includeGallery = true) {
     entries.push({ name, ...source, createdAt: item.createdAt });
   };
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
-  for (const item of includeGallery ? filterVisibleGallery(gallery) : []) {
+  const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.HEISS_MULTI_USER === "1" ? [] : gallery;
+  for (const item of includeGallery ? filterVisibleGallery(sourceGallery) : []) {
     if (item.status !== "done" || !base) continue;
     const file = outputFileCandidates(item).map((candidate) => path.resolve(candidate)).find((resolved) => {
       if (!isInside(base, resolved, { orSame: true })) return false;
@@ -116,7 +118,7 @@ async function measure(file) {
  * browser takes it. The header comes first and needs the CRC, so a file too
  * big to hold is read twice, the second time usually from the system's cache.
  */
-export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true } = {}) {
+export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true, req = null } = {}) {
   let closed = false;
   res.on("close", () => { closed = true; });
   const write = (chunk) => new Promise((resolve) => {
@@ -128,7 +130,7 @@ export async function sendGalleryExport(res, privateAssets = [], { gallery: incl
   try {
     const central = [];
     let offset = 0;
-    for (const entry of archiveEntries(privateAssets, includeGallery)) {
+    for (const entry of archiveEntries(privateAssets, includeGallery, req)) {
       if (closed) return;
       // Most files are read once, into memory, and checked from that copy; a
       // big one (a video) is read through for its CRC and then streamed. A file
