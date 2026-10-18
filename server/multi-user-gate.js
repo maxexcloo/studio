@@ -1,4 +1,7 @@
+// Sign-in, plus the liveness and readiness probes a container platform calls without an account.
 const publicAccountPaths = new Set([
+  "/api/ping",
+  "/api/ready",
   "/api/accounts/status",
   "/api/accounts/sign-in",
   "/api/accounts/sign-out",

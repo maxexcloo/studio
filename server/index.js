@@ -343,6 +343,21 @@ const appVersion = (() => {
 // How a second start finds out HEISS UI already holds the port (see launch.js).
 app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "heiss-ui", version: appVersion }));
 
+// Readiness: the studio can serve once its data folder is writable. ComfyUI workers may come and go
+// without taking the studio out of service, so they do not decide this.
+app.get("/api/ready", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    const probe = path.join(dataDir, `.ready-${process.pid}`);
+    fs.writeFileSync(probe, "");
+    fs.rmSync(probe, { force: true });
+    res.json({ ok: true, ready: true });
+  } catch {
+    res.status(503).json({ ok: false, ready: false, error: "The data folder is not writable." });
+  }
+});
+
 /**
  * How far a source checkout is past its release tag, so About can tell
  * "v0.2.0" from "v0.2.0 + 3". Release copies have no git and are exactly

@@ -17,7 +17,7 @@ type GateState =
   | { kind: 'checking' }
   | { kind: 'in' }
   | { kind: 'sign-in'; status: AccessStatus }
-  | { kind: 'account-sign-in'; recovery: boolean }
+  | { kind: 'account-sign-in'; recovery: boolean; setupToken: boolean }
   | { kind: 'refused'; title: string; text: string };
 
 /**
@@ -32,13 +32,13 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
 
   const check = useCallback(async () => {
     try {
-      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
+      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; setupTokenAccepted?: boolean; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
       if (accountMode.mode === 'multi-user') {
         const signedIn = accountMode.signedIn === true;
         setAccountStorageScope(signedIn ? accountMode.account?.id : undefined);
         setThisComputer(signedIn && accountMode.account?.role === 'administrator');
         setAtComputer(false);
-        setState(signedIn ? { kind: 'in' } : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true });
+        setState(signedIn ? { kind: 'in' } : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true, setupToken: accountMode.setupTokenAccepted === true });
         return;
       }
       setAccountStorageScope();
@@ -68,7 +68,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'in') return <>{children}</>;
   if (state.kind === 'checking') return <div className="device-gate" aria-busy="true" />;
   if (state.kind === 'refused') return <GateMessage title={state.title} text={state.text} />;
-  if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} onSignedIn={() => { window.location.reload(); }} />;
+  if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
   if (!studioPassword.set && !studioPassword.hidden) {
     return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running HEISS UI in Settings › Connection, then reload this page." />;
@@ -76,8 +76,9 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   return <SignIn legacy={studioPassword.hidden} onSignedIn={() => { window.location.reload(); }} />;
 }
 
-function AccountSignIn({ recovery, onSignedIn }: { recovery: boolean; onSignedIn: () => void }) {
+function AccountSignIn({ recovery, setupToken, onSignedIn }: { recovery: boolean; setupToken: boolean; onSignedIn: () => void }) {
   const [username, setUsername] = useState('');
+  const [token, setToken] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [stage, setStage] = useState<LockMarkStage>('locked');
@@ -91,7 +92,7 @@ function AccountSignIn({ recovery, onSignedIn }: { recovery: boolean; onSignedIn
     try {
       await apiJson(recovery ? '/api/accounts/bootstrap' : '/api/accounts/sign-in', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username, displayName, password })
+        body: JSON.stringify({ username, displayName, password, ...(recovery && token ? { setupToken: token } : {}) })
       });
       setStage('opening');
       window.setTimeout(onSignedIn, 400);
@@ -107,9 +108,10 @@ function AccountSignIn({ recovery, onSignedIn }: { recovery: boolean; onSignedIn
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
           <h2>{recovery ? 'Create the Recovery Administrator' : 'Sign In to HEISS UI'}</h2>
-          <p>{recovery ? 'Set up the first administrator on this computer.' : 'Use your approved HEISS account.'}</p>
+          <p>{recovery ? (setupToken ? 'Set up the first administrator with the setup token from the deployment, or on the computer running HEISS UI.' : 'Set up the first administrator on this computer.') : 'Use your approved HEISS account.'}</p>
           <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
             <label>Username<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={working} /></label>
+            {recovery && setupToken && <label>Setup Token<input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} disabled={working} /></label>}
             {recovery && <label>Display Name<input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={working} /></label>}
             <label>Password<input type="password" autoComplete={recovery ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} disabled={working} /></label>
             {error && <p role="alert">{error}</p>}

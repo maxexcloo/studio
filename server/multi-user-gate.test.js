@@ -20,6 +20,9 @@ test("account mode requires identity on loopback and exposes only sign-in/bootst
   assert.equal(anonymous.res.headers["X-HEISS-Sign-In"], "1");
   assert.equal(call("/api/accounts/status").continued, true);
   assert.equal(call("/api/accounts/bootstrap").continued, true);
+  // Container liveness and readiness probes carry no account.
+  assert.equal(call("/api/ping").continued, true);
+  assert.equal(call("/api/ready").continued, true);
 });
 
 test("ordinary accounts reach only reviewed owner-scoped routes; administrators reach everything", () => {

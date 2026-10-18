@@ -80,7 +80,8 @@ function publicStatus(req) {
     mode: "multi-user",
     signedIn: Boolean(account),
     account: account ? { id: account.userId, role: account.role, generationProfiles: account.generationProfiles, features: account.features } : null,
-    needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0
+    needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0,
+    ...(accountStoreSnapshot().accounts.length === 0 && process.env.HEISS_SETUP_TOKEN ? { setupTokenAccepted: true } : {})
   };
 }
 
@@ -108,8 +109,12 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       res.status(409).json({ ok: false, error: "Recovery administrator setup is already complete." });
       return;
     }
-    if (!clientOf(req).thisComputer) {
-      res.status(403).json({ ok: false, reason: "this-computer", error: "Create the recovery administrator on the computer running HEISS UI." });
+    // Where nobody can sit at the computer (a container platform), a one-time setup token from the environment stands in.
+    const setupToken = process.env.HEISS_SETUP_TOKEN || "";
+    const given = String(req.body?.setupToken || "");
+    const tokenMatches = setupToken.length >= 32 && Buffer.byteLength(given) === Buffer.byteLength(setupToken) && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(setupToken));
+    if (!clientOf(req).thisComputer && !tokenMatches) {
+      res.status(403).json({ ok: false, reason: "this-computer", error: setupToken ? "Enter the setup token, or create the recovery administrator on the computer running HEISS UI." : "Create the recovery administrator on the computer running HEISS UI." });
       return;
     }
     if (bootstrapping) {
