@@ -63,7 +63,7 @@ export class McpMedia {
     }
   }
   async profiles(kind = 'all') {
-    const models = await this.request('GET', '/api/models');
+    const models = await this.request('GET', '/api/models?cached=1');
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
@@ -123,20 +123,13 @@ export class McpMedia {
     return { status: 'queued', jobs: queued };
   }
   async galleryJob(jobId) {
-    let cursor = '';
-    const seen = new Set();
+    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`);
     const outputs = new Map();
     let kind;
-    do {
-      const page = await this.request('GET', `/api/gallery?${new URLSearchParams({ bundles: '0', cursor, limit: '200' })}`);
-      for (const item of page.items || []) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
-        outputs.set(item.index, { url: item.url });
-        kind = item.type;
-      }
-      cursor = page.hasMore ? page.nextCursor : '';
-      if (!cursor || seen.has(cursor)) break;
-      seen.add(cursor);
-    } while (true);
+    for (const item of items) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
+      outputs.set(item.index, { url: item.url });
+      kind = item.type;
+    }
     return outputs.size ? { status: 'done', kind, outputs: Array.from({ length: Math.max(...outputs.keys()) + 1 }, (_, index) => outputs.get(index) || {}) } : { status: 'missing', outputs: [] };
   }
   async job(owner, jobId, seconds = 0) {
@@ -175,6 +168,9 @@ export class McpMedia {
   async download(owner, jobId, index) {
     const job = await this.job(owner, jobId);
     const output = this.available(job, index);
+    return this.readOutput(output);
+  }
+  async readOutput(output) {
     const response = await this.response('GET', output.url);
     const chunks = [];
     let bytes = 0;
@@ -203,11 +199,11 @@ export class McpMedia {
   async result(owner, jobId, index = 0, seconds = 0) {
     const job = await this.job(owner, jobId, seconds);
     if (!finished.has(job.status)) return mcpJson({ job_id: jobId, ...this.summary(job) });
-    this.available(job, index);
+    const available = this.available(job, index);
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[Download Video](${url})`), link] };
-    const output = await this.download(owner, jobId, index);
+    const output = await this.readOutput(available);
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) return { content: [text(`[Download Original](${url})`), { ...link, mimeType: output.mime }] };
     const preview = await sharp(output.content, { limitInputPixels: 80000000 }).rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 80 }).toBuffer();
     return { content: [{ type: 'image', data: preview.toString('base64'), mimeType: 'image/jpeg' }, text({ job_id: jobId, output_index: index, status: 'done', message: 'Generation complete. The image is attached. Reply briefly; do not generate or poll again unless requested.' }), text(`[Download Original](${url})`), { ...link, mimeType: output.mime }] };

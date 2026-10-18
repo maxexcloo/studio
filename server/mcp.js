@@ -9,7 +9,7 @@ import { hostAllowed } from './request-guard.js';
 import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 
-const instructions = 'Use HEISS tools directly for requested images or videos. Discover Models by kind, then fetch the selected exact profile_id once for its prompting guidance, defaults and reference slots. Preserve explicit model choices and user intent. Generate takes prompts as a list of strings and returns job IDs immediately. Acknowledge the queued work and continue chatting; never loop over blocking waits or poll automatically. Use Status or Result for the exact job only when asked; never resubmit completed work. Generate one image at the saved dimensions unless the user explicitly requests more or another size. Present attached image previews briefly without reproducing image/download URLs. Upload user-supplied images, or Reuse an owned image for follow-ups. Never invent results or tool responses. GPU allocation is manual: only use separately authorised AI Control tools for an explicit control request, present Preview and obtain approval before Apply. Media generation never changes allocation.';
+const instructions = 'Use HEISS tools directly for requested images or videos. Discover Models by kind, then fetch the selected exact profile_id once for its prompting guidance, defaults and reference slots. Preserve explicit model choices and user intent. Generate takes prompts as a list of strings and returns job IDs immediately. Never wait for generation in the foreground or poll in a loop. If the host exposes run_in_background on Result, start exactly one Result for each returned job with wait_seconds=1800 and run_in_background=true, then acknowledge submission immediately; the host delivers completion automatically. Otherwise use Status or Result for the exact job only when asked; never resubmit completed work. Generate one image at the saved dimensions unless the user explicitly requests more or another size. Present attached image previews briefly without reproducing image/download URLs. Upload user-supplied images, or Reuse an owned image for follow-ups. Never invent results or tool responses. GPU allocation is manual: only use separately authorised AI Control tools for an explicit control request, present Preview and obtain approval before Apply. Media generation never changes allocation.';
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200) };
@@ -61,33 +61,20 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'options'];
         return mcpJson({ profiles: profiles.map(profile => ({ ...Object.fromEntries(fields.filter(key => key in profile).map(key => [key, profile[key]])), ...(profile_id === undefined ? {} : { defaults: { ...profile.defaults, count: 1 } }), prompting: prompting(profile, profile_id !== undefined) })) });
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', 'Queue requested media immediately; return job IDs without blocking chat. Fetch Models details first. Use one image at saved dimensions unless explicitly requested otherwise. Images use separate jobs for variants, at most four jobs per submission. Keep defaults unless requested. Set wait_seconds only for an explicit request to wait, never poll or resubmit for progress. Never switch GPUs.', {
+      tool(server, 'Generate', 'Generate Media', 'Queue requested media immediately; return job IDs without blocking chat. Fetch Models details first. Use one image at saved dimensions unless explicitly requested otherwise. Images use separate jobs for variants, at most four jobs per submission. Keep defaults unless requested. Never wait, poll or resubmit for progress; acknowledge the returned jobs immediately. Never switch GPUs.', {
         profile_id: z.string().min(1), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(),
         width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
-        wait_seconds: wait(45), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
+        wait_seconds: z.literal(0).default(0), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async (args) => {
-        const deadline = Date.now() + args.wait_seconds * 1000;
         const submission = await media.queue(owner, args);
-        const contents = [];
-        if (args.wait_seconds) for (const queued of submission.jobs) {
-          try {
-            for (let index = 0; index < queued.count; index++) {
-              const result = await media.result(owner, queued.job_id, index, Math.max(0, (deadline - Date.now()) / 1000));
-              contents.push(...result.content);
-              const status = await media.job(owner, queued.job_id);
-              queued.status = status.status;
-              if (status.kind === 'video' || status.status !== 'done') break;
-            }
-          } catch { queued.status = 'queued'; queued.retrieval_error = 'Submitted successfully. Use Result with this job ID; do not resubmit.'; }
-        }
-        return { ...mcpJson(submission), content: [...mcpJson(submission).content, ...contents] };
+        return mcpJson({ ...submission, message: 'Submitted. If Result supports run_in_background, start one Result per returned job with wait_seconds=1800 and run_in_background=true, then reply immediately. Otherwise reply now and retrieve only when requested. Never poll, wait in the foreground or resubmit.' });
       });
       tool(server, 'Status', 'Generation Status', 'Return immediate status for this account’s job. Completed outputs have signed download links. Use Result for an inline preview. Wait only when explicitly asked, at most twenty seconds.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }) => {
         const status = await media.job(owner, job_id, wait_seconds);
         return mcpJson({ ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, job_id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', 'Show this account’s requested result. Return immediately by default; attach a finished image preview or video download. Never poll in a loop. Signed original download links expire after ten minutes and are revoked if an output is hidden or deleted.', { ...output, wait_seconds: wait(20) }, ({ job_id, output_index, wait_seconds }) => media.result(owner, job_id, output_index, wait_seconds), { readOnlyHint: true });
+      tool(server, 'Result', 'Show Result', 'Show this account’s requested result. Return immediately by default; attach a finished image preview or video download. For automatic completion in a saved Agent, call once per submitted job with wait_seconds=1800 and run_in_background=true; never wait in the foreground or poll in a loop. Signed original download links expire after ten minutes and are revoked if an output is hidden or deleted.', { ...output, wait_seconds: wait(1800) }, ({ job_id, output_index, wait_seconds }) => media.result(owner, job_id, output_index, wait_seconds), { readOnlyHint: true });
       tool(server, 'Cancel', 'Cancel Generation', 'Cancel only this account’s exact job when the user requests cancellation.', job, async ({ job_id }) => {
         media.own(owner, job_id);
         await media.job(owner, job_id);
