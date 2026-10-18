@@ -166,7 +166,8 @@ export class McpMedia {
     }
   }
   token(owner, jobId, index) {
-    const payload = Buffer.from(JSON.stringify({ audience: this.publicUrl, owner, jobId, index, expires: Date.now() + 600000 })).toString('base64url');
+    // Links do not expire; every request rechecks ownership and that the output still exists.
+    const payload = Buffer.from(JSON.stringify({ audience: this.publicUrl, owner, jobId, index })).toString('base64url');
     return `${payload}.${this.digest(payload)}`;
   }
   claims(token) {
@@ -174,7 +175,9 @@ export class McpMedia {
     const expected = this.digest(payload || '');
     if (extra || !signature || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('Invalid result link.');
     const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    if (claims.audience !== this.publicUrl || !Number.isFinite(claims.expires) || claims.expires <= Date.now() || !Number.isInteger(claims.index) || claims.index < 0) throw new Error('Invalid or expired result link.');
+    // Links issued before the no-expiry change keep the expiry they were issued with.
+    const expired = claims.expires !== undefined && (!Number.isFinite(claims.expires) || claims.expires <= Date.now());
+    if (claims.audience !== this.publicUrl || expired || !Number.isInteger(claims.index) || claims.index < 0) throw new Error('Invalid or expired result link.');
     this.own(claims.owner, claims.jobId);
     return claims;
   }

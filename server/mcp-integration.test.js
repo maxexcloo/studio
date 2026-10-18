@@ -556,7 +556,7 @@ test('explicit status waiting has a bounded deadline and terminal jobs return wi
   assert.ok(performance.now() - terminal < 1000);
 });
 
-test('signed links expire, preserve the configured public path and cannot cross studio audiences', async t => {
+test('signed links do not expire, preserve the configured public path and cannot cross studio audiences', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-audience-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const f = await fixture(t, { dataDir: dir, environment: { MCP_PUBLIC_URL: 'https://studio.example.test/nested/studio' } });
@@ -571,8 +571,9 @@ test('signed links expire, preserve the configured public path and cannot cross 
   second.jobs.set(id, f.jobs.get(id));
   assert.equal((await fetch(second.base + new URL(local).pathname)).status, 404);
   const now = Date.now();
-  const clock = t.mock.method(Date, 'now', () => now + 601000);
-  try { assert.equal((await fetch(local)).status, 404); } finally { clock.mock.restore(); }
+  // Still valid much later; hiding or deleting the output is what ends a link.
+  const clock = t.mock.method(Date, 'now', () => now + 90 * 24 * 60 * 60 * 1000);
+  try { assert.equal((await fetch(local)).status, 200); } finally { clock.mock.restore(); }
 });
 
 test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded identities', async t => {
