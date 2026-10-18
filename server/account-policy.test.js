@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { effectiveAccountAccess, mayUseFeature, mayUseGenerationProfile, normaliseAccessProfile, validAccountKey } from "./account-policy.js";
+import { effectiveAccountAccess, mayUseFeature, mayUseGenerationProfile, normaliseAccessProfile, validAccountKey, visibleGenerationProfiles } from "./account-policy.js";
 
 const available = ["image-fast", "image-quality", "video"];
 
@@ -45,6 +45,7 @@ test("administrators receive current full access and ordinary users receive one 
   assert.equal(mayUseGenerationProfile(user, "image-quality"), false);
   assert.equal(mayUseFeature(user, "loras"), true);
   assert.equal(mayUseFeature(user, "mcp"), false);
+  assert.deepEqual(visibleGenerationProfiles(available.map((id) => ({ id })), user), [{ id: "image-fast" }]);
 });
 
 test("disabled, unknown-role, and unassigned accounts do not authenticate", () => {

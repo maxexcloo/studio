@@ -17,6 +17,8 @@ import { stageReferenceAssets } from './reference-assets.js';
 import { comfyRestarting } from './comfy-restart.js';
 import { upscaleQualities, upscaleTargets } from './upscale.js';
 import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
+import { ownerIdForRequest } from './account-ownership.js';
+import { mayUseFeature, mayUseGenerationProfile } from './account-policy.js';
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
@@ -37,12 +39,29 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
   });
 
   async function dispatchGenerate(req, res) {
-    if (configuredBackends().length === 1) return generateOnBackend(req, res);
+    const accountUser = req.heissAccount?.role === "user";
+    if (accountUser && req.body?.privateVault) return res.status(403).json({ ok: false, error: "Private Vault is not available until account storage is separated." });
+    if (!accountUser && configuredBackends().length === 1) return generateOnBackend(req, res);
     try {
       const available = await mediaModels();
       const profile = available.models.profiles.find((item) => item.id === req.body?.profileId)
         || available.models.profiles.find((item) => item.workflow === req.body?.workflow && item.model === req.body?.model);
       if (!profile) return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
+      if (accountUser) {
+        const feature = (req.body?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
+        if (!mayUseGenerationProfile(req.heissAccount, profile.id) || !mayUseFeature(req.heissAccount, feature)) {
+          return res.status(403).json({ ok: false, error: "This account cannot use the selected generation profile." });
+        }
+        if (Array.isArray(req.body?.loras) && req.body.loras.length && !mayUseFeature(req.heissAccount, "loras")) {
+          return res.status(403).json({ ok: false, error: "LoRAs are not enabled for this account." });
+        }
+        const hasReference = Boolean(req.body?.startImage || req.body?.startImageId || req.body?.referenceAssets?.length);
+        const referenceFeature = feature === "videoGeneration" ? "videoReferences" : "imageReferences";
+        if (hasReference && !mayUseFeature(req.heissAccount, referenceFeature)) {
+          return res.status(403).json({ ok: false, error: "References are not enabled for this account." });
+        }
+      }
+      if (configuredBackends().length === 1) return generateOnBackend(req, res);
       const backend = isLocalVideoProfile(profile) ? "video" : "primary";
       return await withComfyBackend(backend, () => generateOnBackend(req, res));
     } catch (error) {
@@ -126,6 +145,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       return;
     }
     body.comfyBackend = currentComfyBackend();
+    body.ownerId = ownerIdForRequest(req);
     body.privateVault = hidden || fromHidden;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
@@ -138,11 +158,11 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
-      body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: body.privateVault, generation: body }).catch(() => []);
+      body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: body.privateVault || Boolean(body.ownerId), generation: body }).catch(() => []);
     }
     if (!isMockJob && body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
       try {
-        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: body.privateVault, generation: body });
+        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: body.privateVault || Boolean(body.ownerId), generation: body });
         body.startImageId ||= body.referenceAssets[0]?.assetId || "";
         body.startImageName ||= body.referenceAssets[0]?.name || "";
       } catch (error) {
@@ -171,7 +191,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssets(req, [first], { unique: body.privateVault, generation: body });
+        const [replacement] = await stageReferenceAssets(req, [first], { unique: body.privateVault || Boolean(body.ownerId), generation: body });
         if (first.temporary) await forgetComfyRun({ inputNames: [first.comfyName] });
         body.referenceAssets = [replacement, ...others];
       } catch (error) {
@@ -213,7 +233,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
     setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-    jobs.set(id, { status: "queued", comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
+    jobs.set(id, { status: "queued", ownerId: body.ownerId || undefined, comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
     res.json({ jobId: id, items, hidden: body.privateVault, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
     if (isMockJob) {
       setTimeout(() => runMockJob(id, body), 0);

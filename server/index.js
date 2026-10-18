@@ -77,6 +77,8 @@ import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
 import { accountForRequest, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
+import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
+import { mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -636,12 +638,17 @@ async function mediaModels(force = false) {
   return { primary, video, models: mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})) };
 }
 
+function modelsForAccount(models, req) {
+  if (!req.heissAccount) return models;
+  return { ...models, profiles: visibleGenerationProfiles(models.profiles || [], req.heissAccount) };
+}
+
 app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
-    res.json((await mediaModels(req.query.cached !== "1")).models);
+    res.json(modelsForAccount((await mediaModels(req.query.cached !== "1")).models, req));
   } catch {
-    res.json(demoMode ? mockModelResult() : offlineModelResult(comfyUrl));
+    res.json(modelsForAccount(demoMode ? mockModelResult() : offlineModelResult(comfyUrl), req));
   }
 });
 
@@ -1048,7 +1055,7 @@ app.post("/api/reference-assets/upload", async (req, res) => {
   if (!requireLocal(req, res)) return;
   try {
     const upload = await readMultipartImage(req);
-    const asset = await saveUploadedReference(upload);
+    const asset = await saveUploadedReference(upload, ownerIdForRequest(req));
     res.status(201).json({ ok: true, asset });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
@@ -1066,14 +1073,14 @@ app.post("/api/reference-assets/from-gallery", (req, res) => {
 });
 
 app.get("/api/reference-assets/:id/media", (req, res) => {
-  const asset = readUploadedReference(req.params.id, "media");
+  const asset = readUploadedReference(req.params.id, "media", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=3600");
   res.sendFile(asset.file);
 });
 
 app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
-  const asset = readUploadedReference(req.params.id, "thumbnail");
+  const asset = readUploadedReference(req.params.id, "thumbnail", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=86400");
   res.sendFile(asset.file);
@@ -1082,7 +1089,7 @@ app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
 app.delete("/api/reference-assets/:id", (req, res) => {
   if (!requireLocal(req, res)) return;
   try {
-    res.json(deleteUploadedReference(req.params.id));
+    res.json(deleteUploadedReference(req.params.id, ownerIdForRequest(req)));
   } catch (error) {
     res.status(404).json({ ok: false, error: error.message });
   }
@@ -1300,7 +1307,7 @@ app.post("/api/upscale/toggle", (req, res) => {
 
 app.get("/api/jobs/:id", (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) {
+  if (!job || req.heissAccount && job.ownerId !== req.heissAccount.userId) {
     res.json({ status: "missing" });
     return;
   }
@@ -1318,10 +1325,13 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
   if (!job) {
     // Nothing here runs it any more (HEISS restarted): only the tile is left to settle.
     // Its prompt id went with the job, so ComfyUI is left alone rather than interrupted blindly.
+    const hasOwnedRecord = recordsForRequest(gallery, req).some((item) => item.jobId === req.params.id);
+    if (!hasOwnedRecord) return res.json({ ok: true, stale: true, changed: false });
     const changed = updateGalleryJob(req.params.id, { status: "canceled" });
     res.json({ ok: true, stale: true, changed });
     return;
   }
+  if (req.heissAccount && job.ownerId !== req.heissAccount.userId) return res.json({ status: "missing" });
   jobs.set(req.params.id, { ...job, status: "canceling" });
   // Its pictures are saved and only Smart upscale is left: they stay, and runJob delivers them.
   if (!job.keepsPicture) updateGalleryJob(req.params.id, { status: "canceled" });
@@ -1330,9 +1340,10 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/queue/cancel", async (_req, res) => {
-  const promptIds = cancelOwnJobs();
-  setGallery(gallery.map((item) => (item.status === "pending" && !jobs.get(item.jobId)?.keepsPicture ? { ...item, status: "canceled" } : item)));
+app.post("/api/queue/cancel", async (req, res) => {
+  const ownerId = ownerIdForRequest(req);
+  const promptIds = cancelOwnJobs(ownerId);
+  setGallery(gallery.map((item) => (recordBelongsToRequest(item, req) && item.status === "pending" && !jobs.get(item.jobId)?.keepsPicture ? { ...item, status: "canceled" } : item)));
   saveGallery();
   // Only HEISS's own prompts: ComfyUI's queue also holds runs from its own UI and other apps.
   await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
@@ -1343,12 +1354,15 @@ registerGalleryTrashRoutes(app);
 
 app.post("/api/cache/clear", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const promptIds = cancelOwnJobs();
-  setGallery(gallery.filter((item) => item.status === "done").map(({ preview, progress, ...item }) => item).slice(0, galleryLimit));
+  const ownerId = ownerIdForRequest(req);
+  const promptIds = cancelOwnJobs(ownerId);
+  const kept = gallery.filter((item) => !recordBelongsToRequest(item, req) || item.status === "done").map(({ preview, progress, ...item }) => item);
+  const retainedOwn = new Set(kept.filter((item) => recordBelongsToRequest(item, req)).slice(0, galleryLimit));
+  setGallery(kept.filter((item) => !recordBelongsToRequest(item, req) || retainedOwn.has(item)));
   saveGallery();
   await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
   await freeComfyMemory().catch(() => null);
-  res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(gallery)) });
+  res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
 });
 
 // Unloads models and frees what ComfyUI caches, without touching any run: ComfyUI does it between prompts.
@@ -1363,9 +1377,10 @@ app.post("/api/comfy/free", async (req, res) => {
 });
 
 /** Marks every HEISS job still waiting or running as canceled, and returns the prompt ids ComfyUI knows them by. */
-function cancelOwnJobs() {
+function cancelOwnJobs(ownerId = "") {
   const promptIds = [];
   for (const [id, job] of jobs) {
+    if (ownerId && job.ownerId !== ownerId) continue;
     if (job.status === "queued" || job.status === "running" || job.status === "canceling") {
       if (job.promptId) promptIds.push({ promptId: job.promptId, backend: job.comfyBackend });
       // Only upscaling now: its pictures stay, and runJob delivers them once ComfyUI lets go.
@@ -1582,6 +1597,7 @@ app.get('/comfy/video-preview', async (req, res) => {
   const filename = String(req.query.filename || '');
   const subfolder = String(req.query.subfolder || '');
   const type = String(req.query.type || 'output');
+  if (req.heissAccount && (type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
   if (!['output', 'input', 'temp'].includes(type) || !/\.(mp4|webm|mov|mkv)$/i.test(filename) || filename !== path.basename(filename) || /[\\/]/.test(filename) || inDotFolder(subfolder)) {
     res.status(404).end(); return;
   }
@@ -1598,6 +1614,7 @@ app.get("/comfy/thumb", async (req, res) => {
   const subfolder = String(req.query.subfolder || "");
   const type = String(req.query.type || "output");
   if (!filename) { res.status(400).json({ error: "filename is required." }); return; }
+  if (req.heissAccount && (type !== "output" || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
   // The same outputs /comfy/view serves, and nothing else.
   if (!["output", "input", "temp"].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
@@ -1658,6 +1675,11 @@ app.get("/comfy/*path", async (req, res) => {
   try {
     const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
     const proxyPath = Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path;
+    const filename = String(req.query.filename || "");
+    if (req.heissAccount && (proxyPath !== "view" || String(req.query.type || "output") !== "output" || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
+      res.status(404).json({ ok: false, error: "Not an output." });
+      return;
+    }
     // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
     // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
     // and neither are dot folders among the outputs (the gallery's trash, gallery-trash.js).

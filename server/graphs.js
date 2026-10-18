@@ -7,6 +7,7 @@ import { prepareInputImage } from './input-image-sizing.js';
 import { families } from './family-catalog.js';
 import { familyGraph } from './family-graph.js';
 import { withGgufLoaders } from './gguf.js';
+import { accountOutputSubfolder } from './account-ownership.js';
 
 export async function uploadReferenceImage(dataUrl, body = {}) {
   if (!dataUrl || !dataUrl.includes(",")) return "";
@@ -55,12 +56,14 @@ export function composeWorkflowPrompt(workflow, userPrompt = "") {
 
 export async function imageGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
-  return builtInGraph(body);
+  const graph = await builtInGraph(body);
+  return graph;
 }
 
 export async function videoGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
-  return builtInGraph(body);
+  const graph = await builtInGraph(body);
+  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : body.privateVault ? saveIntoHeissFolder(graph) : graph;
 }
 
 /**
@@ -213,13 +216,14 @@ function applyRgthreeLoraStack(graph, body, config) {
  * imported workflow must save where HEISS UI's own runs do: a copy Hidden
  * cannot remove then stays out of "Everything in the output folder" too.
  */
-export function saveIntoHeissFolder(graph) {
+export function saveIntoHeissFolder(graph, ownerId = "") {
+  const accountPrefix = accountOutputSubfolder(ownerId);
   for (const node of Object.values(graph || {})) {
     const inputs = node?.inputs;
     if (!inputs || !Object.hasOwn(inputs, "filename_prefix")) continue;
     // Only the name part is kept; a linked or empty prefix becomes a plain one.
     const name = typeof inputs.filename_prefix === "string" ? inputs.filename_prefix.split(/[\\/]/).filter((part) => part && part !== "." && part !== "..").pop() : "";
-    inputs.filename_prefix = `heiss-ui/${name || "hidden"}`;
+    inputs.filename_prefix = `${accountPrefix || "heiss-ui"}/${name || "hidden"}`;
   }
   return graph;
 }
@@ -232,5 +236,5 @@ export async function customWorkflowGraph(body) {
   await applyMappedInputs(graph, workflow, body);
   if (workflow.loraStack?.adapter === "rgthree-stack-v1") applyRgthreeLoraStack(graph, body, workflow.loraStack);
   else applyPowerLoraStack(graph, body, workflow.loraStack);
-  return body.privateVault ? saveIntoHeissFolder(graph) : graph;
+  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : body.privateVault ? saveIntoHeissFolder(graph) : graph;
 }

@@ -67,3 +67,9 @@ export function mayUseGenerationProfile(access, profileId) {
 export function mayUseFeature(access, feature) {
   return Boolean(access?.authenticated && (access.role === accountRoles.administrator || access.features[feature] === true));
 }
+
+export function visibleGenerationProfiles(profiles, access) {
+  if (!access?.authenticated) return [];
+  if (access.role === accountRoles.administrator) return profiles;
+  return profiles.filter((profile) => mayUseGenerationProfile(access, profile.id));
+}

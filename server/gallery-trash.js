@@ -99,7 +99,7 @@ export function trashGalleryItems(items, baseDir = comfyOutputDir) {
 }
 
 /** The batches in the trash, newest first. */
-export function trashBatches(baseDir = comfyOutputDir) {
+export function trashBatches(baseDir = comfyOutputDir, ownerId = "") {
   const root = trashDir(baseDir);
   if (!root) return [];
   let names = [];
@@ -110,12 +110,13 @@ export function trashBatches(baseDir = comfyOutputDir) {
     let createdAt = batch?.createdAt || "";
     if (!Date.parse(createdAt)) { try { createdAt = fs.statSync(dir).mtime.toISOString(); } catch { createdAt = new Date(0).toISOString(); } }
     return { id: name, dir, createdAt, items: batch?.items?.length || 0, files: batch?.files?.length || 0, batch };
-  }).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  }).filter((batch) => !ownerId || batch.batch?.items?.length && batch.batch.items.every((item) => item.ownerId === ownerId))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 /** What Settings shows: how much is in the trash, and when the oldest goes for good. */
-export function trashSummary(baseDir = comfyOutputDir) {
-  const batches = trashBatches(baseDir);
+export function trashSummary(baseDir = comfyOutputDir, ownerId = "") {
+  const batches = trashBatches(baseDir, ownerId);
   const oldest = batches.at(-1);
   return {
     batches: batches.length,
@@ -132,10 +133,10 @@ export function trashSummary(baseDir = comfyOutputDir) {
  * been taken since stays in the trash rather than overwrite anything.
  * Returns the gallery records whose output is back on disk.
  */
-export function restoreTrash(batchId = "", baseDir = comfyOutputDir) {
+export function restoreTrash(batchId = "", baseDir = comfyOutputDir, ownerId = "") {
   if (!baseDir) return { restored: [], missing: 0 };
   const base = path.resolve(baseDir);
-  const found = trashBatches(base).find((batch) => (batchId ? batch.id === batchId : Boolean(batch.batch)));
+  const found = trashBatches(base, ownerId).find((batch) => (batchId ? batch.id === batchId : Boolean(batch.batch)));
   if (!found?.batch) return { restored: [], missing: 0 };
   let missing = 0;
   const back = new Set();
@@ -186,9 +187,9 @@ export async function purgeTrash({ baseDir = comfyOutputDir, now = Date.now() } 
 }
 
 /** "Empty trash": everything in it, now. */
-export async function emptyTrash(baseDir = comfyOutputDir) {
+export async function emptyTrash(baseDir = comfyOutputDir, ownerId = "") {
   let removed = 0;
-  for (const batch of trashBatches(baseDir)) {
+  for (const batch of trashBatches(baseDir, ownerId)) {
     try {
       await removeBatch(batch);
       removed += 1;

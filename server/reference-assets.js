@@ -13,6 +13,7 @@ import { prepareInputImage } from "./input-image-sizing.js";
 import { forgetComfyRun } from "./hidden-traces.js";
 import { families } from "./family-catalog.js";
 import { mimeExtension, referenceInputName } from "./reference-names.js";
+import { ownerIdForRequest, recordBelongsToRequest, recordsForRequest } from "./account-ownership.js";
 
 const assetsDir = path.join(dataDir, "reference-assets");
 const filesDir = path.join(assetsDir, "files");
@@ -118,14 +119,14 @@ export function listReferenceAssets(req, { source = "upload", cursor = "", limit
     return words.every((word) => text.includes(word));
   };
   if (source === "generation") {
-    return paginate(filterVisibleGallery(gallery).filter((item) => finishedImage(item) && !item.library && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
+    return paginate(filterVisibleGallery(recordsForRequest(gallery, req)).filter((item) => finishedImage(item) && !item.library && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
   }
   if (source === "hidden") {
     if (!encryptionKeyFromRequest(req)) return { items: [], nextCursor: "", hasMore: false, locked: true };
     return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter((item) => finishedImage(item) && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
   }
   const items = loadManifest()
-    .filter((item) => item.source === "upload" && matches(item))
+    .filter((item) => item.source === "upload" && recordBelongsToRequest(item, req) && matches(item))
     .sort(newestFirst);
   return paginate(items, cursor, limit, publicUploadAsset);
 }
@@ -201,12 +202,12 @@ async function inspectImage(buffer, declaredMime = "") {
   return { mime, width, height };
 }
 
-export async function saveUploadedReference({ buffer, name, mime: declaredMime = "" }) {
+export async function saveUploadedReference({ buffer, name, mime: declaredMime = "" }, ownerId = "") {
   if (!buffer?.length) throw new Error("That image is empty.");
   if (buffer.length > maxUploadBytes) throw new Error(`Reference images can be up to ${Math.round(maxUploadBytes / 1024 / 1024)} MB.`);
   const inspected = await inspectImage(buffer, declaredMime);
   const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-  const existing = loadManifest().find((item) => item.hash === hash && item.source === "upload");
+  const existing = loadManifest().find((item) => item.hash === hash && item.source === "upload" && String(item.ownerId || "") === ownerId);
   if (existing && fs.existsSync(path.join(filesDir, existing.file)) && fs.existsSync(path.join(thumbsDir, existing.thumbnail))) return publicUploadAsset(existing);
   ensureDirs();
   const id = crypto.randomUUID();
@@ -229,14 +230,15 @@ export async function saveUploadedReference({ buffer, name, mime: declaredMime =
     hash,
     file,
     thumbnail,
+    ...(ownerId ? { ownerId } : {}),
     createdAt: new Date().toISOString()
   };
   writeManifest([record, ...loadManifest()]);
   return publicUploadAsset(record);
 }
 
-export function readUploadedReference(id, variant = "media") {
-  const record = loadManifest().find((item) => item.id === String(id || "") && item.source === "upload");
+export function readUploadedReference(id, variant = "media", ownerId = "") {
+  const record = loadManifest().find((item) => item.id === String(id || "") && item.source === "upload" && String(item.ownerId || "") === ownerId);
   if (!record) return null;
   const isThumb = variant === "thumbnail";
   const file = path.join(isThumb ? thumbsDir : filesDir, isThumb ? record.thumbnail : record.file);
@@ -246,9 +248,9 @@ export function readUploadedReference(id, variant = "media") {
   return { file: resolved, mime: isThumb && record.thumbnail.endsWith(".webp") ? "image/webp" : record.mime, name: record.name };
 }
 
-export function deleteUploadedReference(id) {
+export function deleteUploadedReference(id, ownerId = "") {
   const records = loadManifest();
-  const record = records.find((item) => item.id === String(id || "") && item.source === "upload");
+  const record = records.find((item) => item.id === String(id || "") && item.source === "upload" && String(item.ownerId || "") === ownerId);
   if (!record) throw new Error("That reference image is gone.");
   for (const [baseDir, filename] of [[filesDir, record.file], [thumbsDir, record.thumbnail]]) {
     const base = path.resolve(baseDir);
@@ -266,10 +268,10 @@ function decodeGalleryReference(id = "") {
   try { return Buffer.from(String(id).slice(8), "base64url").toString("utf8"); } catch { return ""; }
 }
 
-function findGalleryItem(id = "") {
+function findGalleryItem(id = "", req = null) {
   const decoded = decodeGalleryReference(id);
   const wanted = decoded || String(id || "");
-  return filterVisibleGallery(gallery).find((item) => galleryKey(item) === wanted || item.id === wanted || item.url === wanted) || null;
+  return filterVisibleGallery(recordsForRequest(gallery, req)).find((item) => galleryKey(item) === wanted || item.id === wanted || item.url === wanted) || null;
 }
 
 async function publicGalleryBuffer(item) {
@@ -289,7 +291,7 @@ async function publicGalleryBuffer(item) {
 
 export function referenceAssetFromGallery(req, galleryItemId) {
   // Images added from another folder are shown in place, not ComfyUI outputs it can read back.
-  const publicItem = filterVisibleGallery(gallery).find((item) => item.type === "image" && item.status === "done" && !item.library && (item.id === galleryItemId || item.url === galleryItemId || galleryKey(item) === galleryItemId));
+  const publicItem = filterVisibleGallery(recordsForRequest(gallery, req)).find((item) => item.type === "image" && item.status === "done" && !item.library && (item.id === galleryItemId || item.url === galleryItemId || galleryKey(item) === galleryItemId));
   if (publicItem) return galleryAsset(publicItem);
   const vaultItem = vaultGalleryItemsForRequest(req, { bundles: false }).find((item) => item.type === "image" && item.status === "done" && item.id === galleryItemId);
   if (vaultItem) return galleryAsset(vaultItem);
@@ -331,13 +333,14 @@ export async function bytesForReference(req, id) {
     if (!vault.item.upscaleActive) return original;
     return preferUpscale(original, async () => readVaultAsset(req, vaultId, "upscale"));
   }
-  const upload = loadManifest().find((item) => item.id === id && item.source === "upload");
+  const ownerId = ownerIdForRequest(req);
+  const upload = loadManifest().find((item) => item.id === id && item.source === "upload" && String(item.ownerId || "") === ownerId);
   if (upload) {
     const file = path.resolve(filesDir, upload.file);
     if (!file.startsWith(`${path.resolve(filesDir)}${path.sep}`) || !fs.existsSync(file)) throw new Error("That reference image is gone.");
     return { buffer: fs.readFileSync(file), mime: upload.mime, name: upload.name };
   }
-  const item = findGalleryItem(id);
+  const item = findGalleryItem(id, req);
   if (!item || item.type !== "image" || item.status !== "done") throw new Error("That image is no longer in the gallery.");
   const original = await publicGalleryBuffer(item);
   if (!item.upscaleActive || item.upscale?.status !== "done" || !item.upscale.url) return original;

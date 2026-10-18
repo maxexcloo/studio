@@ -836,7 +836,8 @@ export function recordsFromComfyHistory(history) {
         width: Number(saved.width || latent.width || 0),
         height: Number(saved.height || latent.height || 0),
         model: saved.model || model,
-        settings: saved.settings || (loras.length ? { loras } : {})
+        settings: saved.settings || (loras.length ? { loras } : {}),
+        ...(typeof saved.ownerId === "string" && saved.ownerId ? { ownerId: saved.ownerId } : {})
       };
       if (hasExistingOutputFile(record)) records.push(record);
     }
@@ -867,6 +868,7 @@ export function makePendingItems(id, body) {
     referenceImageName: body.startImageName || "",
     startImageId: body.startImageId || "",
     settings: generationSettings(body),
+    ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
     privateVault: Boolean(body.privateVault)
   }));
 }

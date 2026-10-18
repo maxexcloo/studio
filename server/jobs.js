@@ -494,7 +494,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       method: "POST",
       headers: { "content-type": "application/json" },
       // heiss_hidden stays with the run in ComfyUI's history, so no recovery ever takes it for a gallery image.
-      body: JSON.stringify({ prompt, client_id: id, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "auto", ...(hiddenPromptId ? { heiss_hidden: true } : { heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body) } }) } })
+      body: JSON.stringify({ prompt, client_id: id, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "auto", ...(hiddenPromptId ? { heiss_hidden: true } : { heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}) } }) } })
     });
     // An older ComfyUI names the run itself.
     if (hiddenPromptId && queued.prompt_id && queued.prompt_id !== hiddenPromptId) {

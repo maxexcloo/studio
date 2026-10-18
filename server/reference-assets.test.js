@@ -43,6 +43,24 @@ test("a reference page maps only the items it returns", async () => {
   for (const asset of saved) referenceAssets.deleteUploadedReference(asset.id);
 });
 
+test("uploaded reference assets and byte reads are limited to their account owner", async () => {
+  const buffer = await sharp({ create: { width: 20, height: 18, channels: 3, background: "#456789" } }).png().toBuffer();
+  const ownerA = { heissAccount: { userId: "account-a", role: "user" } };
+  const ownerB = { heissAccount: { userId: "account-b", role: "user" } };
+  const assetA = await referenceAssets.saveUploadedReference({ buffer, name: "same.png", mime: "image/png" }, "account-a");
+  const assetB = await referenceAssets.saveUploadedReference({ buffer, name: "same.png", mime: "image/png" }, "account-b");
+
+  assert.notEqual(assetA.id, assetB.id, "identical bytes do not join two users' asset records");
+  assert.deepEqual(referenceAssets.listReferenceAssets(ownerA, { source: "upload" }).items.map((item) => item.id), [assetA.id]);
+  assert.deepEqual(referenceAssets.listReferenceAssets(ownerB, { source: "upload" }).items.map((item) => item.id), [assetB.id]);
+  assert.equal(referenceAssets.readUploadedReference(assetB.id, "media", "account-a"), null);
+  await assert.rejects(referenceAssets.bytesForReference(ownerA, assetB.id), /no longer in the gallery/);
+  assert.throws(() => referenceAssets.deleteUploadedReference(assetB.id, "account-a"), /gone/);
+  assert.ok(referenceAssets.readUploadedReference(assetB.id, "media", "account-b"));
+  referenceAssets.deleteUploadedReference(assetA.id, "account-a");
+  referenceAssets.deleteUploadedReference(assetB.id, "account-b");
+});
+
 test("non-image uploads are rejected", async () => {
   await assert.rejects(() => referenceAssets.saveUploadedReference({ buffer: Buffer.from("not an image"), name: "fake.png", mime: "image/png" }));
 });

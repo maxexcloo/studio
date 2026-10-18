@@ -12,6 +12,7 @@ process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.COMFY_URL = "http://127.0.0.1:9";
 
 const trash = await import("./gallery-trash.js");
+const { accountOutputSubfolder } = await import("./account-ownership.js");
 
 const item = (filename, extra = {}) => ({
   id: `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`,
@@ -53,6 +54,33 @@ test("a file whose name is taken again stays in the trash instead of overwriting
   assert.equal(missing, 1);
   assert.equal(fs.readFileSync(file("image_00003_.png"), "utf8"), "new");
   assert.equal(trash.trashSummary().files, 1);
+});
+
+test("account trash summaries and restore operations stay within the selected owner", async () => {
+  const ownerA = "account-a";
+  const ownerB = "account-b";
+  const subfolderA = accountOutputSubfolder(ownerA);
+  const subfolderB = accountOutputSubfolder(ownerB);
+  const ownedItem = (ownerId, subfolder, filename) => {
+    const url = `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`;
+    return item(filename, { id: url, url, ownerId });
+  };
+  for (const subfolder of [subfolderA, subfolderB]) fs.mkdirSync(path.join(outputDir, subfolder), { recursive: true });
+  const itemA = ownedItem(ownerA, subfolderA, "account-a.png");
+  const itemB = ownedItem(ownerB, subfolderB, "account-b.png");
+  fs.writeFileSync(path.join(outputDir, subfolderA, "account-a.png"), "a");
+  fs.writeFileSync(path.join(outputDir, subfolderB, "account-b.png"), "b");
+  const batchA = trash.trashGalleryItems([itemA]).batch;
+  const batchB = trash.trashGalleryItems([itemB]).batch;
+
+  assert.equal(trash.trashSummary(undefined, ownerA).items, 1);
+  assert.equal(trash.trashSummary(undefined, ownerB).items, 1);
+  assert.equal(trash.trashSummary(undefined, "unknown-owner").items, 0);
+  assert.deepEqual(trash.restoreTrash(batchB, undefined, ownerA), { restored: [], missing: 0 });
+  assert.equal(trash.restoreTrash(batchA, undefined, ownerA).restored[0].ownerId, ownerA);
+  assert.equal(await trash.emptyTrash(undefined, ownerB), 1);
+  assert.equal(trash.trashSummary(undefined, ownerA).batches, 0);
+  assert.equal(trash.trashSummary(undefined, ownerB).batches, 0);
 });
 
 test("nothing outside the output folder is touched, and old batches are purged after the retention", async () => {

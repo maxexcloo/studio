@@ -4,6 +4,7 @@ const publicAccountPaths = new Set([
   "/api/accounts/sign-out",
   "/api/accounts/bootstrap"
 ]);
+const ownerMediaPaths = new Set(["/comfy/view", "/comfy/thumb", "/comfy/video-preview"]);
 
 /** Account mode must require identity even on loopback; ordinary users stay out until stores are owner-scoped. */
 export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
@@ -16,6 +17,7 @@ export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
     return;
   }
   if (req.path.startsWith("/comfy") && account.role !== "administrator") {
+    if (ownerMediaPaths.has(req.path)) return next();
     res.status(403).json({ ok: false, error: "Raw ComfyUI access is restricted to administrators." });
     return;
   }
