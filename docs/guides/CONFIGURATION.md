@@ -46,6 +46,22 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 
 `HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). `HEISS_ACCOUNT_COOKIE_NAME` renames the account cookie (`heiss_account` by default). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`; `HEISS_ACCOUNT_COOKIE_SECURE=1` forces it.
 
+### Importing an Existing Studio
+
+`scripts/import-studio.mjs` moves a whole single-user studio into one existing account of this studio. It runs against this studio's `HEISS_DATA_DIR` and `HEISS_MEDIA_DIR`; stop HEISS first.
+
+```bash
+node scripts/import-studio.mjs --source-data /old/heiss/data --source-outputs /old/comfy/output --account studio --label normal         # dry run
+node scripts/import-studio.mjs --source-data /old/heiss/data --source-outputs /old/comfy/output --account studio --label normal --apply
+node scripts/import-studio.mjs --undo <batch>
+```
+
+- **What moves:** finished gallery outputs and their upscales (copied into the account's media folder), prompt and negative-prompt history, LoRA stacks and library, uploaded references, and MCP job and reference ownership.
+- **What doesn't:** Hidden (it is encrypted and unavailable to accounts), presets and workflow preferences (studio-wide), pending or failed records, and library-folder items. Each of these is counted in the dry run.
+- **Without `--apply`,** nothing is written; the dry run lists every count and conflict.
+- **The source is never changed.** Every target file that changes is backed up under `<HEISS_DATA_DIR>/imports/<batch>/`, and `--undo` removes exactly what that import added.
+- **Refused:** an import whose jobs are already in the gallery, an account that already has its own history files, or a result above `HEISS_GALLERY_LIMIT`.
+
 MCP clients connect in one of three ways in multi-user mode:
 
 - **Personal token:** a client sends the account's own token.
