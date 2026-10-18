@@ -161,7 +161,8 @@ async function recoverGalleryFromHistory() {
   for (const backend of configuredBackends()) {
     await withComfyBackend(backend, async () => {
       const history = withoutHiddenRuns(await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({})));
-      recovered.push(...recordsFromComfyHistory(history));
+      const records = recordsFromComfyHistory(history);
+      recovered.push(...(multiUserEnabled ? records.filter((item) => item.ownerId) : records));
     });
   }
   if (!recovered.length) return;
@@ -1219,7 +1220,13 @@ app.post("/api/upscale", async (req, res) => {
   const info = await upscaleContext(res);
   if (!info) return;
   const quality = normalizeQuality(req.body?.quality);
-  const faceDetail = Boolean(req.body?.faceDetail) && findUpscaleTarget(String(req.body?.galleryItemId || ""))?.type !== "video";
+  const itemId = String(req.body?.galleryItemId || "");
+  const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
+  if (req.heissAccount && !ownedItem) {
+    res.status(404).json({ ok: false, reason: "missing", error: "This image is no longer in the gallery." });
+    return;
+  }
+  const faceDetail = Boolean(req.body?.faceDetail) && (ownedItem || findUpscaleTarget(itemId))?.type !== "video";
   const status = upscaleStatus(info, quality);
   if (!status.ready) {
     res.status(400).json({ ok: false, error: status.nodesInstalled ? "The SeedVR2 models aren’t installed yet." : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`, status });
@@ -1230,7 +1237,6 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   // Say exactly why an image cannot be upscaled; the tile shows this in a popover.
-  const itemId = String(req.body?.galleryItemId || "");
   const hiddenKey = encryptionKeyFromRequest(req);
   // A Hidden image upscales the same way; only where the result goes differs.
   const hiddenItem = findUpscaleTarget(itemId) ? null : findVaultItem(hiddenKey, itemId);
@@ -1285,7 +1291,10 @@ app.post("/api/upscale", async (req, res) => {
 // Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
 app.post("/api/upscale/cancel", async (req, res) => {
   const itemId = String(req.body?.galleryItemId || "");
-  const entry = [...jobs].find(([, job]) => job.kind === "upscale" && job.galleryItemId === itemId && !job.terminalAt);
+  const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
+  if (req.heissAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
+  const entry = [...jobs].find(([, job]) => job.kind === "upscale" && job.galleryItemId === itemId && !job.terminalAt
+    && (!req.heissAccount || job.ownerId === req.heissAccount.userId));
   if (!entry) {
     // Nothing is running it (the server restarted mid-upscale): just clear the spinner.
     const item = findUpscaleTarget(itemId);
@@ -1302,6 +1311,8 @@ app.post("/api/upscale/cancel", async (req, res) => {
 app.post("/api/upscale/toggle", (req, res) => {
   try {
     const itemId = String(req.body?.galleryItemId || "");
+    const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
+    if (req.heissAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
     const key = encryptionKeyFromRequest(req);
     const hiddenItem = findUpscaleTarget(itemId) ? null : findVaultItem(key, itemId);
     if (hiddenItem) {

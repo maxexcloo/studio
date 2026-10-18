@@ -52,7 +52,8 @@ export function createJobRecovery({ backends, filterHistory, finishJob, getGalle
               ? { value: 0, max: 0, phase: 'Queued', steps: false }
               : (current?.progress?.phase && current.progress.phase !== 'Queued') || current?.progress?.max > 0
                 ? current.progress : { value: 0, max: 0, phase: 'Generating', steps: false };
-            jobs.set(id, { ...current, ...place, comfyBackend: backend, progress, ...(!current ? { recovered: true } : {}) });
+            const ownerId = current?.ownerId || getGallery().find((item) => item.jobId === id)?.ownerId;
+            jobs.set(id, { ...current, ...place, ...(ownerId ? { ownerId } : {}), comfyBackend: backend, progress, ...(!current ? { recovered: true } : {}) });
             replace(getGallery().map((item) => item.jobId === id && !item.url
               ? { ...item, status: 'pending', failure: undefined, error: undefined, progress } : item));
             continue;

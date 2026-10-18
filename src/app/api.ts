@@ -167,11 +167,30 @@ const prefsKey = "heiss-ui-prefs";
 const draftKey = "heiss-ui-draft";
 const legacyPrefsKey = "j-ai-studio-prefs";
 const legacyDraftKey = "j-ai-studio-draft";
+let accountStorageScope = "";
+
+/** Keep browser-held studio content separate when people share a browser. */
+export function setAccountStorageScope(accountId?: string) {
+  accountStorageScope = accountId ? `account:${accountId}` : "";
+}
+
+function scopedKey(key: string) {
+  return accountStorageScope ? `${key}:${accountStorageScope}` : key;
+}
+
+export function savePrefs(value: Preferences) {
+  localStorage.setItem(scopedKey(prefsKey), JSON.stringify(value));
+}
+
+export function saveDraft(value: unknown) {
+  localStorage.setItem(scopedKey(draftKey), JSON.stringify(value));
+}
 
 function migratedGet(key: string, legacyKey: string) {
   try {
-    const current = localStorage.getItem(key);
+    const current = localStorage.getItem(scopedKey(key));
     if (current != null) return current;
+    if (accountStorageScope) return null;
     const legacy = localStorage.getItem(legacyKey);
     if (legacy != null) {
       localStorage.setItem(key, legacy);

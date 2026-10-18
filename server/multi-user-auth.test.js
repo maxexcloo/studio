@@ -40,6 +40,8 @@ test("only the local machine can bootstrap the first recovery administrator, onc
   const cookie = [].concat(created.headers["Set-Cookie"])[0].split(";")[0];
   const signedIn = { ...local(), headers: { ...local().headers, cookie } };
   assert.equal(accountForRequest(signedIn).role, "administrator");
+  const status = await call(routes["GET /api/accounts/status"], signedIn);
+  assert.equal(status.body.account.id, accountForRequest(signedIn).userId);
 
   const repeated = await call(routes["POST /api/accounts/bootstrap"], local({ username: "second", password: "a secure second password" }));
   assert.equal(repeated.statusCode, 409);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, RefreshCw } from 'lucide-react';
-import { ApiError, apiJson, signedOutEvent } from './api';
+import { ApiError, apiJson, setAccountStorageScope, signedOutEvent } from './api';
 import { setAtComputer, setThisComputer } from './device';
 import { LockMark, type LockMarkStage } from './LockMark';
 import { cn } from './format';
@@ -33,14 +33,16 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
 
   const check = useCallback(async () => {
     try {
-      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; account?: { role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
+      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
       if (accountMode.mode === 'multi-user') {
         const signedIn = accountMode.signedIn === true;
+        setAccountStorageScope(signedIn ? accountMode.account?.id : undefined);
         setThisComputer(signedIn && accountMode.account?.role === 'administrator');
         setAtComputer(false);
         setState(signedIn ? (accountMode.account?.role === 'administrator' ? { kind: 'in' } : { kind: 'account-pending' }) : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true });
         return;
       }
+      setAccountStorageScope();
       const status = await apiJson<AccessStatus & { ok: boolean }>('/api/access/status', { cache: 'no-store' });
       setThisComputer(status.canAdmin);
       setAtComputer(status.thisComputer);

@@ -13,7 +13,7 @@ import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
 import { clampProfileCount, generationPlan, imageDimension, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
-import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery } from './app/api';
+import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery, saveDraft, savePrefs } from './app/api';
 import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras } from './app/loras';
@@ -619,9 +619,9 @@ function App() {
     };
     const save = () => {
       try {
-        localStorage.setItem("heiss-ui-draft", JSON.stringify(draft));
+        saveDraft(draft);
       } catch {
-        localStorage.setItem("heiss-ui-draft", JSON.stringify({ ...draft, startImage: "", startImageId: draft.startImageId }));
+        saveDraft({ ...draft, startImage: "", startImageId: draft.startImageId });
       }
     };
     // Typing changes the draft on every keystroke: write it once typing pauses,
@@ -719,7 +719,7 @@ function App() {
     const merged = { ...prefs, ...next };
     setPrefsState(merged);
     try {
-      localStorage.setItem("heiss-ui-prefs", JSON.stringify(merged));
+      savePrefs(merged);
     } catch {
       showToast("Couldn’t save settings", "error");
     }
@@ -1159,7 +1159,7 @@ function App() {
         updateSavedSizes((current) => [...current, ...local.filter((item) => !known.has(item.id))]);
         setPrefsState((current) => {
           const { savedSizes: _moved, ...rest } = current;
-          try { localStorage.setItem("heiss-ui-prefs", JSON.stringify(rest)); } catch { /* moved either way */ }
+          try { savePrefs(rest); } catch { /* moved either way */ }
           return rest;
         });
         return;

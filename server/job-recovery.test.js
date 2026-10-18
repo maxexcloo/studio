@@ -45,6 +45,14 @@ test('restart reattaches failed tiles to running and queued video prompts withou
   assert.equal(s.writes, writes, 'unchanged polls do not rewrite the gallery');
 });
 
+test('restart recovery keeps the account owner attached to its queued job', async () => {
+  const s = fixture();
+  s.gallery = [{ ...tile('owned'), ownerId: 'account-a' }];
+  s.snapshots.video.queue = { queue_pending: [queued('owned')] };
+  await s.recover();
+  assert.equal(s.jobs.get('owned').ownerId, 'account-a');
+});
+
 test('late completion replaces the false failure and does not duplicate a recovered output', async () => {
   const s = fixture();
   s.gallery = [tile('finished'), ...result('finished').outputs];
