@@ -11,6 +11,7 @@ test('Normal instances hide the preset library on desktop and phone', async ({ p
 });
 
 async function openLibrary(page: import('@playwright/test').Page) {
+  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
   if (await page.locator('.phone-shell').count()) await page.getByRole('button', { name: 'More', exact: true }).click();
   else await page.getByRole('textbox', { name: 'Prompt', exact: true }).click();
   await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();

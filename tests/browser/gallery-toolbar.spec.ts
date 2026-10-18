@@ -218,6 +218,7 @@ test('compact studio keeps active search and every filter inside the viewport', 
 test('custom gallery filters support keyboard selection and dismiss only their own menu', async ({ page }) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
+  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
   const headerFilters = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
   if (await headerFilters.count()) await headerFilters.click();
   else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
@@ -364,6 +365,7 @@ test('filter options scroll independently and have a compact local search', asyn
   const many = Array.from({ length: 45 }, (_, index) => ({ ...items[0], id: `filter-${index}`, model: `Model ${String(index).padStart(2, '0')}` }));
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: many, revision: 1, hasMore: false } }));
   await page.goto('/');
+  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
   const phoneFilters = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
   if (await phoneFilters.count()) await phoneFilters.click();
   else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();

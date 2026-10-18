@@ -17,7 +17,7 @@ export const accessFeatures = Object.freeze([
   "mcp"
 ]);
 
-const keyPattern = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 
 export function validAccountKey(value) {
   return typeof value === "string" && keyPattern.test(value);

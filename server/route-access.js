@@ -1,8 +1,14 @@
 import { canAdmin, clientOf, deviceSession } from './access.js';
 import { encryptionKeyFromRequest } from './privacy.js';
+import { multiUserEnabled } from './multi-user-auth.js';
 
 /** This computer, or another device that signed in (the gate below has already checked). */
 export function requireLocal(req, res) {
+  if (multiUserEnabled) {
+    if (canAdmin(req)) return true;
+    res.status(403).json({ ok: false, error: "This action is restricted to administrators." });
+    return false;
+  }
   const client = clientOf(req);
   if (client.thisComputer || (client.network && deviceSession(req))) return true;
   res.status(403).json({ ok: false, error: "Only this computer or a signed-in device can do this." });
@@ -24,6 +30,11 @@ export function requireAdmin(req, res) {
 
 /** Creating, erasing or re-keying Hidden happens at the computer it runs on, never from the network. */
 export function requireThisComputer(req, res) {
+  if (multiUserEnabled) {
+    if (clientOf(req).thisComputer && canAdmin(req)) return true;
+    res.status(403).json({ ok: false, reason: "this-computer", error: "Only an administrator on the computer running HEISS UI can do this." });
+    return false;
+  }
   if (clientOf(req).thisComputer) return true;
   res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running HEISS UI can do this." });
   return false;

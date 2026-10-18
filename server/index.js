@@ -75,6 +75,8 @@ import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoic
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
+import { accountForRequest, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
+import { enforceMultiUserRequest } from './multi-user-gate.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -82,6 +84,12 @@ addProbe("thumbs", () => buildStats());
 const app = express();
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
+// Native MCP currently uses deployment-level forwarded identity. Until personal
+// account tokens are implemented, refuse that older privilege path in account mode.
+app.use((req, res, next) => {
+  if (multiUserEnabled && (req.path === "/mcp" || req.path.startsWith("/mcp/"))) return res.status(503).json({ error: "Personal MCP credentials are not configured for this studio." });
+  next();
+});
 registerMcpRoutes(app, {
   dataDir,
   baseUrl: () => `http://127.0.0.1:${port}`,
@@ -170,6 +178,7 @@ async function recoverGalleryFromHistory() {
  */
 function requireSignedIn(req, res, next) {
   if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
+  if (multiUserEnabled) return enforceMultiUserRequest(req, res, next, { accountForRequest });
   const client = clientOf(req);
   if (client.thisComputer) return next();
   if (!client.network) {
@@ -187,6 +196,7 @@ function requireSignedIn(req, res, next) {
 
 app.use(requireSignedIn);
 registerAccessRoutes(app);
+registerMultiUserAuthRoutes(app, { availableProfiles: async () => (await inferModels()).profiles.map((profile) => profile.id) });
 
 async function runRepoCommand(command, args) {
   const npm = command === npmCommand ? npmInvocation(args) : { command, args, shell: false };

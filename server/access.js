@@ -5,6 +5,7 @@ import { allowLanActions, dockerHostOnly, root } from "./comfy.js";
 import { classifyClient } from "./client-trust.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
+import { accountSession } from "./account-store.js";
 
 /**
  * Other devices: how they sign in, how long they stay signed in, and what
@@ -249,6 +250,13 @@ export function isSignedInDevice(req) {
  * when the owner trusts devices with it.
  */
 export function canAdmin(req) {
+  if (process.env.HEISS_MULTI_USER === "1") {
+    if (!req?.heissAccount) {
+      const token = parseCookies(req)[process.env.HEISS_ACCOUNT_COOKIE_NAME || "heiss_account"];
+      if (req) req.heissAccount = accountSession(token);
+    }
+    return req?.heissAccount?.role === "administrator";
+  }
   if (clientOf(req).thisComputer) return true;
   return devicesMayAdmin() && isSignedInDevice(req);
 }

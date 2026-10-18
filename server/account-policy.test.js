@@ -6,7 +6,8 @@ const available = ["image-fast", "image-quality", "video"];
 
 test("account keys accept only bounded server-safe identifiers", () => {
   assert.equal(validAccountKey("user-23"), true);
-  for (const value of ["", "../user", "User", "a/b", "a".repeat(65), null]) assert.equal(validAccountKey(value), false);
+  assert.equal(validAccountKey("custom:portrait-mode"), true);
+  for (const value of ["", "../user", "User", "a/b", "a".repeat(129), null]) assert.equal(validAccountKey(value), false);
 });
 
 test("access profiles contain only currently available generation profiles and known feature switches", () => {
