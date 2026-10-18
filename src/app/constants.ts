@@ -1,8 +1,9 @@
+import { defaultGenerationCount } from '../../server/generation-defaults.js';
 import type { AspectPreset, Mode, Preferences } from './types';
 
 export const defaultPrefs: Preferences = {
-  countDefaultsVersion: 1,
-  defaultImageCount: 4,
+  countDefaultsVersion: 2,
+  defaultImageCount: defaultGenerationCount,
   defaultImageSteps: 8,
   defaultVideoFrames: 33,
   defaultVideoSteps: 12,

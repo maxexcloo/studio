@@ -499,7 +499,7 @@ test("downloaded Sana presets appear once the ExtraModels nodes are in, and runs
   assert.deepEqual([byType(graph, "KSampler")[0].inputs.cfg, byType(graph, "KSampler")[0].inputs.sampler_name], [1, "scm"]);
   assert.equal(byType(graph, "SanaTextEncode")[0].inputs.text, "an astronaut");
   // ExtraModels' own latent node fails on current ComfyUI; the native 1/32 one stands in.
-  assert.deepEqual([byType(graph, "EmptySanaLatentImage").length, byType(graph, "EmptyHunyuanImageLatent")[0].inputs.batch_size], [0, 1]);
+  assert.deepEqual([byType(graph, "EmptySanaLatentImage").length, byType(graph, "EmptyHunyuanImageLatent")[0].inputs.batch_size], [0, 2]);
   assert.equal(byType(graph, "SaveImage").length, 1);
   assert.equal(byType(graph, "CheckpointLoaderSimple").length + byType(graph, "VAELoader").length + byType(graph, "CLIPLoader").length, 0);
 

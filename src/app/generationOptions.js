@@ -1,3 +1,5 @@
+import { defaultGenerationCount } from '../../server/generation-defaults.js';
+
 /** Snap typed and restored dimensions to the selected model's supported stride. */
 export function imageDimension(value, metadata = {}) {
   const step = Number(metadata.step) || 1;
@@ -23,8 +25,8 @@ export function clampProfileCount(profile, count, kind = profile?.kind || "image
   return Math.round(Math.max(min, Math.min(max, Math.round((value - offset) / step) * step + offset)));
 }
 
-export function profileImageCount(profile, fallback = 4) {
-  return clampProfileCount(profile, profile?.kind === "video" ? 1 : fallback);
+export function profileImageCount(profile, fallback = defaultGenerationCount) {
+  return clampProfileCount(profile, fallback);
 }
 
 /** Reference latents multiply memory use: queue each variant separately. */

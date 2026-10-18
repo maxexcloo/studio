@@ -125,7 +125,7 @@ async function failure(client, name, args = {}) {
 }
 async function generate(client, args = {}) {
   await call(client, 'Models', { profile_id: args.profile_id || imageProfile.id });
-  return data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'], ...args }));
+  return data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'], count: 1, ...args }));
 }
 function jobId(result) { assert.ok(result.jobs?.length); return result.jobs[0].job_id; }
 function links(result) { return (result.content || []).filter(item => item.type === 'resource_link').map(item => item.uri); }
@@ -172,7 +172,7 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
   assert.deepEqual(detail.options.loras, imageProfile.options.loras);
   assert.deepEqual(detail.constraints, imageProfile.constraints);
-  assert.equal(detail.defaults.count, 1);
+  assert.equal(detail.defaults.count, 2);
   assert.equal(detail.prompting, null);
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
 });
@@ -180,7 +180,7 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
 test('Generate requires this account to read the selected full guide, not discovery or another profile', async t => {
   const f = await fixture(t);
   const alice = await f.client('alice');
-  const args = { profile_id: imageProfile.id, prompts: ['A landscape'] };
+  const args = { profile_id: imageProfile.id, prompts: ['A landscape'], count: 1 };
   await failure(alice, 'Generate', args);
   await call(alice, 'Models', { kind: 'image' });
   await failure(alice, 'Generate', args);
@@ -204,6 +204,19 @@ test('Generate returns immediately with one saved-size image and passes explicit
   assert.equal(f.submitted[0].sampler, 'euler');
   assert.equal(f.submitted[0].scheduler, 'simple');
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
+});
+
+test('omitted counts queue two independent image or video jobs and explicit one remains one', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  for (const profile of [imageProfile, videoProfile]) {
+    await call(client, 'Models', { profile_id: profile.id });
+    const result = data(await call(client, 'Generate', { profile_id: profile.id, prompts: ['A landscape'] }));
+    assert.equal(result.jobs.length, 2);
+    assert.deepEqual(f.submitted.slice(-2).map(body => [body.kind, body.count]), [[profile.kind, 1], [profile.kind, 1]]);
+    const single = await generate(client, { profile_id: profile.id, count: 1 });
+    assert.equal(single.jobs.length, 1);
+  }
 });
 
 test('image variants queue separately with incrementing seeds and video keeps the actual video profile', async t => {
@@ -461,7 +474,7 @@ test('Generate never waits or fetches completed results, including when retrieva
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 1 });
   assert.equal(f.submitted.length, 0);
   await call(client, 'Models', { profile_id: imageProfile.id });
-  const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'] });
+  const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], count: 1 });
   assert.notEqual(result.isError, true);
   assert.equal(result.content.some(item => item.type === 'image'), false);
   assert.equal(f.submitted.length, 1);
@@ -599,7 +612,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   const profiles = data(await call(client, 'Models', { kind: 'image' })).profiles;
   assert.ok(profiles.length);
   await call(client, 'Models', { profile_id: profiles[0].id });
-  const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'] }));
+  const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'], count: 1 }));
   assert.equal(queued.status, 'queued');
   assert.equal(queued.jobs.length, 1);
   const id = jobId(queued);
