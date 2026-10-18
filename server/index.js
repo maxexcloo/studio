@@ -725,7 +725,8 @@ registerPresetRoutes(app, { models: async () => {
   return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
 } });
 
-app.get("/api/paths", async (_req, res) => {
+app.get("/api/paths", async (req, res) => {
+  if (req.heissAccount && req.heissAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });
   await autoDetectOutputDir();
   res.json({ outputDir: comfyOutputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir });
 });
