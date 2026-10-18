@@ -123,6 +123,10 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
   assert.equal(f.requests.find(request => request.path === '/generate')?.authorization, `Bearer ${token}`);
   const saved = JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8'));
   assert.equal(saved.jobs[id], 'stable-account-a');
+  Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=account-result.png' }] });
+  const preview = await call(client, 'Result', { job_id: id });
+  assert.ok(preview.content.some(item => item.type === 'image'));
+  assert.ok(f.downloads.includes('/comfy/view?filename=account-result.png'));
   const rejected = await fetch(`${f.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   assert.equal(rejected.status, 401);
 });

@@ -221,7 +221,7 @@ export class McpMedia {
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
-    const output = await this.readOutput(available);
+    const output = await this.readOutput(available, owner);
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) return { content: [text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
     const preview = await sharp(output.content, { limitInputPixels: 80000000 }).rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 80 }).toBuffer();
     return { content: [{ type: 'image', data: preview.toString('base64'), mimeType: 'image/jpeg' }, text({ job_id: jobId, output_index: index, status: 'done', message: 'Generation complete. Show the attached image inline. Its original opens in the browser; call it View Original, not Download. Reply briefly; do not generate or poll again unless requested.' }), text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
