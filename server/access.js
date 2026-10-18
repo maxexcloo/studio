@@ -255,7 +255,8 @@ export function canAdmin(req) {
       const token = parseCookies(req)[process.env.HEISS_ACCOUNT_COOKIE_NAME || "heiss_account"];
       if (req) req.heissAccount = accountSession(token);
     }
-    return req?.heissAccount?.role === "administrator";
+    // A personal MCP token never carries administrator authority.
+    return req?.heissAccount?.role === "administrator" && req.heissAccount.credential !== "mcp-token";
   }
   if (clientOf(req).thisComputer) return true;
   return devicesMayAdmin() && isSignedInDevice(req);

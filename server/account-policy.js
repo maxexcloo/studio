@@ -22,10 +22,12 @@ export function validAccountKey(value) {
   return typeof value === "string" && keyPattern.test(value);
 }
 
-export function normaliseAccessProfile(profile, availableProfiles = []) {
-  const names = new Set(availableProfiles.filter((name) => typeof name === "string" && name.trim()));
+/** Without an availability list, keep the stored grants: discovery and execution recheck each profile. */
+export function normaliseAccessProfile(profile, availableProfiles = null) {
+  const names = Array.isArray(availableProfiles) ? new Set(availableProfiles.filter((name) => typeof name === "string" && name.trim())) : null;
+  const usable = (name) => typeof name === "string" && name.trim() && name.length <= 256 && (!names || names.has(name));
   const selected = Array.isArray(profile?.generationProfiles)
-    ? [...new Set(profile.generationProfiles.filter((name) => names.has(name)))]
+    ? [...new Set(profile.generationProfiles.filter(usable))]
     : [];
   const features = Object.fromEntries(accessFeatures.map((feature) => [feature, profile?.features?.[feature] === true]));
   return {
@@ -36,14 +38,14 @@ export function normaliseAccessProfile(profile, availableProfiles = []) {
   };
 }
 
-export function effectiveAccountAccess(account, profiles, availableProfiles = []) {
+export function effectiveAccountAccess(account, profiles, availableProfiles = null) {
   if (!account || account.disabled === true) return { authenticated: false, reason: account ? "disabled" : "anonymous" };
   if (account.role === accountRoles.administrator) {
     return {
       authenticated: true,
       userId: account.id,
       role: accountRoles.administrator,
-      generationProfiles: [...new Set(availableProfiles)],
+      generationProfiles: [...new Set(availableProfiles || [])],
       features: Object.fromEntries(accessFeatures.map((feature) => [feature, true]))
     };
   }

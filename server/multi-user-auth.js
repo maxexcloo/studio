@@ -1,4 +1,4 @@
-import { accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 
@@ -15,10 +15,26 @@ function cookieToken(req) {
   return "";
 }
 
+// Personal MCP tokens reach only the routes MCP itself calls, never account or studio administration.
+const mcpBearerRoutes = [
+  ["GET", /^\/api\/models$/],
+  ["POST", /^\/api\/generate$/],
+  ["GET", /^\/api\/jobs\/[\w-]+$/],
+  ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
+  ["POST", /^\/api\/reference-assets\/upload$/],
+  ["GET", /^\/comfy\/view$/]
+];
+
+export function mcpBearerRouteAllowed(method, routePath) {
+  return mcpBearerRoutes.some(([allowedMethod, pattern]) => allowedMethod === method && pattern.test(routePath));
+}
+
 export function accountForRequest(req) {
   if (req?.heissAccount !== undefined) return req.heissAccount;
   const bearer = /^Bearer ([^\s]+)$/i.exec(String(req?.headers?.authorization || ""))?.[1] || "";
-  const account = accountSession(cookieToken(req)) || verifyAccountMcpToken(bearer);
+  const routePath = String(req?.path || req?.url || "").split("?")[0];
+  const account = accountSession(cookieToken(req))
+    || (bearer && mcpBearerRouteAllowed(String(req?.method || "GET").toUpperCase(), routePath) ? verifyAccountMcpToken(bearer) : null);
   if (req) req.heissAccount = account;
   return account;
 }
@@ -28,8 +44,15 @@ function appendCookie(res, cookie) {
   res.setHeader("Set-Cookie", [].concat(current || [], cookie));
 }
 
+// Behind a TLS-terminating proxy the socket is plain HTTP; a forged header only affects its sender.
+function secureRequest(req) {
+  return Boolean(req?.socket?.encrypted)
+    || process.env.HEISS_ACCOUNT_COOKIE_SECURE === "1"
+    || String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase() === "https";
+}
+
 function accountCookie(req, value, maxAge = 0) {
-  return [`${accountCookieName}=${value}`, "Path=/", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Strict", ...(req?.socket?.encrypted ? ["Secure"] : [])].join("; ");
+  return [`${accountCookieName}=${value}`, "Path=/", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Strict", ...(secureRequest(req) ? ["Secure"] : [])].join("; ");
 }
 
 function publicStatus(req) {
@@ -51,12 +74,19 @@ function requireAccountAdmin(req, res) {
 }
 
 export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [] } = {}) {
-  app.get("/api/accounts/status", (req, res) => {
+  // Single-user mode answers only the status route, even if an old account store remains.
+  const route = (method) => (path, handler) => app[method](path, (req, res) => (multiUserEnabled || path === "/api/accounts/status"
+    ? handler(req, res)
+    : res.status(404).json({ ok: false, error: "Accounts are disabled." })));
+  const [get, post, patch] = ["get", "post", "patch"].map(route);
+  let bootstrapping = null;
+
+  get("/api/accounts/status", (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json(publicStatus(req));
   });
 
-  app.post("/api/accounts/bootstrap", async (req, res) => {
+  post("/api/accounts/bootstrap", async (req, res) => {
     if (!multiUserEnabled || accountStoreSnapshot().accounts.length) {
       res.status(409).json({ ok: false, error: "Recovery administrator setup is already complete." });
       return;
@@ -65,20 +95,29 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       res.status(403).json({ ok: false, reason: "this-computer", error: "Create the recovery administrator on the computer running HEISS UI." });
       return;
     }
+    if (bootstrapping) {
+      res.status(409).json({ ok: false, error: "Recovery administrator setup is already in progress." });
+      return;
+    }
     try {
-      const account = await createLocalAccount({ username: req.body?.username, displayName: req.body?.displayName, password: req.body?.password, role: "administrator" });
+      bootstrapping = createLocalAccount({ username: req.body?.username, displayName: req.body?.displayName, password: req.body?.password, role: "administrator", onlyIfEmpty: true });
+      const account = await bootstrapping;
       const session = createAccountSession(account.id);
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
       res.status(201).json(publicStatus({ ...req, heissAccount: { authenticated: true, userId: account.id, role: account.role, generationProfiles: [], features: {} } }));
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
+    } finally {
+      bootstrapping = null;
     }
   });
 
-  app.post("/api/accounts/sign-in", async (req, res) => {
+  post("/api/accounts/sign-in", async (req, res) => {
     if (!multiUserEnabled) return res.status(404).json({ ok: false, error: "Account sign-in is disabled." });
     const client = clientOf(req);
-    const result = await limiter.attempt(client.address, false, () => verifyLocalAccount(req.body?.username, req.body?.password));
+    // One lane per address and username: behind a proxy every client shares an address.
+    const lane = `${client.address}|${String(req.body?.username || "").trim().normalize("NFKC").toLocaleLowerCase("en-AU").slice(0, 64)}`;
+    const result = await limiter.attempt(lane, false, () => verifyLocalAccount(req.body?.username, req.body?.password));
     if (result.reason === "busy") {
       res.status(429).setHeader("Retry-After", "1").json({ ok: false, error: "Wait a moment, then try again." });
       return;
@@ -98,14 +137,14 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     res.json(publicStatus(req));
   });
 
-  app.post("/api/accounts/sign-out", (req, res) => {
+  post("/api/accounts/sign-out", (req, res) => {
     revokeAccountSession(cookieToken(req));
     appendCookie(res, accountCookie(req, ""));
     req.heissAccount = null;
     res.json({ ok: true });
   });
 
-  app.get("/api/accounts/mcp-token", (req, res) => {
+  get("/api/accounts/mcp-token", (req, res) => {
     const account = accountForRequest(req);
     if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
     res.setHeader("Cache-Control", "no-store");
@@ -113,7 +152,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     res.json({ ok: true, endpoint: `${endpointBase}/mcp`, ...accountMcpTokenStatus(account.userId) });
   });
 
-  app.post("/api/accounts/mcp-token", (req, res) => {
+  post("/api/accounts/mcp-token", (req, res) => {
     const account = accountForRequest(req);
     if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
     try {
@@ -122,7 +161,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   });
 
-  app.post("/api/accounts/mcp-token/revoke", (req, res) => {
+  post("/api/accounts/mcp-token/revoke", (req, res) => {
     const account = accountForRequest(req);
     if (!account) return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
     try {
@@ -131,14 +170,14 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   });
 
-  app.get("/api/accounts/admin", async (req, res) => {
+  get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     const profiles = await availableProfiles();
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, accounts: listAccounts(), accessProfiles: listAccessProfiles(profiles), availableProfiles: profiles });
   });
 
-  app.post("/api/accounts/profiles", async (req, res) => {
+  post("/api/accounts/profiles", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
       res.json({ ok: true, profile: saveAccessProfile(req.body, await availableProfiles()) });
@@ -147,7 +186,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     }
   });
 
-  app.post("/api/accounts/users", async (req, res) => {
+  post("/api/accounts/users", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
       const account = await createLocalAccount({ ...req.body, role: "user" });
@@ -157,12 +196,16 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     }
   });
 
-  app.patch("/api/accounts/users/:id", (req, res) => {
+  patch("/api/accounts/users/:id", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
-      const account = req.body?.accessProfileId
-        ? assignAccessProfile(req.params.id, req.body.accessProfileId)
-        : setAccountDisabled(req.params.id, req.body?.disabled === true);
+      // Each change is explicit: a missing or misspelt field must never re-enable an account.
+      const body = req.body || {};
+      let account;
+      if (typeof body.accessProfileId === "string") account = assignAccessProfile(req.params.id, body.accessProfileId);
+      else if (typeof body.disabled === "boolean") account = setAccountDisabled(req.params.id, body.disabled);
+      else if (typeof body.password === "string") account = await setAccountPassword(req.params.id, body.password);
+      else return res.status(400).json({ ok: false, error: "Choose an access profile, account status or new password." });
       res.json({ ok: true, account });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });

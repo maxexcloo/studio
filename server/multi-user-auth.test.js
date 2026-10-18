@@ -88,8 +88,52 @@ test("only an authenticated administrator can create profiles and approve ordina
   assert.equal(endpoint.body.endpoint, "https://studio.example.test/mcp");
   const createdToken = await call(routes["POST /api/accounts/mcp-token"], admin);
   const token = createdToken.body.token;
-  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, authorization: `Bearer ${token}` } }).userId, accountForRequest(admin).userId);
+  const bearer = (method, routePath) => ({ ...local(), method, path: routePath, headers: { ...local().headers, authorization: `Bearer ${token}` } });
+  assert.equal(accountForRequest(bearer("GET", "/api/models")).userId, accountForRequest(admin).userId);
+  // A personal MCP token is not a general API or administrator credential.
+  assert.equal(accountForRequest(bearer("GET", "/api/accounts/admin")), null);
+  assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
+  assert.equal(accountForRequest(bearer("POST", "/api/shutdown")), null);
+  const { canAdmin } = await import("./access.js");
+  assert.equal(canAdmin(bearer("GET", "/comfy/view")), false);
   const revoked = await call(routes["POST /api/accounts/mcp-token/revoke"], admin);
   assert.equal(revoked.body.enabled, false);
-  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, authorization: `Bearer ${token}` } }), null);
+  assert.equal(accountForRequest(bearer("GET", "/api/models")), null);
+});
+
+test("ordinary accounts keep stored profile grants and explicit administration changes", async () => {
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], local({ username: "recovery", password: "a secure recovery password" }));
+  const admin = { ...local(), headers: { ...local().headers, cookie: [].concat(signedIn.headers["Set-Cookie"])[0].split(";")[0] } };
+  const userSignIn = await call(routes["POST /api/accounts/sign-in"], { ...local({ username: "artist", password: "an approved user password" }), socket: { remoteAddress: "192.168.1.20" } });
+  assert.equal(userSignIn.statusCode, 200);
+  const userCookie = [].concat(userSignIn.headers["Set-Cookie"])[0].split(";")[0];
+  const user = accountForRequest({ ...local(), headers: { ...local().headers, cookie: userCookie } });
+  // Runtime access must not drop grants for lack of a discovery list.
+  assert.deepEqual(user.generationProfiles, ["image-fast"]);
+
+  const list = await call(routes["GET /api/accounts/admin"], admin);
+  const artist = list.body.accounts.find((account) => account.username === "artist");
+  const empty = await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: {} });
+  assert.equal(empty.statusCode, 400);
+  const disabled = await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: true } });
+  assert.equal(disabled.body.account.disabled, true);
+  const typo = await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disable: false } });
+  assert.equal(typo.statusCode, 400);
+  const blocked = await call(routes["POST /api/accounts/sign-in"], { ...local({ username: "artist", password: "an approved user password" }), socket: { remoteAddress: "192.168.1.21" } });
+  assert.equal(blocked.statusCode, 401);
+  await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: false } });
+
+  const reset = await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { password: "a replacement password" } });
+  assert.equal(reset.statusCode, 200);
+  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, cookie: userCookie } }), null);
+
+  // Saving while discovery is degraded keeps existing grants but adds no new unknown ones.
+  const { saveAccessProfile } = await import("./account-store.js");
+  const saved = saveAccessProfile({ id: "artists", name: "Artists", generationProfiles: ["image-fast", "new-unknown"], features: { gallery: true } }, []);
+  assert.deepEqual(saved.generationProfiles, ["image-fast"]);
+});
+
+test("session cookies are Secure behind a TLS-terminating proxy", async () => {
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], { ...local({ username: "recovery", password: "a secure recovery password" }), headers: { host: "studio.example.test", "x-forwarded-proto": "https" } });
+  assert.match([].concat(signedIn.headers["Set-Cookie"])[0], /; Secure/);
 });

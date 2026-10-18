@@ -68,12 +68,15 @@ export function accountAccessForId(accountId) {
   return account ? effectiveAccountAccess(account, store.profiles) : null;
 }
 
-export function listAccessProfiles(availableProfiles = []) {
-  return Object.values(readStore().profiles).map((profile) => normaliseAccessProfile(profile, availableProfiles));
+/** Stored grants stay listed while discovery is degraded; the UI marks them unavailable. */
+export function listAccessProfiles() {
+  return Object.values(readStore().profiles).map((profile) => normaliseAccessProfile(profile));
 }
 
 export function saveAccessProfile(input, availableProfiles = []) {
-  const profile = normaliseAccessProfile(input, availableProfiles);
+  // New grants must be currently available; keep existing grants if discovery is degraded.
+  const existing = validAccountKey(input?.id) ? readStore().profiles[input.id]?.generationProfiles || [] : [];
+  const profile = normaliseAccessProfile(input, [...availableProfiles, ...existing]);
   if (!profile.id) throw new Error("Choose a valid profile ID.");
   if (!profile.name) throw new Error("Enter a name for this access profile.");
   readStore().profiles[profile.id] = profile;
@@ -91,7 +94,7 @@ export function assignAccessProfile(accountId, profileId) {
   return { id: account.id, accessProfileId: account.accessProfileId };
 }
 
-export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null } = {}) {
+export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
   if (!/^[\p{L}\p{N}][\p{L}\p{N}._-]{1,63}$/u.test(String(username || "").trim())) throw new Error("Use a 2–64 character username containing letters, numbers, dots, underscores or hyphens.");
   if (String(password || "").length < 12) throw new Error("Use a password with at least 12 characters.");
@@ -114,6 +117,7 @@ export async function createLocalAccount({ username, displayName = "", password,
   };
   // Recheck after the asynchronous KDF before inserting.
   const store = readStore();
+  if (onlyIfEmpty && store.accounts.length) throw new Error("Recovery administrator setup is already complete.");
   if (store.accounts.some((item) => usernameKey(item.username) === key)) throw new Error("That username is already in use.");
   store.accounts.push(account);
   saveStore();
@@ -130,7 +134,8 @@ export async function verifyLocalAccount(username, password) {
   if (!saved || account.disabled || account.identity?.provider === "pocket-id") return null;
   const expected = Buffer.from(saved.hash, "base64url");
   if (expected.length !== hash.length || !crypto.timingSafeEqual(expected, hash)) return null;
-  return effectiveAccountAccess(account, readStore().profiles);
+  const access = effectiveAccountAccess(account, readStore().profiles);
+  return access.authenticated ? access : null;
 }
 
 export function createAccountSession(accountId) {
@@ -158,7 +163,8 @@ export function verifyAccountMcpToken(token) {
   if (typeof token !== "string" || token.length < 32) return null;
   const hash = tokenHash(token);
   const account = readStore().accounts.find((item) => item.mcpTokenHash === hash && item.disabled !== true);
-  return account ? effectiveAccountAccess(account, readStore().profiles) : null;
+  const access = account ? effectiveAccountAccess(account, readStore().profiles) : null;
+  return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
 export function rotateAccountMcpToken(accountId) {
@@ -191,6 +197,21 @@ export function revokeAccountSession(token) {
   store.sessions = store.sessions.filter((item) => item.tokenHash !== tokenHash(token));
   if (store.sessions.length !== previous) saveStore({ scrubBackup: true });
   return store.sessions.length !== previous;
+}
+
+/** An administrator reset ends the account's browser sessions; its MCP token and data stay. */
+export async function setAccountPassword(accountId, password) {
+  if (String(password || "").length < 12) throw new Error("Use a password with at least 12 characters.");
+  if (!readStore().accounts.some((item) => item.id === accountId && item.identity?.provider !== "pocket-id")) throw new Error("That local account was not found.");
+  const salt = crypto.randomBytes(16);
+  const hash = await scryptAsync(password, salt);
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error("That local account was not found.");
+  account.password = { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") };
+  store.sessions = store.sessions.filter((item) => item.accountId !== accountId);
+  saveStore({ scrubBackup: true });
+  return { id: account.id };
 }
 
 export function setAccountDisabled(accountId, disabled) {
