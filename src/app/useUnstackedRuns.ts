@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { GalleryGroups, Run } from './runs';
+import { scopedStorageKey } from './api';
 
 const storageKey = "heiss-ui-unstacked-runs";
 /** Enough to remember every run anyone unstacks, without growing forever. */
@@ -7,7 +8,7 @@ const limit = 500;
 
 function load(): Set<string> {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const saved = JSON.parse(localStorage.getItem(scopedStorageKey(storageKey)) || "[]");
     return new Set(Array.isArray(saved) ? saved.filter((id) => typeof id === "string") : []);
   } catch {
     return new Set();
@@ -24,7 +25,7 @@ export function useUnstackedRuns(groups: GalleryGroups) {
   const [unstacked, setUnstacked] = useState<Set<string>>(load);
   const [session, setSession] = useState<Set<string>>(() => new Set());
   const persist = (next: Set<string>) => {
-    try { localStorage.setItem(storageKey, JSON.stringify([...next].slice(-limit))); } catch { /* storage off: this session only */ }
+    try { localStorage.setItem(scopedStorageKey(storageKey), JSON.stringify([...next].slice(-limit))); } catch { /* storage off: this session only */ }
   };
   const unstack = useCallback((run: Run, apart: boolean) => {
     const hidden = run.items.some((item) => item.privateVault);

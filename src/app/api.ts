@@ -168,27 +168,35 @@ const draftKey = "heiss-ui-draft";
 const legacyPrefsKey = "j-ai-studio-prefs";
 const legacyDraftKey = "j-ai-studio-draft";
 let accountStorageScope = "";
+export const accountStorageScopeChangeEvent = "heiss:account-storage-scope-changed";
 
 /** Keep browser-held studio content separate when people share a browser. */
 export function setAccountStorageScope(accountId?: string) {
-  accountStorageScope = accountId ? `account:${accountId}` : "";
+  const next = accountId ? `account:${accountId}` : "";
+  if (next === accountStorageScope) return;
+  accountStorageScope = next;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(accountStorageScopeChangeEvent));
 }
 
-function scopedKey(key: string) {
+export function scopedStorageKey(key: string) {
   return accountStorageScope ? `${key}:${accountStorageScope}` : key;
 }
 
+export function hasAccountStorageScope() {
+  return Boolean(accountStorageScope);
+}
+
 export function savePrefs(value: Preferences) {
-  localStorage.setItem(scopedKey(prefsKey), JSON.stringify(value));
+  localStorage.setItem(scopedStorageKey(prefsKey), JSON.stringify(value));
 }
 
 export function saveDraft(value: unknown) {
-  localStorage.setItem(scopedKey(draftKey), JSON.stringify(value));
+  localStorage.setItem(scopedStorageKey(draftKey), JSON.stringify(value));
 }
 
 function migratedGet(key: string, legacyKey: string) {
   try {
-    const current = localStorage.getItem(scopedKey(key));
+    const current = localStorage.getItem(scopedStorageKey(key));
     if (current != null) return current;
     if (accountStorageScope) return null;
     const legacy = localStorage.getItem(legacyKey);

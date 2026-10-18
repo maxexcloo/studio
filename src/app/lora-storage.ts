@@ -1,5 +1,5 @@
 import { normalizeLoras } from './loras';
-import { apiFetch } from './api';
+import { accountStorageScopeChangeEvent, apiFetch, hasAccountStorageScope, scopedStorageKey } from './api';
 import { clientJobUuid } from './format';
 import type { LoraSelection } from './types';
 
@@ -81,30 +81,48 @@ function clean(source: any): LoraLibrary {
 
 function loadLocal(): LoraLibrary {
   try {
-    return clean(JSON.parse(readStorage(storageKey) || readStorage(legacyStorageKey) || 'null'));
+    const saved = readStorage(scopedStorageKey(storageKey)) || (!hasAccountStorageScope() ? readStorage(legacyStorageKey) : null);
+    return clean(JSON.parse(saved || 'null'));
   } catch {
     return clean(null);
   }
 }
 
 let memory: LoraLibrary | null = null;
-let pending: LoraOp[] = (() => {
+let activeStorageKey = '';
+let pending: LoraOp[] = [];
+
+function storedPending() {
   try {
-    const saved = JSON.parse(readStorage(pendingKey) || '[]');
+    const saved = JSON.parse(readStorage(scopedStorageKey(pendingKey)) || '[]');
     return Array.isArray(saved) ? saved : [];
   } catch {
     return [];
   }
-})();
+}
+
+function ensureStorageScope() {
+  const next = scopedStorageKey(storageKey);
+  if (next === activeStorageKey) return;
+  activeStorageKey = next;
+  memory = null;
+  pending = storedPending();
+  inFlight = 0;
+  failures = 0;
+  if (flushTimer !== null) window.clearTimeout(flushTimer);
+  flushTimer = null;
+  status = { pending: pending.length, failing: false, locked: false, error: '' };
+}
 
 function library(): LoraLibrary {
+  ensureStorageScope();
   if (!memory) memory = loadLocal();
   return memory;
 }
 
 function persist() {
-  writeStorage(storageKey, JSON.stringify(library()));
-  writeStorage(pendingKey, pending.length ? JSON.stringify(pending) : null);
+  writeStorage(scopedStorageKey(storageKey), JSON.stringify(library()));
+  writeStorage(scopedStorageKey(pendingKey), pending.length ? JSON.stringify(pending) : null);
 }
 
 /* -------------------------------------------------------------- Reducer */
@@ -174,11 +192,13 @@ function setStatus(next: Partial<LoraSyncStatus>) {
 
 /** Re-renders when the library changes, here or on another device. */
 export function subscribeLoraLibrary(listener: () => void) {
+  ensureStorageScope();
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
 
 export function subscribeLoraSync(listener: (status: LoraSyncStatus) => void) {
+  ensureStorageScope();
   statusListeners.add(listener);
   return () => { statusListeners.delete(listener); };
 }
@@ -197,7 +217,9 @@ function adopt(serverLibrary: unknown) {
 }
 
 async function flush() {
+  ensureStorageScope();
   if (inFlight || !pending.length) return;
+  const scope = activeStorageKey;
   const batch = pending.slice();
   inFlight = batch.length;
   try {
@@ -207,6 +229,7 @@ async function flush() {
       body: JSON.stringify({ ops: batch })
     });
     const data = await response.json().catch(() => ({}));
+    if (scope !== activeStorageKey) return;
     if (!response.ok) {
       const error = new Error(data?.error || `HTTP ${response.status}`) as Error & { locked?: boolean };
       error.locked = response.status === 401 || Boolean(data?.locked);
@@ -219,6 +242,7 @@ async function flush() {
     setStatus({ failing: false, locked: false, error: '' });
     if (pending.length) scheduleFlush(0);
   } catch (error) {
+    if (scope !== activeStorageKey) return;
     inFlight = 0;
     failures += 1;
     const locked = Boolean((error as { locked?: boolean }).locked);
@@ -255,6 +279,7 @@ function apply(op: LoraOp, delay?: number) {
  * older build saved only in this browser when its silent sync failed.
  */
 export function startLoraSync() {
+  ensureStorageScope();
   let lastPull = 0;
   const pull = async () => {
     lastPull = Date.now();
@@ -269,11 +294,11 @@ export function startLoraSync() {
       // Offline: keep what this device has.
     }
   };
-  if (!readStorage(mergedKey)) {
+  if (!readStorage(scopedStorageKey(mergedKey))) {
     const local = loadLocal();
     const hasAnything = Object.values(local.snapshots).some((list) => list?.length) || local.favorites.length || Object.keys(local.strengths).length;
     if (hasAnything) enqueue({ op: 'merge', library: local }, 0);
-    writeStorage(mergedKey, '1');
+    writeStorage(scopedStorageKey(mergedKey), '1');
   }
   void pull();
   // Another device may have saved something; look again when this tab comes back.
@@ -370,11 +395,18 @@ export function recordLoraRecents(added: string[]) {
 }
 
 export function clearLoraLibrary() {
+  ensureStorageScope();
   if (flushTimer !== null) window.clearTimeout(flushTimer);
   flushTimer = null;
   pending = [];
   memory = clean(null);
-  for (const key of [storageKey, legacyStorageKey, pendingKey]) writeStorage(key, null);
+  for (const key of [scopedStorageKey(storageKey), scopedStorageKey(pendingKey), ...(!hasAccountStorageScope() ? [legacyStorageKey] : [])]) writeStorage(key, null);
   setStatus({ failing: false, locked: false, error: '' });
   notify();
 }
+
+if (typeof window !== 'undefined') window.addEventListener(accountStorageScopeChangeEvent, () => {
+  ensureStorageScope();
+  notify();
+  setStatus({ failing: false, locked: false, error: '' });
+});

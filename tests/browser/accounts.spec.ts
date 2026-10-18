@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('administrators can manage access profiles, accounts and a personal MCP token', async ({ page, isMobile }) => {
+  const otherAccountText = 'private-draft-from-another-account';
   const posts: { url: string; body: unknown }[] = [];
+  const loraOps: string[] = [];
   const profiles = [{ id: 'artists', name: 'Artists', generationProfiles: ['image-fast'], features: { loras: true } }];
   const accounts = [
     { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator', disabled: false },
@@ -31,8 +33,26 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     if (url.pathname === '/api/accounts/users/new-user') return request.fulfill({ json: { ok: true, account: { id: 'new-user', accessProfileId: request.request().postDataJSON().accessProfileId } } });
     return request.continue();
   };
+  await page.addInitScript((text) => {
+    localStorage.setItem('heiss-ui-draft', JSON.stringify({ prompt: text }));
+    localStorage.setItem('heiss-ui-lora-pending', JSON.stringify([{ op: 'favorite', name: text, on: true }]));
+    localStorage.setItem('heiss-ui-unstacked-runs', JSON.stringify(['private-run-from-another-account']));
+  }, otherAccountText);
+  await page.route('**/api/loras/**', async (request) => {
+    const url = new URL(request.request().url());
+    if (url.pathname === '/api/loras/library' && request.request().method() === 'GET') return request.fulfill({ json: { found: false, library: { strengths: {}, snapshots: {}, favorites: [], recents: [] } } });
+    if (url.pathname === '/api/loras/library/ops') {
+      loraOps.push(request.request().postData() || '');
+      return request.fulfill({ json: { ok: true, library: { strengths: {}, snapshots: {}, favorites: [], recents: [] } } });
+    }
+    return request.continue();
+  });
   await page.route('**/api/accounts/**', route);
   await page.goto('/');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('heiss-ui-draft:account:admin-id'))).not.toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('heiss-ui-draft:account:admin-id'))).not.toContain(otherAccountText);
+  expect(loraOps.join('\n')).not.toContain(otherAccountText);
+  expect(await page.evaluate(() => localStorage.getItem('heiss-ui-lora-pending:account:admin-id'))).toBeNull();
   if (isMobile) {
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: /Use the full studio/ }).click();
