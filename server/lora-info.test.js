@@ -100,3 +100,10 @@ test("Klein 9B LoKr uses explicit trainer metadata when projection widths are un
   const name = put("klein-lokr.safetensors", header);
   assert.deepEqual(loraInfo(name).families, ["flux2_klein_9b"]);
 });
+
+
+test('MOSS Image Base and SFT metadata share their precise imported model family', () => {
+  assert.deepEqual(familiesFromMetadata({ base_model: 'MOSS Image Base' }), ['moss_image']);
+  assert.deepEqual(familiesFromMetadata({ base_model: 'MOSS Image SFT' }), ['moss_image']);
+  assert.deepEqual(familiesFromMetadata({ base_model: 'MOSS Text' }), []);
+});

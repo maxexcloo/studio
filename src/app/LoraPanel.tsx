@@ -1,3 +1,4 @@
+import { optionalLoras } from './modelRecipes';
 import { loraName, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
@@ -163,6 +164,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, on
       {!missing && item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
       {missing ? <p className="lora-warning"><AlertTriangle size={12} /> Not in ComfyUI’s LoRA folder</p> : null}
       {!missing && overLimit ? <p className="lora-warning"><AlertTriangle size={12} /> Over this workflow’s limit, so it isn’t used</p> : null}
+      {!missing && info?.role && info.role !== 'effect' ? <p className="lora-warning is-soft"><AlertTriangle size={12} />{info.role === 'acceleration' ? 'Use its prepared recipe instead of stacking accelerators.' : 'Supporting file; not an optional generation effect.'} {info.note || ''}</p> : null}
       {!missing && !overLimit && otherModel ? <p className="lora-warning is-soft"><AlertTriangle size={12} /> Made for {otherModel}, so it may not work here</p> : null}
     </Reorder.Item>
   );
@@ -523,7 +525,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
     return (
       <div className="lora-panel">
         <LoraPicker
-          options={options}
+          options={optionalLoras(options, infos, profile)}
           profile={profile}
           fitOf={fitOf}
           baseOf={baseOf}

@@ -1,5 +1,8 @@
 import React from 'react';
 import { FolderPlus, RefreshCw } from 'lucide-react';
+import { loraName } from './catalogueNames';
+import { loraRoleLabel } from './modelRecipes';
+import type { LoraInfo } from './useLoraInfo';
 import { apiJson } from './api';
 import { BetaTag } from './components';
 import { clearPrompts, setPromptHistoryEnabled, usePromptHistory } from './recentPrompts';
@@ -159,4 +162,19 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
       ) : null}
     </>
   );
+}
+
+/** Adapter inventory is read-only; generation effects are chosen in the composer. */
+export function AdapterLibraryGroup({ Group, Row }: Pick<Parts, 'Group' | 'Row'>) {
+  const [infos, setInfos] = React.useState<Record<string, LoraInfo> | null>(null);
+  const [error, setError] = React.useState('');
+  React.useEffect(() => {
+    let live = true;
+    apiJson<{ loras?: Record<string, LoraInfo> }>('/api/loras/info').then((data) => { if (live) setInfos(data.loras || {}); }).catch(() => { if (live) setError('Could not load the adapter library.'); });
+    return () => { live = false; };
+  }, []);
+  return <Group title="LoRAs & Supporting Files" note="Choose acceleration through a prepared recipe. Supporting files stay out of the optional LoRA picker.">
+    {error ? <p role="status">{error}</p> : infos === null ? <p>Loading adapters…</p> : Object.entries(infos).sort(([a, left], [b, right]) => loraName(a, left).localeCompare(loraName(b, right))).map(([name, info]) => <Row key={name} label={loraName(name, info)} description={<>{info.role ? loraRoleLabel(info) : 'LoRA · Role Unknown'}{info.base ? ` · ${info.base}` : ''}<br /><code className="set-path">{name}</code>{info.note ? <><br />{info.note}</> : null}</>} />)}
+    {infos && !Object.keys(infos).length ? <p>No adapters are available in this library.</p> : null}
+  </Group>;
 }

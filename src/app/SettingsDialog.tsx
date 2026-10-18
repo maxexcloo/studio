@@ -22,7 +22,7 @@ import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { useStarterPlan } from './StarterModels';
 import { InpaintDemo } from './InpaintDemo';
-import { CivitaiRow, EarlierImagesGroup, PromptHistoryRow } from './LibrarySettings';
+import { AdapterLibraryGroup, CivitaiRow, EarlierImagesGroup, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { boardUrl, openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
@@ -895,6 +895,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               ) : null}
             </Group>
             {atComputer ? <EarlierImagesGroup Group={Group} Row={Row} showToast={showToast} confirmAction={confirmAction} outputDir={paths.outputDir || ''} /> : null}
+            <AdapterLibraryGroup Group={Group} Row={Row} />
             <Group title="Sharing">
               <SwitchRow label="Share without settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
               <Row label="Export gallery" description="Every finished image in one ZIP file. Hidden has its own export.">

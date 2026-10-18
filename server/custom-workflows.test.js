@@ -46,3 +46,11 @@ test("legacy start image metadata is normalized into a media input", () => {
   assert.equal(workflow.capabilities.startImageRequired, true);
   assert.deepEqual(workflow.mediaInputs[0].control, { node: "1", input: "image" });
 });
+
+
+test("prepared recipe metadata preserves conditioning and exact adapter identities", () => {
+  const recipe = { modelLabel: "MiniMax H3", conditioning: "Ref2VA", label: "PDD · 8-Step", adapters: ["ref-adapter.safetensors"] };
+  const workflow = metadataFromJson({ heissUi: { id: "ref-pdd", recipe }, graph: {} }, "recipe.json");
+  assert.deepEqual(workflow.recipe, recipe);
+  assert.equal(workflow.profileId, "custom:ref-pdd");
+});

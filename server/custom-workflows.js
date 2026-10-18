@@ -164,6 +164,7 @@ export function metadataFromJson(raw, file) {
     description: meta.description || "Custom ComfyUI workflow",
     kind: meta.kind === "video" ? "video" : "image",
     family: meta.family || "custom",
+    recipe: meta.recipe,
     graph,
     controls,
     options: meta.options || {},

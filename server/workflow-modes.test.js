@@ -79,3 +79,20 @@ test('mode selection reaches final graphs, preserves fixed generation denoise an
   assert.equal(referenced[3].inputs.image, 'staged.png');
   assert.equal(referenced[2].inputs.denoise, 0.3);
 });
+
+
+test('recipe-owned graph adapters are not inspected as optional stack entries', async () => {
+  const { optionalLoraIssue } = await import('./lora-catalogue.js');
+  const prepared = structuredClone(raw);
+  prepared.heissUi.id = 'fixed-accelerator';
+  const fixed = { class_type: 'LoraLoader', inputs: { lora_name: 'recipe-accelerator.safetensors', strength_model: 1 } };
+  prepared.graph['90'] = fixed;
+  prepared.heissUi.imageModes.generate.graph['90'] = fixed;
+  saveCustomWorkflow(prepared);
+  const body = sanitizeGenerateBody({ kind: 'image', workflow: 'custom:fixed-accelerator', model: 'custom:fixed-accelerator', prompt: 'A scene' }, info);
+  const infos = { 'recipe-accelerator.safetensors': { role: 'acceleration' } };
+  assert.deepEqual(body.loras, []);
+  assert.equal(optionalLoraIssue(body.loras, infos), '');
+  const finalGraph = await customWorkflowGraph(body);
+  assert.equal(finalGraph['90'].inputs.lora_name, 'recipe-accelerator.safetensors');
+});

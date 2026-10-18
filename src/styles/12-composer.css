@@ -324,3 +324,6 @@
   .composer-count-picker.number-picker .number-picker-value,
   .composer-count-picker.number-picker .number-picker-input { min-width: 44px; min-height: 44px; }
 }
+
+.recipe-control { display: flex; flex-direction: column; gap: 3px; min-width: 110px; max-width: 220px; font-size: 11px; }
+.recipe-control select { width: 100%; min-width: 0; padding: 5px 8px; }

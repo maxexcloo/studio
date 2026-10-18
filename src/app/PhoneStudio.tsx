@@ -2,6 +2,7 @@ import { PromptActions } from './PromptActions';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
+import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes';
 import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
@@ -672,7 +673,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       <div className="phone-group">
         <button type="button" className="phone-row" onClick={() => setSheet('workflow')}>
           <SlidersHorizontal size={20} />
-          <span>{currentProfile ? modelName(currentProfile).name : 'Choose a Model'}<small>{currentProfile ? modelName(currentProfile).detail : 'Model'}</small></span>
+          <span>{currentProfile ? currentProfile.recipe?.modelLabel || modelName(currentProfile).name : 'Choose a Model'}<small>{currentProfile ? currentProfile.recipe?.label || modelName(currentProfile).detail : 'Model'}</small></span>
           <ChevronRight size={18} className="phone-row-end" />
         </button>
       </div>
@@ -731,13 +732,14 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   const [query, setQuery] = React.useState('');
   const [filters, setFilters] = React.useState(emptyCatalogueFilter);
   React.useEffect(() => { if (!open) setQuery(''); }, [open]);
-  const profiles = React.useMemo(() => [...(modelProfiles || [])].sort(compareModelNames), [modelProfiles]);
-  const favorites = new Set(modelMenu?.favorites || []);
+  const profiles = React.useMemo(() => modelRecipeOptions(modelProfiles || [], model).sort(compareModelNames), [modelProfiles, model]);
+  const menu = recipeModelMenu(modelMenu, modelProfiles || [], model);
+  const favorites = new Set(menu?.favorites || []);
   const needle = query.trim().toLowerCase();
-  const matches = (profile: Profile) => profileMatchesFilters(profile, filters, modelMenu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
+  const matches = (profile: Profile) => profileMatchesFilters(profile, filters, menu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
-  const recent = needle ? [] : (modelMenu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
+  const recent = needle ? [] : (menu?.recents || []).filter((id) => !favorites.has(id)).map((id) => byId.get(id)).filter((profile): profile is Profile => Boolean(profile) && matches(profile!)).slice(0, 4).sort(compareModelNames);
   const rest = profiles.filter(matches);
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
@@ -747,7 +749,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
 
       </button>
       {modelMenu ? (
-        <button type="button" className={cn('phone-icon', favorites.has(profile.id) && 'is-on')} aria-pressed={favorites.has(profile.id)} aria-label={favorites.has(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => modelMenu.toggleFavorite(profile.id)}>
+        <button type="button" className={cn('phone-icon', favorites.has(profile.id) && 'is-on')} aria-pressed={favorites.has(profile.id)} aria-label={favorites.has(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => menu?.toggleFavorite(profile.id)}>
           <Star size={18} fill={favorites.has(profile.id) ? 'currentColor' : 'none'} />
         </button>
       ) : null}
@@ -756,6 +758,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   return (
     <Sheet open={open} onClose={onClose} title="Model" full className="phone-model-sheet">
       <div className="phone-model-tools">
+        {recipesFor(modelProfiles || [], model).length ? <label className="phone-row">Recipe<select aria-label="Recipe" value={model} onChange={(event) => pickModel(event.target.value)}>{recipesFor(modelProfiles || [], model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
         {profiles.length ? (
           <label className="phone-search picker-search">
             <Search size={17} aria-hidden="true" />

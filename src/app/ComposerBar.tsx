@@ -5,6 +5,7 @@ import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Layers, MoveHori
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
+import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
@@ -289,7 +290,10 @@ export function ComposerBar(props: ComposerBarProps) {
   /* Every control is a function of its density, so the drawer can render the
      same control at full size while the bar shows a demoted copy. */
   const workflowPicker = (density: ControlDensity) => models
-    ? <ModelPicker value={model} profiles={modelProfiles} showInpaint={showInpaint} onChange={chooseModel} menu={modelMenu} compact badges={profileBadges} density={density} onFindModels={comfyOffline ? undefined : onFindModels} onGetModels={comfyOffline ? undefined : onGetModels} strayCount={strayModelCount} emptyHint={comfyOffline ? "Start ComfyUI to see your models." : strayModelCount ? "Some models are in a folder ComfyUI doesn’t read." : "No usable models in ComfyUI yet. Add one to its models folder, or find yours."} />
+    ? <>
+      <ModelPicker value={model} profiles={modelRecipeOptions(modelProfiles, model)} showInpaint={showInpaint} onChange={chooseModel} menu={recipeModelMenu(modelMenu, modelProfiles, model)} compact badges={profileBadges} density={density} onFindModels={comfyOffline ? undefined : onFindModels} onGetModels={comfyOffline ? undefined : onGetModels} strayCount={strayModelCount} emptyHint={comfyOffline ? "Start ComfyUI to see your models." : strayModelCount ? "Some models are in a folder ComfyUI doesn’t read." : "No usable models in ComfyUI yet. Add one to its models folder, or find yours."} />
+      {recipesFor(modelProfiles, model).length ? <label className="recipe-control">Recipe<select className="is-framed" aria-label="Recipe" value={model} onChange={(event) => chooseModel(event.target.value)}>{recipesFor(modelProfiles, model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
+    </>
     : comfyOffline ? null : <Skeleton className="composer-skeleton" />;
 
   const aspectPicker = (density: ControlDensity) => aspectLocked ? null : (

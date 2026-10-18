@@ -1,10 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { comfy, modelFolders } from './comfy.js';
-import { families } from './family-catalog.js';
+import { families as modelFamilies } from './family-catalog.js';
+
 import { dataDir } from './gallery-store.js';
-import { enrichLoraInfo } from './lora-catalogue.js';
+import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
+
+// Imported-only model families still need precise adapter compatibility labels.
+const families = { ...modelFamilies, moss_image: { label: 'MOSS Image' } };
 
 /**
  * What a LoRA was trained for and how to trigger it, read the same way model
@@ -43,6 +47,7 @@ const metadataFamilies = [
   [/hidream/, ["hidream"]],
   [/lumina|neta/, ["lumina2"]],
   [/krea[-_ ]?2/, ["krea2"]],
+  [/moss[-_ ]?image/, ["moss_image"]],
   [/anima/, ["anima"]],
   [/auraflow|pony[-_ ]?v7/, ["auraflow"]],
   [/sd[-_ ]?3|stable-diffusion-v3|stable-diffusion-3/, ["sd3"]],
@@ -289,8 +294,10 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
   let sources = {};
   try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
+  let catalogue = {};
+  try { catalogue = JSON.parse(fs.readFileSync(path.join(dataDir, 'lora-catalogue.json'), 'utf8')); } catch { /* Optional local display metadata. */ }
   for (const [name, info] of Object.entries(result)) {
-    result[name] = enrichLoraInfo(info, name, sources, familiesFromMetadata, families);
+    result[name] = enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
     lastKnown.set(name, result[name]);
   }
   return result;

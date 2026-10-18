@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { enrichLoraInfo } from './lora-catalogue.js';
+import { enrichLocalLoraInfo, enrichLoraInfo, optionalLoraIssue } from './lora-catalogue.js';
 
 const families = { krea2: { label: 'Krea 2' }, qwen_image: { label: 'Qwen-Image' }, qwen_image_21: { label: 'Qwen-Image 2.1' } };
 const detect = ({ base_model }) => base_model === 'Qwen-Image 2.1' ? ['qwen_image_21'] : base_model === 'Krea 2' ? ['krea2'] : [];
@@ -53,4 +53,27 @@ test('uses pinned Hugging Face source metadata without changing download recover
   assert.equal(result.sourceUrl, official.sourceUrl);
   assert.deepEqual(official, before);
   assert.equal(enrich(info, official.file, { official: { ...official, id: official.id.replace('a'.repeat(40), 'main') } }), info);
+});
+
+
+test('local converted adapter metadata has no fabricated provider or download identity', () => {
+  const entry = { title: 'FastH3 · 4-Step · Preview V1 · BF16', baseModel: 'Krea 2', role: 'acceleration', note: 'Use the prepared recipe.' };
+  const result = enrichLocalLoraInfo({ families: [], triggers: [] }, 'converted.safetensors', { 'converted.safetensors': entry }, detect, families);
+  assert.equal(result.title, entry.title);
+  assert.equal(result.role, 'acceleration');
+  assert.equal(result.sourceUrl, undefined);
+  assert.deepEqual(result.families, ['krea2']);
+  assert.equal(enrichLocalLoraInfo(info, 'other.safetensors', { 'converted.safetensors': entry }, detect, families), info);
+  const contradictory = enrichLocalLoraInfo({ ...info, families: ['qwen_image_21'] }, 'converted.safetensors', { 'converted.safetensors': entry }, detect, families);
+  assert.deepEqual(contradictory.families, ['qwen_image_21']);
+});
+
+
+test('generation refuses infrastructure in optional stacks without modifying saved selections', () => {
+  const stack = [{ name: 'turbo', enabled: true, strength: 1 }, { name: 'source', enabled: false, strength: 1 }];
+  const before = structuredClone(stack);
+  assert.match(optionalLoraIssue(stack, { turbo: { role: 'acceleration' } }), /prepared recipe/);
+  assert.equal(optionalLoraIssue(stack, { source: { role: 'supporting' } }), '');
+  assert.equal(optionalLoraIssue(stack, {}), '');
+  assert.deepEqual(stack, before);
 });

@@ -107,7 +107,7 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {} }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, recipe }) {
   return {
     id,
     kind,
@@ -119,6 +119,7 @@ export function buildProfile({ id, kind, label, displayName, description, model,
     baseModel: baseModel ?? modelBasename(model),
     workflow,
     family,
+    ...(recipe && typeof recipe.modelLabel === "string" && typeof recipe.label === "string" && typeof recipe.conditioning === "string" ? { recipe: { modelLabel: recipe.modelLabel, label: recipe.label, conditioning: recipe.conditioning, adapters: Array.isArray(recipe.adapters) ? recipe.adapters.filter((name) => typeof name === "string") : [] } } : {}),
     defaults: { ...defaults, ...imageModes.generate?.defaults },
     aspectPresets: aspects,
     // A preset the family starts on where its own size is not square (MiniMax H3's 16:9).
@@ -216,6 +217,7 @@ export function inferModels(info, stats = {}) {
       baseModel: modelBasename(defaults.model || ""),
       workflow: workflow.profileId,
       family: workflow.family,
+      recipe: workflow.recipe,
       defaults: {
         count: detectedDefault(countRange, Number(defaults.count || 1)),
         width: detectedDefault(widthRange, Number(defaults.width || 1024)),

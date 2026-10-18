@@ -94,6 +94,10 @@ export type Profile = {
   model: string;
   /** The weights file the workflow runs; empty when a custom workflow doesn't say. */
   baseModel?: string;
+  /** Explicit prepared recipes share weights and conditioning, while retaining their workflow IDs. */
+  /** UI-only members of a model group; never persisted as a new profile. */
+  recipeProfiles?: Profile[];
+  recipe?: { modelLabel: string; conditioning: string; label: string; adapters?: string[] };
   workflow: string;
   family: string;
   /** The family's name as people know it ("Flux.1"), for built-in families. */
