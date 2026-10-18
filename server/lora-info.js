@@ -185,7 +185,9 @@ export function familiesFromKeys(header) {
     if (hidden === 4096) return ["flux2_klein_9b"];
     // Per-block modulation is Flux.1's own; Flux.2 modulates once for all blocks.
     if (has(/img_mod[._]lin|norm1[._]linear/) || linear1 === 21504) return ["flux1", "chroma"];
-    return ["flux1", "chroma", "flux2_klein_4b"];
+    // Factorised adapters such as LoKr may expose no ordinary projection widths.
+    // Leave those unresolved so explicit trainer metadata can identify the family.
+    return hidden === 3072 ? ["flux1", "chroma", "flux2_klein_4b"] : [];
   }
   return [];
 }
