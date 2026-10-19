@@ -5,11 +5,28 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { defaultGenerationCount } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
+import { assertAdjustable } from './mcp-controls.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
 const hidden = (item) => ['privateVault', 'vaultLocked', 'promptProtected', 'promptEncrypted', 'hidden'].some(key => item?.[key]);
 const safeId = (id) => encodeURIComponent(id);
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+/** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
+const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
+const maxReferenceScopes = 5000;
+export const maxResultWaitSeconds = 1500;
+const aborted = (signal) => {
+  const error = new Error('The wait ended because the request was cancelled. The generation continues; collect it later with Result.');
+  error.aborted = true;
+  return error;
+};
+const pause = (milliseconds, signal) => new Promise((resolve, reject) => {
+  if (signal?.aborted) return reject(aborted(signal));
+  const timer = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve(); }, milliseconds);
+  const stop = () => { clearTimeout(timer); reject(aborted(signal)); };
+  signal?.addEventListener('abort', stop, { once: true });
+});
 const text = (value) => ({ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) });
 export const mcpJson = (value) => ({ content: [text(value)], structuredContent: value });
 export const mcpOwner = (key, user, token) => crypto.createHmac('sha256', key).update(user ? `forwarded:${user}` : `provider:${token}`).digest('hex');
@@ -38,6 +55,8 @@ export class McpMedia {
       this.state = { version: 1, signingKey: crypto.randomBytes(32).toString('base64url'), jobs: {}, assets: {} };
     }
     if (this.state.version !== 1 || !this.state.jobs || !this.state.assets || !this.state.signingKey) throw new Error('Invalid MCP ownership data.');
+    // Result numbering is additive; files written before it simply start without references.
+    if (!this.state.refs || typeof this.state.refs !== 'object' || Array.isArray(this.state.refs)) this.state.refs = {};
     this.key = signingKey || this.state.signingKey;
     this.save();
   }
@@ -48,23 +67,29 @@ export class McpMedia {
   own(owner, id, kind = 'jobs') {
     if (typeof id !== 'string' || !Object.hasOwn(this.state[kind], id) || !(kind === 'assets' ? [this.state[kind][id]].flat().includes(owner) : this.state[kind][id] === owner)) throw new Error(`Choose ${kind === 'jobs' ? 'a job' : 'a reference'} submitted by this account to this studio.`);
   }
-  async response(method, route, body, owner = "") {
+  async response(method, route, body, owner = "", { credential: override, signal } = {}) {
     const base = new URL(typeof this.baseUrl === 'function' ? this.baseUrl() : this.baseUrl);
     if (!['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname) || base.protocol !== 'http:') throw new Error('MCP requires the studio’s private HTTP loopback endpoint.');
     let response;
-    const credential = this.credentials.get(owner);
+    const credential = override || this.credentials.get(owner);
     // An account's credential is a header set: its personal bearer, or MCP's internal loopback credential.
     const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Heiss': '1', ...(credential || {}) };
-    try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(60000) }); } catch {
+    try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000) }); } catch {
+      if (signal?.aborted) throw aborted(signal);
       const error = new Error('The studio connection was interrupted. Check the returned job before retrying.');
       error.submissionUncertain = true;
       throw error;
     }
-    if (!response.ok) throw new Error(`HEISS refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
+    if (!response.ok) {
+      // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
+      let reason = '';
+      if ([400, 403, 409, 422].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
+      throw new Error(reason ? `HEISS refused the request: ${reason}` : `HEISS refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
+    }
     return response;
   }
-  async request(method, route, body, owner = "") {
-    const response = await this.response(method, route, body, owner);
+  async request(method, route, body, owner = "", options = {}) {
+    const response = await this.response(method, route, body, owner, options);
     try { return await response.json(); } catch {
       const error = new Error('HEISS returned an invalid response. Check job status before retrying.');
       error.submissionUncertain = true;
@@ -100,27 +125,30 @@ export class McpMedia {
     }
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
-  async queue(owner, args) {
+  /** The studio LoRA picker's metadata for this account, briefly cached; access rules apply upstream. */
+  async loraInfos(owner = "") {
+    this.loraCache ||= new Map();
+    const cached = this.loraCache.get(owner);
+    if (cached && Date.now() - cached.at < 60000) return cached.loras;
+    try {
+      const { loras = {} } = await this.request('GET', '/api/loras/info', undefined, owner);
+      if (this.loraCache.size >= 256) this.loraCache.delete(this.loraCache.keys().next().value);
+      this.loraCache.set(owner, { at: Date.now(), loras });
+      return loras;
+    } catch { return {}; }
+  }
+  async queue(owner, args, scope = '') {
     const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles('all', owner)).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
-    const caps = profile.capabilities || {};
+    // Fixed controls are refused by name, with the adjustable alternatives, instead of being dropped;
+    // a supplied value equal to a fixed one passes unchanged.
+    const adjustable = assertAdjustable(profile, args);
     const controls = {};
-    if (negative_prompt !== undefined) {
-      if (negative_prompt && !caps.negativePrompt) throw new Error('This profile does not support negative prompts.');
-      controls.negative = negative_prompt;
-    }
-    for (const [key, value] of Object.entries({ cfg, denoise })) if (value !== undefined) {
-      const limits = profile.constraints?.[key] || {};
-      if (!caps[key] || !Number.isFinite(value) || value < (limits.min ?? 0) || value > (limits.max ?? (key === 'denoise' ? 1 : 100))) throw new Error(`Choose supported ${key} within this profile’s constraints.`);
-      controls[key] = value;
-    }
-    for (const [key, value] of Object.entries({ sampler, scheduler })) if (value !== undefined) {
-      if (!caps[key] || !profile.options?.[`${key}s`]?.includes(value)) throw new Error(`Choose a supported ${key} from this profile’s options.`);
-      controls[key] = value;
-    }
-    for (const adapter of loras) if (!profile.options?.loras?.includes(adapter.name)) throw new Error('Choose compatible LoRAs.');
+    if (negative_prompt !== undefined && adjustable.negative_prompt) controls.negative = negative_prompt;
+    for (const [key, value] of Object.entries({ cfg, denoise, sampler, scheduler })) if (value !== undefined) controls[key] = value;
+    for (const adapter of loras) if (!profile.options?.loras?.includes(adapter.name)) throw new Error(`${adapter.name} is not a LoRA this profile can use. Choose names from Models loras for this profile_id.`);
     const slots = profile.mediaInputs || [];
     if (reference_asset_ids.length > slots.length || slots.some((slot, index) => slot.required && !reference_asset_ids[index])) throw new Error('Supply the references required by this profile.');
     for (const id of reference_asset_ids) this.own(owner, id, 'assets');
@@ -150,10 +178,10 @@ export class McpMedia {
         if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('HEISS returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
         this.save();
-        queued.push({ job_id: result.jobId, profile_id, count: body.count, variant_index: variant });
+        queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), profile_id, count: body.count, variant_index: variant });
       } catch (error) {
         if (error.submissionUncertain) {
-          queued.push({ job_id: id, profile_id, count: body.count, variant_index: variant, status: 'unknown' });
+          queued.push({ job_id: id, ...this.handle(owner, scope, id), profile_id, count: body.count, variant_index: variant, status: 'unknown' });
           return { status: 'partially_queued', jobs: queued, error: 'The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.' };
         }
         if (queued.length) return { status: 'partially_queued', jobs: queued, error: 'Further submission failed; retain returned jobs before retrying.' };
@@ -162,8 +190,8 @@ export class McpMedia {
     }
     return { status: 'queued', jobs: queued };
   }
-  async galleryJob(jobId, owner = "") {
-    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`, undefined, owner);
+  async galleryJob(jobId, owner = "", options = {}) {
+    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`, undefined, owner, options);
     const outputs = new Map();
     let kind;
     for (const item of items) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
@@ -172,19 +200,59 @@ export class McpMedia {
     }
     return outputs.size ? { status: 'done', kind, outputs: Array.from({ length: Math.max(...outputs.keys()) + 1 }, (_, index) => outputs.get(index) || {}) } : { status: 'missing', outputs: [] };
   }
-  async job(owner, jobId, seconds = 0) {
+  /** Scope of a conversation's result numbers: the owner, narrowed by the client's conversation when it sends one. */
+  referenceScope(owner, conversation = '') {
+    return this.digest(`refs\n${owner}\n${conversation}`).slice(0, 32);
+  }
+  /** The next "result N" in this scope; numbers are never reused. */
+  reference(owner, scope, jobId) {
+    const key = scope || this.referenceScope(owner);
+    let entry = this.state.refs[key];
+    if (!entry) {
+      const keys = Object.keys(this.state.refs);
+      if (keys.length >= maxReferenceScopes) delete this.state.refs[keys.reduce((oldest, item) => (this.state.refs[item].at || 0) < (this.state.refs[oldest].at || 0) ? item : oldest)];
+      entry = this.state.refs[key] = { next: 1, jobs: {} };
+    }
+    const existing = Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
+    if (existing) return Number(existing);
+    const number = entry.next++;
+    entry.jobs[number] = jobId;
+    entry.at = Date.now();
+    this.save();
+    return number;
+  }
+  /** A job's short reference and its signed watch page, returned with the submission. */
+  handle(owner, scope, jobId) {
+    return { ref: `result ${this.reference(owner, scope, jobId)}`, link: this.pageUrl(owner, jobId) };
+  }
+  /** Accepts a job ID or a reference such as "result 3" from this conversation. */
+  resolve(owner, scope, value) {
+    const match = referencePattern.exec(String(value || ''));
+    if (!match) return value;
+    const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[Number(match[1])];
+    if (!jobId) throw new Error(`There is no result ${Number(match[1])} in this conversation. Use the job_id or a ref returned by Generate.`);
+    return jobId;
+  }
+  refOf(owner, scope, jobId) {
+    const entry = this.state.refs[scope || this.referenceScope(owner)];
+    const number = entry && Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
+    return number ? `result ${number}` : undefined;
+  }
+  async job(owner, jobId, seconds = 0, { signal, credential } = {}) {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
-      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner);
+      if (signal?.aborted) throw aborted(signal);
+      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner, { signal, credential });
       if (hidden(job)) throw new Error('Hidden outputs are unavailable to MCP.');
       if (job.status === 'missing' || finished.has(job.status)) {
         // A subsequently hidden/deleted output is revoked even while its terminal job remains cached.
-        const visible = await this.galleryJob(jobId, owner);
+        const visible = await this.galleryJob(jobId, owner, { signal, credential });
         job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind };
       }
       if (terminal.has(job.status) || Date.now() >= deadline) return job;
-      await new Promise(resolve => setTimeout(resolve, Math.min(2000, deadline - Date.now())));
+      // A client Stop or disconnect ends only this wait; the generation itself keeps running.
+      await pause(Math.min(2000, deadline - Date.now()), signal);
     }
   }
   /** Result links are sealed (AES-256-GCM), so a shared link reveals no account or job ID. */
@@ -193,15 +261,20 @@ export class McpMedia {
   }
   token(owner, jobId, index) {
     // Links do not expire; every request rechecks ownership and that the output still exists.
+    return this.seal('v2', { audience: this.publicUrl, owner, jobId, index });
+  }
+  seal(prefix, claims) {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), iv, { authTagLength: 16 });
-    const sealed = Buffer.concat([cipher.update(JSON.stringify({ audience: this.publicUrl, owner, jobId, index })), cipher.final()]);
-    return `v2.${iv.toString('base64url')}.${sealed.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}`;
+    const sealed = Buffer.concat([cipher.update(JSON.stringify(claims)), cipher.final()]);
+    return `${prefix}.${iv.toString('base64url')}.${sealed.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}`;
   }
+  /** A job's watch page: shows progress until done, then its outputs, without the chat. */
+  pageUrl(owner, jobId) { return `${this.publicUrl}/mcp/results/${this.seal('p2', { audience: this.publicUrl, owner, jobId, page: true })}`; }
   claims(token) {
     const parts = String(token || '').split('.');
     let claims;
-    if (parts[0] === 'v2') {
+    if (parts[0] === 'v2' || parts[0] === 'p2') {
       const [, iv, sealed, tag, extra] = parts;
       // Canonical base64url only: an altered character must never decode to the same bytes.
       const canonical = (part) => Buffer.from(part, 'base64url').toString('base64url') === part;
@@ -222,7 +295,9 @@ export class McpMedia {
       claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
       if (claims.expires !== undefined && (!Number.isFinite(claims.expires) || claims.expires <= Date.now())) throw new Error('Invalid or expired result link.');
     }
-    if (claims.audience !== this.publicUrl || !Number.isInteger(claims.index) || claims.index < 0) throw new Error('Invalid result link.');
+    // A watch page (p2) carries no output index; an output link (v2) always does. Neither can stand in for the other.
+    const page = parts[0] === 'p2';
+    if (claims.audience !== this.publicUrl || page !== (claims.page === true) || (!page && (!Number.isInteger(claims.index) || claims.index < 0))) throw new Error('Invalid result link.');
     this.own(claims.owner, claims.jobId);
     return claims;
   }
@@ -231,8 +306,8 @@ export class McpMedia {
     if (!finished.has(job.status) || hidden(job) || !Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
     return job.outputs[index];
   }
-  async download(owner, jobId, index) {
-    const job = await this.job(owner, jobId);
+  async download(owner, jobId, index, options = {}) {
+    const job = await this.job(owner, jobId, 0, options);
     const output = this.available(job, index);
     return this.readOutput(output, owner);
   }
@@ -268,18 +343,60 @@ export class McpMedia {
     this.save();
     return result;
   }
-  async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview') {
-    const job = await this.job(owner, jobId, seconds);
-    if (!finished.has(job.status)) return mcpJson({ job_id: jobId, ...this.summary(job), ...(terminal.has(job.status) ? {} : { message: 'Not finished yet. Reply now; do not poll. A background Result with delivery=notification reports completion.' }) });
+  async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview', { scope = '', signal } = {}) {
+    const wait = Math.min(seconds, maxResultWaitSeconds);
+    const job = await this.job(owner, jobId, wait, { signal });
+    const ref = this.refOf(owner, scope, jobId);
+    const named = { job_id: jobId, ...(ref ? { ref } : {}), link: this.pageUrl(owner, jobId) };
+    if (!finished.has(job.status)) {
+      const pending = !terminal.has(job.status);
+      const message = pending
+        ? `${ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'This job'} is still ${job.status || 'running'}. Reply now; do not poll. It continues in the studio and appears on its watch page when done; a background Result with delivery=notification reports completion.`
+        : `${ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
+      const summary = { ...named, ...this.summary(job), message };
+      if (delivery !== 'notification') return mcpJson(summary);
+      return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), text(summary)], structuredContent: summary };
+    }
     const available = this.available(job, index);
-    if (delivery === 'notification') return mcpJson({ job_id: jobId, output_index: index, status: 'done', kind: job.kind, message: 'This job is finished. Call Result once now with delivery=preview and wait_seconds=0 to show its image inline or view its video. Do not background the preview, poll or generate again.' });
+    if (delivery === 'notification') return this.notification(owner, jobId, job, named);
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
     const output = await this.readOutput(available, owner);
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) return { content: [text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
     const preview = await sharp(output.content, { limitInputPixels: 80000000 }).rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 80 }).toBuffer();
-    return { content: [{ type: 'image', data: preview.toString('base64'), mimeType: 'image/jpeg' }, text({ job_id: jobId, output_index: index, status: 'done', message: 'Generation complete. Show the attached image inline. Its original opens in the browser; call it View Original, not Download. Reply briefly; do not generate or poll again unless requested.' }), text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
+    return { content: [{ type: 'image', data: preview.toString('base64'), mimeType: 'image/jpeg' }, text({ ...named, output_index: index, status: 'done', message: 'Generation complete. Show the attached image inline. Its original opens in the browser; call it View Original, not Download. Reply briefly; do not generate or poll again unless requested.' }), text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
+  }
+  /**
+   * A self-contained, text-only completion: the woken agent can render it directly
+   * (signed image markdown plus View Original) without calling Result again.
+   */
+  notification(owner, jobId, job, named) {
+    const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'HEISS result';
+    const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
+    const markdown = outputs.map(({ url }, position) => {
+      const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
+      return job.kind === 'video' ? `${caption}: [View Video](${url})` : `![${caption}](${url})\n[View Original](${url})`;
+    }).join('\n\n');
+    const message = `${label} is ready. Reply by reproducing the markdown below exactly so the ${job.kind === 'video' ? 'video link' : 'image'} renders inline, with at most one short sentence. Do not call Result again, poll or generate again.`;
+    const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
+    return { content: [text(`${message}\n\n${markdown}`), text(structured)], structuredContent: structured };
+  }
+  /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
+  async page(claims, credential) {
+    let job;
+    try { job = await this.job(claims.owner, claims.jobId, 0, { credential }); } catch { return null; }
+    if (hidden(job)) return null;
+    const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.token(claims.owner, claims.jobId, index)] : []) : [];
+    if (finished.has(job.status) && !outputs.length) return null;
+    const pending = !terminal.has(job.status);
+    const title = pending ? 'Generating…' : outputs.length ? 'HEISS Result' : `Generation ${escapeHtml(job.status)}`;
+    const progress = Number.isFinite(job.progress) ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%` : '';
+    const media = outputs.map(token => job.kind === 'video'
+      ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
+      : `<figure><a href="${token}"><img src="${token}" alt="HEISS result"></a><a href="${token}">View Original</a></figure>`).join('');
+    const body = pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : '<p>This generation did not produce a result.</p>';
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}</style></head><body><h1>${title}</h1>${body}</body></html>`;
   }
   summary(job) { return Object.fromEntries(['status', 'kind', 'progress', 'error', 'failure'].filter(key => key in job).map(key => [key, job[key]])); }
 }
