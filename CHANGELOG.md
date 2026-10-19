@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Named MCP results, with no gap above the image
+
+### Fixed
+- **Named MCP results:** each finished result in Generate, Reuse and Result notification replies now opens with a visible header line naming its reference, model and View Original link, such as `**Result 3** · Krea 2 Turbo · [View Original](…)`, directly above its image with no gap in LibreChat. Users can see which result to refer to; videos get the same header with View Video.
+
 ## [0.23.0] - 2026-10-19
 
 ### Added

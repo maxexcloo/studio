@@ -202,14 +202,16 @@ export class McpMedia {
     return { status: 'queued', jobs: queued };
   }
   async galleryJob(jobId, owner = "", options = {}) {
-    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}`, undefined, owner, options);
+    // Settings name the profile for the result's header.
+    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}?settings=1`, undefined, owner, options);
     const outputs = new Map();
-    let kind;
+    let kind, profileId;
     for (const item of items) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
       outputs.set(item.index, { url: item.url });
       kind = item.type;
+      profileId ||= item.settings?.profileId;
     }
-    return outputs.size ? { status: 'done', kind, outputs: Array.from({ length: Math.max(...outputs.keys()) + 1 }, (_, index) => outputs.get(index) || {}) } : { status: 'missing', outputs: [] };
+    return outputs.size ? { status: 'done', kind, profileId, outputs: Array.from({ length: Math.max(...outputs.keys()) + 1 }, (_, index) => outputs.get(index) || {}) } : { status: 'missing', outputs: [] };
   }
   /** Scope of a conversation's result numbers: the owner, narrowed by the client's conversation when it sends one. */
   referenceScope(owner, conversation = '') {
@@ -259,7 +261,7 @@ export class McpMedia {
       if (job.status === 'missing' || finished.has(job.status)) {
         // A subsequently hidden/deleted output is revoked even while its terminal job remains cached.
         const visible = await this.galleryJob(jobId, owner, { signal, credential });
-        job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind };
+        job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind, profileId: visible.profileId };
       }
       if (terminal.has(job.status) || Date.now() >= deadline) return job;
       // A client Stop or disconnect ends only this wait; the generation itself keeps running.
@@ -413,7 +415,7 @@ export class McpMedia {
       return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), ...(detail ? [text(summary)] : [])], structuredContent: detail ? summary : lean };
     }
     const available = this.available(job, index);
-    if (delivery === 'notification') return this.notification(owner, jobId, job, named, detail);
+    if (delivery === 'notification') return await this.notification(owner, jobId, job, named, detail);
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
@@ -424,23 +426,31 @@ export class McpMedia {
   }
   /**
    * A self-contained, text-only completion: the woken agent can render it directly
-   * (signed image markdown plus View Original) without calling Result again.
+   * (signed image markdown with its header) without calling Result again.
    */
-  notification(owner, jobId, job, named, detail = false) {
+  async notification(owner, jobId, job, named, detail = false) {
     const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'Studio result';
-    const { outputs, markdown } = this.markdown(owner, jobId, job, label);
+    const { outputs, markdown } = await this.markdown(owner, jobId, job, label);
     const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result again, poll or generate again.`;
     // Only the markdown re-enters the chat by default; detail restores the full record.
     if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(named.ref ? { ref: named.ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
     return { content: [text(`${message}\n\n${markdown}`), text(structured)], structuredContent: structured };
   }
-  /** A finished job's signed image markdown with View Original, or a View Video link for videos. */
-  markdown(owner, jobId, job, label) {
+  /**
+   * A finished job's markdown: per output, a visible header naming its ref and profile with a
+   * View Original link, directly above its signed image (a View Video link for videos). The
+   * header and image share one paragraph so renderers add no gap; outputs are blank-line separated.
+   */
+  async markdown(owner, jobId, job, label) {
     const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
+    const profile = job.profileId ? (await this.profiles('all', owner).catch(() => [])).find(item => item.id === job.profileId) : undefined;
+    // The profile's short name, as its label reads before the first ' · '.
+    const name = String(profile?.displayName || profile?.label || '').split(/\s*·\s*/)[0].trim();
     const markdown = outputs.map(({ url }, position) => {
       const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
-      return job.kind === 'video' ? `${caption}: [View Video](${url})` : `![${caption}](${url})\n[View Original](${url})`;
+      const header = [`**${caption}**`, name, job.kind === 'video' ? `[View Video](${url})` : `[View Original](${url})`].filter(Boolean).join(' · ');
+      return job.kind === 'video' ? header : `${header}\n![${caption}](${url})`;
     }).join('\n\n');
     return { outputs, markdown };
   }
@@ -460,10 +470,11 @@ export class McpMedia {
       return job;
     })).catch(() => { stop.abort(); return null; });
     if (!jobs) return null;
-    return jobs.map((job, position) => {
+    const blocks = await Promise.all(jobs.map((job, position) => {
       const { job_id, ref } = submission.jobs[position];
-      return this.markdown(owner, job_id, job, ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'Studio result').markdown;
-    }).join('\n\n');
+      return this.markdown(owner, job_id, job, ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'Studio result');
+    }));
+    return blocks.map(block => block.markdown).join('\n\n');
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
   async page(claims, credential) {

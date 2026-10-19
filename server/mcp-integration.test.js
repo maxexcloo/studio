@@ -636,7 +636,7 @@ test('background Result collects a later completion without another submission',
   assert.equal(f.downloads.length, 0);
   // Self-sufficient: the woken agent renders this markdown without another Result call.
   const [message] = result.content;
-  assert.match(message.text, /!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n\[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
+  assert.match(message.text, /\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)$/);
   assert.match(message.text, /Do not call Result again/);
   const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(message.text);
   const original = await fetch(localLink(f, imageUrl));
@@ -1096,12 +1096,21 @@ test('a background notification returns only its markdown unless detail is asked
   Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=lean.png' }] });
   const lean = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0 });
   assert.equal(lean.content.length, 1);
-  assert.match(lean.content[0].text, /^Result 1 is ready\. .+\n\n!\[Result 1\]\([^)]+\)\n\[View Original\]\([^)]+\)$/);
+  assert.match(lean.content[0].text, /^Result 1 is ready\. .+\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 1\]\([^)]+\)$/);
   assert.deepEqual(lean.structuredContent, { job_id: id, ref: 'result 1', status: 'done' });
   const detailed = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0, detail: true });
   assert.equal(detailed.content.length, 2);
   assert.equal(detailed.structuredContent.outputs.length, 1);
   assert.ok(detailed.structuredContent.link && detailed.structuredContent.markdown);
+});
+
+test('a finished video notification names its result and profile beside View Video', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })));
+  Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=wave.mp4' }] });
+  const result = await call(client, 'Result', { job_id: 'result 1', delivery: 'notification', wait_seconds: 0 });
+  assert.match(result.content[0].text, /\n\n\*\*Result 1\*\* · Fixture Video · \[View Video\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)$/);
 });
 
 test('Generate returns quick images inline as finished markdown, so no background Result is needed', async t => {
@@ -1116,7 +1125,8 @@ test('Generate returns quick images inline as finished markdown, so no backgroun
   assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}` })) });
   assert.equal(result.content.length, 1);
   // The same markdown a background notification returns, one block per job.
-  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly.+\n\n!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n\[View Original\]\([^)]+\)\n\n!\[Result 2\]\([^)]+\)\n\[View Original\]\([^)]+\)$/);
+  // Each image sits directly under its header, in one paragraph; jobs are separated by a blank line.
+  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly.+\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n!\[Result 1\]\([^)]+\)\n\n\*\*Result 2\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 2\]\([^)]+\)$/);
   const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(result.content[0].text);
   const original = await fetch(localLink(f, imageUrl));
   assert.equal(original.status, 200);
@@ -1197,7 +1207,7 @@ test('Reuse runs a result again with its profile and settings, a new seed and an
   f.completeOnSubmit();
   const quick = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', wait_seconds: 5 });
   assert.equal(quick.structuredContent?.status, 'done', JSON.stringify(quick.content));
-  assert.match(quick.content[0].text, /^Done\. .+\n\n!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
+  assert.match(quick.content[0].text, /^Done\. .+\n\n\*\*Result 5\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
   // Without kind, Reuse still returns a reference asset for Generate, and a rerun keeps a result's references.
   const { asset } = data(await call(client, 'Reuse', { job_id: 'result 1' }));
   assert.match(asset.id, /^fixture-asset-/);
