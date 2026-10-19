@@ -10,15 +10,15 @@
 // notes under Unreleased, and that tests and the build pass. Then it bumps
 // package.json and the lockfile, dates the changelog section, commits
 // "Release vX.Y.Z" and makes an annotated tag with the notes. Pushing the tag
-// runs .github/workflows/release.yml, which publishes the download.
+// runs .github/workflows/release.yml, which publishes the container image and
+// the GitHub release.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changelogPath, cutRelease, section, SUMMARY_MAX, summaryOf } from "./changelog.mjs";
+import { changelogPath, cutRelease, section } from "./changelog.mjs";
 import { releaseChanges } from './release-plan.mjs';
-import { releaseIdentity, requireForkSigningOwnership } from '../server/release-identity.js';
-import { releasePublicKey } from "../server/release-signing.js";
+import { releaseIdentity } from '../server/release-identity.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -65,29 +65,10 @@ if (git("rev-list", "--count", "HEAD..origin/main") !== "0") fail("origin/main h
 const repository = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git('remote', 'get-url', 'origin'))?.[1];
 if (repository !== releaseIdentity.repository) fail('origin does not match the configured fork release repository.');
 if (dryRun && push) fail('--dry-run and --push cannot be combined.');
-if (!dryRun) {
-  try { requireForkSigningOwnership(repository); } catch (error) { fail(error.message); }
-}
-
-// Once installed copies trust a release key, CI must be able to sign with it,
-// or the release it publishes would be refused by every one of them.
-if (releasePublicKey() && !dryRun) {
-  // The repository origin points at: a checkout with more remotes leaves gh guessing otherwise.
-  const repo = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git("remote", "get-url", "origin"))?.[1] || "";
-  const repoArgs = repo ? ["-R", repo] : [];
-  let secrets = null;
-  try { secrets = run("gh", ["secret", "list", ...repoArgs, "--json", "name", "--jq", ".[].name"], { quiet: true }).split(/\s+/); } catch { secrets = null; }
-  if (secrets && !secrets.includes("HEISS_RELEASE_SIGNING_KEY")) fail(`server/release-signing.js trusts a release key, but the repository has no HEISS_RELEASE_SIGNING_KEY secret. Run: gh secret set HEISS_RELEASE_SIGNING_KEY ${repo ? `-R ${repo} ` : ""}< ~/.config/heiss-ui/release-signing-key.pem`);
-  if (!secrets) console.warn("Could not ask GitHub whether HEISS_RELEASE_SIGNING_KEY is set (is gh signed in?). The release workflow stops if it isn't.");
-}
 
 const changelog = fs.readFileSync(changelogPath, "utf8");
 const notes = section(changelog, "Unreleased");
 if (!notes) fail("CHANGELOG.md has nothing under Unreleased. Write the release notes first.");
-// The update pill shows this line: a few words for the whole release, not its first bullet.
-const summary = summaryOf(notes);
-if (!summary) fail(`Start the Unreleased notes with a one-line summary for the update pill, like\n\n  > Smoother model setup, clearer progress, calmer errors\n\nName what the release is about in a few words (up to ${SUMMARY_MAX} characters). With several changes, sum them up ("Faster uploads and smaller fixes") instead of picking one.`);
-if (summary.length > SUMMARY_MAX) fail(`The summary is ${summary.length} characters; the update pill fits ${SUMMARY_MAX}. Shorten:\n\n  > ${summary}`);
 const today = new Date().toISOString().slice(0, 10);
 const nextChangelog = cutRelease(changelog, version, today);
 
@@ -97,8 +78,6 @@ run("mise", ["run", "build"], { stdio: "inherit" });
 run(npm, ["run", "test:browser", "--", "--workers=2"], { stdio: "inherit" });
 
 if (dryRun) {
-  console.log(`\nThe update pill will read:\n\n  HEISS UI ${version} is here\n  ${summary}\n`);
-  console.log(`\nPublication remains gated on fork signing ownership and CI platform/container checks.`);
   console.log(`\nWould release ${tag} with these notes:\n\n${notes}\n`);
   process.exit(0);
 }
@@ -112,7 +91,7 @@ console.log(`\n✓ Committed "Release ${tag}" and tagged ${tag}.`);
 
 if (push) {
   run("git", ["push", "--atomic", "origin", "main", tag]);
-  console.log(`✓ Pushed. GitHub Actions now builds and publishes the ${tag} release.`);
+  console.log(`✓ Pushed. GitHub Actions now publishes the ${tag} image and release.`);
 } else {
   console.log(`\nPush when ready (this publishes the GitHub release):\n\n  git push --atomic origin main ${tag}\n`);
 }

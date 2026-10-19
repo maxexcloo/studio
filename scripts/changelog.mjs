@@ -5,7 +5,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { repositoryUrl as repoUrl } from '../server/release-identity.js';
+import { releaseIdentity, repositoryUrl as repoUrl } from '../server/release-identity.js';
+
+const { repository } = releaseIdentity;
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const changelogPath = path.join(root, "CHANGELOG.md");
@@ -66,11 +68,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`CHANGELOG.md has no section for ${tag}.`);
     process.exit(1);
   }
-  // Which zip is which, below the notes (the pill reads only their top).
+  // Where the version's container image is, below the notes.
   const version = tag.replace(/^v/, "");
-  process.stdout.write(`${notes}\n\n### Downloads\n\n`
-    + `- **Windows:** \`heiss-ui-${version}-windows-x64.zip\` (Node.js included), then **Start HEISS UI.bat**\n`
-    + `- **macOS (Apple silicon):** \`heiss-ui-${version}-macos-arm64.zip\`, then **Start HEISS UI.command**\n`
-    + `- **Linux:** \`heiss-ui-${version}-linux-x64.zip\`, then **Start HEISS UI.sh** or \`npm start\`\n`
-    + `- \`heiss-ui-${version}.zip\` is what installed copies download to update themselves. You don't need it.\n`);
+  const image = `ghcr.io/${repository.toLowerCase()}`;
+  const digest = /^sha256:[a-f0-9]{64}$/.test(process.env.HEISS_IMAGE_DIGEST || "") ? process.env.HEISS_IMAGE_DIGEST : "";
+  process.stdout.write(`${notes}\n\n### Container image\n\n`
+    + "```text\n"
+    + `${image}:${version}\n`
+    + (digest ? `${image}@${digest}\n` : "")
+    + "```\n");
 }
