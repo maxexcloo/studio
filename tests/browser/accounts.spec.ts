@@ -70,8 +70,8 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
   await page.getByPlaceholder('Studio Artists').fill('Video Artists');
-  await page.getByRole('checkbox', { name: 'video-hd' }).check();
-  await page.getByRole('checkbox', { name: 'LoRAs' }).check();
+  await page.getByRole('switch', { name: 'video-hd' }).click();
+  await page.getByRole('switch', { name: 'LoRAs' }).click();
   await page.getByRole('button', { name: 'Save Profile', exact: true }).click();
   await expect.poll(() => posts.some((post) => post.url === '/api/accounts/profiles')).toBe(true);
   const profile = posts.find((post) => post.url === '/api/accounts/profiles')?.body as { id: string; generationProfiles: string[]; features: { loras: boolean } };
@@ -86,10 +86,13 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
 
   await page.getByRole('button', { name: 'Edit Artists', exact: true }).click();
   await expect(page.getByLabel('Profile name')).toHaveValue('Artists');
-  await expect(page.getByRole('checkbox', { name: 'image-fast' })).toBeChecked();
+  await expect(page.getByRole('switch', { name: 'image-fast' })).toBeChecked();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await page.getByLabel('Account for librechat-user-7').selectOption('artist-id');
+  // The placeholder shows by name, not as its sentinel value.
+  await expect(page.getByLabel('Account for librechat-user-7')).toContainText('Choose an Account');
+  await page.getByLabel('Account for librechat-user-7').click();
+  await page.getByRole('option', { name: 'Artist One (artist.one)', exact: true }).click();
   await page.getByRole('button', { name: 'Link', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-links')?.body).toEqual({ identity: 'librechat-user-7', accountId: 'artist-id' });
 

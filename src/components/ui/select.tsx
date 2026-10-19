@@ -32,6 +32,8 @@ interface SelectContextValue {
   disabled: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   labelMap: React.MutableRefObject<Map<string, string>>;
+  /** Items register labels after the trigger renders; this redraws it once the chosen one arrives. */
+  labelsChanged: () => void;
 }
 
 const SelectContext = createContext<SelectContextValue | null>(null);
@@ -80,6 +82,8 @@ function Select({
   const currentValue = value !== undefined ? value : internalValue;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const labelMap = useRef(new Map<string, string>());
+  const [, setLabelVersion] = useState(0);
+  const labelsChanged = useCallback(() => setLabelVersion((version) => version + 1), []);
 
   const onChange = useCallback(
     (v: string) => {
@@ -101,6 +105,7 @@ function Select({
         disabled,
         triggerRef,
         labelMap,
+        labelsChanged,
       }}
     >
       {children}
@@ -283,10 +288,11 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
 
     // Register label with root context
     useEffect(() => {
-      if (typeof children === "string") {
+      if (typeof children === "string" && selectCtx.labelMap.current.get(value) !== children) {
         selectCtx.labelMap.current.set(value, children);
+        if (selectCtx.value === value) selectCtx.labelsChanged();
       }
-    }, [value, children, selectCtx.labelMap]);
+    }, [value, children, selectCtx.labelMap, selectCtx.value, selectCtx.labelsChanged]);
 
     // Register with proximity hover (only when content context exists = open)
     useEffect(() => {

@@ -631,6 +631,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
   // Models nothing picked up, plus the ones you assigned by hand so they can be undone.
   const modelList = models as Models | null;
+  const profileLabels = React.useMemo(() => Object.fromEntries((modelList?.profiles || []).map((profile) => [profile.id, profile.displayName || profile.label])), [modelList]);
   // Models nothing picked up, ones still missing a part, and ones you assigned by hand (so they can be undone).
   const typedModels = (modelList?.modelFiles || []).filter((file) => !file.supported || file.via === 'choice' || (file.missing?.length || 0) > 0);
   const [typeBusy, setTypeBusy] = React.useState('');
@@ -937,7 +938,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           <HiddenSettings hidden={hidden} prefs={prefs} setPrefs={setPrefs} showToast={showToast} confirmAction={confirmAction} Group={Group} Row={Row} Status={Status} Switch={Switch} />
         ) : null}
 
-        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} /> : null}
+        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} profileLabels={profileLabels} /> : null}
 
         {section === 'connection' ? (
           <>

@@ -187,19 +187,19 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
         {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
         {upscaleNotice && onDismissUpscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="tile" onDismiss={() => onDismissUpscaleNotice(item.id)} /> : null}
-        {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the upscale · the picture stays" : "Stop generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
+        {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
         {item.status !== "pending" ? (
           <>
-            <button type="button" className="tile-more" aria-label="More actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal size={16} /></button>
+            <button type="button" className="tile-more" aria-label="More Actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal size={16} /></button>
             <span className="tile-hover-actions">
               {canMove ? (
                 item.privateVault
-                  ? <Tip content="Move to gallery" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to gallery" onClick={() => act(() => hiddenActions!.unhide([item]))}><Eye size={14} /><span className="tile-menu-label">Move to gallery</span></button></Tip>
-                  : <Tip content="Move to Hidden" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to Hidden" onClick={() => act(() => hiddenActions!.hide([item]))}><EyeOff size={14} /><span className="tile-menu-label">Hide</span></button></Tip>
+                  ? <Tip content="Move to Gallery" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to Gallery" onClick={() => act(() => hiddenActions!.unhide([item]))}><Eye size={14} /><span className="tile-menu-label">Move to Gallery</span></button></Tip>
+                  : <Tip content="Move to Hidden" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to Hidden" onClick={() => act(() => hiddenActions!.hide([item]))}><EyeOff size={14} /><span className="tile-menu-label">Move to Hidden</span></button></Tip>
               ) : null}
-              {item.url ? <Tip content={item.upscaleActive && !upscaledWithRun(item) ? "Download the upscale" : "Download"} side="left"><a className="tile-icon" aria-label="Download" href={downloadUrl(item)} download onClick={() => setMenuOpen(false)}><Download size={13} /><span className="tile-menu-label">Download</span></a></Tip> : null}
-              {item.status === "done" ? <Tip content="Copy prompt" side="left"><button type="button" className="tile-icon" aria-label="Copy prompt" onClick={() => act(() => copyPromptAndToast(item))}><Copy size={14} /><span className="tile-menu-label">Copy prompt</span></button></Tip> : null}
-              <Tip content={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from gallery" : "Delete from gallery"} side="left"><button type="button" className="tile-delete" aria-label={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from gallery" : "Delete from gallery"} onClick={() => act(() => deleteItem(item))}><Trash2 size={14} /><span className="tile-menu-label">{item.library ? "Remove" : "Delete"}</span></button></Tip>
+              {item.url ? <Tip content={item.upscaleActive && !upscaledWithRun(item) ? "Download the Upscale" : "Download"} side="left"><a className="tile-icon" aria-label="Download" href={downloadUrl(item)} download onClick={() => setMenuOpen(false)}><Download size={13} /><span className="tile-menu-label">Download</span></a></Tip> : null}
+              {item.status === "done" ? <Tip content="Copy Prompt" side="left"><button type="button" className="tile-icon" aria-label="Copy Prompt" onClick={() => act(() => copyPromptAndToast(item))}><Copy size={14} /><span className="tile-menu-label">Copy Prompt</span></button></Tip> : null}
+              <Tip content={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from Gallery" : "Delete from Gallery"} side="left"><button type="button" className="tile-delete" aria-label={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from Gallery" : "Delete from Gallery"} onClick={() => act(() => deleteItem(item))}><Trash2 size={14} /><span className="tile-menu-label">{item.library ? "Remove" : "Delete"}</span></button></Tip>
             </span>
             {/* Its own corner: always there once starred, on hover otherwise. */}
             {star && canStar(item) ? (

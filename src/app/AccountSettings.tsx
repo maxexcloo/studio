@@ -1,7 +1,8 @@
 import React from 'react';
-import { Copy, KeyRound, LogOut, Pencil, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Ban, Check, Copy, KeyRound, Link2, LogOut, Pencil, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
 import { apiJson } from './api';
-import { Group, Row } from './SettingsControls';
+import { StudioSelect } from './components';
+import { Group, Row, Switch } from './SettingsControls';
 import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
@@ -19,8 +20,12 @@ const featureLabels: [Feature, string][] = [
 const blankFeatures = () => Object.fromEntries(featureLabels.map(([key]) => [key, false])) as Record<Feature, boolean>;
 const jsonPost = (method: string, body: unknown) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const message = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+// FluidSelect needs a non-empty value for its placeholder option.
+const NONE = '__none__';
+const choose = (label: string, value: string) => value ? [] : [{ label, value: NONE }];
 
-export function AccountSettings({ showToast, copyToClipboard, confirmAction, isAdmin }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction; isAdmin: boolean }) {
+/** profileLabels names generation profiles from /api/models; an unknown ID shows as itself. */
+export function AccountSettings({ showToast, copyToClipboard, confirmAction, isAdmin, profileLabels }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction; isAdmin: boolean; profileLabels?: Record<string, string> }) {
   const [admin, setAdmin] = React.useState<AdminData | null>(null);
   const [token, setToken] = React.useState<TokenStatus | null>(null);
   const [loadError, setLoadError] = React.useState('');
@@ -146,6 +151,9 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
   // Stored grants stay listed while discovery is degraded, marked unavailable.
   const grantable = [...new Set([...(admin?.availableProfiles || []), ...selectedProfiles])];
   const unavailable = new Set(grantable.filter((id) => !admin?.availableProfiles.includes(id)));
+  const profileLabel = (id: string) => profileLabels?.[id] || id;
+  const profileOptions = (admin?.accessProfiles || []).map((profile) => ({ label: profile.name, value: profile.id }));
+  const accountOptions = (list: Account[]) => list.map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
   const localAccounts = (admin?.accounts || []).filter((account) => account.identity?.provider !== 'pocket-id');
 
   return <>
@@ -155,11 +163,11 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
         {token?.endpoint ? <button className="btn is-ghost" onClick={() => void copy(token.endpoint, 'URL')}><Copy size={14} /> Copy URL</button> : null}
       </Row>
       <Row label={token?.enabled ? 'Token Active' : 'No Token Issued'} description={token?.createdAt ? `Created ${new Date(token.createdAt).toLocaleString('en-AU')}` : 'Create a personal token to connect an MCP client.'}>
-        {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void issueToken()}><RefreshCw size={14} /> Rotate</button> : <button className="btn is-primary" disabled={busy || !token} onClick={() => void issueToken()}>Create Token</button>}
+        {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void issueToken()}><RefreshCw size={14} /> Rotate</button> : <button className="btn is-primary" disabled={busy || !token} onClick={() => void issueToken()}><KeyRound size={14} /> Create Token</button>}
         {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void revokeToken()}><X size={14} /> Revoke</button> : null}
       </Row>
       {issuedToken ? <Row stacked label="New Token" description="Shown once. Store it in your MCP client as a bearer credential, separate from the endpoint URL.">
-        <input aria-label="New MCP token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
+        <input className="modal-input set-path-input" aria-label="New MCP token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
         <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
       </Row> : null}
     </Group>
@@ -168,31 +176,31 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       {admin?.accessProfiles.map((profile) => <Row key={profile.id} label={profile.name} description={`${profile.generationProfiles.length} generation profile${profile.generationProfiles.length === 1 ? '' : 's'} · ${profile.id}`}>
         <button className="btn is-ghost" disabled={busy} aria-label={`Edit ${profile.name}`} onClick={() => editProfile(profile)}><Pencil size={14} /> Edit</button>
       </Row>)}
-      <Row label={editingId ? 'Profile Name' : 'New Profile Name'}><input aria-label="Profile name" value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
-      {editingId ? <Row label="Profile ID" description={editingId} /> : <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen."><input aria-label="Profile ID" value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="studio-artists" /></Row>}
+      <Row label={editingId ? 'Profile Name' : 'New Profile Name'}><input className="modal-input account-field" aria-label="Profile name" value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
+      {editingId ? <Row label="Profile ID" description={editingId} /> : <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen."><input className="modal-input account-field" aria-label="Profile ID" value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="studio-artists" /></Row>}
       <fieldset className="account-profile-list"><legend>Generation Profiles</legend>
-        {grantable.map((id) => <label key={id}><input type="checkbox" checked={selectedProfiles.includes(id)} onChange={(event) => setSelectedProfiles((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} />{id}{unavailable.has(id) ? ' (Unavailable)' : ''}</label>)}
+        {grantable.map((id) => <label key={id}><span>{profileLabel(id)}{unavailable.has(id) ? ' (Unavailable)' : ''}</span><Switch size="sm" label={profileLabel(id)} checked={selectedProfiles.includes(id)} onChange={(next) => setSelectedProfiles((current) => next ? [...current, id] : current.filter((item) => item !== id))} /></label>)}
       </fieldset>
       <fieldset className="account-profile-list"><legend>Features</legend>
-        {featureLabels.map(([id, label]) => <label key={id}><input type="checkbox" checked={features[id]} onChange={(event) => setFeatures((current) => ({ ...current, [id]: event.target.checked }))} />{label}</label>)}
+        {featureLabels.map(([id, label]) => <label key={id}><span>{label}</span><Switch size="sm" label={label} checked={features[id]} onChange={(next) => setFeatures((current) => ({ ...current, [id]: next }))} /></label>)}
       </fieldset>
       <Row label={editingId ? 'Update Access Profile' : 'Save Access Profile'}>
-        {editingId ? <button className="btn is-ghost" disabled={busy} onClick={clearProfileForm}>Cancel</button> : null}
-        <button className="btn is-primary" disabled={busy || !profileName.trim()} onClick={() => void saveProfile()}>Save Profile</button>
+        {editingId ? <button className="btn is-ghost" disabled={busy} onClick={clearProfileForm}><X size={14} /> Cancel</button> : null}
+        <button className="btn is-primary" disabled={busy || !profileName.trim()} onClick={() => void saveProfile()}><Check size={14} /> Save Profile</button>
       </Row>
     </Group> : null}
 
     {isAdmin ? <Group title="Accounts">
       {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role === 'administrator' ? 'Administrator' : 'User'}${account.pending ? ' · Pending Approval: assign a profile to approve' : ''}${account.signInLinked ? ' · Single Sign-On' : ''}${account.disabled ? ' · Disabled' : ''}`}>
         {account.role === 'user' ? <>
-          <select aria-label={`Access profile for ${account.username}`} disabled={busy} value={account.accessProfileId || ''} onChange={(event) => void patchAccount(account, { accessProfileId: event.target.value })}><option value="" disabled>Choose a Profile</option>{admin.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
-          <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? 'Enable' : 'Disable'}</button>
+          <div className="set-type-picker"><StudioSelect ariaLabel={`Access profile for ${account.username}`} value={account.accessProfileId || NONE} options={[...choose('Choose a Profile', account.accessProfileId || ''), ...profileOptions]} onChange={(value) => { if (!busy && value !== NONE && value !== account.accessProfileId) void patchAccount(account, { accessProfileId: value }); }} /></div>
+          <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
         </> : null}
       </Row>)}
-      <Row label="Username"><input aria-label="Username" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
-      <Row label="Display Name"><input aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
-      <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
-      <Row label="Access Profile"><select aria-label="Access profile for the new account" value={assignedProfile} onChange={(event) => setAssignedProfile(event.target.value)}><option value="">Choose a Profile</option>{admin?.accessProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></Row>
+      <Row label="Username"><input className="modal-input account-field" aria-label="Username" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
+      <Row label="Display Name"><input className="modal-input account-field" aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
+      <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
+      <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access profile for the new account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || password.length < 12 || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
@@ -200,19 +208,19 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       {(admin?.gateway?.links || []).map((link) => {
         const account = admin?.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
-          <button className="btn is-ghost" disabled={busy} aria-label={`Unlink ${link.identity}`} onClick={() => void setGatewayLink(link.identity, '')}><X size={14} /> Unlink</button>
+          <button className="btn is-ghost" disabled={busy} aria-label={`Unlink ${link.identity}`} onClick={() => void setGatewayLink(link.identity, '')}><Unlink size={14} /> Unlink</button>
         </Row>;
       })}
       {(admin?.gateway?.pending || []).map((item) => <Row key={item.identity} label={item.identity} description={`Waiting since ${new Date(item.firstSeenAt).toLocaleString('en-AU')}`}>
-        <select aria-label={`Account for ${item.identity}`} disabled={busy} value={gatewayChoice[item.identity] || ''} onChange={(event) => setGatewayChoice((current) => ({ ...current, [item.identity]: event.target.value }))}><option value="">Choose an Account</option>{admin?.accounts.map((account) => <option key={account.id} value={account.id}>{account.displayName} ({account.username})</option>)}</select>
-        <button className="btn is-primary" disabled={busy || !gatewayChoice[item.identity]} onClick={() => void setGatewayLink(item.identity, gatewayChoice[item.identity])}>Link</button>
+        <div className="set-type-picker"><StudioSelect ariaLabel={`Account for ${item.identity}`} value={gatewayChoice[item.identity] || NONE} options={[...choose('Choose an Account', gatewayChoice[item.identity] || ''), ...accountOptions(admin?.accounts || [])]} onChange={(value) => setGatewayChoice((current) => ({ ...current, [item.identity]: value === NONE ? '' : value }))} /></div>
+        <button className="btn is-primary" disabled={busy || !gatewayChoice[item.identity]} onClick={() => void setGatewayLink(item.identity, gatewayChoice[item.identity])}><Link2 size={14} /> Link</button>
       </Row>)}
       {!admin?.gateway?.links.length && !admin?.gateway?.pending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
     </Group> : null}
 
     {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
-      <Row label="Account"><select aria-label="Account to reset" value={resetAccount} onChange={(event) => setResetAccount(event.target.value)}><option value="">Choose an Account</option>{localAccounts.map((account) => <option key={account.id} value={account.id}>{account.displayName} ({account.username})</option>)}</select></Row>
-      <Row label="New Password" description="Use at least 12 characters."><input aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
+      <Row label="Account"><div className="set-type-picker"><StudioSelect ariaLabel="Account to reset" value={resetAccount || NONE} options={[...choose('Choose an Account', resetAccount), ...accountOptions(localAccounts)]} onChange={(value) => setResetAccount(value === NONE ? '' : value)} /></div></Row>
+      <Row label="New Password" description="Use at least 12 characters."><input className="modal-input account-field" aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
       <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || resetPassword.length < 12} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
     </Group> : null}
 

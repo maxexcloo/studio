@@ -8,7 +8,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -313,7 +313,7 @@ export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: Ga
           ) : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Prompt</span></button> : null}
           {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => { void actions.copyPrompt(item); })}><CopyIcon copied={false} size={20} /><span>Copy Prompt</span></button> : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><Wand2 size={20} /><span>Prompts Only</span></button> : null}
+          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><TextQuote size={20} /><span>Prompts Only</span></button> : null}
           {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
           {done && !item.library ? (
             item.privateVault

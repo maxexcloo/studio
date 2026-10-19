@@ -42,7 +42,6 @@
 .phone-create .composer-field-tools { top: 7px; right: 7px; }
 .phone-create .phone-sheet-foot { display: grid; gap: 8px; }
 .phone-creation-toolbar, .phone-creation-submit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.phone-creation-toolbar > button, .phone-creation-reset { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; min-width: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
 .phone-creation-toolbar .phone-model-browse { flex: 1; min-width: 80px; max-width: 180px; }
 .phone-model-browse span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .phone-creation-toolbar > button[aria-label="LoRAs"] span { display: none; }
@@ -82,7 +81,8 @@
 .phone-creation-resource-left .ref-add { width: 44px; height: 44px; padding: 0; border-radius: var(--r-pill); border-style: solid; }
 .phone-creation-resource-left .ref-add-label { display: none; }
 .phone-creation-resource-left .ref-selected { width: 44px; height: 44px; }
-.phone-creation-resources > button, .phone-creation-resource-left > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; }
+/* Phone creation buttons: one 44px pill in a dark well. */
+.phone-creation-toolbar > button, .phone-creation-reset, .phone-creation-resources > button, .phone-creation-resource-left > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
 .phone-creation-resources .phone-model-browse { flex: none; max-width: 160px; margin-left: auto; }
 .phone-creation-submit-row .composer-submit-actions { margin-left: auto; }
 .composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
@@ -151,7 +151,7 @@
 .composer-loras .lora-library-select:hover { color: hsl(var(--foreground)); }
 .composer-loras .lora-library-select:focus-visible { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
 .composer-loras .lora-library-select:disabled { opacity: .45; cursor: default; }
-.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: 5px; color: hsl(var(--background)); }
+.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: calc(var(--r-media) / 2); color: hsl(var(--background)); }
 .composer-loras .lora-library-select[aria-checked="true"] .lora-library-check { background: hsl(var(--foreground)); border-color: hsl(var(--foreground)); }
 .composer-loras .lora-library-select .lora-option-copy { flex: 1; min-width: 0; }
 .composer-loras .lora-library-select .lora-option-copy strong { font-size: 12px; }
@@ -180,7 +180,7 @@
 .composer-loras .lora-panel { display: flex; flex-direction: column; overflow-y: auto; }
 .composer-loras .lora-picker { gap: 0; }
 .composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--surface-border); }
-.composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: rgb(255 255 255 / .045); }
+.composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: var(--control-fill); }
 .composer-loras .lora-filter { order: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 10px; }
 .composer-loras .lora-filter small { max-width: 260px; text-align: right; }
 .composer-loras .lora-picker-list { order: 2; margin: 0; padding: 0 12px 10px; }
@@ -221,6 +221,8 @@
 .composer-loras .lora-library-row > .lora-details > summary { position: absolute; top: 12px; right: 36px; justify-content: center; width: 32px; min-height: 32px; border-radius: var(--r-item); }
 .composer-loras .lora-library-row > .lora-details > summary::-webkit-details-marker { display: none; }
 .composer-loras .lora-library-row > .lora-details > summary:hover { color: hsl(var(--foreground)); }
+/* On touch the Info target reaches 44px without changing the row; it stops short of the star. */
+@media (hover: none) { .composer-loras .lora-library-row > .lora-details > summary::after { content: ""; position: absolute; inset: -6px; } }
 .composer-loras .lora-library-row > .lora-details[open] > div { padding-top: 2px; }
 /* The keyboard's place in the list is always visible. */
 .composer-loras .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .055); }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Pencil, RefreshCw } from 'lucide-react';
+import { Check, Lock, Pencil, PlugZap, RefreshCw, X } from 'lucide-react';
 import { apiFetch, apiJson } from './api';
 import { StudioSelect } from './components';
 import { cn } from './format';
@@ -76,10 +76,10 @@ function AddressEditor({ connection, showToast, onSaved, onClose }: { connection
   const changed = value.trim() !== connection.value;
   return <Row stacked label={`${connection.label} Address`} description={note || (connection.backend === 'video' ? 'A separate ComfyUI for local video workflows. Leave empty to use the image connection.' : 'Where ComfyUI runs for images. ComfyUI Desktop usually uses port 8000, a manual install 8188.')}>
     <div className="set-address">
-      <input className="set-path-input" value={value} onChange={(event) => setValue(event.target.value)} aria-label={`${connection.label} ComfyUI address`} spellCheck={false} autoComplete="off" placeholder={connection.backend === 'video' ? 'Use the image connection' : 'http://127.0.0.1:8188'} onKeyDown={(event) => { if (event.key === 'Enter' && changed) void submit(true); if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }} />
-      <button className="btn" onClick={() => void submit(false)} disabled={busy || !value.trim()}>Test</button>
-      <button className="btn is-primary" onClick={() => void submit(true)} disabled={busy || !changed || (!value.trim() && connection.backend !== 'video')}>{busy ? 'Checking…' : 'Save'}</button>
-      <button className="btn is-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+      <input className="modal-input set-path-input" value={value} onChange={(event) => setValue(event.target.value)} aria-label={`${connection.label} ComfyUI address`} spellCheck={false} autoComplete="off" placeholder={connection.backend === 'video' ? 'Use the image connection' : 'http://127.0.0.1:8188'} onKeyDown={(event) => { if (event.key === 'Enter' && changed) void submit(true); if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }} />
+      <button className="btn" onClick={() => void submit(false)} disabled={busy || !value.trim()}><PlugZap size={14} /> Test</button>
+      <button className="btn is-primary" onClick={() => void submit(true)} disabled={busy || !changed || (!value.trim() && connection.backend !== 'video')}><Check size={14} /> {busy ? 'Checking…' : 'Save'}</button>
+      <button className="btn is-ghost" onClick={onClose} disabled={busy}><X size={14} /> Cancel</button>
     </div>
   </Row>;
 }
