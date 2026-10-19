@@ -422,10 +422,6 @@
 
 .phone-search { margin-bottom: 8px; }
 
-/* The create sheet's size row: the real shape, with the 2K or C tag on its corner. */
-.phone-size-icon { flex: none; width: 20px; height: 20px; color: hsl(var(--muted-foreground)); }
-.phone-size-icon .aspect-shape { max-width: 22px; max-height: 22px; }
-
 /* -------------------------------------------------------------- Create */
 
 /* An on-screen keyboard leaves the sheet little height. The prompt keeps its
@@ -505,47 +501,7 @@
 .phone-create .ref-menu-paint > svg { width: 15px; height: 15px; margin: 0; }
 .phone-create .ref-menu-paint-label { display: none; }
 
-.phone-field {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: #1f1f1f;
-}
-.phone-field > span { color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 600; }
-.phone-field textarea {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: hsl(var(--foreground));
-  font-size: 16px;
-  line-height: 1.4;
-  resize: none;
-  outline: none;
-}
-.phone-negative { display: block; border-top: 1px solid var(--surface-border); padding-top: 6px; }
-.phone-compose .phone-negative textarea { min-height: 0; height: calc(1lh + 8px); padding: 4px; transition: height 120ms var(--ease-out); }
-.phone-compose .phone-negative textarea:focus { height: calc(2lh + 8px); }
-.phone-negative.is-unused { opacity: .55; }
 .phone-create .composer-submit-actions .phone-generate { flex: 1; min-width: 0; }
-
-
-.phone-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 48px;
-  margin: 0 0 8px;
-  padding: 0 6px;
-  border: 0;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font-size: 15px;
-  font-weight: 550;
-}
-.phone-link.is-strong { color: hsl(var(--foreground)); }
 
 .phone-seed { margin-bottom: 12px; border-radius: 18px; background: rgb(255 140 90 / .1); }
 .phone-seed,
@@ -562,30 +518,6 @@
 .phone-control-label { font-size: 15px; font-weight: 600; }
 .phone-control-label b { float: right; font-variant-numeric: tabular-nums; }
 .phone-control-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: hsl(var(--muted-foreground)); font-size: 12px; }
-/* Back to what the workflow suggests, one tap; greyed out when it already is. */
-.phone-step-default {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 18px;
-  background: rgb(255 255 255 / .07);
-  color: hsl(var(--foreground));
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.phone-step-default:disabled { opacity: .45; }
-.phone-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
-.phone-seg button {
-  min-height: 48px;
-  border: 0;
-  border-radius: 14px;
-  background: rgb(255 255 255 / .06);
-  color: hsl(var(--foreground));
-  font-size: 17px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-.phone-seg button.active { background: #f2f2f2; color: #0b0b0b; }
 
 .phone-slider {
   -webkit-appearance: none;
@@ -631,15 +563,6 @@
 .phone-generate[aria-disabled="true"] { opacity: .4; }
 .phone-generate.is-restarting { background: rgb(255 190 110 / .12); color: rgb(255 214 160); opacity: 1; }
 .phone-generate.is-offline { background: rgb(255 120 100 / .14); color: #ffc4b9; }
-
-/* The full sidebar, one link deep: the same controls, room to breathe. */
-.phone-advanced-body .zen-controls,
-.phone-advanced-body { display: grid; gap: 14px; }
-.phone-advanced-body input,
-.phone-advanced-body select,
-.phone-advanced-body textarea { font-size: 16px; }
-.phone-advanced-body .fluid-select-trigger,
-.phone-advanced-body .number-picker { min-height: 48px; }
 
 /* The reference picker, as a sheet from the bottom edge. */
 .reference-popover.is-sheet {
@@ -943,15 +866,6 @@
   text-align: right;
 }
 
-/* The LoRA panel keeps its logic and gets thumb-sized parts. */
-.phone-loras { display: grid; gap: 10px; }
-.phone-loras button { min-height: 44px; }
-.phone-loras input[type="range"] { height: 40px; }
-.phone-loras input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -11px; }
-.phone-loras .lora-card { padding: 12px; border-radius: 16px; }
-/* The picker replaces the list in place; on a phone it may use most of the screen. */
-.phone-loras .lora-picker { max-height: none; }
-
 /* ----------------------------------------------------------- Selecting */
 
 .phone-bar.is-behind { display: none; }
@@ -1016,40 +930,6 @@
     radial-gradient(closest-side, #f2f2f2 calc(100% - 4px), transparent calc(100% - 3px)),
     conic-gradient(hsl(38 92% 60%) calc(var(--progress, 0) * 360deg), rgb(255 255 255 / .18) 0);
 }
-.phone-step-line { color: hsl(38 92% 70%); font-variant-numeric: tabular-nums; }
-
-.phone-peek {
-  position: fixed;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px);
-  z-index: 21;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 8px 14px 8px 8px;
-  border: 0;
-  border-radius: 22px;
-  background: #242424;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 16px 40px rgb(0 0 0 / .6);
-  color: hsl(var(--foreground));
-  text-align: left;
-}
-.phone-peek-thumb {
-  flex: none;
-  width: 48px;
-  height: 48px;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #111;
-}
-.phone-peek-thumb img,
-.phone-peek-thumb video { width: 100%; height: 100%; object-fit: cover; }
-.phone-peek-text { flex: 1; display: grid; gap: 1px; }
-.phone-peek-text strong { font-size: 16px; }
-.phone-peek-text small { color: hsl(var(--muted-foreground)); font-size: 13px; }
-
 /* ------------------------------------------- Shared dialogs, phone-shaped */
 
 /* Dialogs render outside the phone shell, so they key off the page holding it:

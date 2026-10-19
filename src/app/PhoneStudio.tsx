@@ -383,7 +383,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   onAnimate: (items: GalleryItem[]) => void;
 }) {
   const {
-    prompt, currentProfile, hiddenSpace, hidden, runningCount, cancelQueue, comfyStatus, retryComfyStatus, mode, changeMode,
+    prompt, hiddenSpace, runningCount, comfyStatus, retryComfyStatus, mode, changeMode,
     galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, deleteItems, hideItems, unhideItems, showToast
   } = view;
   const gallery = (visibleGallery || []) as GalleryItem[];
@@ -527,9 +527,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         </div>
       ) : null}
 
-      <AnimatePresence>
-      </AnimatePresence>
-
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
       <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => setSelection(new Set()) : undefined} />
       <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} actions={itemActions} onSelect={(item) => { haptic('press'); setSelection(new Set([item.id])); }} />
@@ -561,13 +558,12 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile, hiddenSpace,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
-    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, loraActiveCount, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
-    prefs, chooseAutoUpscale, setShowNegativePrompt, customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers
+    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
+    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
   const many = (referenceAssets || []).length > 1;
   const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
-  const [showNegative, setShowNegative] = React.useState(Boolean(negative));
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
   const { prompts: recentNegatives } = usePromptHistory(open, 'negative');

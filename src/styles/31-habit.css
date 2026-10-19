@@ -160,12 +160,7 @@
   .prompt-history-foot:not(:has(em)) { display: none; }
 }
 
-/* Phone: a chip in the prompt box, and a sheet of big rows. */
-.phone-compose-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
-}
+/* Phone: recent prompts as a sheet of big rows. */
 .phone-history-row .phone-row > span { gap: 4px; }
 .phone-history-text {
   display: -webkit-box;

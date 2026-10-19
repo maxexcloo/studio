@@ -34,7 +34,6 @@
 .zen-prompt:not(.is-expanded) .prompt-count,
 .zen-prompt:not(.is-expanded) .lora-mismatch { display: none; }
 .composer-advanced-body { display: grid; gap: 12px; max-height: min(65dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
-.composer-advanced-body .phone-advanced-body { padding: 0; }
 .composer-loras .model-loras { padding: 0; }
 .composer-loras .model-loras > h3 { display: none; }
 .phone-create .phone-compose { display: grid; gap: 12px; }
