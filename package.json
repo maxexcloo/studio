@@ -29,7 +29,6 @@
     "predev:setup-demo": "node scripts/ensure-runtime-dependencies.mjs --dev",
     "preview": "vite preview --host 127.0.0.1 --port 5173",
     "release": "node scripts/release.mjs",
-    "site": "node scripts/site-preview.mjs",
     "start": "node server/index.js",
     "test": "node --test server/*.test.js scripts/*.test.js",
     "test:browser": "playwright test"

@@ -10,7 +10,7 @@
 
 ## Delivery
 
-- The container image on GHCR, built and verified by CI, is the only delivery. Do not reintroduce desktop launchers, packaged downloads, the self-updater or release signing; drop them when they arrive in an upstream merge.
+- The container image on GHCR, built and verified by CI, is the only delivery. Do not reintroduce the `docs/` website, desktop launchers, packaged downloads, the self-updater or release signing; drop them when they arrive in an upstream merge.
 - A `v*` tag publishes the verified image under its version tags and a GitHub release with notes from `CHANGELOG.md`.
 - Single-user mode may keep working for local development but needs no exact upstream parity.
 

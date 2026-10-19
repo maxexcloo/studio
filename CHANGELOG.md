@@ -41,6 +41,7 @@ version opens with a `> ` summary line.
 
 ### Removed
 - **Container-only delivery:** this fork ships only the verified container image on GHCR. The desktop downloads and launchers, the in-app updater and its Settings › About controls and update pill, restarting HEISS UI from Settings, release signing and the legacy `JAI_*` environment variables are gone; set the `HEISS_*` names instead. A `v*` tag publishes the image under its version and a GitHub release with these notes and the image digest. LAN and HTTPS changes apply on the next start.
+- **Project website:** the upstream website and feedback board in `docs/` and its Pages workflow are not carried by this fork; the guides and screenshots stay.
 
 ### Fixed
 - **Mangled images from imported workflows:** an imported workflow now uses its model family's size step (for example 32 for Qwen Image 2.1) when its latent node allows a finer one. Off-step sizes such as 1536×2728 were silently cut by ComfyUI and could come out mangled.

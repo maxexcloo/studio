@@ -88,26 +88,11 @@ Between releases a source checkout shows how far it is past its tag in **Setting
 
 ## Found a bug?
 
-Post it on the [feedback board](https://heiss-ui.vercel.app/board/), from the website or from the app (**Idea or bug?** at the bottom of the Settings sidebar, **Settings › About**, or **Report bug** on a failed card), or [open an issue](https://github.com/maxexcloo/heiss-ui/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. Ideas and questions go on the same board. To talk something through first, there's the [Discord](https://discord.gg/Hf7ysvDeGa).
-
-## The feedback board
-
-The board is part of the website in `docs/`: the page is `docs/board/`, and `docs/api/board.js` is a Vercel function with its logic in `docs/api/_board/` (tests in `scripts/board.test.js`). Anyone can post, upvote and comment without an account; a random cookie keeps one browser's votes apart, and posting is rate limited per (hashed) address. Moving, editing and deleting posts take the admin password.
-
-To try it locally, `npm run site -- --demo` serves the website with the board on http://127.0.0.1:4321/board/, with posts kept in memory and a few examples. The admin password there is `admin`, from **Admin** in the board's footer.
-
-On Vercel it needs:
-
-- **Storage:** add an Upstash Redis database to the project (Vercel › Storage, or the Upstash integration). It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` work too). Without them the board says it isn't set up yet.
-- **`BOARD_ADMIN_PASSWORD`:** the admin password. Changing it signs every admin out.
-- Optional: `BOARD_SESSION_SECRET` to sign admin sessions with a key of its own, `BOARD_ADMIN_NAME` for the name on your replies (default "Maintainer"), `BOARD_PREFIX` for the Redis key prefix (default `board:`).
-
-As admin, drag cards to set their order or move them to another column, and open one to set its status (Open, Planned, In progress, Done, Closed), the version it shipped in, fix its text, reply, or delete it.
-
+[Open an issue](https://github.com/maxexcloo/heiss-ui/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. The in-app feedback links go to upstream's board.
 
 ### Fork Integration & Release Gates
 
-Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
+Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's website in `docs/`, desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
 
 Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 
