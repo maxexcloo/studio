@@ -13,6 +13,7 @@ version opens with a `> ` summary line.
 
 ### Added
 - **MCP tiers:** Generate accepts `kind` and `tier` (`quality`, `standard`, `fast` or `turbo`) instead of a `profile_id` and picks the account's default ready profile for that tier, so ordinary chat requests need no Models call. Models filters by tier. Turbo means Super Fast; standard means Standard or untiered profiles, otherwise Quality.
+- **Inline MCP results:** Generate waits up to `wait_seconds` (30 seconds for images and none for videos by default, at most 60) and, when every job finishes in time, returns `status: done` with the signed image markdown and View Original link that a Result notification returns. Quick images then need no background Result and no extra agent turn; slower jobs return `status: queued` as before. A client Stop or disconnect ends the wait, never the generation.
 
 ### Changed
 - **Leaner MCP output:** the Models list returns only ID, label, kind, tier and a one-line summary (prompting guides stay in the profile detail), Generate returns the chosen profile and each job's ID, reference and watch link, and a background Result notification returns only its markdown unless `detail: true` is passed. For the Bento catalogue, a tier-filtered image list drops from 9.5 KB to 0.2 KB and a notification from 2.5 KB to 0.8 KB.

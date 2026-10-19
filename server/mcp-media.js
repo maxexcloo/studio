@@ -249,7 +249,7 @@ export class McpMedia {
     const number = entry && Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
     return number ? `result ${number}` : undefined;
   }
-  async job(owner, jobId, seconds = 0, { signal, credential } = {}) {
+  async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
@@ -263,7 +263,7 @@ export class McpMedia {
       }
       if (terminal.has(job.status) || Date.now() >= deadline) return job;
       // A client Stop or disconnect ends only this wait; the generation itself keeps running.
-      await pause(Math.min(2000, deadline - Date.now()), signal);
+      await pause(Math.min(interval, deadline - Date.now()), signal);
     }
   }
   /** Result links are sealed (AES-256-GCM), so a shared link reveals no account or job ID. */
@@ -386,16 +386,42 @@ export class McpMedia {
    */
   notification(owner, jobId, job, named, detail = false) {
     const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'Studio result';
-    const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
-    const markdown = outputs.map(({ url }, position) => {
-      const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
-      return job.kind === 'video' ? `${caption}: [View Video](${url})` : `![${caption}](${url})\n[View Original](${url})`;
-    }).join('\n\n');
+    const { outputs, markdown } = this.markdown(owner, jobId, job, label);
     const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result again, poll or generate again.`;
     // Only the markdown re-enters the chat by default; detail restores the full record.
     if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(named.ref ? { ref: named.ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
     return { content: [text(`${message}\n\n${markdown}`), text(structured)], structuredContent: structured };
+  }
+  /** A finished job's signed image markdown with View Original, or a View Video link for videos. */
+  markdown(owner, jobId, job, label) {
+    const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
+    const markdown = outputs.map(({ url }, position) => {
+      const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
+      return job.kind === 'video' ? `${caption}: [View Video](${url})` : `![${caption}](${url})\n[View Original](${url})`;
+    }).join('\n\n');
+    return { outputs, markdown };
+  }
+  /**
+   * Waits up to `seconds` for every job of a submission. Returns their markdown once all
+   * finished with outputs; null when one is still running, failed, or the wait was cancelled.
+   */
+  async settle(owner, submission, seconds, { signal } = {}) {
+    if (!seconds || submission.status !== 'queued') return null;
+    // One unfinished job sends the whole submission to background Result, so stop waiting for the rest.
+    const stop = new AbortController();
+    const linked = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
+    const jobs = await Promise.all(submission.jobs.map(async ({ job_id }) => {
+      // A finer poll than Result's: every second counts while the chat waits.
+      const job = await this.job(owner, job_id, seconds, { signal: linked, interval: 1000 });
+      if (!finished.has(job.status) || !job.outputs?.some(item => mcpOutputPath(item?.url))) throw new Error('Unfinished.');
+      return job;
+    })).catch(() => { stop.abort(); return null; });
+    if (!jobs) return null;
+    return jobs.map((job, position) => {
+      const { job_id, ref } = submission.jobs[position];
+      return this.markdown(owner, job_id, job, ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'Studio result').markdown;
+    }).join('\n\n');
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
   async page(claims, credential) {

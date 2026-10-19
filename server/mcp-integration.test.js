@@ -32,7 +32,7 @@ const loraInfo = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
+async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -85,6 +85,8 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
     environment,
     accountMode,
     authenticateAccountToken,
+    // Most tests check the queued response; inline waits have their own tests.
+    imageWaitSeconds,
     ...(foregroundWaitSeconds !== undefined ? { foregroundWaitSeconds } : {}),
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
@@ -534,7 +536,7 @@ test('invalid generation controls, references and excessive batches fail before 
     { count: 5 },
     { count: 3, prompts: ['One', 'Two'] },
     { wait_seconds: -1 },
-    { wait_seconds: 46 },
+    { wait_seconds: 61 },
     { cfg: 21 },
     { denoise: 1.1 },
     { sampler: 'unsupported' },
@@ -601,19 +603,21 @@ test('an interrupted generation acknowledgement retains its client job ownership
   await failure(await f.client('bob'), 'Status', { job_id: id });
 });
 
-test('Generate never waits or fetches completed results, including when retrieval is unavailable', async t => {
+test('Generate without a wait never fetches results, and unavailable retrieval falls back to queued', async t => {
   const f = await fixture(t);
   f.completeOnSubmit();
   f.jobLookupFails(true);
   const client = await f.client();
-  await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 1 });
-  assert.equal(f.submitted.length, 0);
   await call(client, 'Models', { profile_id: imageProfile.id });
   const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], count: 1 });
   assert.notEqual(result.isError, true);
   assert.equal(result.content.some(item => item.type === 'image'), false);
   assert.equal(f.submitted.length, 1);
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/') || request.path.startsWith('/gallery')), false);
+  assert.equal(f.downloads.length, 0);
+  const waited = data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], count: 1, wait_seconds: 1 }));
+  assert.equal(waited.status, 'queued');
+  assert.equal(f.submitted.length, 2);
   assert.equal(f.downloads.length, 0);
 });
 
@@ -762,7 +766,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   const profiles = data(await call(client, 'Models', { kind: 'image' })).profiles;
   assert.ok(profiles.length);
   await call(client, 'Models', { profile_id: profiles[0].id });
-  const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'], count: 1 }));
+  const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'], count: 1, wait_seconds: 0 }));
   assert.equal(queued.status, 'queued');
   assert.equal(queued.jobs.length, 1);
   const id = jobId(queued);
@@ -1095,4 +1099,72 @@ test('a background notification returns only its markdown unless detail is asked
   assert.equal(detailed.content.length, 2);
   assert.equal(detailed.structuredContent.outputs.length, 1);
   assert.ok(detailed.structuredContent.link && detailed.structuredContent.markdown);
+});
+
+test('Generate returns quick images inline as finished markdown, so no background Result is needed', async t => {
+  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const client = await f.client();
+  const started = performance.now();
+  const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 2 });
+  setTimeout(() => { for (const job of f.jobs.values()) Object.assign(job, { status: 'done', outputs: [{ url: `/comfy/view?filename=${job.id}.png` }] }); }, 50);
+  const result = await pending;
+  assert.notEqual(result.isError, true);
+  assert.ok(performance.now() - started < 5000, 'returns once the jobs finish, not at the deadline');
+  assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}` })) });
+  assert.equal(result.content.length, 1);
+  // The same markdown a background notification returns, one block per job.
+  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly.+\n\n!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n\[View Original\]\([^)]+\)\n\n!\[Result 2\]\([^)]+\)\n\[View Original\]\([^)]+\)$/);
+  const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(result.content[0].text);
+  const original = await fetch(localLink(f, imageUrl));
+  assert.equal(original.status, 200);
+  assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
+  assert.equal(f.downloads.length, 1, 'only the link fetch downloads the output');
+});
+
+test('Generate falls back to the queued response when a job outlasts the wait or fails', async t => {
+  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const client = await f.client();
+  let started = performance.now();
+  const slow = data(await call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1, wait_seconds: 1 }));
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
+  assert.equal(slow.status, 'queued');
+  assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
+  assert.match(slow.message, /background|run_in_background/);
+  started = performance.now();
+  const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
+  setTimeout(() => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; }, 50);
+  const mixed = data(await pending);
+  assert.equal(mixed.status, 'queued');
+  assert.equal(mixed.jobs.length, 2);
+  assert.ok(performance.now() - started < 5000, 'a failed job ends the wait for the others');
+});
+
+test('the Generate wait ends promptly when the client cancels, without cancelling the generation', async t => {
+  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const lookups = () => f.requests.filter(request => request.path.startsWith('/jobs/')).length;
+  const client = await f.client();
+  const controller = new AbortController();
+  const waiting = client.callTool({ name: 'Generate', arguments: { kind: 'image', prompts: ['An egg'], count: 1 } }, undefined, { signal: controller.signal, timeout: 60000 });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.ok(lookups() >= 1);
+  controller.abort();
+  await assert.rejects(waiting);
+  const before = lookups();
+  await new Promise(resolve => setTimeout(resolve, 4500));
+  assert.equal(lookups() - before, 0, 'a cancelled wait stops polling');
+  assert.equal(f.submitted.length, 1);
+  assert.equal([...f.jobs.values()][0].status, 'running');
+  assert.equal(f.requests.some(request => request.path.endsWith('/cancel')), false);
+});
+
+test('Generate does not wait for videos by default', async t => {
+  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const client = await f.client();
+  const started = performance.now();
+  const queued = data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 }));
+  assert.ok(performance.now() - started < 1500);
+  assert.equal(queued.status, 'queued');
+  assert.equal(queued.profile.id, videoProfile.id);
+  assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
 });
