@@ -133,7 +133,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
 
   const submitPasswordReset = async () => {
     const account = admin?.accounts.find((item) => item.id === resetAccount);
-    if (!account || resetPassword.length < 12) return;
+    if (!account || !resetPassword) return;
     if (!await confirmAction({ title: `Reset ${account.displayName}’s Password?`, description: 'Their browser sessions end. Their MCP token and outputs are kept.', action: 'Reset Password', destructive: true })) return;
     await patchAccount(account, { password: resetPassword });
     setResetPassword('');
@@ -199,9 +199,9 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       </Row>)}
       <Row label="Username"><input className="modal-input account-field" aria-label="Username" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
       <Row label="Display Name"><input className="modal-input account-field" aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
-      <Row label="Temporary Password" description="Use at least 12 characters. Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
+      <Row label="Temporary Password" description="Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
       <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access profile for the new account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
-      <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || password.length < 12 || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
+      <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
     {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only after it is linked to an account here.">
@@ -220,8 +220,8 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
 
     {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
       <Row label="Account"><div className="set-type-picker"><StudioSelect ariaLabel="Account to reset" value={resetAccount || NONE} options={[...choose('Choose an Account', resetAccount), ...accountOptions(localAccounts)]} onChange={(value) => setResetAccount(value === NONE ? '' : value)} /></div></Row>
-      <Row label="New Password" description="Use at least 12 characters."><input className="modal-input account-field" aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="At least 12 characters" /></Row>
-      <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || resetPassword.length < 12} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
+      <Row label="New Password"><input className="modal-input account-field" aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} /></Row>
+      <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || !resetPassword} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
     </Group> : null}
 
     <Group title="Account Session" note="Sign out of this browser before handing it to someone else.">

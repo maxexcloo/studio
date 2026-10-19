@@ -105,7 +105,7 @@ export function assignAccessProfile(accountId, profileId) {
 export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
   if (!validUsername(username)) throw new Error("Use a 2–128 character username containing letters, numbers, dots, underscores, hyphens, plus signs or @.");
-  if (String(password || "").length < 12) throw new Error("Use a password with at least 12 characters.");
+  if (!String(password || "")) throw new Error("Enter a password.");
   if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
   if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign an existing access profile to this user.");
   if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("That username is already in use.");
@@ -209,7 +209,7 @@ export function revokeAccountSession(token) {
 
 /** An administrator reset ends the account's browser sessions; its MCP token and data stay. */
 export async function setAccountPassword(accountId, password) {
-  if (String(password || "").length < 12) throw new Error("Use a password with at least 12 characters.");
+  if (!String(password || "")) throw new Error("Enter a password.");
   if (!readStore().accounts.some((item) => item.id === accountId && item.identity?.provider !== "pocket-id")) throw new Error("That local account was not found.");
   const salt = crypto.randomBytes(16);
   const hash = await scryptAsync(password, salt);
