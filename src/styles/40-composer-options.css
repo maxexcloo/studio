@@ -60,9 +60,7 @@
 .phone-gallery-mode button[aria-pressed="true"] { background: var(--control-hover); color: hsl(var(--foreground)); }
 .phone-gallery-mode-row { flex-basis: 100%; width: 100%; }
 .phone-shell:has(.phone-gallery-mode) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 108px); }
-.phone-shell:has(.phone-gallery-mode):has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 166px); }
 .phone-bar { flex-wrap: wrap; }
-.phone-shell:has(.phone-gallery-mode) .phone-searchbar { --phone-search-offset: 108px; }
 .phone-gallery-mode.phone-mode-select button { width: auto; min-width: 78px; height: 44px; }
 @media (min-width: 761px) { .zen-prompt { width: min(920px, calc(100vw - 176px)); min-width: 0; } }
 .phone-create-pill { background: rgb(22 22 22 / .5); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }

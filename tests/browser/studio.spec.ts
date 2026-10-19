@@ -749,7 +749,8 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   } else await page.getByRole('group', { name: 'Gallery Management' }).getByRole('button', { name: 'Select', exact: true }).click();
   await tile.click();
   await expect(tile).toHaveAttribute('aria-pressed', 'true');
-  await expect(search).toBeVisible();
+  // The phone overlay closes on an outside tap; its query stays applied (checked on reopening below).
+  if (!isMobile) await expect(search).toBeVisible();
   expect(await image!.evaluate((node) => node.isConnected)).toBe(true);
   const after = await tile.boundingBox();
   expect(after!.y).toBeCloseTo(before!.y, 0);
@@ -764,7 +765,12 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
     expect(Math.abs(box!.y + box!.height / 2 - mode!.y - mode!.height / 2)).toBeLessThan(3);
     await expect(bar).toBeVisible();
     await page.setViewportSize({ width: 900, height: 700 });
-  } else await page.setViewportSize({ width: 320, height: 568 });
+  } else {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
+    await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
+    await expect(search).toHaveValue('Image');
+  }
   await expect(search).toBeInViewport();
   const searchBox = await search.boundingBox();
   expect(searchBox!.x).toBeGreaterThanOrEqual(0);

@@ -284,10 +284,11 @@ test('phone filter-only mode keeps every wrapped control visible without opening
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   for (const button of await panel.getByRole('button').all()) await expect(button).toBeInViewport();
   expect(await panel.locator('.gallery-filter-select > span').evaluateAll(nodes => nodes.every(n => n.scrollWidth <= n.clientWidth))).toBe(true);
-  const row = await panel.boundingBox(), gallery = await page.locator('.phone-gallery .virtual-gallery').boundingBox();
+  const row = await panel.boundingBox(), trigger = await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).boundingBox();
   expect(row!.x).toBeGreaterThanOrEqual(0);
   expect(row!.x + row!.width).toBeLessThanOrEqual(320);
-  expect(gallery!.y).toBeGreaterThanOrEqual(row!.y + row!.height + 8);
+  // The overlay hangs under the header button and leaves it uncovered.
+  expect(row!.y).toBeGreaterThanOrEqual(trigger!.y + trigger!.height);
 });
 
 test('grouping uses the same glass shell and inset action states as Search and Select', async ({ page, isMobile }, testInfo) => {
@@ -327,6 +328,30 @@ test('grouping uses the same glass shell and inset action states as Search and S
   const focus = await grouping.evaluate(n => ({ outline: getComputedStyle(n).outline, offset: getComputedStyle(n).outlineOffset }));
   await select.focus();
   expect(await select.evaluate(n => ({ outline: getComputedStyle(n).outline, offset: getComputedStyle(n).outlineOffset }))).toEqual(focus);
+});
+
+test('phone search and filters float over the gallery without moving it', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Phone overlay.');
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+  await page.goto('/');
+  const tile = page.locator('.phone-gallery .tile').first();
+  await expect(tile).toBeVisible();
+  const before = await tile.boundingBox();
+  for (const name of ['Search Gallery', 'Open Gallery Filters']) {
+    const opener = page.getByRole('button', { name, exact: true }).first();
+    await opener.click();
+    await expect(page.locator('.phone-searchbar')).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(await tile.boundingBox()).toEqual(before);
+    const bar = await page.locator('.phone-searchbar > *').first().boundingBox(), button = await opener.boundingBox();
+    expect(bar!.y).toBeGreaterThanOrEqual(button!.y + button!.height);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.phone-searchbar')).toHaveCount(0);
+  }
+  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
+  await expect(page.locator('.phone-searchbar')).toBeVisible();
+  await page.mouse.click(195, 800);
+  await expect(page.locator('.phone-searchbar')).toHaveCount(0);
 });
 
 test('phone search and filters retain inset neutral actions without changing header controls', async ({ page, isMobile }, testInfo) => {
