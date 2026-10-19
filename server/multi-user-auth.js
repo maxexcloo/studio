@@ -5,7 +5,7 @@ import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
 export const multiUserEnabled = process.env.HEISS_MULTI_USER === "1";
-export const accountCookieName = process.env.HEISS_ACCOUNT_COOKIE_NAME || "heiss_account";
+export const accountCookieName = "heiss_account";
 const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
 
@@ -66,7 +66,6 @@ function appendCookie(res, cookie) {
 // Behind a TLS-terminating proxy the socket is plain HTTP; a forged header only affects its sender.
 function secureRequest(req) {
   return Boolean(req?.socket?.encrypted)
-    || process.env.HEISS_ACCOUNT_COOKIE_SECURE === "1"
     || String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase() === "https";
 }
 

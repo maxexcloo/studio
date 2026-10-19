@@ -18,7 +18,7 @@ const output = { ...job, output_index: z.number().int().min(0).max(999).default(
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult } = {}) {
   const mediaKey = environment.HEISS_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
@@ -27,8 +27,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const parsedPublic = new URL(publicUrl);
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
   const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl, resolveSignedResult }) : null;
-  const foregroundWait = Number(environment.HEISS_MCP_FOREGROUND_WAIT_SECONDS ?? 20);
-  if (!Number.isInteger(foregroundWait) || foregroundWait < 0 || foregroundWait > 1800) throw new Error('HEISS_MCP_FOREGROUND_WAIT_SECONDS must be a whole number from 0 to 1800.');
+  // A chat model waiting in the foreground can block its chat; only background notifications wait longer.
+  const foregroundWait = foregroundWaitSeconds;
   // Only a background notification may hold a request open for long; a foreground wait blocks the chat.
   const capWait = (seconds, delivery) => delivery === 'notification' ? seconds : Math.min(seconds, foregroundWait);
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
@@ -53,7 +53,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (!own) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
     }
     const token = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ''))?.[1];
-    const user = String(req.headers['x-bento-user-id'] || '');
+    const user = String(req.headers['x-ai-user-id'] || '');
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user)) return res.status(400).json({ error: 'Invalid forwarded user identity.' });
     let account = null;
     let scope = '';

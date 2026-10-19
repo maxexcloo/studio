@@ -16,7 +16,7 @@ export type DeploymentSettings = {
   connections: Connection[];
   defaults: { image: DefaultProfile; video: DefaultProfile; profiles: { id: string; label: string; kind: string; ready: boolean }[] };
   catalogue: CatalogueFlag[];
-  integrations: { civitai: { browsing: boolean; token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus }; modelDownloads: Source & { routed: boolean } };
+  integrations: { civitai: { browsing: boolean; token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
   storage: Source & { outputs: 'heiss' | 'comfy'; workerToken: boolean; multiUser: boolean };
 };
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
@@ -140,13 +140,12 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
 
 /** Third-party services and storage at a glance: what is on, configured and available. */
 export function IntegrationsOverview({ settings, Status }: { settings: DeploymentSettings; Status: React.ComponentType<React.PropsWithChildren<{ tone?: 'ok' | 'bad' | 'warn' }>> }) {
-  const { civitai, huggingFace, modelDownloads } = settings.integrations;
+  const { civitai, huggingFace } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <>
     <Group title="Overview">
       <Row label="Civitai" description={`Browsing ${civitai.browsing ? 'on' : 'off'} · token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}`}>{state(civitai.browsing || civitai.presets, ['On', 'Off'])}</Row>
       <Row label="Hugging Face" description={huggingFace.token.set ? `Token ${huggingFace.token.editable ? 'saved here' : 'set by the deployment'}; gated models can download.` : 'No token; public models only.'}>{state(huggingFace.token.set, ['Configured', 'Public Only'])}</Row>
-      <Row label={<>Model Downloads <SourceTag source={modelDownloads.source} locked={modelDownloads.locked} /></>} description={modelDownloads.routed ? 'Downloads go through the deployment’s download service onto the workers.' : 'HEISS downloads into the model folders it can reach.'}>{state(modelDownloads.routed, ['Routed', 'Direct'])}</Row>
       <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'heiss' ? `HEISS keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'heiss', ['HEISS Media', 'ComfyUI Folder'])}</Row>
     </Group>
   </>;

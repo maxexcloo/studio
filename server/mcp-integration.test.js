@@ -26,7 +26,7 @@ const imageProfile = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
+async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -75,6 +75,7 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     environment,
     accountMode,
     authenticateAccountToken,
+    ...(foregroundWaitSeconds !== undefined ? { foregroundWaitSeconds } : {}),
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(internalCredential ? { internalCredential } : {}),
@@ -113,7 +114,7 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     client: async (user = 'alice', key = mediaKey) => {
       const client = new Client({ name: 'heiss-integration-fixture', version: '1.0.0' }, { capabilities: {} });
       clients.push(client);
-      await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${key}`, ...(user ? { 'x-bento-user-id': user } : {}) } } }));
+      await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${key}`, ...(user ? { 'x-ai-user-id': user } : {}) } } }));
       return client;
     }
   };
@@ -148,7 +149,7 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
     internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId })
   });
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-  const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-bento-user-id': user } : {}) });
+  const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-ai-user-id': user } : {}) });
   assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers(''), body })).status, 403);
   assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers('librechat-unlinked'), body })).status, 403);
   assert.deepEqual(noted, ['librechat-unlinked']);
@@ -297,7 +298,7 @@ test('Models caches each owner’s catalogue for the TTL instead of rescanning p
 });
 
 test('foreground Status and Result waits are capped; background notification waits are not', async t => {
-  const f = await fixture(t, { environment: { HEISS_MCP_FOREGROUND_WAIT_SECONDS: '0' } });
+  const f = await fixture(t, { foregroundWaitSeconds: 0 });
   const client = await f.client();
   const id = jobId(await generate(client));
   let started = performance.now();
@@ -308,7 +309,6 @@ test('foreground Status and Result waits are capped; background notification wai
   assert.ok(performance.now() - started < 1500, 'foreground waits return at once under a zero cap');
   setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
   assert.equal(data(await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 1800 })).status, 'done');
-  await assert.rejects(fixture(t, { environment: { HEISS_MCP_FOREGROUND_WAIT_SECONDS: 'forever' } }), /HEISS_MCP_FOREGROUND_WAIT_SECONDS/);
 });
 
 test('Generate returns immediately with one saved-size image and passes explicit controls without polling', async t => {
@@ -651,7 +651,7 @@ test('signed links do not expire, preserve the configured public path and cannot
 test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded identities', async t => {
   const f = await fixture(t);
   const message = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-  for (const [headers, status] of [[{ Origin: 'https://hostile.example.test' }, 403], [{ Host: 'rebound.example.test' }, 403], [{ 'x-bento-user-id': 'x'.repeat(257) }, 400]]) {
+  for (const [headers, status] of [[{ Origin: 'https://hostile.example.test' }, 403], [{ Host: 'rebound.example.test' }, 403], [{ 'x-ai-user-id': 'x'.repeat(257) }, 400]]) {
     const requestHeaders = { authorization: `Bearer ${mediaKey}`, accept: 'application/json, text/event-stream', 'content-type': 'application/json', ...headers };
     // Fetch normalises Host, so use the native HTTP client for the rebinding case.
     const actual = headers.Host ? await new Promise((resolve, reject) => {
@@ -726,7 +726,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
     child.once('error', reject);
   });
   const base = started.url.replace('localhost', '127.0.0.1');
-  await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { authorization: `Bearer ${mediaKey}`, 'x-bento-user-id': 'real-server-fixture' } } }));
+  await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': 'real-server-fixture' } } }));
   assert.equal((await client.listTools()).tools.length, 7);
   const profiles = data(await call(client, 'Models', { kind: 'image' })).profiles;
   assert.ok(profiles.length);

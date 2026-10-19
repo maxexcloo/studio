@@ -18,7 +18,8 @@ import { isInside } from "./paths.js";
 
 const importedPath = path.join(dataDir, "model-manifest.json");
 const verifiedPath = path.join(dataDir, "model-manifest-verified.json");
-const prefix = (process.env.HEISS_MODEL_MANIFEST_PREFIX ?? "models/comfyui/").replace(/^\/+/, "");
+// Manifest paths are relative to ComfyUI's model folder unless the deployment names a prefix to strip.
+const prefix = String(process.env.HEISS_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
 // What HEISS's downloader may place; anything else is restored by the deployment's own tooling.
 const restorableFolders = new Set(["text_encoders", "vae", "diffusion_models", "checkpoints", "loras", "clip_vision"]);
 const verifyState = { running: false, done: 0, total: 0, current: "", startedAt: 0, finishedAt: 0, error: "" };

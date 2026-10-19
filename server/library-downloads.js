@@ -63,80 +63,22 @@ export async function resolveModelLink(value, directory = 'loras', { json = civi
   };
 }
 
-function backendConfig(env = process.env) {
-  if (!env.HEISS_MODEL_DOWNLOAD_URL) return null;
-  const url = new URL(env.HEISS_MODEL_DOWNLOAD_URL);
-  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('The configured model download service address is invalid.');
-  if (!env.HEISS_MODEL_DOWNLOAD_TOKEN) throw new Error('The model download service needs its configured token.');
-  return { url, token: env.HEISS_MODEL_DOWNLOAD_TOKEN };
-}
-
 export function libraryDownloadAccess() {
   try {
-    if (backendConfig()) return { available: true, backend: 'control', note: 'Downloads enter the shared library. Normal access is selected in AI Control.' };
     const dir = comfyModelsDir();
     if (dir) {
       fs.accessSync(dir, fs.constants.W_OK);
       return { available: true, backend: 'local', note: 'Downloads enter your ComfyUI model folders.' };
     }
-  } catch { /* Read-only mounts and incomplete service configuration need setup. */ }
-  return { available: false, backend: '', note: 'Downloads need a writable ComfyUI model folder or a configured AI Control download service.' };
-}
-
-/** The endpoint is administrator configuration, never a browser-supplied URL. */
-export async function controlRequest(pathname, body, { env = process.env, request = fetch } = {}) {
-  const config = backendConfig(env);
-  if (!config) throw new Error('The model download service is not configured.');
-  const url = new URL(`${config.url.href.replace(/\/$/, '')}/${pathname}`);
-  let response;
-  try {
-    response = await request(url, {
-      method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(30000),
-      headers: { authorization: `Bearer ${config.token}`, 'content-type': 'application/json' },
-      ...(body ? { body: JSON.stringify(body) } : {})
-    });
-  } catch { throw new Error('Couldn’t reach the configured model download service.'); }
-  if (!response.ok) { await response.body?.cancel(); throw new Error(`The model download service answered HTTP ${response.status}. Check its availability and access.`); }
-  try { return JSON.parse((await limitedBody(response, 1024 * 1024)).toString()); }
-  catch { throw new Error('The model download service returned an unreadable response.'); }
-}
-
-const delegated = [];
-let pumping = false;
-let pendingTimer;
-
-async function pumpControl() {
-  if (pumping) return;
-  pumping = true;
-  const entry = delegated.find((item) => ['queued', 'downloading'].includes(item.status));
-  try {
-    if (!entry) return;
-    if (!entry.jobId) {
-      const job = await controlRequest('downloads', { directory: entry.folder, filename: entry.file, sha256: entry.sha256, url: entry.url });
-      if (!/^[a-f0-9]{24}$/.test(job.id || '')) throw new Error('The download service did not return a job.');
-      entry.jobId = job.id;
-      entry.status = 'downloading';
-    }
-    const job = await controlRequest(`jobs/${entry.jobId}`);
-    entry.stage = String(job.stage || 'Downloading').slice(0, 160);
-    if (job.state === 'completed') { entry.status = 'done'; entry.finishedAt = Date.now(); }
-    if (job.state === 'failed') { entry.status = 'error'; entry.error = 'The download failed. Check model access and provider credentials in AI Control, then retry.'; entry.finishedAt = Date.now(); }
-  } catch (error) {
-    if (entry) { entry.status = 'error'; entry.error = error.message; entry.finishedAt = Date.now(); }
-  } finally {
-    pumping = false;
-    if (delegated.some((item) => ['queued', 'downloading'].includes(item.status))) {
-      pendingTimer = setTimeout(pumpControl, 1500);
-      pendingTimer.unref();
-    }
-  }
+  } catch { /* A read-only mount needs setup. */ }
+  return { available: false, backend: '', note: 'Downloads need a writable ComfyUI model folder.' };
 }
 
 export async function startLibraryDownload(spec) {
   if (!presetsEnabled()) throw new Error('Presets & Models is disabled on this instance.');
   if (!/^[a-f0-9]{64}$/i.test(spec.sha256 || '')) throw new Error('This model has no valid provider SHA-256 checksum. Preview its source again.');
   if (!libraryDownloadAccess().available) throw new Error(libraryDownloadAccess().note);
-  if (!backendConfig()) {
+  {
     const file = existingCopy(spec);
     if (file) {
       const hash = crypto.createHash('sha256');
@@ -148,13 +90,7 @@ export async function startLibraryDownload(spec) {
     if (running && running.id !== spec.id) throw new Error('A different download already uses this filename.');
   }
   remember(spec);
-  if (!backendConfig()) return startDownload(spec);
-  const existing = delegated.find((item) => item.id === spec.id && ['queued', 'downloading'].includes(item.status));
-  if (existing) return { id: existing.id, status: existing.status };
-  if (delegated.filter((item) => ['queued', 'downloading'].includes(item.status)).length >= 32) throw new Error('The download queue is full. Wait for a download to finish.');
-  delegated.push({ ...spec, status: 'queued', receivedBytes: 0, totalBytes: 0, error: '', queuedAt: Date.now() });
-  void pumpControl();
-  return { id: spec.id, status: 'queued' };
+  return startDownload(spec);
 }
 
 export function libraryDownloads() {
@@ -162,6 +98,6 @@ export function libraryDownloads() {
   const local = [state.active, ...state.queued, ...state.recent, ...(state.paused || [])].filter((item) => item && libraryDownload(item.id));
   // Keep one current state per resource, including when a failed file is retried.
   const entries = new Map();
-  for (const item of [...local].reverse().concat(delegated)) entries.set(item.id, item);
-  return [...entries.values()].slice(-64).map(({ url, sha256, jobId, ...item }) => item);
+  for (const item of [...local].reverse()) entries.set(item.id, item);
+  return [...entries.values()].slice(-64).map(({ url, sha256, ...item }) => item);
 }

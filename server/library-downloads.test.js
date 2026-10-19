@@ -8,11 +8,10 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-library-downloads-'));
 process.env.HEISS_DATA_DIR = path.join(dir, 'data');
 process.env.HEISS_COMFY_ROOT = dir;
 process.env.HEISS_ENABLE_PRESETS = '1';
-delete process.env.HEISS_MODEL_DOWNLOAD_URL;
 fs.mkdirSync(path.join(dir, 'models', 'loras'), { recursive: true });
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
 fs.writeFileSync(path.join(dir, 'data', 'model-download-sources.json'), JSON.stringify({ 'civitai:17:3': { id: 'civitai:17:3', file: 'style.safetensors', folder: 'loras', url: 'https://civitai.com/api/download/models/17' } }));
-const { controlRequest, libraryDownload, libraryDownloadAccess, resolveModelLink, startLibraryDownload } = await import('./library-downloads.js');
+const { libraryDownload, libraryDownloadAccess, resolveModelLink, startLibraryDownload } = await import('./library-downloads.js');
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test('Hugging Face preview pins a revision and requires the published checksum', async () => {
@@ -34,44 +33,6 @@ test('local imports never accept a different existing file as installed', async 
   assert.equal(libraryDownloadAccess().available, true);
   await assert.rejects(startLibraryDownload({ id: 'civitai:17:3', file: 'existing.safetensors', folder: 'loras', url: 'https://civitai.com/api/download/models/17', sha256: 'a'.repeat(64) }), /different model/);
   assert.equal(fs.readFileSync(path.join(dir, 'models', 'loras', 'existing.safetensors'), 'utf8'), 'old model');
-});
-
-test('delegated requests use only the configured API path and never follow redirects', async () => {
-  const env = { HEISS_MODEL_DOWNLOAD_URL: 'http://control.internal:9090/api', HEISS_MODEL_DOWNLOAD_TOKEN: 'test-only' };
-  const response = await controlRequest('downloads', { directory: 'loras', filename: 'style.safetensors', url: 'https://civitai.com/api/download/models/17' }, { env, request: async (url, init) => {
-    assert.equal(url.href, 'http://control.internal:9090/api/downloads');
-    assert.equal(init.redirect, 'error');
-    assert.equal(init.headers.authorization, 'Bearer test-only');
-    assert.equal(JSON.parse(init.body).directory, 'loras');
-    return Response.json({ id: 'a'.repeat(24), state: 'running' });
-  } });
-  assert.equal(response.state, 'running');
-  await assert.rejects(controlRequest('downloads', null, { env, request: async () => new Response(null, { status: 403 }) }), /HTTP 403/);
-});
-
-test('delegated imports require and transmit the provider checksum', async () => {
-  const previousFetch = globalThis.fetch;
-  const sha256 = 'd'.repeat(64);
-  const spec = { id: 'civitai:18:4', file: 'verified.safetensors', folder: 'loras', sha256, url: 'https://civitai.com/api/download/models/18' };
-  const requests = [];
-  process.env.HEISS_MODEL_DOWNLOAD_URL = 'http://control.internal:9090/api';
-  process.env.HEISS_MODEL_DOWNLOAD_TOKEN = 'test-only';
-  globalThis.fetch = async (url, init) => {
-    requests.push({ url: url.href, body: init.body && JSON.parse(init.body) });
-    return Response.json(init.body ? { id: 'b'.repeat(24) } : { state: 'completed' });
-  };
-  try {
-    await assert.rejects(startLibraryDownload({ ...spec, sha256: undefined }), /provider SHA-256/);
-    assert.equal(requests.length, 0);
-    await startLibraryDownload(spec);
-    for (let attempt = 0; attempt < 20 && requests.length < 2; attempt += 1) await new Promise(setImmediate);
-    assert.deepEqual(requests[0], { url: 'http://control.internal:9090/api/downloads', body: { directory: 'loras', filename: spec.file, sha256, url: spec.url } });
-    assert.equal(requests[1].url, `http://control.internal:9090/api/jobs/${'b'.repeat(24)}`);
-  } finally {
-    globalThis.fetch = previousFetch;
-    delete process.env.HEISS_MODEL_DOWNLOAD_URL;
-    delete process.env.HEISS_MODEL_DOWNLOAD_TOKEN;
-  }
 });
 
 test('disabled instances cannot resume previously resolved provider downloads', async () => {

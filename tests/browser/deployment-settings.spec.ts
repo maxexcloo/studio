@@ -15,7 +15,7 @@ const settings = {
     { key: 'HEISS_ENABLE_LORAS', label: 'LoRAs', description: 'LoRA browsing.', value: true, defaultOn: true, applies: 'restart', source: 'default', locked: false },
     { key: 'HEISS_ENABLE_GROK', label: 'Grok', description: 'Grok workflows.', value: false, defaultOn: true, applies: 'restart', source: 'deployment', locked: true }
   ],
-  integrations: { civitai: { browsing: false, token: { set: true, editable: false }, presets: true }, huggingFace: { token: { set: false, editable: true } }, modelDownloads: { routed: true, source: 'deployment', locked: true } },
+  integrations: { civitai: { browsing: false, token: { set: true, editable: false }, presets: true }, huggingFace: { token: { set: false, editable: true } } },
   storage: { outputs: 'heiss', source: 'default', locked: false, workerToken: true, multiUser: true }
 };
 
@@ -50,7 +50,6 @@ test('deployment settings show sources, keep locked values read-only and save th
 
   await dialog.getByRole('button', { name: 'Integrations', exact: true }).click();
   await expect(dialog.locator('.set-row').filter({ hasText: 'Output Storage' })).toContainText('HEISS Media');
-  await expect(dialog.locator('.set-row').filter({ hasText: 'Model Downloads' })).toContainText('Routed');
   await expect(dialog.getByRole('heading', { name: 'Civitai' })).toBeVisible();
 });
 

@@ -18,11 +18,9 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `COMFY_VIDEO_URL` optionally routes local video workflows to a second ComfyUI endpoint. Images and provider-backed Grok workflows continue to use `COMFY_URL`; if the video endpoint is unavailable, video work does not fall back to the image server. Both backends must share input and output storage for local gallery access.
 
-`HEISS_DEVICE_COOKIE_NAME` optionally gives each studio on the same hostname a distinct device sign-in cookie. The default remains `heiss_device`.
-
 ## Model Manifest
 
-`HEISS_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to the deployment and starts with `models/comfyui/` (`HEISS_MODEL_MANIFEST_PREFIX` changes that).
+`HEISS_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to ComfyUI's model folder; when the manifest's paths start with a deployment folder instead (such as `models/comfyui/`), set `HEISS_MODEL_MANIFEST_PREFIX` to strip it.
 
 **Settings › Models › Model Manifest** shows which files are verified, present, missing or wrong. It verifies checksums in the background, and restores missing files through HEISS's checksum-verifying downloader. Only Civitai and Hugging Face files that go straight into a model folder are restored; others are listed with the reason, for the deployment's own tooling.
 
@@ -52,7 +50,7 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 - **Personal MCP tokens** are issued once in Settings, stored only as hashes, and work only for MCP. They are never an administrator credential. Rotating or revoking a token leaves existing result links working; a result link ends when its output is hidden or deleted.
 - **Records from single-user mode have no owner** and stay out of every account's gallery until they are explicitly migrated to an account.
 
-`HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). `HEISS_ACCOUNT_COOKIE_NAME` renames the account cookie (`heiss_account` by default). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`; `HEISS_ACCOUNT_COOKIE_SECURE=1` forces it.
+`HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`.
 
 ### Importing an Existing Studio
 
@@ -73,12 +71,12 @@ node scripts/import-studio.mjs --undo <batch>
 MCP clients connect in one of three ways in multi-user mode:
 
 - **Personal token:** a client sends the account's own token.
-- **Trusted gateway:** a chat gateway such as LiteLLM sends the shared `HEISS_MCP_API_KEY` together with its own user ID in `x-bento-user-id`. HEISS acts for that user only after an administrator links the ID to an account under **Settings › Accounts & MCP › Chat Gateway Users**. Unlinked IDs are refused and listed there for linking.
+- **Trusted gateway:** a chat gateway such as LiteLLM sends the shared `HEISS_MCP_API_KEY` together with its own user ID in `x-ai-user-id`. HEISS acts for that user only after an administrator links the ID to an account under **Settings › Accounts & MCP › Chat Gateway Users**. Unlinked IDs are refused and listed there for linking.
 - **AI Control:** `CONTROL_MCP_API_KEY` keeps its control tools and reaches no galleries or accounts.
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
-`HEISS_MCP_FOREGROUND_WAIT_SECONDS` (default `20`, `0` to `1800`) caps how long `Status` and `Result` wait for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, keeps its full wait. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
+`Status` and `Result` wait at most 20 seconds for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, keeps its full wait. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
 
 `HEISS_ENABLE_GROK=0`, `HEISS_ENABLE_TESSERA=0` and `HEISS_ENABLE_LORAS=0` disable those optional catalogue features and reject unavailable generation settings. All three are enabled by default.
 

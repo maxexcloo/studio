@@ -1314,8 +1314,7 @@ app.get("/api/settings/deployment", async (req, res) => {
     catalogue: catalogueFlags.map(describeFlag),
     integrations: {
       civitai: { browsing: civitaiPrefs().enabled === true, token: civitaiTokenStatus(), presets: presetsEnabled() },
-      huggingFace: { token: hfTokenStatus() },
-      modelDownloads: { routed: Boolean(process.env.HEISS_MODEL_DOWNLOAD_URL), ...settingSource("HEISS_MODEL_DOWNLOAD_URL") }
+      huggingFace: { token: hfTokenStatus() }
     },
     storage: { outputs: mediaStorageEnabled ? "heiss" : "comfy", ...settingSource("HEISS_OUTPUT_STORAGE"), workerToken: Boolean(process.env.HEISS_WORKER_TOKEN), multiUser: multiUserEnabled }
   });

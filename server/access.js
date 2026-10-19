@@ -28,7 +28,7 @@ import { accountSession } from "./account-store.js";
 
 const dataDir = process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
-export const deviceCookieName = process.env.HEISS_DEVICE_COOKIE_NAME || "heiss_device";
+export const deviceCookieName = "heiss_device";
 const kdf = "scrypt-n32768-r8-p1";
 const maxSessions = 50;
 const seenFlushMs = 60 * 1000;
@@ -252,7 +252,7 @@ export function isSignedInDevice(req) {
 export function canAdmin(req) {
   if (process.env.HEISS_MULTI_USER === "1") {
     if (!req?.heissAccount) {
-      const token = parseCookies(req)[process.env.HEISS_ACCOUNT_COOKIE_NAME || "heiss_account"];
+      const token = parseCookies(req)["heiss_account"];
       if (req) req.heissAccount = accountSession(token);
     }
     // A personal MCP token never carries administrator authority.
