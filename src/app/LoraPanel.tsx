@@ -133,7 +133,7 @@ function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
   const description = info?.description || info?.about;
   const source = info?.sourceUrl && /^https?:\/\//i.test(info.sourceUrl) ? info.sourceUrl : '';
   return <details className="lora-details">
-    <summary aria-label={`Information About ${label}`}><Info size={14} /> Info</summary>
+    <summary aria-label={`Information About ${label}`} title="Info"><Info size={14} /></summary>
     <div>
       {description ? <p>{description}</p> : <p>No description is available.</p>}
       {info?.note ? <p>{info.note}</p> : null}
@@ -236,6 +236,14 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
+  // Rows keep their places while the picker is open: a pick never jumps away from the pointer.
+  // What was selected when it opened leads, in stack order; the next opening brings new picks up.
+  const [pinned, setPinned] = useState(() => new Set(current));
+  // Reordering is about the stack: from then on every selected LoRA leads, in stack order.
+  const reorder = (from: number, to: number) => {
+    inlineSelection?.move(from, to);
+    setPinned(new Set([...pinned, ...current]));
+  };
 
   const filteredOptions = useMemo(() => [...new Set([...modelLoras(options, fitOf, showAll), ...(libraryView ? current : [])])], [options, fitOf, showAll, libraryView, current]);
   const available = useMemo(() => new Set(filteredOptions), [filteredOptions]);
@@ -244,7 +252,9 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(filteredOptions.filter((name) => `${name} ${nameOf(name)}`.toLowerCase().includes(q)), profile, '', fitOf).map((name) => ({ key: `q:${name}`, name })) }];
     if (libraryView) {
       const ranked = rankedLoras(filteredOptions, profile, '', fitOf);
-      return [{ id: 'all', label: '', rows: [...current, ...ranked.filter(name => !current.includes(name) && favorites.includes(name)), ...ranked.filter(name => !current.includes(name) && !favorites.includes(name))].map(name => ({ key: name, name })) }];
+      const lead = [...current.filter((name) => pinned.has(name)), ...[...pinned].filter((name) => !current.includes(name) && available.has(name))];
+      const rest = ranked.filter((name) => !pinned.has(name));
+      return [{ id: 'all', label: '', rows: [...lead, ...rest.filter((name) => favorites.includes(name)), ...rest.filter((name) => !favorites.includes(name)), ...current.filter((name) => !pinned.has(name) && !ranked.includes(name))].map(name => ({ key: name, name })) }];
     }
     const out: PickerSection[] = [];
     const fav = favorites.filter((name) => available.has(name));
@@ -257,7 +267,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }
     return out;
-  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents, libraryView, current]);
+  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents, libraryView, current, pinned]);
 
   const visibleRows = useMemo(() => sections.flatMap((section) => collapsed.has(section.id) ? [] : section.rows), [collapsed, sections]);
   useEffect(() => { setHighlight(0); }, [query, showAll]);
@@ -269,7 +279,13 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const isAdded = (name: string) => current.includes(name) && name !== swapping;
   const full = selected.length >= remaining;
   const choose = (name: string) => {
-    if (libraryView && inlineSelection && !swapping) { inlineSelection.toggle(name); return; }
+    if (libraryView && inlineSelection && !swapping) {
+      const adding = !inlineSelection.items.some((item) => item.name === name);
+      inlineSelection.toggle(name);
+      // Bring the new strength controls into view once they have opened.
+      if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 260);
+      return;
+    }
     if (isAdded(name)) return;
     if (!multi) { onSwap(name); return; }
     setSelected((list) => list.includes(name) ? list.filter((item) => item !== name) : list.length >= remaining ? list : [...list, name]);
@@ -294,6 +310,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') { event.preventDefault(); setHighlight((value) => Math.min(visibleRows.length - 1, value + 1)); }
             if (event.key === 'ArrowUp') { event.preventDefault(); setHighlight((value) => Math.max(0, value - 1)); }
+            if ((event.key === 'Home' || event.key === 'End') && !query) { event.preventDefault(); setHighlight(event.key === 'Home' ? 0 : Math.max(0, visibleRows.length - 1)); }
             if (event.key === 'Enter') {
               event.preventDefault();
               if ((event.metaKey || event.ctrlKey) && selected.length) { onAdd(selected); return; }
@@ -359,13 +376,13 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                         dragged.current = null;
                         setDragTarget(null);
                         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-                        if (from >= 0 && to >= 0 && from !== to) inlineSelection.move(from, to);
+                        if (from >= 0 && to >= 0 && from !== to) reorder(from, to);
                       }}
                       onLostPointerCapture={() => { dragged.current = null; setDragTarget(null); }}
                       onKeyDown={event => {
                         const index = inlineSelection.items.indexOf(item);
                         const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : index;
-                        if (to !== index) { event.preventDefault(); if (to >= 0 && to < inlineSelection.items.length) inlineSelection.move(index, to); }
+                        if (to !== index) { event.preventDefault(); if (to >= 0 && to < inlineSelection.items.length) reorder(index, to); }
                       }}><GripVertical size={14} /></button> : null}
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={!item && remaining <= 0} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
                       <span className="lora-library-check" aria-hidden="true">{item ? <Check size={12} strokeWidth={3} /> : null}</span>
@@ -378,8 +395,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                       <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
                       {inlineSelection.items.length > 1 ? <span className="lora-library-order">
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); inlineSelection.move(index, index - 1); }}><ChevronUp size={14} /></button>
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); inlineSelection.move(index, index + 1); }}><ChevronDown size={14} /></button>
+                        <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); reorder(index, index - 1); }}><ChevronUp size={14} /></button>
+                        <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); reorder(index, index + 1); }}><ChevronDown size={14} /></button>
                       </span> : null}
                       {item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
                     </div></motion.div> : null}</AnimatePresence>

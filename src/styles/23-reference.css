@@ -681,3 +681,6 @@
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }
+
+/* Full capacity is said in the picker itself, on the phone too. */
+.reference-popover .reference-popover-hint.is-full { display: block; color: hsl(var(--foreground)); }

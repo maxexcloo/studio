@@ -159,6 +159,9 @@ test('reference sources name their search and keep one upload action', async ({ 
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
   const picker = page.locator('.reference-popover');
+  // Open and type on desktop; the phone sheet takes focus itself so no keyboard pops up.
+  if (!isMobile) await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
+  await expect(picker.getByRole('button', { name: 'Close References', exact: true })).toBeVisible();
   await picker.getByRole('tab', { name: 'Library', exact: true }).click();
   await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveAttribute('placeholder', 'Search Library');
   await expect(picker.getByText('No Outputs Yet', { exact: true })).toBeVisible();

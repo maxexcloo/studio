@@ -105,7 +105,7 @@ test('phone filter tools stay on screen and yield to create and reference sheets
   await reachable(page.locator('.phone-create').getByRole('textbox', { name: 'Prompt', exact: true }), true);
   await page.locator('.phone-create .ref-add').click();
   await reachable(page.locator('.reference-popover').getByRole('searchbox', { name: 'Search Library', exact: true }));
-  await page.locator('.reference-popover').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.reference-popover').getByRole('button', { name: 'Close References', exact: true }).click();
   await reachable(page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }));
 });
 

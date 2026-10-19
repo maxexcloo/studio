@@ -5,6 +5,7 @@ import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Pl
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
+import { surfaceMotion, useComposerSurfaceBox } from "./composerSurface";
 import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
@@ -92,22 +93,13 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
 
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
   // the bar's own backdrop blur would stop this one from blurring the gallery.
-  const [box, setBox] = React.useState<{ left: number; width: number; bottom: number } | null>(null);
+  const { box, asSheet } = useComposerSurfaceBox(anchor);
   React.useEffect(() => {
-    if (box) popRef.current?.focus({ preventScroll: true });
+    if (!box) return;
+    // Open and type: search takes focus on desktop. On the phone the sheet does, so no keyboard pops up.
+    if (asSheet) popRef.current?.focus({ preventScroll: true });
+    else searchRef.current?.focus({ preventScroll: true });
   }, [Boolean(box)]);
-  React.useLayoutEffect(() => {
-    if (!anchor) return;
-    const measure = () => {
-      const rect = anchor.getBoundingClientRect();
-      setBox({ left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top + 10 });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(anchor);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [anchor]);
 
   // Dragging a file over the popover means "add to my uploads".
   React.useEffect(() => { if (dropActive) setTab("upload"); }, [dropActive]);
@@ -246,13 +238,12 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
   if (!box) return null;
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
-  const asSheet = Boolean(anchor?.classList.contains("phone-create"));
   // An exiting picker must not intercept Escape intended for the next overlay.
   return createPortal(
     <motion.div
       ref={popRef}
       className={cn("reference-popover", dropActive && "is-drop-target", asSheet && "is-sheet")}
-      style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom }}
+      style={asSheet ? undefined : box}
       role={present ? "dialog" : undefined}
       aria-hidden={!present || undefined}
       inert={!present}
@@ -260,10 +251,7 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
       aria-busy={upload.busy || Boolean(selectingId) || undefined}
       tabIndex={-1}
       data-open-surface
-      initial={{ opacity: 0, y: 10, scale: 0.97, filter: "blur(4px)" }}
-      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={{ opacity: 0, y: 8, scale: 0.98, filter: "blur(3px)" }}
-      transition={spring}
+      {...surfaceMotion}
     >
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
@@ -271,13 +259,13 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
           {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => changeTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
         </div>
-        <span className="reference-popover-hint">Drop or paste an image anywhere on the prompt</span>
+        <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? "All slots filled · select an image to remove it" : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
           <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
         </button>
         <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
-        <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close" onClick={onClose}><X size={15} /></button></Tip>
+        <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={15} /></button></Tip>
       </header>
 
       <div className="reference-search picker-search">

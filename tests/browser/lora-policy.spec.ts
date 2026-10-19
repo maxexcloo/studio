@@ -129,7 +129,10 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(row).toHaveAttribute('aria-checked', 'true');
   await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
+  const before = await other.boundingBox();
   await other.click();
+  // A pick stays where it was clicked; it doesn't jump away from the pointer.
+  await expect.poll(async () => Math.abs((await other.boundingBox())!.y - before!.y)).toBeLessThan(2);
   await picker.getByLabel('Information About Cards One', { exact: true }).click();
   await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
   await expect(picker.getByRole('link', { name: 'View Source' })).toHaveAttribute('href', 'https://example.com/cards');

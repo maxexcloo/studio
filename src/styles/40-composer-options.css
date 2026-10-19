@@ -216,3 +216,13 @@
 
 .composer-loras .lora-library-row.is-dragging { opacity: .6; }
 .composer-loras .lora-library-row.is-drop-target { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
+
+/* Info sits beside the star as an icon, so a closed row is one line; its details still open below. */
+.composer-loras .lora-library-select { padding-right: 72px; }
+.composer-loras .lora-library-row > .lora-details { margin: 0 2px 0 30px; }
+.composer-loras .lora-library-row > .lora-details > summary { position: absolute; top: 12px; right: 36px; justify-content: center; width: 32px; min-height: 32px; border-radius: var(--r-item); }
+.composer-loras .lora-library-row > .lora-details > summary::-webkit-details-marker { display: none; }
+.composer-loras .lora-library-row > .lora-details > summary:hover { color: hsl(var(--foreground)); }
+.composer-loras .lora-library-row > .lora-details[open] > div { padding-top: 2px; }
+/* The keyboard's place in the list is always visible. */
+.composer-loras .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .055); }
