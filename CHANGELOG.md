@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-19
+
 ### Added
 - **MCP tiers:** Generate accepts `kind` and `tier` (`quality`, `standard`, `fast` or `turbo`) instead of a `profile_id` and picks the account's default ready profile for that tier, so ordinary chat requests need no Models call. Models filters by tier. Turbo means Super Fast; standard means Standard or untiered profiles, otherwise Quality.
 - **Inline MCP results:** Generate waits up to `wait_seconds` (30 seconds for images and none for videos by default, at most 60) and, when every job finishes in time, returns `status: done` with the signed image markdown and View Original link that a Result notification returns. Quick images then need no background Result and no extra agent turn; slower jobs return `status: queued` as before. A client Stop or disconnect ends the wait, never the generation.
@@ -1220,7 +1222,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/maxexcloo/studio/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/maxexcloo/studio/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/maxexcloo/studio/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/maxexcloo/studio/releases/tag/v0.19.0
