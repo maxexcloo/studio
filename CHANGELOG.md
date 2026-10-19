@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-19
+
 ### Added
 - **MCP follow-ups:** Reuse with a result reference and `kind` handles "again", "more like that" and "animate it" without a Models call. The result's own kind runs it again with the same profile and settings and a new seed, optionally with a revised `prompt`. `kind: video` animates an image as the first frame of the account's default first-frame video profile (Fast unless a `tier` is given), sized to the image's proportions. Follow-ups reply and wait as Generate does; Reuse without `kind` still returns a reference asset.
 
@@ -1228,7 +1230,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/maxexcloo/studio/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/maxexcloo/studio/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/maxexcloo/studio/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/maxexcloo/studio/compare/v0.19.0...v0.20.0
