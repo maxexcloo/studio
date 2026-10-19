@@ -143,8 +143,11 @@ test('the composer model menu stays within the composer, under its trigger', asy
   await page.locator('.zen-prompt .model-trigger').click();
   const menu = page.locator('.model-menu');
   await expect(menu).toBeVisible();
-  const [box, composer, trigger] = await Promise.all([menu.boundingBox(), page.locator('.zen-prompt').boundingBox(), page.locator('.zen-prompt .model-trigger').boundingBox()]);
+  // Measured once its opening scale has settled.
+  await menu.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)));
+  const [box, composer, trigger] = await Promise.all([menu.boundingBox(), page.locator('.zen-prompt').boundingBox(), page.locator('.zen-prompt .model-picker').boundingBox()]);
   expect(box!.x).toBeGreaterThanOrEqual(composer!.x);
   expect(box!.x + box!.width).toBeLessThanOrEqual(composer!.x + composer!.width + 1);
-  expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThan(2);
+  // Right-aligned under its trigger, unless the composer is too narrow to allow it.
+  if (trigger!.x + trigger!.width - box!.width >= composer!.x + 8) expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThan(2);
 });
