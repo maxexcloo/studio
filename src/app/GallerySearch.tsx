@@ -140,9 +140,14 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
   const setFiltersOpen = controlledSetFiltersOpen ?? setLocalFiltersOpen;
   // An open filter menu takes the outside tap or Escape for itself.
   const closeFilters = React.useCallback(() => { if (!floatingRef.current?.isConnected) setFiltersOpen(false); }, [setFiltersOpen]);
-  const closeSearch = React.useCallback(() => { if (!floatingRef.current?.isConnected) setOpen(false); }, [setOpen]);
+  // Dismissing the phone overlay (an outside tap or Escape) also clears its query; its own button keeps it.
+  const closeSearch = React.useCallback(() => {
+    if (floatingRef.current?.isConnected) return;
+    if (phone && search.q) setSearch({ ...search, q: '' });
+    setOpen(false);
+  }, [phone, search, setSearch, setOpen]);
   const reducedMotion = useReducedMotion();
-  // The phone overlay closes on an outside tap or Escape even while what it set stays applied.
+  // The phone overlay closes on an outside tap or Escape even while its filters stay applied.
   const triggers = [filterTriggerRef || toolsRef, searchTriggerRef || toolsRef];
   useDismiss([toolsRef, floatingRef, ...triggers], filtersOpen && (phone || !filterActive), closeFilters);
   useDismiss([toolsRef, floatingRef, ...triggers], open && (phone || !queryActive), closeSearch);

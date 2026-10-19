@@ -749,9 +749,11 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   } else await page.getByRole('group', { name: 'Gallery Management' }).getByRole('button', { name: 'Select', exact: true }).click();
   await tile.click();
   await expect(tile).toHaveAttribute('aria-pressed', 'true');
-  // The phone overlay closes on an outside tap; its query stays applied (checked on reopening below).
+  // Opening Select from More dismisses the phone overlay and clears its query, so every tile shows again.
   if (!isMobile) await expect(search).toBeVisible();
-  expect(await image!.evaluate((node) => node.isConnected)).toBe(true);
+  else await expect(search).toHaveCount(0);
+  // Clearing the phone query reloads the unfiltered gallery, so only the desktop keeps the same image node.
+  if (!isMobile) expect(await image!.evaluate((node) => node.isConnected)).toBe(true);
   const after = await tile.boundingBox();
   expect(after!.y).toBeCloseTo(before!.y, 0);
   expect(after!.width).toBeCloseTo(before!.width, 0);
@@ -768,7 +770,15 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   } else {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
-    await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
+    const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
+    await opener.click();
+    await expect(search).toHaveValue('');
+    // Its own button closes the overlay and keeps the query.
+    await search.fill('Image');
+    await opener.click();
+    await expect(search).toHaveCount(0);
+    await expect(opener).toHaveClass(/has-dot/);
+    await opener.click();
     await expect(search).toHaveValue('Image');
   }
   await expect(search).toBeInViewport();
