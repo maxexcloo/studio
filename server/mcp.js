@@ -14,7 +14,7 @@ import { mcpTiers, profilesForTier, summaryOf, tierOf } from './mcp-tiers.js';
 
 const generateWaitSeconds = 30;
 const maxGenerateWaitSeconds = 60;
-const instructions = `Studio makes requested images and videos. For an ordinary request, call Generate directly with kind, tier and prompts; no Models call is needed. Tiers: quality, standard, fast and turbo (Super Fast). Studio picks this account's default ready profile for the tier and applies its defaults; omit tier for the deployment default. Write one clear natural-language prompt that keeps the user's intent. Call Models only when the user names a model, asks what is available, or needs controls, LoRAs or references: Models(kind, tier) lists matching profiles briefly, and Models(profile_id) returns its prompting guide, defaults, adjustable controls, LoRAs and reference slots. Pass only controls that detail lists; Generate refuses fixed ones. Keep explicit model choices and the saved count and size unless asked otherwise. Generate waits briefly for quick jobs (by default ${generateWaitSeconds} seconds for images, none for videos). If it returns status done, reply with its markdown exactly, plus at most a short caption, and do not call Result. Only if it returns queued: it lists, per job, a job_id, a ref such as "result 3" and a watch link; share each watch link as a markdown link labelled with its ref. A ref works wherever a job_id is asked for. Never poll, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per queued job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification contains the finished markdown: reproduce it exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
+const instructions = `Studio makes requested images and videos. For an ordinary request, call Generate directly with kind, tier and prompts; no Models call is needed. Tiers: quality, standard, fast and turbo (Super Fast). Studio picks this account's default ready profile for the tier and applies its defaults; omit tier for the deployment default. Write one clear natural-language prompt that keeps the user's intent. Call Models only when the user names a model, asks what is available, or needs controls, LoRAs or references: Models(kind, tier) lists matching profiles briefly, and Models(profile_id) returns its prompting guide, defaults, adjustable controls, LoRAs and reference slots. Pass only controls that detail lists; Generate refuses fixed ones. Keep explicit model choices and the saved count and size unless asked otherwise. Generate waits briefly for quick jobs (by default ${generateWaitSeconds} seconds for images, none for videos). If it returns status done, reply with its markdown exactly, plus at most a short caption, and do not call Result. Only if it returns queued: it lists, per job, a job_id, a ref such as "result 3" and a watch link; share each watch link as a markdown link labelled with its ref. A ref works wherever a job_id is asked for. Never poll, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per queued job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification contains the finished markdown: reproduce it exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref, not Models or Generate: the result's own kind runs it again with the same profile and settings and a new seed, prompt optionally revises it, and kind=video animates an image from its first frame; Reuse replies like Generate. Reuse without kind returns a reference asset for Generate. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('The job_id from Generate, or its ref such as "result 3".') };
@@ -109,6 +109,18 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       }
     });
     const resolve = (value) => media.resolve(owner, refs, value);
+    /** A submission's reply: finished markdown when every job ends within the wait, otherwise the queued jobs. */
+    const respond = async (submission, profile, waitSeconds, signal, guide = {}) => {
+      const summary = { id: profile.id, label: profile.label || profile.id, tier: tierOf(profile) };
+      // Quick jobs come back finished, so the agent needs no background Result and no second turn.
+      const seconds = waitSeconds ?? (profile.kind === 'video' ? 0 : imageWaitSeconds);
+      const markdown = await media.settle(owner, submission, seconds, { signal });
+      if (markdown) {
+        const done = { status: 'done', profile: summary, jobs: submission.jobs.map(({ job_id, ref }) => ({ job_id, ref })), ...guide };
+        return { content: [{ type: 'text', text: `Done. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result, poll or generate again.\n\n${markdown}` }, ...(guide.prompting ? [{ type: 'text', text: JSON.stringify(guide) }] : [])], structuredContent: done };
+      }
+      return mcpJson({ ...submission, profile: summary, ...guide, message: `Submitted. Share each link as [Watch <ref>](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then reply; otherwise reply now. Never poll or resubmit.` });
+    };
     const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
       tool(server, 'Models', 'Browse Models', 'Only needed when the user names a model or needs controls, LoRAs or references; ordinary requests call Generate with kind and tier instead. Without profile_id, list ready profiles briefly (id, label, kind, tier, summary), optionally for one tier. With profile_id, return its prompting guide, defaults, adjustable controls (only these can be passed to Generate), compatible LoRAs with descriptions, trigger words, recommended strength and source links, reference slots and native sizes. lora_query narrows a long LoRA list. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional() }, async ({ kind, tier: wanted, profile_id, lora_query }) => {
@@ -156,15 +168,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         let guide = {};
         if (unread && profile) guide = { prompting: prompting(profile, true), guide_note: 'This profile\u2019s prompting guide was not read before submission; apply it to later prompts.' };
         if (chosen || unread) review(owner, profileId);
-        const summary = { id: profileId, label: profile?.label || profileId, tier: tierOf(profile) };
-        // Quick jobs come back finished, so the agent needs no background Result and no second turn.
-        const seconds = wait_seconds ?? (profile?.kind === 'video' ? 0 : imageWaitSeconds);
-        const markdown = await media.settle(owner, submission, seconds, { signal });
-        if (markdown) {
-          const done = { status: 'done', profile: summary, jobs: submission.jobs.map(({ job_id, ref }) => ({ job_id, ref })), ...guide };
-          return { content: [{ type: 'text', text: `Done. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result, poll or generate again.\n\n${markdown}` }, ...(guide.prompting ? [{ type: 'text', text: JSON.stringify(guide) }] : [])], structuredContent: done };
-        }
-        return mcpJson({ ...submission, profile: summary, ...guide, message: `Submitted. Share each link as [Watch <ref>](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then reply; otherwise reply now. Never poll or resubmit.` });
+        return respond(submission, profile || { id: profileId }, wait_seconds, signal, guide);
       });
       tool(server, 'Status', 'Generation Status', 'Return this account’s job status now, by job_id or ref, with signed links for finished outputs. Use Result for an inline preview. Only when the user asks; never repeatedly or while a background Result is pending. Wait only when asked, briefly.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
         const id = resolve(job_id);
@@ -180,10 +184,25 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
       tool(server, 'Upload', 'Upload Reference', 'Upload a user’s PNG, JPEG or WebP image (base64, at most 20 MB) as a reference; pass its id to Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
-      tool(server, 'Reuse', 'Reuse Image', 'Use this account’s finished image, by job_id or ref, as a reference without reattaching it. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
-        const result = await media.download(owner, resolve(job_id), output_index);
-        if (!['image/png', 'image/jpeg', 'image/webp'].includes(result.mime)) throw new Error('Only images can be reused as references.');
-        return mcpJson(await media.upload(owner, result.content.toString('base64'), `reference.${result.mime.split('/')[1]}`));
+      tool(server, 'Reuse', 'Reuse Result', `Follow up on this account’s finished result, by job_id or ref such as "result 3", without Models or reattaching it. Without kind, return the image as a reference asset id for Generate. With kind, generate from it and reply as Generate does (status done with markdown, or queued jobs to collect): the result’s own kind runs it again ("again", "more like that") with the same profile and settings and a new seed; kind=video on an image animates it, using the image as the first frame of the account’s default first-frame video profile for the tier. prompt replaces the original prompt; omit it to keep it. Hidden media cannot be reused.`, {
+        ...output, kind: z.enum(['image', 'video']).optional().describe('Generate from the result: its own kind runs it again; video animates an image.'), tier: tier.optional().describe('Only when animating; fast first-frame profiles by default.'),
+        prompt: z.string().trim().min(1).optional().describe('A revised full prompt; omit to keep the original.'), count: z.number().int().min(1).max(4).default(1),
+        wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional().describe(`As for Generate: ${generateWaitSeconds} for images and 0 for videos by default.`)
+      }, async ({ job_id, output_index, kind, tier: wanted, prompt, count, wait_seconds }, signal) => {
+        const id = resolve(job_id);
+        if (!kind) {
+          if (wanted || prompt) throw new Error('Pass kind with tier or prompt to generate from this result.');
+          const result = await media.download(owner, id, output_index);
+          if (!['image/png', 'image/jpeg', 'image/webp'].includes(result.mime)) throw new Error('Only images can be reused as references.');
+          return mcpJson(await media.upload(owner, result.content.toString('base64'), `reference.${result.mime.split('/')[1]}`));
+        }
+        const item = await media.source(owner, id, output_index);
+        const own = item.type === 'video' ? 'video' : 'image';
+        if (kind !== own && own === 'video') throw new Error('A video result can only run again as a video.');
+        if (kind === own && wanted) throw new Error('tier applies only when animating an image; call Generate for another tier.');
+        const { profile, args } = kind === own ? await media.rerun(owner, item, { prompt, count }) : await media.animate(owner, id, output_index, item, { tier: wanted, prompt, count });
+        review(owner, profile.id);
+        return respond(await media.queue(owner, args, refs), profile, wait_seconds, signal);
       });
     } else {
       const request = async (method, route, body) => {

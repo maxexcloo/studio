@@ -26,12 +26,20 @@ export function summaryOf(profile, length = 120) {
   return sentence.length > length ? `${sentence.slice(0, length - 1)}…` : sentence;
 }
 
+/** A profile whose first image slot starts the video, so an image can be animated from its first frame. */
+export function takesFirstFrame(profile) {
+  const slot = profile?.mediaInputs?.[0];
+  return Boolean(slot) && (slot.role === 'start' || /\b(?:first frame|start image)\b/i.test(String(slot.label || '')));
+}
+
 /**
  * The profile Studio uses when Generate names a kind and tier instead of a profile_id:
  * the deployment default when it fits, then its family, then unrestricted, then catalogue order.
- * `profiles` is already limited to this account's ready profiles of the kind.
+ * `firstFrame` (animating an image) prefers first-frame profiles and, without a tier or a
+ * first-frame deployment default, the fast tier. `profiles` is already limited to this
+ * account's ready profiles of the kind.
  */
-export function chooseProfile(profiles, { kind, tier, defaultId, references = 0 }) {
+export function chooseProfile(profiles, { kind, tier, defaultId, references = 0, firstFrame = false }) {
   if (!profiles.length) throw new Error(`No ready ${kind} profile is available to this account.`);
   const fallback = profiles.find(profile => profile.id === defaultId);
   const usable = (tier ? profilesForTier(profiles, tier) : profiles).filter(profile => {
@@ -42,6 +50,13 @@ export function chooseProfile(profiles, { kind, tier, defaultId, references = 0 
     const available = mcpTiers.filter(item => profilesForTier(profiles, item).length);
     throw new Error(`No ready ${kind} profile${tier ? ` in the ${tier} tier` : ''} is available to this account${references ? ` for ${references} reference${references > 1 ? 's' : ''}` : ''}. Available ${kind} tiers: ${available.join(', ')}.`);
   }
+  let pool = usable;
+  const frames = firstFrame ? usable.filter(takesFirstFrame) : [];
+  if (frames.length) {
+    // A chat follow-up wants a quick animation, so Fast first-frame profiles lead unless a tier or the default says otherwise.
+    const fast = tier || frames.some(profile => profile.id === defaultId) ? [] : profilesForTier(frames, 'fast');
+    pool = fast.length ? fast : frames;
+  }
   const score = (profile) => [profile.id === defaultId, Boolean(fallback?.family) && profile.family === fallback.family, !profile.restricted].reduce((total, value) => total * 2 + Number(value), 0);
-  return usable.reduce((best, profile) => score(profile) > score(best) ? profile : best);
+  return pool.reduce((best, profile) => score(profile) > score(best) ? profile : best);
 }

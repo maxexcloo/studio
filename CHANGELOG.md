@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **MCP follow-ups:** Reuse with a result reference and `kind` handles "again", "more like that" and "animate it" without a Models call. The result's own kind runs it again with the same profile and settings and a new seed, optionally with a revised `prompt`. `kind: video` animates an image as the first frame of the account's default first-frame video profile (Fast unless a `tier` is given), sized to the image's proportions. Follow-ups reply and wait as Generate does; Reuse without `kind` still returns a reference asset.
+
 ## [0.22.0] - 2026-10-19
 
 ### Added

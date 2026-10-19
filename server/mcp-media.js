@@ -3,9 +3,9 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import { defaultGenerationCount } from './generation-defaults.js';
+import { defaultGenerationCount, referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
-import { assertAdjustable } from './mcp-controls.js';
+import { assertAdjustable, mcpControls } from './mcp-controls.js';
 import { chooseProfile } from './mcp-tiers.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
@@ -107,10 +107,10 @@ export class McpMedia {
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   /** The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream. */
-  async choose(owner, { kind = 'image', tier, references = 0 } = {}) {
+  async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false } = {}) {
     const models = await this.catalogue(owner);
     const profiles = await this.profiles(kind, owner);
-    return chooseProfile(profiles, { kind, tier, references, defaultId: models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'] });
+    return chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId: models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'] });
   }
   async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
@@ -321,6 +321,48 @@ export class McpMedia {
     const job = await this.job(owner, jobId, 0, options);
     const output = this.available(job, index);
     return this.readOutput(output, owner);
+  }
+  /** A finished, visible output's gallery record with its prompt and settings, for Reuse to run it again or animate it. */
+  async source(owner, jobId, index) {
+    this.available(await this.job(owner, jobId), index);
+    const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}?settings=1`, undefined, owner);
+    const item = items.find(entry => entry.jobId === jobId && entry.index === index && entry.status === 'done' && !hidden(entry));
+    if (!item?.settings?.profileId || !item.prompt) throw new Error('This result has no recorded profile or prompt to reuse. Call Generate instead.');
+    return item;
+  }
+  /** Generate arguments that run a finished output again with its profile and settings; the seed is new. */
+  async rerun(owner, item, { prompt, count = 1 } = {}) {
+    const settings = item.settings;
+    const base = (await this.profiles(item.type === 'video' ? 'video' : 'image', owner)).find(profile => profile.id === settings.profileId);
+    if (!base) throw new Error('The profile behind this result is no longer available to this account. Call Generate instead.');
+    const references = (settings.referenceAssets || []).map(asset => asset?.assetId).filter(Boolean);
+    const profile = references.length ? { ...base, ...base.imageModes?.reference } : base;
+    const controls = mcpControls(profile);
+    const args = { profile_id: base.id, prompts: [prompt || item.prompt], count, ...(references.length ? { reference_asset_ids: references } : {}) };
+    if (settings.referenceRole && controls.reference_role) args.reference_role = settings.referenceRole;
+    // Only what this run changed from the profile's defaults, and only what MCP may adjust.
+    const recorded = { width: item.width, height: item.height, steps: settings.steps, cfg: settings.cfg, denoise: settings.denoise, sampler: settings.sampler, scheduler: settings.scheduler };
+    for (const [key, value] of Object.entries(recorded)) if (controls[key] && value !== undefined && value !== '' && value !== 0 && value !== profile.defaults?.[key]) args[key] = value;
+    if (item.negative && controls.negative_prompt) args.negative_prompt = item.negative;
+    const loras = controls.loras ? (settings.loras || []).filter(lora => profile.options?.loras?.includes(lora.name)).map(({ name, strength }) => ({ name, strength })) : [];
+    if (loras.length) args.loras = loras;
+    return { profile: base, args };
+  }
+  /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
+  async animate(owner, jobId, index, item, { tier, prompt, count = 1 } = {}) {
+    const output = await this.download(owner, jobId, index);
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) throw new Error('Only image results can be animated.');
+    const base = await this.choose(owner, { kind: 'video', tier, references: 1, firstFrame: true });
+    const { asset } = await this.upload(owner, output.content.toString('base64'), `first-frame.${output.mime.split('/')[1]}`);
+    const profile = { ...base, ...base.imageModes?.reference };
+    const args = { profile_id: base.id, prompts: [prompt || item.prompt], count, reference_asset_ids: [asset.id] };
+    // The video takes the image's proportions at the profile's default pixel count, snapped to its limits.
+    const controls = mcpControls(profile);
+    const { width, height } = await sharp(output.content, { limitInputPixels: 80000000 }).metadata();
+    const scale = Math.sqrt((profile.defaults?.width * profile.defaults?.height) / (width * height));
+    const size = controls.width && controls.height && scale > 0 ? referenceImageSize(profile, { width: width * scale, height: height * scale }) : null;
+    if (size && (size.width !== profile.defaults?.width || size.height !== profile.defaults?.height)) Object.assign(args, size);
+    return { profile: base, args };
   }
   async signedResult(owner, jobId, index) {
     if (!this.resolveSignedResult) throw new Error('The signed result is unavailable.');

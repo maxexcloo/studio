@@ -67,7 +67,10 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
   app.get('/api/gallery', (_req, res) => res.json({ items: [...jobs.values()].flatMap(job => job.gallery ?? (job.status === 'done' && !job.privateVault ? job.outputs.map((output, index) => ({ id: `${job.id}:${index}`, jobId: job.id, index, status: 'done', type: job.kind, ...output })) : [])), hasMore: false, nextCursor: '' }));
   app.get('/api/gallery/jobs/:id', (req, res) => {
     const job = jobs.get(req.params.id);
-    res.json({ items: !job || job.privateVault ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...output })) : []) });
+    // Like the studio's gallery record: the prompt and generation settings only on request.
+    const body = job?.settings || {};
+    const recorded = req.query.settings === '1' ? { prompt: body.prompt, negative: body.negative || '', width: body.width, height: body.height, settings: { profileId: body.profileId, steps: body.steps, cfg: body.cfg, sampler: body.sampler || '', scheduler: body.scheduler || '', seed: body.seed || 'Random', referenceAssets: body.referenceAssets || [], ...(body.loras?.length ? { loras: body.loras } : {}) } } : {};
+    res.json({ items: !job || job.privateVault ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...recorded, ...output })) : []) });
   });
   app.post('/api/reference-assets/upload', async (req, res) => {
     for await (const _chunk of req) { /* Consume the multipart body. */ }
@@ -1167,4 +1170,87 @@ test('Generate does not wait for videos by default', async t => {
   assert.equal(queued.status, 'queued');
   assert.equal(queued.profile.id, videoProfile.id);
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
+});
+
+const finish = (f, extension = 'png') => { for (const job of f.jobs.values()) if (job.status !== 'done') Object.assign(job, { status: 'done', outputs: [{ url: `/comfy/view?filename=${job.id}.${extension}` }] }); };
+
+test('Reuse runs a result again with its profile and settings, a new seed and an optional prompt, without Models', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const first = data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1, width: 1024, height: 1024, cfg: 4, sampler: 'dpmpp_2m', seed: 7, negative_prompt: 'blur', loras: [{ name: 'fixture-effect.safetensors', strength: 0.6 }] }));
+  finish(f);
+  const models = () => f.requests.filter(request => request.path === '/models').length;
+  const before = models();
+  const again = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image' }));
+  assert.equal(again.status, 'queued');
+  assert.deepEqual(again.profile, first.profile);
+  assert.deepEqual(again.jobs.map(job => job.ref), ['result 2']);
+  const [original, rerun] = f.submitted;
+  for (const key of ['profileId', 'prompt', 'width', 'height', 'cfg', 'sampler', 'negative', 'loras']) assert.deepEqual(rerun[key], original[key], key);
+  assert.equal(original.seed, '7');
+  assert.equal(rerun.seed, '', 'a new seed');
+  const tweaked = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', prompt: 'A heron at dusk', count: 2 }));
+  assert.equal(tweaked.jobs.length, 2);
+  assert.deepEqual(f.submitted.slice(2).map(body => [body.prompt, body.cfg]), [['A heron at dusk', 4], ['A heron at dusk', 4]]);
+  assert.ok(models() - before <= 1, 'reads the cached catalogue at most once and needs no Models call');
+  // A follow-up still waits like Generate, so a quick rerun returns finished markdown.
+  f.completeOnSubmit();
+  const quick = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', wait_seconds: 5 });
+  assert.equal(quick.structuredContent?.status, 'done', JSON.stringify(quick.content));
+  assert.match(quick.content[0].text, /^Done\. .+\n\n!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
+  // Without kind, Reuse still returns a reference asset for Generate, and a rerun keeps a result's references.
+  const { asset } = data(await call(client, 'Reuse', { job_id: 'result 1' }));
+  assert.match(asset.id, /^fixture-asset-/);
+  const edit = data(await call(client, 'Generate', { kind: 'image', prompts: ['Make it blue'], count: 1, reference_asset_ids: [asset.id] }));
+  finish(f);
+  data(await call(client, 'Reuse', { job_id: edit.jobs[0].ref, kind: 'image' }));
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, [{ slot: 'reference', assetId: asset.id }]);
+});
+
+test('Reuse animates an image from its first frame with the default first-frame video profile', async t => {
+  const f = await fixture(t);
+  const frame = [{ id: 'reference', kind: 'image', label: 'Optional First Frame', min: 0, max: 1, required: false }];
+  const video = (id, label, extra = {}) => ({ ...structuredClone(videoProfile), id, label, mediaInputs: frame, aspectPolicy: 'reference', constraints: { width: { min: 256, max: 2048, step: 32 }, height: { min: 256, max: 2048, step: 32 } }, defaults: { width: 1344, height: 768, count: 1, steps: 8 }, ...extra });
+  await f.profiles([
+    structuredClone(imageProfile),
+    { ...structuredClone(videoProfile), id: 'text-video', label: 'Text Video · Quality' },
+    video('ref-fast', 'H3 Ref · Fast · 8 Steps', { mediaInputs: [{ ...frame[0], label: 'Reference Image' }] }),
+    video('fl-quality', 'H3 FL · Quality · 20 Steps'),
+    video('fl-fast', 'H3 FL · Fast · 8 Steps')
+  ], { defaults: { image: imageProfile.id, video: 'text-video' } });
+  const client = await f.client();
+  data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  finish(f);
+  const animated = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' }));
+  assert.equal(animated.status, 'queued', 'videos do not wait by default');
+  assert.deepEqual(animated.profile, { id: 'fl-fast', label: 'H3 FL · Fast · 8 Steps', tier: 'fast' });
+  const body = f.submitted.at(-1);
+  assert.equal(body.kind, 'video');
+  assert.equal(body.prompt, 'The heron takes flight');
+  assert.equal(body.referenceAssets.length, 1);
+  assert.equal(body.referenceAssets[0].slot, 'reference');
+  assert.ok(f.assets.has(body.referenceAssets[0].assetId), 'the image was uploaded as the first frame');
+  // The 64×48 fixture image sets a 4:3 frame at the profile's 1344×768 pixel count, on its 32-pixel grid.
+  assert.deepEqual([body.width, body.height], [1184, 864]);
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'quality' }));
+  assert.equal(f.submitted.at(-1).profileId, 'fl-quality');
+  assert.equal(f.submitted.at(-1).prompt, 'A heron', 'the image prompt by default');
+  // A video cannot become an image, tiers are only for animation, and tier or prompt need a kind.
+  finish(f, 'mp4');
+  await failure(client, 'Reuse', { job_id: 'result 2', kind: 'image' });
+  await failure(client, 'Reuse', { job_id: 'result 1', kind: 'image', tier: 'fast' });
+  await failure(client, 'Reuse', { job_id: 'result 1', prompt: 'A heron at dusk' });
+});
+
+test('Reuse follow-ups respect ownership and Hidden results', async t => {
+  const f = await fixture(t);
+  const alice = await f.client('alice');
+  const bob = await f.client('bob');
+  const id = jobId(data(await call(alice, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 })));
+  finish(f);
+  const submitted = f.submitted.length;
+  for (const kind of ['image', 'video']) await failure(bob, 'Reuse', { job_id: id, kind });
+  f.jobs.get(id).privateVault = true;
+  for (const kind of ['image', 'video']) await failure(alice, 'Reuse', { job_id: id, kind });
+  assert.equal(f.submitted.length, submitted);
 });

@@ -11,7 +11,7 @@ process.env.COMFY_OUTPUT_DIR = dir;
 const { setGallery } = await import('./gallery-store.js');
 const { registerGalleryReadRoutes } = await import('./gallery-routes.js');
 
-test('exact job results exclude unrelated, deleted and Hidden outputs without exposing prompts', async t => {
+test('exact job results exclude unrelated, deleted and Hidden outputs and expose prompts only on request', async t => {
   const app = express();
   registerGalleryReadRoutes(app);
   const server = app.listen(0, '127.0.0.1');
@@ -30,6 +30,9 @@ test('exact job results exclude unrelated, deleted and Hidden outputs without ex
   const response = await fetch(`${base}/api/gallery/jobs/chosen`);
   const result = await response.json();
   assert.deepEqual(result.items, [{ jobId: 'chosen', index: 0, status: 'done', type: 'image', url: '/comfy/view?filename=visible.png' }]);
+  // MCP asks for the prompt and settings only to run a result again; Hidden outputs stay out.
+  const detailed = await (await fetch(`${base}/api/gallery/jobs/chosen?settings=1`)).json();
+  assert.deepEqual(detailed.items.map(({ index, prompt }) => ({ index, prompt })), [{ index: 0, prompt: 'private prompt text' }]);
   assert.deepEqual(await (await fetch(`${base}/api/gallery/jobs/missing`)).json(), { items: [] });
   setGallery([]);
   assert.deepEqual(await (await fetch(`${base}/api/gallery/jobs/chosen`)).json(), { items: [] });
