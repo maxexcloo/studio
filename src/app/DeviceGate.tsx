@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, RefreshCw } from 'lucide-react';
+import { emailFieldProps, looksLikeEmail } from './accounts';
 import { ApiError, apiJson, setAccountStorageScope, signedOutEvent } from './api';
 import { setAtComputer, setThisComputer } from './device';
 import { LockMark, type LockMarkStage } from './LockMark';
@@ -90,22 +91,28 @@ function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recove
     if (value) window.history.replaceState(null, '', window.location.pathname);
     return signInOutcomes[value] || '';
   });
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [stage, setStage] = useState<LockMarkStage>('locked');
   const [error, setError] = useState('');
+  const emailRef = useRef<HTMLInputElement>(null);
   const working = stage === 'asking' || stage === 'opening';
+  // Existing accounts may predate email usernames; only new ones must be emails.
+  const ready = Boolean(email.trim() && password) && (!recovery || looksLikeEmail(email));
+  const notice = error || outcome;
+
+  useEffect(() => { window.setTimeout(() => emailRef.current?.focus(), 80); }, []);
 
   const submit = async () => {
-    if (!username || !password || working) return;
+    if (!ready || working) return;
     setStage('asking');
     setError('');
     try {
       await apiJson(recovery ? '/api/accounts/bootstrap' : '/api/accounts/sign-in', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username, displayName, password, ...(recovery && token ? { setupToken: token } : {}) })
+        body: JSON.stringify({ username: email.trim(), displayName, password, ...(recovery && token ? { setupToken: token } : {}) })
       });
       setStage('opening');
       window.setTimeout(onSignedIn, 400);
@@ -114,23 +121,43 @@ function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recove
       setError(reason instanceof Error ? reason.message : 'Sign-in failed.');
     }
   };
+  const edit = (set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    set(event.target.value);
+    if (stage === 'failed') setStage('locked');
+  };
 
   return (
-    <section className={cn('device-gate hidden-lockscreen', `is-${stage}`)}>
-      <div className="empty stage-empty hidden-lock-stage">
-        <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
-        <div className="stage-copy">
-          <h2>{recovery ? 'Create the Recovery Administrator' : 'Sign In to Studio'}</h2>
-          <p>{recovery ? (setupToken ? 'Set up the first administrator with the setup token from the deployment, or on the computer running Studio.' : 'Set up the first administrator on this computer.') : 'Use your approved HEISS account.'}</p>
-          <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-            <label>Username<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={working} /></label>
-            {recovery && setupToken && <label>Setup Token<input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} disabled={working} /></label>}
-            {recovery && <label>Display Name<input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={working} /></label>}
-            <label>Password<input type="password" autoComplete={recovery ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} disabled={working} /></label>
-            {(error || outcome) && <p role="alert">{error || outcome}</p>}
-            <button className="reconnect-btn primary" type="submit" disabled={!username || !password || working}>{working ? 'Please Wait…' : recovery ? 'Create Administrator' : 'Sign In'}</button>
+    <section className={cn('device-gate account-gate', `is-${stage}`)}>
+      <div className="account-gate-column">
+        <div className="account-gate-mark" aria-hidden="true"><LockMark className="stage-layer" stage={stage} /></div>
+        <div className="modal modal-alert account-gate-card" role="region" aria-labelledby="account-gate-title">
+          <div className="modal-head">
+            <div className="modal-titles">
+              <h2 id="account-gate-title">{recovery ? 'Create the First Administrator' : 'Sign In to Studio'}</h2>
+              <p>{recovery
+                ? (setupToken ? 'Use the setup token from the deployment, or set this up on the computer running Studio.' : 'Set up the first administrator on this computer.')
+                : 'Use the email and password for your approved account.'}</p>
+            </div>
+          </div>
+          <form className="modal-body account-gate-form" noValidate onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+            <label className="account-gate-field">
+              <span>Email</span>
+              <input ref={emailRef} className="modal-input" name="email" autoComplete="username" placeholder="you@example.com" {...emailFieldProps} value={email} onChange={edit(setEmail)} disabled={working} />
+            </label>
+            {recovery && setupToken ? <label className="account-gate-field"><span>Setup Token</span><input className="modal-input" type="password" autoComplete="off" value={token} onChange={edit(setToken)} disabled={working} /></label> : null}
+            {recovery ? <label className="account-gate-field"><span>Display Name</span><input className="modal-input" autoComplete="name" value={displayName} onChange={edit(setDisplayName)} disabled={working} /></label> : null}
+            <label className="account-gate-field">
+              <span>Password</span>
+              <input className="modal-input" type="password" name="password" autoComplete={recovery ? 'new-password' : 'current-password'} value={password} onChange={edit(setPassword)} disabled={working} />
+            </label>
+            {recovery && email.trim() && !looksLikeEmail(email) ? <p className="account-gate-hint">Enter an email address, such as you@example.com.</p> : null}
+            {notice ? <p className="account-gate-error" role="alert">{notice}</p> : null}
+            <button className="btn is-primary account-gate-submit" type="submit" disabled={!ready || working}>{working ? 'Please Wait…' : recovery ? 'Create Administrator' : 'Sign In'}</button>
           </form>
-          {!recovery && oidcLabel ? <div className="empty-actions"><a className="reconnect-btn" href="/api/accounts/oidc/start">Sign In With {oidcLabel}</a></div> : null}
+          {!recovery && oidcLabel ? <div className="modal-foot account-gate-alt">
+            <span className="account-gate-or">or</span>
+            <a className="btn" href="/api/accounts/oidc/start"><KeyRound size={14} aria-hidden="true" /> Sign In with {oidcLabel}</a>
+          </div> : <div className="account-gate-end" />}
         </div>
       </div>
     </section>

@@ -101,11 +101,18 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   // The one-time token stays readable if the clipboard is unavailable.
   await expect(page.getByLabel('New MCP token')).toHaveValue('new-one-time-secret');
   await expect(page.getByText('https://studio.example.test/mcp')).toBeVisible();
-  await page.getByLabel('Username', { exact: true }).fill('new.artist');
+  const newEmail = page.getByLabel('Email', { exact: true });
+  await expect(newEmail).toHaveAttribute('type', 'email');
+  await expect(newEmail).toHaveAttribute('autocapitalize', 'none');
+  await newEmail.fill('new.artist');
   await page.getByLabel('Display name', { exact: true }).fill('New Artist');
   await page.getByLabel('Temporary password', { exact: true }).fill('a secure temporary password');
+  // The username is the account's email, so a new one must look like one.
+  await expect(page.getByRole('button', { name: 'Create User', exact: true })).toBeDisabled();
+  await expect(page.getByText('Enter an email address.', { exact: false })).toBeVisible();
+  await newEmail.fill(' new.artist@example.com ');
   await page.getByRole('button', { name: 'Create User', exact: true }).click();
-  await expect.poll(() => posts.some((post) => post.url === '/api/accounts/users')).toBe(true);
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users')?.body).toMatchObject({ username: 'new.artist@example.com' });
   await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });
@@ -132,4 +139,41 @@ test('ordinary accounts open their own studio without administration sections', 
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible();
+});
+
+const signedOutStatus = (extra: object = {}) => ({ ok: true, mode: 'multi-user', signedIn: false, account: null, ...extra });
+
+test('the sign-in box asks for an email, never capitalises it and shows errors inline', async ({ page }) => {
+  const attempts: unknown[] = [];
+  await page.route('**/api/accounts/status', (request) => request.fulfill({ json: signedOutStatus({ oidc: { label: 'Pocket ID' } }) }));
+  await page.route('**/api/accounts/sign-in', (request) => {
+    attempts.push(request.request().postDataJSON());
+    return request.fulfill({ status: 401, json: { ok: false, error: 'That email or password is incorrect, or the account is not approved.' } });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Sign In to Studio', exact: true })).toBeVisible();
+  const email = page.getByLabel('Email', { exact: true });
+  for (const [name, value] of [['type', 'email'], ['autocomplete', 'username'], ['autocapitalize', 'none'], ['autocorrect', 'off'], ['spellcheck', 'false'], ['inputmode', 'email']]) await expect(email).toHaveAttribute(name, value);
+  await expect(email).toHaveCSS('text-transform', 'none');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'current-password');
+  await expect(page.getByRole('link', { name: 'Sign In with Pocket ID', exact: true })).toHaveAttribute('href', '/api/accounts/oidc/start');
+  await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeDisabled();
+  await email.fill('max@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('wrong');
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('That email or password is incorrect, or the account is not approved.');
+  await expect(email).toHaveValue('max@example.com');
+  expect(attempts).toEqual([{ username: 'max@example.com', displayName: '', password: 'wrong' }]);
+});
+
+test('the first administrator is created with an email address', async ({ page }) => {
+  await page.route('**/api/accounts/status', (request) => request.fulfill({ json: signedOutStatus({ needsRecoveryAdmin: true, setupTokenAccepted: true }) }));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Create the First Administrator', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Pocket ID/ })).toHaveCount(0);
+  await page.getByLabel('Email', { exact: true }).fill('admin');
+  await page.getByLabel('Password', { exact: true }).fill('a password');
+  await expect(page.getByRole('button', { name: 'Create Administrator', exact: true })).toBeDisabled();
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.com');
+  await expect(page.getByRole('button', { name: 'Create Administrator', exact: true })).toBeEnabled();
 });

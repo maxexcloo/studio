@@ -159,7 +159,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     }
     if (!result.ok || !result.value) {
       if (result.retryAfterMs) res.setHeader("Retry-After", String(Math.ceil(result.retryAfterMs / 1000)));
-      res.status(401).json({ ok: false, error: "That username or password is incorrect, or the account is not approved." });
+      res.status(401).json({ ok: false, error: "That email or password is incorrect, or the account is not approved." });
       return;
     }
     const session = createAccountSession(result.value.userId);

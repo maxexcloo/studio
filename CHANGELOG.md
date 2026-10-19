@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Clearer sign-in:** the account sign-in and first-administrator screens are a card like Studio's dialogs, with an Email field that phone keyboards no longer capitalise or autocorrect, inline errors and a separate Pocket ID button. Accounts are identified by email everywhere: new accounts and the first administrator need an email address, while existing non-email usernames keep working.
+
 ## [0.25.0] - 2026-10-19
 
 > LibreChat users reach Studio without a manual link

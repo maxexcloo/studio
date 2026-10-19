@@ -350,3 +350,27 @@
 /* Another device before it signs in (DeviceGate.tsx): this is all it can show, above everything. */
 .device-gate { position: fixed; inset: 0; z-index: 40; background: #0a0a0a; }
 .device-gate.hidden-lockscreen { pointer-events: auto; }
+
+/* Account sign-in (DeviceGate.tsx): the lock over a card drawn like the alert modal. */
+.account-gate {
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.account-gate-column { display: flex; flex-direction: column; align-items: center; width: min(420px, 100%); }
+.account-gate-mark { position: relative; width: min(300px, 80%, calc(24dvh * 2.5)); aspect-ratio: 60 / 24; margin-bottom: 20px; pointer-events: none; }
+.account-gate-card { width: 100%; max-height: none; overflow: visible; }
+.account-gate-form { display: grid; gap: 14px; overflow: visible; }
+.account-gate-field { display: grid; gap: 6px; }
+.account-gate-field > span { font-size: 12.5px; font-weight: 550; color: hsl(var(--muted-foreground)); }
+.account-gate-field .modal-input:disabled { opacity: .6; }
+.account-gate-hint { margin: -4px 0 0; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.account-gate-error { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--danger-fill); color: var(--danger-ink); font-size: 12.5px; line-height: 1.45; }
+.account-gate-submit { width: 100%; margin-top: 4px; }
+.account-gate-alt { flex-direction: column; align-items: stretch; gap: 14px; padding-top: 18px; }
+.account-gate-alt .btn { width: 100%; text-decoration: none; }
+.account-gate-or { display: flex; align-items: center; gap: 12px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.account-gate-or::before,
+.account-gate-or::after { content: ""; flex: 1; height: 1px; background: var(--surface-border); }
+.account-gate-end { height: 24px; }

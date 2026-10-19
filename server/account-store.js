@@ -104,11 +104,11 @@ export function assignAccessProfile(accountId, profileId) {
 
 export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
-  if (!validUsername(username)) throw new Error("Use a 2–128 character username containing letters, numbers, dots, underscores, hyphens, plus signs or @.");
+  if (!validUsername(username)) throw new Error("Use an email address of up to 128 characters.");
   if (!String(password || "")) throw new Error("Enter a password.");
   if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
   if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign an existing access profile to this user.");
-  if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("That username is already in use.");
+  if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("An account with that email already exists.");
 
   const salt = crypto.randomBytes(16);
   const hash = await scryptAsync(password, salt);
@@ -126,7 +126,7 @@ export async function createLocalAccount({ username, displayName = "", password,
   // Recheck after the asynchronous KDF before inserting.
   const store = readStore();
   if (onlyIfEmpty && store.accounts.length) throw new Error("Recovery administrator setup is already complete.");
-  if (store.accounts.some((item) => usernameKey(item.username) === key)) throw new Error("That username is already in use.");
+  if (store.accounts.some((item) => usernameKey(item.username) === key)) throw new Error("An account with that email already exists.");
   store.accounts.push(account);
   saveStore();
   const { password: _secret, ...publicAccount } = account;

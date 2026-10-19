@@ -41,7 +41,7 @@ test("local account passwords and bearer sessions are stored only as verifiers",
 
 test("profile assignment, duplicate names and account disabling fail closed", async () => {
   const admin = await store.createLocalAccount({ username: "recovery", password: "another secure password", role: "administrator" });
-  await assert.rejects(store.createLocalAccount({ username: "RECOVERY", password: "a different secure password", role: "administrator" }), /already in use/);
+  await assert.rejects(store.createLocalAccount({ username: "RECOVERY", password: "a different secure password", role: "administrator" }), /already exists/);
   const user = await store.createLocalAccount({ username: "artist.two", password: "a third secure password", accessProfileId: "artists" });
   store.setAccountDisabled(user.id, true);
   assert.equal(await store.verifyLocalAccount("artist.two", "a third secure password"), null);

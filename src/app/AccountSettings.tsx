@@ -1,5 +1,6 @@
 import React from 'react';
 import { Ban, Check, Copy, KeyRound, Link2, LogOut, Pencil, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
+import { emailFieldProps, looksLikeEmail, signOutAccount } from './accounts';
 import { apiJson } from './api';
 import { StudioSelect } from './components';
 import { Group, Row, Switch } from './SettingsControls';
@@ -94,7 +95,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
   };
 
   const createAccount = async () => {
-    if (await run(() => apiJson('/api/accounts/users', jsonPost('POST', { username, displayName, password, accessProfileId: assignedProfile })), 'Could not create the account.')) {
+    if (await run(() => apiJson('/api/accounts/users', jsonPost('POST', { username: username.trim(), displayName, password, accessProfileId: assignedProfile })), 'Could not create the account.')) {
       setUsername(''); setDisplayName(''); setPassword('');
       await refresh();
     }
@@ -119,7 +120,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
   };
 
   const signOut = async () => {
-    if (await run(() => apiJson('/api/accounts/sign-out', { method: 'POST' }), 'Could not sign out.')) window.location.reload();
+    await run(signOutAccount, 'Could not sign out.');
   };
 
   const patchAccount = async (account: Account, body: Record<string, unknown>) => {
@@ -197,14 +198,14 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
           <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
         </> : null}
       </Row>)}
-      <Row label="Username"><input className="modal-input account-field" aria-label="Username" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="new.artist" /></Row>
+      <Row label="Email" description={username.trim() && !looksLikeEmail(username) ? 'Enter an email address. It is the account’s sign-in name.' : undefined}><input className="modal-input account-field" aria-label="Email" autoComplete="off" {...emailFieldProps} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="artist@example.com" /></Row>
       <Row label="Display Name"><input className="modal-input account-field" aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
       <Row label="Temporary Password" description="Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
       <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access profile for the new account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
-      <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
+      <Row label="Create Account"><button className="btn is-primary" disabled={busy || !looksLikeEmail(username) || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
-    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, either here or automatically when the gateway forwards an email that is an enabled account's username.">
+    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, either here or automatically when the gateway forwards an enabled account's email.">
       {(admin?.gateway?.links || []).map((link) => {
         const account = admin?.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
