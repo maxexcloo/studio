@@ -26,7 +26,7 @@ import { accountSession } from "./account-store.js";
  * Everything lives in data/access.json (0600).
  */
 
-const dataDir = process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR) : path.join(root, "data");
+const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
 export const deviceCookieName = "heiss_device";
 const kdf = "scrypt-n32768-r8-p1";

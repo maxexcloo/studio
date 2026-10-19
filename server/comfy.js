@@ -125,7 +125,7 @@ export function setComfyOutputDir(value = "") {
  * always a direct child of the ComfyUI root, until a real models/ turns up.
  */
 export function comfyModelsDir() {
-  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || process.env.JAI_COMFY_ROOT || "").trim();
+  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || "").trim();
   if (comfyRoot) return path.join(path.resolve(comfyRoot), "models");
   if (!comfyOutputDir) return "";
   let current = path.resolve(comfyOutputDir);
@@ -175,7 +175,7 @@ export function modelFolders(kind, subfolders = [kind]) {
 // Whether other devices may use the studio at all. Who a request comes from
 // (this computer, a device, a proxy) is decided in client-trust.js, never
 // from the socket address alone.
-export const allowLanActions = process.env.HEISS_ALLOW_LAN === "1" || process.env.JAI_ALLOW_LAN === "1" || lanListening;
+export const allowLanActions = process.env.HEISS_ALLOW_LAN === "1" || lanListening;
 /** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
 export const demoMode = process.env.HEISS_DEMO === "1";
 
@@ -337,7 +337,7 @@ export function textRange(info, node, key) {
 export function comfyInputDir() {
   const explicit = String(process.env.COMFY_INPUT_DIR || "").trim();
   if (explicit) return path.resolve(explicit);
-  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || process.env.JAI_COMFY_ROOT || "").trim();
+  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || "").trim();
   const candidates = [
     comfyRoot ? path.join(path.resolve(comfyRoot), "input") : "",
     comfyOutputDir ? path.join(path.dirname(path.resolve(comfyOutputDir)), "input") : ""

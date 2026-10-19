@@ -6,7 +6,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
 import { accountRoles, effectiveAccountAccess, normaliseAccessProfile, validAccountKey } from "./account-policy.js";
 
-const dataDir = path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR || path.join(root, "data"));
+const dataDir = path.resolve(process.env.HEISS_DATA_DIR || path.join(root, "data"));
 const storePath = path.join(dataDir, "accounts.json");
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessions = 500;

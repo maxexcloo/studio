@@ -26,7 +26,7 @@ import { scryptAsync, scryptParams } from './kdf.js';
  * access.js), so signing the device out, or all devices, locks it too.
  */
 
-const dataDir = process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR || process.env.JAI_DATA_DIR) : path.join(root, "data");
+const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
 const privacyPath = path.join(dataDir, "privacy.json");
 const cookieName = "heiss_privacy_unlock";
 const legacyCookieName = "jai_privacy_unlock";
