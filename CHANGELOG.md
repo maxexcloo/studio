@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-19
+
 ### Removed
 - **Upstream links on About:** Settings › About no longer shows the feedback panel or links to upstream's feedback board, Discord and website. Source, licence, changelog and credits stay.
 
@@ -1207,7 +1209,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/maxexcloo/studio/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/maxexcloo/studio/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/maxexcloo/studio/releases/tag/v0.19.0
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
