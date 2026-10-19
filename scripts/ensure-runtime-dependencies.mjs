@@ -1,4 +1,3 @@
-import { releasesUrl } from '../server/release-identity.js';
 import { execFileSync, execSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -122,6 +121,6 @@ if (!wantDev && builtAt && sourceCheckout && installed("vite") && newestSource()
     console.warn("No built app in dist/ yet. Building it once...");
     runNpm(["run", "build"], { cwd: projectRoot, stdio: "inherit" });
   } else {
-    console.warn(`No built app in dist/. Download a release from ${releasesUrl}, or run \`npm install\` and \`npm run build\` in a source checkout.`);
+    console.warn("No built app in dist/. Run `npm install` and `npm run build` first.");
   }
 }

@@ -1,15 +1,12 @@
 // `npm run dev`: Vite serves the page, the HEISS server answers the API.
 //
 // `npm run dev -- --lan` (or `npm run dev:lan`, or the switch in Settings ›
-// Connection) opens both to the network. The server restarts itself when the
-// app asks (Settings › General › Restart, the LAN switch), and Vite follows
-// when the LAN choice changed, so the switch works in a checkout too.
-import { fork, spawn } from "node:child_process";
+// Connection, from the next start) opens both to the network.
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listensBeyondThisComputer, readEnvFile, resolveLan } from "../server/lan.js";
-import { CONSOLE_STOP_CODE, RESTART_CODE, consoleStopTracker } from "../server/release-swap.js";
 import { recordExit, tailKeeper } from "../server/exit-record.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,7 +17,6 @@ const shell = { ...process.env };
 // in dev LAN mode is another device, not this computer.
 process.env.HEISS_DEV_PROXY_TOKEN = crypto.randomBytes(32).toString("base64url");
 
-// Read .env fresh each time: the LAN switch writes to it between restarts.
 function viteHost() {
   const file = readEnvFile(root);
   const fileKeys = new Set([...file.keys].filter((key) => !(key in shell)));
@@ -29,7 +25,6 @@ function viteHost() {
 }
 
 let vite = null;
-let viteOn = "";
 let server = null;
 let stopping = false;
 // The last lines each child printed to stderr, so a stop nobody asked for says why (exit-record.js).
@@ -41,13 +36,11 @@ function teeStderr(child, tail) {
 const exitWords = (code, signal) => signal ? `was ended (${signal})` : `exited with code ${code}`;
 
 function startVite(host) {
-  viteOn = host;
   const child = spawn(process.execPath, [path.join(root, "node_modules", "vite", "bin", "vite.js"), "--host", host, "--port", "5173"], { cwd: root, stdio: ["ignore", "inherit", "pipe"] });
   teeStderr(child, viteTail);
   vite = child;
   child.on("exit", (code, signal) => {
-    // Swapped out on purpose, or the whole thing is stopping.
-    if (stopping || vite !== child) return;
+    if (stopping) return;
     // The page server stopping takes the studio with it: say so before stopping the rest.
     recordExit({ who: "vite", code, signal, reason: `The page server (Vite) ${exitWords(code, signal)}, so HEISS UI stopped with it`, detail: viteTail.text() });
     console.error(`\n  HEISS UI stopped: the page server (Vite) ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
@@ -55,28 +48,16 @@ function startVite(host) {
   });
 }
 
-function stopVite() {
-  if (!vite) return Promise.resolve();
-  const child = vite;
-  vite = null;
-  return new Promise((resolve) => {
-    child.once("exit", resolve);
-    child.kill("SIGTERM");
-  });
-}
-
 function runServer() {
   return new Promise((resolve) => {
-    // Neither child reads the console: one reading it while the other is swapped out is how a
-    // stray console event ended the server mid-restart on Windows.
-    server = fork(path.join(root, "server", "index.js"), args, { cwd: root, stdio: ["ignore", "inherit", "pipe", "ipc"] });
+    // Neither child reads the console, so a console event reaches this launcher only.
+    server = spawn(process.execPath, [path.join(root, "server", "index.js"), ...args], { cwd: root, stdio: ["ignore", "inherit", "pipe"] });
     teeStderr(server, serverTail);
     server.on("error", () => resolve(1));
     server.on("exit", (code, signal) => {
       server = null;
       // The server writes its own crash down; this catches what it couldn't (killed from outside).
-      // A console stop is decided below, once it is clear whether this launcher was stopped too.
-      if (!stopping && code !== 0 && code !== RESTART_CODE && code !== CONSOLE_STOP_CODE) {
+      if (!stopping && code !== 0) {
         recordExit({ who: "server", code, signal, reason: `The server ${exitWords(code, signal)}`, detail: serverTail.text() });
         console.error(`\n  HEISS UI stopped: the server ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
       }
@@ -100,25 +81,5 @@ for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM", "SIGHU
   });
 }
 
-const strayConsoleStop = consoleStopTracker({ isStopping: () => stopping });
-
-for (;;) {
-  const host = viteHost();
-  if (host !== viteOn) {
-    await stopVite();
-    startVite(host);
-  }
-  const code = await runServer();
-  if (code === RESTART_CODE && !stopping) continue;
-  if (code === CONSOLE_STOP_CODE && !stopping) {
-    if (await strayConsoleStop()) {
-      console.error("\n  The server was ended by a console event nobody sent to HEISS UI. Starting it again.\n");
-      continue;
-    }
-    if (!stopping) {
-      recordExit({ who: "server", code, reason: "The server kept being ended by console events (Ctrl+C or a closed window) that HEISS UI didn't get itself", detail: serverTail.text() });
-      console.error("\n  HEISS UI stopped: console events kept ending the server. The reason is in data/logs/last-exit.json.\n");
-    }
-  }
-  shutdown(code ?? 0);
-}
+startVite(viteHost());
+shutdown((await runServer()) ?? 0);

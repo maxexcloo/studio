@@ -5,13 +5,11 @@
 .git
 .github
 .mise.toml
-.update
 .updatecli.d
 data
 dist
 node_modules
 outputs
 playwright-report
-release
 test-results
 tests/browser

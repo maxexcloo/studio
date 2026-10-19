@@ -4,7 +4,7 @@ import { createJobRecovery } from "./job-recovery.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
 import { addProbe, logDir, logWarning } from "./crash-log.js";
-import { noteAlive, startSession } from "./exit-record.js";
+import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
 import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
@@ -23,8 +23,6 @@ import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { printBanner } from './banner.js';
-import { releaseStatus, requestRestart, saveUpdatePrefs, startReleaseUpdate, warmReleaseCheck } from './updater.js';
-import { PORT_IN_USE_CODE, removeForeignLaunchers } from './release-swap.js';
 import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
@@ -77,7 +75,6 @@ import { cancelModelInstall, downloadPlan, installState, managerAvailable, manag
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
 import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
-import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
 import { isMediaUrl, mediaStorageEnabled, mediaType } from './media-paths.js';
 import { gatedPath } from './gated-path.js';
@@ -140,22 +137,6 @@ app.use((error, _req, res, next) => {
 // Gallery pages and model lists travel compressed to phones and tablets; this computer skips the work.
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 const execFileAsync = promisify(execFile);
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-
-/**
- * How to run npm with execFile. On Windows npm is a .cmd, which Node refuses to
- * run without a shell since the CVE-2024-27980 fix (EINVAL), so run npm's own
- * JavaScript entry with this Node instead: the one npm started us with, else the
- * one installed next to node.exe. A shell is the last resort.
- */
-function npmInvocation(args) {
-  if (process.platform !== "win32") return { command: npmCommand, args, shell: false };
-  const candidates = [process.env.npm_execpath, path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js")];
-  const script = candidates.find((file) => file && /\.[cm]?js$/i.test(file) && fs.existsSync(file));
-  if (script) return { command: process.execPath, args: [script, ...args], shell: false };
-  const quote = (arg) => (/^[\w.:=@/\\-]+$/.test(arg) ? arg : `"${arg.replace(/"/g, '""')}"`);
-  return { command: npmCommand, args: args.map(quote), shell: true };
-}
 let comfyCache = { info: null, stats: null, fetchedAt: 0 };
 let videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
 
@@ -270,36 +251,6 @@ registerMultiUserAuthRoutes(app, {
   }
 });
 
-async function runRepoCommand(command, args) {
-  const npm = command === npmCommand ? npmInvocation(args) : { command, args, shell: false };
-  const { stdout = "", stderr = "" } = await execFileAsync(npm.command, npm.args, {
-    cwd: root,
-    shell: npm.shell,
-    timeout: 600000,
-    maxBuffer: 1024 * 1024
-  });
-  return `${stdout}${stderr}`.trim();
-}
-
-async function updateStatus({ fresh = false, auto = false } = {}) {
-  if (!fs.existsSync(path.join(root, ".git"))) {
-    if (fs.existsSync(path.join(root, "release.json"))) return releaseStatus(root, { fresh, auto, dataDir });
-    return { ok: false, available: false, current: "", latest: "", branch: "", error: "This copy isn’t a Git checkout." };
-  }
-  // A checkout updates by hand with git: the automatic check leaves it alone.
-  if (auto) return { ok: true, available: false, release: false };
-  // git's own output (spawn ENOENT, "Could not resolve host") becomes plain words.
-  const git = (args, step = "fetch") => runRepoCommand("git", args).catch((error) => { throw new Error(describeGitError(error, step)); });
-  const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-  const current = (await git(["rev-parse", "--short", "HEAD"])).trim();
-  await git(["fetch", "--quiet", "origin"]);
-  const upstreamRef = branch && branch !== "HEAD" ? `origin/${branch}` : "origin/main";
-  const latest = (await git(["rev-parse", "--short", upstreamRef])).trim();
-  const behindText = await git(["rev-list", "--count", `${current}..${upstreamRef}`]);
-  const behind = Number(behindText.trim() || 0);
-  return { ok: true, available: behind > 0, current, latest, branch, behind };
-}
-
 function openFolder(folder) {
   if (process.platform === "win32") return execFile("explorer.exe", [folder]);
   if (process.platform === "darwin") return execFile("open", [folder]);
@@ -319,7 +270,7 @@ app.get("/api/network", (req, res) => {
   res.json({
     addresses: interfaces.map((item) => item.address), interfaces, port, listening: lanListening,
     // saved: what the next start does. source: who decides it now (flag and shell outrank the switch).
-    lan: { saved: lan.saved, source: lan.source, supervised: typeof process.send === "function", hiddenReady: isPrivacyEnabled() },
+    lan: { saved: lan.saved, source: lan.source, hiddenReady: isPrivacyEnabled() },
     // HTTPS for other devices (tls.js). `next`: what .env says now, used from the next start.
     tls: networkTls(clientOf(req).thisComputer)
   });
@@ -487,7 +438,7 @@ app.get("/api/diagnostics", async (_req, res) => {
   const since = await commitsSinceRelease();
   const install = fs.existsSync(path.join(root, ".git"))
     ? `Git checkout${since?.commits ? `, ${since.tag} + ${since.commits}` : ""}`
-    : fs.existsSync(path.join(root, "release.json")) ? "release" : "";
+    : "";
   // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
   let comfyBusy = false;
   const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then((response) => (response.ok ? response.json() : null), (error) => { comfyBusy = isComfyTimeout(error); return null; });
@@ -1761,71 +1712,6 @@ app.post("/api/open-output-folder", (req, res) => {
   res.json({ ok: true, outputDir: comfyOutputDir });
 });
 
-app.get("/api/update/status", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const auto = req.query.auto === "1";
-  try {
-    res.json(await updateStatus({ fresh: req.query.fresh === "1", auto }));
-  } catch (error) {
-    // The automatic check never reports a failure: offline is a choice, not news.
-    if (auto) res.json({ ok: false, available: false, quiet: true });
-    else res.status(500).json({ ok: false, available: false, error: error.message });
-  }
-});
-
-app.post("/api/update/prefs", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    res.json({ ok: true, prefs: saveUpdatePrefs(dataDir, req.body || {}) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/update/install", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const before = await updateStatus();
-    if (!before.ok) {
-      res.status(400).json(before);
-      return;
-    }
-    if (!before.available) {
-      res.json({ ...before, updated: false, message: "Already up to date." });
-      return;
-    }
-    if (before.release) {
-      // A release copy has no git to pull: download the new release, swap it in on restart.
-      if (!before.canInstall && before.download?.status !== "ready") {
-        res.json({ ...before, updated: false, message: before.unsigned
-          ? `HEISS UI ${before.latest} isn’t signed with the release key, so it wasn’t installed. To install it anyway, download it from ${before.url} and replace this folder, keeping the data folder.`
-          : `HEISS UI ${before.latest} is available. Download it from ${before.url} and replace this folder, keeping the data folder.` });
-        return;
-      }
-      if (before.download?.status === "ready") { res.json({ ...before, updated: false }); return; }
-      res.json({ ...before, updated: false, download: await startReleaseUpdate(root) });
-      return;
-    }
-    const branch = before.branch && before.branch !== "HEAD" ? before.branch : "main";
-    // Refuses local changes, and goes back to this commit if the new one will not install or build.
-    const { pull, install, build } = await updateCheckout({ run: runRepoCommand, npm: npmCommand, branch, log: (message) => console.warn(`[HEISS] ${message}`) });
-    const after = await updateStatus();
-    res.json({ ...after, updated: true, restartRequired: true, logs: { pull, install, build } });
-  } catch (error) {
-    res.status(500).json({ ok: false, updated: false, error: error.message, ...(error.rolledBack ? { rolledBack: true } : {}), ...(error.localChanges ? { localChanges: error.localChanges } : {}) });
-  }
-});
-
-// Only a release started through scripts/start.mjs can restart itself (and swap in an update).
-app.post("/api/update/restart", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  if (!requestRestart()) {
-    res.status(409).json({ ok: false, error: "This copy wasn’t started with its launcher, so it can’t restart from here. Stop it and start it again." });
-    return;
-  }
-  res.json({ ok: true });
-});
-
 app.post("/api/shutdown", (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json({ ok: true });
@@ -2001,8 +1887,6 @@ setTimeout(() => recoverGalleryFromHistory().catch(() => null)
   // Videos imported before their size was read get it now.
   .then(() => fillVideoSizes()).catch(() => null), 1200);
 scheduleTrashPurge();
-warmReleaseCheck(root, dataDir);
-try { removeForeignLaunchers(root); } catch { /* a launcher in use or read-only: harmless */ }
 
 // Under `npm run dev*` the page comes from Vite, which forwards to this exact port, so it stays put there.
 const dev = /^dev/.test(process.env.npm_lifecycle_event || "");
@@ -2019,11 +1903,8 @@ startServers(app, {
       ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT in .env.\n`
       : `\n  Ports ${port} to ${port + 9} are all in use. Set another PORT in .env.\n`;
     console.error(message);
-    // A distinct code, so scripts/start.mjs does not blame (and roll back) a fresh update for it.
-    const exit = () => process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
-    // The launcher opens the copy that is already running instead.
-    if (error.heissRunning && process.send) process.send({ type: "already-running", url: `http://${runningHost}:${error.port}` }, exit);
-    else exit();
+    // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
+    process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
   },
   onListening({ plan, port: listening, moved }) {
     beginSession();
@@ -2052,7 +1933,7 @@ startServers(app, {
       const found = answering || demoMode ? "" : await findComfy({ current: comfyUrl });
       if (!(found && adoptFoundComfy(found)) && !answering && !demoMode) console.log(`    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`);
     }).catch(() => {});
-    // Tells scripts/start.mjs this version runs, so a fresh update is kept, and where to open it.
+    // Tells a parent process (the server tests) where this one listens.
     process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
   }
 });

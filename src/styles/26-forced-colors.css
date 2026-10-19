@@ -14,16 +14,14 @@
   .switch:disabled { border-color: GrayText; }
   .switch:disabled .switch-thumb { background: GrayText; }
 
-  /* Pill and mosaic buttons are borderless fills; outline them instead. */
+  /* Pill buttons are borderless fills; outline them instead. */
   .btn,
-  .mosaic-button,
   .lora-pill,
   .segmented button,
   .wf-filters button,
   .number-picker { outline: 1px solid ButtonText; outline-offset: -1px; }
   .segmented button.active,
   .wf-filters button.active { outline: 2px solid Highlight; outline-offset: -2px; }
-  .mosaic-button canvas { display: none; }
 
   /* Focus rings are box-shadows (var(--focus-ring)), which forced colors remove. */
   :focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px !important; }

@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { recordExit } from "./exit-record.js";
-import { PORT_IN_USE_CODE } from "./release-swap.js";
-
-/** The launchers' "restart me" exit code (release-swap.js RESTART_CODE), a stop that was meant. */
-const RESTART_EXIT = 75;
+import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
 
 /**
  * What HEISS UI writes down when something goes wrong, so "the server is down"
@@ -104,8 +100,8 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
     write(code ? "error" : "info", "HEISS UI exited", { code, ...readings() });
     // Started while a copy already ran: that one's run, not this, so its record stays its own.
     if (code === PORT_IN_USE_CODE) return;
-    const meant = code === 0 || code === RESTART_EXIT;
-    recordExit({ who: "server", clean: meant, code, reason: code === RESTART_EXIT ? "Restarted" : meant ? "Stopped" : `The server stopped with exit code ${code}` });
+    const meant = code === 0;
+    recordExit({ who: "server", clean: meant, code, reason: meant ? "Stopped" : `The server stopped with exit code ${code}` });
   });
   // Only noted: gallery-store.js owns stopping (it saves the gallery first,
   // then raises the signal again for Node's default exit). Once, like that

@@ -12,9 +12,8 @@ import { cn } from './format';
 import { BetaTag, NumberPicker, Skeleton, StudioSelect, Tip } from './components';
 import { Modal } from './Modal';
 import { HeatMark } from './HeatMark';
-import { MosaicButton } from './MosaicButton';
 import { apiFetch, apiJson } from './api';
-import type { ModelFile, Models, Profile, OutputFolderReport, UpdateStatus, UpscaleInstall, UpscaleStatus } from './types';
+import type { ModelFile, Models, Profile, OutputFolderReport, UpscaleInstall, UpscaleStatus } from './types';
 import type { ModelFolders } from './useModelFolders';
 import { formatBytes, upscaleEfforts, upscaleQualityLabel } from './useUpscale';
 import { HiddenSettings } from './HiddenSettings';
@@ -174,16 +173,10 @@ function RestartButton({ what, busy, done, disabled, onClick }: { what: string; 
   );
 }
 
-/**
- * Restarting ComfyUI (new nodes and files, freed memory) and HEISS UI itself,
- * as two ordinary rows like the rest of General.
- */
-function RestartGroup({ confirmAction, onComfyBack, restartHeiss, heissRestarting, updateStatus }: {
+/** Restarting ComfyUI (new nodes and files, freed memory), as an ordinary row like the rest of General. */
+function RestartGroup({ confirmAction, onComfyBack }: {
   confirmAction: ConfirmAction;
   onComfyBack: () => void;
-  restartHeiss: () => Promise<boolean>;
-  heissRestarting: boolean;
-  updateStatus: UpdateStatus | null;
 }) {
   const comfy = useComfyRestart({
     onBack: onComfyBack,
@@ -195,24 +188,10 @@ function RestartGroup({ confirmAction, onComfyBack, restartHeiss, heissRestartin
     : comfy.phase === 'error' ? comfy.error
     : 'Loads new custom nodes and files, and frees memory.';
 
-  // A release copy knows whether its launcher can bring it back; a checkout finds out on the first try.
-  const [heissFailed, setHeissFailed] = React.useState(false);
-  const unsupervised = Boolean(updateStatus?.release && updateStatus.supervised === false) || heissFailed;
-  const restartApp = async () => {
-    if (!await confirmAction({ title: 'Restart HEISS UI?', description: 'Running generations stop and this page reloads.', action: 'Restart HEISS UI', destructive: true })) return;
-    if (!await restartHeiss()) setHeissFailed(true);
-  };
-  const heissLine = heissRestarting ? 'This page reloads when it’s done.'
-    : unsupervised ? 'Started without its launcher, so it can’t restart from here. Quit it and start it again.'
-    : 'Reloads the studio. Running generations stop.';
-
   return (
     <Group title="Restart" note={comfy.off && comfy.info ? <ComfyManagerNote info={comfy.info} refresh={comfy.refresh} /> : undefined}>
       <Row label="ComfyUI" description={comfyLine}>
         <RestartButton what="ComfyUI" busy={comfy.busy} done={comfyBack} disabled={comfy.off || comfy.info === null} onClick={comfy.restart} />
-      </Row>
-      <Row label="HEISS UI" description={heissLine}>
-        <RestartButton what="HEISS UI" busy={heissRestarting} disabled={unsupervised} onClick={restartApp} />
       </Row>
     </Group>
   );
@@ -309,106 +288,6 @@ function InpaintSuggestions({ onGetModels }: { onGetModels?: () => void }) {
         {onGetModels ? <button className="btn is-primary" onClick={onGetModels}><Download size={14} /> Get a model</button> : null}
       </div>
     </Row>
-  );
-}
-
-/* ------------------------------------------------------------ Updates */
-
-/**
- * A release copy: download the new release, then restart into it. Each stage
- * says what happens next, and a rolled-back update says so plainly.
- */
-function ReleaseUpdateRow({ status, busy, restarting, checking, onCheck, onInstall, onRestart }: {
-  status: UpdateStatus;
-  busy: boolean;
-  restarting: boolean;
-  checking: boolean;
-  onCheck: () => void;
-  onInstall: () => void;
-  onRestart: () => void;
-}) {
-  const download = status.download;
-  const latest = status.latest || download?.version || '';
-  const notes = status.url ? <a className="btn is-ghost" href={status.url} target="_blank" rel="noreferrer"><ExternalLink size={13} /> What's new</a> : null;
-  const check = (
-    <MosaicButton busy={checking} disabled={checking || busy} onClick={onCheck}>
-      {checking ? 'Checking for updates…' : status.ok && !status.available ? 'Up to date · check again' : 'Check for updates'}
-    </MosaicButton>
-  );
-  const result = status.result;
-  const resultRow = result && !result.ok ? (
-    <Row
-      label={<Status tone="bad">{result.rolledBack ? `${result.to} didn’t start` : 'The last update didn’t install'}</Status>}
-      description={result.rolledBack ? `Still on ${result.from}.${result.error ? ` ${result.error}` : ''}` : result.error}
-    />
-  ) : null;
-
-  if (restarting) {
-    return <Row label={<Status tone="warn">{download?.status === 'ready' ? `Restarting into ${latest}` : 'Restarting'}</Status>} description="This page reloads when it’s done." />;
-  }
-  if (download?.status === 'downloading' || download?.status === 'verifying' || download?.status === 'unpacking') {
-    const ratio = download.totalBytes ? Math.min(1, (download.receivedBytes || 0) / download.totalBytes) : 0;
-    return (
-      <Row
-        label={<Status tone="warn">{download.status === 'downloading' ? `Downloading ${latest}` : 'Checking the download'}</Status>}
-        description={download.status === 'downloading' ? `${formatBytes(download.receivedBytes)} of ${formatBytes(download.totalBytes)}. You can keep working.` : 'Checking and unpacking.'}
-        stacked
-      >
-        <div className="set-progress"><div style={{ width: `${Math.round((download.status === 'downloading' ? ratio : 1) * 100)}%` }} /></div>
-      </Row>
-    );
-  }
-  if (download?.status === 'ready') {
-    return (
-      <Row
-        label={<Status tone="ok">{latest} is ready to install</Status>}
-        description={status.supervised ? 'Running generations stop when HEISS UI restarts.' : 'Quit HEISS UI and open it again to finish.'}
-        stacked
-      >
-        <div className="about-update">
-          {status.supervised ? <button className="btn is-primary" onClick={onRestart}>Restart now</button> : null}
-          {notes}
-        </div>
-      </Row>
-    );
-  }
-  if (status.available) {
-    return (
-      <>
-        {resultRow}
-        <Row
-          label={<Status tone="warn">HEISS UI {latest} is available</Status>}
-          description={download?.status === 'error'
-            ? `The download stopped: ${download.error}`
-            : status.canInstall
-              ? `You have ${status.current}.${status.size ? ` ${formatBytes(status.size)}.` : ''} Installs on restart.`
-              : status.unsigned
-                ? `You have ${status.current}. This release can’t be verified, so it won’t install from here. Download it yourself only if you trust the source.`
-                : `You have ${status.current}. Download this release, replace this folder with it and keep your data folder.`}
-          stacked
-        >
-          <div className="about-update">
-            {status.canInstall
-              ? <button className="btn is-primary" onClick={onInstall} disabled={busy}>{download?.status === 'error' ? 'Try again' : 'Install update'}</button>
-              : status.url ? <a className="btn is-primary" href={status.url} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Download</a> : null}
-            {notes}
-            {check}
-          </div>
-        </Row>
-      </>
-    );
-  }
-  return (
-    <>
-      {resultRow}
-      <Row
-        label={<Status tone={status.error ? 'bad' : status.ok ? 'ok' : undefined}>{status.error || (result?.ok && result.to ? `Updated to ${result.to}` : status.ok ? 'Up to date' : 'Not checked yet')}</Status>}
-        description={status.current ? `HEISS UI ${status.current}. Checks GitHub for a newer release.` : 'Checks GitHub for a newer release.'}
-        stacked
-      >
-        <div className="about-update">{check}</div>
-      </Row>
-    </>
   );
 }
 
@@ -625,7 +504,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
     clearFailedItems, clearGallery, clearAllCache, resetAllSettings, confirmAction,
     hidden,
     health, refreshHealth, models, refreshModels, refreshWorkflows, modelFolders,
-    updateStatus, updateBusy, checkForUpdates, installUpdate, restartForUpdate, restartHeiss, restarting, setUpdatePrefs, refreshUpdateStatus, workflows, modelProfiles
+    workflows, modelProfiles
   } = view;
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) || SETTINGS_SECTIONS[0];
 
@@ -667,12 +546,10 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
     }
   };
 
-  // About: stats come from the local gallery; the update check always runs long
-  // enough for the mosaic button to show its burn.
+  // About: stats come from the local gallery.
   // Kept between opens, and fetched as soon as Settings opens, so About draws filled in.
   const [about, setAbout] = React.useState<AboutData | null>(aboutCache);
   const { stats = null, version: appVersion = '', sinceRelease = null } = about || {};
-  const [checking, setChecking] = React.useState(false);
   React.useEffect(() => {
     if (!open) return;
     let live = true;
@@ -688,19 +565,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
       || (modelProfiles || []).find((item: { id: string; displayName?: string; label?: string }) => item.id === stats.topWorkflow)?.displayName
       || stats.topWorkflow.replace(/^custom:/, '')
     : '';
-  // Opened before the automatic check answered: ask now (quietly, from the
-  // server's cache when it has one), so the row doesn't change shape later.
-  React.useEffect(() => {
-    if (open && section === 'about' && !updateStatus) refreshUpdateStatus?.();
-  }, [open, section]); // eslint-disable-line react-hooks/exhaustive-deps
-  const runUpdateCheck = async () => {
-    const started = performance.now();
-    setChecking(true);
-    try { await checkForUpdates(false); } finally {
-      window.setTimeout(() => setChecking(false), Math.max(0, 1600 - (performance.now() - started)));
-    }
-  };
-
 
   const upscaleOn = prefs.smartUpscale !== false;
   const upscaleState = upscaleSummary(upscaleStatus, upscaleInstall);
@@ -720,12 +584,11 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   };
   const comfyRestarting = useComfyRestarting();
   const restartEta = useComfyRestartEta();
-  // Folders, models, updates and wiping the gallery are looked after at the computer itself.
+  // Folders, models and wiping the gallery are looked after at the computer itself.
 
   // Earlier images opens a folder picker on the computer itself; the server takes it from nowhere else.
   const atComputer = useAtComputer();
   const phoneDevice = usePhone();
-  const updateLabel = updateStatus?.error || (updateStatus?.available ? `${updateStatus.behind || 1} update${updateStatus.behind === 1 ? '' : 's'} available` : updateStatus?.ok ? 'Up to date' : 'Not checked yet');
 
   // On phones the section row scrolls sideways; keep the chosen one in view.
   React.useEffect(() => {
@@ -970,12 +833,10 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 </Row>
               )}
             </Group>
-            {thisComputer ? <RestartGroup confirmAction={confirmAction} onComfyBack={() => { refreshModels(false); refreshWorkflows(); }} restartHeiss={restartHeiss} heissRestarting={Boolean(restarting)} updateStatus={updateStatus} /> : null}
+            {thisComputer ? <RestartGroup confirmAction={confirmAction} onComfyBack={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
             <OtherDevicesGroup
               canChange={thisComputer}
               confirmAction={confirmAction}
-              restartHeiss={restartHeiss}
-              restarting={Boolean(restarting)}
               copyToClipboard={copyToClipboard}
               showToast={showToast}
               Group={Group}
@@ -1051,7 +912,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                     ? <span title={`${sinceRelease.commits} commit${sinceRelease.commits === 1 ? '' : 's'} since the ${sinceRelease.tag} release`}>v{appVersion} + {sinceRelease.commits}</span>
                     : <span>v{appVersion}</span>
                 ) : null}
-                {updateStatus?.current ? <span>{updateStatus.branch || 'main'} · {String(updateStatus.current).slice(0, 7)}</span> : null}
                 <span>MIT licensed</span>
               </div>
             </section>
@@ -1074,37 +934,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 ))}
               </div>
             </Group>
-
-            {thisComputer ? <Group title="Updates" note={updateStatus?.restartRequired ? 'Restart HEISS UI to finish updating.' : undefined}>
-              {updateStatus?.release ? (
-                <ReleaseUpdateRow
-                  status={updateStatus}
-                  busy={updateBusy}
-                  restarting={Boolean(restarting)}
-                  checking={checking}
-                  onCheck={runUpdateCheck}
-                  onInstall={installUpdate}
-                  onRestart={restartForUpdate}
-                />
-              ) : (
-                <Row label={<Status tone={updateStatus?.error ? 'bad' : updateStatus?.available ? 'warn' : updateStatus?.ok ? 'ok' : undefined}>{updateLabel}</Status>} description={updateStatus?.available ? 'Downloads the latest code and rebuilds.' : 'Checks GitHub for a newer commit.'} stacked>
-                  <div className="about-update">
-                    <MosaicButton busy={checking} disabled={checking || updateBusy} onClick={runUpdateCheck}>
-                      {checking ? 'Checking for updates…' : updateStatus?.ok && !updateStatus.available ? 'Up to date · check again' : 'Check for updates'}
-                    </MosaicButton>
-                    {updateStatus?.available ? <button className="btn is-primary" onClick={installUpdate} disabled={updateBusy}>{updateBusy ? 'Installing…' : 'Install update'}</button> : null}
-                  </div>
-                </Row>
-              )}
-              {updateStatus?.release && updateStatus.prefs ? (
-                <SwitchRow
-                  label="Check automatically"
-                  description="Checks GitHub for a new version every few hours."
-                  checked={updateStatus.prefs.autoCheck}
-                  onChange={(autoCheck) => setUpdatePrefs({ autoCheck })}
-                />
-              ) : null}
-            </Group> : null}
 
             <section className="feedback-hero">
               <div className="feedback-hero-copy">

@@ -219,20 +219,6 @@ export type PreviousExit = { at: number; who: "server" | "vite" | "launcher" | "
 /** How a ComfyUI restart ended, as the server saw it: how long it took, and which node packs it brought in or failed to load. */
 export type RestartResult = { startedAt: number; endedAt: number; outcome: 'back' | 'failed'; durationMs?: number | null; newPacks?: string[]; failedPacks?: string[] };
 export type ComfyStatus = { connected: boolean; label?: string; busy?: boolean; backends?: Record<string, { connected: boolean; busy?: boolean; device: string; version?: string; url?: string; error?: string }>; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart HEISS asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer HEISS UI tries by itself. */ nearby?: string[] };
-export type UpdateDownload = { status: "downloading" | "verifying" | "unpacking" | "ready" | "error"; version?: string; receivedBytes?: number; totalBytes?: number; error?: string };
-export type UpdateResult = { ok: boolean; rolledBack?: boolean; from?: string; to?: string; error?: string };
-export type UpdateStatus = {
-  ok: boolean; available?: boolean; current?: string; latest?: string; branch?: string; behind?: number; updated?: boolean; restartRequired?: boolean; message?: string; error?: string;
-  /** A copy unpacked from a GitHub release rather than a Git checkout. */
-  release?: boolean; url?: string; size?: number; canInstall?: boolean; supervised?: boolean; download?: UpdateDownload; result?: UpdateResult;
-  /** A release key is configured and this release has no signature, so it can't install itself. */
-  unsigned?: boolean;
-  /** The first headline of the new release's notes, and how many more changes it has. */
-  highlight?: string; more?: number;
-  prefs?: UpdatePrefs;
-};
-/** Kept on the server, so every device shares them. */
-export type UpdatePrefs = { autoCheck: boolean; dismissed: string };
 export type AspectPreset = { label: string; value: string; w: number; h: number };
 export type WorkflowValidation = { ok: boolean; unverified?: boolean; issues: string[]; warnings?: string[]; missingNodes?: string[]; missingFiles?: string[]; missingPacks?: string[]; /** ComfyUI itself is too old for this model. */ outdatedComfy?: boolean; /** An imported workflow's missing files, with downloads where HEISS's catalog has them. */ missingParts?: MissingPart[] };
 export type WorkflowSummary = {

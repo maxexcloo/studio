@@ -15,7 +15,7 @@ type NetworkInfo = {
   listening: boolean;
   port: number;
   interfaces: Array<{ name: string; address: string; likelyVirtual: boolean }>;
-  lan?: { saved: boolean; source: 'flag' | 'shell' | 'setting'; supervised: boolean; hiddenReady: boolean };
+  lan?: { saved: boolean; source: 'flag' | 'shell' | 'setting'; hiddenReady: boolean };
   /** HTTPS as it runs now (server/tls.js), and `next`: what .env says for the next start. */
   tls?: TlsInfo & { next: TlsInfo; fromShell: boolean; problem?: string };
 };
@@ -32,7 +32,7 @@ function day(value: string) {
  * example from `tailscale cert`). Two paths, checked by the server before
  * they are kept; used from the next start.
  */
-function HttpsRows({ tls, supervised, restartHeiss, showToast, onSaved, Row, Status }: { tls: NonNullable<NetworkInfo['tls']>; supervised: boolean; restartHeiss: () => Promise<boolean>; showToast: ShowToast; onSaved: () => void } & Pick<Pieces, 'Row' | 'Status'>) {
+function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<NetworkInfo['tls']>; showToast: ShowToast; onSaved: () => void } & Pick<Pieces, 'Row' | 'Status'>) {
   const atComputer = useAtComputer();
   const [editing, setEditing] = React.useState(false);
   const [cert, setCert] = React.useState(tls.next.certPath || '');
@@ -84,9 +84,7 @@ function HttpsRows({ tls, supervised, restartHeiss, showToast, onSaved, Row, Sta
         ) : null}
       </Row>
       {pending ? (
-        <Row label="Waiting for a restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when HEISS UI restarts.` : 'HTTPS turns off when HEISS UI restarts.'}>
-          {supervised && atComputer ? <button className="btn" onClick={() => { restartHeiss(); }}>Restart now</button> : null}
-        </Row>
+        <Row label="Waiting for a restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when HEISS UI restarts.` : 'HTTPS turns off when HEISS UI restarts.'} />
       ) : null}
     </>
   );
@@ -194,11 +192,9 @@ function AddressRow({ url, detail, open, onToggle, copyToClipboard, Row }: { url
  * signed in. Passwords, the admin switch and signing everyone out only change
  * on the computer itself; the server refuses them from anywhere else.
  */
-export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, restarting, copyToClipboard, showToast, Group, Row, Status, Switch }: {
+export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, showToast, Group, Row, Status, Switch }: {
   canChange: boolean;
   confirmAction: ConfirmAction;
-  restartHeiss: (options?: { lan?: boolean }) => Promise<boolean>;
-  restarting: boolean;
   copyToClipboard: (text: string) => Promise<boolean>;
   showToast: ShowToast;
 } & Pieces) {
@@ -228,21 +224,12 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
   const real = entries.filter((item) => !item.virtual);
   const shownCode = openCode || (real.length === 1 ? real[0].key : '');
 
-  const restartNow = () => { restartHeiss({ lan: lan?.saved }); };
   const toggle = async (next: boolean) => {
     if (!lan) return;
-    if (lan.supervised && !await confirmAction({
-      title: next ? 'Open on other devices?' : 'Close to other devices?',
-      description: next
-        ? 'Running generations stop and this page reloads.'
-        : 'Running generations stop and other devices disconnect.',
-      action: 'Restart HEISS UI'
-    })) return;
     setBusy(true);
     try {
-      const result = await apiJson<{ restartNeeded: boolean }>('/api/network/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
+      await apiJson('/api/network/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
       await load();
-      if (result.restartNeeded && lan.supervised) restartHeiss({ lan: next });
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Couldn’t change the setting', 'error');
     } finally {
@@ -253,7 +240,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
   const setAdmin = async (enabled: boolean) => {
     if (enabled && !await confirmAction({
       title: 'Trust other devices with admin?',
-      description: 'Signed-in devices can then update HEISS UI, install nodes and models, change the output folder and clear the gallery.',
+      description: 'Signed-in devices can then install nodes and models, change the output folder and clear the gallery.',
       action: 'Allow admin'
     })) return;
     try {
@@ -283,10 +270,9 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
   const description = !lan ? undefined
     : lan.source === 'flag' ? 'On because HEISS UI was started with --lan.'
     : lan.source === 'shell' ? 'Set by HOST when HEISS UI was started, so it can’t be changed here.'
-    : restarting ? 'Restarting…'
-    : pending ? (lan.supervised ? `${lan.saved ? 'Turns on' : 'Turns off'} when HEISS UI restarts.` : `${lan.saved ? 'Turns on' : 'Turns off'} the next time you start HEISS UI.`)
+    : pending ? `${lan.saved ? 'Turns on' : 'Turns off'} the next time you start HEISS UI.`
     : on ? 'Phones and other computers on this network can open the studio after signing in.'
-    : 'Lets phones and other computers on this network open the studio. Switching restarts HEISS UI.';
+    : 'Lets phones and other computers on this network open the studio, from the next start.';
   const noPassword = Boolean(access && !access.studioPassword.set && !access.studioPassword.hidden);
   const devices = access?.devices || [];
 
@@ -294,9 +280,8 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
     <>
       <Group title="Other devices" note="Only on a network you trust.">
         {lan ? (
-          <Row label="Open on other devices" description={description} disabled={busy || restarting}>
-            {pending && lan.supervised && !restarting ? <button className="btn" onClick={restartNow}>Restart now</button> : null}
-            <Switch label="Open on other devices" checked={forced ? on : lan.saved} disabled={!canChange || forced || busy || restarting} onChange={toggle} />
+          <Row label="Open on other devices" description={description} disabled={busy}>
+            <Switch label="Open on other devices" checked={forced ? on : lan.saved} disabled={!canChange || forced || busy} onChange={toggle} />
           </Row>
         ) : !network ? <Row label={<Skeleton className="skeleton-text short" />} /> : null}
         {(on || lan?.saved) && noPassword ? (
@@ -322,7 +307,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, restartHeiss, rest
             description={<>{tls.active ? 'On' : tls.configured && (!tls.ok || tls.problem) ? 'Set up, but it can’t start' : tls.configured ? 'Set up' : 'Off'} · uses a certificate you already have, such as one from <code>tailscale cert</code></>}
             defaultOpen={Boolean(tls.configured && (!tls.ok || tls.problem))}
           >
-            <HttpsRows tls={tls} supervised={Boolean(lan?.supervised)} restartHeiss={restartHeiss} showToast={showToast} onSaved={load} Row={Row} Status={Status} />
+            <HttpsRows tls={tls} showToast={showToast} onSaved={load} Row={Row} Status={Status} />
           </SettingsDrawer>
         ) : null}
       </Group>

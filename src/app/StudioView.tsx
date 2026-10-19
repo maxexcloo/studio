@@ -31,7 +31,6 @@ import { UpscaleNoticePopover } from './UpscaleNotice';
 import { useUpscaleDownloadActivity } from './UpscaleDownloadActivity';
 import { FailurePanel } from './GenerationFailure';
 import { useModelDownloadActivity } from './ModelDownloadActivity';
-import { useUpdateActivity } from './UpdateActivity';
 import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
@@ -382,19 +381,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     onOpen: (where) => (where === "starter" ? setGetModelsOpen(true) : setWorkflowGalleryOpen(true))
   });
   const thisComputer = useThisComputer();
-  const updateActivity = useUpdateActivity({
-    status: view.updateStatus,
-    thisComputer,
-    restarting: Boolean(view.restarting),
-    justUpdated: view.justUpdated,
-    running: runningCount,
-    hiddenSpace,
-    settingsOpen: Boolean(settings),
-    onUpdate: () => view.installUpdate({ confirm: false }),
-    onRestart: view.restartForUpdate,
-    onLater: (version) => view.setUpdatePrefs({ dismissed: version }),
-    onDoneUpdated: view.clearJustUpdated
-  });
   // A generation stands in for itself only where its tile can't be seen: the
   // viewer on another image, zen on an older one, the gallery scrolled away.
   const pendingIds = React.useMemo(() => ((visibleGallery || []) as GalleryItem[]).filter((item) => item.status === "pending").map((item) => item.id), [visibleGallery]);
@@ -840,7 +826,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("library"); }}
         showToast={showToast}
       />
-      <ActivityColumn activities={[upscaleActivity, modelActivity, updateActivity, generationActivity]} onHeight={setIslandsHeight} />
+      <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />
       <HiddenSetupDialog hidden={hidden} comfyOnline={Boolean(comfyStatus?.connected)} comfyUrl={health?.comfyUrl} onRecheck={refreshComfyStatus} onDone={() => { if (!hidden.intent || hidden.intent.kind === "enter") hidden.setSpace("hidden"); }} onChooseFolder={() => { resumeHiddenSetup.current = true; hidden.setSetupOpen(false); openSettings("library"); }} />
       <HiddenUnlockSheet hidden={hidden} />
       {active ? (() => {

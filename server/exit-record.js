@@ -11,8 +11,8 @@ import { readEnvFile } from "./lan.js";
  * - The server notes when its run starts and, every minute, that it's alive
  *   (data/logs/session.json).
  * - Whoever sees the stop writes it down (data/logs/last-exit.json): the
- *   server for its own crash or a clean stop, the launcher (scripts/dev.mjs,
- *   scripts/start.mjs) for a child that died, with the last lines it printed.
+ *   server for its own crash or a clean stop, the dev launcher
+ *   (scripts/dev.mjs) for a child that died, with the last lines it printed.
  *   The first word on a run that went wrong is the one kept: a clean stop
  *   afterwards (the launcher stopping the rest) doesn't paper over it.
  * - No word at all after a run started means it was ended from outside: the
@@ -21,6 +21,9 @@ import { readEnvFile } from "./lan.js";
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/** The server's exit code when its port is taken: that start never ran, so it leaves the record alone. */
+export const PORT_IN_USE_CODE = 78;
 
 function dataDir() {
   // The launchers don't load .env (the server does), so its data folder is read from it here.
@@ -46,7 +49,7 @@ function writeSync(file, value) {
 
 /**
  * Writes down a stop. `clean` is a stop someone meant (Ctrl+C, closing the
- * window, Restart, the launcher's stop); anything else is reported next start.
+ * window, the launcher's stop); anything else is reported next start.
  */
 export function recordExit({ who, reason, code = null, signal = null, clean = false, detail = "" }) {
   const session = read(sessionFile());

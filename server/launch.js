@@ -1,47 +1,10 @@
 /**
- * Starting up like an app: find a port, open the browser.
- *
- * - The port: when the one asked for is taken by another program, HEISS UI
- *   takes the next free one (8788, 8789, …) instead of stopping with a note
- *   to edit .env. When it is taken by HEISS UI itself, that copy is already
- *   running: say where, and open it, instead of starting a second one.
- * - The browser: the launcher (scripts/start.mjs) opens the studio once,
- *   the first time the server is ready. Not in dev, not in CI, not over SSH or
- *   on a Linux machine without a display, and never with HEISS_NO_BROWSER=1
- *   (in the shell or .env) or `--no-browser`.
- *
- * No dependencies beyond Node: scripts/start.mjs imports this too.
+ * Finding a port: when the one asked for is taken by another program, HEISS
+ * UI takes the next free one (8788, 8789, …) instead of stopping with a note
+ * to edit .env. When it is taken by HEISS UI itself, that copy is already
+ * running: say where instead of starting a second one.
  */
-import { spawn } from "node:child_process";
 import http from "node:http";
-
-const truthy = (value) => /^(1|true|yes|on)$/i.test(String(value || "").trim());
-
-/** Whether the launcher should open the studio in the default browser. */
-export function shouldOpenBrowser({ env = process.env, argv = process.argv, platform = process.platform } = {}) {
-  if (truthy(env.HEISS_NO_BROWSER) || argv.includes("--no-browser")) return false;
-  if (truthy(env.CI) || env.SSH_CONNECTION || env.SSH_TTY) return false;
-  if (/^dev/.test(env.npm_lifecycle_event || "")) return false;
-  // A Linux server without a desktop has nowhere to show a browser.
-  if (platform === "linux" && !env.DISPLAY && !env.WAYLAND_DISPLAY) return false;
-  return true;
-}
-
-/** Opens `url` in the default browser, detached. Failing quietly is fine: the address is printed too. */
-export function openBrowser(url, { platform = process.platform, run = spawn } = {}) {
-  if (!/^https?:\/\//.test(String(url || ""))) return false;
-  const [command, args] = platform === "darwin" ? ["open", [url]]
-    : platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url]]
-    : ["xdg-open", [url]];
-  try {
-    const child = run(command, args, { detached: true, stdio: "ignore", windowsHide: true });
-    child.on?.("error", () => {});
-    child.unref?.();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Where to ask whether HEISS UI holds a port: the address it listens on when

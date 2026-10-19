@@ -1,6 +1,5 @@
 {
   "repository": "maxexcloo/heiss-ui",
-  "signingOwner": "unverified",
   "upstream": {
     "commit": "a0452538d14a74b23e1422e59a9f24b4781f2406",
     "repository": "tristmeister/HEISS-UI",

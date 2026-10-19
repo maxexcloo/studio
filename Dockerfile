@@ -11,7 +11,6 @@ FROM node:26.11.1-bookworm-slim AS runtime
 
 ENV HEISS_DATA_DIR=/data \
     HEISS_ENV_FILE=/data/.env \
-    HEISS_NO_BROWSER=1 \
     HOST=0.0.0.0 \
     NODE_ENV=production \
     PORT=8787
