@@ -8,7 +8,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, Trash2, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -588,7 +588,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
           <div className="phone-creation-resources">
-            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}><Plus size={16} /><span>LoRAs</span>{view.loraActiveCount ? <b>{view.loraActiveCount}</b> : null}</button></div>
+            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}>{view.loraSummary ? <><Layers size={16} /><span className="lora-pill-summary">{view.loraSummary}</span></> : <><Plus size={16} /><span>LoRAs</span></>}</button></div>
             <button type="button" className="phone-model-browse" aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')}><SlidersHorizontal size={16} /><span>{currentProfile?.recipe?.modelLabel || currentProfile?.displayName || currentProfile?.label || 'Model'}</span></button>
           </div>
           <div className="phone-creation-toolbar phone-creation-submit-row">

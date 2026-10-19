@@ -2,13 +2,12 @@ import { imageDimension } from './generationOptions';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Plus, ChevronUp, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Layers, Plus, ChevronUp, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
 import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
-import { AnimatedNumber } from './AnimatedNumber';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import type { AspectPreset, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
@@ -256,6 +255,8 @@ export type ComposerBarProps = {
   countMeta: Record<string, number>;
   setCount: (value: number) => void;
   loraActiveCount: number;
+  /** The active stack in a few words ("Film Grain +1"), shown on the closed composer. */
+  loraSummary?: string;
   hiddenSpace: boolean;
   lorasOpen?: boolean;
   onOpenLoras?: () => void;
@@ -292,7 +293,7 @@ export function ComposerBar(props: ComposerBarProps) {
     models, model, modelProfiles, showInpaint = true, profileBadges, chooseModel, modelMenu, currentProfile, comfyOffline, comfyRestarting = false, advancedOpen = false, onAdvanced, onBrowseModels, onReset, onFindModels, onGetModels, strayModelCount, mode,
     aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeTiers, sizeArea = 0, megapixelControl = null, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
-    steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount,
+    steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount, loraSummary = "",
     hiddenSpace, lorasOpen = false, onOpenLoras,
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
@@ -357,8 +358,7 @@ export function ComposerBar(props: ComposerBarProps) {
   const loraPill = (density: ControlDensity) => onOpenLoras ? (
     <Tip content={loraActiveCount ? `${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit` : "LoRAs"}>
       <button type="button" className={cn("lora-pill composer-resource-add", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={lorasOpen}>
-        <Plus size={13} /><span>LoRAs</span>
-        {loraActiveCount ? <AnimatedNumber value={loraActiveCount} /> : null}
+        {loraSummary ? <><Layers size={13} /><span className="lora-pill-summary" title={loraSummary}>{loraSummary}</span></> : <><Plus size={13} /><span>LoRAs</span></>}
       </button>
     </Tip>
   ) : null;
