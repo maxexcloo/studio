@@ -21,8 +21,14 @@ const imageProfile = {
   capabilities: { negativePrompt: true, cfg: true, denoise: true, sampler: true, scheduler: true },
   constraints: { cfg: { min: 0, max: 20 }, denoise: { min: 0, max: 1 } },
   defaults: { width: 768, height: 512, count: 8, steps: 8, cfg: 0 },
-  options: { loras: ['fixture-effect.safetensors'], samplers: ['euler'], schedulers: ['simple'] },
+  options: { loras: ['fixture-effect.safetensors', 'fixture-unknown.safetensors', 'fixture-other.safetensors', 'fixture-turbo.safetensors'], samplers: ['euler', 'dpmpp_2m'], schedulers: ['simple'] },
   mediaInputs: [{ id: 'reference', kind: 'image', min: 0, max: 1, required: false }]
+};
+const loraInfo = {
+  'fixture-effect.safetensors': { families: ['flux'], base: 'FLUX.1', triggers: ['glowfx'], title: 'Glow Effect', description: 'Adds a soft neon glow.', sourceUrl: 'https://civitai.example.test/models/1', strengthRange: { min: 0.2, max: 1.2, step: 0.1, default: 0.8 } },
+  'fixture-unknown.safetensors': { families: [], base: '', triggers: [] },
+  'fixture-other.safetensors': { families: ['sdxl'], base: 'SDXL', triggers: ['sdxlonly'] },
+  'fixture-turbo.safetensors': { families: ['flux'], base: 'FLUX.1', triggers: [], role: 'acceleration' }
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
@@ -45,8 +51,10 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
   let base;
   app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
+  app.get('/api/loras/info', (_req, res) => res.json({ ok: true, loras: loraInfo }));
   app.post('/api/generate', (req, res) => {
     if (submitted.length >= failAfter) return res.status(503).json({ error: 'Fixture backend offline' });
+    if (req.body.prompt === 'refuse with reason') return res.status(400).json({ ok: false, error: 'Fixture LoRA supports strength 0.2 to 1.2.' });
     submitted.push(req.body);
     const id = req.body.clientJobId || `fixture-job-${submitted.length}`;
     jobs.set(id, { id, status: completeOnSubmit ? 'done' : 'running', kind: req.body.kind, outputs: completeOnSubmit ? [{ url: '/comfy/view?filename=immediate.png' }] : [], settings: req.body });
@@ -250,9 +258,14 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   const compact = data(await call(client, 'Models', { kind: 'image' }));
   assert.deepEqual(compact.profiles.map(profile => profile.id), [imageProfile.id]);
   assert.equal(compact.profiles[0].options, undefined);
+  assert.equal(compact.profiles[0].loras, undefined);
   const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
-  assert.deepEqual(detail.options.loras, imageProfile.options.loras);
-  assert.deepEqual(detail.constraints, imageProfile.constraints);
+  // Only adjustable controls are advertised; raw capability and constraint tables are not.
+  assert.equal(detail.capabilities, undefined);
+  assert.equal(detail.constraints, undefined);
+  assert.deepEqual(detail.controls.cfg, { min: 0, max: 20, default: 0 });
+  assert.deepEqual(detail.controls.sampler.options, ['euler', 'dpmpp_2m']);
+  assert.equal(detail.controls.scheduler, undefined, 'a single scheduler is fixed');
   assert.equal(detail.defaults.count, 2);
   assert.equal(detail.prompting, null);
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
@@ -605,11 +618,20 @@ test('background Result collects a later completion without another submission',
   const client = await f.client();
   const id = jobId(await generate(client));
   setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
-  const result = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 1800 });
+  const result = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 1500 });
   assert.notEqual(result.isError, true);
   assert.equal(data(result).status, 'done');
   assert.ok(result.content.every(item => item.type === 'text'));
   assert.equal(f.downloads.length, 0);
+  // Self-sufficient: the woken agent renders this markdown without another Result call.
+  const [message] = result.content;
+  assert.match(message.text, /!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n\[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
+  assert.match(message.text, /Do not call Result again/);
+  const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(message.text);
+  const original = await fetch(localLink(f, imageUrl));
+  assert.equal(original.status, 200);
+  assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
+  assert.equal(data(result).ref, 'result 1');
   const preview = await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 0 });
   assert.ok(preview.content.some(item => item.type === 'image'));
   assert.equal(f.submitted.length, 1);
@@ -676,9 +698,14 @@ test('reference-mode capabilities override text controls without losing the prof
   } }]);
   const client = await f.client();
   const details = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
-  assert.equal(details.capabilities.negativePrompt, false);
-  assert.deepEqual(details.options.loras, imageProfile.options.loras);
-  await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
+  assert.equal(details.controls.negative_prompt, undefined);
+  assert.equal(details.controls.denoise, undefined);
+  assert.deepEqual(details.imageModes.reference.controls.negative_prompt, {});
+  assert.ok(details.imageModes.reference.controls.denoise);
+  assert.ok(details.loras.some(lora => lora.name === 'fixture-effect.safetensors'));
+  const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /negative_prompt cannot be adjusted.*Adjustable controls: .*cfg/);
   assert.equal(f.submitted.length, 0);
   const uploaded = data(await call(client, 'Upload', { content_base64: png.toString('base64') }));
   await generate(client, { reference_asset_ids: [uploaded.asset.id], negative_prompt: 'Blur', denoise: 0.6, loras: [{ name: 'fixture-effect.safetensors', strength: 0.7 }] });
@@ -841,4 +868,141 @@ test('MCP advertises native sizing and submits tiled 2K with an explicit referen
   await f.profiles([imageProfile]);
   await failure(client, 'Generate', { profile_id: profile.id, prompts: ['A scene'], reference_asset_ids: [assetId], reference_role: 'reference' });
   assert.equal(f.submitted.length, 2);
+});
+
+test('Generate returns per-conversation refs with signed watch pages that tools accept in place of job IDs', async t => {
+  const f = await fixture(t);
+  const conversation = async (user, id) => {
+    const client = new Client({ name: 'heiss-ref-fixture', version: '1.0.0' }, { capabilities: {} });
+    t.after(() => client.close());
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': user, ...(id ? { 'x-heiss-conversation-id': id } : {}) } } }));
+    return client;
+  };
+  const first = await conversation('alice', 'conversation-a');
+  const queued = await generate(first, { count: 2 });
+  assert.deepEqual(queued.jobs.map(job => job.ref), ['result 1', 'result 2']);
+  for (const job of queued.jobs) assert.match(job.link, /^https:\/\/studio\.example\.test\/mcp\/results\/p2\./);
+  assert.deepEqual((await generate(first)).jobs.map(job => job.ref), ['result 3']);
+  // Another conversation numbers from one again; the same account without a conversation has its own sequence.
+  const second = await conversation('alice', 'conversation-b');
+  assert.deepEqual((await generate(second)).jobs.map(job => job.ref), ['result 1']);
+  assert.equal(data(await call(second, 'Status', { job_id: 'result 1' })).job_id, f.submitted.at(-1).clientJobId);
+  assert.deepEqual((await generate(await conversation('alice'))).jobs.map(job => job.ref), ['result 1']);
+
+  const [, secondJob] = queued.jobs;
+  for (const reference of ['result 2', 'r2', '#2', '2', 'Result #2']) {
+    const status = data(await call(first, 'Status', { job_id: reference }));
+    assert.equal(status.job_id, secondJob.job_id);
+    assert.equal(status.ref, 'result 2');
+  }
+  await failure(first, 'Status', { job_id: 'result 9' });
+  // Bob's conversation with the same identifier cannot reach Alice's numbers.
+  await failure(await conversation('bob', 'conversation-a'), 'Status', { job_id: 'result 1' });
+
+  // The watch page works without the chat: progress first, then the outputs through their own signed links.
+  const page = localLink(f, secondJob.link);
+  const pending = await fetch(page);
+  assert.equal(pending.status, 200);
+  assert.match(pending.headers.get('content-type'), /^text\/html/);
+  assert.match(pending.headers.get('content-security-policy'), /default-src 'none'/);
+  assert.match(await pending.text(), /Still generating/);
+  Object.assign(f.jobs.get(secondJob.job_id), { status: 'done', outputs: [{ url: '/comfy/view?filename=watched.png' }] });
+  const html = await (await fetch(page)).text();
+  const [, output] = /<img src="(v2\.[^"]+)"/.exec(html);
+  assert.match(html, /View Original/);
+  const image = await fetch(new URL(output, page));
+  assert.equal(image.status, 200);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+  // A page link is not an output link, and the reverse: prefixes cannot be swapped.
+  const sealed = new URL(page).pathname.split('/').pop();
+  assert.equal((await fetch(page.replace(sealed, sealed.replace(/^p2\./, 'v2.')))).status, 404);
+  assert.equal((await fetch(page.replace(sealed, output.replace(/^v2\./, 'p2.')))).status, 404);
+  f.jobs.get(secondJob.job_id).gallery = [];
+  assert.equal((await fetch(page)).status, 404, 'hiding the output ends the watch page');
+});
+
+test('the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation', async t => {
+  const f = await fixture(t);
+  const lookups = () => f.requests.filter(request => request.path.startsWith('/jobs/')).length;
+  const settled = async () => {
+    const before = lookups();
+    await new Promise(resolve => setTimeout(resolve, 4500));
+    return lookups() - before;
+  };
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  const controller = new AbortController();
+  const waiting = client.callTool({ name: 'Result', arguments: { job_id: id, delivery: 'notification', wait_seconds: 1500 } }, undefined, { signal: controller.signal, timeout: 60000 });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.ok(lookups() >= 1);
+  controller.abort();
+  await assert.rejects(waiting);
+  assert.equal(await settled(), 0, 'a cancelled wait stops polling');
+
+  const disconnecting = await f.client();
+  const second = disconnecting.callTool({ name: 'Result', arguments: { job_id: id, delivery: 'notification', wait_seconds: 1500 } }, undefined, { timeout: 60000 }).catch(error => error);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  await disconnecting.close();
+  await second;
+  assert.equal(await settled(), 0, 'a disconnect stops polling');
+  assert.equal(f.jobs.get(id).status, 'running');
+  assert.equal(f.requests.some(request => request.path.endsWith('/cancel')), false);
+});
+
+test('Models lists compatible LoRAs with picker metadata and fixed controls are refused by name', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  assert.deepEqual(detail.loras.map(lora => lora.name), ['fixture-effect.safetensors', 'fixture-unknown.safetensors']);
+  assert.deepEqual(detail.loras[0], { name: 'fixture-effect.safetensors', title: 'Glow Effect', description: 'Adds a soft neon glow.', trigger_words: ['glowfx'], strength: { recommended: 0.8, min: 0.2, max: 1.2 }, trained_for: 'FLUX.1', source_url: 'https://civitai.example.test/models/1' });
+  assert.equal(detail.loras[1].compatibility, 'unverified');
+  assert.equal(detail.loras_total, 2);
+  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id, lora_query: 'glowfx' })).profiles[0].loras.map(lora => lora.name), ['fixture-effect.safetensors']);
+
+  await f.profiles([{ ...imageProfile, capabilities: { ...imageProfile.capabilities, negativePrompt: false }, constraints: { ...imageProfile.constraints, steps: { min: 4, max: 4 }, cfg: { min: 1, max: 1 } }, defaults: { ...imageProfile.defaults, steps: 4, cfg: 1 } }]);
+  const fixed = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  for (const key of ['steps', 'cfg', 'negative_prompt']) assert.equal(fixed.controls[key], undefined, key);
+  for (const key of ['steps', 'cfg']) assert.equal(fixed.defaults[key], undefined, key);
+  for (const [field, value, pattern] of [['steps', 20, /steps cannot be adjusted.*fixed at 4.*Adjustable controls: width, height, count, seed/], ['cfg', 3, /cfg cannot be adjusted.*fixed at 1/], ['negative_prompt', 'Blur', /negative_prompt cannot be adjusted.*no negative prompt input/]]) {
+    const result = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], [field]: value });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, pattern);
+  }
+  assert.equal(f.submitted.length, 0);
+  await generate(client, { steps: 4 });
+  assert.equal(f.submitted.length, 1, 'a value equal to the fixed one is accepted');
+  const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['refuse with reason'], count: 1 });
+  assert.match(refused.content[0].text, /HEISS refused the request: Fixture LoRA supports strength 0\.2 to 1\.2\./);
+});
+
+test('negative prompts reach the submission only where they take effect', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const cfgOne = { ...imageProfile, defaults: { ...imageProfile.defaults, cfg: 1 } };
+  await f.profiles([cfgOne]);
+  const advertised = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].controls.negative_prompt;
+  assert.match(advertised.note, /cfg 1/);
+  const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
+  assert.match(refused.content[0].text, /negative_prompt has no effect at cfg 1.*Set cfg above 1/);
+  await generate(client, { negative_prompt: 'Blur', cfg: 4 });
+  assert.deepEqual([f.submitted[0].negative, f.submitted[0].cfg], ['Blur', 4]);
+  // A guidance-distilled profile locked at cfg 1 explains why instead of dropping the negative.
+  await f.profiles([{ ...cfgOne, constraints: { ...imageProfile.constraints, cfg: { min: 1, max: 1 } } }]);
+  const distilled = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
+  assert.match(distilled.content[0].text, /runs at cfg 1 \(guidance-distilled\)/);
+  assert.equal(f.submitted.length, 1);
+});
+
+test('account watch pages read as the signed owner through the loopback credential, not a stored bearer', async t => {
+  const token = 'account-mcp-token-for-watch-page-fixture';
+  const account = { userId: 'stable-account-watch', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null, internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId }) });
+  const client = await f.client('', token);
+  const [queued] = (await generate(client)).jobs;
+  assert.equal(f.requests.find(request => request.path === '/loras/info')?.authorization, `Bearer ${token}`, 'LoRA metadata is read with the account’s own credential');
+  const before = f.requests.length;
+  const response = await fetch(localLink(f, queued.link));
+  assert.equal(response.status, 200);
+  const lookup = f.requests.slice(before).find(request => request.path === `/jobs/${queued.job_id}`);
+  assert.deepEqual([lookup.authorization, lookup.internal, lookup.account], [undefined, 'fixture-internal', account.userId]);
 });

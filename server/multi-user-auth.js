@@ -21,6 +21,7 @@ function cookieToken(req, name = accountCookieName) {
 // Personal MCP tokens reach only the routes MCP itself calls, never account or studio administration.
 const mcpBearerRoutes = [
   ["GET", /^\/api\/models$/],
+  ["GET", /^\/api\/loras\/info$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
