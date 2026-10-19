@@ -1,3 +1,4 @@
+import { ownerIdForRequest } from './account-ownership.js';
 import { dropSnapshots } from "./data-snapshot.js";
 import { comfyOutputDir } from './comfy.js';
 import { clientOf } from './access.js';
@@ -260,7 +261,7 @@ export function registerPrivacyRoutes(app) {
     if (!key) return;
     try {
       const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String);
-      const restored = await unhideItems(key, ids);
+      const restored = await unhideItems(key, ids, ownerIdForRequest(req));
       for (const id of ids) forgetPrivateVideoPreviews(id);
       addGalleryItems(restored);
       res.json({ ok: true, restored: restored.length, revision: galleryRevisionValue() });

@@ -1,3 +1,4 @@
+import { accountOutputSubfolder } from './account-ownership.js';
 import crypto from "node:crypto";
 import { isMediaUrl, mediaFile, mediaParams, mediaPath, mediaRoot, mediaStorageEnabled, mediaType } from './media-paths.js';
 import fs from "node:fs";
@@ -555,15 +556,16 @@ function viewParams(file, base) {
  * ComfyUI is not answering is it written straight into the output folder.
  * `written` is set only for a file this call created on disk.
  */
-async function putBackInOutput(buffer, name, mime) {
+async function putBackInOutput(buffer, name, mime, ownerId = "") {
   const safe = safeOutputName(name);
-  // With HEISS media storage, an unhidden file goes back into HEISS media, not ComfyUI.
+  // With HEISS media storage, an unhidden file goes back into its owner's HEISS media folder, not ComfyUI.
   if (mediaStorageEnabled) {
-    const folder = path.join(mediaRoot, "heiss-ui");
+    const subfolder = ownerId ? accountOutputSubfolder(ownerId) : "heiss-ui";
+    const folder = path.join(mediaRoot, subfolder);
     fs.mkdirSync(folder, { recursive: true });
     const file = uniqueOutputPath(folder, safe);
     fs.writeFileSync(file, buffer);
-    return { params: new URLSearchParams({ filename: path.basename(file), subfolder: "heiss-ui", type: mediaType }), written: file };
+    return { params: new URLSearchParams({ filename: path.basename(file), subfolder, type: mediaType }), written: file };
   }
   let refused = "";
   if (!comfyRecentlyUnreachable()) {
@@ -597,7 +599,7 @@ async function putBackInOutput(buffer, name, mime) {
  * heiss-ui folder, where HEISS UI saves everything, with their prompts and
  * settings intact. Returns the gallery records for the caller to add.
  */
-export async function unhideItems(key, ids) {
+export async function unhideItems(key, ids, ownerId = "") {
   if (!key) throw new Error("Unlock Hidden first.");
   const manifest = readManifest(key);
   const wanted = new Set(ids);
@@ -606,7 +608,7 @@ export async function unhideItems(key, ids) {
   const leaving = manifest.items.filter((item) => wanted.has(item.id));
   try {
     for (const item of leaving) {
-      const original = await putBackInOutput(openAsset(item), item.outputName || `${item.id}${item.type === "video" ? ".mp4" : ".png"}`, item.mime || mimeFor(item.outputName, item.type));
+      const original = await putBackInOutput(openAsset(item), item.outputName || `${item.id}${item.type === "video" ? ".mp4" : ".png"}`, item.mime || mimeFor(item.outputName, item.type), ownerId);
       if (original.written) written.push(original.written);
       const params = original.params;
       const url = `/comfy/view?${params}`;
@@ -614,7 +616,7 @@ export async function unhideItems(key, ids) {
       if (item.upscale?.assetFile) {
         const stem = path.basename(params.get("filename"), path.extname(params.get("filename")));
         const upscaleName = item.upscale.outputName || `${stem}-upscale.png`;
-        const back = await putBackInOutput(openAsset(item.upscale), upscaleName, item.upscale.mime || mimeFor(upscaleName, "image"));
+        const back = await putBackInOutput(openAsset(item.upscale), upscaleName, item.upscale.mime || mimeFor(upscaleName, "image"), ownerId);
         if (back.written) written.push(back.written);
         const { assetFile, assetKey, mime, leftBehind: _left, ...state } = item.upscale;
         upscale = { ...state, status: "done", url: `/comfy/view?${back.params}`, thumbnailUrl: `/comfy/thumb?${back.params}`, outputName: back.params.get("filename") };
@@ -622,6 +624,7 @@ export async function unhideItems(key, ids) {
       const { assetFile, assetKey, mime, hiddenAt, upscale: _, upscaleActive, ...meta } = item;
       restored.push({
         ...meta,
+        ...(ownerId ? { ownerId } : {}),
         id: url,
         url,
         thumbnailUrl: item.type === "video" ? undefined : `/comfy/thumb?${params}`,

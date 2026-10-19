@@ -7,21 +7,31 @@
 //
 // The target is this studio: HEISS_DATA_DIR (and HEISS_MEDIA_DIR). Stop HEISS first.
 import path from "node:path";
-import { applyStudioImport, findAccount, planStudioImport, summarizePlan, undoStudioImport } from "../server/studio-import.js";
+import { fileURLToPath } from "node:url";
+// The studio's own settings first: HEISS_DATA_DIR, HEISS_MEDIA_DIR and PORT may live in its .env (HEISS_ENV_FILE).
+await import("../server/env.js");
+const { applyStudioImport, findAccount, planStudioImport, summarizePlan, undoStudioImport } = await import("../server/studio-import.js");
 
 const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(`--${name}`); return index >= 0 ? args[index + 1] : undefined; };
 const flag = (name) => args.includes(`--${name}`);
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const targetData = path.resolve(option("target-data") || process.env.HEISS_DATA_DIR || path.join(root, "data"));
 const mediaRoot = path.resolve(option("media-dir") || process.env.HEISS_MEDIA_DIR || path.join(targetData, "media"));
 const port = Number(option("port") || process.env.PORT || 8787);
 
+// The server moves up to nine ports on when its own is taken, and may listen beyond loopback.
 async function serverRunning() {
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/ping`, { signal: AbortSignal.timeout(1500) });
-    return response.ok;
-  } catch { return false; }
+  const hosts = [...new Set(["127.0.0.1", process.env.HOST && !["0.0.0.0", "::"].includes(process.env.HOST) ? process.env.HOST : ""].filter(Boolean))];
+  for (const host of hosts) {
+    for (let offset = 0; offset < 10; offset += 1) {
+      try {
+        const response = await fetch(`http://${host.includes(":") ? `[${host}]` : host}:${port + offset}/api/ping`, { signal: AbortSignal.timeout(800) });
+        if (response.ok && (await response.json().catch(() => ({}))).app === "heiss-ui") return port + offset;
+      } catch { /* nothing there */ }
+    }
+  }
+  return 0;
 }
 
 function fail(message) {
@@ -34,7 +44,8 @@ if (flag("help") || !args.length) {
   process.exit(0);
 }
 const writes = flag("apply") || option("undo");
-if (writes && await serverRunning() && !flag("ignore-running")) fail(`HEISS answers on port ${port}. Stop it before importing, so it cannot overwrite the gallery.`);
+const running = writes && !flag("ignore-running") ? await serverRunning() : 0;
+if (running) fail(`HEISS answers on port ${running}. Stop it before importing, so it cannot overwrite the gallery.`);
 
 if (option("undo")) {
   console.log(JSON.stringify(undoStudioImport(targetData, option("undo")), null, 2));

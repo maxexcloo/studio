@@ -41,7 +41,7 @@ import { catalogueFlags, describeFlag, isCatalogueFlag, saveDeploymentSetting, s
 import { civitaiTokenStatus } from './civitai-access.js';
 import { hfTokenStatus } from './hf-access.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
-import { dedupeGallery, filterVisibleGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
+import { dedupeGallery, filterVisibleGallery, flushGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
 import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
 import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
@@ -79,9 +79,9 @@ import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoic
 import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
-import { mediaStorageEnabled, mediaType } from './media-paths.js';
+import { isMediaUrl, mediaStorageEnabled, mediaType } from './media-paths.js';
 import { gatedPath } from './gated-path.js';
-import { ingestRecords, removeComfyFiles } from './media-store.js';
+import { ingestRecords, noteIngested, removeComfyFiles, wasIngested } from './media-store.js';
 import { forgetComfyRun } from './hidden-traces.js';
 import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
@@ -189,14 +189,26 @@ const recoverRunningJobs = createJobRecovery({
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : [])
 });
 
-/** With HEISS media storage, recovered ComfyUI outputs move into HEISS media and leave ComfyUI. */
+/**
+ * With HEISS media storage, recovered ComfyUI outputs move into HEISS media and
+ * leave ComfyUI. ComfyUI's copies go only after the caller has put the records
+ * in the gallery and it is on disk.
+ */
 async function ingestRecoveredRecords(records, promptIds = []) {
   if (!mediaStorageEnabled || !records.length) return records;
   const moved = await ingestRecords(records);
   if (moved.comfyFiles.length) {
-    await removeComfyFiles(moved.comfyFiles);
+    const backend = currentComfyBackend();
     const ids = [...new Set([...promptIds, ...records.map((item) => item.promptId).filter(Boolean)])];
-    if (ids.length) await forgetComfyRun({ promptIds: ids }).catch(() => false);
+    setTimeout(() => withComfyBackend(backend, async () => {
+      await flushGallery();
+      const inGallery = new Set(gallery.map((item) => item.url));
+      // Nothing that did not make it into the gallery loses its ComfyUI copy.
+      if (!moved.records.every((record) => !record.url || inGallery.has(record.url) || !isMediaUrl(record.url))) return;
+      noteIngested(records.map((item) => item.jobId));
+      await removeComfyFiles(moved.comfyFiles);
+      if (ids.length) await forgetComfyRun({ promptIds: ids }).catch(() => false);
+    }).catch(() => null), 0);
   }
   return moved.records;
 }
@@ -214,8 +226,9 @@ async function recoverGalleryFromHistory() {
       const records = recordsFromComfyHistory(history);
       const owned = multiUserEnabled ? records.filter((item) => item.ownerId) : records;
       // Already delivered (and so already in HEISS media): never imported a second time.
-      const delivered = new Set(gallery.filter((item) => item.status === "done").map((item) => `${item.jobId}:${item.index}`));
-      recovered.push(...await ingestRecoveredRecords(mediaStorageEnabled ? owned.filter((item) => !delivered.has(`${item.jobId}:${item.index}`)) : owned));
+      // History records carry no index, so a run counts as delivered by its job.
+      const delivered = new Set(gallery.filter((item) => item.status === "done" && item.jobId).map((item) => item.jobId));
+      recovered.push(...await ingestRecoveredRecords(mediaStorageEnabled ? owned.filter((item) => !delivered.has(item.jobId) && !wasIngested(item.jobId) && !jobs.has(item.jobId)) : owned));
     });
   }
   if (!recovered.length) return;

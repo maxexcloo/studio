@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { comfy, comfyUrl, normalizeComfyError } from "./comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy-queue.js";
-import { gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
+import { flushGallery, gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
@@ -218,6 +218,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         await target.finish(output, plan);
         setTerminalJob(jobId, { status: "done", outputs: target.hidden ? [] : [output] });
         if (comfyCopies.length) {
+          await flushGallery();
           await removeComfyFiles(comfyCopies);
           await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
         }

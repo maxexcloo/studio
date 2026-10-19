@@ -32,8 +32,12 @@ def resolve_target(bases, entry):
     parts = [part for part in subfolder.replace('\\', '/').split('/') if part]
     if any(part.startswith('.') for part in parts) or os.path.isabs(subfolder):
         return None
+    named = os.path.join(base, *parts, filename)
+    # A link is never followed, even to a file inside the folder: only the file itself is named.
+    if os.path.islink(named):
+        return None
     root = os.path.realpath(base)
-    target = os.path.realpath(os.path.join(root, *parts, filename))
+    target = os.path.realpath(named)
     if os.path.commonpath([root, target]) != root or target == root:
         return None
     return target

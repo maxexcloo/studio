@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { comfyFileRef, ingestRunResults, mediaStorageEnabled, removeComfyFiles, temporaryInputFiles } from './media-store.js';
+import { comfyFileRef, ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, temporaryInputFiles } from './media-store.js';
+import { flushGallery } from './gallery-store.js';
 import { withComfyBackend } from './comfy-backends.js';
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
@@ -578,7 +579,10 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         // A Hidden image used as the reference for a normal run: only its staged copy goes.
         if (body.hiddenInputNames?.length) await forgetComfyRun({ inputNames: body.hiddenInputNames });
         // The gallery has HEISS's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
+        // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
         if (mediaStorageEnabled) {
+          await flushGallery();
+          noteIngested([id]);
           await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
           if (comfyCopies.length) await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
         }

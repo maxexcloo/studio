@@ -73,6 +73,10 @@ export function planStudioImport({ sourceData, sourceOutputs, targetData, mediaR
   const plan = { batch, label, account: { id: account.id, username: account.username }, sourceData, sourceOutputs, targetData, mediaRoot, subfolder, copies: [], records: [], references: [], files: [], mcp: { jobs: {}, assets: {} }, skipped: {}, conflicts: [], bytes: 0 };
   const skip = (reason) => { plan.skipped[reason] = (plan.skipped[reason] || 0) + 1; };
 
+  // Only the backup left means the gallery is mid-recovery: never write a gallery of just the import over it.
+  if (!fs.existsSync(path.join(targetData, "gallery.json")) && fs.existsSync(path.join(targetData, "gallery.json.bak"))) {
+    throw new Error("The target gallery.json is missing but its backup exists. Start HEISS once so it recovers the gallery, stop it, then import.");
+  }
   const targetGallery = readJson(path.join(targetData, "gallery.json"), []);
   const targetJobs = new Set(targetGallery.map((item) => item.jobId).filter(Boolean));
   const usedNames = new Set();
@@ -132,6 +136,12 @@ export function planStudioImport({ sourceData, sourceOutputs, targetData, mediaR
     });
   }
 
+  // Imported records name references by their new IDs.
+  for (const record of plan.records) {
+    for (const key of ["startImageId", "referenceImage"]) if (record[key] && assetIds[record[key]]) record[key] = assetIds[record[key]];
+    if (Array.isArray(record.settings?.referenceAssets)) record.settings = { ...record.settings, referenceAssets: record.settings.referenceAssets.map((item) => (item?.assetId && assetIds[item.assetId] ? { ...item, assetId: assetIds[item.assetId] } : item)) };
+  }
+
   // MCP: the old studio's jobs and uploads (owned by gateway users there) all belong to this account now.
   const mcp = readJson(path.join(sourceData, "mcp-ownership.json"), null);
   const importedJobs = new Set(plan.records.map((item) => item.jobId).filter(Boolean));
@@ -170,7 +180,9 @@ export function applyStudioImport(plan) {
   for (const [name, file] of Object.entries(targets)) if (fs.existsSync(file)) fs.copyFileSync(file, path.join(backups, `${name}.json`));
 
   const created = [];
-  const manifest = { batch: plan.batch, label: plan.label, accountId: plan.account.id, created, recordIds: plan.records.map((item) => item.id), referenceIds: plan.references.map((item) => item.record.id), mcp: plan.mcp, backups: Object.keys(targets).filter((name) => fs.existsSync(path.join(backups, `${name}.json`))) };
+  const hashOf = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  const previousMcp = readJson(targets.mcp, null);
+  const manifest = { batch: plan.batch, label: plan.label, accountId: plan.account.id, created, fileHashes: {}, previousMcp: { jobs: Object.fromEntries(Object.keys(plan.mcp.jobs).filter((id) => previousMcp?.jobs?.[id] !== undefined).map((id) => [id, previousMcp.jobs[id]])), assets: Object.fromEntries(Object.keys(plan.mcp.assets).filter((id) => previousMcp?.assets?.[id] !== undefined).map((id) => [id, previousMcp.assets[id]])) }, recordIds: plan.records.map((item) => item.id), referenceIds: plan.references.map((item) => item.record.id), mcp: plan.mcp, backups: Object.keys(targets).filter((name) => fs.existsSync(path.join(backups, `${name}.json`))) };
   const copy = ({ from, to }) => {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to, fs.constants.COPYFILE_EXCL);
@@ -178,7 +190,7 @@ export function applyStudioImport(plan) {
   };
   try {
     for (const item of plan.copies) copy(item);
-    for (const item of plan.files) copy(item);
+    for (const item of plan.files) { copy(item); manifest.fileHashes[item.to] = hashOf(item.to); }
     for (const reference of plan.references) for (const item of reference.copies) copy(item);
 
     writeJson(targets.gallery, [...plan.records, ...readJson(targets.gallery, [])]);
@@ -207,12 +219,26 @@ export function undoStudioImport(targetData, batch) {
   const mcpFile = path.join(targetData, "mcp-ownership.json");
   const mcp = readJson(mcpFile, null);
   if (mcp) {
-    for (const id of Object.keys(manifest.mcp?.jobs || {})) delete mcp.jobs[id];
-    for (const id of Object.keys(manifest.mcp?.assets || {})) delete mcp.assets[id];
+    // Entries the import replaced get their earlier owner back; the rest go.
+    for (const [kind, previous] of [["jobs", manifest.previousMcp?.jobs || {}], ["assets", manifest.previousMcp?.assets || {}]]) {
+      for (const id of Object.keys(manifest.mcp?.[kind] || {})) {
+        if (previous[id] !== undefined) mcp[kind][id] = previous[id];
+        else delete mcp[kind][id];
+      }
+    }
     writeJson(mcpFile, mcp);
   }
   let removed = 0;
-  for (const file of manifest.created || []) { try { fs.unlinkSync(file); removed += 1; } catch { /* already gone */ } }
+  const kept = [];
+  for (const file of manifest.created || []) {
+    // History and LoRA files the account has changed since are its own now: kept, and reported.
+    const expected = manifest.fileHashes?.[file];
+    try {
+      if (expected && crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex") !== expected) { kept.push(file); continue; }
+      fs.unlinkSync(file);
+      removed += 1;
+    } catch { /* already gone */ }
+  }
   fs.renameSync(batchDir, `${batchDir}.undone`);
-  return { batch: manifest.batch, records: recordIds.size, references: referenceIds.size, filesRemoved: removed };
+  return { batch: manifest.batch, records: recordIds.size, references: referenceIds.size, filesRemoved: removed, keptChangedFiles: kept };
 }

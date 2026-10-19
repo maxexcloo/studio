@@ -4,7 +4,33 @@ import path from "node:path";
 import { comfy } from "./comfy.js";
 import { currentComfyBackend } from "./comfy-backends.js";
 import { accountOutputSubfolder } from "./account-ownership.js";
-import { mediaPath, mediaStorageEnabled, mediaType, mediaUrls } from "./media-paths.js";
+import { dataDir, mediaPath, mediaStorageEnabled, mediaType, mediaUrls } from "./media-paths.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
+
+/*
+ * Runs already moved into HEISS media, by job ID. Each stored copy gets a unique
+ * name, so a run left in ComfyUI's history (a failed cleanup) can only be told
+ * apart from a new one by its job; recovery skips these instead of importing twice.
+ */
+const ingestedPath = path.join(dataDir, "media-ingested.json");
+const maxIngested = 20_000;
+let ingested = null;
+function ingestedJobs() {
+  if (ingested) return ingested;
+  try { ingested = new Map(Object.entries(readJsonFile(ingestedPath)?.jobs || {})); } catch { ingested = new Map(); }
+  return ingested;
+}
+export function noteIngested(jobIds) {
+  const jobs = ingestedJobs();
+  let changed = false;
+  for (const id of jobIds) if (id && !jobs.has(id)) { jobs.set(String(id), Date.now()); changed = true; }
+  if (!changed) return;
+  while (jobs.size > maxIngested) jobs.delete(jobs.keys().next().value);
+  try { writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 }); } catch (error) { console.warn(`[HEISS] Could not record ingested runs: ${error.message}`); }
+}
+export function wasIngested(jobId) {
+  return Boolean(jobId && ingestedJobs().has(String(jobId)));
+}
 
 /**
  * ComfyUI as a worker (media-paths.js): a finished output is copied over
@@ -119,7 +145,14 @@ export async function ingestRecords(records) {
 
 /** Asks the HEISS worker node to delete files ComfyUI no longer needs. Never throws. */
 export async function removeComfyFiles(files) {
-  const list = (files || []).filter((file) => file?.filename).slice(0, 256);
+  const all = (files || []).filter((file) => file?.filename);
+  // The worker takes at most 256 names a call.
+  if (all.length > 256) {
+    let deleted = 0;
+    for (let start = 0; start < all.length; start += 256) deleted += (await removeComfyFiles(all.slice(start, start + 256))).deleted;
+    return { deleted, skipped: all.length - deleted };
+  }
+  const list = all;
   if (!list.length) return { deleted: 0, skipped: 0 };
   const backend = currentComfyBackend();
   try {

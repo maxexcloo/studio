@@ -43,6 +43,10 @@ class WorkerFileTests(unittest.TestCase):
             self.assertIsNone(resolve_target(self.bases, entry), entry)
         self.assertEqual(delete_files(self.bases, [{'filename': 'link.png'}])['deleted'], 0)
         self.assertTrue(os.path.exists(self.outside))
+        inside = self.touch(self.bases['output'], 'kept.png')
+        os.symlink(inside, os.path.join(self.bases['output'], 'inner-link.png'))
+        self.assertEqual(delete_files(self.bases, [{'filename': 'inner-link.png'}])['refused'], 1)
+        self.assertTrue(os.path.exists(inside))
 
     def test_tokens_and_limits(self):
         self.assertTrue(token_matches('', None))

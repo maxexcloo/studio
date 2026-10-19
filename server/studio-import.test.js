@@ -81,8 +81,13 @@ test("applying copies into the account, refuses a repeat and undoes exactly what
   assert.ok(repeat.conflicts.some((line) => line.includes("prompt-history.json")));
   assert.throws(() => applyStudioImport(repeat), /Resolve these first/);
 
+  // The account kept using its history after the import: undo leaves that file alone.
+  const history = path.join(target, "accounts", crypto.createHash("sha256").update("acct-x").digest("hex"), "prompt-history.json");
+  fs.appendFileSync(history, "\n");
   const undone = undoStudioImport(target, result.batch);
   assert.equal(undone.records, 2);
+  assert.deepEqual(undone.keptChangedFiles, [history]);
+  assert.ok(fs.existsSync(history));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(target, "gallery.json"), "utf8")).map((item) => item.id), ["existing"]);
   assert.equal(fs.existsSync(path.join(media, accountMediaSubfolder("acct-x"), params.get("filename"))), false);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(target, "mcp-ownership.json"), "utf8")).jobs, {});

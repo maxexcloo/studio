@@ -33,6 +33,7 @@ await new Promise((resolve) => comfy.listen(0, "127.0.0.1", resolve));
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-media-"));
 process.env.HEISS_DATA_DIR = temporary;
 process.env.HEISS_OUTPUT_STORAGE = "heiss";
+process.env.COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
 process.env.HEISS_WORKER_TOKEN = "worker-secret";
 process.env.COMFY_URL = `http://127.0.0.1:${comfy.address().port}`;
 const media = await import("./media-store.js");
@@ -85,4 +86,30 @@ test("recovered history records move into media and keep their titles", async ()
   assert.equal(records[0].id, records[0].url);
   assert.equal(paths.mediaParams(records[0].url).subfolder, accountOutputSubfolder("account-b"));
   assert.equal(comfyFiles.length, 1);
+});
+
+test("clearing a gallery that mixes HEISS media and older ComfyUI outputs trashes and restores both", async () => {
+  const trash = await import("./gallery-trash.js");
+  const { results } = await media.ingestRunResults([{ output: comfyOutput("image_00009_.png") }], "");
+  const mediaItem = { ...results[0].output, id: results[0].output.url, status: "done" };
+  fs.mkdirSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui"), { recursive: true });
+  fs.writeFileSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png"), "old");
+  const oldItem = { ...comfyOutput("old_00001_.png"), id: comfyOutput("old_00001_.png").url, status: "done" };
+  const result = trash.trashGalleryItems([mediaItem, oldItem]);
+  assert.equal(result.moved, 2);
+  assert.equal(result.batch.split(",").length, 2);
+  assert.equal(trash.trashSummary().batches, 2);
+  assert.equal(fs.existsSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")), false);
+  const restored = trash.restoreTrash(result.batch);
+  assert.equal(restored.restored.length, 2);
+  assert.equal(fs.existsSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")), true);
+  assert.ok(localOutputFile(paths.mediaParams(mediaItem.url).filename, "heiss-ui", "media"));
+});
+
+test("ingested runs are remembered across restarts so recovery never imports them twice", async () => {
+  assert.equal(media.wasIngested("job-remembered"), false);
+  media.noteIngested(["job-remembered"]);
+  assert.equal(media.wasIngested("job-remembered"), true);
+  const saved = JSON.parse(fs.readFileSync(path.join(temporary, "media-ingested.json"), "utf8"));
+  assert.ok(saved.jobs["job-remembered"]);
 });
