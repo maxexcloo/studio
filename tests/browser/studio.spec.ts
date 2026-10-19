@@ -714,7 +714,7 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   }
   const bar = page.locator(isMobile ? '.phone-select-bar' : '.gallery-management');
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
-  await expect(page.locator('[data-tile-id="image-2"] .tile-action')).toBeVisible();
+  await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await expect(bar.getByRole('button', { name: isMobile ? 'Hide' : 'Move To Hidden', exact: true })).toBeDisabled();
   await page.locator('[data-tile-id="image-0"] .tile').click();
   await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();

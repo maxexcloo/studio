@@ -239,6 +239,12 @@
   .tile-hover-actions { opacity: 1; transform: translateY(0); }
 }
 .tile-overlay .tile-action { opacity: 1; transform: none; }
+/* A running tile's profile: the Stop chip's look in the opposite corner, inert so hover passes to the tile. */
+.tile-overlay .generate-model {
+  right: auto; left: 8px; max-width: calc(100% - 76px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  pointer-events: none;
+}
 .tile.pending .tile-caption { display: none; }
 .tile.error { opacity: 1; }
 

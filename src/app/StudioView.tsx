@@ -13,7 +13,7 @@ import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { useHorizontalWheel, useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
 import { GenerationMedia, GenerationPreviewMode } from './GenerationPreview';
-import { GenerationProgress } from './GenerationProgress';
+import { GenerationProfiles, GenerationProgress } from './GenerationProgress';
 import { ComposerBar } from './ComposerBar';
 import { ExpandingComposer } from './ExpandingComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
@@ -117,6 +117,8 @@ const SettingsDialog = React.lazy(() => loadSettings().then((module) => ({ defau
 const PresetLibrary = React.lazy(() => import('./PresetLibrary').then((module) => ({ default: module.PresetLibrary })));
 const loadWorkflows = () => import('./WorkflowGallery');
 const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ default: module.WorkflowGallery })));
+// One empty list until models load, so the tiles' profile context holds steady.
+const noProfiles: never[] = [];
 
 function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retrying: boolean; onClick: () => void }) {
   const state = status?.restarting ? "restarting" : status?.checking || retrying ? "checking" : status?.connected ? "connected" : "disconnected";
@@ -674,6 +676,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <FavoriteContext.Provider value={toggleFavorite}>
+    <GenerationProfiles.Provider value={models?.profiles || noProfiles}>
     <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
@@ -1020,6 +1023,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {/* Portaled to <body>: inside the fixed shell it would sit under every dialog's scrim. */}
       <Toaster offset={islandsHeight ? islandsHeight + 8 : 0} />
     </div>
+    </GenerationProfiles.Provider>
     </FavoriteContext.Provider>
     </TileLongPressContext.Provider>
     </HiddenActionsContext.Provider>

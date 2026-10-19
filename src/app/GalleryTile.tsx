@@ -6,7 +6,7 @@ import { cn } from './format';
 import { Tip } from './components';
 import { GenerationMedia } from './GenerationPreview';
 import { ElapsedTime } from './ElapsedTime';
-import { GenerationProgress } from './GenerationProgress';
+import { GenerationModel, GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
 import type { GalleryItem } from './types';
 import { canUpscaleItem, upscaleDisplayUrl, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
@@ -171,7 +171,7 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
       >
         {item.status === "pending" || item.status === "done" ? (
           <GenerationMedia item={item} muted>
-          <GenerationProgress item={item} formatElapsed={formatElapsed} />
+          <GenerationProgress item={item} formatElapsed={formatElapsed} showModel={false} />
           </GenerationMedia>
         ) : item.status === "error" ? <FailureTile item={item} /> : <div className="generating stopped"><span>{titleFromPrompt(item.filename || "Failed")}</span></div>}
         <span className="tile-caption">
@@ -187,6 +187,8 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
         {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
         {upscaleNotice && onDismissUpscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="tile" onDismiss={() => onDismissUpscaleNotice(item.id)} /> : null}
+        {/* Beside Stop, in the overlay, so it holds still while the tile lifts on hover. */}
+        {item.status === "pending" ? <GenerationModel item={item} className="tile-action" /> : null}
         {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
         {item.status !== "pending" ? (
           <>

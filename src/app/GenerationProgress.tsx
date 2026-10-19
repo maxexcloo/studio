@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from './format';
 import { ElapsedTime } from './ElapsedTime';
 import { serverClockOffset } from './api';
-import type { GalleryItem, Progress } from './types';
+import { modelName } from './catalogueNames';
+import type { GalleryItem, Profile, Progress } from './types';
 
 const numberVariants = {
   initial: { opacity: 0, y: 3 },
@@ -78,9 +79,20 @@ export function RunLeft({ progress }: { progress?: Progress | null }) {
   return leftMs === null ? null : <>{formatLeft(leftMs)}</>;
 }
 
+/** The catalogue's profiles, so a running item can name the profile it runs through. */
+export const GenerationProfiles = React.createContext<Profile[]>([]);
+
+/** The run's profile by the name the model picker shows; the saved model file once that profile is gone. */
+export function GenerationModel({ item, className }: { item: GalleryItem; className?: string }) {
+  const profiles = React.useContext(GenerationProfiles);
+  const id = String(item.settings?.profileId || item.model || "");
+  const profile = id ? profiles.find((candidate) => candidate.id === id) : undefined;
+  const name = profile ? modelName(profile).name : String(item.settings?.modelName || item.model || "");
+  return name ? <span className={cn('generate-model', className)} title={name}>{name}</span> : null;
+}
+
 /** The overlay on a running generation: what it is doing, how far, and how long is left (or how long it has been). */
-export function GenerationProgress({ item, formatElapsed }: { item: GalleryItem; formatElapsed: (value: number) => string }) {
-  const model = String(item.settings?.modelName || item.model || "");
+export function GenerationProgress({ item, formatElapsed, showModel = true }: { item: GalleryItem; formatElapsed: (value: number) => string; showModel?: boolean }) {
   const reading = progressReading(item.progress);
   const clock = useRunClock(item.progress);
   // With an estimate the bar follows the whole run, setup and decoding too, instead of steps alone.
@@ -115,7 +127,7 @@ export function GenerationProgress({ item, formatElapsed }: { item: GalleryItem;
         </span>
         <span className="generate-elapsed">{clock.leftMs !== null ? formatLeft(clock.leftMs) : <ElapsedTime startedAt={item.createdAt} format={formatElapsed} />}</span>
       </div>
-      {model ? <span className="generate-model" title={model}>{model}</span> : null}
+      {showModel ? <GenerationModel item={item} /> : null}
       {/* Only steps (or a timed run) fill the bar; a phase's own count would fill and reset it. */}
       <div className={cn('generate-bar', timed ? 'is-timed' : reading.kind !== 'steps' && !upscaling && 'is-indeterminate')}>
         <div className="generate-bar-fill" />

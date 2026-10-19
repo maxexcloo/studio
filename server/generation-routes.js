@@ -145,6 +145,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         prompt,
         negative: String(req.body?.negative || ""),
         model: String(req.body?.model || "flux1-schnell.safetensors"),
+        profileId: String(req.body?.profileId || ""),
         width: Number(req.body?.width || 1024),
         height: Number(req.body?.height || 1024),
         steps: Number(req.body?.steps || 4),
