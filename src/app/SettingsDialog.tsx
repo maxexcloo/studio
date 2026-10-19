@@ -27,6 +27,7 @@ import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnos
 import { boardUrl, openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { AccountSettings } from './AccountSettings';
+import { ModelManifestGroup } from './ModelManifestSettings';
 import { ConnectionsGroup, DefaultsCatalogueGroups, DeploymentSettingsError, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
 import { OtherDevicesGroup } from './OtherDevices';
 import { TrashRow } from './TrashRow';
@@ -1017,6 +1018,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 <button className="btn" onClick={() => { refreshModels(); refreshWorkflows(); }}><RefreshCw size={14} /> Rescan</button>
               </Row>
             </Group>
+            {thisComputer ? <ModelManifestGroup showToast={showToast} /> : null}
             {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints !== false} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
           </>
         ) : null}

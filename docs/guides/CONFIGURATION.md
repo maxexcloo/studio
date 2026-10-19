@@ -20,6 +20,14 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 `HEISS_DEVICE_COOKIE_NAME` optionally gives each studio on the same hostname a distinct device sign-in cookie. The default remains `heiss_device`.
 
+## Model Manifest
+
+`HEISS_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to the deployment and starts with `models/comfyui/` (`HEISS_MODEL_MANIFEST_PREFIX` changes that).
+
+**Settings › Models › Model Manifest** shows which files are verified, present, missing or wrong. It verifies checksums in the background, and restores missing files through HEISS's checksum-verifying downloader. Only Civitai and Hugging Face files that go straight into a model folder are restored; others are listed with the reason, for the deployment's own tooling.
+
+An administrator can import another manifest or export the one in use. The deployment's file stays the disaster-recovery record.
+
 ## HEISS Media Storage (ComfyUI as a Worker)
 
 With media storage, HEISS keeps every finished output in its own folder and treats ComfyUI as a stateless worker:

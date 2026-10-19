@@ -53,3 +53,32 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.locator('.set-row').filter({ hasText: 'Model Downloads' })).toContainText('Routed');
   await expect(dialog.getByRole('heading', { name: 'Civitai' })).toBeVisible();
 });
+
+test('the model manifest reports problems and restores what it can', async ({ page, isMobile }) => {
+  const posts: string[] = [];
+  const items = [
+    { path: 'models/comfyui/loras/good.safetensors', size: 4, status: 'verified' },
+    { path: 'models/comfyui/loras/missing.safetensors', size: 4, status: 'missing', restorable: true },
+    { path: 'models/comfyui/SEEDVR2/model.safetensors', size: 4, status: 'missing', restoreNote: 'HEISS doesn’t download into SEEDVR2' },
+    { path: 'models/comfyui/vae/changed.safetensors', size: 4, status: 'mismatch' }
+  ];
+  await page.route('**/api/models/manifest**', (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'POST') { posts.push(url.pathname); return route.fulfill({ json: { ok: true, queued: ['models/comfyui/loras/missing.safetensors'], skipped: [] } }); }
+    return route.fulfill({ json: { ok: true, source: 'deployment', total: 4, counts: { verified: 1, present: 0, missing: 2, 'wrong-size': 0, mismatch: 1, external: 0 }, restorable: 1, items, verify: { running: false, done: 0, total: 0, current: '', error: '' } } });
+  });
+  await page.goto('/');
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: /Use the full studio/ }).click();
+  }
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const dialog = page.locator('.settings-modal');
+  await dialog.getByRole('button', { name: 'Models', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'Model Manifest' })).toBeVisible();
+  await expect(dialog.locator('.set-row').filter({ hasText: '4 Models' })).toContainText('2 missing');
+  await expect(dialog.locator('.set-row').filter({ hasText: 'SEEDVR2/model.safetensors' })).toContainText('HEISS doesn’t download into SEEDVR2');
+  await expect(dialog.locator('.set-row').filter({ hasText: 'vae/changed.safetensors' })).toContainText('Checksum Mismatch');
+  await dialog.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expect.poll(() => posts).toContain('/api/models/manifest/restore');
+});
