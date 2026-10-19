@@ -11,6 +11,15 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> LibreChat users reach Studio without a manual link
+
+### Added
+- **Chat gateway links by email:** a trusted gateway can forward the user's email in `x-ai-user-email` (in LibreChat, `{{LIBRECHAT_USER_EMAIL}}`, passed on by LiteLLM's `extra_headers`). An unlinked chat user whose email is an enabled, approved account's username, ignoring case, is linked to that account on its first request, recorded like an administrator's link. Unknown emails stay pending, disabled accounts are not linked and no accounts are created.
+
+### Changed
+- **Unlinked chat users see a clear message:** instead of a refused connection, which LibreChat reports as no available MCP tools, an unlinked gateway user gets Studio's tools, and every call returns a short message asking an administrator to link it in Settings › Accounts & MCP. It still cannot generate or read anything.
+- **Local passwords have no minimum length:** any non-empty password is accepted when creating or resetting an account, and Settings no longer asks for 12 characters.
+
 ## [0.24.0] - 2026-10-19
 
 ### Added

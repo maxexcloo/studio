@@ -141,7 +141,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
 
   const setGatewayLink = async (identity: string, accountId: string) => {
     const account = admin?.accounts.find((item) => item.id === accountId);
-    if (!accountId && !await confirmAction({ title: 'Unlink This Chat User?', description: 'Their chat stops reaching Studio until it is linked again. Their outputs stay with the account.', action: 'Unlink', destructive: true })) return;
+    if (!accountId && !await confirmAction({ title: 'Unlink This Chat User?', description: 'Their chat stops reaching Studio until it is linked again, which happens automatically if the gateway forwards an email matching an enabled account. Their outputs stay with the account.', action: 'Unlink', destructive: true })) return;
     if (await run(() => apiJson('/api/accounts/gateway-links', jsonPost('POST', { identity, ...(accountId ? { accountId } : {}) })), 'Could not update the chat user.')) {
       if (account) showToast(`Linked to ${account.displayName}`, 'success');
       await refresh();
@@ -204,7 +204,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !username || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
-    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only after it is linked to an account here.">
+    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, either here or automatically when the gateway forwards an email that is an enabled account's username.">
       {(admin?.gateway?.links || []).map((link) => {
         const account = admin?.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>

@@ -15,6 +15,7 @@ import { mcpTiers, profilesForTier, summaryOf, tierOf } from './mcp-tiers.js';
 const generateWaitSeconds = 30;
 const maxGenerateWaitSeconds = 60;
 const instructions = `Studio makes requested images and videos. For an ordinary request, call Generate directly with kind, tier and prompts; no Models call is needed. Tiers: quality, standard, fast and turbo (Super Fast). Studio picks this account's default ready profile for the tier and applies its defaults; omit tier for the deployment default. While the local video worker is off, video and animation without a profile_id go to a ready cloud video profile (such as Grok), Standard unless one matches the tier; the reply names it, so tell the user. Write one clear natural-language prompt that keeps the user's intent. Call Models only when the user names a model, asks what is available, or needs controls, LoRAs or references: Models(kind, tier) lists matching profiles briefly, and Models(profile_id) returns its prompting guide, defaults, adjustable controls, LoRAs and reference slots. Pass only controls that detail lists; Generate refuses fixed ones. Keep explicit model choices and the saved count and size unless asked otherwise. Generate waits briefly for quick jobs (by default ${generateWaitSeconds} seconds for images, none for videos). If it returns status done, reply with its markdown exactly, plus at most a short caption, and do not call Result. Only if it returns queued: it lists, per job, a job_id, a ref such as "result 3" and a watch link; share each watch link as a markdown link labelled with its ref. A ref works wherever a job_id is asked for. Never poll, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per queued job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification contains the finished markdown: reproduce it exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref, not Models or Generate: the result's own kind runs it again with the same profile and settings and a new seed, prompt optionally revises it, and kind=video animates an image from its first frame; Reuse replies like Generate. Reuse without kind returns a reference asset for Generate. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
+const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('The job_id from Generate, or its ref such as "result 3".') };
@@ -68,15 +69,19 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     if (!accountMode) scope = equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
     else if (equal(token, controlKey)) scope = 'control';
     else if (equal(token, mediaKey)) {
-      // Gateway trust: the shared key vouches for the gateway; only an administrator's link maps its user to an account.
+      // Gateway trust: the shared key vouches for the gateway; only a link (an administrator's, or by matching email) maps its user to an account.
       if (!user) return res.status(403).json({ error: 'The gateway must forward its user identity.' });
-      account = authenticateGatewayIdentity(user);
-      if (!account) {
+      const email = String(req.headers['x-ai-user-email'] || '');
+      if (email.length > 256 || /[\x00-\x1f\x7f]/.test(email)) return res.status(400).json({ error: 'Invalid forwarded user email.' });
+      account = authenticateGatewayIdentity(user, email);
+      if (account) {
+        scope = 'media';
+        media.credentials.set(account.userId, internalCredential(account.userId));
+      } else {
+        // Listed tools that each explain the missing link read better in a chat than a refused connection.
         noteGatewayIdentity(user);
-        return res.status(403).json({ error: 'This chat user is not linked to a Studio account yet. Ask a Studio administrator to link it in Settings › Accounts & MCP.' });
+        scope = 'unlinked';
       }
-      scope = 'media';
-      media.credentials.set(account.userId, internalCredential(account.userId));
     } else {
       account = authenticateAccountToken(token);
       if (account) {
@@ -101,7 +106,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (extra.signal?.aborted) controller.abort(); else extra.signal?.addEventListener('abort', forward, { once: true });
       const key = extra.requestId === undefined ? null : inflightKey(actor, extra.requestId);
       if (key) inflight.set(key, controller);
-      try { return await action(args, controller.signal); } catch (error) {
+      try {
+        if (scope === 'unlinked') throw new Error(unlinkedMessage);
+        return await action(args, controller.signal);
+      } catch (error) {
         return { isError: true, content: [{ type: 'text', text: error?.message || 'Studio could not complete this request.' }] };
       } finally {
         extra.signal?.removeEventListener('abort', forward);
@@ -124,7 +132,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       return mcpJson({ ...submission, profile: summary, ...guide, message: `Submitted. ${note ? `${note} ` : ''}Share each link as [Watch <ref>](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then reply; otherwise reply now. Never poll or resubmit.` });
     };
     const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions });
-    if (scope === 'media') {
+    if (scope === 'media' || scope === 'unlinked') {
       tool(server, 'Models', 'Browse Models', 'Only needed when the user names a model or needs controls, LoRAs or references; ordinary requests call Generate with kind and tier instead. Without profile_id, list ready profiles briefly (id, label, kind, tier, summary), optionally for one tier. With profile_id, return its prompting guide, defaults, adjustable controls (only these can be passed to Generate), compatible LoRAs with descriptions, trigger words, recommended strength and source links, reference slots and native sizes. lora_query narrows a long LoRA list. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional() }, async ({ kind, tier: wanted, profile_id, lora_query }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {

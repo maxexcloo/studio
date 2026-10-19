@@ -238,16 +238,32 @@ export function setAccountDisabled(accountId, disabled) {
 
 /**
  * A trusted gateway (LiteLLM for LibreChat) authenticates with its shared key and
- * forwards its own user ID. Only an administrator's explicit link maps that ID to
- * an account; unlinked IDs are remembered so they can be linked, and get nothing.
+ * forwards its own user ID, and optionally the user's email. A link maps that ID
+ * to an account: an administrator's, or one made here when the forwarded email is
+ * an enabled account's username. Unlinked IDs are remembered so they can be
+ * linked, and get nothing. Accounts are never created this way.
  */
-export function gatewayAccountAccess(identity) {
+export function gatewayAccountAccess(identity, email = "") {
   if (!validGatewayIdentity(identity)) return null;
   const store = readStore();
   const link = store.gatewayLinks.find((item) => item.identity === identity);
-  const account = link && store.accounts.find((item) => item.id === link.accountId && item.disabled !== true);
+  if (!link) return linkGatewayEmail(store, identity, email);
+  const account = store.accounts.find((item) => item.id === link.accountId && item.disabled !== true);
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
+}
+
+// The gateway is trusted and its emails come from the shared identity provider, so a matching username is the same person.
+function linkGatewayEmail(store, identity, email) {
+  if (!validGatewayIdentity(email) || !email.includes("@")) return null;
+  const key = usernameKey(email);
+  const account = store.accounts.find((item) => usernameKey(item.username) === key && item.disabled !== true);
+  const access = account ? effectiveAccountAccess(account, store.profiles) : null;
+  if (!access?.authenticated) return null;
+  store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
+  store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
+  saveStore();
+  return { ...access, credential: "mcp-token" };
 }
 
 export function noteGatewayIdentity(identity) {

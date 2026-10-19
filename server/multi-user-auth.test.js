@@ -172,3 +172,33 @@ test("gateway identities map to accounts only through administrator links, and t
   assert.deepEqual(unlinked.body.gateway.links, []);
   assert.equal(gatewayAccountAccess("librechat-user-1"), null);
 });
+
+test("a forwarded gateway email links its identity to the enabled account with that username, and never creates one", async () => {
+  const { gatewayAccountAccess, noteGatewayIdentity } = await import("./account-store.js");
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], local({ username: "recovery", password: "a secure recovery password" }));
+  const admin = { ...local(), headers: { ...local().headers, cookie: [].concat(signedIn.headers["Set-Cookie"])[0].split(";")[0] } };
+  const create = async (username) => (await call(routes["POST /api/accounts/users"], { ...admin, body: { username, password: "an approved user password", accessProfileId: "artists" } })).body.account;
+  const painter = await create("Painter@Example.test");
+  const retired = await create("retired@example.test");
+  await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: retired.id }, body: { disabled: true } });
+  const accounts = (await call(routes["GET /api/accounts/admin"], admin)).body.accounts.length;
+
+  // Case-insensitive, and recorded like an administrator's link.
+  assert.equal(gatewayAccountAccess("librechat-painter", "painter@EXAMPLE.test").userId, painter.id);
+  assert.equal(gatewayAccountAccess("librechat-painter").userId, painter.id);
+  const gateway = (await call(routes["GET /api/accounts/admin"], admin)).body.gateway;
+  assert.deepEqual(gateway.links.filter((item) => item.identity === "librechat-painter").map((item) => item.accountId), [painter.id]);
+  assert.ok(gateway.links.find((item) => item.identity === "librechat-painter").linkedAt);
+
+  // A disabled account is not linked; an unknown email stays pending and creates nothing.
+  assert.equal(gatewayAccountAccess("librechat-retired", "retired@example.test"), null);
+  assert.equal(gatewayAccountAccess("librechat-stranger", "stranger@example.test"), null);
+  noteGatewayIdentity("librechat-retired");
+  noteGatewayIdentity("librechat-stranger");
+  const after = (await call(routes["GET /api/accounts/admin"], admin)).body;
+  assert.equal(after.accounts.length, accounts);
+  assert.equal(after.gateway.links.some((item) => ["librechat-retired", "librechat-stranger"].includes(item.identity)), false);
+  assert.deepEqual(after.gateway.pending.map((item) => item.identity).filter((identity) => identity !== "librechat-user-1").sort(), ["librechat-retired", "librechat-stranger"]);
+  // An email never overrides an existing link.
+  assert.equal(gatewayAccountAccess("librechat-painter", "stranger@example.test").userId, painter.id);
+});

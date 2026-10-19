@@ -159,18 +159,29 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
 test('account mode trusts the gateway key only for linked forwarded users and keeps the control scope', async t => {
   const linked = { userId: 'stable-account-gateway', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
   const noted = [];
+  const emails = [];
   const f = await fixture(t, {
     accountMode: true,
     environment: adminEnvironment,
-    authenticateGatewayIdentity: user => user === 'librechat-linked' ? linked : null,
+    authenticateGatewayIdentity: (user, email) => { emails.push([user, email]); return user === 'librechat-linked' ? linked : null; },
     noteGatewayIdentity: user => noted.push(user),
     internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId })
   });
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-ai-user-id': user } : {}) });
   assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers(''), body })).status, 403);
-  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers('librechat-unlinked'), body })).status, 403);
+  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: { ...headers('librechat-unlinked'), 'x-ai-user-email': 'unlinked@example.test' }, body })).status, 200);
   assert.deepEqual(noted, ['librechat-unlinked']);
+  assert.deepEqual(emails, [['librechat-unlinked', 'unlinked@example.test']]);
+  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: { ...headers('librechat-unlinked'), 'x-ai-user-email': 'x'.repeat(257) }, body })).status, 400);
+
+  // An unlinked chat user sees the tools, but every call only explains the missing link.
+  const unlinked = await f.client('librechat-unlinked');
+  assert.ok((await unlinked.listTools()).tools.some(tool => tool.name === 'Generate'));
+  const refused = await unlinked.callTool({ name: 'Generate', arguments: { prompts: ['a lighthouse'] } });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /isn’t linked to a Studio account yet\. Ask an administrator to link it in Settings › Accounts & MCP\./);
+  assert.equal(f.requests.length, 0);
 
   const client = await f.client('librechat-linked');
   const id = jobId(await generate(client));
