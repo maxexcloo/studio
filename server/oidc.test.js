@@ -100,6 +100,11 @@ test("verified emails link to matching accounts; other identities wait for appro
   store.assignAccessProfile(pending.id, "artists");
   assert.equal(store.signInWithOidcIdentity({ issuer, subject: "subject-2" }).access.userId, pending.id);
 
+  // A matching email never links an administrator; that identity waits as its own pending account.
+  await store.createLocalAccount({ username: "admin@excloo.com", password: "an administrator password", role: "administrator" });
+  assert.equal(store.signInWithOidcIdentity({ issuer, subject: "attacker", email: "admin@excloo.com", emailVerified: true }).pending, true);
+  assert.equal(store.listAccounts().find((account) => account.username === "admin@excloo.com").signInLinked, undefined);
+
   store.setAccountDisabled(legacy.id, true);
   assert.equal(store.signInWithOidcIdentity({ issuer, subject: "subject-1" }).refused, true);
 });

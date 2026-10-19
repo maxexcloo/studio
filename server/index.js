@@ -80,6 +80,7 @@ import { compressJson, serveApp } from './http-assets.js';
 import { describeGitError, updateCheckout } from './git-update.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
 import { mediaStorageEnabled, mediaType } from './media-paths.js';
+import { gatedPath } from './gated-path.js';
 import { ingestRecords, removeComfyFiles } from './media-store.js';
 import { forgetComfyRun } from './hidden-traces.js';
 import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
@@ -92,6 +93,9 @@ import { accountAccessForId, gatewayAccountAccess, noteGatewayIdentity, verifyAc
 addProbe("thumbs", () => buildStats());
 
 const app = express();
+// Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
+// checks the lowercase prefix, so a capitalised path would reach handlers ungated.
+app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
 async function resolveSignedMcpResult(owner, jobId, index) {
@@ -226,7 +230,7 @@ async function recoverGalleryFromHistory() {
  * signed in with the studio password. /api/access is how they sign in.
  */
 function requireSignedIn(req, res, next) {
-  if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
+  if (!gatedPath(req.path)) return next();
   if (multiUserEnabled) return enforceMultiUserRequest(req, res, next, { accountForRequest });
   const client = clientOf(req);
   if (client.thisComputer) return next();
@@ -234,7 +238,7 @@ function requireSignedIn(req, res, next) {
     res.status(403).json({ ok: false, reason: "lan-off", error: "Only this computer can open the studio. To use it on other devices, turn them on in Settings › Connection." });
     return;
   }
-  if (req.path.startsWith("/api/access/")) return next();
+  if (req.path.toLowerCase().startsWith("/api/access/")) return next();
   if (!deviceSession(req)) {
     res.setHeader("X-HEISS-Sign-In", "1");
     res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with the studio password to continue." });
@@ -532,9 +536,11 @@ const ownerMediaTypes = new Set(["output", mediaType]);
 
 /** Ordinary accounts see whether backends answer, never their addresses or nearby hosts. */
 function withoutBackendAddresses(status) {
-  const { url: _url, nearby: _nearby, found: _found, backends, ...rest } = status || {};
+  // Error text can quote an address too; ordinary accounts get a plain one instead.
+  const plain = (value) => (value && typeof value === "object" && typeof value.error === "string" && /:\/\/|\d+\.\d+\.\d+\.\d+|localhost/i.test(value.error) ? { ...value, error: "Not connected" } : value);
+  const { url: _url, nearby: _nearby, found: _found, backends, ...rest } = plain(status) || {};
   return backends
-    ? { ...rest, backends: Object.fromEntries(Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [name, backend])) }
+    ? { ...rest, backends: Object.fromEntries(Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [name, plain(backend)])) }
     : rest;
 }
 

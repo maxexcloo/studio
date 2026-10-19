@@ -304,7 +304,8 @@ export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerif
   if (!account && emailVerified && email) {
     const key = usernameKey(email);
     const match = store.accounts.find((item) => usernameKey(item.username) === key);
-    if (match && !match.oidc) {
+    // Never an administrator: whoever controls a matching email at the provider would become one.
+    if (match && !match.oidc && match.role !== accountRoles.administrator) {
       match.oidc = { issuer, subject, linkedAt: new Date().toISOString() };
       account = match;
       saveStore();

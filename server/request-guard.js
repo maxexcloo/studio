@@ -1,3 +1,4 @@
+import { gatedPath } from "./gated-path.js";
 import os from "node:os";
 
 /**
@@ -99,13 +100,16 @@ function refuse(res, reason, error) {
  */
 export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) {
   return (req, res, next) => {
-    if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
+    if (!gatedPath(req.path)) return next();
     if (!hostAllowed(req.headers.host, { lan: lan(), extra: extraHosts() })) {
       refuse(res, "host", `HEISS UI doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to HEISS_ALLOWED_HOSTS.`);
       return;
     }
     const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
-    if (site === "cross-site" || site === "same-site") {
+    // The sign-in provider's redirect back is a top-level navigation from its own site.
+    // Its single-use state, bound to a cookie, is what proves it (multi-user-auth.js).
+    const signInReturn = req.method === "GET" && req.path === "/api/accounts/oidc/callback" && String(req.headers["sec-fetch-mode"] || "navigate").toLowerCase() === "navigate";
+    if ((site === "cross-site" || site === "same-site") && !signInReturn) {
       refuse(res, "origin", "Blocked a request from another website.");
       return;
     }

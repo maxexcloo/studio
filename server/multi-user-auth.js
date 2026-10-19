@@ -83,7 +83,7 @@ function publicStatus(req) {
     signedIn: Boolean(account),
     account: account ? { id: account.userId, role: account.role, generationProfiles: account.generationProfiles, features: account.features } : null,
     needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0,
-    ...(accountStoreSnapshot().accounts.length === 0 && process.env.HEISS_SETUP_TOKEN ? { setupTokenAccepted: true } : {}),
+    ...(accountStoreSnapshot().accounts.length === 0 && setupTokenUsable() ? { setupTokenAccepted: true } : {}),
     ...(oidc ? { oidc: { label: oidc.label } } : {})
   };
 }
@@ -95,6 +95,9 @@ function requireAccountAdmin(req, res) {
 }
 
 let oidc = null;
+// Shorter tokens are refused outright, so they are never advertised either.
+const setupTokenUsable = () => String(process.env.HEISS_SETUP_TOKEN || "").length >= 32;
+if (multiUserEnabled && process.env.HEISS_SETUP_TOKEN && !setupTokenUsable()) console.warn("[HEISS] HEISS_SETUP_TOKEN is ignored: use at least 32 characters.");
 
 export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], oidcClient } = {}) {
   oidc = oidcClient !== undefined ? oidcClient : multiUserEnabled && oidcConfigFromEnv() ? createOidcClient(oidcConfigFromEnv()) : null;

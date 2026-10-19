@@ -121,3 +121,12 @@ test("a host-only Docker port counts the host's Docker address as this computer,
   assert.equal(classifyClient({ socket: { remoteAddress: "203.0.113.9" }, headers: {} }, { hostOnly: true }).thisComputer, false);
   assert.equal(classifyClient({ socket: { remoteAddress: "172.18.0.1" }, headers: { "x-forwarded-for": "203.0.113.9" } }, { hostOnly: true }).thisComputer, false);
 });
+
+test("only the sign-in provider's top-level return navigation crosses sites, and capitals change nothing", () => {
+  assert.ok(run(guard, { method: "GET", path: "/api/accounts/oidc/callback", headers: { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate" } }).passed);
+  assert.equal(run(guard, { method: "GET", path: "/api/accounts/oidc/callback", headers: { "sec-fetch-site": "cross-site", "sec-fetch-mode": "cors" } }).passed, false);
+  assert.equal(run(guard, { method: "POST", path: "/api/accounts/oidc/callback", headers: { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate" } }).passed, false);
+  assert.equal(run(guard, { method: "GET", path: "/api/accounts/oidc/start", headers: { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate" } }).passed, false);
+  assert.equal(run(guard, { method: "GET", path: "/API/paths", headers: { host: "evil.example" } }).passed, false);
+  assert.equal(run(guard, { method: "POST", path: "/API/queue/cancel", headers: { "sec-fetch-site": "cross-site", "content-type": "text/plain" } }).passed, false);
+});

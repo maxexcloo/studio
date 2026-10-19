@@ -1,3 +1,4 @@
+import { gatedPath } from "./gated-path.js";
 // Sign-in, plus the liveness and readiness probes a container platform calls without an account.
 const publicAccountPaths = new Set([
   "/api/ping",
@@ -48,7 +49,7 @@ export function ordinaryRouteAllowed(method, routePath) {
 
 /** Account mode requires identity even on loopback; ordinary accounts reach only reviewed routes. */
 export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
-  if (!req.path.startsWith("/api") && !req.path.startsWith("/comfy")) return next();
+  if (!gatedPath(req.path)) return next();
   if (publicAccountPaths.has(req.path)) return next();
   const account = accountForRequest(req);
   if (!account) {

@@ -174,7 +174,7 @@ export class McpMedia {
   token(owner, jobId, index) {
     // Links do not expire; every request rechecks ownership and that the output still exists.
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), iv, { authTagLength: 16 });
     const sealed = Buffer.concat([cipher.update(JSON.stringify({ audience: this.publicUrl, owner, jobId, index })), cipher.final()]);
     return `v2.${iv.toString('base64url')}.${sealed.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}`;
   }
@@ -187,8 +187,11 @@ export class McpMedia {
       const canonical = (part) => Buffer.from(part, 'base64url').toString('base64url') === part;
       if (extra !== undefined || !iv || !sealed || !tag || ![iv, sealed, tag].every(canonical)) throw new Error('Invalid result link.');
       try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), Buffer.from(iv, 'base64url'));
-        decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+        // A full 16-byte tag only: older Node accepts truncated tags, which are easier to forge.
+        const tagBytes = Buffer.from(tag, 'base64url');
+        if (tagBytes.length !== 16) throw new Error('short tag');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), Buffer.from(iv, 'base64url'), { authTagLength: 16 });
+        decipher.setAuthTag(tagBytes);
         claims = JSON.parse(Buffer.concat([decipher.update(Buffer.from(sealed, 'base64url')), decipher.final()]).toString());
       } catch { throw new Error('Invalid result link.'); }
     } else {
