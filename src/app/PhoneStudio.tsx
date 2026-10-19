@@ -8,7 +8,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, UserRound, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -33,6 +33,8 @@ import { PhoneSearchBar } from './GallerySearch';
 import { StackRunsButton } from './StackRunsButton';
 import { canStar, emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
+import { signOutAccount } from './accounts';
+import { hasAccountStorageScope } from './api';
 
 /* ---------------------------------------------------------------------------
    The phone studio
@@ -907,6 +909,7 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
 
 function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void; statusText: string }) {
   const { prefs, setPrefs, hidden, retryComfyStatus, comfyRetrying } = view;
+  const [signingOut, setSigningOut] = React.useState(false);
   const toggle = (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => (
     <button type="button" role="switch" aria-checked={checked} className="phone-row" onClick={() => onChange(!checked)}>
       <span>{label}<small>{description}</small></span>
@@ -947,6 +950,14 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
           <SlidersHorizontal size={20} /><span>Use the full studio<small>All controls, laid out for a larger screen</small></span>
         </button>
       </div>
+      {hasAccountStorageScope() ? <>
+        <h3 className="phone-section">Account</h3>
+        <div className="phone-group">
+          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('accounts'); }}><UserRound size={20} /><span>Accounts & MCP<small>Your MCP token and session</small></span></button>
+          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('general'); }}><Settings size={20} /><span>Settings</span></button>
+          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Could not sign out.', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
+        </div>
+      </> : null}
       <p className="phone-note">Models, folders, downloads and updates are managed on the computer running Studio.</p>
     </Sheet>
   );

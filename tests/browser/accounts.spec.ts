@@ -177,3 +177,28 @@ test('the first administrator is created with an email address', async ({ page }
   await page.getByLabel('Email', { exact: true }).fill('admin@example.com');
   await expect(page.getByRole('button', { name: 'Create Administrator', exact: true })).toBeEnabled();
 });
+
+test('phones reach account settings and sign out from the More sheet', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The More sheet is the phone studio.');
+  let signedIn = true;
+  await page.route('**/api/accounts/**', async (request) => {
+    const url = new URL(request.request().url());
+    if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn, account: signedIn ? { id: 'artist-id', role: 'user', generationProfiles: [], features: {} } : null } });
+    if (url.pathname === '/api/accounts/mcp-token') return request.fulfill({ json: { ok: true, enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
+    if (url.pathname === '/api/accounts/sign-out' && request.request().method() === 'POST') {
+      signedIn = false;
+      return request.fulfill({ json: { ok: true } });
+    }
+    return request.continue();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('button', { name: /^Accounts & MCP/ }).click();
+  await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sign In to Studio', exact: true })).toBeVisible();
+  expect(signedIn).toBe(false);
+});

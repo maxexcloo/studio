@@ -681,7 +681,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
-          view={{ ...view, lorasOpen, openLoras: () => setLorasOpen(open => !open), phoneSearchOpen: searchOpen, setPhoneSearchOpen: setSearchOpen }}
+          view={{ ...view, lorasOpen, openLoras: () => setLorasOpen(open => !open), phoneSearchOpen: searchOpen, setPhoneSearchOpen: setSearchOpen, openSettings }}
           galleryBody={galleryBody}
           canUseNegativePrompt={canUseNegativePrompt}
           comfyOffline={Boolean(comfyOffline)}
