@@ -7,11 +7,11 @@ Every release of HEISS UI, newest first. The format follows
 
 Add notes under **Unreleased** as changes land; `npm run release` turns that
 section into the next version and uses it as the GitHub release notes. Each
-version opens with a `> ` summary line, which the update pill shows.
+version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Reliable selections and fork release safeguards
+> Reliable selections and container-only releases
 
 ### Added
 - **Model manifest:** `HEISS_MODEL_MANIFEST` (or an imported copy) lists every model the deployment expects, with checksums. Settings shows what is verified, missing or wrong, verifies checksums in the background, restores missing Civitai and Hugging Face files through the checksum-verifying downloader, and exports the manifest.
@@ -28,13 +28,15 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Signed MCP result links no longer expire:** they keep working until the output is hidden or deleted. New links are sealed, so they reveal no account or job ID; links issued earlier still open.
 - **Studio import:** `scripts/import-studio.mjs` copies an existing single-user studio into one account. It runs as a dry run by default, backs up changed files, and can be undone; the source studio is never changed.
 - **Multi-user migration:** existing single-user galleries, history and MCP ownership have no account owner and stay hidden in multi-user mode until migrated explicitly. In multi-user mode, a trusted gateway's shared MCP key works only for forwarded user IDs that an administrator has linked to an account, and the AI Control MCP key keeps only its control tools.
-- **Fork release safety:** release/update links use the fork repository, upstream metadata is tracked separately, and publication waits for browser, platform-launcher and container checks before promoting draft assets. Signing ownership remains an explicit publication gate.
 - **Reference selection:** click to select or deselect without closing the picker; selected images remain first across searches and tabs, including at capacity.
 - **Workflows list:** shorter, wider tiles in a wider desktop popup, with the detail panel preserved.
 - **Reference browsing:** scrolling near the end loads another page automatically; the fixed search row blends into the picker with a softer scrolling edge.
 - **Compact negative prompts:** one line expands for editing; profiles that ignore it grey the field without an extra note, preserving the saved text.
 - **Faster studio loading:** settings, workflows and the image editor load when needed.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
+
+### Removed
+- **Container-only delivery:** this fork ships only the verified container image on GHCR. The desktop downloads and launchers, the in-app updater and its Settings › About controls and update pill, restarting HEISS UI from Settings, release signing and the legacy `JAI_*` environment variables are gone; set the `HEISS_*` names instead. A `v*` tag publishes the image under its version and a GitHub release with these notes and the image digest. LAN and HTTPS changes apply on the next start.
 
 ### Fixed
 - **Mangled images from imported workflows:** an imported workflow now uses its model family's size step (for example 32 for Qwen Image 2.1) when its latent node allows a finer one. Off-step sizes such as 1536×2728 were silently cut by ComfyUI and could come out mangled.

@@ -40,7 +40,7 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 
 ## Multi-User Mode
 
-`HEISS_MULTI_USER=1` turns on optional accounts. It is off by default; single-user mode, the launcher and device sign-in behave exactly as before.
+`HEISS_MULTI_USER=1` turns on optional accounts. It is off by default; single-user mode and device sign-in behave as before.
 
 - **Every request needs an account,** including requests from this computer. The first visit on the computer running HEISS UI creates the recovery administrator; after that, administrators add accounts in **Settings › Accounts & MCP**. Where nobody can open HEISS on its own computer (a container platform), set `HEISS_SETUP_TOKEN` to a random value of at least 32 characters: the first-administrator screen then accepts it from any address, until an account exists.
 - **Single sign-on (Pocket ID or another OpenID Connect provider):** set `HEISS_OIDC_ISSUER`, `HEISS_OIDC_CLIENT_ID` and `HEISS_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`). Public PKCE clients need no secret; `HEISS_OIDC_CLIENT_SECRET` supports confidential clients, and `HEISS_OIDC_LABEL` names the button. The provider only proves identity. A verified email that matches an account's username links that account. Any other identity becomes a pending account, which an administrator approves by assigning an access profile. Roles never come from the provider.
@@ -82,7 +82,7 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 `HEISS_DEFAULT_IMAGE_PROFILE` and `HEISS_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
-Also optional: `HEISS_COMFY_SEARCH=0` keeps HEISS on `COMFY_URL` (the **Find ComfyUI on its own** switch under Settings › Connection › Change address; by default, when that doesn't answer, HEISS looks on 8188 and 8000 and switches to whatever ComfyUI answers there), `HEISS_NO_BROWSER=1` keeps the launcher from opening the browser, and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
+Also optional: `HEISS_COMFY_SEARCH=0` keeps HEISS on `COMFY_URL` (the **Find ComfyUI on its own** switch under Settings › Connection › Change address; by default, when that doesn't answer, HEISS looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
 
 Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a token saved in **Settings › Models**) opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy.
 

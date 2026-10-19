@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maxexcloo/heiss-ui/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/heiss-ui?style=for-the-badge&label=download&labelColor=1a1a1a&color=ff7a3d" alt="Download the latest release" /></a>
+  <a href="https://github.com/maxexcloo/heiss-ui/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/heiss-ui?style=for-the-badge&label=release&labelColor=1a1a1a&color=ff7a3d" alt="The latest release" /></a>
   <a href="https://heiss-ui.vercel.app/"><img src="https://img.shields.io/badge/website-heiss--ui-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Website" /></a>
   <a href="https://discord.gg/Hf7ysvDeGa"><img src="https://img.shields.io/badge/discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=1a1a1a" alt="Join the Discord" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-444?style=for-the-badge&labelColor=1a1a1a" alt="MIT license" /></a>
@@ -33,7 +33,9 @@
 
 ---
 
-This is the [maxexcloo/heiss-ui fork](https://github.com/maxexcloo/heiss-ui), based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0), commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions follow an independent numeric Semantic Versioning stream; the upstream base is recorded separately in `server/release-identity.json`. Updates and release links use this fork. Release publication is blocked until fork signing-key ownership and the transition for existing installations have been verified.
+This is the [maxexcloo/heiss-ui fork](https://github.com/maxexcloo/heiss-ui), based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0), commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions follow an independent numeric Semantic Versioning stream; the upstream base is recorded separately in `server/release-identity.json`.
+
+This fork is delivered only as a container image, `ghcr.io/maxexcloo/heiss-ui`. Upstream's desktop downloads, double-click launchers and in-app updater are not part of it; update by deploying a newer image. Upstream model, workflow and studio work is merged in regularly, and fork features (accounts, media storage, MCP, deployment settings) live in separate modules.
 
 HEISS UI sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
 
@@ -64,19 +66,17 @@ LoRA stacks, live previews, video previews, recent prompts and gallery search ar
 
 ## Quick start
 
-**1. Download** the zip for your system from the [latest release](https://github.com/maxexcloo/heiss-ui/releases/latest):
+**1. Have ComfyUI running** somewhere the container can reach, and note its address.
 
-| Windows                                                                                  | macOS (Apple Silicon)                                                                    | Linux                                                                                  |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [`heiss-ui-*-windows-x64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) | [`heiss-ui-*-macos-arm64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) | [`heiss-ui-*-linux-x64.zip`](https://github.com/maxexcloo/heiss-ui/releases/latest) |
+**2. Run the image** with that address and a folder for HEISS UI's data:
 
-The plain `heiss-ui-*.zip` (no system in its name) is for in-app updates; you can skip it.
+```sh
+mkdir -p data
+docker run --env COMFY_URL=http://comfyui.local:8188 --init --publish 127.0.0.1:8787:8787 --rm \
+  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" ghcr.io/maxexcloo/heiss-ui:latest
+```
 
-**2. Unpack it and double-click Start HEISS UI** (`.bat` on Windows, `.command` on macOS, `.desktop` on Linux), or run `npm start` in the folder. Node.js and the packages are inside, so there's nothing else to install, and the studio opens in the browser.
-
-**3. Have ComfyUI running.** ComfyUI on this computer connects automatically, at `http://127.0.0.1:8188` or ComfyUI Desktop's port 8000. On another machine or port, set its address in **Settings › Connection**.
-
-Launcher won't open, or the window closes? [Troubleshooting › Starting HEISS UI](./docs/guides/TROUBLESHOOTING.md#starting-heiss-ui) covers macOS, Windows and Linux. To hand the whole setup to a coding agent (Claude Code, Codex), the [install section](https://heiss-ui.vercel.app/#install) has a prompt to paste.
+**3. Open http://localhost:8787.** Models, samplers and VAEs show up once ComfyUI is connected. [Containers](#containers) covers video backends, storage and image tags.
 
 <details>
 <summary><b>No ComfyUI yet?</b></summary>
@@ -88,16 +88,17 @@ Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and HEI
 <details>
 <summary><b>Install from source</b></summary>
 
-To follow `main` or change the code. This needs **Node.js 20.9+** (22 LTS or newer recommended); the downloads bring their own.
+To run without a container or change the code. This needs **Node.js 20.9+** (22 LTS or newer recommended).
 
 ```bash
 git clone https://github.com/maxexcloo/heiss-ui.git heiss-ui
 cd heiss-ui
 npm install
+npm run build
 npm start
 ```
 
-`npm start` opens **http://localhost:8787** in the browser (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
+`npm start` serves **http://localhost:8787** (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
 
 ComfyUI on another machine or port? Set its address in **Settings › Connection**, or copy `.env.example` to `.env` and set `COMFY_URL`.
 
@@ -118,7 +119,7 @@ Set `COMFY_VIDEO_URL` to a separate ComfyUI HTTP(S) endpoint to route local vide
 
 Open `http://localhost:8787`. `/data` retains settings, galleries, histories and imported workflows. Mount ComfyUI inputs, outputs and model directories separately when a feature needs local file access. The image defaults to UID 1000, exposes port 8787 and includes a health check. It starts the server directly; update the container image to update the application.
 
-CI calls the Container workflow after application and browser checks pass on `main` and `v*` tags. The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities. Packaged launcher checks run alongside it in CI. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance. Prefer an immutable `sha-<full commit>` tag or image digest for deployment.
+CI calls the Container workflow after application and browser checks pass on `main`; the Release workflow does the same for `v*` tags. The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance: `latest` and `sha-<full commit>` from `main`, and `X.Y.Z` and `X.Y` from a release tag, whose GitHub release lists the changelog notes and the image digest. Prefer an immutable `sha-<full commit>` or version tag, or the image digest, for deployment.
 
 For local verification, run `mise run setup`, then `mise run check`. Updatecli previews action, base image and npm dependency updates.
 
@@ -264,7 +265,7 @@ Laptops and desktops get the full studio and phones get the phone layout. Only e
 <details>
 <summary><b>More on setup</b></summary>
 
-Turning on **Open on other devices** restarts HEISS UI. For a single session, start it with `npm start -- --lan` instead. The first time, your system may ask whether Node.js can accept connections; allow it for private networks.
+**Open on other devices** takes effect the next time HEISS UI starts. For a single session, start it with `npm start -- --lan` instead. The container listens on all addresses (`HOST=0.0.0.0`), so publish its port only where other devices should reach it.
 
 </details>
 
@@ -284,9 +285,7 @@ There's no password reset. If the password and every passkey are lost, **Erase H
 
 ## Updating
 
-**Settings › About › Install update** updates a downloaded release in place, and a Git checkout too as long as it has no local changes. A downloaded release also offers new versions in a small pill at the top.
-
-Updating a checkout by hand is in [Troubleshooting](./docs/guides/TROUBLESHOOTING.md#a-git-checkout-wasnt-updated).
+Deploy a newer container image. Pin a version tag or digest, read its release notes, and keep the `/data` volume: the first start of a new version backs up its settings and records in `/data/.backups/` before migrating them.
 
 ## Configuration
 
@@ -301,8 +300,6 @@ COMFY_OUTPUT_DIR=
 ```
 
 Everything else (the output folder, other devices, HTTPS, the Hugging Face token, proxies) is in [CONFIGURATION.md](./docs/guides/CONFIGURATION.md).
-
-A Windows shortcut that starts ComfyUI and HEISS UI together is in [WINDOWS-SHORTCUT.md](./docs/guides/WINDOWS-SHORTCUT.md).
 
 ## Troubleshooting
 
@@ -352,4 +349,4 @@ The upstream application retains its [MIT licence](./LICENSE). The original J-AI
 
 The native MCP modules and importer (`server/mcp*.js`, except independently authored tests) retain the [AGPL-3.0 licence](./server/mcp.LICENSE) of the ported MCP service. Both licence texts are preserved in the source and distributed application.
 
-The downloads include an [FFmpeg](https://ffmpeg.org) build (via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)) for video previews. It's licensed separately under the GPL, with its license and source at those links.
+The container image includes an [FFmpeg](https://ffmpeg.org) build (via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)) for video previews. It's licensed separately under the GPL, with its license and source at those links.

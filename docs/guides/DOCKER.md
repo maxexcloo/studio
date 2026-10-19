@@ -5,13 +5,15 @@ holds the studio alone, talks to a running ComfyUI over the network, and reads
 the images ComfyUI writes through a mount of ComfyUI's output folder. Data and
 the settings you make in the app live on a volume, not in the image.
 
-What a container does differently from a plain install: the server listens on
-`0.0.0.0` so the published port reaches it, it doesn't open a browser
-(`HEISS_NO_BROWSER=1`), its data and saved settings are under `/data`
-(`HEISS_DATA_DIR`, `HEISS_ENV_FILE=/data/.env`), and it looks for ComfyUI at
-`http://host.docker.internal:8188` until you save another address. The image
-ships without `.git`, so the in-app updater can't update it: for a new release,
-pull the source and rebuild.
+What a container does differently from running from source: the server
+listens on `0.0.0.0` so the published port reaches it, its data and saved
+settings are under `/data` (`HEISS_DATA_DIR`, `HEISS_ENV_FILE=/data/.env`), and
+it looks for ComfyUI at `http://host.docker.internal:8188` until you save
+another address.
+
+CI publishes verified images to `ghcr.io/maxexcloo/heiss-ui`: `latest` and
+`sha-<full commit>` from `main`, and `X.Y.Z` and `X.Y` from each release. Use
+one of those in place of a local build where you deploy.
 
 ## Build and start
 
@@ -80,9 +82,9 @@ studio still runs, but the gallery stays empty.
   saved settings across rebuilds and new containers. To use a folder instead
   (`-v /some/folder:/data`), make it writable for the container's user first:
   `sudo chown 1000:1000 /some/folder`.
-- **Updates**: Settings › About reports that this copy isn't a Git checkout.
-  New version: pull the source and `docker compose up --build`.
+- **Updates**: deploy a newer image tag, or pull the source and
+  `docker compose up --build`.
 - **Video previews**: the image brings `ffmpeg-static`, the same optional
   encoder the app installs otherwise.
-- **Node version**: the image uses Node 22, the version the launcher
-  recommends.
+- **Node version**: the image uses the Node.js version pinned in the
+  `Dockerfile`.

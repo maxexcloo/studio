@@ -22,7 +22,7 @@ The browser checks run the built studio on desktop and phone viewports with temp
 
 ## Missing packages and demo mode
 
-Both `npm run dev` and `npm start` reinstall missing runtime packages, so an incomplete `node_modules` folder doesn't stop a normal start.
+`npm run dev` reinstalls missing packages, so an incomplete `node_modules` folder doesn't stop it.
 
 `npm run dev:demo` (or `HEISS_DEMO=1`) is for agent and UI testing without a GPU. When ComfyUI is unreachable it offers fake models and returns placeholder images. It's off otherwise, so a normal install shows ComfyUI as offline instead.
 
@@ -59,12 +59,11 @@ Before every release, on a real ComfyUI with GPU:
 
 1. Generate with three or four model families, including one all-in-one checkpoint and one model-only file.
 2. Run one native 2K picture, one upscale from the upscale arrow and one inpaint.
-3. Unpack the release zip (`npm run package` builds it) in a fresh folder and start it with its launcher.
-4. Check that **Settings › About** shows the version and the update check answers.
+3. Build and start the container image (`docker build`, then the run command in the README) and check that **Settings › About** shows the version.
 
 ### Cutting a release
 
-To cut a release, from an up-to-date `main` with the notes written under **Unreleased**, opened by a one-line summary:
+To cut a release, from an up-to-date `main` with the notes written under **Unreleased**, opened by a one-line summary of the release:
 
 ```markdown
 ## [Unreleased]
@@ -75,26 +74,15 @@ To cut a release, from an up-to-date `main` with the notes written under **Unrel
 - ...
 ```
 
-The summary is what installed copies show in their update pill, under "HEISS UI x.y.z is here", so it has to make sense on its own. Name what the release is about in a few words, at most 60 characters. With one big change, name it; with several, name the theme ("Smoother model setup and calmer errors"); with only small ones, say so ("Smaller fixes across the studio"). Don't lead with a minor fix just because it was written first. The release script refuses a release without a summary or with one too long, and `--dry-run` shows how the pill will read.
+Name what the release is about in a few words. With one big change, name it; with several, name the theme ("Smoother model setup and calmer errors"); with only small ones, say so ("Smaller fixes across the studio").
 
 ```bash
 npm run release -- minor --dry-run   # checks everything, changes nothing
 npm run release -- minor             # bump, date the changelog, commit "Release vX.Y.Z", tag
-git push --atomic origin main vX.Y.Z # publishes the GitHub release
+git push --atomic origin main vX.Y.Z # publishes the image and the GitHub release
 ```
 
-`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow, which checks the tag matches `package.json`, builds the download and publishes it with that changelog section as the notes. Release copies find it through their update check and install it in one click: `server/updater.js` downloads it, checks it against the SHA-256 digest GitHub publishes for the asset and against its Ed25519 signature, and `scripts/start.mjs` (a release's `npm start`) swaps it in on restart and rolls back if it does not start.
-
-### Signing releases
-
-Every release zip is signed in CI (`<zip>.sig` beside it), and copies that know the release public key install nothing without a valid signature. Setting it up is a one-time step for the maintainer, on their own computer:
-
-```bash
-node scripts/release-keygen.mjs   # writes ~/.config/heiss-ui/release-signing-key.pem (mode 600), prints the public key
-gh secret set HEISS_RELEASE_SIGNING_KEY -R maxexcloo/heiss-ui < ~/.config/heiss-ui/release-signing-key.pem
-```
-
-Then paste the printed public key into `RELEASE_PUBLIC_KEY` in `server/release-signing.js` and release as usual. Until that constant is filled in, updates are checked by SHA-256 alone. Once it is, a tag build without the secret fails, `npm run release` checks the secret exists, and an unsigned release tells people to download it by hand instead of installing itself. Keep a backup of the private key offline: installed copies trust only that key.
+`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/heiss-ui:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
 
 Between releases a source checkout shows how far it is past its tag in **Settings › About**, for example `v0.2.0 + 3`.
 
@@ -119,12 +107,10 @@ As admin, drag cards to set their order or move them to another column, and open
 
 ### Fork Integration & Release Gates
 
-Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Integrate new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Review external profiles, image/video routing, MCP, picker behaviour, launchers and updater paths before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
+Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
 
-Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, signing, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks; tracked or modified copies are rejected, and neither belongs in release archives. The next feature release after the integrated 0.18.0 base is 0.19.0 if still unused. Do not create 1.0 implicitly or reuse upstream tags.
+Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 
-Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions, Windows/Linux/macOS packaged-launcher smoke tests and the container smoke/security checks for that commit. The container candidate is verified before promotion. GitHub assets are staged in a draft and promoted only after successful upload, with a provenance record containing the full source commit, upstream base and immutable image digest. Package archives contain their own fork repository/upstream metadata; the updater selects only the exact generic archive for the release version and verifies its checksum, signature and fork identity before staging.
-
-The bundled signing key is currently inherited from upstream. `signingOwner: "unverified"` deliberately blocks publication. Resolve the fork private key through existing credential tooling, compare its public key locally with the bundled key and verify the repository secret configuration without logging secret values. Verify or replace the bundled public key and set `signingOwner` to the fork repository only after this ownership check and an installed-key transition have been reviewed. Existing installations trusting another key require a manual verified package replacement unless a separately verified transition release is available; do not remove signature checks or assume an old key can sign the transition. Local unsigned packages remain available for smoke tests and cannot be installed automatically.
+Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions and the container smoke/security checks for that commit. The image is pushed as an untagged candidate, verified, and only then given its version tags.
 
 Publication does not authorise deployment. Deployment configuration belongs in `../ai` and must pin a verified published fork image by digest. Account/data migration and retirement of old services require protected backups, explicit ownership mapping, a recovery procedure and live image/video and cross-account verification. Those gates have not been established by local demo tests.

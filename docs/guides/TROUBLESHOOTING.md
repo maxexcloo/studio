@@ -19,33 +19,21 @@ ComfyUI makes every image, so it has to be running. Start it and the studio conn
 
 ComfyUI Desktop usually uses port 8000, a manual or portable install 8188. Both are checked on this computer. For another address, set it in **Settings › Connection** (a port such as `8000` is enough) or set `COMFY_URL` in `.env`. ComfyUI on another computer needs to be started with `--listen`.
 
-### The browser didn't open, or opened the wrong address
+### Which address to open
 
-The launchers and `npm start` open the studio once it's ready. They don't over SSH, on Linux without a desktop, in CI, or with `HEISS_NO_BROWSER=1`. Open the address the terminal shows under **Open**, usually `http://localhost:8787`.
+Open the address the server log shows under **Open**, usually `http://localhost:8787`, or the address and port the container is published on.
 
 Use `localhost` rather than `127.0.0.1`. Passkeys for Hidden only work on a name.
 
 ### The port is taken, or HEISS UI is already running
 
-When port 8787 is in use, the next free one (8788, 8789, …) is used instead. The terminal says which, and the browser opens it. To keep one fixed port, set `PORT` in `.env`.
+When port 8787 is in use, the next free one (8788, 8789, …) is used instead. The log says which. To keep one fixed port, set `PORT` in `.env`.
 
-"""HEISS UI is already running""" means another copy has the port. The browser opens that copy. Close its terminal window to stop it.
+"""HEISS UI is already running""" means another copy has the port. Open that copy, or stop it first.
 
 ### Node.js is missing or too old
 
-The Windows, macOS (Apple Silicon) and Linux downloads include Node.js in the `runtime` folder. A copy from GitHub, or an older macOS or Linux download, needs **Node.js 20.9 or newer** (22 LTS recommended) from [nodejs.org](https://nodejs.org). The launcher says which version it found.
-
-### macOS won't open the launcher
-
-The first time, macOS may say it can't check `Start HEISS UI.command`. Right-click it › **Open**, then **Open** again, or allow it in **System Settings › Privacy & Security**. The launcher then clears the same mark from the Node.js and packages in the zip.
-
-### Windows won't start it, or the window closes at once
-
-Unpack the zip with **Extract All** first. The launcher doesn't run from inside the zip. If Windows asks whether to run a downloaded file, right-click the zip › Properties › **Unblock** before unpacking. A plain folder such as `C:\HEISS-UI` works better than a Desktop or Documents folder synced by OneDrive, which can lock files during installs and updates.
-
-### Linux opens the launcher in a text editor
-
-Most file managers open a `.sh` file for editing. Use **Start HEISS UI.desktop** instead: right-click it › **Allow Launching** (GNOME) or make it executable, then double-click it. It runs the launcher in a terminal. Or run `./"Start HEISS UI.sh"` in a terminal in that folder.
+The container image brings its own Node.js. Running from source needs **Node.js 20.9 or newer** (22 LTS recommended) from [nodejs.org](https://nodejs.org).
 
 ### No models show up
 
@@ -133,7 +121,7 @@ Auto-grouping is off by default. Turn it on with the stack button next to the ga
 
 ### A download says the file is no longer at its address
 
-The link in this version is out of date (HTTP 404). Update HEISS UI in **Settings › About**. Newer versions have newer links. Or download the file from its Hugging Face page, put it in the ComfyUI folder the setup panel names, and use **Rescan** in Settings › Models.
+The link in this version is out of date (HTTP 404). Deploy a newer HEISS UI image. Newer versions have newer links. Or download the file from its Hugging Face page, put it in the ComfyUI folder the setup panel names, and use **Rescan** in Settings › Models.
 
 ### A download needs a Hugging Face sign-in
 
@@ -156,23 +144,15 @@ Free space is checked before a large download. Free some space on the disk that 
 
 ## Updates
 
-### A downloaded release went back to the previous version
-
-A release copy installs an update on restart and keeps the old version. If the new one doesn't start, the old one comes back and **Settings › About** says why. Try again later, or download the new zip and unpack it over the old folder. The `data` folder and `.env` stay.
-
 ### Going back to an earlier version
 
-The first time a new version starts, it saves a copy of the settings, the gallery list, Hidden's records and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and Hidden's images aren't copied, because updates don't change them. To go back, stop HEISS UI, put the earlier version in place, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, at most three are kept, and erasing Hidden removes them all.
-
-### A Git checkout wasn't updated
-
-**Install update** in a Git clone only runs when the copy has no changed files. Commit or stash them first, or update by hand with `git pull`, `npm install` and `npm run build`. If the new version doesn't install or build, the copy goes back to the commit it had and the error says what failed. """Couldn't reach GitHub""" means the connection is down. """Git isn't installed""" means Git isn't on this computer.
+The first time a new version starts, it saves a copy of the settings, the gallery list, Hidden's records and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and Hidden's images aren't copied, because updates don't change them. To go back, stop HEISS UI, deploy the earlier image, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, at most three are kept, and erasing Hidden removes them all.
 
 ## Phones and other devices
 
 ### A phone can't open the studio
 
-1. Turn on **Settings › Connection › Other devices** and restart HEISS UI when asked.
+1. Turn on **Settings › Connection › Other devices** and restart HEISS UI.
 2. Use one of the addresses Settings shows. The phone must be on the same network.
 3. Set a studio password on this computer first. Other devices sign in with it.
 4. If the page still doesn't load, the computer's firewall may block the port. Allow Node.js (or port 8787) on private networks.
