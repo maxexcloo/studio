@@ -127,24 +127,6 @@
   font-weight: 600;
 }
 
-.phone-running {
-  position: fixed;
-  top: calc(max(6px, env(safe-area-inset-top)) + 50px);
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  z-index: 19;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 4px 4px 4px 16px;
-  border-radius: 24px;
-  background: #1b1b1b;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08), 0 8px 24px rgb(0 0 0 / .4);
-  font-size: 14px;
-  font-weight: 550;
-}
-.phone-running > span { flex: 1; }
 
 /* ------------------------------------------------------------- Gallery */
 
@@ -162,7 +144,6 @@
     calc(max(12px, env(safe-area-inset-bottom)) + 96px)
     max(6px, env(safe-area-inset-left));
 }
-.phone-shell:has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px); }
 .phone-gallery .empty.stage-empty { min-height: calc(100dvh - 200px); }
 /* The phone bar carries the way back; the lock screen's own button would sit under it. */
 .phone-shell .hidden-lockscreen-back { display: none; }

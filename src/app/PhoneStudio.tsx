@@ -395,6 +395,18 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const endSelection = () => setSelection(null);
   const reducedMotion = useReducedMotion();
   const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+  // Tapping what is generating shows that run: its own mode, its own tile.
+  const revealRunning = () => {
+    const running = gallery.filter((item) => item.status === 'pending');
+    const here = running.find((item) => item.type === mode);
+    const target = here || running[0];
+    if (target && target.type !== mode) changeMode(target.type === 'video' ? 'video' : 'image');
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const tile = target ? galleryStageRef.current?.querySelector(`[data-tile-id="${CSS.escape(String(target.id))}"]`) : null;
+      if (tile) tile.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
+      else scrollToTop();
+    }));
+  };
 
   // Progress of what is running, for the ring on the pill and its second line.
   const pending = gallery.filter((item) => item.status === 'pending');
@@ -427,12 +439,14 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const [moreOpen, setMoreOpen] = React.useState(false);
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
+  const searchTriggerRef = React.useRef<HTMLButtonElement>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const filterTriggerRef = React.useRef<HTMLButtonElement>(null);
   const searchOpen = Boolean(view.phoneSearchOpen);
   const activeFilters = Boolean(hiddenSpace || gallerySearch.favorites || gallerySearch.model || gallerySearch.workflow || gallerySearch.lora);
-  const searchExpanded = searchOpen || Boolean(gallerySearch.q.trim());
-  const filtersExpanded = filtersOpen || activeFilters;
+  // Search and filters toggle independently; what is active stays applied while closed (the dot says so).
+  const searchExpanded = searchOpen;
+  const filtersExpanded = filtersOpen;
   const setSearchOpen = view.setPhoneSearchOpen as (open: boolean) => void;
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
@@ -462,12 +476,12 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
             <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
           </button>
-          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Scroll To Top`} title={runningLabel} onClick={scrollToTop}>
+          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
             <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
           </button> : null}
         </div>
-        {!hiddenLocked ? <button type="button" className={cn('phone-icon', Boolean(gallerySearch.q.trim()) && 'has-dot')} aria-label="Search Gallery" aria-expanded={searchExpanded} onClick={() => setSearchOpen(gallerySearch.q.trim() ? true : !searchExpanded)}><Search size={20} /></button> : null}
-        <button type="button" className={cn('phone-icon', activeFilters && 'has-dot')} ref={filterTriggerRef} aria-label="Open Gallery Filters" title="Filters" aria-expanded={filtersExpanded} onClick={() => setFiltersOpen(activeFilters ? true : !filtersExpanded)}><SlidersHorizontal size={20} /></button>
+        {!hiddenLocked ? <button type="button" className={cn('phone-icon', Boolean(gallerySearch.q.trim()) && 'has-dot')} ref={searchTriggerRef} aria-label="Search Gallery" aria-expanded={searchExpanded} onClick={() => setSearchOpen(!searchExpanded)}><Search size={20} /></button> : null}
+        <button type="button" className={cn('phone-icon', activeFilters && 'has-dot')} ref={filterTriggerRef} aria-label="Open Gallery Filters" title="Filters" aria-expanded={filtersExpanded} onClick={() => setFiltersOpen(!filtersExpanded)}><SlidersHorizontal size={20} /></button>
         <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
         <div className="phone-gallery-mode-row">
           <div className="phone-mode-select phone-gallery-mode" role="group" aria-label="Gallery Mode">
@@ -475,7 +489,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           </div>
         </div>
       </header>
-      {<PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchExpanded} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} filterTriggerRef={filterTriggerRef} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} items={gallery} />}
+      {<PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchExpanded} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} filterTriggerRef={filterTriggerRef} searchTriggerRef={searchTriggerRef} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} items={gallery} />}
 
       <main ref={galleryStageRef} className="phone-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
         {galleryBody}

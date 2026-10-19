@@ -782,16 +782,21 @@ test('model and LoRA filters reach gallery queries and clear independently', asy
     await route.fulfill({ json: { items: images.slice(0, 3).map((item) => ({ ...item, model: 'flux', settings: { ...item.settings, workflow: 'landscape', loras: [{ name: 'grain', strength: 1 }] } })), revision: 1, hasMore: false } });
   });
   await page.goto('/');
-  if (isMobile) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
-  await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  // The phone opens filters from their own header button; search stays closed.
+  if (isMobile) await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
+  else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  if (isMobile) await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   for (const [name, value] of [['Model', 'flux'], ['LoRA', 'grain']]) {
     await page.getByRole('button', { name: `Filter By ${name}`, exact: true }).click();
     await page.getByRole('listbox', { name: `${name} Filter`, exact: true }).getByRole('option', { name: value, exact: true }).click();
   }
   await expect.poll(() => queries.some((query) => query.get('model') === 'flux' && !query.has('workflow') && query.get('lora') === 'grain')).toBe(true);
   await page.getByRole('button', { name: 'Clear Filters', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Gallery Filters', exact: true })).not.toHaveClass(/is-on/);
-  if (await page.getByRole('button', { name: 'Gallery Filters', exact: true }).getAttribute('aria-expanded') === 'true') await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  if (isMobile) await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
+  else {
+    await expect(page.getByRole('button', { name: 'Gallery Filters', exact: true })).not.toHaveClass(/is-on/);
+    if (await page.getByRole('button', { name: 'Gallery Filters', exact: true }).getAttribute('aria-expanded') === 'true') await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  }
   if (!await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).count()) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).fill('snow');
   await expect.poll(() => queries.some((query) => query.get('q') === 'snow' && !query.has('model') && !query.has('workflow') && !query.has('lora'))).toBe(true);

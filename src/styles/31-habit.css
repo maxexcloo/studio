@@ -324,8 +324,6 @@
 .phone-searchbar .phone-search-fav { color: hsl(var(--muted-foreground)); }
 .phone-searchbar .phone-search-fav.is-on { color: var(--ember); }
 .phone-shell:has(.phone-searchbar) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 110px + var(--phone-mode-h, 0px)); }
-.phone-shell:has(.phone-searchbar) .phone-running { top: calc(max(6px, env(safe-area-inset-top)) + 106px + var(--phone-mode-h, 0px)); }
-.phone-shell:has(.phone-searchbar):has(.phone-running) .phone-gallery { padding-top: calc(max(6px, env(safe-area-inset-top)) + 164px + var(--phone-mode-h, 0px)); }
 
 /* ------------------------------------------------------------------ Stars */
 

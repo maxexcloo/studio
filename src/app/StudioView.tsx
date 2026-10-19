@@ -408,8 +408,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     onJump: (item) => {
       if (active) setActive(null);
       if (prefs.zenMode) { selectZenItem(item.id); return; }
+      // The run's own tile, wherever it is; the top when it isn't rendered yet.
       window.requestAnimationFrame(() => {
-        galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        const tile = galleryStageRef.current?.querySelector(`[data-tile-id="${CSS.escape(String(item.id))}"]`);
+        if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
+        else galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       });
     },
     onView: (item) => openItem(item)

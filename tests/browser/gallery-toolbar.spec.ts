@@ -334,23 +334,29 @@ test('phone search and filters retain inset neutral actions without changing hea
   await page.goto('/');
   await page.waitForTimeout(700);
   await page.screenshot({ path: testInfo.outputPath('phone-default.png') });
-  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
+  const header = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
+  await header.click();
   const bar = page.locator('.phone-searchbar');
-  const search = bar.getByRole('button', { name: 'Expand Search', exact: true });
-  const searchSize = await search.boundingBox();
-  expect(searchSize!.width).toBeCloseTo(40, 1);
-  expect(searchSize!.height).toBeCloseTo(40, 1);
-  expect(await search.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  await search.hover();
-  await page.waitForTimeout(200);
-  await page.screenshot({ path: testInfo.outputPath('phone-hover.png') });
+  // Filters open on their own: no search control comes with them.
+  await expect(bar.getByRole('button', { name: 'Expand Search', exact: true })).toHaveCount(0);
+  await expect(bar.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   await bar.getByRole('button', { name: 'Only favourites', exact: true }).click();
   await page.mouse.move(0, 500);
   await page.waitForTimeout(400);
   const favourite = bar.getByRole('button', { name: 'Only favourites', exact: true });
   const filter = bar.getByRole('button', { name: 'Gallery Filters', exact: true });
   expect(await favourite.evaluate(n => getComputedStyle(n).backgroundColor)).toBe(await filter.evaluate(n => getComputedStyle(n).backgroundColor));
-  expect(await favourite.evaluate(n => getComputedStyle(n).color)).toBe(await search.evaluate(n => getComputedStyle(n).color));
+  // Active filters stay applied when the bar closes; its button says so.
+  await header.click();
+  await expect(bar).toHaveCount(0);
+  await expect(header).toHaveClass(/has-dot/);
+  // Search toggles open and shut from its own button.
+  const searchButton = page.getByRole('button', { name: 'Search Gallery', exact: true }).first();
+  await searchButton.click();
+  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toBeVisible();
+  await expect(page.locator('.phone-searchbar .gallery-filter-anchor')).toHaveCount(0);
+  await searchButton.click();
+  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('phone-selected.png') });
 });
 
@@ -366,12 +372,12 @@ test('search keeps a neutral shell without a selected input highlight', async ({
   const filters = tools.locator('.gallery-filter-anchor');
   const border = node => node.evaluate(n => { const s = getComputedStyle(n); return { colour: s.borderColor, width: s.borderWidth, style: s.borderStyle }; });
   await expect(input).toBeFocused();
-  expect(await border(search)).toEqual(await border(filters));
+  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
   expect(await input.evaluate(n => getComputedStyle(n).outlineStyle)).toBe('none');
   await expect(input).toHaveAttribute('placeholder', 'Search');
   await input.fill('picture');
   await search.hover();
-  expect(await border(search)).toEqual(await border(filters));
+  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
   if (!isMobile) {
     await tools.getByRole('button', { name: 'Select', exact: true }).click();
     expect(await border(search)).toEqual(await border(tools.locator('.gallery-management')));
@@ -383,7 +389,7 @@ test('search keeps a neutral shell without a selected input highlight', async ({
   if (isMobile) await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   await opener.click();
   await expect(input).toBeFocused();
-  expect(await border(search)).toEqual(await border(filters));
+  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
   await page.keyboard.press('Escape');
   await expect(input).toHaveCount(0);
 });

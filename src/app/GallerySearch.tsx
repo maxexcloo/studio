@@ -115,11 +115,13 @@ type SearchProps = {
   hiddenSpace?: boolean;
   onToggleHidden?: () => void;
   filterTriggerRef?: React.RefObject<HTMLElement | null>;
+  /** The button outside the bar that toggles search, so pressing it is not an outside click. */
+  searchTriggerRef?: React.RefObject<HTMLElement | null>;
   filtersOpen?: boolean;
   setFiltersOpen?: (open: boolean) => void;
 };
 
-export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace = false, onToggleHidden, filterTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [], phone = false }: SearchProps & { islandsHeight?: number; items?: GalleryItem[]; phone?: boolean }) {
+export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace = false, onToggleHidden, filterTriggerRef, searchTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [], phone = false }: SearchProps & { islandsHeight?: number; items?: GalleryItem[]; phone?: boolean }) {
   const present = useIsPresent();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const toolsRef = React.useRef<HTMLDivElement>(null);
@@ -131,18 +133,19 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
   const filterActive = filterCount > 0 || hiddenSpace;
   const queryActive = Boolean(search.q.trim());
   const active = queryActive || filterActive;
-  const searchExpanded = open || queryActive;
+  // On the phone each opens only from its own button; on desktop an active one stays open.
+  const searchExpanded = open || (!phone && queryActive);
   const filtersRequested = controlledFiltersOpen ?? localFiltersOpen;
-  const filtersOpen = filtersRequested || filterActive;
+  const filtersOpen = filtersRequested || (!phone && filterActive);
   const setFiltersOpen = controlledSetFiltersOpen ?? setLocalFiltersOpen;
   const closeFilters = React.useCallback(() => setFiltersOpen(false), [setFiltersOpen]);
   const closeSearch = React.useCallback(() => setOpen(false), [setOpen]);
   const reducedMotion = useReducedMotion();
   useDismiss([toolsRef, floatingRef, filterTriggerRef || toolsRef], filtersOpen && !filterActive, closeFilters);
-  useDismiss([toolsRef, floatingRef, filterTriggerRef || toolsRef], open && !queryActive, closeSearch);
+  useDismiss([toolsRef, floatingRef, filterTriggerRef || toolsRef, searchTriggerRef || toolsRef], open && !queryActive, closeSearch);
   React.useEffect(() => {
-    if (filterActive && !filtersRequested) setFiltersOpen(true);
-  }, [filterActive, filtersRequested, setFiltersOpen]);
+    if (!phone && filterActive && !filtersRequested) setFiltersOpen(true);
+  }, [phone, filterActive, filtersRequested, setFiltersOpen]);
   React.useLayoutEffect(() => {
     const controls = filterControlsRef.current;
     if (!controls) { setFilterHeight(0); return; }
@@ -166,7 +169,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
     model: items.flatMap((item) => [item.model, item.settings?.modelName]),
   };
   return <motion.div ref={toolsRef} className={cn(phone ? 'phone-searchbar' : 'gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={phone ? { opacity: 0, y: -6 } : false} animate={{ opacity: 1, y: 0 }} exit={phone ? { opacity: 0, y: -6 } : undefined} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+    {phone && !searchExpanded ? null : <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
       <button type="button" className="gallery-search-trigger" aria-label={phone ? 'Expand Search' : hiddenSpace ? 'Search Hidden' : 'Search Gallery'} aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
       <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}
@@ -176,8 +179,8 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
           }} placeholder="Search" aria-label={hiddenSpace ? 'Search Hidden' : 'Search the gallery'} spellCheck={false} autoComplete="off" enterKeyHint="search" />
       </motion.div>
       {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
-    </motion.div>
-    <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+    </motion.div>}
+    {phone && !filtersOpen ? null : <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
       <button type="button" className={cn('gallery-filter-trigger', (filterCount > 0 || hiddenSpace) && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
       <AnimatePresence initial={false}>
         {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
@@ -195,7 +198,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
           </div>
         </motion.div> : null}
       </AnimatePresence>
-    </motion.div>
+    </motion.div>}
 
   </motion.div>;
 }
@@ -225,6 +228,6 @@ export function SearchEmpty({ search, onClear, hiddenSpace = false }: { search: 
 /* ------------------------------------------------------------ Phone */
 
 export function PhoneSearchBar(props: Omit<SearchProps, 'count'> & { items?: GalleryItem[] }) {
-  const visible = props.open || searchActive(props.search) || Boolean(props.hiddenSpace) || Boolean(props.filtersOpen);
+  const visible = props.open || Boolean(props.filtersOpen);
   return <AnimatePresence initial={false}>{visible ? <GallerySearchBar key="phone-search" {...props} phone /> : null}</AnimatePresence>;
 }

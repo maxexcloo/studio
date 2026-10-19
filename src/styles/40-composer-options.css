@@ -233,3 +233,11 @@
 
 /* The closed composer names the active LoRAs instead of counting them. */
 .lora-pill-summary { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The phone's Images/Videos switch floats over the gallery like every other floating control. */
+.phone-gallery-mode {
+  background: var(--surface-grain), var(--surface-float);
+  -webkit-backdrop-filter: var(--surface-float-blur);
+  backdrop-filter: var(--surface-float-blur);
+  box-shadow: var(--shadow-float-sm);
+}
