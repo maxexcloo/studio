@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Cloud video while the local worker is off:** when the separate local video worker is unavailable, as in a text and image GPU mode, MCP Generate with `kind: video` and Reuse animation without a `profile_id` now use a ready provider-backed cloud video profile, such as Grok, instead of failing. The profile matching the requested tier wins, otherwise Standard; animation needs one that takes a starting image. The reply marks the profile `remote` and names it, so users know the video went to the cloud. `/api/models` reports the video worker's availability with the catalogue it already loads, so no request adds a check. Explicit profiles, accounts without cloud access and a running local worker behave as before.
+
 ## [0.23.1] - 2026-10-19
 
 > Named MCP results, with no gap above the image

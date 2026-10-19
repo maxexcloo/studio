@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { defaultGenerationCount, referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, mcpControls } from './mcp-controls.js';
-import { chooseProfile } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
@@ -106,11 +106,17 @@ export class McpMedia {
     const models = await this.catalogue(owner);
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
-  /** The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream. */
+  /**
+   * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
+   * While the studio reports its local video worker unavailable, video goes to a ready remote (cloud) profile,
+   * marked `remote` so the reply can say so.
+   */
   async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false } = {}) {
     const models = await this.catalogue(owner);
     const profiles = await this.profiles(kind, owner);
-    return chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId: models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'] });
+    const defaultId = models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'];
+    const remote = kind === 'video' && models.backends?.video?.available === false ? chooseRemoteVideo(profiles, { tier, defaultId, references, firstFrame }) : null;
+    return remote ? { ...remote, remote: true } : chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
   }
   async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.

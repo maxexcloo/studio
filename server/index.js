@@ -691,7 +691,9 @@ async function mediaModels(force = false) {
   const primary = main.status === "fulfilled" ? main.value : null;
   const video = secondary.status === "fulfilled" ? secondary.value : null;
   if (!primary && !video) throw new Error("Neither ComfyUI backend is available.");
-  return { primary, video, models: mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})) };
+  // Whether the local video worker answered this catalogue load, so MCP can send video elsewhere while it is off.
+  const models = { ...mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})), backends: { video: { available: Boolean(video) } } };
+  return { primary, video, models };
 }
 
 function modelsForAccount(models, req) {

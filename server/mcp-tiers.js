@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Speed tiers for MCP: read from the tier segment of a profile label such as "Krea 2 Turbo · Super Fast · 2 Steps".
+import { isLocalVideoProfile } from './comfy-backends.js';
 
 export const mcpTiers = ['quality', 'standard', 'fast', 'turbo'];
 const labels = { 'super fast': 'turbo', fast: 'fast', quality: 'quality', standard: 'standard' };
@@ -32,6 +33,12 @@ export function takesFirstFrame(profile) {
   return Boolean(slot) && (slot.role === 'start' || /\b(?:first frame|start image)\b/i.test(String(slot.label || '')));
 }
 
+/** Whether a profile's image slots take this many references. */
+const fits = (profile, references) => {
+  const slots = profile.mediaInputs || [];
+  return references <= slots.length && slots.filter(slot => slot.required).length <= references;
+};
+
 /**
  * The profile Studio uses when Generate names a kind and tier instead of a profile_id:
  * the deployment default when it fits, then its family, then unrestricted, then catalogue order.
@@ -42,10 +49,7 @@ export function takesFirstFrame(profile) {
 export function chooseProfile(profiles, { kind, tier, defaultId, references = 0, firstFrame = false }) {
   if (!profiles.length) throw new Error(`No ready ${kind} profile is available to this account.`);
   const fallback = profiles.find(profile => profile.id === defaultId);
-  const usable = (tier ? profilesForTier(profiles, tier) : profiles).filter(profile => {
-    const slots = profile.mediaInputs || [];
-    return references <= slots.length && slots.filter(slot => slot.required).length <= references;
-  });
+  const usable = (tier ? profilesForTier(profiles, tier) : profiles).filter(profile => fits(profile, references));
   if (!usable.length) {
     const available = mcpTiers.filter(item => profilesForTier(profiles, item).length);
     throw new Error(`No ready ${kind} profile${tier ? ` in the ${tier} tier` : ''} is available to this account${references ? ` for ${references} reference${references > 1 ? 's' : ''}` : ''}. Available ${kind} tiers: ${available.join(', ')}.`);
@@ -59,4 +63,18 @@ export function chooseProfile(profiles, { kind, tier, defaultId, references = 0,
   }
   const score = (profile) => [profile.id === defaultId, Boolean(fallback?.family) && profile.family === fallback.family, !profile.restricted].reduce((total, value) => total * 2 + Number(value), 0);
   return pool.reduce((best, profile) => score(profile) > score(best) ? profile : best);
+}
+
+/**
+ * The video profile to use while the local video worker is unavailable: a ready profile
+ * that runs elsewhere (a provider-backed cloud profile), fits the references and, when
+ * animating, starts from an image. The requested tier wins when one matches, otherwise
+ * Standard. Null when the account has no such profile, so the usual choice and error apply.
+ */
+export function chooseRemoteVideo(profiles, { tier, defaultId, references = 0, firstFrame = false }) {
+  const remote = profiles.filter(profile => !isLocalVideoProfile(profile) && fits(profile, references)
+    && (!firstFrame || takesFirstFrame(profile) || Boolean({ ...profile, ...profile.imageModes?.reference }.capabilities?.startImage)));
+  if (!remote.length) return null;
+  const preferred = [tier, 'standard'].find(item => item && profilesForTier(remote, item).length);
+  return chooseProfile(remote, { kind: 'video', tier: preferred, defaultId, references });
 }

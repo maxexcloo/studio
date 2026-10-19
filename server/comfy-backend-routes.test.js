@@ -76,6 +76,20 @@ test("health keeps the studio connected while either configured backend is avail
   }
 });
 
+test("the catalogue reports whether the local video worker answered, keeping Grok while it is off", async () => {
+  try {
+    let models = (await api("/api/models")).body;
+    assert.deepEqual(models.backends, { video: { available: true } });
+    video.setDown(true);
+    models = (await api("/api/models")).body;
+    assert.deepEqual(models.backends, { video: { available: false } });
+    assert.equal(models.profiles.some((profile) => profile.family === "minimax_h3"), false);
+    assert.ok(models.profiles.some((profile) => profile.id === "custom:grok-video"));
+  } finally {
+    video.setDown(false);
+  }
+});
+
 test("HTTP catalogue and generate select the video node schema, keep Grok primary and cancel only target", { timeout: 10000 }, async () => {
   const models = (await api("/api/models")).body;
   const h3 = models.profiles.find((profile) => profile.family === "minimax_h3");

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, profilesForTier, summaryOf, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo, profilesForTier, summaryOf, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -51,4 +51,17 @@ test('animating prefers a fast first-frame profile unless a tier or a first-fram
   assert.equal(animate({ defaultId: 'text', tier: 'quality' }), 'fl-quality');
   // Without a first-frame profile, any profile that takes the image still animates it.
   assert.equal(chooseProfile(profiles.filter(profile => !takesFirstFrame(profile)), { kind: 'video', references: 1, firstFrame: true }).id, 'ref-fast');
+});
+
+test('the remote video fallback uses only cloud profiles that fit, preferring the tier and then Standard', () => {
+  const slot = { id: 'reference', kind: 'image', label: 'Reference Image', required: false };
+  const local = { id: 'local', kind: 'video', family: 'minimax_h3', label: 'H3 · Fast', mediaInputs: [{ ...slot, label: 'Optional First Frame' }] };
+  const cloud = { id: 'cloud', kind: 'video', family: 'grok', label: 'Grok Video · Cloud', mediaInputs: [slot], imageModes: { reference: { capabilities: { startImage: true } } } };
+  const fast = { id: 'cloud-fast', kind: 'video', family: 'grok', label: 'Grok Video · Fast · Cloud', mediaInputs: [] };
+  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'fast' }).id, 'cloud-fast');
+  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'quality' }).id, 'cloud');
+  // Animating needs an image input that starts the video.
+  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'fast', references: 1, firstFrame: true }).id, 'cloud');
+  assert.equal(chooseRemoteVideo([local, fast], { references: 1, firstFrame: true }), null);
+  assert.equal(chooseRemoteVideo([local], {}), null);
 });

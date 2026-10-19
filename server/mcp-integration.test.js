@@ -51,6 +51,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
   let base;
   let defaults = { image: imageProfile.id, video: videoProfile.id };
   let visibleTo = null;
+  let backends;
   app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
   app.get('/api/loras/info', (_req, res) => res.json({ ok: true, loras: loraInfo }));
@@ -107,7 +108,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
   });
   // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
   // The studio limits each account's catalogue to its access profile; the deployment defaults are not limited.
-  app.get('/api/models', (req, res) => res.json({ profiles: visibleTo ? profiles.filter(profile => visibleTo(req.headers['x-ai-user-id'] || req.headers.authorization, profile)) : profiles, defaults: { imageModel: defaults.image, videoModel: defaults.video } }));
+  app.get('/api/models', (req, res) => res.json({ profiles: visibleTo ? profiles.filter(profile => visibleTo(req.headers['x-ai-user-id'] || req.headers.authorization, profile)) : profiles, defaults: { imageModel: defaults.image, videoModel: defaults.video }, ...(backends ? { backends } : {}) }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -126,7 +127,8 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     jobLookupFails: value => { jobLookupFails = value; },
     deduplicateUploads: () => { deduplicateUploads = true; },
     // A model change reaches the studio as a rescan, which refreshes MCP's cached catalogues.
-    profiles: async (value, { defaults: chosen, visibleTo: filter } = {}) => { profiles = value; if (chosen) defaults = chosen; if (filter) visibleTo = filter; await fetch(`${base}/api/models`); },
+    // `videoAvailable` is the studio's report of whether its local video worker answered.
+    profiles: async (value, { defaults: chosen, visibleTo: filter, videoAvailable } = {}) => { profiles = value; if (chosen) defaults = chosen; if (filter) visibleTo = filter; if (videoAvailable !== undefined) backends = { video: { available: videoAvailable } }; await fetch(`${base}/api/models`); },
     client: async (user = 'alice', key = mediaKey) => {
       const client = new Client({ name: 'heiss-integration-fixture', version: '1.0.0' }, { capabilities: {} });
       clients.push(client);
@@ -1263,4 +1265,80 @@ test('Reuse follow-ups respect ownership and Hidden results', async t => {
   f.jobs.get(id).privateVault = true;
   for (const kind of ['image', 'video']) await failure(alice, 'Reuse', { job_id: id, kind });
   assert.equal(f.submitted.length, submitted);
+});
+
+// Provider-backed cloud video, shaped like the studio's Grok profiles: an optional image animates the scene.
+const cloudVideo = (id, label) => ({
+  ...structuredClone(videoProfile), id, label, family: 'grok', model: '', workflow: `custom:${id}`, aspectPolicy: 'manual',
+  capabilities: { lora: false, startImage: true, imageToImage: true }, defaults: { width: 1280, height: 720, count: 2, duration: 8 }, options: {},
+  mediaInputs: [{ id: 'reference', kind: 'image', label: 'Reference Image', min: 0, max: 1, required: false }],
+  imageModes: { generate: { capabilities: { lora: false } }, reference: { capabilities: { lora: false, startImage: true, imageToImage: true } } }
+});
+const localFirstFrame = { ...structuredClone(videoProfile), id: 'fl-fast', label: 'H3 FL · Fast · 8 Steps', mediaInputs: [{ id: 'reference', kind: 'image', label: 'Optional First Frame', min: 0, max: 1, required: false }] };
+const videoCatalogue = (local = true) => [
+  structuredClone(imageProfile),
+  ...(local ? [{ ...structuredClone(videoProfile), label: 'Video · Quality · 20 Steps' }, structuredClone(localFirstFrame)] : []),
+  cloudVideo('cloud-video', 'Cloud Video 1.5 · Cloud'),
+  cloudVideo('cloud-video-fast', 'Cloud Video · Fast · Cloud')
+];
+
+test('video goes to a cloud profile for the tier while the local video worker is off', async t => {
+  const f = await fixture(t);
+  await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
+  const client = await f.client();
+  const plain = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
+  const result = data(plain);
+  assert.deepEqual(result.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
+  assert.match(result.message, /local video worker is unavailable, so this video runs on the cloud profile Cloud Video 1\.5 · Cloud/);
+  assert.equal(f.submitted.at(-1).profileId, 'cloud-video');
+  assert.equal(f.submitted.at(-1).referenceAssets.length, 0, 'plain video is text only');
+  // A matching cloud tier wins; otherwise Standard.
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'fast', prompts: ['A wave'], count: 1 })).profile.id, 'cloud-video-fast');
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'], count: 1 })).profile.id, 'cloud-video');
+  // An explicit profile stays explicit: the local profile is not ready, so it fails clearly.
+  await f.profiles(videoCatalogue(false).concat({ ...structuredClone(localFirstFrame), ready: false }));
+  await failure(client, 'Generate', { profile_id: 'fl-fast', prompts: ['A wave'] });
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video', 'cloud-video-fast', 'cloud-video']);
+});
+
+test('Reuse animates an image on a cloud profile while the local video worker is off', async t => {
+  const f = await fixture(t);
+  await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
+  const client = await f.client();
+  data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  finish(f);
+  const animated = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' }));
+  assert.deepEqual(animated.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
+  assert.match(animated.message, /cloud profile Cloud Video 1\.5 · Cloud/);
+  const body = f.submitted.at(-1);
+  assert.equal(body.profileId, 'cloud-video');
+  assert.equal(body.referenceAssets.length, 1);
+  assert.ok(f.assets.has(body.referenceAssets[0].assetId), 'the image was uploaded as the starting frame');
+  assert.equal(data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'fast' })).profile.id, 'cloud-video-fast');
+});
+
+test('video stays local while the worker is up, and without cloud access keeps the usual error', async t => {
+  const tokens = { 'restricted-account-token-long-enough-for-the-fixture': 'restricted', 'full-account-token-that-is-long-enough-for-fixture': 'full' };
+  const accounts = Object.fromEntries(Object.entries(tokens).map(([token, userId]) => [token, { userId, role: 'user', authenticated: true, generationProfiles: [], features: {} }]));
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => accounts[value] || null });
+  const visibleTo = (authorization, profile) => !String(authorization).includes('restricted') || profile.family !== 'grok';
+  await f.profiles(videoCatalogue(), { defaults: { image: imageProfile.id, video: videoProfile.id }, visibleTo, videoAvailable: true });
+  const full = await f.client('', Object.keys(tokens)[1]);
+  const local = data(await call(full, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 }));
+  assert.deepEqual(local.profile, { id: videoProfile.id, label: 'Video · Quality · 20 Steps', tier: 'quality' });
+  assert.doesNotMatch(local.message, /cloud/);
+  const missing = await call(full, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'] });
+  assert.match(missing.content[0].text, /No ready video profile in the turbo tier/, 'an up worker never falls back');
+  data(await call(full, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  finish(f);
+  assert.equal(data(await call(full, 'Reuse', { job_id: 'result 2', kind: 'video' })).profile.id, 'fl-fast');
+  await f.profiles(videoCatalogue(false), { videoAvailable: false });
+  const restricted = await f.client('', Object.keys(tokens)[0]);
+  const refused = await call(restricted, 'Generate', { kind: 'video', prompts: ['A wave'] });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /No ready video profile is available to this account\./);
+  data(await call(restricted, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  finish(f);
+  await failure(restricted, 'Reuse', { job_id: 'result 1', kind: 'video' });
+  assert.deepEqual(f.submitted.map(body => body.profileId), [videoProfile.id, imageProfile.id, 'fl-fast', imageProfile.id]);
 });
