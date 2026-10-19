@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-19
+
 > LibreChat users reach Studio without a manual link
 
 ### Added
@@ -1251,7 +1253,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/maxexcloo/studio/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/maxexcloo/studio/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/maxexcloo/studio/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/maxexcloo/studio/compare/v0.22.0...v0.23.0
