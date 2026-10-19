@@ -68,3 +68,17 @@ test('real encoder produces a small silent preview, reuses it, and invalidates/r
   assert.equal(fs.existsSync(poster), false);
   assert.equal(fs.existsSync(one), false); assert.equal(fs.existsSync(changed), false);
 });
+
+test('last frame comes from the end of an in-memory video at full size', { skip: !available }, async () => {
+  const source = path.join(dir, 'extend.mp4');
+  // Red then blue, with MP4 metadata at the end: only the closing blue frame may come back.
+  execFileSync(encoder, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=red:size=320x180:rate=24:duration=1', '-f', 'lavfi', '-i', 'color=blue:size=320x180:rate=24:duration=1',
+    '-filter_complex', '[0:v][1:v]concat=n=2:v=1[v]', '-map', '[v]', '-c:v', 'libx264', '-threads', '1', '-pix_fmt', 'yuv420p', source]);
+  const frame = await previews.extractLastFrame(fs.readFileSync(source));
+  assert.equal(frame.subarray(1, 4).toString(), 'PNG');
+  const { default: sharp } = await import('sharp');
+  const { data, info } = await sharp(frame).raw().toBuffer({ resolveWithObject: true });
+  assert.deepEqual([info.width, info.height], [320, 180]);
+  const [red, , blue] = data.subarray(0, 3);
+  assert.ok(blue > 200 && red < 60, `expected the final blue frame, got rgb ${[...data.subarray(0, 3)]}`);
+});

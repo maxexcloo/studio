@@ -1160,7 +1160,7 @@ app.post("/api/reference-assets/from-gallery", (req, res) => {
   if (req.heissAccount && (!canReference || !mayUseFeature(req.heissAccount, 'gallery'))) return res.status(403).json({ ok: false, error: 'Gallery references are disabled for this account.' });
   if (!canReference && !requireLocal(req, res)) return;
   try {
-    const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""));
+    const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), { frame: req.body?.frame === "last" ? "last" : "" });
     res.json({ ok: true, asset });
   } catch (error) {
     res.status(404).json({ ok: false, error: error.message });

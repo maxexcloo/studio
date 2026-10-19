@@ -1,12 +1,12 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
-import { AnimatePhotos } from './AnimatePhotos';
+import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { PromptField } from './PromptField';
 import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, FastForward, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Video, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -295,7 +295,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, toggleFavorite]);
+  // The viewer offers Animate and Extend Video only where a first-frame video profile can run them.
+  const canAnimate = animationProfiles(models?.profiles || []).length > 0;
   const phoneItemActions: PhoneItemActions = {
+    animate: canAnimate ? (item) => setAnimationItems([item]) : undefined,
     star: (item) => toggleFavorite([item], !item.favorite),
     showToast,
     smartUpscale: prefs.smartUpscale !== false,
@@ -978,6 +981,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       </button>
                     </Tip>
                   ) : null}
+                  {canAnimate && canAnimatePhoto(active) ? <Tip content="Animate"><button className="icon-button" aria-label="Animate" onClick={() => setAnimationItems([active])}><Video size={15} /></button></Tip> : null}
+                  {canAnimate && canExtendVideo(active) ? <Tip content="Extend Video"><button className="icon-button" aria-label="Extend Video" onClick={() => setAnimationItems([active])}><FastForward size={15} /></button></Tip> : null}
                   {canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? <Tip content="Use as Reference Image"><button className="icon-button" aria-label="Use as Reference Image" onClick={() => useOutputAsStartImage(active)}><ImagePlus size={15} /></button></Tip> : null}
                   {prefs.smartUpscale !== false && canUpscaleItem(active) ? (
                     <span className="upscale-notice-anchor">

@@ -139,3 +139,25 @@ test('search filters the full reference library before pagination and matches pr
     assert.equal(referenceAssets.listReferenceAssets({}, { source: 'hidden', q: 'mountain' }).locked, true);
   } finally { for (const item of items) gallery.splice(gallery.indexOf(item), 1); }
 });
+
+test('a video’s last frame is referenced only by its owner and only for finished videos', async () => {
+  const { gallery } = await import('./gallery-store.js');
+  const owner = { heissAccount: { userId: 'account-a', role: 'user' } };
+  const other = { heissAccount: { userId: 'account-b', role: 'user' } };
+  const items = [
+    { id: 'extend-video', ownerId: 'account-a', type: 'video', status: 'done', url: '/images/extend.mp4', outputName: 'extend.mp4', createdAt: '2026-01-01T00:00:00Z' },
+    { id: 'extend-image', ownerId: 'account-a', type: 'image', status: 'done', url: '/images/extend.png', createdAt: '2026-01-01T00:00:00Z' },
+  ];
+  gallery.push(...items);
+  try {
+    const asset = referenceAssets.referenceAssetFromGallery(owner, 'extend-video', { frame: 'last' });
+    assert.match(asset.id, /^gallery:.+:last-frame$/);
+    assert.equal(asset.mime, 'image/png');
+    assert.equal(asset.name, 'extend last frame.png');
+    assert.equal(asset.galleryItemId, 'extend-video');
+    assert.throws(() => referenceAssets.referenceAssetFromGallery(other, 'extend-video', { frame: 'last' }), /no longer in the gallery/);
+    assert.throws(() => referenceAssets.referenceAssetFromGallery(owner, 'extend-image', { frame: 'last' }), /no longer in the gallery/);
+    assert.throws(() => referenceAssets.referenceAssetFromGallery(owner, 'extend-video'), /no longer in the gallery/, 'a video is never a plain image reference');
+    await assert.rejects(referenceAssets.bytesForReference(other, asset.id), /no longer in the gallery/);
+  } finally { for (const item of items) gallery.splice(gallery.indexOf(item), 1); }
+});

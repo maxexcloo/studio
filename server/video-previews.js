@@ -276,7 +276,8 @@ export function forgetPrivateVideoPreviews(id = '') {
   for (const key of privatePreviews.keys()) if (!id || key.startsWith(`${id}:`)) privatePreviews.delete(key);
 }
 
-async function encodePrivate(buffer) {
+/** Serves the bytes to ffmpeg over a seekable loopback URL, so MP4s with trailing metadata work and no plaintext file is written. */
+async function withLoopback(buffer, work) {
   const token = crypto.randomBytes(24).toString('hex');
   const server = http.createServer((req, res) => {
     if (req.url !== `/${token}` || !['GET', 'HEAD'].includes(req.method)) { res.writeHead(404).end(); return; }
@@ -286,8 +287,27 @@ async function encodePrivate(buffer) {
   });
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    return await encode(`http://127.0.0.1:${server.address().port}/${token}`);
+    return await work(`http://127.0.0.1:${server.address().port}/${token}`);
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+}
+
+function encodePrivate(buffer) {
+  return withLoopback(buffer, (input) => encode(input));
+}
+
+/**
+ * A video's final frame at full size, as a PNG: the first frame of its
+ * extension. Only the last half second is decoded, then played backwards so
+ * the first frame out is the last one in.
+ */
+export async function extractLastFrame(buffer) {
+  if (buffer.length > maxSourceBytes) throw new Error('This video is too large to extend.');
+  return queued(() => withLoopback(buffer, async (input) => {
+    const { code, stdout } = await run(['-loglevel', 'error', '-threads', '1', '-sseof', '-0.5', '-i', input, '-map', '0:v:0', '-an',
+      '-vf', 'reverse', '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'png', 'pipe:1'], { timeout: 60_000, limit: 64 * 1024 * 1024 });
+    if (code !== 0 || !stdout.length) throw new Error('The video’s last frame couldn’t be read.');
+    return stdout;
+  }), { poster: true });
 }
 
 export function sendVideoPreview(req, res, file) {

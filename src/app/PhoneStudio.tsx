@@ -1,5 +1,5 @@
 import { PromptField } from './PromptField';
-import { canAnimatePhoto } from './AnimatePhotos';
+import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
@@ -8,7 +8,7 @@ import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, UserRound, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, FastForward, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, UserRound, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
 import { downloadUrl } from './GalleryTile';
@@ -243,6 +243,8 @@ export type PhoneItemActions = {
   reuse: (item: GalleryItem) => void;
   promptsOnly: (item: GalleryItem) => void;
   useAsReference?: (item: GalleryItem) => void;
+  /** Animates a photo or extends a video; left out when no first-frame video profile is ready. */
+  animate?: (item: GalleryItem) => void;
   hide: (item: GalleryItem) => void;
   unhide: (item: GalleryItem) => void;
   remove: (item: GalleryItem) => void;
@@ -342,6 +344,8 @@ export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, co
       {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
       {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} /> : null}
       {item.prompt ? <button type="button" aria-label="Copy Prompt" onClick={() => { void promptCopy.copyWith(() => actions.copyPrompt(item)); }}><CopyIcon copied={Boolean(promptCopy.copied)} size={21} /><span>{promptCopy.copied ? 'Copied' : 'Copy Prompt'}</span></button> : null}
+      {actions.animate && canAnimatePhoto(item) ? <button type="button" onClick={() => actions.animate!(item)}><Video size={21} /><span>Animate</span></button> : null}
+      {actions.animate && canExtendVideo(item) ? <button type="button" aria-label="Extend Video" onClick={() => actions.animate!(item)}><FastForward size={21} /><span>Extend</span></button> : null}
       {canStar(item) ? (
         <button type="button" className={cn('viewer-phone-star', item.favorite && 'is-starred')} aria-label={item.favorite ? 'Unstar' : 'Star'} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
           <Star size={21} fill={item.favorite ? 'currentColor' : 'none'} /><HapticTarget />

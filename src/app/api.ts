@@ -150,11 +150,12 @@ export function uploadReferenceAsset(file: File, onProgress?: (progress: number)
   });
 }
 
-export async function referenceAssetFromGallery(galleryItemId: string) {
+/** A gallery image as a reference, or with frame "last", a finished video's last frame. */
+export async function referenceAssetFromGallery(galleryItemId: string, { frame }: { frame?: "last" } = {}) {
   const data = await apiJson<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ galleryItemId })
+    body: JSON.stringify(frame ? { galleryItemId, frame } : { galleryItemId })
   });
   return data.asset;
 }

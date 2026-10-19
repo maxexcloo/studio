@@ -168,7 +168,7 @@ export async function sourceFromOutput(output) {
 }
 
 /** Reads a finished gallery item's own file (and its upscale), wherever it lives. */
-async function galleryItemBytes(item, url) {
+export async function galleryItemBytes(item, url) {
   if (!url) return null;
   const imported = url === item.url && importedImageFile(item);
   if (imported && fs.existsSync(imported)) return { buffer: fs.readFileSync(imported), sourcePath: imported, mime: "image/png" };

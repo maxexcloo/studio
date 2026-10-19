@@ -11,6 +11,10 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Animate from the image viewer:** a finished image has Animate in the viewer's dock on desktop and its action bar on a phone. It opens the same Animate review as a gallery selection, with that image as the first frame of a MiniMax H3 video.
+- **Extend Video:** a finished video has Extend Video in the viewer. Its last frame starts a new MiniMax H3 video with the video's prompt, which can be edited first. The frame is cut from the original when the run is staged and never stored, so only the owner's own videos can be extended and a Hidden video's extension stays in Hidden.
+
 ### Changed
 - **Clearer sign-in:** the account sign-in and first-administrator screens are a card like Studio's dialogs, with an Email field that phone keyboards no longer capitalise or autocorrect, inline errors and a separate Pocket ID button. Accounts are identified by email everywhere: new accounts and the first administrator need an email address, while existing non-email usernames keep working.
 - **Account actions on phones:** the phone studio's More sheet has an Account section with Accounts & MCP, Settings and Sign Out.

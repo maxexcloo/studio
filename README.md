@@ -180,6 +180,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 - **Edit or Reference.** On Flux.2 and Qwen-Image 2.1 the first reference is **Edit** (the result keeps its size and changes that picture) or **Reference** (it only guides, and the size and shape stay yours, 2K included).
 - **A reference library in the composer.** Click images to select or deselect them immediately; the picker stays open. Selected images stay first across searches and source tabs, and can still be removed when every slot is filled. Pick from uploads or your own generations, drop files in, or send any image from the viewer. Reuse an image and switch to Video to use that output as the starting reference with its aspect ratio; it replaces the primary video reference and preserves a separate end frame. An upscaled image is used upscaled.
 - **Your workflows too.** Imported workflows can take reference images and let one set the output size and aspect.
+- **Animate or extend from the viewer.** With a ready MiniMax H3 first-frame video model, **Animate** in the viewer starts a video from that image, and **Extend Video** continues a finished video from its last frame with its prompt. Both open the Animate review, so the prompt can be edited before it queues.
 
 </details>
 

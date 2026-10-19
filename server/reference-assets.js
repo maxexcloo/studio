@@ -6,7 +6,8 @@ import Busboy from "busboy";
 import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
 import { dataDir, importedImageFile, filterVisibleGallery, gallery, galleryKey, outputFileCandidates } from "./gallery-store.js";
 import { encryptionKeyFromRequest } from "./privacy.js";
-import { readVaultAsset, vaultGalleryItemsForRequest } from "./vault.js";
+import { galleryItemBytes, readVaultAsset, vaultGalleryItemsForRequest } from "./vault.js";
+import { extractLastFrame } from "./video-previews.js";
 import { renameWithRetry } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -296,7 +297,39 @@ async function publicGalleryBuffer(item) {
   return { buffer: Buffer.from(data), mime: mimeFromName(item.outputName || item.filename || item.url), name: item.outputName || item.filename || "generated-image.png" };
 }
 
-export function referenceAssetFromGallery(req, galleryItemId) {
+// Marks a reference to a finished video's last frame, which is cut from the video when a run is staged.
+const lastFrameSuffix = ":last-frame";
+
+/**
+ * A finished video of this request's own, as the reference for its last frame.
+ * Nothing is stored: the id carries the video's own reference (vault: for
+ * Hidden, so every Hidden rule still applies) and the frame is cut when used.
+ */
+function lastFrameAsset(req, galleryItemId) {
+  const finishedVideo = (item) => item.type === "video" && item.status === "done" && item.url && !item.library;
+  const item = filterVisibleGallery(recordsForRequest(gallery, req)).find((candidate) => finishedVideo(candidate) && (candidate.id === galleryItemId || galleryKey(candidate) === galleryItemId))
+    || vaultGalleryItemsForRequest(req, { bundles: false }).find((candidate) => finishedVideo(candidate) && candidate.id === galleryItemId);
+  if (!item) throw new Error("That video is no longer in the gallery.");
+  const asset = galleryAsset(item);
+  return { ...asset, id: `${asset.id}${lastFrameSuffix}`, name: `${String(asset.name).replace(/\.[a-z0-9]+$/i, "")} last frame.png`, mime: "image/png", size: 0, url: "", thumbnailUrl: item.thumbnailUrl || "" };
+}
+
+async function lastFrameBytes(req, videoId) {
+  let video;
+  if (videoId.startsWith("vault:")) {
+    const vault = readVaultAsset(req, videoId.slice(6));
+    if (!vault || vault.item?.type !== "video") throw new Error("This Hidden video is locked or gone.");
+    video = { buffer: vault.buffer, name: vault.item.outputName || "hidden-video" };
+  } else {
+    const item = findGalleryItem(videoId, req);
+    if (!item || item.type !== "video" || item.status !== "done" || item.library) throw new Error("That video is no longer in the gallery.");
+    video = { ...await galleryItemBytes(item, item.url), name: item.outputName || item.filename || "video" };
+  }
+  return { buffer: await extractLastFrame(video.buffer), mime: "image/png", name: `${String(video.name).replace(/\.[a-z0-9]+$/i, "")}-last-frame.png` };
+}
+
+export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {}) {
+  if (frame === "last") return lastFrameAsset(req, galleryItemId);
   // Images added from another folder are shown in place, not ComfyUI outputs it can read back.
   const publicItem = filterVisibleGallery(recordsForRequest(gallery, req)).find((item) => item.type === "image" && item.status === "done" && !item.library && (item.id === galleryItemId || item.url === galleryItemId || galleryKey(item) === galleryItemId));
   if (publicItem) return galleryAsset(publicItem);
@@ -332,6 +365,7 @@ async function preferUpscale(original, readUpscale) {
 
 /** The bytes a run gets for a reference (exported for tests). */
 export async function bytesForReference(req, id) {
+  if (String(id).endsWith(lastFrameSuffix)) return lastFrameBytes(req, String(id).slice(0, -lastFrameSuffix.length));
   if (String(id).startsWith("vault:")) {
     const vaultId = String(id).slice(6);
     const vault = readVaultAsset(req, vaultId);
