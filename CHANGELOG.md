@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-19
+
 ### Changed
 - **Renamed to Studio:** this fork is now Studio, at `maxexcloo/studio` and `ghcr.io/maxexcloo/studio`. The app title, wordmark, MCP server and messages say Studio; HEISS UI stays credited as upstream. Upstream's `HEISS_*` settings keep their names. The fork's own settings move to `STUDIO_*`, with no fallback: `STUDIO_MULTI_USER`, `STUDIO_SETUP_TOKEN`, `STUDIO_OIDC_*`, `STUDIO_MCP_API_KEY`, `STUDIO_OUTPUT_STORAGE` (its `heiss` value is now `studio`), `STUDIO_MEDIA_DIR`, `STUDIO_WORKER_TOKEN`, `STUDIO_MODEL_MANIFEST`, `STUDIO_MODEL_MANIFEST_PREFIX`, `STUDIO_DEFAULT_IMAGE_PROFILE`, `STUDIO_DEFAULT_VIDEO_PROFILE`, `STUDIO_ENABLE_BUILTIN_PROFILES`, `STUDIO_ENABLE_GROK`, `STUDIO_ENABLE_TESSERA`, `STUDIO_ENABLE_LORAS`, `STUDIO_ENABLE_PRESETS` and `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS`.
 - **Worker node:** the ComfyUI node is now `comfyui/studio_worker`, answering on `/studio/worker` with the `X-Studio-Worker-Token` header. Update it together with Studio.
@@ -1202,7 +1204,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/maxexcloo/studio/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/maxexcloo/studio/releases/tag/v0.19.0
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
