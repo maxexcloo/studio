@@ -167,19 +167,39 @@ export class McpMedia {
       await new Promise(resolve => setTimeout(resolve, Math.min(2000, deadline - Date.now())));
     }
   }
+  /** Result links are sealed (AES-256-GCM), so a shared link reveals no account or job ID. */
+  sealingKey() {
+    return crypto.hkdfSync('sha256', Buffer.from(String(this.key)), Buffer.alloc(0), Buffer.from('heiss-mcp-result-link-v2'), 32);
+  }
   token(owner, jobId, index) {
     // Links do not expire; every request rechecks ownership and that the output still exists.
-    const payload = Buffer.from(JSON.stringify({ audience: this.publicUrl, owner, jobId, index })).toString('base64url');
-    return `${payload}.${this.digest(payload)}`;
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), iv);
+    const sealed = Buffer.concat([cipher.update(JSON.stringify({ audience: this.publicUrl, owner, jobId, index })), cipher.final()]);
+    return `v2.${iv.toString('base64url')}.${sealed.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}`;
   }
   claims(token) {
-    const [payload, signature, extra] = token.split('.');
-    const expected = this.digest(payload || '');
-    if (extra || !signature || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('Invalid result link.');
-    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    // Links issued before the no-expiry change keep the expiry they were issued with.
-    const expired = claims.expires !== undefined && (!Number.isFinite(claims.expires) || claims.expires <= Date.now());
-    if (claims.audience !== this.publicUrl || expired || !Number.isInteger(claims.index) || claims.index < 0) throw new Error('Invalid or expired result link.');
+    const parts = String(token || '').split('.');
+    let claims;
+    if (parts[0] === 'v2') {
+      const [, iv, sealed, tag, extra] = parts;
+      // Canonical base64url only: an altered character must never decode to the same bytes.
+      const canonical = (part) => Buffer.from(part, 'base64url').toString('base64url') === part;
+      if (extra !== undefined || !iv || !sealed || !tag || ![iv, sealed, tag].every(canonical)) throw new Error('Invalid result link.');
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(this.sealingKey()), Buffer.from(iv, 'base64url'));
+        decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+        claims = JSON.parse(Buffer.concat([decipher.update(Buffer.from(sealed, 'base64url')), decipher.final()]).toString());
+      } catch { throw new Error('Invalid result link.'); }
+    } else {
+      // Links issued before sealing: a readable payload with its signature, and any expiry it carried.
+      const [payload, signature, extra] = parts;
+      const expected = this.digest(payload || '');
+      if (extra || !signature || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('Invalid result link.');
+      claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
+      if (claims.expires !== undefined && (!Number.isFinite(claims.expires) || claims.expires <= Date.now())) throw new Error('Invalid or expired result link.');
+    }
+    if (claims.audience !== this.publicUrl || !Number.isInteger(claims.index) || claims.index < 0) throw new Error('Invalid result link.');
     this.own(claims.owner, claims.jobId);
     return claims;
   }
