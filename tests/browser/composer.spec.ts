@@ -72,6 +72,35 @@ test('phone compact prompt is one muted line with overflow ellipsis', async ({ p
   expect(prompt!.height).toBe(send!.height);
 });
 
+test('phone prompt keeps a usable height when tapped with the keyboard up', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Phone creation sheet.');
+  // iOS Safari: the keyboard shrinks only the visual viewport, so the sheet lifts by the inset and loses that height.
+  await page.addInitScript(() => {
+    const viewport = new EventTarget();
+    const state = { height: innerHeight };
+    for (const [key, read] of Object.entries({ height: () => state.height, offsetLeft: () => 0, offsetTop: () => 0, scale: () => 1, width: () => innerWidth })) Object.defineProperty(viewport, key, { get: read });
+    Object.defineProperty(window, 'visualViewport', { get: () => viewport });
+    Object.assign(window, { keyboard: (height: number) => { state.height = innerHeight - height; viewport.dispatchEvent(new Event('resize')); } });
+  });
+  await page.setViewportSize({ width: 393, height: 660 });
+  await page.goto('/');
+  await page.locator('.phone-create-open').click();
+  const sheet = page.locator('.phone-create');
+  const prompt = sheet.getByRole('textbox', { name: 'Prompt', exact: true });
+  await prompt.tap();
+  await expect(prompt).toBeFocused();
+  await page.evaluate(() => (window as unknown as { keyboard: (height: number) => void }).keyboard(336));
+  await expect(page.locator('html')).toHaveClass(/kb-open/);
+  await expect.poll(() => prompt.evaluate((field) => {
+    // The part of the field left uncovered by every box that could clip it.
+    const boxes = [field, field.closest('.phone-sheet-body')!, field.closest('.phone-sheet')!].map((box) => box.getBoundingClientRect());
+    return Math.round(Math.min(...boxes.map((box) => box.bottom)) - Math.max(...boxes.map((box) => box.top)));
+  })).toBeGreaterThanOrEqual(60);
+  const send = sheet.getByRole('button', { name: 'Generate', exact: true });
+  await send.scrollIntoViewIfNeeded();
+  await expect(send).toBeInViewport();
+});
+
 
 test('each expanded field owns its clear action and reset clears only the current creation', async ({ page, isMobile }) => {
   let destructiveRequest = false;

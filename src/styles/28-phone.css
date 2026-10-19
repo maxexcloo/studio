@@ -428,6 +428,12 @@
 
 /* -------------------------------------------------------------- Create */
 
+/* An on-screen keyboard leaves the sheet little height. The prompt keeps its
+   own height and the whole sheet scrolls, rather than the body shrinking to a
+   sliver above the fixed footer until a scroll moves the keyboard inset. */
+.phone-create { overflow-y: auto; overscroll-behavior: contain; }
+.phone-create > .phone-sheet-body { flex: 1 0 auto; overflow: visible; }
+
 .phone-compose {
   position: relative;
   display: grid;
