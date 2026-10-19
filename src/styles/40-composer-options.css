@@ -226,3 +226,7 @@
 .composer-loras .lora-library-row > .lora-details[open] > div { padding-top: 2px; }
 /* The keyboard's place in the list is always visible. */
 .composer-loras .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .055); }
+
+/* The on/off switch beside a strength is small to look at but a full finger's width to tap. */
+.composer-loras .lora-library-settings .switch { position: relative; }
+.composer-loras .lora-library-settings .switch::after { content: ""; position: absolute; inset: -13px -4px; }

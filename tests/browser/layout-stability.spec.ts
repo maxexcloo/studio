@@ -135,3 +135,16 @@ test('short desktop filter tools stay above the composer', async ({ page, isMobi
   const composer = await page.locator('.zen-prompt').boundingBox();
   expect(panel!.y + panel!.height).toBeLessThanOrEqual(composer!.y);
 });
+
+test('the composer model menu stays within the composer, under its trigger', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The phone uses its own model sheet.');
+  await page.goto('/');
+  await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await page.locator('.zen-prompt .model-trigger').click();
+  const menu = page.locator('.model-menu');
+  await expect(menu).toBeVisible();
+  const [box, composer, trigger] = await Promise.all([menu.boundingBox(), page.locator('.zen-prompt').boundingBox(), page.locator('.zen-prompt .model-trigger').boundingBox()]);
+  expect(box!.x).toBeGreaterThanOrEqual(composer!.x);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(composer!.x + composer!.width + 1);
+  expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThan(2);
+});

@@ -596,15 +596,20 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
       const anchor = pickerRef.current?.getBoundingClientRect();
       const surface = menuRef.current;
       if (!anchor || !surface) return;
-      const width = Math.min(520, window.innerWidth - 32);
+      // Inside the composer the menu stays within it, right-aligned under its trigger, like the
+      // composer's other pickers; elsewhere it keeps to the screen.
+      const host = pickerRef.current?.closest('.zen-prompt')?.getBoundingClientRect();
+      const bounds = host ? { left: host.left + 8, right: host.right - 8 } : { left: 16, right: window.innerWidth - 16 };
+      const width = Math.min(520, window.innerWidth - 32, bounds.right - bounds.left);
       const above = anchor.top - 16;
       const below = window.innerHeight - anchor.bottom - 16;
       const upward = compact ? above >= Math.min(320, below) : below < Math.min(320, above);
+      const left = host ? Math.max(bounds.left, Math.min(anchor.right - width, bounds.right - width)) : Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16));
       Object.assign(surface.style, {
         position: 'absolute',
         width: `${width}px`,
         minWidth: '0',
-        left: `${Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16)) - anchor.left}px`,
+        left: `${left - anchor.left}px`,
         right: 'auto',
         top: upward ? 'auto' : 'calc(100% + 8px)',
         bottom: upward ? 'calc(100% + 8px)' : 'auto',
