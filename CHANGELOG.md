@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Email sign-in, Animate and Extend Video in the viewer, and a steadier phone prompt
+
 ### Added
 - **Animate from the image viewer:** a finished image has Animate in the viewer's dock on desktop and its action bar on a phone. It opens the same Animate review as a gallery selection, with that image as the first frame of a MiniMax H3 video.
 - **Extend Video:** a finished video has Extend Video in the viewer. Its last frame starts a new MiniMax H3 video with the video's prompt, which can be edited first. The frame is cut from the original when the run is staged and never stored, so only the owner's own videos can be extended and a Hidden video's extension stays in Hidden.
