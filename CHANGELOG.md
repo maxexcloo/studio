@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-19
+
 ### Added
 - **Cloud video while the local worker is off:** when the separate local video worker is unavailable, as in a text and image GPU mode, MCP Generate with `kind: video` and Reuse animation without a `profile_id` now use a ready provider-backed cloud video profile, such as Grok, instead of failing. The profile matching the requested tier wins, otherwise Standard; animation needs one that takes a starting image. The reply marks the profile `remote` and names it, so users know the video went to the cloud. `/api/models` reports the video worker's availability with the catalogue it already loads, so no request adds a check. Explicit profiles, accounts without cloud access and a running local worker behave as before.
 
@@ -1240,7 +1242,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/maxexcloo/studio/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/maxexcloo/studio/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/maxexcloo/studio/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/maxexcloo/studio/compare/v0.21.0...v0.22.0
