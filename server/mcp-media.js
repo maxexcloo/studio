@@ -24,7 +24,8 @@ export function mcpOutputPath(value) {
 }
 
 export class McpMedia {
-  constructor({ dataDir, baseUrl, publicUrl, signingKey, fetchImpl = fetch, resolveSignedResult }) {
+  constructor({ dataDir, baseUrl, publicUrl, signingKey, fetchImpl = fetch, resolveSignedResult, profileTtl = 60000 }) {
+    this.profileTtl = profileTtl;
     this.baseUrl = baseUrl;
     this.publicBase = publicUrl;
     this.fetch = fetchImpl;
@@ -70,14 +71,33 @@ export class McpMedia {
       throw error;
     }
   }
+  /** Forget every cached catalogue when the studio's model list changes. */
+  invalidateProfiles() {
+    this.profileGeneration = (this.profileGeneration || 0) + 1;
+    this.profileCache?.clear();
+  }
   async profiles(kind = 'all', owner = "") {
-    // Concurrent submissions share discovery; do not queue repeated catalogue scans.
+    // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
     this.profileRequests ||= new Map();
-    if (!this.profileRequests.has(owner)) {
-      const pending = this.request('GET', '/api/models?cached=1', undefined, owner).finally(() => this.profileRequests.delete(owner));
-      this.profileRequests.set(owner, pending);
+    this.profileCache ||= new Map();
+    const cached = this.profileCache.get(owner);
+    let models = cached && Date.now() - cached.at < (this.profileTtl ?? 60000) ? cached.models : null;
+    if (!models) {
+      // Concurrent submissions share discovery; do not queue repeated catalogue scans.
+      if (!this.profileRequests.has(owner)) {
+        const generation = this.profileGeneration || 0;
+        const pending = this.request('GET', '/api/models?cached=1', undefined, owner).then(result => {
+          // A scan that overlapped a model-list change is used once but not cached.
+          if ((this.profileGeneration || 0) === generation) {
+            if (this.profileCache.size >= 4096) this.profileCache.delete(this.profileCache.keys().next().value);
+            this.profileCache.set(owner, { at: Date.now(), models: result });
+          }
+          return result;
+        }).finally(() => this.profileRequests.delete(owner));
+        this.profileRequests.set(owner, pending);
+      }
+      models = await this.profileRequests.get(owner);
     }
-    const models = await this.profileRequests.get(owner);
     return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
   }
   async queue(owner, args) {
@@ -250,7 +270,7 @@ export class McpMedia {
   }
   async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview') {
     const job = await this.job(owner, jobId, seconds);
-    if (!finished.has(job.status)) return mcpJson({ job_id: jobId, ...this.summary(job) });
+    if (!finished.has(job.status)) return mcpJson({ job_id: jobId, ...this.summary(job), ...(terminal.has(job.status) ? {} : { message: 'Not finished yet. Reply now; do not poll. A background Result with delivery=notification reports completion.' }) });
     const available = this.available(job, index);
     if (delivery === 'notification') return mcpJson({ job_id: jobId, output_index: index, status: 'done', kind: job.kind, message: 'This job is finished. Call Result once now with delivery=preview and wait_seconds=0 to show its image inline or view its video. Do not background the preview, poll or generate again.' });
     const url = this.url(owner, jobId, index);

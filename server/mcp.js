@@ -10,7 +10,7 @@ import { hostAllowed } from './request-guard.js';
 import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 
-const instructions = 'Use HEISS tools directly for requested images or videos. Discover Models by kind, then fetch the selected exact profile_id once for its prompting guidance, defaults and reference slots. Preserve explicit model choices and user intent. Generate takes prompts as a list of strings and returns job IDs immediately. Never wait for generation in the foreground or poll in a loop. If the host exposes run_in_background on Result, start exactly one Result for each returned job with delivery=notification, wait_seconds=1800 and run_in_background=true, then acknowledge submission immediately; the host delivers the text-only completion automatically. When it arrives with status done, call Result once with delivery=preview and wait_seconds=0 to attach the finished image or video; never background the preview call. Otherwise use Status or Result for the exact job only when asked; never resubmit completed work. Use the saved default generation count and dimensions unless the user explicitly requests a different count or size. Show attached images inline with a brief caption. Label original links View Original, never Download. Do not replace the image with a text link or reproduce raw URLs. Upload user-supplied images, or Reuse an owned image for follow-ups. Never invent results or tool responses. GPU allocation is manual: only use separately authorised AI Control tools for an explicit control request, present Preview and obtain approval before Apply. Media generation never changes allocation.';
+const instructions = 'HEISS makes requested images and videos. Models lists profiles by kind; Models with a profile_id returns its prompting guide, defaults and reference slots. Keep explicit model choices, user intent and the saved count and size unless asked otherwise. Generate queues jobs and returns job IDs at once; never wait or poll in the foreground, and never resubmit. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=1800 and run_in_background=true, then reply immediately. When it reports done, call Result once with delivery=preview and wait_seconds=0, never in the background. Otherwise use Status or Result only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.';
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200) };
@@ -27,9 +27,22 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const parsedPublic = new URL(publicUrl);
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
   const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl, resolveSignedResult }) : null;
+  const foregroundWait = Number(environment.HEISS_MCP_FOREGROUND_WAIT_SECONDS ?? 20);
+  if (!Number.isInteger(foregroundWait) || foregroundWait < 0 || foregroundWait > 1800) throw new Error('HEISS_MCP_FOREGROUND_WAIT_SECONDS must be a whole number from 0 to 1800.');
+  // Only a background notification may hold a request open for long; a foreground wait blocks the chat.
+  const capWait = (seconds, delivery) => delivery === 'notification' ? seconds : Math.min(seconds, foregroundWait);
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
+  // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
+  if (media) app.use('/api/models', (req, _res, next) => {
+    if (req.method !== 'GET' ? true : req.path === '/' && req.query.cached !== '1') media.invalidateProfiles();
+    next();
+  });
   const reviewedGuides = new Map();
   const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
+  const review = (owner, profileId) => {
+    if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
+    reviewedGuides.set(guideKey(owner, profileId), Date.now());
+  };
   const guard = (req, res, next) => {
     res.set('Cache-Control', 'private, no-store');
     if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) return res.status(403).json({ error: 'Unrecognised MCP host.' });
@@ -75,42 +88,46 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const create = ({ scope, owner }) => {
     const server = new McpServer({ name: 'HEISS', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
-      tool(server, 'Models', 'Browse Models', 'Discover ready profiles by kind. Supply exact profile_id for defaults, capabilities, prompting guidance, compatible LoRAs and reference slots and native size support. Explicit width and height request native generation; 2K uses a 2048-pixel long side. Fetch details before first use; imageModes.reference overrides text-only controls when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
+      tool(server, 'Models', 'Browse Models', 'List ready profiles by kind. With profile_id, return its prompting guide, defaults, capabilities, LoRAs, reference slots and native sizes. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id !== undefined) {
           profiles = profiles.filter(profile => profile.id === profile_id);
           if (!profiles.length) throw new Error('Choose a ready profile from Models.');
         }
-        if (profile_id !== undefined) {
-          if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
-          reviewedGuides.set(guideKey(owner, profile_id), Date.now());
-        }
+        if (profile_id !== undefined) review(owner, profile_id);
         const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native', 'options'];
         return mcpJson({ profiles: profiles.map(profile => ({ ...Object.fromEntries(fields.filter(key => key in profile).map(key => [key, profile[key]])), ...(profile_id === undefined ? {} : { defaults: { ...profile.defaults, count: defaultGenerationCount } }), prompting: prompting(profile, profile_id !== undefined) })) });
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', 'Queue requested media immediately; return job IDs without blocking chat. Fetch Models details first. Use the saved default generation count and dimensions unless explicitly requested otherwise. Variants use separate jobs, at most four jobs per submission. Keep defaults unless requested. Never wait, poll or resubmit for progress; acknowledge the returned jobs immediately. Never switch GPUs.', {
+      tool(server, 'Generate', 'Generate Media', 'Queue media and return job IDs at once. Keep saved defaults, count and size unless asked. At most four jobs per call. If this profile’s guide was not yet read, it is returned with the jobs; apply it to later prompts. Never wait, poll or resubmit. Never switches GPUs.', {
         profile_id: z.string().min(1), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.literal(0).default(0), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async (args) => {
         const reviewed = reviewedGuides.get(guideKey(owner, args.profile_id));
-        if (reviewed === undefined || Date.now() - reviewed >= 3600000) throw new Error('Fetch Models with this exact profile_id to read its full prompting guide and saved controls before generating. Guidance must be refreshed after one hour or a studio restart.');
+        // An unread guide accompanies the submission instead of costing a refused call and another round trip.
+        const unread = reviewed === undefined || Date.now() - reviewed >= 3600000;
         const submission = await media.queue(owner, args);
-        return mcpJson({ ...submission, message: 'Submitted. If Result supports run_in_background, start one Result per returned job with delivery=notification, wait_seconds=1800 and run_in_background=true, then reply immediately. Otherwise reply now and retrieve only when requested. Never poll, wait in the foreground or resubmit.' });
+        let guide = {};
+        if (unread) {
+          const profile = (await media.profiles('all', owner)).find(item => item.id === args.profile_id);
+          if (profile) guide = { prompting: prompting(profile, true), guide_note: 'This profile’s prompting guide was not read before submission; apply it to later prompts.' };
+          review(owner, args.profile_id);
+        }
+        return mcpJson({ ...submission, ...guide, message: 'Submitted. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=1800 and run_in_background=true, then reply immediately. Otherwise reply now. Never poll, wait in the foreground or resubmit.' });
       });
-      tool(server, 'Status', 'Generation Status', 'Return immediate status for this account’s job. Completed outputs have signed download links. Use Result for an inline preview. Wait only when explicitly asked, at most twenty seconds.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }) => {
-        const status = await media.job(owner, job_id, wait_seconds);
+      tool(server, 'Status', 'Generation Status', 'Return this account’s job status now, with signed links for finished outputs. Use Result for an inline preview. Wait only when asked, briefly.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }) => {
+        const status = await media.job(owner, job_id, capWait(wait_seconds));
         return mcpJson({ ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, job_id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', 'Show this account’s requested result. Return immediately by default; attach a finished image preview or video download. For automatic completion in a saved Agent, call once per submitted job with delivery=notification, wait_seconds=1800 and run_in_background=true; then collect delivery=preview with wait_seconds=0 after completion. Notification returns text only so the host can deliver it automatically. Never wait in the foreground or poll in a loop. Signed original download links stay valid until the output is hidden or deleted.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800) }, ({ job_id, output_index, delivery, wait_seconds }) => media.result(owner, job_id, output_index, wait_seconds, delivery), { readOnlyHint: true });
-      tool(server, 'Cancel', 'Cancel Generation', 'Cancel only this account’s exact job when the user requests cancellation.', job, async ({ job_id }) => {
+      tool(server, 'Result', 'Show Result', 'Show this account’s result: a finished image preview or video link, immediately by default. For automatic completion, call once per job in the background with delivery=notification, wait_seconds=1800 and run_in_background=true; it returns text only. Then call delivery=preview with wait_seconds=0. Foreground waits are capped; never poll.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800) }, ({ job_id, output_index, delivery, wait_seconds }) => media.result(owner, job_id, output_index, capWait(wait_seconds, delivery), delivery), { readOnlyHint: true });
+      tool(server, 'Cancel', 'Cancel Generation', 'Cancel this account’s job when the user asks.', job, async ({ job_id }) => {
         media.own(owner, job_id);
         await media.job(owner, job_id);
         return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(job_id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
-      tool(server, 'Upload', 'Upload Reference', 'Upload a user-supplied PNG, JPEG or WebP image as base64, at most 20 MB. The returned reference asset belongs to this account; supply its id to Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
-      tool(server, 'Reuse', 'Reuse Image', 'Reuse this account’s completed image as a reference without reattachment. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
+      tool(server, 'Upload', 'Upload Reference', 'Upload a user’s PNG, JPEG or WebP image (base64, at most 20 MB) as a reference; pass its id to Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
+      tool(server, 'Reuse', 'Reuse Image', 'Use this account’s finished image as a reference without reattaching it. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
         const result = await media.download(owner, job_id, output_index);
         if (!['image/png', 'image/jpeg', 'image/webp'].includes(result.mime)) throw new Error('Only images can be reused as references.');
         return mcpJson(await media.upload(owner, result.content.toString('base64'), `reference.${result.mime.split('/')[1]}`));
@@ -123,14 +140,14 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           return mcpJson(await response.json());
         } catch { throw new Error('AI Control is unavailable or refused the request. Refresh its status and preview before retrying.'); }
       };
-      tool(server, 'GPUStatus', 'AI Control Status', 'Read GPU allocation and runtime health. Requires a separate AI Control credential.', {}, () => request('GET', 'status'), { readOnlyHint: true });
-      tool(server, 'Workloads', 'AI Control Catalogue', 'List supported workloads and placement rules before an explicitly requested allocation.', {}, () => request('GET', 'catalogue'), { readOnlyHint: true });
-      tool(server, 'Preview', 'Preview GPU Allocation', 'Preview a COMPLETE GPU board without applying it. Omitted workloads stop; an empty board stops all workloads. Present the returned changes for approval. Cancel by discarding the preview.', { allocation }, args => request('POST', 'board/plan', args), { readOnlyHint: true });
-      tool(server, 'Apply', 'Apply GPU Allocation', 'Apply only an explicitly requested complete allocation after presenting its preview and obtaining approval. Supply its exact signature. Active jobs may stop; never switch GPUs to satisfy media generation.', { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) }, ({ allocation, signature, confirmed }) => {
+      tool(server, 'GPUStatus', 'GPU Status', 'Read GPU allocation and runtime health.', {}, () => request('GET', 'status'), { readOnlyHint: true });
+      tool(server, 'Workloads', 'GPU Workloads', 'List workloads and placement rules for an explicitly requested allocation.', {}, () => request('GET', 'catalogue'), { readOnlyHint: true });
+      tool(server, 'Preview', 'Preview GPU Allocation', 'Preview a COMPLETE GPU board without applying it; omitted workloads stop and an empty board stops all. Present the changes for approval; discard to cancel.', { allocation }, args => request('POST', 'board/plan', args), { readOnlyHint: true });
+      tool(server, 'Apply', 'Apply GPU Allocation', 'Apply an explicitly requested allocation only after its Preview was presented and approved, with its exact signature. Active jobs may stop; never use it for media generation.', { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) }, ({ allocation, signature, confirmed }) => {
         if (!confirmed) throw new Error('Present the preview and obtain approval before applying this allocation.');
         return request('POST', 'board', { allocation, replace: true, signature });
       }, { destructiveHint: true });
-      tool(server, 'Operation', 'AI Control Job', 'Read the control job returned by Apply, without waiting or starting another operation.', { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) }, ({ job_id }) => request('GET', `jobs/${job_id}`), { readOnlyHint: true });
+      tool(server, 'Operation', 'GPU Operation', 'Read the job returned by Apply, without waiting.', { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) }, ({ job_id }) => request('GET', `jobs/${job_id}`), { readOnlyHint: true });
     }
     return server;
   };

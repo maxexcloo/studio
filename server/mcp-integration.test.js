@@ -45,7 +45,6 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
   let base;
   app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
-  app.get('/api/models', (_req, res) => res.json({ profiles, defaults: { imageModel: imageProfile.id, videoModel: videoProfile.id } }));
   app.post('/api/generate', (req, res) => {
     if (submitted.length >= failAfter) return res.status(503).json({ error: 'Fixture backend offline' });
     submitted.push(req.body);
@@ -90,6 +89,8 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
       return response;
     }
   });
+  // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
+  app.get('/api/models', (_req, res) => res.json({ profiles, defaults: { imageModel: imageProfile.id, videoModel: videoProfile.id } }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -107,7 +108,8 @@ async function fixture(t, { environment: extra = {}, dataDir: existingDir, enabl
     completeOnSubmit: () => { completeOnSubmit = true; },
     jobLookupFails: value => { jobLookupFails = value; },
     deduplicateUploads: () => { deduplicateUploads = true; },
-    profiles: value => { profiles = value; },
+    // A model change reaches the studio as a rescan, which refreshes MCP's cached catalogues.
+    profiles: async value => { profiles = value; await fetch(`${base}/api/models`); },
     client: async (user = 'alice', key = mediaKey) => {
       const client = new Client({ name: 'heiss-integration-fixture', version: '1.0.0' }, { capabilities: {} });
       clients.push(client);
@@ -255,20 +257,58 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
 });
 
-test('Generate requires this account to read the selected full guide, not discovery or another profile', async t => {
+test('Generate shows the full guide unless this account read the selected profile, not discovery or another profile', async t => {
   const f = await fixture(t);
+  await f.profiles([{ ...structuredClone(imageProfile), prompting: { id: 'fixture-guide', summary: 'Subject first', rules: ['Describe the subject first'] } }, structuredClone(videoProfile)]);
   const alice = await f.client('alice');
   const args = { profile_id: imageProfile.id, prompts: ['A landscape'], count: 1 };
-  await failure(alice, 'Generate', args);
   await call(alice, 'Models', { kind: 'image' });
-  await failure(alice, 'Generate', args);
   await call(alice, 'Models', { profile_id: videoProfile.id });
-  await failure(alice, 'Generate', args);
-  assert.equal(f.submitted.length, 0);
+  const first = data(await call(alice, 'Generate', args));
+  assert.equal(first.status, 'queued');
+  assert.deepEqual(first.prompting.rules, ['Describe the subject first'], 'an unread guide accompanies the submission');
+  assert.ok(first.guide_note);
+  const second = data(await call(alice, 'Generate', args));
+  assert.equal(second.prompting, undefined, 'the guide is shown once per account');
+  const bob = await f.client('bob');
+  await call(bob, 'Models', { profile_id: imageProfile.id });
+  assert.equal(data(await call(bob, 'Generate', args)).prompting, undefined, 'a guide read through Models is not repeated');
+  assert.ok(data(await call(await f.client('carol'), 'Generate', args)).prompting, 'another account has not read it');
+  assert.equal(f.submitted.length, 4);
+});
+
+test('Models caches each owner’s catalogue for the TTL instead of rescanning per call', async t => {
+  const f = await fixture(t);
+  const scans = () => f.requests.filter(request => request.path === '/models').length;
+  const alice = await f.client('alice');
+  await call(alice, 'Models', { kind: 'image' });
+  await call(alice, 'Models', { kind: 'video' });
   await call(alice, 'Models', { profile_id: imageProfile.id });
-  assert.equal(data(await call(alice, 'Generate', args)).status, 'queued');
-  await failure(await f.client('bob'), 'Generate', args);
-  assert.equal(f.submitted.length, 1);
+  assert.equal(scans(), 1, 'one upstream scan serves repeated Models calls within the TTL');
+  data(await call(alice, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], count: 1 }));
+  assert.equal(scans(), 1, 'Generate reuses the cached catalogue');
+  const bob = await f.client('bob');
+  assert.deepEqual(data(await call(bob, 'Models', { kind: 'video' })).profiles.map(profile => profile.id), [videoProfile.id]);
+  assert.equal(scans(), 2, 'each owner has its own cache entry');
+  await f.profiles([structuredClone(videoProfile)]);
+  const rescans = scans();
+  assert.deepEqual(data(await call(alice, 'Models', {})).profiles.map(profile => profile.id), [videoProfile.id], 'a studio rescan invalidates cached catalogues');
+  assert.equal(scans(), rescans + 1);
+});
+
+test('foreground Status and Result waits are capped; background notification waits are not', async t => {
+  const f = await fixture(t, { environment: { HEISS_MCP_FOREGROUND_WAIT_SECONDS: '0' } });
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  let started = performance.now();
+  const pending = data(await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 1800 }));
+  assert.equal(pending.status, 'running');
+  assert.match(pending.message, /do not poll/);
+  assert.equal(data(await call(client, 'Status', { job_id: id, wait_seconds: 20 })).status, 'running');
+  assert.ok(performance.now() - started < 1500, 'foreground waits return at once under a zero cap');
+  setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
+  assert.equal(data(await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 1800 })).status, 'done');
+  await assert.rejects(fixture(t, { environment: { HEISS_MCP_FOREGROUND_WAIT_SECONDS: 'forever' } }), /HEISS_MCP_FOREGROUND_WAIT_SECONDS/);
 });
 
 test('Generate returns immediately with one saved-size image and passes explicit controls without polling', async t => {
@@ -488,7 +528,7 @@ test('invalid generation controls, references and excessive batches fail before 
     { loras: [{ name: 'unavailable-effect.safetensors', strength: 1 }] }
   ]) await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], ...arguments_ });
   assert.equal(f.submitted.length, 0);
-  f.profiles([{ ...imageProfile, capabilities: {} }]);
+  await f.profiles([{ ...imageProfile, capabilities: {} }]);
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], cfg: 1 });
   assert.equal(f.submitted.length, 0);
@@ -630,7 +670,7 @@ test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded
 
 test('reference-mode capabilities override text controls without losing the profile LoRA options', async t => {
   const f = await fixture(t);
-  f.profiles([{ ...imageProfile, imageModes: {
+  await f.profiles([{ ...imageProfile, imageModes: {
     generate: { capabilities: { ...imageProfile.capabilities, negativePrompt: false, denoise: false }, defaults: imageProfile.defaults },
     reference: { capabilities: imageProfile.capabilities, defaults: imageProfile.defaults }
   } }]);
@@ -705,7 +745,7 @@ test('Models consumes self-contained profile guidance without a runtime promptin
   const shared = { id: 'owned-guide', summary: 'Profile-owned research', rules: ['Preserve the subject'], patterns: { subject: 'Subject first', composition: 'Then composition' }, sources: ['https://example.test/research'], reviewed_on: '2026-10-16', variant: { id: 'distilled', rules: ['Keep the saved steps'] } };
   const generateGuide = { ...shared, mode: { id: 'generate', example: 'A tree in morning light' } };
   const referenceGuide = { ...shared, mode: { id: 'reference', example: 'Keep the tree and change its background' } };
-  f.profiles([{ ...imageProfile, prompting: shared, imageModes: { generate: { prompting: generateGuide }, reference: { prompting: referenceGuide } } }]);
+  await f.profiles([{ ...imageProfile, prompting: shared, imageModes: { generate: { prompting: generateGuide }, reference: { prompting: referenceGuide } } }]);
   const client = await f.client();
   const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0];
   assert.deepEqual(compact.prompting, { id: 'owned-guide', summary: 'Profile-owned research', mode: 'generate', variant: 'distilled' });
@@ -724,7 +764,7 @@ test('profile-owned prompting overrides a stale compatibility inventory', async 
   fs.writeFileSync(file, JSON.stringify({ families: { flux: { image: 'stale-pack' } }, packs: { 'stale-pack': { summary: 'Stale fallback guidance', rules: ['Old guidance'] } } }));
   const f = await fixture(t, { dataDir: dir, environment: { MCP_PROMPTING_PATH: file } });
   const owned = { id: 'profile-guide', summary: 'Reviewed profile guidance', rules: ['Use the reviewed profile'], sources: ['https://example.test/reviewed'], reviewed_on: '2026-10-16' };
-  f.profiles([{ ...imageProfile, prompting: owned }]);
+  await f.profiles([{ ...imageProfile, prompting: owned }]);
   const client = await f.client();
   assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].prompting, owned);
 });
@@ -784,7 +824,7 @@ test('MCP advertises native sizing and submits tiled 2K with an explicit referen
   const f = await fixture(t);
   const client = await f.client('native-sizing');
   const profile = { ...imageProfile, aspectPolicy: 'reference', family: 'flux3', native: { '2k': 'yes' }, workflow: 'family:flux3' };
-  f.profiles([profile]);
+  await f.profiles([profile]);
   const detail = data(await call(client, 'Models', { profile_id: profile.id })).profiles[0];
   assert.deepEqual(detail.native, { '2k': 'yes' });
   const uploaded = data(await call(client, 'Upload', { content_base64: png.toString('base64'), filename: 'reference.png' }));
@@ -798,7 +838,7 @@ test('MCP advertises native sizing and submits tiled 2K with an explicit referen
   assert.equal(f.submitted[1].referenceRole, 'edit');
   assert.equal(f.submitted[1].tiledDecode, undefined);
   await failure(client, 'Generate', { profile_id: profile.id, prompts: ['A scene'], reference_role: 'reference' });
-  f.profiles([imageProfile]);
+  await f.profiles([imageProfile]);
   await failure(client, 'Generate', { profile_id: profile.id, prompts: ['A scene'], reference_asset_ids: [assetId], reference_role: 'reference' });
   assert.equal(f.submitted.length, 2);
 });

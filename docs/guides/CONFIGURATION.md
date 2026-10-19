@@ -78,6 +78,8 @@ MCP clients connect in one of three ways in multi-user mode:
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
+`HEISS_MCP_FOREGROUND_WAIT_SECONDS` (default `20`, `0` to `1800`) caps how long `Status` and `Result` wait for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, keeps its full wait. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
+
 `HEISS_ENABLE_GROK=0`, `HEISS_ENABLE_TESSERA=0` and `HEISS_ENABLE_LORAS=0` disable those optional catalogue features and reject unavailable generation settings. All three are enabled by default.
 
 `HEISS_DEFAULT_IMAGE_PROFILE` and `HEISS_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
