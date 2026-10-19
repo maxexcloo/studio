@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-19
+
 > Reliable selections and container-only releases
 
 ### Added
@@ -1195,7 +1197,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/heiss-ui/commits/main
+[Unreleased]: https://github.com/maxexcloo/heiss-ui/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/maxexcloo/heiss-ui/releases/tag/v0.19.0
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0
