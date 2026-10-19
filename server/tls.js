@@ -61,7 +61,7 @@ export function inspectTls(certPath = "", keyPath = "") {
     // Throws when the key does not belong to the certificate, or either is not PEM.
     tls.createSecureContext({ cert: certPem, key: keyPem });
     if (!x509.checkPrivateKey(crypto.createPrivateKey(keyPem))) throw new Error("The key doesn’t belong to this certificate.");
-    if (report.expired) throw new Error(`The certificate expired on ${report.validTo.slice(0, 10)}. Renew it (for Tailscale: tailscale cert), then restart HEISS UI.`);
+    if (report.expired) throw new Error(`The certificate expired on ${report.validTo.slice(0, 10)}. Renew it (for Tailscale: tailscale cert), then restart Studio.`);
     if (!report.names.length) throw new Error("The certificate has no host name, so browsers won’t accept it.");
     report.ok = true;
     report.pem = { cert: certPem, key: keyPem };
@@ -100,12 +100,12 @@ export function watchCertificate(server, report = startupTls, everyMs = 6 * 60 *
     if (now === last) return;
     const next = inspectTls(report.certPath, report.keyPath);
     if (!next.ok) {
-      console.warn(`[HEISS] The renewed certificate can’t be used (${next.error}); keeping the current one.`);
+      console.warn(`[Studio] The renewed certificate can’t be used (${next.error}); keeping the current one.`);
       return;
     }
     server.setSecureContext({ cert: next.pem.cert, key: next.pem.key });
     last = now;
-    console.log(`[HEISS] Reloaded the HTTPS certificate (valid until ${next.validTo.slice(0, 10)}).`);
+    console.log(`[Studio] Reloaded the HTTPS certificate (valid until ${next.validTo.slice(0, 10)}).`);
   }, everyMs);
   timer.unref?.();
   return timer;

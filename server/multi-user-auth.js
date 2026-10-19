@@ -4,8 +4,8 @@ import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
-export const multiUserEnabled = process.env.HEISS_MULTI_USER === "1";
-export const accountCookieName = "heiss_account";
+export const multiUserEnabled = process.env.STUDIO_MULTI_USER === "1";
+export const accountCookieName = "studio_account";
 const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
 
@@ -96,8 +96,8 @@ function requireAccountAdmin(req, res) {
 
 let oidc = null;
 // Shorter tokens are refused outright, so they are never advertised either.
-const setupTokenUsable = () => String(process.env.HEISS_SETUP_TOKEN || "").length >= 32;
-if (multiUserEnabled && process.env.HEISS_SETUP_TOKEN && !setupTokenUsable()) console.warn("[HEISS] HEISS_SETUP_TOKEN is ignored: use at least 32 characters.");
+const setupTokenUsable = () => String(process.env.STUDIO_SETUP_TOKEN || "").length >= 32;
+if (multiUserEnabled && process.env.STUDIO_SETUP_TOKEN && !setupTokenUsable()) console.warn("[Studio] STUDIO_SETUP_TOKEN is ignored: use at least 32 characters.");
 
 export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], oidcClient } = {}) {
   oidc = oidcClient !== undefined ? oidcClient : multiUserEnabled && oidcConfigFromEnv() ? createOidcClient(oidcConfigFromEnv()) : null;
@@ -119,11 +119,11 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       return;
     }
     // Where nobody can sit at the computer (a container platform), a one-time setup token from the environment stands in.
-    const setupToken = process.env.HEISS_SETUP_TOKEN || "";
+    const setupToken = process.env.STUDIO_SETUP_TOKEN || "";
     const given = String(req.body?.setupToken || "");
     const tokenMatches = setupToken.length >= 32 && Buffer.byteLength(given) === Buffer.byteLength(setupToken) && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(setupToken));
     if (!clientOf(req).thisComputer && !tokenMatches) {
-      res.status(403).json({ ok: false, reason: "this-computer", error: setupToken ? "Enter the setup token, or create the recovery administrator on the computer running HEISS UI." : "Create the recovery administrator on the computer running HEISS UI." });
+      res.status(403).json({ ok: false, reason: "this-computer", error: setupToken ? "Enter the setup token, or create the recovery administrator on the computer running Studio." : "Create the recovery administrator on the computer running Studio." });
       return;
     }
     if (bootstrapping) {
@@ -179,7 +179,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       res.setHeader("Cache-Control", "no-store");
       res.redirect(302, url);
     } catch (error) {
-      console.warn(`[HEISS] Single sign-on could not start: ${error.message}`);
+      console.warn(`[Studio] Single sign-on could not start: ${error.message}`);
       res.redirect(302, "/?sign-in=unavailable");
     }
   });
@@ -198,7 +198,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
       res.redirect(302, "/");
     } catch (error) {
-      console.warn(`[HEISS] Single sign-on failed: ${error.message}`);
+      console.warn(`[Studio] Single sign-on failed: ${error.message}`);
       res.redirect(302, "/?sign-in=failed");
     }
   });

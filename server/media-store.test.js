@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// A stand-in ComfyUI worker: /view serves outputs; the HEISS worker node records deletes.
+// A stand-in ComfyUI worker: /view serves outputs; the Studio worker node records deletes.
 const png = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const deletes = [];
 const served = [];
@@ -17,11 +17,11 @@ const comfy = http.createServer((req, res) => {
     res.writeHead(200, { "content-type": "image/png" }).end(png);
     return;
   }
-  if (url.pathname === "/heiss/worker/delete" && req.method === "POST") {
+  if (url.pathname === "/studio/worker/delete" && req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
-      deletes.push({ token: req.headers["x-heiss-worker-token"], files: JSON.parse(body).files });
+      deletes.push({ token: req.headers["x-studio-worker-token"], files: JSON.parse(body).files });
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true, deleted: JSON.parse(body).files.length }));
     });
     return;
@@ -32,9 +32,9 @@ await new Promise((resolve) => comfy.listen(0, "127.0.0.1", resolve));
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-media-"));
 process.env.HEISS_DATA_DIR = temporary;
-process.env.HEISS_OUTPUT_STORAGE = "heiss";
+process.env.STUDIO_OUTPUT_STORAGE = "studio";
 process.env.COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
-process.env.HEISS_WORKER_TOKEN = "worker-secret";
+process.env.STUDIO_WORKER_TOKEN = "worker-secret";
 process.env.COMFY_URL = `http://127.0.0.1:${comfy.address().port}`;
 const media = await import("./media-store.js");
 const paths = await import("./media-paths.js");

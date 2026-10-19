@@ -1,4 +1,4 @@
-"""File operations the HEISS worker endpoints allow, kept free of ComfyUI imports for testing."""
+"""File operations the Studio worker endpoints allow, kept free of ComfyUI imports for testing."""
 import hmac
 import os
 

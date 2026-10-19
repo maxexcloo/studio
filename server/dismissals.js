@@ -33,7 +33,7 @@ export function isDismissed(key) {
 /** Hides (or, with `dismissed: false`, brings back) one recommendation. Only well-formed keys. */
 export function setDismissed(key, dismissed = true) {
   const value = String(key || "");
-  if (!keyPattern.test(value)) throw new Error("That isn’t something HEISS recommends.");
+  if (!keyPattern.test(value)) throw new Error("That isn’t something Studio recommends.");
   const keys = dismissedKeys();
   if (dismissed) keys.add(value);
   else keys.delete(value);

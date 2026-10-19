@@ -88,7 +88,7 @@ function archiveEntries(privateAssets, includeGallery = true, req = null) {
     entries.push({ name, ...source, createdAt: item.createdAt });
   };
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
-  const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.HEISS_MULTI_USER === "1" ? [] : gallery;
+  const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.STUDIO_MULTI_USER === "1" ? [] : gallery;
   for (const item of includeGallery ? filterVisibleGallery(sourceGallery) : []) {
     // HEISS media lives in its own folder; everything else in ComfyUI's.
     const itemBase = isMediaUrl(item.url) ? mediaRoot : base;

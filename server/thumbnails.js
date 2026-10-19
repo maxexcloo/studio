@@ -138,7 +138,7 @@ function maybeSweep() {
   lastSweepAt = now;
   sweeping = sweepThumbnails()
     .then(({ removed, freedBytes }) => {
-      if (removed) console.log(`[HEISS] Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`);
+      if (removed) console.log(`[Studio] Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`);
     })
     .catch(() => {})
     .finally(() => { sweeping = null; });

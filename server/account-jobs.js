@@ -30,7 +30,7 @@ export function reserveAccountJob(ownerId, jobs, reservations, limit) {
   };
 }
 
-export function configuredAccountJobLimit(value = process.env.HEISS_ACCOUNT_MAX_OUTSTANDING_JOBS) {
+export function configuredAccountJobLimit(value = process.env.STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS) {
   const limit = Number(value);
   return Number.isSafeInteger(limit) && limit > 0 ? limit : 2;
 }

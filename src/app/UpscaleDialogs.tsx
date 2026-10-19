@@ -179,7 +179,7 @@ export function UpscaleSetupDialog({
   } else if (stage === "models") {
     body = !admin ? (
       <div className="upscale-callout">
-        <strong>The upscale model downloads on the computer running HEISS UI.</strong>
+        <strong>The upscale model downloads on the computer running Studio.</strong>
         <span>Set up smart upscale there, and it works here too.</span>
       </div>
     ) : !status?.canDownload ? (

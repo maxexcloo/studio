@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for wanting to help with HEISS UI. It's a local front end for ComfyUI, so most changes are best tested against a real local ComfyUI server, especially anything that touches generation.
+Thanks for wanting to help with Studio. It's a local front end for ComfyUI, so most changes are best tested against a real local ComfyUI server, especially anything that touches generation.
 
 ## Setup
 
@@ -41,7 +41,7 @@ The browser checks run the built studio on desktop and phone viewports with temp
 
 ## Versions and releases
 
-HEISS UI uses [Semantic Versioning](https://semver.org/). `package.json` holds the version, and every release is a `vX.Y.Z` tag with the same number.
+Studio uses [Semantic Versioning](https://semver.org/). `package.json` holds the version, and every release is a `vX.Y.Z` tag with the same number.
 
 Until the public 1.0 release, versions stay at `0.x.y`:
 
@@ -82,17 +82,17 @@ npm run release -- minor             # bump, date the changelog, commit "Release
 git push --atomic origin main vX.Y.Z # publishes the image and the GitHub release
 ```
 
-`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/heiss-ui:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
+`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/studio:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
 
 Between releases a source checkout shows how far it is past its tag in **Settings › About**, for example `v0.2.0 + 3`.
 
 ## Found a bug?
 
-[Open an issue](https://github.com/maxexcloo/heiss-ui/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. The in-app feedback links go to upstream's board.
+[Open an issue](https://github.com/maxexcloo/studio/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. The in-app feedback links go to upstream's board.
 
 ### Fork Integration & Release Gates
 
-Keep `origin` pointed at `maxexcloo/heiss-ui` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's website in `docs/`, desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
+Keep `origin` pointed at `maxexcloo/studio` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's website in `docs/`, desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
 
 Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 

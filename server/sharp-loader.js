@@ -11,9 +11,9 @@ export function loadSharp() {
     (module) => module.default,
     (error) => {
       console.warn(
-        `\n  [HEISS] Image resizing is off: sharp could not load (${error.message.split("\n")[0]}).\n` +
+        `\n  [Studio] Image resizing is off: sharp could not load (${error.message.split("\n")[0]}).\n` +
         "  Thumbnails show the full images, and uploaded reference images are kept unresized.\n" +
-        "  To fix it, run `npm install --omit=dev` in the HEISS UI folder, then restart.\n"
+        "  To fix it, run `npm install --omit=dev` in the Studio folder, then restart.\n"
       );
       return null;
     }

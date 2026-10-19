@@ -71,7 +71,7 @@ test("health says whether ComfyUI answers, and keeps its system stats (command l
 
 test("diagnostics name this setup for a bug report", async () => {
   const { body } = await api("/api/diagnostics");
-  assert.match(body.text, /^HEISS UI \d+\.\d+\.\d+/);
+  assert.match(body.text, /^Studio \d+\.\d+\.\d+/);
   assert.match(body.text, /\nComfyUI 0\.34\.1, on this computer; Python 3\.12, PyTorch 2\.8\.0\n/);
   assert.match(body.text, /\nGPU: Fake GPU \[cuda\], 22\.4 GB VRAM/);
   assert.equal(body.text.includes(dataDir), false);

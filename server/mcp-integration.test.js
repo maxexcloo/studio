@@ -76,7 +76,7 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
   app.get('/api/reference-assets', (_req, res) => res.json({ items: [...assets.values()], hasMore: false }));
   app.get('/api/reference-assets/:id', (req, res) => res.json({ asset: assets.get(req.params.id) }));
   app.get('/comfy/view', (req, res) => { downloads.push(req.originalUrl); res.type('png').send(png); });
-  const environment = { ...(enabled ? { HEISS_MCP_API_KEY: mediaKey } : {}), MCP_PUBLIC_URL: 'https://studio.example.test', ...extra };
+  const environment = { ...(enabled ? { STUDIO_MCP_API_KEY: mediaKey } : {}), MCP_PUBLIC_URL: 'https://studio.example.test', ...extra };
   await registerMcpRoutes(app, {
     baseUrl: () => base,
     dataDir,
@@ -736,7 +736,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   const here = path.dirname(fileURLToPath(import.meta.url));
   const child = fork(path.join(here, 'index.js'), [], {
     cwd: path.dirname(here),
-    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: envFile, HEISS_DEMO: '1', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', HEISS_MCP_API_KEY: mediaKey, COMFY_URL: 'http://127.0.0.1:1' },
+    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: envFile, HEISS_DEMO: '1', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: 'http://127.0.0.1:1' },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc']
   });
   const client = new Client({ name: 'heiss-real-server-fixture', version: '1.0.0' }, { capabilities: {} });
@@ -815,7 +815,7 @@ test('maintained profile guidance reaches the real model API and native MCP with
   });
   await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
   const child = fork(path.join(path.dirname(fileURLToPath(import.meta.url)), 'index.js'), [], {
-    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: path.join(dir, '.env'), HEISS_ENABLE_BUILTIN_PROFILES: '0', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', HEISS_MCP_API_KEY: mediaKey, COMFY_URL: `http://127.0.0.1:${backend.address().port}` },
+    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: path.join(dir, '.env'), STUDIO_ENABLE_BUILTIN_PROFILES: '0', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: `http://127.0.0.1:${backend.address().port}` },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc']
   });
   const client = new Client({ name: 'owned-profile-fixture', version: '1.0.0' }, { capabilities: {} });
@@ -875,7 +875,7 @@ test('Generate returns per-conversation refs with signed watch pages that tools 
   const conversation = async (user, id) => {
     const client = new Client({ name: 'heiss-ref-fixture', version: '1.0.0' }, { capabilities: {} });
     t.after(() => client.close());
-    await client.connect(new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': user, ...(id ? { 'x-heiss-conversation-id': id } : {}) } } }));
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': user, ...(id ? { 'x-studio-conversation-id': id } : {}) } } }));
     return client;
   };
   const first = await conversation('alice', 'conversation-a');
@@ -972,7 +972,7 @@ test('Models lists compatible LoRAs with picker metadata and fixed controls are 
   await generate(client, { steps: 4 });
   assert.equal(f.submitted.length, 1, 'a value equal to the fixed one is accepted');
   const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['refuse with reason'], count: 1 });
-  assert.match(refused.content[0].text, /HEISS refused the request: Fixture LoRA supports strength 0\.2 to 1\.2\./);
+  assert.match(refused.content[0].text, /Studio refused the request: Fixture LoRA supports strength 0\.2 to 1\.2\./);
 });
 
 test('negative prompts reach the submission only where they take effect', async t => {

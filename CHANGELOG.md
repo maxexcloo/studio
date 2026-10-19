@@ -1,6 +1,6 @@
 # Changelog
 
-Every release of HEISS UI, newest first. The format follows
+Every release of Studio, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/) as described in
 [docs/guides/CONTRIBUTING.md](docs/guides/CONTRIBUTING.md#versions-and-releases).
@@ -10,6 +10,11 @@ section into the next version and uses it as the GitHub release notes. Each
 version opens with a `> ` summary line.
 
 ## [Unreleased]
+
+### Changed
+- **Renamed to Studio:** this fork is now Studio, at `maxexcloo/studio` and `ghcr.io/maxexcloo/studio`. The app title, wordmark, MCP server and messages say Studio; HEISS UI stays credited as upstream. Upstream's `HEISS_*` settings keep their names. The fork's own settings move to `STUDIO_*`, with no fallback: `STUDIO_MULTI_USER`, `STUDIO_SETUP_TOKEN`, `STUDIO_OIDC_*`, `STUDIO_MCP_API_KEY`, `STUDIO_OUTPUT_STORAGE` (its `heiss` value is now `studio`), `STUDIO_MEDIA_DIR`, `STUDIO_WORKER_TOKEN`, `STUDIO_MODEL_MANIFEST`, `STUDIO_MODEL_MANIFEST_PREFIX`, `STUDIO_DEFAULT_IMAGE_PROFILE`, `STUDIO_DEFAULT_VIDEO_PROFILE`, `STUDIO_ENABLE_BUILTIN_PROFILES`, `STUDIO_ENABLE_GROK`, `STUDIO_ENABLE_TESSERA`, `STUDIO_ENABLE_LORAS`, `STUDIO_ENABLE_PRESETS` and `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS`.
+- **Worker node:** the ComfyUI node is now `comfyui/studio_worker`, answering on `/studio/worker` with the `X-Studio-Worker-Token` header. Update it together with Studio.
+- **Sessions and MCP:** accounts sign in again once (the cookie is now `studio_account`), and MCP clients send `x-studio-conversation-id` for per-conversation references.
 
 ## [0.19.0] - 2026-10-19
 
@@ -1197,8 +1202,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/heiss-ui/compare/v0.19.0...HEAD
-[0.19.0]: https://github.com/maxexcloo/heiss-ui/releases/tag/v0.19.0
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/maxexcloo/studio/releases/tag/v0.19.0
 [0.18.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/tristmeister/HEISS-UI/compare/v0.15.0...v0.16.0

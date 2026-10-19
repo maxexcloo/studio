@@ -6,7 +6,7 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-multi-user-auth-"));
 process.env.HEISS_DATA_DIR = path.join(temporary, "data");
-process.env.HEISS_MULTI_USER = "1";
+process.env.STUDIO_MULTI_USER = "1";
 process.env.COMFY_URL = "http://127.0.0.1:9";
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
 
@@ -55,12 +55,12 @@ test("local password sign-in sets an HttpOnly session and sign-out revokes it", 
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Strict/);
   assert.match(cookie, /Max-Age=2592000/);
-  const token = cookie.match(/heiss_account=([^;]+)/)[1];
-  const req = { ...local(), headers: { ...local().headers, cookie: `heiss_account=${token}` } };
+  const token = cookie.match(/studio_account=([^;]+)/)[1];
+  const req = { ...local(), headers: { ...local().headers, cookie: `studio_account=${token}` } };
   assert.equal(accountForRequest(req).role, "administrator");
 
   await call(routes["POST /api/accounts/sign-out"], req);
-  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, cookie: `heiss_account=${token}` } }), null);
+  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, cookie: `studio_account=${token}` } }), null);
 });
 
 test("only an authenticated administrator can create profiles and approve ordinary accounts", async () => {

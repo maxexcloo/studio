@@ -250,7 +250,7 @@ export function useHidden({ autoLockMinutes, showToast }: { autoLockMinutes: num
   const ensureReady = useCallback((next: HiddenIntent) => {
     if (!enabled) {
       if (!atComputer) {
-        showToast("Hidden isn’t set up. Set it up on the computer running HEISS UI.", "warning");
+        showToast("Hidden isn’t set up. Set it up on the computer running Studio.", "warning");
         return false;
       }
       setIntent(next);

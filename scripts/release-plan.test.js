@@ -15,7 +15,7 @@ test('immutable fork release tags must match the numeric package version', () =>
 });
 
 test('release links belong to the fork, with upstream recorded separately', () => {
-  assert.equal(releaseIdentity.repository, 'maxexcloo/heiss-ui');
+  assert.equal(releaseIdentity.repository, 'maxexcloo/studio');
   assert.equal(releaseIdentity.upstream.repository, 'tristmeister/HEISS-UI');
-  assert.equal(releasesUrl, 'https://github.com/maxexcloo/heiss-ui/releases');
+  assert.equal(releasesUrl, 'https://github.com/maxexcloo/studio/releases');
 });

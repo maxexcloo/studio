@@ -66,7 +66,7 @@ test("only a folder ComfyUI writes to can become the output folder", async () =>
   try {
     assert.equal((await outputDirChoice(comfyOutput, options)).ok, true, "next to ComfyUI’s models");
     assert.equal((await outputDirChoice(empty, options)).ok, true, "a fresh, empty one next to models too");
-    assert.equal((await outputDirChoice(renders, options)).ok, true, "one HEISS UI already saved into");
+    assert.equal((await outputDirChoice(renders, options)).ok, true, "one Studio already saved into");
     const refused = await outputDirChoice(random, options);
     assert.equal(refused.ok, false);
     assert.match(refused.error, /doesn’t look like a ComfyUI output folder/);

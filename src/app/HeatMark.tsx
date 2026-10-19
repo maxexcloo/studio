@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { trackCanvasSize } from './canvasSize';
 
 /**
- * The website's footer wordmark, brought into the app: "HEISS UI" in pixel
+ * The website's footer wordmark, brought into the app: "STUDIO" in pixel
  * letters that develop out of a gray flow mosaic. A small, dense flame
  * stands on the pointer and warms the letters beside it. Press to stoke it.
  *
@@ -12,14 +12,14 @@ import { trackCanvasSize } from './canvasSize';
  */
 
 const GLYPHS: Record<string, string[]> = {
-  H: ['X...X', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
-  E: ['XXXXX', 'X....', 'X....', 'XXXX.', 'X....', 'X....', 'XXXXX'],
+  D: ['XXXX.', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', 'XXXX.'],
   I: ['XXX', '.X.', '.X.', '.X.', '.X.', '.X.', 'XXX'],
+  O: ['.XXX.', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', '.XXX.'],
   S: ['.XXXX', 'X....', 'X....', '.XXX.', '....X', '....X', 'XXXX.'],
-  U: ['X...X', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', '.XXX.'],
-  ' ': ['..', '..', '..', '..', '..', '..', '..']
+  T: ['XXXXX', '..X..', '..X..', '..X..', '..X..', '..X..', '..X..'],
+  U: ['X...X', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', '.XXX.']
 };
-const TEXT = 'HEISS UI';
+const TEXT = 'STUDIO';
 const SUB = 3;            // shader cells per letter pixel
 const ROWS = 7;
 const MARGIN_X = 3;       // cells
@@ -330,9 +330,9 @@ export function HeatMark({ className }: { className?: string }) {
   }, []);
 
   return (
-    <div ref={wrapRef} className={className} style={{ aspectRatio: heatMarkAspect }} role="img" aria-label="HEISS UI">
+    <div ref={wrapRef} className={className} style={{ aspectRatio: heatMarkAspect }} role="img" aria-label="Studio">
       {failed
-        ? <img className="about-mark-fallback" src="/heiss-lockup-white.svg" alt="" aria-hidden="true" draggable={false} />
+        ? <img className="about-mark-fallback" src="/studio-lockup-white.svg" alt="" aria-hidden="true" draggable={false} />
         : <canvas ref={canvasRef} aria-hidden="true" />}
     </div>
   );

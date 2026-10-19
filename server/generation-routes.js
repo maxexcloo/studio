@@ -204,7 +204,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // An empty painted mask falls back to a normal run, so apply normal sizing too.
     if (body.inpaint?.box) {
       const { box, image, work } = body.inpaint;
-      console.log(`[HEISS] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`);
+      console.log(`[Studio] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`);
     }
     // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
     const inpaintSkipped = Boolean(!isMockJob && req.body?.inpaint?.mask && !body.inpaint);

@@ -8,7 +8,7 @@ import test from 'node:test';
 import { importMcpOwnership, mcpImportSupported } from './mcp-import.js';
 import { McpMedia } from './mcp-media.js';
 
-const environment = { HEISS_MCP_API_KEY: 'test-provider-key', MCP_SIGNING_KEY: 'test-signing-key' };
+const environment = { STUDIO_MCP_API_KEY: 'test-provider-key', MCP_SIGNING_KEY: 'test-signing-key' };
 const options = { skip: !mcpImportSupported() };
 async function fixture(t, rows) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-mcp-import-'));
@@ -34,12 +34,12 @@ test('legacy ownership import selects one studio and preserves forwarded and pro
   const f = await fixture(t, [['primary-user', 'primary', 'openwebui:alice'], ['primary-provider', 'primary', 'litellm:heiss'], ['x-user', 'secondary', 'openwebui:bob'], ['x-provider', 'secondary', 'litellm:heiss-secondary']]);
   assert.deepEqual(await importMcpOwnership({ ...f, studio: 'primary' }), { imported: 2, unchanged: 0, studio: 'primary' });
   const media = native(f);
-  media.own(media.owner('alice', environment.HEISS_MCP_API_KEY), 'primary-user');
-  media.own(media.owner('', environment.HEISS_MCP_API_KEY), 'primary-provider');
-  assert.throws(() => media.own(media.owner('bob', environment.HEISS_MCP_API_KEY), 'primary-user'));
+  media.own(media.owner('alice', environment.STUDIO_MCP_API_KEY), 'primary-user');
+  media.own(media.owner('', environment.STUDIO_MCP_API_KEY), 'primary-provider');
+  assert.throws(() => media.own(media.owner('bob', environment.STUDIO_MCP_API_KEY), 'primary-user'));
   assert.equal(Object.hasOwn(read(f).jobs, 'x-user'), false);
   if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(f.dataDir, 'mcp-ownership.json')).mode & 0o777, 0o600);
-  const x = { ...f, dataDir: path.join(f.dataDir, 'x'), environment: { ...environment, HEISS_MCP_API_KEY: 'test-x-provider' } };
+  const x = { ...f, dataDir: path.join(f.dataDir, 'x'), environment: { ...environment, STUDIO_MCP_API_KEY: 'test-x-provider' } };
   assert.equal((await importMcpOwnership({ ...x, studio: 'secondary' })).imported, 2);
   const hash = crypto.createHmac('sha256', environment.MCP_SIGNING_KEY).update('provider:test-x-provider').digest('hex');
   assert.equal(read(x).jobs['x-provider'], hash);
@@ -49,7 +49,7 @@ test('legacy ownership import selects one studio and preserves forwarded and pro
 test('ownership import merges idempotently without replacing existing jobs, references or metadata', options, async t => {
   const f = await fixture(t, [['legacy', 'primary', 'openwebui:alice']]);
   const media = native(f);
-  media.state.jobs.existing = media.owner('bob', environment.HEISS_MCP_API_KEY);
+  media.state.jobs.existing = media.owner('bob', environment.STUDIO_MCP_API_KEY);
   media.state.assets.reference = ['existing-reference-owner'];
   media.state.extra = 'retained';
   media.save();
@@ -70,7 +70,7 @@ test('ownership import merges idempotently without replacing existing jobs, refe
 test('conflicting and unknown owners reject the entire import before writing destination state', options, async t => {
   const f = await fixture(t, [['new-first', 'primary', 'openwebui:alice'], ['conflict', 'primary', 'openwebui:alice']]);
   const media = native(f);
-  media.state.jobs.conflict = media.owner('bob', environment.HEISS_MCP_API_KEY);
+  media.state.jobs.conflict = media.owner('bob', environment.STUDIO_MCP_API_KEY);
   media.save();
   const file = path.join(f.dataDir, 'mcp-ownership.json');
   const before = fs.readFileSync(file);

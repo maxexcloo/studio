@@ -1,6 +1,6 @@
 # Adding a model
 
-How a new model family gets into HEISS UI so it works out of the box: dropped
+How a new model family gets into Studio so it works out of the box: dropped
 into ComfyUI, recognised, set up with the settings its makers ship, and, when
 something is missing, explained with a way to get it right in the app.
 
@@ -17,7 +17,7 @@ catalog, so a family that is described correctly needs no UI work.
 | Text encoders and VAEs | `server/model-components.js` → `encoderKinds`, `vaeKinds`, `encoderKindFromHeader`, `vaeLayoutFromHeader` | What each encoder or VAE file is, by shape first and name second |
 | Downloads | `family-catalog.js` → `encoderDownloads`, `vaeDownloads` | Hugging Face files the Download buttons fetch. Abliterated builds first wherever a ComfyUI-ready one exists |
 | Quantized files | `family-catalog.js` → `quantFormats`, `quantFromHeader` | Formats ComfyUI's own loaders cannot read (Nunchaku SVDQuant, bitsandbytes NF4): the loader node that reads each one instead, per model source, or why it cannot run |
-| Node packs | `server/node-packs.js` → `nodePacks` | Every custom node pack HEISS may ask for: name, Git URL, folder, the node classes that prove it loaded |
+| Node packs | `server/node-packs.js` → `nodePacks` | Every custom node pack Studio may ask for: name, Git URL, folder, the node classes that prove it loaded |
 | Graph | `server/family-graph.js` → `familyGraph` | One builder for every family; special sampling styles branch off it |
 | Profiles | `server/family-profiles.js` | Turns every model file into a runnable profile and lists exactly what is missing |
 | GGUF | `server/gguf.js` | Reads GGUF headers as safetensors-style headers (so detection needs no GGUF rules), lists GGUF models and encoders, and swaps core loaders for ComfyUI-GGUF's twins in the graph. See `docs/gguf-research.md` |
@@ -43,10 +43,10 @@ catalog, so a family that is described correctly needs no UI work.
    for the panel). Then point the family at it with `pack: "<id>"`. When a model runs
    on more than one pack (for example one CUDA-only, one that also runs on
    Apple Silicon), describe each as a runner the way `sanaRunners` does, one
-   model source per runner. HEISS then shows an **Install** button wherever
+   model source per runner. Studio then shows an **Install** button wherever
    the model appears (`server/pack-installer.js`): packs with a `manager` id
    are queued in ComfyUI-Manager when it answers; otherwise, with ComfyUI on
-   this computer, HEISS clones the pack and installs its requirements with
+   this computer, Studio clones the pack and installs its requirements with
    ComfyUI's own Python. Manager 4 cannot install by Git URL (only in its
    legacy UI, behind a config flag), so unlisted packs always take the local
    route. Manual steps (Manager or terminal) stay one tap away and are all a
@@ -60,7 +60,7 @@ catalog, so a family that is described correctly needs no UI work.
    family `runners`: per model source, the pack, its `loader` (one node that
    loads model, encoder and VAE, standing in for the three core loaders),
    `patches` for the model before sampling, the core nodes those need, and
-   `folders` when the loader takes a Diffusers folder by path (HEISS lists
+   `folders` when the loader takes a Diffusers folder by path (Studio lists
    matching folders in models/diffusers itself; see `server/diffusers-folders.js`).
    MOSS-Image is the example: Comfy-Org's single files on core nodes, the
    official folder on its makers' pack.

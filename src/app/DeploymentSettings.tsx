@@ -17,7 +17,7 @@ export type DeploymentSettings = {
   defaults: { image: DefaultProfile; video: DefaultProfile; profiles: { id: string; label: string; kind: string; ready: boolean }[] };
   catalogue: CatalogueFlag[];
   integrations: { civitai: { browsing: boolean; token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
-  storage: Source & { outputs: 'heiss' | 'comfy'; workerToken: boolean; multiUser: boolean };
+  storage: Source & { outputs: 'studio' | 'comfy'; workerToken: boolean; multiUser: boolean };
 };
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
 
@@ -70,7 +70,7 @@ function AddressEditor({ connection, showToast, onSaved, onClose }: { connection
       if (data.saved) { showToast(`${connection.label} Connection Saved`, 'success'); onSaved(); onClose(); }
       else setNote('ComfyUI responds at that address.');
     } catch {
-      setNote('Can’t reach HEISS UI. Make sure it’s running.');
+      setNote('Can’t reach Studio. Make sure it’s running.');
     } finally { setBusy(false); }
   };
   const changed = value.trim() !== connection.value;
@@ -110,9 +110,9 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
     try {
       const { response, data } = await postJson('/api/settings/deployment', { key, value });
       if (!response.ok) { showToast(data.error || 'Couldn’t save that setting.', 'error'); return; }
-      showToast(data.setting?.applies === 'restart' ? 'Saved. Restart HEISS UI to apply it.' : 'Saved', 'success');
+      showToast(data.setting?.applies === 'restart' ? 'Saved. Restart Studio to apply it.' : 'Saved', 'success');
       onSaved();
-    } catch { showToast('Can’t reach HEISS UI. Make sure it’s running.', 'error'); }
+    } catch { showToast('Can’t reach Studio. Make sure it’s running.', 'error'); }
     finally { setBusy(''); }
   };
   const label = (id: string) => settings.defaults.profiles.find((profile) => profile.id === id)?.label || id;
@@ -130,7 +130,7 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
       {defaultRow('image')}
       {defaultRow('video')}
     </Group>
-    <Group title="Catalogue" note="What the generation catalogue offers. Some changes apply after HEISS UI restarts.">
+    <Group title="Catalogue" note="What the generation catalogue offers. Some changes apply after Studio restarts.">
       {settings.catalogue.map((item) => <Row key={item.key} label={<>{item.label} <SourceTag source={item.source} locked={item.locked} /></>} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} disabled={busy === item.key}>
         <Switch label={item.label} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />
       </Row>)}
@@ -146,7 +146,7 @@ export function IntegrationsOverview({ settings, Status }: { settings: Deploymen
     <Group title="Overview">
       <Row label="Civitai" description={`Browsing ${civitai.browsing ? 'on' : 'off'} · token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}`}>{state(civitai.browsing || civitai.presets, ['On', 'Off'])}</Row>
       <Row label="Hugging Face" description={huggingFace.token.set ? `Token ${huggingFace.token.editable ? 'saved here' : 'set by the deployment'}; gated models can download.` : 'No token; public models only.'}>{state(huggingFace.token.set, ['Configured', 'Public Only'])}</Row>
-      <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'heiss' ? `HEISS keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'heiss', ['HEISS Media', 'ComfyUI Folder'])}</Row>
+      <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
     </Group>
   </>;
 }

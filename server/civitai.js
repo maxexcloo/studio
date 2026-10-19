@@ -121,7 +121,7 @@ export function parametersText(body = {}, { width = 0, height = 0, hashes = {} }
   if (hasReference && Number(body.denoise) > 0 && Number(body.denoise) < 1) settings.push(["Denoising strength", Number(body.denoise)]);
   const loraHashes = loras.filter((lora) => hashes[lora.name]).map((lora) => `${stem(lora.name)}: ${hashes[lora.name]}`);
   if (loraHashes.length) settings.push(["Lora hashes", loraHashes.join(", ")]);
-  if (appVersion) settings.push(["Version", `HEISS UI ${appVersion}`]);
+  if (appVersion) settings.push(["Version", `Studio ${appVersion}`]);
   if (settings.length) lines.push(settings.map(([key, value]) => `${key}: ${field(value)}`).join(", "));
   return lines.join("\n");
 }

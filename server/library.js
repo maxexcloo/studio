@@ -321,7 +321,7 @@ export async function addLibraryFolder(input) {
   try { stat = fs.statSync(dir); } catch { throw new Error("That folder doesn’t exist on this computer."); }
   if (!stat.isDirectory()) throw new Error("That’s a file. Choose a folder.");
   const real = realPath(dir);
-  if (isOwnFolder(real)) throw new Error("That’s the HEISS UI folder. Choose the folder with your earlier images.");
+  if (isOwnFolder(real)) throw new Error("That’s the Studio folder. Choose the folder with your earlier images.");
   if (isOutputFolder(real)) return { output: true, ...(await importOutputFolder()) };
   const existing = folders.find((folder) => samePath(folder.path, real));
   if (existing) return scanLibraryFolder(existing.id);

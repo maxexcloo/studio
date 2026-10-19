@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-workflow-modes-'));
 process.env.HEISS_DATA_DIR = scratch;
-process.env.HEISS_ENABLE_BUILTIN_PROFILES = '0';
+process.env.STUDIO_ENABLE_BUILTIN_PROFILES = '0';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveCustomWorkflow, validateGraph } = await import('./custom-workflows.js');
 const { customWorkflowGraph } = await import('./graphs.js');

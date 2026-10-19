@@ -36,7 +36,7 @@ function forgetOldHiddenThumbnails(key) {
   try {
     const names = vaultItems(key, { bundles: false }).flatMap((item) => [item.outputName, item.upscale?.outputName]);
     const removed = forgetLegacyHiddenThumbnails(names);
-    if (removed) console.log(`[HEISS] Removed ${removed} thumbnail${removed === 1 ? "" : "s"} left behind by images hidden before.`);
+    if (removed) console.log(`[Studio] Removed ${removed} thumbnail${removed === 1 ? "" : "s"} left behind by images hidden before.`);
   } catch {
     oldHiddenThumbnailsChecked = false;
   }
@@ -48,7 +48,7 @@ async function privacyPayload(req, key = encryptionKeyFromRequest(req)) {
   if (unlocked) {
     migrateLegacyPrompts(key);
     forgetOldHiddenThumbnails(key);
-    // What Hidden runs made after HEISS UI lost track of them joins Hidden now.
+    // What Hidden runs made after Studio lost track of them joins Hidden now.
     try { adoptHiddenRuns(key); } catch { /* the next unlocked request tries again */ }
   }
   return {

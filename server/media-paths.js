@@ -10,17 +10,17 @@ import { isInside } from "./paths.js";
  * `/comfy/view?filename=…&subfolder=…&type=media`, so owner subfolders, caches
  * and parsers carry over, but such a file is only ever served from here.
  *
- * On by default in multi-user mode; `HEISS_OUTPUT_STORAGE=heiss` opts a
+ * On by default in multi-user mode; `STUDIO_OUTPUT_STORAGE=studio` opts a
  * single-user studio in and `=comfy` keeps ComfyUI's output folder.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
 
 export const mediaType = "media";
-export const mediaStorageEnabled = process.env.HEISS_OUTPUT_STORAGE
-  ? process.env.HEISS_OUTPUT_STORAGE === "heiss"
-  : process.env.HEISS_MULTI_USER === "1";
-export const mediaRoot = path.resolve(process.env.HEISS_MEDIA_DIR || path.join(dataDir, "media"));
+export const mediaStorageEnabled = process.env.STUDIO_OUTPUT_STORAGE
+  ? process.env.STUDIO_OUTPUT_STORAGE === "studio"
+  : process.env.STUDIO_MULTI_USER === "1";
+export const mediaRoot = path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(dataDir, "media"));
 
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
 const inDotFolder = (subfolder) => String(subfolder || "").split(/[\\/]/).some((part) => part.startsWith("."));
@@ -45,7 +45,7 @@ export function mediaFile(filename, subfolder = "") {
   }
 }
 
-/** A gallery URL's media file reference, or null when it is not a HEISS media URL. */
+/** A gallery URL's media file reference, or null when it is not a Studio media URL. */
 export function mediaParams(url) {
   const value = String(url || "");
   if (!value.startsWith("/comfy/view?") && !value.startsWith("/comfy/thumb?") && !value.startsWith("/comfy/video-preview?")) return null;

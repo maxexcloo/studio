@@ -1,5 +1,5 @@
 /**
- * The startup banner: the HEISS UI wordmark as a dot mosaic, like the one in
+ * The startup banner: the Studio wordmark as a dot mosaic, like the one in
  * Settings › About, with an ember glow at the foot of the I.
  *
  * Braille cells give real dots (2×4 per character), large when the terminal
@@ -10,14 +10,14 @@
  */
 
 const GLYPHS = {
-  H: ["X...X", "X...X", "X...X", "XXXXX", "X...X", "X...X", "X...X"],
-  E: ["XXXXX", "X....", "X....", "XXXX.", "X....", "X....", "XXXXX"],
+  D: ["XXXX.", "X...X", "X...X", "X...X", "X...X", "X...X", "XXXX."],
   I: ["XXX", ".X.", ".X.", ".X.", ".X.", ".X.", "XXX"],
+  O: [".XXX.", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
   S: [".XXXX", "X....", "X....", ".XXX.", "....X", "....X", "XXXX."],
-  U: ["X...X", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
-  " ": ["..", "..", "..", "..", "..", "..", ".."]
+  T: ["XXXXX", "..X..", "..X..", "..X..", "..X..", "..X..", "..X.."],
+  U: ["X...X", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."]
 };
-const TEXT = "HEISS UI";
+const TEXT = "STUDIO";
 const ROWS = 7;
 
 /** Letter pixels as a grid of booleans, one column gap between letters. */
@@ -32,8 +32,8 @@ function letterGrid() {
   return rows;
 }
 
-// Where the ember sits, in letter pixels: the foot of the first I.
-const EMBER_X = 12;
+// Where the ember sits, in letter pixels: the foot of the I.
+const EMBER_X = 24;
 
 function hash(x, y) {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;

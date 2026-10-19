@@ -13,7 +13,7 @@ const child = fork('server/index.js', [], {
     HEISS_DATA_DIR: data,
     HEISS_DEMO: '1',
     HEISS_ENV_FILE: path.join(data, '.env'),
-    HEISS_ENABLE_PRESETS: '1',
+    STUDIO_ENABLE_PRESETS: '1',
     HEISS_LAN: '0',
     HEISS_NO_BROWSER: '1',
     HOST: '127.0.0.1',

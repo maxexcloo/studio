@@ -256,18 +256,18 @@ test("custom batch counts reach the UI and configured ready profiles become inst
     graph: { "1": { class_type: "EmptyLatentImage", inputs: { width: 864, height: 1152, batch_size: 4 } } },
     heissUi: { id: "batch-profile", name: "Batch Profile", kind: "image", controls: { count: { node: "1", input: "batch_size" } }, defaults: { count: 4, width: 864, height: 1152 } }
   }));
-  const previous = process.env.HEISS_DEFAULT_IMAGE_PROFILE;
+  const previous = process.env.STUDIO_DEFAULT_IMAGE_PROFILE;
   try {
-    process.env.HEISS_DEFAULT_IMAGE_PROFILE = "custom:batch-profile";
+    process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "custom:batch-profile";
     const info = objectInfo({ checkpoints: ["sdxl_turbo_1.0.safetensors"] });
     const models = inferModels(info);
     assert.equal(models.defaults.imageModel, "custom:batch-profile");
     assert.equal(models.profiles.find((profile) => profile.id === "custom:batch-profile").defaults.count, 4);
-    process.env.HEISS_DEFAULT_IMAGE_PROFILE = "custom:missing";
+    process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "custom:missing";
     assert.notEqual(inferModels(info).defaults.imageModel, "custom:missing");
   } finally {
-    if (previous === undefined) delete process.env.HEISS_DEFAULT_IMAGE_PROFILE;
-    else process.env.HEISS_DEFAULT_IMAGE_PROFILE = previous;
+    if (previous === undefined) delete process.env.STUDIO_DEFAULT_IMAGE_PROFILE;
+    else process.env.STUDIO_DEFAULT_IMAGE_PROFILE = previous;
     fs.rmSync(file);
   }
 });
@@ -293,22 +293,22 @@ test("imported-only deployments retain user workflows and model files while hidi
     graph: { '1': { class_type: 'EmptyLatentImage', inputs: { width: 512, height: 512, batch_size: 1 } } },
     heissUi: { id: 'imported-only', name: 'Imported Only', kind: 'image', controls: {}, defaults: { width: 512, height: 512 } }
   }));
-  const previous = process.env.HEISS_ENABLE_BUILTIN_PROFILES;
+  const previous = process.env.STUDIO_ENABLE_BUILTIN_PROFILES;
   const info = objectInfo({ checkpoints: ['sdxl_turbo_1.0.safetensors'] });
   try {
-    delete process.env.HEISS_ENABLE_BUILTIN_PROFILES;
+    delete process.env.STUDIO_ENABLE_BUILTIN_PROFILES;
     const ordinary = inferModels(info);
     assert(ordinary.profiles.some((profile) => !profile.id.startsWith('custom:')));
     assert(allCustomWorkflowRecords().some((workflow) => workflow.source === 'bundled'));
-    process.env.HEISS_ENABLE_BUILTIN_PROFILES = '0';
+    process.env.STUDIO_ENABLE_BUILTIN_PROFILES = '0';
     const imported = inferModels(info);
     assert.deepEqual(imported.profiles.map((profile) => profile.id), ['custom:imported-only']);
     assert.equal(imported.defaults.imageModel, 'custom:imported-only');
     assert.deepEqual(imported.modelFiles, ordinary.modelFiles);
     assert(allCustomWorkflowRecords().every((workflow) => workflow.source === 'custom'));
   } finally {
-    if (previous === undefined) delete process.env.HEISS_ENABLE_BUILTIN_PROFILES;
-    else process.env.HEISS_ENABLE_BUILTIN_PROFILES = previous;
+    if (previous === undefined) delete process.env.STUDIO_ENABLE_BUILTIN_PROFILES;
+    else process.env.STUDIO_ENABLE_BUILTIN_PROFILES = previous;
     fs.rmSync(file);
   }
 });

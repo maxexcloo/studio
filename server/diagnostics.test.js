@@ -10,7 +10,7 @@ const stats = {
 test("the report names versions, system and GPU in plain lines", () => {
   const text = diagnosticsText(diagnostics({ version: "0.11.0", install: "release", stats, comfyLocal: true, platform: "win32", arch: "x64" }));
   const lines = text.split("\n");
-  assert.equal(lines[0], "HEISS UI 0.11.0 (release)");
+  assert.equal(lines[0], "Studio 0.11.0 (release)");
   assert.equal(lines[1], `Node.js ${process.versions.node}`);
   assert.match(lines[2], /^System: .*x64, [\d.]+ GB RAM$/);
   assert.equal(lines[3], "ComfyUI 0.34.1, on this computer; Python 3.12.10, PyTorch 2.8.0+cu128, portable");

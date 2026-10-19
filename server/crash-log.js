@@ -83,7 +83,7 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
   if (installed) return;
   installed = true;
   sweep();
-  write("info", "HEISS UI started", { pid: process.pid, node: process.version, platform: `${process.platform}-${process.arch}` });
+  write("info", "Studio started", { pid: process.pid, node: process.version, platform: `${process.platform}-${process.arch}` });
 
   process.on("uncaughtException", (error) => {
     write("fatal", "Crashed: uncaught exception", { ...describe(error), ...readings() });
@@ -97,7 +97,7 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
     write("error", "Unhandled promise rejection (kept running)", { ...describe(reason), ...readings() });
   });
   process.on("exit", (code) => {
-    write(code ? "error" : "info", "HEISS UI exited", { code, ...readings() });
+    write(code ? "error" : "info", "Studio exited", { code, ...readings() });
     // Started while a copy already ran: that one's run, not this, so its record stays its own.
     if (code === PORT_IN_USE_CODE) return;
     const meant = code === 0;

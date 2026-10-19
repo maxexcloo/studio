@@ -686,7 +686,7 @@ export async function flushGallery() {
     .catch((error) => {
       // Try again shortly; the old file (and its backup) are still whole.
       dirty = true;
-      console.warn(`[HEISS] Could not save the gallery: ${error.message}`);
+      console.warn(`[Studio] Could not save the gallery: ${error.message}`);
     })
     .finally(() => {
       writing = null;
@@ -715,7 +715,7 @@ function flushBeforeExit() {
   try {
     writeGalleryNow();
   } catch (error) {
-    console.warn(`[HEISS] Could not save the gallery before stopping: ${error.message}`);
+    console.warn(`[Studio] Could not save the gallery before stopping: ${error.message}`);
   }
 }
 

@@ -12,7 +12,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-routes-'));
 process.env.HEISS_DATA_DIR = dir;
 process.env.HEISS_ENV_FILE = path.join(dir, '.env');
 process.env.HEISS_LAN = '0';
-process.env.HEISS_ENABLE_PRESETS = '1';
+process.env.STUDIO_ENABLE_PRESETS = '1';
 delete process.env.CIVITAI_API_TOKEN;
 fs.writeFileSync(path.join(dir, 'presets.json'), JSON.stringify([{ id: '43', name: 'Legacy Landscape', previewUrl: 'https://image.civitai.com/legacy.png', sourceUrl: 'https://civitai.com/images/43', prompt: 'an older saved landscape', negative: '', settings: { seed: '0' }, resources: [], warnings: [], savedAt: '2025-01-01T00:00:00Z' }]));
 const { registerPresetRoutes } = await import('./preset-routes.js');
@@ -188,8 +188,8 @@ test('browser-supplied downloads and paths cannot bypass preview resolution', as
 test('disabled instances refuse every preset, provider download and token route', async () => {
   try {
     for (const enabled of [undefined, '0']) {
-      if (enabled === undefined) delete process.env.HEISS_ENABLE_PRESETS;
-      else process.env.HEISS_ENABLE_PRESETS = enabled;
+      if (enabled === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
+      else process.env.STUDIO_ENABLE_PRESETS = enabled;
       const { mockModelResult, offlineModelResult } = await import('./models.js');
       assert.equal(mockModelResult().features.presets, false);
       assert.equal(offlineModelResult().features.presets, false);
@@ -203,7 +203,7 @@ test('disabled instances refuse every preset, provider download and token route'
         assert.equal(response.status, 404, `${method} ${url} with flag ${enabled}`);
       }
     }
-  } finally { process.env.HEISS_ENABLE_PRESETS = '1'; }
+  } finally { process.env.STUDIO_ENABLE_PRESETS = '1'; }
 });
 
 test('split workflow imports queue verified model, encoder, VAE and LoRA files and retain their associations', async () => {

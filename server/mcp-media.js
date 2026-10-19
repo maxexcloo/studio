@@ -84,14 +84,14 @@ export class McpMedia {
       // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
       let reason = '';
       if ([400, 403, 409, 422].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
-      throw new Error(reason ? `HEISS refused the request: ${reason}` : `HEISS refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
+      throw new Error(reason ? `Studio refused the request: ${reason}` : `Studio refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
     }
     return response;
   }
   async request(method, route, body, owner = "", options = {}) {
     const response = await this.response(method, route, body, owner, options);
     try { return await response.json(); } catch {
-      const error = new Error('HEISS returned an invalid response. Check job status before retrying.');
+      const error = new Error('Studio returned an invalid response. Check job status before retrying.');
       error.submissionUncertain = true;
       throw error;
     }
@@ -174,8 +174,8 @@ export class McpMedia {
         this.state.jobs[id] = owner;
         this.save();
         const result = await this.request('POST', '/api/generate', { ...body, clientJobId: id, prompt, seed: seed === undefined ? '' : String(seed + queued.length) }, owner);
-        if (!result.jobId) throw new Error('HEISS did not return a job ID.');
-        if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('HEISS returned a job owned by another account.');
+        if (!result.jobId) throw new Error('Studio did not return a job ID.');
+        if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('Studio returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
         this.save();
         queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), profile_id, count: body.count, variant_index: variant });
@@ -323,7 +323,7 @@ export class McpMedia {
     let bytes = 0;
     for await (const chunk of response.body) {
       bytes += chunk.length;
-      if (bytes > 128000000) throw new Error('Download large results directly from HEISS.');
+      if (bytes > 128000000) throw new Error('Download large results directly from Studio.');
       chunks.push(Buffer.from(chunk));
     }
     return { content: Buffer.concat(chunks), mime: response.headers.get('content-type')?.split(';')[0] || 'application/octet-stream' };
@@ -338,7 +338,7 @@ export class McpMedia {
     const form = new FormData();
     form.append('image', new Blob([content], { type: `image/${metadata.format}` }), path.basename(filename));
     const result = await this.request('POST', '/api/reference-assets/upload', form, owner);
-    if (!result.asset?.id || hidden(result.asset) || result.asset.privacyDomain === 'hidden') throw new Error('HEISS could not accept this reference image.');
+    if (!result.asset?.id || hidden(result.asset) || result.asset.privacyDomain === 'hidden') throw new Error('Studio could not accept this reference image.');
     this.state.assets[result.asset.id] = [...new Set([...(this.state.assets[result.asset.id] ? [this.state.assets[result.asset.id]].flat() : []), owner])];
     this.save();
     return result;
@@ -372,7 +372,7 @@ export class McpMedia {
    * (signed image markdown plus View Original) without calling Result again.
    */
   notification(owner, jobId, job, named) {
-    const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'HEISS result';
+    const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'Studio result';
     const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
     const markdown = outputs.map(({ url }, position) => {
       const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
@@ -390,11 +390,11 @@ export class McpMedia {
     const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.token(claims.owner, claims.jobId, index)] : []) : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);
-    const title = pending ? 'Generating…' : outputs.length ? 'HEISS Result' : `Generation ${escapeHtml(job.status)}`;
+    const title = pending ? 'Generating…' : outputs.length ? 'Studio Result' : `Generation ${escapeHtml(job.status)}`;
     const progress = Number.isFinite(job.progress) ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%` : '';
     const media = outputs.map(token => job.kind === 'video'
       ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
-      : `<figure><a href="${token}"><img src="${token}" alt="HEISS result"></a><a href="${token}">View Original</a></figure>`).join('');
+      : `<figure><a href="${token}"><img src="${token}" alt="Studio result"></a><a href="${token}">View Original</a></figure>`).join('');
     const body = pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : '<p>This generation did not produce a result.</p>';
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}</style></head><body><h1>${title}</h1>${body}</body></html>`;
   }

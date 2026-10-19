@@ -250,9 +250,9 @@ export function isSignedInDevice(req) {
  * when the owner trusts devices with it.
  */
 export function canAdmin(req) {
-  if (process.env.HEISS_MULTI_USER === "1") {
+  if (process.env.STUDIO_MULTI_USER === "1") {
     if (!req?.heissAccount) {
-      const token = parseCookies(req)["heiss_account"];
+      const token = parseCookies(req)["studio_account"];
       if (req) req.heissAccount = accountSession(token);
     }
     // A personal MCP token never carries administrator authority.

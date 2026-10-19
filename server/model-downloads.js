@@ -361,7 +361,7 @@ async function fetchInto(entry, signal) {
     if (response.status === 404) {
       // The catalog in this version is out of date; a newer one usually knows where the file went.
       const page = repositoryPage(entry.url);
-      throw finalError(`${entry.file} is no longer at its download address (HTTP 404). Update HEISS UI in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`);
+      throw finalError(`${entry.file} is no longer at its download address (HTTP 404). Update Studio in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`);
     }
     throw new Error(`${provider} answered ${response.status} for ${entry.file}.`);
   }

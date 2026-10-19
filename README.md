@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./public/heiss-lockup-white.svg" />
-    <img src="./public/heiss-lockup-black.svg" alt="HEISS UI" width="260" />
+    <source media="(prefers-color-scheme: dark)" srcset="./public/studio-lockup-white.svg" />
+    <img src="./public/studio-lockup-black.svg" alt="Studio" width="260" />
   </picture>
 </p>
 
@@ -13,9 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maxexcloo/heiss-ui/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/heiss-ui?style=for-the-badge&label=release&labelColor=1a1a1a&color=ff7a3d" alt="The latest release" /></a>
-  <a href="https://heiss-ui.vercel.app/"><img src="https://img.shields.io/badge/website-heiss--ui-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Website" /></a>
-  <a href="https://discord.gg/Hf7ysvDeGa"><img src="https://img.shields.io/badge/discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=1a1a1a" alt="Join the Discord" /></a>
+  <a href="https://github.com/maxexcloo/studio/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/studio?style=for-the-badge&label=release&labelColor=1a1a1a&color=ff7a3d" alt="The latest release" /></a>
+  <a href="https://github.com/tristmeister/HEISS-UI"><img src="https://img.shields.io/badge/upstream-HEISS%20UI-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Upstream HEISS UI" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-444?style=for-the-badge&labelColor=1a1a1a" alt="MIT license" /></a>
 </p>
 
@@ -24,22 +23,22 @@
 </p>
 
 <p align="center">
-  <img src="./docs/screenshots/hero.jpg" alt="HEISS UI: a masonry gallery of generated photographs, two still resolving as pixel mosaics, with the prompt composer floating at the bottom" width="1100" />
+  <img src="./docs/screenshots/hero.jpg" alt="Studio: a masonry gallery of generated photographs, two still resolving as pixel mosaics, with the prompt composer floating at the bottom" width="1100" />
 </p>
 
 <p align="center">
-  <sub>Free and open source under MIT. Built on <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper.</sub>
+  <sub>Free and open source under MIT. A fork of <a href="https://github.com/tristmeister/HEISS-UI">HEISS UI</a>, built on <a href="https://github.com/jasperdevs/J-AI-Studio">J-AI Studio</a> by Jasper.</sub>
 </p>
 
 ---
 
-This is the [maxexcloo/heiss-ui fork](https://github.com/maxexcloo/heiss-ui), based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0), commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions follow an independent numeric Semantic Versioning stream; the upstream base is recorded separately in `server/release-identity.json`.
+Studio is the [maxexcloo/studio](https://github.com/maxexcloo/studio) fork of HEISS UI, based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0), commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions follow an independent numeric Semantic Versioning stream; the upstream base is recorded separately in `server/release-identity.json`.
 
-This fork is delivered only as a container image, `ghcr.io/maxexcloo/heiss-ui`. Upstream's desktop downloads, double-click launchers and in-app updater are not part of it; update by deploying a newer image. Upstream model, workflow and studio work is merged in regularly, and fork features (accounts, media storage, MCP, deployment settings) live in separate modules.
+This fork is delivered only as a container image, `ghcr.io/maxexcloo/studio`. Upstream's desktop downloads, double-click launchers and in-app updater are not part of it; update by deploying a newer image. Upstream model, workflow and studio work is merged in regularly, and fork features (accounts, media storage, MCP, deployment settings) live in separate modules.
 
-HEISS UI sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
+Studio sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
 
-The node graph is for building workflows. HEISS UI is for the everyday loop of prompt, wait, look, tweak, and your workflows come along.
+The node graph is for building workflows. Studio is for the everyday loop of prompt, wait, look, tweak, and your workflows come along.
 
 ## Features
 
@@ -58,7 +57,7 @@ The node graph is for building workflows. HEISS UI is for the everyday loop of p
 
 Open **LoRAs** in the composer to select effects and adjust their strengths. Drag the selected effects by their grips to change the applied order, or use the Up/Down buttons or arrow keys on a grip. **Info** shows available descriptions, trigger words and source links without fetching extra metadata.
 
-LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [website](https://heiss-ui.vercel.app/#features).
+LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [HEISS UI website](https://heiss-ui.vercel.app/#features).
 
 <p align="center">
   <a href="./docs/screenshots/realtime-generation.mp4"><img src="./docs/screenshots/realtime-generation.gif" alt="Two new images resolving live in the gallery, from pixel-mosaic step previews to the finished photograph" width="100%" /></a>
@@ -68,12 +67,12 @@ LoRA stacks, live previews, video previews, recent prompts and gallery search ar
 
 **1. Have ComfyUI running** somewhere the container can reach, and note its address.
 
-**2. Run the image** with that address and a folder for HEISS UI's data:
+**2. Run the image** with that address and a folder for Studio's data:
 
 ```sh
 mkdir -p data
 docker run --env COMFY_URL=http://comfyui.local:8188 --init --publish 127.0.0.1:8787:8787 --rm \
-  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" ghcr.io/maxexcloo/heiss-ui:latest
+  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" ghcr.io/maxexcloo/studio:latest
 ```
 
 **3. Open http://localhost:8787.** Models, samplers and VAEs show up once ComfyUI is connected. [Containers](#containers) covers video backends, storage and image tags.
@@ -81,7 +80,7 @@ docker run --env COMFY_URL=http://comfyui.local:8188 --init --publish 127.0.0.1:
 <details>
 <summary><b>No ComfyUI yet?</b></summary>
 
-Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and HEISS UI connects on its own.
+Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and Studio connects on its own.
 
 </details>
 
@@ -91,8 +90,8 @@ Get [ComfyUI Desktop](https://www.comfy.org/download), leave it running, and HEI
 To run without a container or change the code. This needs **Node.js 20.9+** (22 LTS or newer recommended).
 
 ```bash
-git clone https://github.com/maxexcloo/heiss-ui.git heiss-ui
-cd heiss-ui
+git clone https://github.com/maxexcloo/studio.git studio
+cd studio
 npm install
 npm run build
 npm start
@@ -109,10 +108,10 @@ ComfyUI on another machine or port? Set its address in **Settings › Connection
 The Dockerfile builds a Linux AMD64 image for Docker and Podman. Set `COMFY_URL` to the existing ComfyUI endpoint reachable from the container, then build and run:
 
 ```sh
-docker build --tag heiss-ui:local .
+docker build --tag studio:local .
 mkdir -p data
 docker run --env COMFY_URL --init --publish 127.0.0.1:8787:8787 --rm \
-  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" heiss-ui:local
+  --user "$(id -u):$(id -g)" --volume "$PWD/data:/data" studio:local
 ```
 
 Set `COMFY_VIDEO_URL` to a separate ComfyUI HTTP(S) endpoint to route local video workflows there. Images and provider-backed Grok workflows stay on `COMFY_URL`. Job progress, uploads and cancellation follow the selected backend; an unavailable video server never falls back to the primary server. Both backends must share input and output storage for local gallery access. On phones, select **Video** on the **Create** sheet, then choose a video model; duration controls are under **Advanced Settings**.
@@ -125,11 +124,11 @@ For local verification, run `mise run setup`, then `mise run check`. Renovate up
 
 ### Native MCP
 
-HEISS serves optional Streamable HTTP MCP at `/mcp` on its existing application port, in the same Node process. Set `HEISS_MCP_API_KEY` on each studio instance to enable its seven tools: Models, Generate, Status, Result, Cancel, Upload and Reuse. Each key accesses only its own studio. No additional service, Python runtime, studio passwords or other studio URLs are needed. Generation always returns, per job, its job ID, a short reference such as `result 3` and a signed watch link without waiting for completion. The watch link opens a page that shows progress and then the finished outputs, so users can follow results without the chat. References are numbered per conversation when the client sends `x-heiss-conversation-id` (in LibreChat, for example, a header set from the conversation ID placeholder), otherwise per account; Status, Result, Cancel and Reuse accept a reference wherever they accept a job ID. Status and Result return immediately by default. For automatic in-chat delivery, use a saved LibreChat Agent with background execution enabled for Result: call Result once per queued job with `delivery: notification`, `wait_seconds: 1500` and `run_in_background: true`, then end the foreground turn and wait for the notification. The text-only completion is self-sufficient: it carries the signed image markdown and a View Original link (a View Video link for videos), so the resumed Agent renders it in one step without calling Result again. `delivery: preview` still attaches an inline preview on request. Background (`delivery: notification`) Result waits are capped at 1500 seconds, below LibreChat's 1800-second background deadline, and foreground waits by `HEISS_MCP_FOREGROUND_WAIT_SECONDS`; earlier Agents that pass 1800 are capped rather than refused. A client Stop or disconnect ends the wait promptly; it never cancels the generation, which only Cancel does. Regular chats retrieve results on request. Run `mise run test:mcp` for the native integration and importer tests; `mise run check` includes them too.
+Studio serves optional Streamable HTTP MCP at `/mcp` on its existing application port, in the same Node process. Set `STUDIO_MCP_API_KEY` on each studio instance to enable its seven tools: Models, Generate, Status, Result, Cancel, Upload and Reuse. Each key accesses only its own studio. No additional service, Python runtime, studio passwords or other studio URLs are needed. Generation always returns, per job, its job ID, a short reference such as `result 3` and a signed watch link without waiting for completion. The watch link opens a page that shows progress and then the finished outputs, so users can follow results without the chat. References are numbered per conversation when the client sends `x-studio-conversation-id` (in LibreChat, for example, a header set from the conversation ID placeholder), otherwise per account; Status, Result, Cancel and Reuse accept a reference wherever they accept a job ID. Status and Result return immediately by default. For automatic in-chat delivery, use a saved LibreChat Agent with background execution enabled for Result: call Result once per queued job with `delivery: notification`, `wait_seconds: 1500` and `run_in_background: true`, then end the foreground turn and wait for the notification. The text-only completion is self-sufficient: it carries the signed image markdown and a View Original link (a View Video link for videos), so the resumed Agent renders it in one step without calling Result again. `delivery: preview` still attaches an inline preview on request. Background (`delivery: notification`) Result waits are capped at 1500 seconds, below LibreChat's 1800-second background deadline, and foreground waits at 20 seconds; earlier Agents that pass 1800 are capped rather than refused. A client Stop or disconnect ends the wait promptly; it never cancels the generation, which only Cancel does. Regular chats retrieve results on request. Run `mise run test:mcp` for the native integration and importer tests; `mise run check` includes them too.
 
-Enable `serverInstructions: true` on LibreChat’s HEISS connections so the model receives the submission and background collection rules. MCP catalogue reads reuse the existing backend metadata cache; studio rescans still refresh it. Completed-result visibility checks target the exact job and retain Hidden/deletion revocation.
+Enable `serverInstructions: true` on LibreChat’s Studio connections so the model receives the submission and background collection rules. MCP catalogue reads reuse the existing backend metadata cache; studio rescans still refresh it. Completed-result visibility checks target the exact job and retain Hidden/deletion revocation.
 
-Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/heiss`; signed links retain that prefix. Without it, links use the studio’s local loopback address. Set and preserve `MCP_SIGNING_KEY` and retain `mcp-ownership.json` in `HEISS_DATA_DIR` across updates. Keep shared provider credentials at the trusted gateway, which sets `x-ai-user-id` to partition job and reference ownership. Direct provider calls use a separate fallback owner; the forwarded header alone grants no access. Original links open inline in the browser, do not expire and stop working when outputs are hidden or deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid.
+Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/studio`; signed links retain that prefix. Without it, links use the studio’s local loopback address. Set and preserve `MCP_SIGNING_KEY` and retain `mcp-ownership.json` in `HEISS_DATA_DIR` across updates. Keep shared provider credentials at the trusted gateway, which sets `x-ai-user-id` to partition job and reference ownership. Direct provider calls use a separate fallback owner; the forwarded header alone grants no access. Original links open inline in the browser, do not expire and stop working when outputs are hidden or deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid.
 
 Generate requires the same account to fetch Models with the exact profile ID within the preceding hour; compact discovery cannot satisfy this check. Full model details list only the `controls` a profile lets MCP adjust, with their ranges, options and defaults; fixed controls are omitted, and Generate refuses a fixed control by name together with the adjustable alternatives. `negative_prompt` appears only where it takes effect: profiles without a negative input, or guidance-distilled profiles fixed at CFG 1, refuse it with an explanation, and profiles whose default CFG is 1 require a CFG above 1 alongside it. Details also list the profile's compatible optional LoRAs from the studio LoRA picker's metadata (title, description, trigger words, recommended strength and range, source link), excluding other architectures, acceleration and supporting files, and respecting the account's LoRA access; `lora_query` narrows long lists. Studio validation messages, such as a LoRA strength outside its published range, are returned to the agent. Refresh guidance after a studio restart. Full model details include `native` size support. Explicit `width` and `height` request native generation (a 2048-pixel long side for 2K), with tiled decoding for large images. On supported built-in reference models, `reference_role: edit` changes the supplied picture at its framing; `reference_role: reference` guides a new image at the requested dimensions. Automatic upscaling remains off unless `upscale_quality` is explicitly supplied.
 
@@ -137,7 +136,7 @@ Profiles and researched guidance remain in the sibling AI configuration reposito
 
 Optional AI Control tools require `CONTROL_MCP_API_KEY`, `CONTROL_API_KEY` and `CONTROL_URL` on the instance that exposes them. The control MCP credential must differ from the media credential and the upstream control API credential. It exposes only GPUStatus, Workloads, Preview, Apply and Operation; media credentials cannot discover or invoke them. Allocation changes require an explicit preview and approved apply.
 
-To preserve chat job ownership when replacing the legacy Python bridge, stop both the bridge and destination studio before running the offline importer with Node 22.13 or newer. Resolve `MCP_SIGNING_KEY` and the destination studio’s `HEISS_MCP_API_KEY` through the existing credential environment; never put secret values in command arguments. Run `node server/mcp-import.js --data-dir <studio-data> --database <legacy-jobs.sqlite> --studio primary`, then repeat for the other studio’s data directory with `--studio secondary` and its own provider key. The importer reads the selected studio’s legacy SQLite records without modifying them, preserves forwarded-user identities and maps the matching studio provider to its native key. It atomically merges compatible owners, skips existing matches, and rejects unknown owners or conflicts before writing. Keep the original SQLite database and all studio data. Do not run the importer while either service is writing ownership records.
+To preserve chat job ownership when replacing the legacy Python bridge, stop both the bridge and destination studio before running the offline importer with Node 22.13 or newer. Resolve `MCP_SIGNING_KEY` and the destination studio’s `STUDIO_MCP_API_KEY` through the existing credential environment; never put secret values in command arguments. Run `node server/mcp-import.js --data-dir <studio-data> --database <legacy-jobs.sqlite> --studio primary`, then repeat for the other studio’s data directory with `--studio secondary` and its own provider key. The importer reads the selected studio’s legacy SQLite records without modifying them, preserves forwarded-user identities and maps the matching studio provider to its native key. It atomically merges compatible owners, skips existing matches, and rejects unknown owners or conflicts before writing. Keep the original SQLite database and all studio data. Do not run the importer while either service is writing ownership records.
 
 The source migration does not deploy or switch a running service. Existing deployed bridge state remains unchanged until an explicit deployment and ownership import.
 
@@ -189,7 +188,7 @@ Getting a new model running in ComfyUI usually means hunting for the right text 
 Change one part of a picture and keep the rest. Hover a reference or start image in the prompt bar and press the brush, paint over what should change, then write what it becomes.
 
 <p align="center">
-  <a href="./docs/screenshots/inpainting.mp4"><img src="./docs/screenshots/inpainting.webp" alt="Inpainting in HEISS UI: a picture is dropped into the prompt bar as a reference, the brush opens the inpaint studio over the gallery, and a stroke is painted over the part to change" width="100%" /></a>
+  <a href="./docs/screenshots/inpainting.mp4"><img src="./docs/screenshots/inpainting.webp" alt="Inpainting in Studio: a picture is dropped into the prompt bar as a reference, the brush opens the inpaint studio over the gallery, and a stroke is painted over the part to change" width="100%" /></a>
 </p>
 
 - **The rest stays untouched.** Only the painted part is redrawn, so the rest never softens or shifts in color.
@@ -254,9 +253,9 @@ The gallery runs edge to edge, and one **Describe…** pill opens the prompt, re
 
 ## Connect over LAN
 
-Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. HEISS UI and ComfyUI keep running on your PC with its models and outputs; the other device needs only a browser.
+Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. Studio and ComfyUI keep running on your PC with its models and outputs; the other device needs only a browser.
 
-1. On the PC running HEISS UI, open **Settings › Connection** and turn on **Open on other devices**.
+1. On the PC running Studio, open **Settings › Connection** and turn on **Open on other devices**.
 2. In the same settings, set a **studio password** under **Signing in**.
 3. On your other device, open the **network address** shown in Connection (for example, `http://192.168.1.20:8787`) and sign in with that password. Use your PC’s listed address, not `localhost`.
 
@@ -265,7 +264,7 @@ Laptops and desktops get the full studio and phones get the phone layout. Only e
 <details>
 <summary><b>More on setup</b></summary>
 
-**Open on other devices** takes effect the next time HEISS UI starts. For a single session, start it with `npm start -- --lan` instead. The container listens on all addresses (`HOST=0.0.0.0`), so publish its port only where other devices should reach it.
+**Open on other devices** takes effect the next time Studio starts. For a single session, start it with `npm start -- --lan` instead. The container listens on all addresses (`HOST=0.0.0.0`), so publish its port only where other devices should reach it.
 
 </details>
 
@@ -306,22 +305,22 @@ Everything else (the output folder, other devices, HTTPS, the Hugging Face token
 [TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems. A failed generation links straight to its section.
 
 - **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Connection. After adding files, use **Settings › Models › Rescan**.
-- **Asking for help?** **Settings › About › Copy diagnostics** copies versions, system and GPU, without prompts or images. Paste it on the [board](https://heiss-ui.vercel.app/board/) or in the [Discord](https://discord.gg/Hf7ysvDeGa).
+- **Asking for help?** **Settings › About › Copy diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
 
 ## Feedback and community
 
-Found a bug, want a feature, or not sure how something works? Post it on the **[feedback board](https://heiss-ui.vercel.app/board/)**: it's public, needs no account, and shows what's planned, in progress and done. Rather talk it through? **[Join the Discord](https://discord.gg/Hf7ysvDeGa)**.
+Found a bug in Studio or want a feature? Open a [GitHub issue](https://github.com/maxexcloo/studio/issues).
 
-From the app, **Idea or bug?** at the bottom of the Settings sidebar and **Report bug** on a failed generation send a post with the details filled in, and you see everything that goes with it before you send. GitHub issues work as well.
+The in-app **Idea or bug?** and **Report bug** links post to upstream's [HEISS UI feedback board](https://heiss-ui.vercel.app/board/), for problems that also affect upstream HEISS UI. Upstream also has a [Discord](https://discord.gg/Hf7ysvDeGa).
 
 ## FAQ
 
-The [website FAQ](https://heiss-ui.vercel.app/#faq) answers the common questions.
+The [HEISS UI website FAQ](https://heiss-ui.vercel.app/#faq) answers the common questions.
 
 <details>
-<summary><b>Why "HEISS"?</b></summary>
+<summary><b>Why "Studio"?</b></summary>
 
-_Heiß_ is German for hot. Hence the steaming cup.
+It is a separately delivered fork of HEISS UI, so it has its own name. _Heiß_ is German for hot, hence the steaming cup it keeps.
 
 </details>
 
@@ -339,7 +338,7 @@ npm run dev
 
 ## Credits
 
-HEISS UI started as a fork of **[J-AI Studio](https://github.com/jasperdevs/J-AI-Studio)** by **[Jasper](https://github.com/jasperdevs)**. The prompt-first idea and much of the foundation are his work. If HEISS UI is useful to you, go give the original a star too.
+Studio is a fork of **[HEISS UI](https://github.com/tristmeister/HEISS-UI)**, which started as a fork of **[J-AI Studio](https://github.com/jasperdevs/J-AI-Studio)** by **[Jasper](https://github.com/jasperdevs)**. The prompt-first idea and much of the foundation are his work. If Studio is useful to you, give both originals a star too.
 
 Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 

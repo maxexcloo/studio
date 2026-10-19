@@ -6,8 +6,8 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-setup-token-"));
 process.env.HEISS_DATA_DIR = path.join(temporary, "data");
-process.env.HEISS_MULTI_USER = "1";
-process.env.HEISS_SETUP_TOKEN = "a-deployment-setup-token-of-sufficient-length";
+process.env.STUDIO_MULTI_USER = "1";
+process.env.STUDIO_SETUP_TOKEN = "a-deployment-setup-token-of-sufficient-length";
 process.env.COMFY_URL = "http://127.0.0.1:9";
 const { registerMultiUserAuthRoutes } = await import("./multi-user-auth.js");
 
@@ -37,9 +37,9 @@ test("a deployment setup token creates the first administrator remotely, once", 
   assert.equal(status.body.setupTokenAccepted, true);
   const wrong = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "recovery", password: "a secure recovery password", setupToken: "guessed" }));
   assert.equal(wrong.statusCode, 403);
-  const created = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "recovery", password: "a secure recovery password", setupToken: process.env.HEISS_SETUP_TOKEN }));
+  const created = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "recovery", password: "a secure recovery password", setupToken: process.env.STUDIO_SETUP_TOKEN }));
   assert.equal(created.statusCode, 201);
-  const again = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "second", password: "a secure second password", setupToken: process.env.HEISS_SETUP_TOKEN }));
+  const again = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "second", password: "a secure second password", setupToken: process.env.STUDIO_SETUP_TOKEN }));
   assert.equal(again.statusCode, 409);
   assert.equal((await call(routes["GET /api/accounts/status"], remote({}))).body.setupTokenAccepted, undefined);
 });

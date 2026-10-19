@@ -1,7 +1,7 @@
 {
-  "name": "HEISS UI",
-  "short_name": "HEISS",
-  "description": "A local image and video studio for ComfyUI.",
+  "name": "Studio",
+  "short_name": "Studio",
+  "description": "An image and video studio for ComfyUI.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

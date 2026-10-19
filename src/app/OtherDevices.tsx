@@ -49,7 +49,7 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
       await apiJson('/api/network/tls', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(off ? {} : { cert, key }) });
       setEditing(false);
       onSaved();
-      showToast(off ? 'HTTPS turns off when HEISS UI restarts' : 'Saved. HTTPS starts when HEISS UI restarts.', 'success');
+      showToast(off ? 'HTTPS turns off when Studio restarts' : 'Saved. HTTPS starts when Studio restarts.', 'success');
     } catch (error) {
       setProblem(error instanceof Error ? error.message : 'Those files can’t be used');
     } finally {
@@ -84,7 +84,7 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
         ) : null}
       </Row>
       {pending ? (
-        <Row label="Waiting for a restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when HEISS UI restarts.` : 'HTTPS turns off when HEISS UI restarts.'} />
+        <Row label="Waiting for a restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when Studio restarts.` : 'HTTPS turns off when Studio restarts.'} />
       ) : null}
     </>
   );
@@ -145,7 +145,7 @@ function StudioPasswordRow({ access, onSaved, showToast, Row, Status }: { access
     : state.hidden ? <Status tone="warn">Using the Hidden password</Status>
     : <Status tone="warn">No studio password</Status>;
   const description = !state ? undefined
-    : !atComputer ? 'Other devices sign in with it. Set it on the computer running HEISS UI.'
+    : !atComputer ? 'Other devices sign in with it. Set it on the computer running Studio.'
     : state.set ? 'Other devices sign in with it. Changing it signs every device out.'
     : state.hidden ? 'Other devices sign in with the Hidden password for now. Set a studio password to keep them separate.'
     : 'Other devices need it to sign in.';
@@ -268,9 +268,9 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
   };
 
   const description = !lan ? undefined
-    : lan.source === 'flag' ? 'On because HEISS UI was started with --lan.'
-    : lan.source === 'shell' ? 'Set by HOST when HEISS UI was started, so it can’t be changed here.'
-    : pending ? `${lan.saved ? 'Turns on' : 'Turns off'} the next time you start HEISS UI.`
+    : lan.source === 'flag' ? 'On because Studio was started with --lan.'
+    : lan.source === 'shell' ? 'Set by HOST when Studio was started, so it can’t be changed here.'
+    : pending ? `${lan.saved ? 'Turns on' : 'Turns off'} the next time you start Studio.`
     : on ? 'Phones and other computers on this network can open the studio after signing in.'
     : 'Lets phones and other computers on this network open the studio, from the next start.';
   const noPassword = Boolean(access && !access.studioPassword.set && !access.studioPassword.hidden);
@@ -316,7 +316,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
         <StudioPasswordRow access={access} onSaved={loadAccess} showToast={showToast} Row={Row} Status={Status} />
         <Row
           label="Trust other devices with admin"
-          description={`Lets signed-in devices update HEISS UI, install nodes and models, change the output folder and clear the gallery.${atComputer ? '' : ' Only the computer running HEISS UI can change this.'}`}
+          description={`Lets signed-in devices update Studio, install nodes and models, change the output folder and clear the gallery.${atComputer ? '' : ' Only the computer running Studio can change this.'}`}
           disabled={!atComputer || !access}
         >
           <Switch label="Trust other devices with admin" checked={Boolean(access?.adminFromDevices)} disabled={!atComputer || !access} onChange={setAdmin} />

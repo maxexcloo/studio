@@ -64,7 +64,7 @@ export function createJobRecovery({ backends, filterHistory, finishJob, getGalle
           if (done) {
             untracked.delete(id);
             missing.delete(id);
-            // With HEISS media storage, recovered outputs move out of ComfyUI like delivered ones.
+            // With Studio media storage, recovered outputs move out of ComfyUI like delivered ones.
             const outputs = await ingest(visible(recordsFromHistory({ [done.promptId]: done.entry })), done.promptId);
             if (outputs.length) {
               const urls = new Set(getGallery().filter((item) => item.status === 'done').map((item) => item.url));

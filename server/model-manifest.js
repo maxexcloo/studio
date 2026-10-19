@@ -10,8 +10,8 @@ import { isInside } from "./paths.js";
 /**
  * A pinned model manifest: every weight the deployment expects, with its size
  * and SHA-256, and where to get it again. The deployment keeps the master copy
- * (HEISS_MODEL_MANIFEST, mounted read-only); an administrator may import one
- * here instead, and export what HEISS uses. HEISS reports what is present,
+ * (STUDIO_MODEL_MANIFEST, mounted read-only); an administrator may import one
+ * here instead, and export what Studio uses. Studio reports what is present,
  * missing or wrong, verifies checksums in the background and restores missing
  * files through its own checksum-verifying downloader.
  */
@@ -19,8 +19,8 @@ import { isInside } from "./paths.js";
 const importedPath = path.join(dataDir, "model-manifest.json");
 const verifiedPath = path.join(dataDir, "model-manifest-verified.json");
 // Manifest paths are relative to ComfyUI's model folder unless the deployment names a prefix to strip.
-const prefix = String(process.env.HEISS_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
-// What HEISS's downloader may place; anything else is restored by the deployment's own tooling.
+const prefix = String(process.env.STUDIO_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
+// What Studio's downloader may place; anything else is restored by the deployment's own tooling.
 const restorableFolders = new Set(["text_encoders", "vae", "diffusion_models", "checkpoints", "loras", "clip_vision"]);
 const verifyState = { running: false, done: 0, total: 0, current: "", startedAt: 0, finishedAt: 0, error: "" };
 let verified = null;
@@ -53,7 +53,7 @@ export function loadManifest() {
   try {
     if (fs.existsSync(importedPath)) return { source: "imported", entries: parseManifest(readJsonFile(importedPath)) };
   } catch (error) { return { source: "imported", entries: [], error: error.message }; }
-  const file = process.env.HEISS_MODEL_MANIFEST;
+  const file = process.env.STUDIO_MODEL_MANIFEST;
   if (!file) return { source: "none", entries: [] };
   try { return { source: "deployment", entries: parseManifest(JSON.parse(fs.readFileSync(file, "utf8"))) }; }
   catch (error) { return { source: "deployment", entries: [], error: error.code === "ENOENT" ? "The deployment's manifest file is missing." : error.message }; }
@@ -76,7 +76,7 @@ function verifiedCache() {
   return verified;
 }
 
-/** Where an entry lives under ComfyUI's model folder, or why HEISS cannot place it. */
+/** Where an entry lives under ComfyUI's model folder, or why Studio cannot place it. */
 function locate(entry, modelsDir) {
   if (!entry.path.startsWith(prefix)) return { reason: "Outside ComfyUI's model folder" };
   if (!modelsDir) return { reason: "ComfyUI's model folder isn't known here" };
@@ -103,7 +103,7 @@ function restoreRoute(entry, relative) {
   if (!entry.url) return { restorable: false, restoreNote: "No download address; restore it from the deployment's backup" };
   const [folder, file, extra] = String(relative || "").split("/");
   if (extra !== undefined) return { restorable: false, restoreNote: "In a subfolder; restore it with the deployment's tooling" };
-  if (!restorableFolders.has(folder)) return { restorable: false, restoreNote: `HEISS doesn't download into ${folder}` };
+  if (!restorableFolders.has(folder)) return { restorable: false, restoreNote: `Studio doesn't download into ${folder}` };
   if (!/\.(safetensors|gguf)$/i.test(file || "")) return { restorable: false, restoreNote: "Only .safetensors and .gguf files download here" };
   return { restorable: true, folder, file };
 }
@@ -148,7 +148,7 @@ export function startVerify({ all = false } = {}) {
   return { ...verifyState };
 }
 
-/** Queues every missing, restorable entry (or the named ones) on HEISS's downloader. */
+/** Queues every missing, restorable entry (or the named ones) on Studio's downloader. */
 export function restoreMissing(paths = null) {
   const wanted = Array.isArray(paths) ? new Set(paths.map(String)) : null;
   const { entries } = loadManifest();

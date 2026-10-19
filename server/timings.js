@@ -29,7 +29,7 @@ function save(label) {
   try {
     writeJsonFile(timingsPath, timings);
   } catch (error) {
-    console.warn(`[HEISS] Could not save ${label} timing: ${error.message}`);
+    console.warn(`[Studio] Could not save ${label} timing: ${error.message}`);
   }
 }
 

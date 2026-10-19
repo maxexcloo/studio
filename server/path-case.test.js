@@ -19,7 +19,7 @@ test("capitalised API paths reach no handler, with or without accounts", { timeo
     const data = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-path-case-"));
     const port = await freePort();
     const child = spawn(process.execPath, ["server/index.js"], {
-      env: { ...process.env, NODE_TEST_CONTEXT: "", COMFY_URL: "http://127.0.0.1:1", COMFY_VIDEO_URL: "", HEISS_DATA_DIR: data, HEISS_ENV_FILE: path.join(data, ".env"), HEISS_DEMO: "1", HEISS_LAN: "0", HEISS_NO_BROWSER: "1", HOST: "127.0.0.1", PORT: String(port), HEISS_MULTI_USER: multiUser },
+      env: { ...process.env, NODE_TEST_CONTEXT: "", COMFY_URL: "http://127.0.0.1:1", COMFY_VIDEO_URL: "", HEISS_DATA_DIR: data, HEISS_ENV_FILE: path.join(data, ".env"), HEISS_DEMO: "1", HEISS_LAN: "0", HEISS_NO_BROWSER: "1", HOST: "127.0.0.1", PORT: String(port), STUDIO_MULTI_USER: multiUser },
       stdio: "ignore"
     });
     t.after(() => { child.kill(); fs.rmSync(data, { recursive: true, force: true }); });

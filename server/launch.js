@@ -27,7 +27,7 @@ export function heissAnswersAt(port, { timeoutMs = 1500, host = "" } = {}) {
         // Older versions have no /api/ping, but their unknown-route answer names HEISS UI.
         try {
           const data = JSON.parse(body);
-          resolve(data?.app === "heiss-ui" || /HEISS UI/.test(String(data?.error || "")));
+          resolve(data?.app === "heiss-ui" || /Studio/.test(String(data?.error || "")));
         } catch {
           resolve(false);
         }

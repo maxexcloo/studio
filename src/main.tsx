@@ -298,7 +298,7 @@ function App() {
       if (sync.failing && sync.pending > 0 && !loraSyncFailing.current) {
         showToast(sync.locked
           ? "LoRA changes are saved on this device. Sign in again to sync them."
-          : "Can’t reach HEISS UI. LoRA changes are saved on this device and sync when it’s back.", "error");
+          : "Can’t reach Studio. LoRA changes are saved on this device and sync when it’s back.", "error");
       } else if (!sync.failing && loraSyncFailing.current && !sync.pending) {
         showToast("LoRA changes synced", "success");
       }
@@ -806,8 +806,8 @@ function App() {
     const key = `heiss-ui:exit-told:${exit.at}`;
     try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { /* told this session at most */ }
     const when = new Date(exit.lastSeen || exit.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
-    const details = [`HEISS UI stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
-    showToast("HEISS UI stopped unexpectedly last time", "warning", {
+    const details = [`Studio stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
+    showToast("Studio stopped unexpectedly last time", "warning", {
       description: `${exit.reason.replace(/\.?$/, ".")} Last seen running ${when}.`,
       duration: 20_000,
       action: { label: "Copy details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
@@ -826,7 +826,7 @@ function App() {
         if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
         if (data.previousExit) tellPreviousExit(data.previousExit);
       })
-      .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach HEISS UI. Make sure it’s running." }));
+      .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach Studio. Make sure it’s running." }));
   }
 
   /** The status poll mostly returns the same answer; a new object would re-render the whole app every five seconds. */

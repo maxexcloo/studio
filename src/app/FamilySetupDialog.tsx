@@ -306,7 +306,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
             );
           })}
         </ul>
-        {!admin ? <p className="upscale-fine">Files download on the computer running HEISS UI. Set {title} up there.</p>
+        {!admin ? <p className="upscale-fine">Files download on the computer running Studio. Set {title} up there.</p>
           : plan.local === false ? <p className="upscale-fine">ComfyUI runs on another computer. Put these files in its model folders there.</p>
           : short ? <p className="upscale-fine is-warn">These need {formatBytes(remaining)} and the disk has {formatBytes(space?.free)} free.</p>
           : null}

@@ -57,12 +57,12 @@ test("a section an older HEISS wrote under unet_gguf is rewritten; other lines a
   const old = [
     "comfyui:",
     "    unet_gguf: somewhere/else",
-    "# >>> Added by HEISS UI: D:\\ComfyUI\\models",
+    "# >>> Added by Studio: D:\\ComfyUI\\models",
     "heiss_comfyui_models:",
     "    base_path: 'D:\\ComfyUI\\models'",
     "    unet_gguf: 'unet_gguf'",
     "    clip_gguf: 'clip_gguf'",
-    "# <<< HEISS UI",
+    "# <<< Studio",
     ""
   ].join("\n");
   const { text, changed } = migrateDerivedKinds(old);

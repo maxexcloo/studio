@@ -76,7 +76,7 @@ export function startSession({ pid = process.pid, now = Date.now(), bootedAt = n
   return {
     at: lastSeen,
     who: "unknown",
-    reason: "HEISS UI was ended from outside, without a crash of its own: the process was closed, or the window it ran in.",
+    reason: "Studio was ended from outside, without a crash of its own: the process was closed, or the window it ran in.",
     code: null,
     signal: null,
     clean: false,

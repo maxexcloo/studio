@@ -38,7 +38,7 @@ export function hiddenPasswordSignsIn() {
 
 function requireThisComputer(req, res) {
   if (clientOf(req).thisComputer) return true;
-  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running HEISS UI can change this." });
+  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can change this." });
   return false;
 }
 
@@ -67,7 +67,7 @@ export function registerAccessRoutes(app) {
     if (client.thisComputer) { res.json(accessStatus(req)); return; }
     const password = String(req.body?.password || "");
     if (!studioPasswordSet() && !isPrivacyEnabled()) {
-      res.status(409).json({ ok: false, reason: "setup", error: "Set a studio password first, on the computer running HEISS UI (Settings › Connection)." });
+      res.status(409).json({ ok: false, reason: "setup", error: "Set a studio password first, on the computer running Studio (Settings › Connection)." });
       return;
     }
     const legacy = hiddenPasswordSignsIn();

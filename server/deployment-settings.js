@@ -2,7 +2,7 @@ import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from "./env.js";
 
 /**
  * Settings a deployment can own. A value from the real environment (compose,
- * Kubernetes, the shell) is the deployment's and locked here; one in HEISS's own
+ * Kubernetes, the shell) is the deployment's and locked here; one in Studio's own
  * .env was saved from Settings and stays editable; anything else is the default.
  * Settings show each value with its source, so nothing changes behind the
  * deployment's back and nothing saved here silently loses to it after a restart.
@@ -18,12 +18,12 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
 
 /** Catalogue switches: what the generation catalogue offers. Some are read once, at start. */
 export const catalogueFlags = [
-  flag("HEISS_ENABLE_BUILTIN_PROFILES", "Built-In Profiles", "Detected model profiles and bundled workflow templates."),
-  flag("HEISS_ENABLE_LORAS", "LoRAs", "LoRA browsing and LoRA settings on generations.", { applies: "restart" }),
-  flag("HEISS_ENABLE_GROK", "Grok", "Provider-backed Grok workflows.", { applies: "restart" }),
-  flag("HEISS_ENABLE_TESSERA", "Tessera", "Tessera model profiles."),
+  flag("STUDIO_ENABLE_BUILTIN_PROFILES", "Built-In Profiles", "Detected model profiles and bundled workflow templates."),
+  flag("STUDIO_ENABLE_LORAS", "LoRAs", "LoRA browsing and LoRA settings on generations.", { applies: "restart" }),
+  flag("STUDIO_ENABLE_GROK", "Grok", "Provider-backed Grok workflows.", { applies: "restart" }),
+  flag("STUDIO_ENABLE_TESSERA", "Tessera", "Tessera model profiles."),
   flag("HEISS_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" }),
-  flag("HEISS_ENABLE_PRESETS", "Presets & Civitai Imports", "Saved image presets and Civitai image imports.", { defaultOn: false })
+  flag("STUDIO_ENABLE_PRESETS", "Presets & Civitai Imports", "Saved image presets and Civitai image imports.", { defaultOn: false })
 ];
 
 const flagOn = (item) => (item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1");
@@ -32,7 +32,7 @@ export function describeFlag(item) {
   return { ...item, value: flagOn(item), ...settingSource(item.key) };
 }
 
-/** Writes one deployment setting to HEISS's .env, unless the deployment owns it. */
+/** Writes one deployment setting to Studio's .env, unless the deployment owns it. */
 export function saveDeploymentSetting(key, value) {
   if (settingSource(key).locked) throw new Error("This setting comes from the deployment configuration. Change it there.");
   if (value === "" || value === null || value === undefined) removeLocalEnvValue(key);

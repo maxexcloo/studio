@@ -33,14 +33,14 @@ export const controlLabel = (key: string) => workflowControls.find((item) => ite
 /** The LoRA picker drives exactly these nodes. */
 export const loraNodes = { "rgthree-power-v1": "Power Lora Loader (rgthree)", "rgthree-stack-v1": "Lora Loader Stack (rgthree)" } as const;
 
-const promptHead = `I use HEISS UI, a frontend for ComfyUI with a simple prompt box. Help me prepare a ComfyUI workflow for it.
+const promptHead = `I use Studio, a frontend for ComfyUI with a simple prompt box. Help me prepare a ComfyUI workflow for it.
 
-HEISS UI sends the saved workflow to ComfyUI, updating only the node inputs connected to its controls. ComfyUI runs the workflow. The connections live in a "heissUi" block at the top level of the workflow JSON, in ComfyUI's API format (the object whose keys are node ids, each with "class_type" and "inputs").
+Studio sends the saved workflow to ComfyUI, updating only the node inputs connected to its controls. ComfyUI runs the workflow. The connections live in a "heissUi" block at the top level of the workflow JSON, in ComfyUI's API format (the object whose keys are node ids, each with "class_type" and "inputs").
 
 Your task:
 1. Read the workflow. If it is in ComfyUI's visual format (it has "nodes" and "links"), ask me to export it again with ComfyUI's "Export (API)", unless you are certain of every widget value.
 2. Add or fix the "heissUi" block so each control below points at the right node input. Leave the graph as it is, unless a connection can't work without a change (see "Changing the graph").
-3. Reply with the complete JSON, ready to paste into HEISS UI's import. After it, list briefly: what is connected, what stays as saved, and anything you were unsure about.
+3. Reply with the complete JSON, ready to paste into Studio's import. After it, list briefly: what is connected, what stays as saved, and anything you were unsure about.
 
 The heissUi block (every field but "controls" is optional):
 {
@@ -61,7 +61,7 @@ The heissUi block (every field but "controls" is optional):
   }
 }
 
-Controls HEISS UI can connect. Each points at exactly one input, and that input must already exist on the node:
+Controls Studio can connect. Each points at exactly one input, and that input must already exist on the node:
 ${workflowControls.map((item) => `- ${item.key}: ${item.hint}`).join("\n")}
 
 Reference images ("mediaInputs"), each a LoadImage "image" input:
@@ -71,11 +71,11 @@ Set capabilities.imageToImage to true when the workflow edits an image. "aspectP
 The LoRA picker ("loraStack") works only with these nodes, already wired to the model and CLIP:
 - { "adapter": "rgthree-power-v1", "node": "<id of a ${loraNodes["rgthree-power-v1"]}>", "max": 8 }
 - { "adapter": "rgthree-stack-v1", "node": "<id of a ${loraNodes["rgthree-stack-v1"]}>", "max": 4 }
-Set capabilities.lora to true with it. HEISS UI replaces only that node's LoRA slots.
+Set capabilities.lora to true with it. Studio replaces only that node's LoRA slots.
 
 "promptComposition" wraps the user's prompt in fixed text before it reaches the prompt input (for example an edit instruction). The gallery keeps the user's own words.
 
-What HEISS UI cannot connect (these keep the value saved in the workflow):
+What Studio cannot connect (these keep the value saved in the workflow):
 - Any input not listed above: ControlNet strength, upscale factors, extra text fields, custom sliders.
 - One control on several nodes. With two samplers (a refiner or hires pass) or two prompt encoders, only the connected one follows the studio.
 - Masks, videos or audio as inputs. Reference inputs are images only.
@@ -101,9 +101,9 @@ export function agentPromptFor(item: { filename?: string; raw: unknown; preview:
   const problems = [...(item.preview.validation.issues || []), ...(item.preview.validation.warnings || [])].map((issue) => `- ${issue}`);
   return `${promptHead}
 
-How HEISS UI read it on import${item.filename ? ` (${item.filename})` : ""}:
+How Studio read it on import${item.filename ? ` (${item.filename})` : ""}:
 ${read.length ? read.join("\n") : "- Nothing connected yet."}
-${problems.length ? `\nWhat HEISS UI reported:\n${problems.join("\n")}\n` : ""}
+${problems.length ? `\nWhat Studio reported:\n${problems.join("\n")}\n` : ""}
 The workflow JSON:
 ${JSON.stringify(item.raw, null, 2)}`;
 }

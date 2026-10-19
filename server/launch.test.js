@@ -8,7 +8,7 @@ const listen = (handler) => new Promise((resolve) => {
   server.listen(0, "127.0.0.1", () => resolve(server));
 });
 
-test("a port another program holds moves HEISS UI to the next free one", async () => {
+test("a port another program holds moves Studio to the next free one", async () => {
   const other = await listen((_req, res) => res.end("not heiss"));
   const taken = other.address().port;
   try {
@@ -22,7 +22,7 @@ test("a port another program holds moves HEISS UI to the next free one", async (
   }
 });
 
-test("a port HEISS UI itself holds means it is already running, not a reason to start another", async () => {
+test("a port Studio itself holds means it is already running, not a reason to start another", async () => {
   const running = await listen((req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(req.url === "/api/ping" ? { ok: true, app: "heiss-ui" } : {}));
@@ -36,10 +36,10 @@ test("a port HEISS UI itself holds means it is already running, not a reason to 
   }
 });
 
-test("an older HEISS UI without the ping route is still recognised", async () => {
+test("an older Studio without the ping route is still recognised", async () => {
   const older = await listen((_req, res) => {
     res.statusCode = 404;
-    res.end(JSON.stringify({ ok: false, error: "Unknown API route. Restart HEISS UI if it was just updated." }));
+    res.end(JSON.stringify({ ok: false, error: "Unknown API route. Restart Studio if it was just updated." }));
   });
   const other = await listen((_req, res) => res.end("<html>something else</html>"));
   try {

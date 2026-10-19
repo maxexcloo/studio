@@ -255,7 +255,7 @@ export function useGenerationActions(view: any) {
           } catch {
             misses += 1;
             if (misses < 12) continue;
-            galleryPatch((item: GalleryItem) => item.jobId === jobId && item.status === "pending" ? { ...item, status: "error", optimistic: false, filename: "Lost the connection to HEISS UI. The image may still finish. Reload to check." } : item);
+            galleryPatch((item: GalleryItem) => item.jobId === jobId && item.status === "pending" ? { ...item, status: "error", optimistic: false, filename: "Lost the connection to Studio. The image may still finish. Reload to check." } : item);
             return null;
           }
           if (job.status === "missing") {
@@ -387,7 +387,7 @@ export function useGenerationActions(view: any) {
     const where = outputDir ? ` in ${outputDir}` : " in ComfyUI’s output folder";
     if (!await confirmAction({
       title: "Delete all finished images?",
-      description: `Their files${where} move to HEISS UI’s trash there for 30 days. Hidden isn’t affected.`,
+      description: `Their files${where} move to Studio’s trash there for 30 days. Hidden isn’t affected.`,
       action: "Delete all",
       destructive: true
     })) return;

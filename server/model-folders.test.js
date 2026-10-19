@@ -66,7 +66,7 @@ test("adding writes a marked, backed-up section ComfyUI can read, and removing t
   assert.deepEqual(result.added, [shared]);
   assert.equal(fs.readFileSync(`${config}.heiss-backup`, "utf8").startsWith("# mine"), true);
   const text = fs.readFileSync(config, "utf8");
-  assert.match(text, /^other:\n    base_path: \/elsewhere\n    loras: loras\n\n# >>> Added by HEISS UI: /m, "the person's own section stays as it was");
+  assert.match(text, /^other:\n    base_path: \/elsewhere\n    loras: loras\n\n# >>> Added by Studio: /m, "the person's own section stays as it was");
   assert.match(text, /    diffusion_models: \|\n        diffusion_models\n        unet\n/);
   assert.equal(heissSections(text).length, 1);
 

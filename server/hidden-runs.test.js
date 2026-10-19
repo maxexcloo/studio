@@ -78,7 +78,7 @@ test("a Hidden run is written down before ComfyUI gets it, and struck off once i
   const queued = fake.nextPrompt();
   const running = runJob(id, body);
   const prompt = await queued;
-  assert.match(prompt.id, uuid, "HEISS UI chose the run's id, so it was written down first");
+  assert.match(prompt.id, uuid, "Studio chose the run's id, so it was written down first");
   assert.equal(prompt.prompt_id, prompt.id);
   assert.equal(prompt.extra_data.heiss_hidden, true, "the run carries its own mark into ComfyUI's history");
   assert.equal(hiddenRuns.hiddenRunCount(), 1);
@@ -97,7 +97,7 @@ test("a Hidden run is written down before ComfyUI gets it, and struck off once i
   assert.ok(vault.vaultItems(key).some((item) => item.prompt === "a lantern only I should see"));
 });
 
-test("ComfyUI's history without HEISS UI's Hidden runs: marked ones, and ones on the list", () => {
+test("ComfyUI's history without Studio's Hidden runs: marked ones, and ones on the list", () => {
   const promptId = crypto.randomUUID();
   hiddenRuns.rememberHiddenRun(key, promptId, { body: hiddenRequest("listed", { prompt: "listed" }) });
   const filtered = hiddenRuns.withoutHiddenRuns({

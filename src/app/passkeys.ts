@@ -38,7 +38,7 @@ export async function passkeySupport(): Promise<PasskeySupport> {
     return { available: false, label, localhostUrl, reason: `${label} only works on this computer or over HTTPS. Use the password here.` };
   }
   if (isIpAddress(host)) {
-    return { available: false, label, localhostUrl, reason: loopback ? `${label} needs HEISS UI opened at localhost, not ${host}.` : `${label} isn’t available over the network. Use the password here.` };
+    return { available: false, label, localhostUrl, reason: loopback ? `${label} needs Studio opened at localhost, not ${host}.` : `${label} isn’t available over the network. Use the password here.` };
   }
   try {
     const platform = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -151,8 +151,8 @@ export async function registerPasskey(): Promise<RegisteredPasskey> {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { id: window.location.hostname, name: "HEISS UI Hidden" },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "Hidden", displayName: "HEISS UI · Hidden" },
+      rp: { id: window.location.hostname, name: "Studio Hidden" },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "Hidden", displayName: "Studio · Hidden" },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "preferred", userVerification: "required" },
       timeout: 60_000,

@@ -59,7 +59,7 @@ if (wrongPlatform) {
   try {
     runNpm(["install", "--no-audit", "--no-fund", ...(releaseInstall ? ["--omit=dev"] : [])], { cwd: projectRoot, stdio: "inherit" });
   } catch (error) {
-    console.warn(`Could not fetch it (${error.message}). HEISS UI starts anyway; thumbnails fall back to full images.`);
+    console.warn(`Could not fetch it (${error.message}). Studio starts anyway; thumbnails fall back to full images.`);
   }
 }
 

@@ -80,12 +80,12 @@ async function main() {
   }
   results.requests = 0;
   results.failed = 0;
-  if (!health.answered) { console.error(`HEISS UI isn't answering at ${heiss}. Start it, or pass --heiss.`); process.exit(2); }
+  if (!health.answered) { console.error(`Studio isn't answering at ${heiss}. Start it, or pass --heiss.`); process.exit(2); }
   if (!comfy) {
     try { comfy = String((await (await fetch(`${heiss}/api/health`)).json()).comfyUrl || "").replace(/\/$/, ""); } catch { comfy = ""; }
   }
   log(`HEISS ${heiss}${comfy ? ` · ComfyUI ${comfy}` : ""} · ${rounds} rounds of ${burst} at once`);
-  const watchers = [watch("HEISS UI", `${heiss}/api/health`, results.heissDown, { anyAnswer: true })];
+  const watchers = [watch("Studio", `${heiss}/api/health`, results.heissDown, { anyAnswer: true })];
   if (comfy) watchers.push(watch("ComfyUI", `${comfy}/system_stats`, results.comfyDown));
 
   // Every page of the gallery, as the app loads it.
@@ -127,13 +127,13 @@ async function main() {
   try {
     const response = await fetch(`${heiss}/api/logs?lines=30`);
     if (response.ok) tail = await response.text();
-  } catch { /* older HEISS UI */ }
+  } catch { /* older Studio */ }
 
   console.log("\n— Crash kit report —");
   console.log(`requests ${results.requests} · failed ${results.failed} · dropped on purpose ${results.aborted} · slowest ${results.slowest} ms`);
-  console.log(`HEISS UI went down: ${results.heissDown.length ? results.heissDown.map((s) => `${s}${typeof s === "number" ? "s" : ""}`).join(", ") : "no"}`);
+  console.log(`Studio went down: ${results.heissDown.length ? results.heissDown.map((s) => `${s}${typeof s === "number" ? "s" : ""}`).join(", ") : "no"}`);
   if (comfy) console.log(`ComfyUI went down: ${results.comfyDown.length ? results.comfyDown.map((s) => `${s}${typeof s === "number" ? "s" : ""}`).join(", ") : "no"}`);
-  if (tail) console.log(`\nHEISS UI log, last lines:\n${tail}`);
+  if (tail) console.log(`\nStudio log, last lines:\n${tail}`);
   process.exit(results.heissDown.length || results.comfyDown.length ? 1 : 0);
 }
 

@@ -36,10 +36,10 @@ function derivedKinds() {
 /** Rewrites derived kinds in HEISS's own sections to their core kind; other text is left alone. */
 export function migrateDerivedKinds(text = "") {
   let changed = [];
-  const next = text.replace(/# >>> Added by HEISS UI: ([^\r\n]*)([\s\S]*?)# <<< HEISS UI/g, (block, dir, body) => {
+  const next = text.replace(/# >>> Added by Studio: ([^\r\n]*)([\s\S]*?)# <<< Studio/g, (block, dir, body) => {
     const fixed = body.replace(/^(    )(unet_gguf|clip_gguf):/gm, (_m, indent, kind) => `${indent}${derivedKinds()[kind]}:`);
     if (fixed !== body) changed.push(dir.trim());
-    return `# >>> Added by HEISS UI: ${dir}${fixed}# <<< HEISS UI`;
+    return `# >>> Added by Studio: ${dir}${fixed}# <<< Studio`;
   });
   return { text: next, changed };
 }
@@ -344,14 +344,14 @@ export async function findModelFolders(knownKinds, { home = os.homedir(), drives
 
 /* ------------------------------------------------------------ the config file */
 
-const startMark = "# >>> Added by HEISS UI:";
-const endMark = "# <<< HEISS UI";
+const startMark = "# >>> Added by Studio:";
+const endMark = "# <<< Studio";
 
 /** Sections HEISS added before, by the folder they point at. */
 export function heissSections(text = "") {
   const sections = [];
   // \r?: Notepad and other Windows editors save CRLF.
-  const pattern = /^# >>> Added by HEISS UI: (.+?)\r?\n([\s\S]*?)^# <<< HEISS UI\s*$/gm;
+  const pattern = /^# >>> Added by Studio: (.+?)\r?\n([\s\S]*?)^# <<< Studio\s*$/gm;
   for (const match of text.matchAll(pattern)) sections.push({ path: match[1].trim(), block: match[0] });
   return sections;
 }

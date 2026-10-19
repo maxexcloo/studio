@@ -6,7 +6,7 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-oidc-routes-"));
 process.env.HEISS_DATA_DIR = path.join(temporary, "data");
-process.env.HEISS_MULTI_USER = "1";
+process.env.STUDIO_MULTI_USER = "1";
 process.env.COMFY_URL = "http://127.0.0.1:9";
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
 const store = await import("./account-store.js");
@@ -52,13 +52,13 @@ test("single sign-on sets a Lax state cookie, then signs approved identities in"
   assert.equal(elsewhere.location, "/?sign-in=failed");
   const pending = await call(routes["GET /api/accounts/oidc/callback"], browser(cookie, { code: "c", state: "s1" }));
   assert.equal(pending.location, "/?sign-in=pending");
-  assert.equal([].concat(pending.headers["Set-Cookie"]).some((value) => value.startsWith("heiss_account=") && !value.startsWith("heiss_account=;")), false);
+  assert.equal([].concat(pending.headers["Set-Cookie"]).some((value) => value.startsWith("studio_account=") && !value.startsWith("studio_account=;")), false);
 
   store.saveAccessProfile({ id: "artists", name: "Artists", generationProfiles: [], features: { gallery: true } }, []);
   store.assignAccessProfile(store.listAccounts().find((account) => account.pending).id, "artists");
   const approved = await call(routes["GET /api/accounts/oidc/callback"], browser(cookie, { code: "c", state: "s1" }));
   assert.equal(approved.location, "/");
-  const session = [].concat(approved.headers["Set-Cookie"]).find((value) => value.startsWith("heiss_account=") && !value.startsWith("heiss_account=;"));
+  const session = [].concat(approved.headers["Set-Cookie"]).find((value) => value.startsWith("studio_account=") && !value.startsWith("studio_account=;"));
   assert.match(session, /SameSite=Strict/);
   assert.equal(accountForRequest({ ...browser(session.split(";")[0]), path: "/api/gallery", method: "GET" }).role, "user");
 });

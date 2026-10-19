@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 /**
  * OpenID Connect sign-in (Pocket ID) as a PKCE client. The provider proves who
- * someone is; HEISS administrators decide what they may do. Nothing here
+ * someone is; Studio administrators decide what they may do. Nothing here
  * assigns roles or access profiles.
  */
 
@@ -21,21 +21,21 @@ const decodeJson = (part) => JSON.parse(Buffer.from(part, "base64url").toString(
 const trimSlash = (value) => String(value || "").replace(/\/+$/, "");
 
 export function oidcConfigFromEnv(env = process.env) {
-  const issuer = trimSlash(env.HEISS_OIDC_ISSUER);
-  const clientId = String(env.HEISS_OIDC_CLIENT_ID || "");
-  const redirectUri = String(env.HEISS_OIDC_REDIRECT_URI || "");
+  const issuer = trimSlash(env.STUDIO_OIDC_ISSUER);
+  const clientId = String(env.STUDIO_OIDC_CLIENT_ID || "");
+  const redirectUri = String(env.STUDIO_OIDC_REDIRECT_URI || "");
   if (!issuer || !clientId || !redirectUri) return null;
   for (const value of [issuer, redirectUri]) {
     const url = new URL(value);
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error("HEISS_OIDC_ISSUER and HEISS_OIDC_REDIRECT_URI must use HTTPS.");
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error("STUDIO_OIDC_ISSUER and STUDIO_OIDC_REDIRECT_URI must use HTTPS.");
   }
   return {
     issuer,
     clientId,
-    clientSecret: String(env.HEISS_OIDC_CLIENT_SECRET || ""),
+    clientSecret: String(env.STUDIO_OIDC_CLIENT_SECRET || ""),
     redirectUri,
-    label: String(env.HEISS_OIDC_LABEL || "Pocket ID").slice(0, 40),
+    label: String(env.STUDIO_OIDC_LABEL || "Pocket ID").slice(0, 40),
     scopes: "openid email profile"
   };
 }

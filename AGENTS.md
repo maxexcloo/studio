@@ -2,7 +2,8 @@
 
 ## Ownership
 
-- This is a sync-friendly fork of HEISS UI. Keep core files (server model and family detection, graphs, composer, gallery, viewer) close to upstream and avoid restructuring them, so upstream model, workflow, graph and UI work merges cleanly.
+- This is Studio, a sync-friendly fork of HEISS UI. User-facing text and documentation say Studio, and fork-owned settings use `STUDIO_*`. Upstream's `HEISS_*` settings, internal identifiers, headers, cookies and data paths keep upstream's names; rename new user-facing "HEISS UI" text that arrives in upstream merges.
+- Keep core files (server model and family detection, graphs, composer, gallery, viewer) close to upstream and avoid restructuring them, so upstream model, workflow, graph and UI work merges cleanly.
 - Merge upstream on a dedicated branch from current `main`, then review the differences before merging back.
 - Fork features live in clearly separate modules: accounts, media storage, MCP and deployment settings.
 - Keep upstream documentation layout, workflow filenames and externally defined identifiers to simplify synchronisation.

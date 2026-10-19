@@ -143,7 +143,7 @@ export async function prepareInpaint(req, body) {
   const reference = body.referenceAssets?.[0];
   if (!body.inpaint?.mask || !reference?.assetId || !reference.comfyName) return null;
   const sharp = await loadSharp();
-  if (!sharp) throw new Error("Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the HEISS UI folder, then restart.");
+  if (!sharp) throw new Error("Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the Studio folder, then restart.");
   const source = await bytesForReference(req, reference.assetId);
   const files = await inpaintFiles(sharp, source.buffer, maskBufferFromDataUrl(body.inpaint.mask), {
     targetPixels: Number(body.width) * Number(body.height),

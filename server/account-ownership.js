@@ -9,7 +9,7 @@ export function ownerIdForRequest(req) {
 /** Legacy single-user records remain visible only in the single-user mode. */
 export function recordBelongsToRequest(record, req) {
   const ownerId = ownerIdForRequest(req);
-  if (!ownerId) return process.env.HEISS_MULTI_USER !== "1";
+  if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   return record?.ownerId === ownerId;
 }
 
@@ -25,7 +25,7 @@ export function accountOutputSubfolder(ownerId) {
 
 export function outputSubfolderBelongsToRequest(subfolder, req) {
   const ownerId = ownerIdForRequest(req);
-  if (!ownerId) return process.env.HEISS_MULTI_USER !== "1";
+  if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   const prefix = `${accountOutputSubfolder(ownerId)}/`;
   return typeof subfolder === "string" && subfolder.startsWith(prefix);
 }
@@ -33,7 +33,7 @@ export function outputSubfolderBelongsToRequest(subfolder, req) {
 export function outputFilenameBelongsToRequest(filename, subfolder, req) {
   if (typeof filename !== "string" || !filename || filename !== path.basename(filename) || /[\\/]/.test(filename)) return false;
   const ownerId = ownerIdForRequest(req);
-  if (!ownerId) return process.env.HEISS_MULTI_USER !== "1";
+  if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   const root = accountOutputSubfolder(ownerId);
   return subfolder === root || outputSubfolderBelongsToRequest(subfolder, req);
 }

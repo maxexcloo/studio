@@ -924,7 +924,7 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
       <h3 className="phone-section">Hidden</h3>
       <div className="phone-group">
         {!hidden.enabled
-          ? <p className="phone-note">Set up Hidden on the computer running HEISS UI, in Settings › Hidden. Then unlock it here with its password.</p>
+          ? <p className="phone-note">Set up Hidden on the computer running Studio, in Settings › Hidden. Then unlock it here with its password.</p>
           : hidden.unlocked
             ? <button type="button" className="phone-row" onClick={() => { hidden.lock(); onClose(); }}><LockKeyhole size={20} /><span>Lock Hidden<small>Also locks when idle</small></span></button>
             : <button type="button" className="phone-row" onClick={() => { onClose(); hidden.requestUnlock(null); }}><LockKeyhole size={20} /><span>Unlock Hidden</span></button>}
@@ -947,7 +947,7 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
           <SlidersHorizontal size={20} /><span>Use the full studio<small>All controls, laid out for a larger screen</small></span>
         </button>
       </div>
-      <p className="phone-note">Models, folders, downloads and updates are managed on the computer running HEISS UI.</p>
+      <p className="phone-note">Models, folders, downloads and updates are managed on the computer running Studio.</p>
     </Sheet>
   );
 }

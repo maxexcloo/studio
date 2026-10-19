@@ -53,7 +53,7 @@ function nextVersion() {
 
 const version = nextVersion();
 const tag = `v${version}`;
-console.log(`Releasing HEISS UI ${current} -> ${version}${dryRun ? " (dry run)" : ""}`);
+console.log(`Releasing Studio ${current} -> ${version}${dryRun ? " (dry run)" : ""}`);
 
 // Only ever release what is on origin/main, committed.
 if (git("rev-parse", "--abbrev-ref", "HEAD") !== "main") fail("Releases are cut from main.");
@@ -86,7 +86,7 @@ run(npm, ["version", version, "--no-git-tag-version"], { quiet: true });
 fs.writeFileSync(changelogPath, nextChangelog);
 run("git", ["add", "package.json", "package-lock.json", "CHANGELOG.md"]);
 run("git", ["commit", "--quiet", "-m", `Release ${tag}`]);
-run("git", ["tag", "--annotate", tag, "--cleanup=verbatim", "-m", `HEISS UI ${tag}\n\n${notes}`]);
+run("git", ["tag", "--annotate", tag, "--cleanup=verbatim", "-m", `Studio ${tag}\n\n${notes}`]);
 console.log(`\n✓ Committed "Release ${tag}" and tagged ${tag}.`);
 
 if (push) {

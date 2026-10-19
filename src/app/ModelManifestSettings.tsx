@@ -54,14 +54,14 @@ export function ModelManifestGroup({ showToast }: { showToast: ShowToast }) {
   };
 
   if (!status || (status.source === 'none' && !status.total)) {
-    return <Group title="Model Manifest" note="A pinned list of every model the deployment expects, with checksums. Set HEISS_MODEL_MANIFEST, or import one.">
+    return <Group title="Model Manifest" note="A pinned list of every model the deployment expects, with checksums. Set STUDIO_MODEL_MANIFEST, or import one.">
       <Row label="No Manifest"><button className="btn is-ghost" disabled={busy} onClick={() => fileInput.current?.click()}><Upload size={14} /> Import</button></Row>
       <input ref={fileInput} hidden type="file" accept="application/json,.json" onChange={(event) => { void importFile(event.target.files?.[0]); event.currentTarget.value = ''; }} />
     </Group>;
   }
   const problems = status.items.filter((item) => problemWords[item.status]);
   const { counts, verify } = status;
-  return <Group title="Model Manifest" note={status.source === 'imported' ? 'Using an imported manifest. The deployment’s copy stays the disaster-recovery record.' : 'From the deployment’s manifest. HEISS checks it and restores what it can; the deployment’s tooling covers the rest.'}>
+  return <Group title="Model Manifest" note={status.source === 'imported' ? 'Using an imported manifest. The deployment’s copy stays the disaster-recovery record.' : 'From the deployment’s manifest. Studio checks it and restores what it can; the deployment’s tooling covers the rest.'}>
     {status.error ? <Row label="Manifest Unreadable" description={status.error} /> : null}
     <Row label={`${status.total} Models`} description={`${counts.verified} verified · ${counts.present} present, not yet verified · ${counts.missing} missing · ${counts['wrong-size'] + counts.mismatch} wrong · ${counts.external} outside ComfyUI’s folder`}>
       <button className="btn is-ghost" disabled={busy || verify.running || !(counts.present + counts.verified + counts.mismatch)} onClick={() => void post('/api/models/manifest/verify', {}, () => 'Verifying Checksums')}><ShieldCheck size={14} /> {verify.running ? `Verifying ${verify.done}/${verify.total}` : 'Verify'}</button>

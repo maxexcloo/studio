@@ -49,8 +49,8 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) {
         setState(error.reason === 'host'
-          ? { kind: 'refused', title: 'Open HEISS UI by its address', text: error.message }
-          : { kind: 'refused', title: 'Not open to other devices', text: 'On the computer running HEISS UI, turn on “Open on other devices” in Settings › Connection, then reload this page.' });
+          ? { kind: 'refused', title: 'Open Studio by its address', text: error.message }
+          : { kind: 'refused', title: 'Not open to other devices', text: 'On the computer running Studio, turn on “Open on other devices” in Settings › Connection, then reload this page.' });
         return;
       }
       // Not reachable at all: the studio has its own offline screens.
@@ -71,7 +71,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} oidcLabel={state.oidcLabel} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
   if (!studioPassword.set && !studioPassword.hidden) {
-    return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running HEISS UI in Settings › Connection, then reload this page." />;
+    return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Connection, then reload this page." />;
   }
   return <SignIn legacy={studioPassword.hidden} onSignedIn={() => { window.location.reload(); }} />;
 }
@@ -120,8 +120,8 @@ function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recove
       <div className="empty stage-empty hidden-lock-stage">
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
-          <h2>{recovery ? 'Create the Recovery Administrator' : 'Sign In to HEISS UI'}</h2>
-          <p>{recovery ? (setupToken ? 'Set up the first administrator with the setup token from the deployment, or on the computer running HEISS UI.' : 'Set up the first administrator on this computer.') : 'Use your approved HEISS account.'}</p>
+          <h2>{recovery ? 'Create the Recovery Administrator' : 'Sign In to Studio'}</h2>
+          <p>{recovery ? (setupToken ? 'Set up the first administrator with the setup token from the deployment, or on the computer running Studio.' : 'Set up the first administrator on this computer.') : 'Use your approved HEISS account.'}</p>
           <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
             <label>Username<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={working} /></label>
             {recovery && setupToken && <label>Setup Token<input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} disabled={working} /></label>}
@@ -185,17 +185,17 @@ function SignIn({ legacy, onSignedIn }: { legacy: boolean; onSignedIn: () => voi
       <div className="empty stage-empty hidden-lock-stage">
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
-          <h2>{stage === 'opening' ? 'Signed in' : 'Sign in to HEISS UI'}</h2>
+          <h2>{stage === 'opening' ? 'Signed in' : 'Sign in to Studio'}</h2>
           <p>{legacy
             ? 'Enter the studio password. Until one is set, it’s the Hidden password.'
-            : 'Enter the studio password set on the computer running HEISS UI.'}</p>
+            : 'Enter the studio password set on the computer running Studio.'}</p>
           <div className="empty-actions">
             {stage !== 'opening' ? (
               <div className="hidden-unlock">
                 <form className={cn('hidden-unlock-field', stage === 'failed' && 'is-wrong')} onSubmit={(event) => { event.preventDefault(); submit(); }}>
                   <KeyRound size={14} aria-hidden="true" />
                   {/* A name for password managers, so they file the password under this studio. */}
-                  <input type="text" name="username" autoComplete="username" value="HEISS UI" readOnly hidden />
+                  <input type="text" name="username" autoComplete="username" value="Studio" readOnly hidden />
                   <input
                     ref={inputRef}
                     className="is-framed"

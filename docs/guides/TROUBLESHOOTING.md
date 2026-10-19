@@ -2,16 +2,16 @@
 
 Common problems and how to get past them. A failed generation's card links to its section below.
 
-Still stuck? **Settings › About › Copy diagnostics** copies the HEISS UI, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/tristmeister/HEISS-UI/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself. Or skip the pasting: **Report bug** on a failed card, **Idea or bug?** at the bottom of the Settings sidebar send it to the [feedback board](https://heiss-ui.vercel.app/board/), with the setup lines if you want them. For a quick hand, ask in the [Discord](https://discord.gg/Hf7ysvDeGa).
+Still stuck? **Settings › About › Copy diagnostics** copies the Studio, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/maxexcloo/studio/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself. Or skip the pasting: **Report bug** on a failed card, **Idea or bug?** at the bottom of the Settings sidebar send it to the [feedback board](https://heiss-ui.vercel.app/board/), with the setup lines if you want them. For a quick hand, ask in the [Discord](https://discord.gg/Hf7ysvDeGa).
 
-- [Starting HEISS UI](#starting-heiss-ui)
+- [Starting Studio](#starting-studio)
 - [When a generation fails](#when-a-generation-fails)
 - [Inpainting, upscaling and stacks](#inpainting-upscaling-and-stacks)
 - [Downloads and node packs](#downloads-and-node-packs)
 - [Updates](#updates)
 - [Phones and other devices](#phones-and-other-devices)
 
-## Starting HEISS UI
+## Starting Studio
 
 ### The studio can't reach ComfyUI
 
@@ -25,11 +25,11 @@ Open the address the server log shows under **Open**, usually `http://localhost:
 
 Use `localhost` rather than `127.0.0.1`. Passkeys for Hidden only work on a name.
 
-### The port is taken, or HEISS UI is already running
+### The port is taken, or Studio is already running
 
 When port 8787 is in use, the next free one (8788, 8789, …) is used instead. The log says which. To keep one fixed port, set `PORT` in `.env`.
 
-"""HEISS UI is already running""" means another copy has the port. Open that copy, or stop it first.
+"""Studio is already running""" means another copy has the port. Open that copy, or stop it first.
 
 ### Node.js is missing or too old
 
@@ -121,7 +121,7 @@ Auto-grouping is off by default. Turn it on with the stack button next to the ga
 
 ### A download says the file is no longer at its address
 
-The link in this version is out of date (HTTP 404). Deploy a newer HEISS UI image. Newer versions have newer links. Or download the file from its Hugging Face page, put it in the ComfyUI folder the setup panel names, and use **Rescan** in Settings › Models.
+The link in this version is out of date (HTTP 404). Deploy a newer Studio image. Newer versions have newer links. Or download the file from its Hugging Face page, put it in the ComfyUI folder the setup panel names, and use **Rescan** in Settings › Models.
 
 ### A download needs a Hugging Face sign-in
 
@@ -146,13 +146,13 @@ Free space is checked before a large download. Free some space on the disk that 
 
 ### Going back to an earlier version
 
-The first time a new version starts, it saves a copy of the settings, the gallery list, Hidden's records and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and Hidden's images aren't copied, because updates don't change them. To go back, stop HEISS UI, deploy the earlier image, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, at most three are kept, and erasing Hidden removes them all.
+The first time a new version starts, it saves a copy of the settings, the gallery list, Hidden's records and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and Hidden's images aren't copied, because updates don't change them. To go back, stop Studio, deploy the earlier image, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, at most three are kept, and erasing Hidden removes them all.
 
 ## Phones and other devices
 
 ### A phone can't open the studio
 
-1. Turn on **Settings › Connection › Other devices** and restart HEISS UI.
+1. Turn on **Settings › Connection › Other devices** and restart Studio.
 2. Use one of the addresses Settings shows. The phone must be on the same network.
 3. Set a studio password on this computer first. Other devices sign in with it.
 4. If the page still doesn't load, the computer's firewall may block the port. Allow Node.js (or port 8787) on private networks.

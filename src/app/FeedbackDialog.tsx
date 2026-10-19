@@ -146,7 +146,7 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
             <div className="feedback-setup-row">
               <div>
                 <strong>Include setup</strong>
-                <span>HEISS UI, ComfyUI and Node.js versions, system and GPU.</span>
+                <span>Studio, ComfyUI and Node.js versions, system and GPU.</span>
               </div>
               <Switch label="Include setup" checked={withSetup} onChange={setWithSetup} size="sm" />
             </div>

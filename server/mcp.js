@@ -11,7 +11,7 @@ import { mcpControls, mcpLoras } from './mcp-controls.js';
 import { McpMedia, maxResultWaitSeconds, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 
-const instructions = `HEISS makes requested images and videos. Models lists profiles by kind; Models with a profile_id returns its prompting guide, defaults, adjustable controls, compatible LoRAs and reference slots. Pass only the controls it lists; anything else is fixed and Generate refuses it. Keep explicit model choices, user intent and the saved count and size unless asked otherwise. Generate queues jobs and returns at once, per job, a job_id, a ref such as "result 3" and a signed watch link; share each watch link as a markdown link labelled with its ref so the user can follow it without you. A ref works wherever a job_id is asked for. Never wait or poll in the foreground, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification already contains the finished image markdown and View Original link: reproduce that markdown exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
+const instructions = `Studio makes requested images and videos. Models lists profiles by kind; Models with a profile_id returns its prompting guide, defaults, adjustable controls, compatible LoRAs and reference slots. Pass only the controls it lists; anything else is fixed and Generate refuses it. Keep explicit model choices, user intent and the saved count and size unless asked otherwise. Generate queues jobs and returns at once, per job, a job_id, a ref such as "result 3" and a signed watch link; share each watch link as a markdown link labelled with its ref so the user can follow it without you. A ref works wherever a job_id is asked for. Never wait or poll in the foreground, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification already contains the finished image markdown and View Original link: reproduce that markdown exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('The job_id from Generate, or its ref such as "result 3".') };
@@ -20,7 +20,7 @@ const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.arr
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
 export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult } = {}) {
-  const mediaKey = environment.HEISS_MCP_API_KEY;
+  const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
   if (controlKey && (!environment.CONTROL_URL || !environment.CONTROL_API_KEY || equal(controlKey, mediaKey) || equal(controlKey, environment.CONTROL_API_KEY) || equal(mediaKey, environment.CONTROL_API_KEY))) throw new Error('AI Control requires separate MCP/media/upstream credentials and CONTROL_URL.');
@@ -69,7 +69,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       account = authenticateGatewayIdentity(user);
       if (!account) {
         noteGatewayIdentity(user);
-        return res.status(403).json({ error: 'This chat user is not linked to a HEISS account yet. Ask a HEISS administrator to link it in Settings › Accounts & MCP.' });
+        return res.status(403).json({ error: 'This chat user is not linked to a Studio account yet. Ask a Studio administrator to link it in Settings › Accounts & MCP.' });
       }
       scope = 'media';
       media.credentials.set(account.userId, internalCredential(account.userId));
@@ -80,8 +80,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         media.credentials.set(account.userId, { Authorization: `Bearer ${token}` });
       }
     }
-    if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="HEISS MCP"').json({ error: 'A valid MCP bearer credential is required.' });
-    const conversation = String(req.headers['x-heiss-conversation-id'] || '');
+    if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="Studio MCP"').json({ error: 'A valid MCP bearer credential is required.' });
+    const conversation = String(req.headers['x-studio-conversation-id'] || '');
     if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation)) return res.status(400).json({ error: 'Invalid conversation identity.' });
     const owner = account?.userId || (scope === 'media' ? media.owner(user, token) : null);
     // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
@@ -98,14 +98,14 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       const key = extra.requestId === undefined ? null : inflightKey(actor, extra.requestId);
       if (key) inflight.set(key, controller);
       try { return await action(args, controller.signal); } catch (error) {
-        return { isError: true, content: [{ type: 'text', text: error?.message || 'HEISS could not complete this request.' }] };
+        return { isError: true, content: [{ type: 'text', text: error?.message || 'Studio could not complete this request.' }] };
       } finally {
         extra.signal?.removeEventListener('abort', forward);
         if (key && inflight.get(key) === controller) inflight.delete(key);
       }
     });
     const resolve = (value) => media.resolve(owner, refs, value);
-    const server = new McpServer({ name: 'HEISS', version: '1.0.0' }, { instructions });
+    const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
       tool(server, 'Models', 'Browse Models', 'List ready profiles by kind. With profile_id, return its prompting guide, defaults, adjustable controls (only these can be passed to Generate), compatible LoRAs with descriptions, trigger words, recommended strength and source links, reference slots and native sizes. lora_query narrows a long LoRA list. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional(), lora_query: z.string().max(200).optional() }, async ({ kind, profile_id, lora_query }) => {
         let profiles = await media.profiles(kind, owner);

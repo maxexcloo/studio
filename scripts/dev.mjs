@@ -42,8 +42,8 @@ function startVite(host) {
   child.on("exit", (code, signal) => {
     if (stopping) return;
     // The page server stopping takes the studio with it: say so before stopping the rest.
-    recordExit({ who: "vite", code, signal, reason: `The page server (Vite) ${exitWords(code, signal)}, so HEISS UI stopped with it`, detail: viteTail.text() });
-    console.error(`\n  HEISS UI stopped: the page server (Vite) ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
+    recordExit({ who: "vite", code, signal, reason: `The page server (Vite) ${exitWords(code, signal)}, so Studio stopped with it`, detail: viteTail.text() });
+    console.error(`\n  Studio stopped: the page server (Vite) ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
     shutdown(code ?? 1);
   });
 }
@@ -59,7 +59,7 @@ function runServer() {
       // The server writes its own crash down; this catches what it couldn't (killed from outside).
       if (!stopping && code !== 0) {
         recordExit({ who: "server", code, signal, reason: `The server ${exitWords(code, signal)}`, detail: serverTail.text() });
-        console.error(`\n  HEISS UI stopped: the server ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
+        console.error(`\n  Studio stopped: the server ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
       }
       resolve(code);
     });

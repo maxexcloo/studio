@@ -294,7 +294,7 @@ function networkTls(thisComputer) {
 app.post("/api/network/tls", (req, res) => {
   if (!requireThisComputer(req, res)) return;
   if (tlsFromShell) {
-    res.status(409).json({ ok: false, error: "HTTPS is set with HEISS_TLS_CERT and HEISS_TLS_KEY where HEISS UI starts. Change it there." });
+    res.status(409).json({ ok: false, error: "HTTPS is set with HEISS_TLS_CERT and HEISS_TLS_KEY where Studio starts. Change it there." });
     return;
   }
   const off = !req.body?.cert && !req.body?.key;
@@ -659,7 +659,7 @@ function watchComfyRestart() {
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-  })().catch((error) => console.warn(`[HEISS] Lost track of the ComfyUI restart: ${error.message}`)).finally(() => { restartWatch = null; });
+  })().catch((error) => console.warn(`[Studio] Lost track of the ComfyUI restart: ${error.message}`)).finally(() => { restartWatch = null; });
   return restartWatch;
 }
 
@@ -802,7 +802,7 @@ app.get("/api/output-dir/detect", async (req, res) => {
 app.post("/api/output-dir/browse", async (req, res) => {
   // The picker opens on this machine's screen, so only its own browser may ask.
   if (!clientOf(req).thisComputer) {
-    res.status(403).json({ ok: false, error: "The folder picker only opens on the computer running HEISS UI." });
+    res.status(403).json({ ok: false, error: "The folder picker only opens on the computer running Studio." });
     return;
   }
   try {
@@ -1258,8 +1258,8 @@ app.get("/api/settings/deployment", async (req, res) => {
       { backend: "video", label: "Videos", key: "COMFY_VIDEO_URL", value: process.env.COMFY_VIDEO_URL || "", ...settingSource("COMFY_VIDEO_URL"), routes: process.env.COMFY_VIDEO_URL ? "Local video workflows" : "Uses the image connection" }
     ],
     defaults: {
-      image: defaultFor("HEISS_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
-      video: defaultFor("HEISS_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
+      image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
+      video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
       profiles
     },
     catalogue: catalogueFlags.map(describeFlag),
@@ -1267,7 +1267,7 @@ app.get("/api/settings/deployment", async (req, res) => {
       civitai: { browsing: civitaiPrefs().enabled === true, token: civitaiTokenStatus(), presets: presetsEnabled() },
       huggingFace: { token: hfTokenStatus() }
     },
-    storage: { outputs: mediaStorageEnabled ? "heiss" : "comfy", ...settingSource("HEISS_OUTPUT_STORAGE"), workerToken: Boolean(process.env.HEISS_WORKER_TOKEN), multiUser: multiUserEnabled }
+    storage: { outputs: mediaStorageEnabled ? "studio" : "comfy", ...settingSource("STUDIO_OUTPUT_STORAGE"), workerToken: Boolean(process.env.STUDIO_WORKER_TOKEN), multiUser: multiUserEnabled }
   });
 });
 
@@ -1283,7 +1283,7 @@ app.post("/api/settings/deployment", (req, res) => {
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"), key, applies: item.applies } });
       return;
     }
-    if (key === "HEISS_DEFAULT_IMAGE_PROFILE" || key === "HEISS_DEFAULT_VIDEO_PROFILE") {
+    if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
       const id = String(value || "").trim();
       if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key, applies: "now" } });
@@ -1625,7 +1625,7 @@ app.delete("/api/model-folders", async (req, res) => {
 // The person points at a folder the scan missed; it still has to read as a models folder.
 app.post("/api/model-folders/pick", async (req, res) => {
   if (!clientOf(req).thisComputer) {
-    res.status(403).json({ ok: false, error: "The folder picker only opens on the computer running HEISS UI." });
+    res.status(403).json({ ok: false, error: "The folder picker only opens on the computer running Studio." });
     return;
   }
   try {
@@ -1876,7 +1876,7 @@ app.get("/comfy/*path", async (req, res) => {
 
 const dist = path.join(root, "dist");
 // An unknown API route must fail as JSON, never fall through to the app page.
-app.all("/api/*splat", (_req, res) => res.status(404).json({ ok: false, error: "Unknown API route. If HEISS UI was updated, restart it." }));
+app.all("/api/*splat", (_req, res) => res.status(404).json({ ok: false, error: "Unknown API route. If Studio was updated, restart it." }));
 
 if (fs.existsSync(dist)) serveApp(app, dist);
 
@@ -1895,10 +1895,10 @@ startServers(app, {
   port,
   fallback: !dev,
   onFatal(error) {
-    let message = `\n  HEISS UI couldn’t start: ${error.message}\n`;
+    let message = `\n  Studio couldn’t start: ${error.message}\n`;
     // Where the running copy answered: this computer, or the one address HOST names.
     const runningHost = !error.host || error.host === "127.0.0.1" ? "localhost" : error.host.includes(":") ? `[${error.host}]` : error.host;
-    if (error.heissRunning) message = `\n  HEISS UI is already running: http://${runningHost}:${error.port}\n`;
+    if (error.heissRunning) message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
     else if (error.code === "EADDRINUSE") message = dev
       ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT in .env.\n`
       : `\n  Ports ${port} to ${port + 9} are all in use. Set another PORT in .env.\n`;
@@ -1910,7 +1910,7 @@ startServers(app, {
     beginSession();
     // From here on everything that names the address (banner, phone links in Settings) uses this one.
     setListeningPort(listening);
-    if (moved) console.log(`\n  Port ${requestedPort} is in use, so HEISS UI is on ${listening} this time.`);
+    if (moved) console.log(`\n  Port ${requestedPort} is in use, so Studio is on ${listening} this time.`);
     // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
     // (Touch ID, Windows Hello for Hidden) on a name, never on an address.
     const shownHost = host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;

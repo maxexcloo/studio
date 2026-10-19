@@ -7,16 +7,16 @@ const settings = {
     { backend: 'video', label: 'Videos', key: 'COMFY_VIDEO_URL', value: '', source: 'default', locked: false, routes: 'Uses the image connection' }
   ],
   defaults: {
-    image: { key: 'HEISS_DEFAULT_IMAGE_PROFILE', configured: 'mock-flux-schnell', effective: 'mock-flux-schnell', source: 'deployment', locked: true },
-    video: { key: 'HEISS_DEFAULT_VIDEO_PROFILE', configured: '', effective: 'mock-wan-video', source: 'default', locked: false },
+    image: { key: 'STUDIO_DEFAULT_IMAGE_PROFILE', configured: 'mock-flux-schnell', effective: 'mock-flux-schnell', source: 'deployment', locked: true },
+    video: { key: 'STUDIO_DEFAULT_VIDEO_PROFILE', configured: '', effective: 'mock-wan-video', source: 'default', locked: false },
     profiles: [{ id: 'mock-flux-schnell', label: 'FLUX.1 Schnell', kind: 'image', ready: true }, { id: 'mock-wan-video', label: 'Wan Video', kind: 'video', ready: true }]
   },
   catalogue: [
-    { key: 'HEISS_ENABLE_LORAS', label: 'LoRAs', description: 'LoRA browsing.', value: true, defaultOn: true, applies: 'restart', source: 'default', locked: false },
-    { key: 'HEISS_ENABLE_GROK', label: 'Grok', description: 'Grok workflows.', value: false, defaultOn: true, applies: 'restart', source: 'deployment', locked: true }
+    { key: 'STUDIO_ENABLE_LORAS', label: 'LoRAs', description: 'LoRA browsing.', value: true, defaultOn: true, applies: 'restart', source: 'default', locked: false },
+    { key: 'STUDIO_ENABLE_GROK', label: 'Grok', description: 'Grok workflows.', value: false, defaultOn: true, applies: 'restart', source: 'deployment', locked: true }
   ],
   integrations: { civitai: { browsing: false, token: { set: true, editable: false }, presets: true }, huggingFace: { token: { set: false, editable: true } } },
-  storage: { outputs: 'heiss', source: 'default', locked: false, workerToken: true, multiUser: true }
+  storage: { outputs: 'studio', source: 'default', locked: false, workerToken: true, multiUser: true }
 };
 
 test('deployment settings show sources, keep locked values read-only and save the rest', async ({ page, isMobile }) => {
@@ -46,10 +46,10 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.locator('.set-row').filter({ hasText: 'Default Image Profile' })).toContainText('FLUX.1 Schnell');
   await expect(dialog.getByRole('switch', { name: 'Grok', exact: true })).toBeDisabled();
   await dialog.getByRole('switch', { name: 'LoRAs', exact: true }).click();
-  await expect.poll(() => saved).toContainEqual({ key: 'HEISS_ENABLE_LORAS', value: false });
+  await expect.poll(() => saved).toContainEqual({ key: 'STUDIO_ENABLE_LORAS', value: false });
 
   await dialog.getByRole('button', { name: 'Integrations', exact: true }).click();
-  await expect(dialog.locator('.set-row').filter({ hasText: 'Output Storage' })).toContainText('HEISS Media');
+  await expect(dialog.locator('.set-row').filter({ hasText: 'Output Storage' })).toContainText('Studio Media');
   await expect(dialog.getByRole('heading', { name: 'Civitai' })).toBeVisible();
 });
 
@@ -58,7 +58,7 @@ test('the model manifest reports problems and restores what it can', async ({ pa
   const items = [
     { path: 'models/comfyui/loras/good.safetensors', size: 4, status: 'verified' },
     { path: 'models/comfyui/loras/missing.safetensors', size: 4, status: 'missing', restorable: true },
-    { path: 'models/comfyui/SEEDVR2/model.safetensors', size: 4, status: 'missing', restoreNote: 'HEISS doesn’t download into SEEDVR2' },
+    { path: 'models/comfyui/SEEDVR2/model.safetensors', size: 4, status: 'missing', restoreNote: 'Studio doesn’t download into SEEDVR2' },
     { path: 'models/comfyui/vae/changed.safetensors', size: 4, status: 'mismatch' }
   ];
   await page.route('**/api/models/manifest**', (route) => {
@@ -76,7 +76,7 @@ test('the model manifest reports problems and restores what it can', async ({ pa
   await dialog.getByRole('button', { name: 'Models', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Model Manifest' })).toBeVisible();
   await expect(dialog.locator('.set-row').filter({ hasText: '4 Models' })).toContainText('2 missing');
-  await expect(dialog.locator('.set-row').filter({ hasText: 'SEEDVR2/model.safetensors' })).toContainText('HEISS doesn’t download into SEEDVR2');
+  await expect(dialog.locator('.set-row').filter({ hasText: 'SEEDVR2/model.safetensors' })).toContainText('Studio doesn’t download into SEEDVR2');
   await expect(dialog.locator('.set-row').filter({ hasText: 'vae/changed.safetensors' })).toContainText('Checksum Mismatch');
   await dialog.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect.poll(() => posts).toContain('/api/models/manifest/restore');

@@ -8,7 +8,7 @@ import { dataDir, mediaPath, mediaStorageEnabled, mediaType, mediaUrls } from ".
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 
 /*
- * Runs already moved into HEISS media, by job ID. Each stored copy gets a unique
+ * Runs already moved into Studio media, by job ID. Each stored copy gets a unique
  * name, so a run left in ComfyUI's history (a failed cleanup) can only be told
  * apart from a new one by its job; recovery skips these instead of importing twice.
  */
@@ -26,7 +26,7 @@ export function noteIngested(jobIds) {
   for (const id of jobIds) if (id && !jobs.has(id)) { jobs.set(String(id), Date.now()); changed = true; }
   if (!changed) return;
   while (jobs.size > maxIngested) jobs.delete(jobs.keys().next().value);
-  try { writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 }); } catch (error) { console.warn(`[HEISS] Could not record ingested runs: ${error.message}`); }
+  try { writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 }); } catch (error) { console.warn(`[Studio] Could not record ingested runs: ${error.message}`); }
 }
 export function wasIngested(jobId) {
   return Boolean(jobId && ingestedJobs().has(String(jobId)));
@@ -34,12 +34,12 @@ export function wasIngested(jobId) {
 
 /**
  * ComfyUI as a worker (media-paths.js): a finished output is copied over
- * ComfyUI's /view API into HEISS media, and only once that copy is safely on
- * disk is ComfyUI asked to delete its own (comfyui/heiss_worker). An output that
+ * ComfyUI's /view API into Studio media, and only once that copy is safely on
+ * disk is ComfyUI asked to delete its own (comfyui/studio_worker). An output that
  * cannot be fetched keeps its ComfyUI address, so nothing is lost.
  */
 
-const workerTokenHeader = () => (process.env.HEISS_WORKER_TOKEN ? { "X-Heiss-Worker-Token": process.env.HEISS_WORKER_TOKEN } : {});
+const workerTokenHeader = () => (process.env.STUDIO_WORKER_TOKEN ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN } : {});
 const missingWorker = new Set();
 
 export function comfyFileRef(url) {
@@ -67,7 +67,7 @@ function storedName(filename) {
   return `${stamp}-${path.basename(filename)}`;
 }
 
-/** One output into HEISS media: the rewritten output, and the ComfyUI file to remove, or null when it stays put. */
+/** One output into Studio media: the rewritten output, and the ComfyUI file to remove, or null when it stays put. */
 export async function ingestOutput(output, ownerId = "") {
   const ref = comfyRef(output?.url);
   if (!ref) return null;
@@ -88,7 +88,7 @@ export async function ingestOutput(output, ownerId = "") {
 }
 
 /**
- * A run's results (each picture with its optional upscale) into HEISS media.
+ * A run's results (each picture with its optional upscale) into Studio media.
  * The returned `comfyFiles` are removed from ComfyUI only after the gallery
  * has the new addresses (removeComfyFiles).
  */
@@ -102,7 +102,7 @@ export async function ingestRunResults(results, ownerId = "") {
       comfyFiles.push(moved.comfyFile);
       return moved.output;
     } catch (error) {
-      console.warn(`[HEISS] Keeping an output in ComfyUI: ${error.message}`);
+      console.warn(`[Studio] Keeping an output in ComfyUI: ${error.message}`);
       return output;
     }
   };
@@ -115,7 +115,7 @@ export async function ingestRunResults(results, ownerId = "") {
 
 /**
  * Gallery records recovered from ComfyUI's history (a restart between a run
- * finishing and its delivery) into HEISS media, keeping each record's title.
+ * finishing and its delivery) into Studio media, keeping each record's title.
  */
 export async function ingestRecords(records) {
   const comfyFiles = [];
@@ -126,7 +126,7 @@ export async function ingestRecords(records) {
       comfyFiles.push(moved.comfyFile);
       return moved.output;
     } catch (error) {
-      console.warn(`[HEISS] Keeping a recovered output in ComfyUI: ${error.message}`);
+      console.warn(`[Studio] Keeping a recovered output in ComfyUI: ${error.message}`);
       return null;
     }
   };
@@ -143,7 +143,7 @@ export async function ingestRecords(records) {
   return { records: result, comfyFiles };
 }
 
-/** Asks the HEISS worker node to delete files ComfyUI no longer needs. Never throws. */
+/** Asks the Studio worker node to delete files ComfyUI no longer needs. Never throws. */
 export async function removeComfyFiles(files) {
   const all = (files || []).filter((file) => file?.filename);
   // The worker takes at most 256 names a call.
@@ -156,7 +156,7 @@ export async function removeComfyFiles(files) {
   if (!list.length) return { deleted: 0, skipped: 0 };
   const backend = currentComfyBackend();
   try {
-    const result = await comfy("/heiss/worker/delete", {
+    const result = await comfy("/studio/worker/delete", {
       method: "POST",
       headers: { "content-type": "application/json", ...workerTokenHeader() },
       body: JSON.stringify({ files: list }),
@@ -167,7 +167,7 @@ export async function removeComfyFiles(files) {
   } catch (error) {
     if (!missingWorker.has(backend)) {
       missingWorker.add(backend);
-      console.warn(`[HEISS] ComfyUI (${backend}) kept its copies: install the HEISS worker node (comfyui/heiss_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim());
+      console.warn(`[Studio] ComfyUI (${backend}) kept its copies: install the Studio worker node (comfyui/studio_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim());
     }
     return { deleted: 0, skipped: list.length };
   }

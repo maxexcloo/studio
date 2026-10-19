@@ -231,7 +231,7 @@ export async function emptyTrash(baseDir = ALL, ownerId = "") {
 
 /** Purges once shortly after start, then every six hours while running. */
 export function scheduleTrashPurge() {
-  const sweep = () => purgeTrash().catch((error) => console.warn(`[HEISS] Could not empty old trash: ${error.message}`));
+  const sweep = () => purgeTrash().catch((error) => console.warn(`[Studio] Could not empty old trash: ${error.message}`));
   setTimeout(sweep, 30 * 1000).unref?.();
   setInterval(sweep, 6 * 60 * 60 * 1000).unref?.();
 }

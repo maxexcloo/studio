@@ -50,6 +50,6 @@ test("the summary is the notes' opening > line, and only that", () => {
 test('the first fork release does not compare against an upstream tag as a fork release', () => {
   const upstream = `${base}\n[0.1.0]: https://github.com/tristmeister/HEISS-UI/releases/tag/v0.1.0\n`;
   const next = cutRelease(upstream, '0.19.0', '2026-10-18');
-  assert.match(next, /\[0\.19\.0\]: https:\/\/github\.com\/maxexcloo\/heiss-ui\/releases\/tag\/v0\.19\.0/);
+  assert.match(next, /\[0\.19\.0\]: https:\/\/github\.com\/maxexcloo\/studio\/releases\/tag\/v0\.19\.0/);
   assert.match(next, /\[0\.1\.0\]: https:\/\/github\.com\/tristmeister\/HEISS-UI\/releases\/tag\/v0\.1\.0/);
 });

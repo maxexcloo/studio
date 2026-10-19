@@ -5,7 +5,7 @@ import { isInside } from "./paths.js";
 
 /**
  * Moves a whole single-user studio (its data folder and ComfyUI output folder)
- * into one account of a multi-user studio with HEISS media storage. Nothing in
+ * into one account of a multi-user studio with Studio media storage. Nothing in
  * the source is changed: files are copied, records are rewritten for the
  * account, and every target file that changes is backed up first. A manifest
  * lists exactly what was added, so `undoStudioImport` can take it out again.
@@ -75,7 +75,7 @@ export function planStudioImport({ sourceData, sourceOutputs, targetData, mediaR
 
   // Only the backup left means the gallery is mid-recovery: never write a gallery of just the import over it.
   if (!fs.existsSync(path.join(targetData, "gallery.json")) && fs.existsSync(path.join(targetData, "gallery.json.bak"))) {
-    throw new Error("The target gallery.json is missing but its backup exists. Start HEISS once so it recovers the gallery, stop it, then import.");
+    throw new Error("The target gallery.json is missing but its backup exists. Start Studio once so it recovers the gallery, stop it, then import.");
   }
   const targetGallery = readJson(path.join(targetData, "gallery.json"), []);
   const targetJobs = new Set(targetGallery.map((item) => item.jobId).filter(Boolean));

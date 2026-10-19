@@ -109,7 +109,7 @@ export function HiddenLockScreen({ hidden, onLeave, onSetup }: { hidden: HiddenS
         <div className="stage-copy">
           <h2>{notSetUp ? "Hidden" : stage === "opening" ? "Unlocked" : "Hidden is locked"}</h2>
           <p>{notSetUp
-            ? atComputer ? "Images you keep to yourself, encrypted on this computer." : "Images you keep to yourself. Set up Hidden on the computer running HEISS UI."
+            ? atComputer ? "Images you keep to yourself, encrypted on this computer." : "Images you keep to yourself. Set up Hidden on the computer running Studio."
             : hidden.usablePasskey && hidden.support?.available ? `Unlock with ${hidden.support.label} or your password.` : "Enter your password to unlock."}</p>
           <div className="empty-actions">
             {notSetUp && !atComputer ? <div className="hidden-unlock-spacer" /> : notSetUp ? (

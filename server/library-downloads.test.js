@@ -7,7 +7,7 @@ import test from 'node:test';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-library-downloads-'));
 process.env.HEISS_DATA_DIR = path.join(dir, 'data');
 process.env.HEISS_COMFY_ROOT = dir;
-process.env.HEISS_ENABLE_PRESETS = '1';
+process.env.STUDIO_ENABLE_PRESETS = '1';
 fs.mkdirSync(path.join(dir, 'models', 'loras'), { recursive: true });
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
 fs.writeFileSync(path.join(dir, 'data', 'model-download-sources.json'), JSON.stringify({ 'civitai:17:3': { id: 'civitai:17:3', file: 'style.safetensors', folder: 'loras', url: 'https://civitai.com/api/download/models/17' } }));
@@ -39,8 +39,8 @@ test('disabled instances cannot resume previously resolved provider downloads', 
   const spec = libraryDownload('civitai:17:3');
   assert.ok(spec);
   try {
-    delete process.env.HEISS_ENABLE_PRESETS;
+    delete process.env.STUDIO_ENABLE_PRESETS;
     assert.equal(libraryDownload('civitai:17:3'), null);
     await assert.rejects(startLibraryDownload(spec), /disabled on this instance/);
-  } finally { process.env.HEISS_ENABLE_PRESETS = '1'; }
+  } finally { process.env.STUDIO_ENABLE_PRESETS = '1'; }
 });

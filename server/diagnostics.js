@@ -59,7 +59,7 @@ export function diagnostics({ version = "", install = "", stats = null, comfyBus
 export function diagnosticsText(report) {
   const { heiss, node, system, comfy } = report;
   const lines = [
-    `HEISS UI ${heiss.version || "(unknown version)"}${heiss.install ? ` (${heiss.install})` : ""}`,
+    `Studio ${heiss.version || "(unknown version)"}${heiss.install ? ` (${heiss.install})` : ""}`,
     `Node.js ${node}`,
     `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`
   ];

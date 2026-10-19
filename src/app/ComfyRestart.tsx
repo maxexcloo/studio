@@ -265,7 +265,7 @@ export function ComfyManagerNote({ info, refresh, className }: { info: ManagerIn
   return (
     <p className={cn('comfy-restart-note', className)}>
       {info?.stale
-        ? <>Restart HEISS UI to use this.</>
+        ? <>Restart Studio to use this.</>
         : info?.connected
         ? <>Needs ComfyUI-Manager. Start ComfyUI with <code>--enable-manager</code>, or restart it yourself.</>
         : info?.error ? <>Couldn’t check ComfyUI: {info.error}</>
@@ -288,7 +288,7 @@ export function ComfyRestart({ onBack, confirm, compact = false, className }: {
   const { info, refresh, phase, error, busy, off, restart, eta, result } = useComfyRestart({ onBack, confirm });
   const thisComputer = useThisComputer();
   // Restarting is looked after at the computer; elsewhere only its progress shows.
-  if (!thisComputer && !busy) return <p className={cn('comfy-restart-note', className)}>Restart ComfyUI from the computer running HEISS UI.</p>;
+  if (!thisComputer && !busy) return <p className={cn('comfy-restart-note', className)}>Restart ComfyUI from the computer running Studio.</p>;
   return (
     <div className={cn('comfy-restart', compact && 'is-compact', className)}>
       <button type="button" className={cn('btn', phase === 'back' && 'is-done')} onClick={restart} disabled={off || busy || info === null} aria-live="polite">

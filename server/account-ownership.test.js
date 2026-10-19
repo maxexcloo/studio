@@ -13,14 +13,14 @@ test("record ownership comes only from the authenticated server account", () => 
 });
 
 test("multi-user sessions do not inherit unowned legacy records", () => {
-  const previous = process.env.HEISS_MULTI_USER;
-  process.env.HEISS_MULTI_USER = "1";
+  const previous = process.env.STUDIO_MULTI_USER;
+  process.env.STUDIO_MULTI_USER = "1";
   try {
     assert.equal(recordBelongsToRequest({ id: "old-record" }, { heissAccount: { userId: "new-account" } }), false);
     assert.equal(recordBelongsToRequest({ ownerId: "new-account" }, { heissAccount: { userId: "new-account" } }), true);
   } finally {
-    if (previous === undefined) delete process.env.HEISS_MULTI_USER;
-    else process.env.HEISS_MULTI_USER = previous;
+    if (previous === undefined) delete process.env.STUDIO_MULTI_USER;
+    else process.env.STUDIO_MULTI_USER = previous;
   }
 });
 

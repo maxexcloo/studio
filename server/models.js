@@ -323,8 +323,8 @@ export function inferModels(info, stats = {}) {
     schedulers,
     loras,
     defaults: {
-      imageModel: firstReady(imageProfiles, process.env.HEISS_DEFAULT_IMAGE_PROFILE),
-      videoModel: firstReady(videoProfiles, process.env.HEISS_DEFAULT_VIDEO_PROFILE)
+      imageModel: firstReady(imageProfiles, process.env.STUDIO_DEFAULT_IMAGE_PROFILE),
+      videoModel: firstReady(videoProfiles, process.env.STUDIO_DEFAULT_VIDEO_PROFILE)
     },
     capabilities: {
       image: imageProfiles.length > 0,

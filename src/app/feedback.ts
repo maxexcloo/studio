@@ -71,5 +71,5 @@ export function boardComposeUrl(post: Pick<FeedbackPost, 'kind' | 'title' | 'bod
 
 /** The HEISS UI version from the diagnostics' first line. */
 export function versionFromDiagnostics(text: string) {
-  return /^HEISS UI (\S+)/.exec(text)?.[1]?.replace(/^\(unknown$/, '') || '';
+  return /^Studio (\S+)/.exec(text)?.[1]?.replace(/^\(unknown$/, '') || '';
 }

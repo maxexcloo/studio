@@ -74,7 +74,7 @@ function copyFor(stage: ModelFolderStage, folders: StrayModelFolder[], added: Mo
         : `They’re in ${plural(folders.length, 'folder')} ComfyUI doesn’t fully read.`
     };
     case 'none': return { title: 'No models found outside ComfyUI', description: 'If models are somewhere else, choose the folder.' };
-    case 'remote': return { title: 'ComfyUI runs on another computer', description: 'Only folders on the computer running HEISS UI can be searched.' };
+    case 'remote': return { title: 'ComfyUI runs on another computer', description: 'Only folders on the computer running Studio can be searched.' };
     case 'offline': return comfyRestarting
       ? { title: 'ComfyUI is restarting', description: 'The search continues when it’s back, usually in a few seconds.' }
       : { title: 'Waiting for ComfyUI', description: 'Start ComfyUI to continue.' };

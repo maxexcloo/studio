@@ -75,10 +75,10 @@ export function readJsonFile(file) {
       // Leave it in place; the next write replaces it either way.
     }
     if (backup !== undefined) {
-      console.warn(`[HEISS] ${path.basename(file)} was unreadable; restored the previous copy.`);
+      console.warn(`[Studio] ${path.basename(file)} was unreadable; restored the previous copy.`);
       return backup;
     }
-    console.warn(`[HEISS] ${path.basename(file)} was unreadable and had no backup; it was set aside.`);
+    console.warn(`[Studio] ${path.basename(file)} was unreadable and had no backup; it was set aside.`);
     throw error;
   }
 }

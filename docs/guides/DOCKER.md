@@ -1,6 +1,6 @@
 # Docker
 
-Run HEISS UI in a container while ComfyUI stays where the GPU is. The image
+Run Studio in a container while ComfyUI stays where the GPU is. The image
 holds the studio alone, talks to a running ComfyUI over the network, and reads
 the images ComfyUI writes through a mount of ComfyUI's output folder. Data and
 the settings you make in the app live on a volume, not in the image.
@@ -11,7 +11,7 @@ settings are under `/data` (`HEISS_DATA_DIR`, `HEISS_ENV_FILE=/data/.env`), and
 it looks for ComfyUI at `http://host.docker.internal:8188` until you save
 another address.
 
-CI publishes verified images to `ghcr.io/maxexcloo/heiss-ui`: `latest` and
+CI publishes verified images to `ghcr.io/maxexcloo/studio`: `latest` and
 `sha-<full commit>` from `main`, and `X.Y.Z` and `X.Y` from each release. Use
 one of those in place of a local build where you deploy.
 
@@ -70,7 +70,7 @@ HEISS_DEFAULT_COMFY_URL=...` with `docker run`).
 
 ## The output folder
 
-HEISS reads the images ComfyUI produces straight from the folder ComfyUI
+Studio reads the images ComfyUI produces straight from the folder ComfyUI
 writes to. The path ComfyUI reports is one on the machine it runs on, which the
 container only reaches if you mount it, so the output folder is mounted at
 `/comfy-output` and `COMFY_OUTPUT_DIR` points there. Without the mount the

@@ -734,7 +734,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               </div>
             ) : (
               <div className="zen-empty">
-                <img src="/heiss-mark-white.svg" alt="HEISS UI" />
+                <img src="/heiss-mark-white.svg" alt="Studio" />
               </div>
             )}
             {hiddenLockScreen}

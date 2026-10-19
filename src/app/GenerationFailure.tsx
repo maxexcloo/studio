@@ -19,7 +19,7 @@ export function failureOf(item: GalleryItem): GenerationFailure {
 
 function reportFor(item: GalleryItem, failure: GenerationFailure) {
   return [
-    `HEISS UI generation failed: ${failure.title}`,
+    `Studio generation failed: ${failure.title}`,
     failure.summary,
     failure.file ? `File: ${failure.file}` : '',
     failure.nodeType ? `Node: ${failure.nodeType}${failure.nodeId ? ` (#${failure.nodeId})` : ''}` : '',

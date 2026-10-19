@@ -93,13 +93,13 @@ function ComfySearchRow({ enabled, onSaved }: { enabled: boolean; onSaved: () =>
       onSaved();
     } catch {
       setChecked(!next);
-      setNote('Couldn’t save that. Make sure HEISS UI is running.');
+      setNote('Couldn’t save that. Make sure Studio is running.');
     }
   };
   return (
     <SwitchRow
       label="Find ComfyUI on its own"
-      description={note || 'When nothing answers at this address, try ports 8188 and 8000 and switch to the ComfyUI there. Turn off to stay on this address, e.g. with a second ComfyUI just for HEISS.'}
+      description={note || 'When nothing answers at this address, try ports 8188 and 8000 and switch to the ComfyUI there. Turn off to stay on this address, e.g. with a second ComfyUI just for Studio.'}
       checked={checked}
       onChange={change}
     />
@@ -278,7 +278,7 @@ function InpaintSuggestions({ onGetModels }: { onGetModels?: () => void }) {
   const { plan } = useStarterPlan();
   const families = plan?.families || [];
   return (
-    <Row label="Models that can inpaint" description={onGetModels ? 'Each downloads in the studio with its text encoder and VAE.' : 'Get one on the computer running HEISS UI.'} stacked>
+    <Row label="Models that can inpaint" description={onGetModels ? 'Each downloads in the studio with its text encoder and VAE.' : 'Get one on the computer running Studio.'} stacked>
       <div className="set-suggest">
         <ul className="set-chips" aria-label="Suggested models">
           {families.length ? families.map((family) => (
@@ -311,7 +311,7 @@ function HelpGroup({ copyToClipboard }: { copyToClipboard: (text: string) => Pro
       <Row label="Troubleshooting" description="Common errors and how to fix them.">
         <a className="btn is-ghost" href={troubleshootingUrl()} target="_blank" rel="noreferrer"><LifeBuoy size={13} /> Open</a>
       </Row>
-      <Row label="Copy diagnostics" description="HEISS UI, ComfyUI and Node.js versions, system and GPU, for a bug report. Prompts, images and file names aren’t included.">
+      <Row label="Copy diagnostics" description="Studio, ComfyUI and Node.js versions, system and GPU, for a bug report. Prompts, images and file names aren’t included.">
         <button className="btn" onClick={() => copy.copyWith(copyDiagnostics)}><CopyIcon copied={Boolean(copy.copied)} /> {copy.copied ? 'Copied' : 'Copy'}</button>
       </Row>
     </Group>
@@ -938,8 +938,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <section className="feedback-hero">
               <div className="feedback-hero-copy">
                 <span className="feedback-hero-eyebrow">Feedback</span>
-                <strong>Make HEISS better.</strong>
-                <p>Report a bug or suggest an idea on the public board.</p>
+                <strong>Make HEISS UI better.</strong>
+                <p>Report a bug or suggest an idea on upstream HEISS UI’s public board.</p>
                 <div className="feedback-hero-actions">
                   <button type="button" className="feedback-hero-post" onClick={() => openFeedback({ from: 'settings' })}>
                     New post <span><Plus size={14} strokeWidth={2.4} /></span>
@@ -964,15 +964,18 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <Group title="Links">
               <div className="about-links">
                 <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={15} /><span>Source on GitHub</span><ExternalLink size={12} /></a>
-                <a href={boardUrl} target="_blank" rel="noreferrer"><MessageSquarePlus size={15} /><span>Feedback board</span><ExternalLink size={12} /></a>
-                <a href={discordUrl} target="_blank" rel="noreferrer"><DiscordIcon size={15} /><span>Discord</span><ExternalLink size={12} /></a>
-                <a href="https://heiss-ui.vercel.app/" target="_blank" rel="noreferrer"><Globe size={15} /><span>Website</span><ExternalLink size={12} /></a>
+                <a href={boardUrl} target="_blank" rel="noreferrer"><MessageSquarePlus size={15} /><span>HEISS UI Feedback Board</span><ExternalLink size={12} /></a>
+                <a href={discordUrl} target="_blank" rel="noreferrer"><DiscordIcon size={15} /><span>HEISS UI Discord</span><ExternalLink size={12} /></a>
+                <a href="https://heiss-ui.vercel.app/" target="_blank" rel="noreferrer"><Globe size={15} /><span>HEISS UI Website</span><ExternalLink size={12} /></a>
                 <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer"><Scale size={15} /><span>MIT license</span><ExternalLink size={12} /></a>
                 <a href={`${githubUrl}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer"><ScrollText size={15} /><span>Changelog</span><ExternalLink size={12} /></a>
               </div>
             </Group>
 
             <Group title="Credits">
+              <Row label="HEISS UI" description="Studio is a fork of HEISS UI and merges its model, workflow and studio work.">
+                <a className="btn is-ghost" href="https://github.com/tristmeister/HEISS-UI" target="_blank" rel="noreferrer"><ExternalLink size={13} /> HEISS UI</a>
+              </Row>
               <Row label="J-AI Studio by Jasper" description="HEISS UI started as a fork of J-AI Studio. The prompt-first idea and much of the foundation are his work.">
                 <a className="btn is-ghost" href="https://github.com/jasperdevs/J-AI-Studio" target="_blank" rel="noreferrer"><ExternalLink size={13} /> J-AI Studio</a>
               </Row>

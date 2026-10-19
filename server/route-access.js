@@ -24,7 +24,7 @@ export function requireLocal(req, res) {
  */
 export function requireAdmin(req, res) {
   if (canAdmin(req)) return true;
-  res.status(403).json({ ok: false, reason: "computer-only", error: "Do this on the computer running HEISS UI. Other devices can be allowed in Settings › Connection." });
+  res.status(403).json({ ok: false, reason: "computer-only", error: "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection." });
   return false;
 }
 
@@ -32,11 +32,11 @@ export function requireAdmin(req, res) {
 export function requireThisComputer(req, res) {
   if (multiUserEnabled) {
     if (clientOf(req).thisComputer && canAdmin(req)) return true;
-    res.status(403).json({ ok: false, reason: "this-computer", error: "Only an administrator on the computer running HEISS UI can do this." });
+    res.status(403).json({ ok: false, reason: "this-computer", error: "Only an administrator on the computer running Studio can do this." });
     return false;
   }
   if (clientOf(req).thisComputer) return true;
-  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running HEISS UI can do this." });
+  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can do this." });
   return false;
 }
 

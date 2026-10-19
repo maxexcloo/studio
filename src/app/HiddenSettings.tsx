@@ -44,7 +44,7 @@ export function HiddenSettings({ hidden, prefs, setPrefs, showToast, confirmActi
   if (!enabled) {
     return (
       <Group>
-        <Row label={<Status>Not set up</Status>} description={atComputer ? "Images you keep to yourself, encrypted on this computer. Unlock with a password, Touch ID or Windows Hello." : "Images you keep to yourself. Set up Hidden on the computer running HEISS UI."}>
+        <Row label={<Status>Not set up</Status>} description={atComputer ? "Images you keep to yourself, encrypted on this computer. Unlock with a password, Touch ID or Windows Hello." : "Images you keep to yourself. Set up Hidden on the computer running Studio."}>
           {atComputer ? <button className="btn is-primary" onClick={() => { hidden.takeIntent(); hidden.setSetupOpen(true); }}><LockKeyhole size={14} /> Set up Hidden</button> : null}
         </Row>
       </Group>
@@ -114,7 +114,7 @@ export function HiddenSettings({ hidden, prefs, setPrefs, showToast, confirmActi
       </Group>
 
       <Group title="Unlock methods" note={support && !support.available ? <>{support.reason}{support.localhostUrl ? <> Open <a href={support.localhostUrl}>{support.localhostUrl.replace(/^https?:\/\//, "")}</a> to add it.</> : null}</> : undefined}>
-        <Row label={<span className="hidden-way"><KeyRound size={14} /> Password</span>} description={atComputer ? "Works on any signed-in device." : "Works on any signed-in device. Change it on the computer running HEISS UI."} stacked={changing}>
+        <Row label={<span className="hidden-way"><KeyRound size={14} /> Password</span>} description={atComputer ? "Works on any signed-in device." : "Works on any signed-in device. Change it on the computer running Studio."} stacked={changing}>
           {changing ? (
             <form className="set-inline-form is-password" onSubmit={(event) => { event.preventDefault(); if (canSavePassword) savePassword(); }}>
               {/* Typed twice, as at setup: there is no reset, so a typo would lock you out. */}

@@ -71,7 +71,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // Where the version's container image is, below the notes.
   const version = tag.replace(/^v/, "");
   const image = `ghcr.io/${repository.toLowerCase()}`;
-  const digest = /^sha256:[a-f0-9]{64}$/.test(process.env.HEISS_IMAGE_DIGEST || "") ? process.env.HEISS_IMAGE_DIGEST : "";
+  const digest = /^sha256:[a-f0-9]{64}$/.test(process.env.STUDIO_IMAGE_DIGEST || "") ? process.env.STUDIO_IMAGE_DIGEST : "";
   process.stdout.write(`${notes}\n\n### Container image\n\n`
     + "```text\n"
     + `${image}:${version}\n`

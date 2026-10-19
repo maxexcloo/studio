@@ -66,14 +66,14 @@ jobs:
           provenance: mode=max
           push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
           sbom: true
-          tags: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && format('{0}:candidate-{1}-{2}-{3}', env.IMAGE_NAME, github.sha, github.run_id, github.run_attempt) || 'heiss-ui:test' }}
+          tags: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && format('{0}:candidate-{1}-{2}-{3}', env.IMAGE_NAME, github.sha, github.run_id, github.run_attempt) || 'studio:test' }}
       - id: verification
         name: Select Verification Image
         env:
           BUILD_DIGEST: ${{ steps.build.outputs.digest }}
           PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
         run: |
-          image=heiss-ui:test
+          image=studio:test
           if [ "$PUBLISH" = true ]; then
             image="$IMAGE_NAME@$BUILD_DIGEST"
             docker pull "$image"
@@ -83,13 +83,13 @@ jobs:
         env:
           VERIFICATION_IMAGE: ${{ steps.verification.outputs.image }}
         run: |
-          docker run --cap-drop=ALL --detach --init --name heiss-smoke \
+          docker run --cap-drop=ALL --detach --init --name studio-smoke \
             --publish 127.0.0.1:8787:8787 --read-only --rm \
             --security-opt=no-new-privileges \
             --tmpfs /data:uid=1000,gid=1000,mode=0700 --tmpfs /tmp "$VERIFICATION_IMAGE"
-          trap 'docker logs heiss-smoke; docker rm --force heiss-smoke' EXIT
+          trap 'docker logs studio-smoke; docker rm --force studio-smoke' EXIT
           for _ in $(seq 1 30); do
-            if [ "$(docker inspect --format '{{.State.Health.Status}}' heiss-smoke)" = healthy ]; then exit 0; fi
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' studio-smoke)" = healthy ]; then exit 0; fi
             sleep 1
           done
           exit 1

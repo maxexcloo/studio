@@ -7,13 +7,13 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-oidc-"));
 process.env.HEISS_DATA_DIR = path.join(temporary, "data");
-process.env.HEISS_MULTI_USER = "1";
+process.env.STUDIO_MULTI_USER = "1";
 process.env.COMFY_URL = "http://127.0.0.1:9";
 const { createOidcClient, oidcConfigFromEnv } = await import("./oidc.js");
 const store = await import("./account-store.js");
 
 const issuer = "https://id.example.test";
-const config = { issuer, clientId: "heiss", clientSecret: "", redirectUri: "https://studio.example.test/api/accounts/oidc/callback", label: "Pocket ID", scopes: "openid email profile" };
+const config = { issuer, clientId: "studio", clientSecret: "", redirectUri: "https://studio.example.test/api/accounts/oidc/callback", label: "Pocket ID", scopes: "openid email profile" };
 const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: "jwk" }), kid: "key-1", alg: "RS256", use: "sig" };
 
@@ -41,12 +41,12 @@ function provider(claimsFor) {
 }
 
 const nonceOf = (url) => new URL(url).searchParams.get("nonce");
-const baseClaims = (nonce, extra = {}) => ({ iss: issuer, aud: "heiss", sub: "subject-1", exp: Math.floor(Date.now() / 1000) + 300, nonce, email: "n@excloo.com", email_verified: true, ...extra });
+const baseClaims = (nonce, extra = {}) => ({ iss: issuer, aud: "studio", sub: "subject-1", exp: Math.floor(Date.now() / 1000) + 300, nonce, email: "n@excloo.com", email_verified: true, ...extra });
 
 test("configuration needs issuer, client and HTTPS callback", () => {
   assert.equal(oidcConfigFromEnv({}), null);
-  assert.throws(() => oidcConfigFromEnv({ HEISS_OIDC_ISSUER: "http://id.example.test", HEISS_OIDC_CLIENT_ID: "heiss", HEISS_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }));
-  assert.equal(oidcConfigFromEnv({ HEISS_OIDC_ISSUER: `${issuer}/`, HEISS_OIDC_CLIENT_ID: "heiss", HEISS_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }).issuer, issuer);
+  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: "http://id.example.test", STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }));
+  assert.equal(oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: `${issuer}/`, STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }).issuer, issuer);
 });
 
 test("a PKCE sign-in verifies the signed identity token once", async () => {
