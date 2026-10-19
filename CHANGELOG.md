@@ -14,6 +14,7 @@ version opens with a `> ` summary line.
 ### Changed
 - **Clearer sign-in:** the account sign-in and first-administrator screens are a card like Studio's dialogs, with an Email field that phone keyboards no longer capitalise or autocorrect, inline errors and a separate Pocket ID button. Accounts are identified by email everywhere: new accounts and the first administrator need an email address, while existing non-email usernames keep working.
 - **Account actions on phones:** the phone studio's More sheet has an Account section with Accounts & MCP, Settings and Sign Out.
+- **Smaller MCP context:** the seven media tools' descriptions and parameter notes and the server instructions are cut to their essentials (about 2,900 to 1,650 estimated tokens per model step), since chat hosts resend them on every step. Media sessions no longer receive the GPU allocation rule, and AI Control sessions receive only it.
 
 ## [0.25.0] - 2026-10-19
 

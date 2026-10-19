@@ -263,6 +263,13 @@ test('media and administrator credentials discover only their own friendly tools
   await failure(media, 'GPUStatus');
   const admin = await f.client('administrator', controlKey);
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
+  // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
+  assert.match(media.getInstructions(), /call Generate with kind, tier/);
+  assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
+  assert.match(admin.getInstructions(), /Preview and get approval before Apply/);
+  assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
+  // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
+  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7500, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
   await call(admin, 'GPUStatus');
