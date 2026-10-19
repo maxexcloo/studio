@@ -11,9 +11,10 @@ settings are under `/data` (`HEISS_DATA_DIR`, `HEISS_ENV_FILE=/data/.env`), and
 it looks for ComfyUI at `http://host.docker.internal:8188` until you save
 another address.
 
-CI publishes verified images to `ghcr.io/maxexcloo/heiss-ui`: `latest` and
-`sha-<full commit>` from `main`, and `X.Y.Z` and `X.Y` from each release. Use
-one of those in place of a local build where you deploy.
+CI publishes verified images to `ghcr.io/maxexcloo/heiss-ui`: an immutable
+`X.Y.Z-<UTC timestamp>` tag for every build, `latest` and `sha-<full commit>`
+from `main`, and `X.Y.Z` and `X.Y` from each release. Pin the exact
+`X.Y.Z-<UTC timestamp>` tag in place of a local build where you deploy.
 
 ## Build and start
 

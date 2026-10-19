@@ -82,7 +82,7 @@ npm run release -- minor             # bump, date the changelog, commit "Release
 git push --atomic origin main vX.Y.Z # publishes the image and the GitHub release
 ```
 
-`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/heiss-ui:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
+`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/heiss-ui:X.Y.Z`, `:X.Y` and the exact `:X.Y.Z-<UTC timestamp>` tag that every published build receives, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
 
 Between releases a source checkout shows how far it is past its tag in **Settings › About**, for example `v0.2.0 + 3`.
 
@@ -113,4 +113,4 @@ Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It 
 
 Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions and the container smoke/security checks for that commit. The image is pushed as an untagged candidate, verified, and only then given its version tags.
 
-Publication does not authorise deployment. Deployment configuration belongs in `../ai` and must pin a verified published fork image by digest. Account/data migration and retirement of old services require protected backups, explicit ownership mapping, a recovery procedure and live image/video and cross-account verification. Those gates have not been established by local demo tests.
+Publication does not authorise deployment. Deployment configuration belongs in `../ai` and must pin a verified published fork image by its exact `X.Y.Z-<UTC timestamp>` tag. Account/data migration and retirement of old services require protected backups, explicit ownership mapping, a recovery procedure and live image/video and cross-account verification. Those gates have not been established by local demo tests.
