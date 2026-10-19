@@ -16,6 +16,9 @@ version opens with a `> ` summary line.
 - **Account actions on phones:** the phone studio's More sheet has an Account section with Accounts & MCP, Settings and Sign Out.
 - **Smaller MCP context:** the seven media tools' descriptions and parameter notes and the server instructions are cut to their essentials (about 2,900 to 1,650 estimated tokens per model step), since chat hosts resend them on every step. Media sessions no longer receive the GPU allocation rule, and AI Control sessions receive only it.
 
+### Fixed
+- **Phone prompt with the keyboard up:** tapping the prompt in the phone's Create sheet no longer squeezes it to a sliver above the controls until the page is scrolled; the prompt keeps its height and the sheet scrolls instead.
+
 ## [0.25.0] - 2026-10-19
 
 > LibreChat users reach Studio without a manual link
