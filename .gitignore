@@ -33,3 +33,6 @@ docs/screenshots/size-picker*
 
 # Python bytecode from the companion ComfyUI node
 __pycache__/
+
+# Old local desktop archives from before the fork became container-only
+release
