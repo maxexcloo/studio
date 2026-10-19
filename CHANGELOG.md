@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-10-19
+
 > Named MCP results, with no gap above the image
 
 ### Fixed
@@ -1235,7 +1237,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/maxexcloo/studio/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/maxexcloo/studio/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/maxexcloo/studio/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/maxexcloo/studio/compare/v0.20.0...v0.21.0
