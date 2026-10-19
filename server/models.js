@@ -3,7 +3,7 @@ import path from 'node:path';
 import { dataDir } from './gallery-store.js';
 import { missingNodes, nodeRange, optionsFor, textRange } from './comfy.js';
 import { loadCustomWorkflows, workflowOptionIssues } from './custom-workflows.js';
-import { modelTypeChoices } from './model-families.js';
+import { classifyModel, modelTypeChoices } from './model-families.js';
 import { familyProfiles } from './family-profiles.js';
 import { families } from './family-catalog.js';
 import { builtInProfilesEnabled, inpaintingEnabled, lorasEnabled, modelFamilyEnabled, presetsEnabled } from './features.js';
@@ -157,6 +157,32 @@ export function buildProfile({ id, kind, label, displayName, description, model,
   };
 }
 
+/**
+ * The size step an imported workflow's model needs. A latent node may accept any
+ * multiple of 8 while the model itself needs 16 or 32 (Qwen Image 2.1): an
+ * off-step size is silently cut by ComfyUI and can come out mangled.
+ */
+export function workflowFamilyStep(workflow) {
+  const own = families[workflow.family]?.sizeStep;
+  if (own) return own;
+  for (const node of Object.values(workflow.graph || {})) {
+    for (const [key, source] of [["unet_name", "unet"], ["ckpt_name", "checkpoint"]]) {
+      const name = node?.inputs?.[key];
+      if (typeof name !== "string" || !name) continue;
+      try { const step = families[classifyModel(source, name)?.family]?.sizeStep; if (step) return step; } catch { /* unknown file: the node's own step stands */ }
+    }
+  }
+  return 0;
+}
+
+/** A width or height range on the stricter of the node's and the model family's steps. */
+export function sizedRange(range, familyStep) {
+  const step = Math.max(Number(range.step) || 1, familyStep || 0);
+  if (step === range.step) return range;
+  const onStep = (value) => Math.max(step, Math.round(Number(value) / step) * step);
+  return { ...range, step, ...(range.default ? { default: onStep(range.default) } : {}), ...(range.min ? { min: Math.max(step, Math.ceil(range.min / step) * step) } : {}) };
+}
+
 export function inferModels(info, stats = {}) {
   const missingCoreImageNodes = missingNodes(info, ["KSampler", "CLIPTextEncode", "VAEDecode", "SaveImage"]);
   if (missingCoreImageNodes.length) {
@@ -193,8 +219,9 @@ export function inferModels(info, stats = {}) {
     if (missing.length || workflowOptionIssues(workflow, info).length) continue;
     const defaults = workflow.defaults || {};
     const controls = workflow.controls || {};
-    const widthRange = controls.width ? nodeRange(info, workflow.graph?.[controls.width.node]?.class_type, controls.width.input, { default: Number(defaults.width || 1024), min: 16, max: 16384, step: 8 }) : {};
-    const heightRange = controls.height ? nodeRange(info, workflow.graph?.[controls.height.node]?.class_type, controls.height.input, { default: Number(defaults.height || 1024), min: 16, max: 16384, step: 8 }) : {};
+    const familyStep = workflowFamilyStep(workflow);
+    const widthRange = controls.width ? sizedRange(nodeRange(info, workflow.graph?.[controls.width.node]?.class_type, controls.width.input, { default: Number(defaults.width || 1024), min: 16, max: 16384, step: 8 }), familyStep) : {};
+    const heightRange = controls.height ? sizedRange(nodeRange(info, workflow.graph?.[controls.height.node]?.class_type, controls.height.input, { default: Number(defaults.height || 1024), min: 16, max: 16384, step: 8 }), familyStep) : {};
     const countRange = controls.count ? nodeRange(info, workflow.graph?.[controls.count.node]?.class_type, controls.count.input, { default: Number(defaults.count || 1), min: 1, max: 4096, step: 1 }) : {};
     const frameRange = controls.frames ? nodeRange(info, workflow.graph?.[controls.frames.node]?.class_type, controls.frames.input, { default: Number(defaults.frames || 33), min: 1, max: 16384, step: 1 }) : {};
     const fpsRange = controls.fps ? nodeRange(info, workflow.graph?.[controls.fps.node]?.class_type, controls.fps.input, { default: Number(defaults.fps || 16), min: 1, max: 120, step: 1 }) : {};

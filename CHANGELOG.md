@@ -36,6 +36,7 @@ version opens with a `> ` summary line, which the update pill shows.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Fixed
+- **Mangled images from imported workflows:** an imported workflow now uses its model family's size step (for example 32 for Qwen Image 2.1) when its latent node allows a finer one. Off-step sizes such as 1536×2728 were silently cut by ComfyUI and could come out mangled.
 - **Container security updates:** Debian mirrors use verified HTTPS, and a package-index download failure now stops the build instead of silently leaving vulnerable packages installed.
 - **Video frame references:** deselecting a start frame preserves the end frame in its own slot, including when both use the same image.
 - **LoRA trigger:** opening the picker preserves the composer and reliably tracks its opener on touch devices.
