@@ -49,6 +49,8 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
   let deduplicateUploads = false;
   let profiles = [structuredClone(imageProfile), structuredClone(videoProfile), { ...imageProfile, id: 'not-ready', ready: false }];
   let base;
+  let defaults = { image: imageProfile.id, video: videoProfile.id };
+  let visibleTo = null;
   app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
   app.get('/api/loras/info', (_req, res) => res.json({ ok: true, loras: loraInfo }));
@@ -99,7 +101,8 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
     }
   });
   // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
-  app.get('/api/models', (_req, res) => res.json({ profiles, defaults: { imageModel: imageProfile.id, videoModel: videoProfile.id } }));
+  // The studio limits each account's catalogue to its access profile; the deployment defaults are not limited.
+  app.get('/api/models', (req, res) => res.json({ profiles: visibleTo ? profiles.filter(profile => visibleTo(req.headers['x-ai-user-id'] || req.headers.authorization, profile)) : profiles, defaults: { imageModel: defaults.image, videoModel: defaults.video } }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -118,7 +121,7 @@ async function fixture(t, { foregroundWaitSeconds, environment: extra = {}, data
     jobLookupFails: value => { jobLookupFails = value; },
     deduplicateUploads: () => { deduplicateUploads = true; },
     // A model change reaches the studio as a rescan, which refreshes MCP's cached catalogues.
-    profiles: async value => { profiles = value; await fetch(`${base}/api/models`); },
+    profiles: async (value, { defaults: chosen, visibleTo: filter } = {}) => { profiles = value; if (chosen) defaults = chosen; if (filter) visibleTo = filter; await fetch(`${base}/api/models`); },
     client: async (user = 'alice', key = mediaKey) => {
       const client = new Client({ name: 'heiss-integration-fixture', version: '1.0.0' }, { capabilities: {} });
       clients.push(client);
@@ -572,8 +575,9 @@ test('deployment prompting packs retain compact discovery, profile modes and rev
   }));
   const f = await fixture(t, { dataDir: dir, environment: { MCP_PROMPTING_PATH: file } });
   const client = await f.client();
-  const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0].prompting;
-  assert.deepEqual(compact, { id: 'fixture-pack', mode: 'reference', summary: 'Fixture scene guidance', variant: 'quick' });
+  // Guides stay in the detail; the compact list carries only identity, tier and a one-line summary.
+  const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0];
+  assert.deepEqual(compact, { id: imageProfile.id, label: imageProfile.label, kind: 'image', tier: 'standard', summary: imageProfile.description });
   const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].prompting;
   assert.equal(detail.mode.id, 'reference');
   assert.deepEqual(detail.mode.rules, ['Preserve the subject']);
@@ -775,8 +779,7 @@ test('Models consumes self-contained profile guidance without a runtime promptin
   await f.profiles([{ ...imageProfile, prompting: shared, imageModes: { generate: { prompting: generateGuide }, reference: { prompting: referenceGuide } } }]);
   const client = await f.client();
   const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0];
-  assert.deepEqual(compact.prompting, { id: 'owned-guide', summary: 'Profile-owned research', mode: 'generate', variant: 'distilled' });
-  assert.equal(compact.imageModes, undefined);
+  assert.deepEqual(Object.keys(compact), ['id', 'label', 'kind', 'tier', 'summary']);
   assert.equal(JSON.stringify(compact).includes('Subject first'), false);
   const detailed = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
   assert.deepEqual(detailed.prompting, generateGuide);
@@ -1005,4 +1008,91 @@ test('account watch pages read as the signed owner through the loopback credenti
   assert.equal(response.status, 200);
   const lookup = f.requests.slice(before).find(request => request.path === `/jobs/${queued.job_id}`);
   assert.deepEqual([lookup.authorization, lookup.internal, lookup.account], [undefined, 'fixture-internal', account.userId]);
+});
+
+const tiered = (id, label, extra = {}) => ({ ...structuredClone(imageProfile), id, label, prompting: { id: `${id}-guide`, summary: 'Guide summary', rules: ['A long rule the compact outputs must not repeat'] }, ...extra });
+const tieredCatalogue = () => [
+  tiered('qwen-quality', 'Qwen-Image · Quality · 40 Steps', { family: 'qwen' }),
+  tiered('qwen-fast', 'Qwen-Image Turbo · Fast · 8 Steps', { family: 'qwen' }),
+  tiered('krea-fast', 'Krea 2 Turbo · Fast · 8 Steps', { family: 'krea' }),
+  tiered('krea-turbo', 'Krea 2 Turbo · Super Fast · 2 Steps', { family: 'krea' }),
+  tiered('edit-turbo', 'Edit · Super Fast · 4 Steps', { family: 'edit', mediaInputs: [{ id: 'reference', kind: 'image', min: 1, max: 1, required: true }] }),
+  { ...structuredClone(videoProfile), label: 'Video · Quality · 20 Steps' }
+];
+
+test('Models filters by tier and lists only id, label, kind, tier and a one-line summary', async t => {
+  const f = await fixture(t);
+  await f.profiles(tieredCatalogue(), { defaults: { image: 'qwen-quality', video: videoProfile.id } });
+  const client = await f.client();
+  const turbo = data(await call(client, 'Models', { kind: 'image', tier: 'turbo' }));
+  assert.deepEqual(turbo.profiles.map(profile => profile.id), ['krea-turbo', 'edit-turbo']);
+  assert.deepEqual(turbo.profiles[0], { id: 'krea-turbo', label: 'Krea 2 Turbo · Super Fast · 2 Steps', kind: 'image', tier: 'turbo', summary: imageProfile.description });
+  assert.deepEqual(data(await call(client, 'Models', { kind: 'image', tier: 'fast' })).profiles.map(profile => profile.id), ['qwen-fast', 'krea-fast']);
+  // No profile is labelled Standard here, so standard falls back to Quality.
+  assert.deepEqual(data(await call(client, 'Models', { kind: 'all', tier: 'standard' })).profiles.map(profile => profile.id), ['qwen-quality', videoProfile.id]);
+  const all = await call(client, 'Models', { kind: 'image' });
+  assert.equal(all.content[0].text.includes('A long rule'), false);
+  assert.equal(data(await call(client, 'Models', { profile_id: 'krea-turbo' })).profiles[0].tier, 'turbo');
+});
+
+test('Generate with kind and tier needs no Models call, picks the default profile for the tier and stays lean', async t => {
+  const f = await fixture(t);
+  await f.profiles(tieredCatalogue(), { defaults: { image: 'qwen-quality', video: videoProfile.id } });
+  const client = await f.client();
+  const fast = await call(client, 'Generate', { kind: 'image', tier: 'fast', prompts: ['An egg'], count: 1 });
+  const result = data(fast);
+  // Same family as the deployment default wins; the guide is applied server-side, not echoed.
+  assert.deepEqual(result.profile, { id: 'qwen-fast', label: 'Qwen-Image Turbo · Fast · 8 Steps', tier: 'fast' });
+  assert.deepEqual(Object.keys(result.jobs[0]), ['job_id', 'ref', 'link']);
+  assert.equal(result.prompting, undefined);
+  assert.equal(fast.content[0].text.includes('A long rule'), false);
+  assert.equal(f.submitted[0].profileId, 'qwen-fast');
+  assert.equal(f.requests.some(request => request.path === '/loras/info'), false);
+  // A reference-only profile is skipped without references.
+  assert.equal(data(await call(client, 'Generate', { tier: 'turbo', prompts: ['An egg'], count: 1 })).profile.id, 'krea-turbo');
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1 })).profile.id, 'qwen-quality', 'no tier uses the deployment default');
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 })).profile.id, videoProfile.id);
+  // A follow-up with the chosen profile_id does not repeat its guide.
+  assert.equal(data(await call(client, 'Generate', { profile_id: 'qwen-fast', prompts: ['Another egg'], count: 1 })).prompting, undefined);
+  const missing = await call(client, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'] });
+  assert.equal(missing.isError, true);
+  assert.match(missing.content[0].text, /No ready video profile in the turbo tier.*Available video tiers: quality, standard\./);
+  assert.equal(f.submitted.length, 5);
+});
+
+test('tier-based Generate chooses only profiles the account may use', async t => {
+  const tokens = { 'restricted-account-token-long-enough-for-the-fixture': 'restricted', 'full-account-token-that-is-long-enough-for-fixture': 'full' };
+  const accounts = Object.fromEntries(Object.entries(tokens).map(([token, userId]) => [token, { userId, role: 'user', authenticated: true, generationProfiles: [], features: {} }]));
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => accounts[value] || null });
+  const restricted = ['qwen-fast', 'krea-fast'];
+  await f.profiles(tieredCatalogue(), { defaults: { image: 'qwen-quality', video: videoProfile.id }, visibleTo: (authorization, profile) => !String(authorization).includes('restricted') || restricted.includes(profile.id) });
+  const limited = await f.client('', Object.keys(tokens)[0]);
+  // The deployment default is not visible to this account, so another permitted profile is chosen.
+  assert.equal(data(await call(limited, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1 })).profile.id, 'qwen-fast');
+  assert.deepEqual(data(await call(limited, 'Models', { kind: 'image', tier: 'turbo' })).profiles, []);
+  const refused = await call(limited, 'Generate', { kind: 'image', tier: 'turbo', prompts: ['An egg'] });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /Available image tiers: fast\./);
+  await failure(limited, 'Generate', { profile_id: 'krea-turbo', prompts: ['An egg'] });
+  const full = await f.client('', Object.keys(tokens)[1]);
+  assert.equal(data(await call(full, 'Generate', { kind: 'image', tier: 'turbo', prompts: ['An egg'], count: 1 })).profile.id, 'krea-turbo');
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['qwen-fast', 'krea-turbo']);
+});
+
+test('a background notification returns only its markdown unless detail is asked for', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  const pending = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0 });
+  assert.equal(pending.content.length, 1);
+  assert.deepEqual(pending.structuredContent, { job_id: id, ref: 'result 1', status: 'running' });
+  Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=lean.png' }] });
+  const lean = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0 });
+  assert.equal(lean.content.length, 1);
+  assert.match(lean.content[0].text, /^Result 1 is ready\. .+\n\n!\[Result 1\]\([^)]+\)\n\[View Original\]\([^)]+\)$/);
+  assert.deepEqual(lean.structuredContent, { job_id: id, ref: 'result 1', status: 'done' });
+  const detailed = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0, detail: true });
+  assert.equal(detailed.content.length, 2);
+  assert.equal(detailed.structuredContent.outputs.length, 1);
+  assert.ok(detailed.structuredContent.link && detailed.structuredContent.markdown);
 });

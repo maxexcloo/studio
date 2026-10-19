@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import { defaultGenerationCount } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable } from './mcp-controls.js';
+import { chooseProfile } from './mcp-tiers.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
@@ -102,6 +103,16 @@ export class McpMedia {
     this.profileCache?.clear();
   }
   async profiles(kind = 'all', owner = "") {
+    const models = await this.catalogue(owner);
+    return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
+  }
+  /** The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream. */
+  async choose(owner, { kind = 'image', tier, references = 0 } = {}) {
+    const models = await this.catalogue(owner);
+    const profiles = await this.profiles(kind, owner);
+    return chooseProfile(profiles, { kind, tier, references, defaultId: models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'] });
+  }
+  async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
     this.profileRequests ||= new Map();
     this.profileCache ||= new Map();
@@ -123,7 +134,7 @@ export class McpMedia {
       }
       models = await this.profileRequests.get(owner);
     }
-    return (models.profiles || []).filter(profile => profile.ready !== false && (kind === 'all' || profile.kind === kind)).map(profile => ({ ...profile, ...profile.imageModes?.generate }));
+    return models;
   }
   /** The studio LoRA picker's metadata for this account, briefly cached; access rules apply upstream. */
   async loraInfos(owner = "") {
@@ -178,10 +189,10 @@ export class McpMedia {
         if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('Studio returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
         this.save();
-        queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), profile_id, count: body.count, variant_index: variant });
+        queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId) });
       } catch (error) {
         if (error.submissionUncertain) {
-          queued.push({ job_id: id, ...this.handle(owner, scope, id), profile_id, count: body.count, variant_index: variant, status: 'unknown' });
+          queued.push({ job_id: id, ...this.handle(owner, scope, id), status: 'unknown' });
           return { status: 'partially_queued', jobs: queued, error: 'The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.' };
         }
         if (queued.length) return { status: 'partially_queued', jobs: queued, error: 'Further submission failed; retain returned jobs before retrying.' };
@@ -343,7 +354,7 @@ export class McpMedia {
     this.save();
     return result;
   }
-  async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview', { scope = '', signal } = {}) {
+  async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview', { scope = '', signal, detail = false } = {}) {
     const wait = Math.min(seconds, maxResultWaitSeconds);
     const job = await this.job(owner, jobId, wait, { signal });
     const ref = this.refOf(owner, scope, jobId);
@@ -355,10 +366,12 @@ export class McpMedia {
         : `${ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       const summary = { ...named, ...this.summary(job), message };
       if (delivery !== 'notification') return mcpJson(summary);
-      return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), text(summary)], structuredContent: summary };
+      // The woken agent needs only the sentence and watch link; detail adds the status fields.
+      const lean = { job_id: jobId, ...(ref ? { ref } : {}), status: job.status || 'running' };
+      return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), ...(detail ? [text(summary)] : [])], structuredContent: detail ? summary : lean };
     }
     const available = this.available(job, index);
-    if (delivery === 'notification') return this.notification(owner, jobId, job, named);
+    if (delivery === 'notification') return this.notification(owner, jobId, job, named, detail);
     const url = this.url(owner, jobId, index);
     const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
     if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
@@ -371,14 +384,16 @@ export class McpMedia {
    * A self-contained, text-only completion: the woken agent can render it directly
    * (signed image markdown plus View Original) without calling Result again.
    */
-  notification(owner, jobId, job, named) {
+  notification(owner, jobId, job, named, detail = false) {
     const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'Studio result';
     const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
     const markdown = outputs.map(({ url }, position) => {
       const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
       return job.kind === 'video' ? `${caption}: [View Video](${url})` : `![${caption}](${url})\n[View Original](${url})`;
     }).join('\n\n');
-    const message = `${label} is ready. Reply by reproducing the markdown below exactly so the ${job.kind === 'video' ? 'video link' : 'image'} renders inline, with at most one short sentence. Do not call Result again, poll or generate again.`;
+    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result again, poll or generate again.`;
+    // Only the markdown re-enters the chat by default; detail restores the full record.
+    if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(named.ref ? { ref: named.ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
     return { content: [text(`${message}\n\n${markdown}`), text(structured)], structuredContent: structured };
   }
