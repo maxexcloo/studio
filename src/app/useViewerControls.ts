@@ -4,6 +4,7 @@ import { normaliseReusedSettings } from './outputReuse';
 import { reusedNegative } from './composerSettings';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
+import { usePhone } from './device';
 import { normalizeLoras } from './loras';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
@@ -44,6 +45,13 @@ export function useViewerControls(view: any) {
   const [viewerNativeZoom, setViewerNativeZoom] = useState(1);
   const nativeZoomRef = useRef(1);
   const sizeMode = useRef<'native' | 'fit' | 'manual'>('native');
+  // Desktop opens images at 1:1. A phone screen would show a corner of one at
+  // that size, so there they open fitted, and a double tap toggles from fit.
+  const phone = usePhone();
+  const phoneRef = useRef(phone);
+  phoneRef.current = phone;
+  const openingMode = () => phoneRef.current ? 'fit' as const : 'native' as const;
+  const homeZoom = () => phoneRef.current ? 1 : nativeZoomRef.current;
   const swipeZoom = useRef(1);
   useLayoutEffect(() => {
     const item = active || (prefs.zenMode ? zenItem : null);
@@ -53,7 +61,7 @@ export function useViewerControls(view: any) {
     }
     const canvas = document.querySelector<HTMLElement>(active ? '.viewer-canvas' : '.zen-output');
     if (!canvas) return;
-    sizeMode.current = 'native';
+    sizeMode.current = openingMode();
     let first = true;
     const measure = () => {
       const image = canvas.querySelector<HTMLImageElement>('img.generation-result');
@@ -65,8 +73,8 @@ export function useViewerControls(view: any) {
       const previous = nativeZoomRef.current;
       nativeZoomRef.current = factor;
       setViewerNativeZoom(factor);
-      if (first || sizeMode.current === 'native') setViewerZoom(factor);
-      else if (sizeMode.current === 'fit') setViewerZoom(1);
+      if (sizeMode.current === 'fit') setViewerZoom(1);
+      else if (first || sizeMode.current === 'native') setViewerZoom(factor);
       else setViewerZoom((zoom: number) => zoom * factor / previous);
       if (first) setViewerPan({ x: 0, y: 0 });
       first = false;
@@ -98,16 +106,16 @@ export function useViewerControls(view: any) {
   }, []);
   const lastTouchRef = view.lastTouchRef as React.MutableRefObject<number>;
   const touchGestureRef = view.touchGestureRef as React.MutableRefObject<TouchGesture | null>;
-  function resetViewer() {
+  function resetViewer(mode: 'native' | 'fit' = 'native') {
     lastTapRef.current = 0;
     tapPointRef.current = null;
-    sizeMode.current = 'native';
-    setViewerZoom(nativeZoomRef.current);
+    sizeMode.current = mode;
+    setViewerZoom(mode === 'fit' ? 1 : nativeZoomRef.current);
     setViewerPan({ x: 0, y: 0 });
   }
 
   function openItem(item: GalleryItem) {
-    resetViewer();
+    resetViewer(openingMode());
     setZenSelectedId(item.id);
     // The side panel squeezes the image below laptop widths, so it starts closed there.
     setShowDetails(typeof window === "undefined" ? true : !window.matchMedia("(max-width: 1024px)").matches);
@@ -244,7 +252,7 @@ export function useViewerControls(view: any) {
     const doneItems: GalleryItem[] = current.viewerGallery || viewerItems();
     const currentIndex = doneItems.findIndex((item: GalleryItem) => item.id === activeItem.id);
     if (currentIndex < 0 || doneItems.length < 2) return;
-    resetViewer();
+    resetViewer(openingMode());
     setActive(doneItems[(currentIndex + direction + doneItems.length) % doneItems.length]);
   }
 
@@ -354,7 +362,7 @@ export function useViewerControls(view: any) {
     // On touch a single tap only closes (outside the image); zoom is a double tap
     // or a pinch, so a stray tap never jumps the picture to 200%.
     if (Date.now() - lastTouchRef.current < 700) return;
-    zoomViewer(viewerZoom > nativeZoomRef.current * 1.05 ? nativeZoomRef.current : nativeZoomRef.current * 2);
+    zoomViewer(viewerZoom > homeZoom() * 1.05 ? homeZoom() : homeZoom() * 2);
   }
 
   function startViewerDrag(event: React.PointerEvent) {
@@ -611,7 +619,7 @@ export function useViewerControls(view: any) {
     if (!gesture.moved && doubleTap && endedTouch) {
       event.preventDefault();
       const current = gesture.mode === 'pan' ? gesture.zoom : swipeZoom.current;
-      const zoom = current > nativeZoomRef.current * 1.05 ? nativeZoomRef.current : Math.min(MAX_ZOOM, nativeZoomRef.current * 2.5);
+      const zoom = current > homeZoom() * 1.05 ? homeZoom() : Math.min(MAX_ZOOM, homeZoom() * 2.5);
       const geometry = measureViewer(canvas);
       const point = { x: endedTouch.clientX, y: endedTouch.clientY };
       const pan = geometry ? clampPan(geometry, zoom, anchorPan(geometry, zoom, current, viewerPan, point, point)) : { x: 0, y: 0 };

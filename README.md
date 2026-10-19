@@ -208,7 +208,7 @@ Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no 
 
 A reference being edited or a painted mask sets the size itself, and your 2K pick comes back afterwards.
 
-Images open at 1:1, with one image pixel per CSS pixel. Zoom In, Zoom Out, 1:1 and Fit Whole Image controls are available on desktop and phone. Fit Whole Image shows the entire picture within the viewer without cropping or changing its aspect ratio.
+On desktop, images open at 1:1, with one image pixel per CSS pixel; on a phone they open fitted to the screen. Zoom In, Zoom Out, 1:1 and Fit Whole Image controls are available on desktop and phone. Fit Whole Image shows the entire picture within the viewer without cropping or changing its aspect ratio.
 
 ## Smart upscale
 
@@ -245,7 +245,7 @@ Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **S
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference images (with Edit or Reference in plain sight), workflow, size (Default, 2K, Custom and your saved sizes) and number of images, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pinch to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
+The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference images (with Edit or Reference in plain sight), workflow, size (Default, 2K, Custom and your saved sizes) and number of images, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pictures open fitted to the screen; pinch or double tap to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
 
 **Use the full studio** under More switches a phone to the complete layout.
 

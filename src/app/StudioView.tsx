@@ -574,7 +574,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </>
   );
 
-  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={resetViewer} onFit={view.fitViewer} />;
+  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={() => resetViewer()} onFit={view.fitViewer} />;
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
@@ -963,7 +963,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       showDetails={Boolean(showDetails)}
                       onToggleDetails={() => setShowDetails((value: boolean) => !value)}
                       compareOpen={Boolean(compareOpen)}
-                      onToggleCompare={() => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); }}
+                      onToggleCompare={() => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer('fit'); }}
                     />
                   </>
                 ) : (

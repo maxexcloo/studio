@@ -18,6 +18,7 @@ version opens with a `> ` summary line.
 
 ### Fixed
 - **Phone prompt with the keyboard up:** tapping the prompt in the phone's Create sheet no longer squeezes it to a sliver above the controls until the page is scrolled; the prompt keeps its height and the sheet scrolls instead.
+- **Phone viewer opens fitted:** on a phone, an image opens fitted to the screen instead of at 1:1, which showed a corner of it. A double tap zooms in from the fitted size and back; 1:1 and the zoom buttons stay available. Desktop still opens images at 1:1.
 
 ## [0.25.0] - 2026-10-19
 

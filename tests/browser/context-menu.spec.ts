@@ -96,13 +96,16 @@ test('phone double taps zoom in and back out without browser click interference'
   const box = await media.boundingBox();
   const x = box!.x + box!.width / 2;
   const y = box!.y + box!.height / 2;
+  // A phone opens fitted: a double tap zooms to 2.5 times that, and back.
+  const percent = page.getByLabel('Image Zoom Percentage', { exact: true });
+  const fitted = await percent.textContent();
   await page.touchscreen.tap(x, y);
   await page.touchscreen.tap(x + 2, y + 2);
-  await expect(page.getByLabel('Image Zoom Percentage', { exact: true })).toHaveText('250%');
+  await expect.poll(async () => parseInt(await percent.textContent() || '') / parseInt(fitted || '')).toBeCloseTo(2.5, 1);
   // Let the zoom settle before starting a separate pair of taps.
   await expect.poll(() => canvas.getAttribute('data-settle')).toBeNull();
   await page.touchscreen.tap(x, y);
   await page.touchscreen.tap(x, y);
-  await expect(page.getByLabel('Image Zoom Percentage', { exact: true })).toHaveText('100%');
+  await expect(percent).toHaveText(fitted!);
   await expect(page.getByRole('dialog', { name: 'Image Viewer', exact: true })).toBeVisible();
 });
