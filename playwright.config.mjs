@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   retries: process.env.CI ? 1 : 0,
   testDir: './tests/browser',
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 1000 } } },
     { name: 'phone', use: { viewport: { width: 390, height: 844 }, isMobile: true } },

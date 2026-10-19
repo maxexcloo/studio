@@ -6,12 +6,15 @@ on:
       image_digest:
         description: Verified container image digest
         value: ${{ jobs.image.outputs.digest }}
+      image_tags:
+        description: Tags to publish once every check passes
+        value: ${{ jobs.image.outputs.tags }}
 
 permissions:
   contents: read
 
 concurrency:
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
   group: container-${{ github.ref }}
 
 env:
@@ -23,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      tags: ${{ steps.metadata.outputs.tags }}
     permissions:
       contents: read
       packages: write
@@ -100,28 +104,3 @@ jobs:
           ignore-unfixed: true
           image-ref: ${{ steps.verification.outputs.image }}
           severity: CRITICAL,HIGH
-      - id: publish
-        name: Publish Verified Image
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-        env:
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
-        run: |
-          tags=()
-          while IFS= read -r tag; do
-            if [ -n "$tag" ]; then tags+=(--tag "$tag"); fi
-          done <<< "$IMAGE_TAGS"
-          docker buildx imagetools create --prefer-index=false "${tags[@]}" "$IMAGE_NAME@$IMAGE_DIGEST"
-      - name: Summarise Image
-        if: steps.publish.outcome == 'success'
-        env:
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
-        run: |
-          {
-            echo 'Published image tags:'
-            echo '```text'
-            echo "$IMAGE_TAGS"
-            echo '```'
-            echo "Digest: \`$IMAGE_DIGEST\`"
-          } >> "$GITHUB_STEP_SUMMARY"
