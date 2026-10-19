@@ -7,13 +7,14 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { defaultGenerationCount } from './generation-defaults.js';
 import { hostAllowed } from './request-guard.js';
-import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
+import { mcpControls, mcpLoras } from './mcp-controls.js';
+import { McpMedia, maxResultWaitSeconds, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 
-const instructions = 'HEISS makes requested images and videos. Models lists profiles by kind; Models with a profile_id returns its prompting guide, defaults and reference slots. Keep explicit model choices, user intent and the saved count and size unless asked otherwise. Generate queues jobs and returns job IDs at once; never wait or poll in the foreground, and never resubmit. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=1800 and run_in_background=true, then reply immediately. When it reports done, call Result once with delivery=preview and wait_seconds=0, never in the background. Otherwise use Status or Result only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.';
+const instructions = `HEISS makes requested images and videos. Models lists profiles by kind; Models with a profile_id returns its prompting guide, defaults, adjustable controls, compatible LoRAs and reference slots. Pass only the controls it lists; anything else is fixed and Generate refuses it. Keep explicit model choices, user intent and the saved count and size unless asked otherwise. Generate queues jobs and returns at once, per job, a job_id, a ref such as "result 3" and a signed watch link; share each watch link as a markdown link labelled with its ref so the user can follow it without you. A ref works wherever a job_id is asked for. Never wait or poll in the foreground, never call Status repeatedly, and never resubmit. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply immediately, then wait for the host's notification without checking the task. The notification already contains the finished image markdown and View Original link: reproduce that markdown exactly with at most a short caption, and do not call Result again. Otherwise use Status or Result (delivery=preview) only when asked. Show images inline with a brief caption; label original links View Original, not Download; never paste raw URLs outside markdown. Upload user images; Reuse owned ones. Never invent results. GPU allocation is manual: use AI Control tools only on explicit request, present Preview and get approval before Apply. Generation never changes allocation.`;
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
-const job = { job_id: z.string().min(1).max(200) };
+const job = { job_id: z.string().min(1).max(200).describe('The job_id from Generate, or its ref such as "result 3".') };
 const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
@@ -38,6 +39,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     next();
   });
   const reviewedGuides = new Map();
+  // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
+  const inflight = new Map();
+  const inflightKey = (actor, requestId) => JSON.stringify([actor.scope, actor.owner, String(requestId)]);
   const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
   const review = (owner, profileId) => {
     if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
@@ -77,28 +81,58 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       }
     }
     if (!scope) return res.status(401).set('WWW-Authenticate', 'Bearer realm="HEISS MCP"').json({ error: 'A valid MCP bearer credential is required.' });
-    req.mcpActor = { scope, owner: account?.userId || (scope === 'media' ? media.owner(user, token) : null) };
+    const conversation = String(req.headers['x-heiss-conversation-id'] || '');
+    if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation)) return res.status(400).json({ error: 'Invalid conversation identity.' });
+    const owner = account?.userId || (scope === 'media' ? media.owner(user, token) : null);
+    // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
+    req.mcpActor = { scope, owner, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
     next();
   };
-  const tool = (server, name, title, description, inputSchema, action, annotations = {}) => server.registerTool(name, { title, description, inputSchema, annotations: { readOnlyHint: false, destructiveHint: false, ...annotations } }, async (args) => {
-    try { return await action(args); } catch (error) {
-      return { isError: true, content: [{ type: 'text', text: error?.message || 'HEISS could not complete this request.' }] };
-    }
-  });
-  const create = ({ scope, owner }) => {
+  const create = (actor) => {
+    const { scope, owner, refs } = actor;
+    const tool = (server, name, title, description, inputSchema, action, annotations = {}) => server.registerTool(name, { title, description, inputSchema, annotations: { readOnlyHint: false, destructiveHint: false, ...annotations } }, async (args, extra = {}) => {
+      // The SDK aborts extra.signal when the client disconnects; a cancellation notification aborts it here.
+      const controller = new AbortController();
+      const forward = () => controller.abort();
+      if (extra.signal?.aborted) controller.abort(); else extra.signal?.addEventListener('abort', forward, { once: true });
+      const key = extra.requestId === undefined ? null : inflightKey(actor, extra.requestId);
+      if (key) inflight.set(key, controller);
+      try { return await action(args, controller.signal); } catch (error) {
+        return { isError: true, content: [{ type: 'text', text: error?.message || 'HEISS could not complete this request.' }] };
+      } finally {
+        extra.signal?.removeEventListener('abort', forward);
+        if (key && inflight.get(key) === controller) inflight.delete(key);
+      }
+    });
+    const resolve = (value) => media.resolve(owner, refs, value);
     const server = new McpServer({ name: 'HEISS', version: '1.0.0' }, { instructions });
     if (scope === 'media') {
-      tool(server, 'Models', 'Browse Models', 'List ready profiles by kind. With profile_id, return its prompting guide, defaults, capabilities, LoRAs, reference slots and native sizes. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional() }, async ({ kind, profile_id }) => {
+      tool(server, 'Models', 'Browse Models', 'List ready profiles by kind. With profile_id, return its prompting guide, defaults, adjustable controls (only these can be passed to Generate), compatible LoRAs with descriptions, trigger words, recommended strength and source links, reference slots and native sizes. lora_query narrows a long LoRA list. Explicit width and height request native generation; 2K means a 2048-pixel long side. imageModes.reference applies when references are supplied.', { kind: z.enum(['all', 'image', 'video']).default('all'), profile_id: z.string().optional(), lora_query: z.string().max(200).optional() }, async ({ kind, profile_id, lora_query }) => {
         let profiles = await media.profiles(kind, owner);
-        if (profile_id !== undefined) {
-          profiles = profiles.filter(profile => profile.id === profile_id);
-          if (!profiles.length) throw new Error('Choose a ready profile from Models.');
-        }
-        if (profile_id !== undefined) review(owner, profile_id);
-        const fields = profile_id === undefined ? ['id', 'label', 'kind'] : ['id', 'label', 'kind', 'family', 'description', 'capabilities', 'constraints', 'defaults', 'imageModes', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native', 'options'];
-        return mcpJson({ profiles: profiles.map(profile => ({ ...Object.fromEntries(fields.filter(key => key in profile).map(key => [key, profile[key]])), ...(profile_id === undefined ? {} : { defaults: { ...profile.defaults, count: defaultGenerationCount } }), prompting: prompting(profile, profile_id !== undefined) })) });
+        if (profile_id === undefined) return mcpJson({ profiles: profiles.map(profile => ({ id: profile.id, label: profile.label, kind: profile.kind, prompting: prompting(profile, false) })) });
+        profiles = profiles.filter(profile => profile.id === profile_id);
+        if (!profiles.length) throw new Error('Choose a ready profile from Models.');
+        review(owner, profile_id);
+        const [profile] = profiles;
+        const infos = profile.options?.loras?.length && profile.capabilities?.lora !== false ? await media.loraInfos(owner) : {};
+        const controls = mcpControls(profile);
+        // Defaults only for adjustable controls: a fixed value is not something to choose.
+        const defaults = Object.fromEntries(Object.entries({ ...profile.defaults, count: defaultGenerationCount }).filter(([key]) => controls[key] || ['frames', 'fps', 'duration'].includes(key)));
+        const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
+          // The same merge Generate validates against when references select this mode.
+          const merged = { ...profile, ...settings };
+          return [mode, { controls: mcpControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
+        }));
+        const { loras, total } = mcpLoras(profile, infos, { query: lora_query });
+        const detail = {
+          ...Object.fromEntries(['id', 'label', 'kind', 'family', 'description', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native'].filter(key => key in profile).map(key => [key, profile[key]])),
+          defaults, controls, ...(modes ? { imageModes: modes } : {}),
+          ...(controls.loras ? { loras, loras_total: total, ...(total > loras.length ? { loras_note: `Showing ${loras.length} of ${total}; narrow with lora_query.` } : {}) } : {}),
+          prompting: prompting(profile, true)
+        };
+        return mcpJson({ profiles: [detail] });
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', 'Queue media and return job IDs at once. Keep saved defaults, count and size unless asked. At most four jobs per call. If this profile’s guide was not yet read, it is returned with the jobs; apply it to later prompts. Never wait, poll or resubmit. Never switches GPUs.', {
+      tool(server, 'Generate', 'Generate Media', 'Queue media and return at once, per job, a job_id, a ref such as "result 3" and a signed watch link. Pass only the profile\u2019s adjustable controls from Models; a fixed control is refused by name. negative_prompt works only where Models lists it (not on guidance-distilled cfg 1 profiles); LoRA names come from Models loras. Keep saved defaults, count and size unless asked. At most four jobs per call. If this profile\u2019s guide was not yet read, it is returned with the jobs; apply it to later prompts. Never wait, poll or resubmit. Never switches GPUs.', {
         profile_id: z.string().min(1), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
@@ -107,28 +141,31 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const reviewed = reviewedGuides.get(guideKey(owner, args.profile_id));
         // An unread guide accompanies the submission instead of costing a refused call and another round trip.
         const unread = reviewed === undefined || Date.now() - reviewed >= 3600000;
-        const submission = await media.queue(owner, args);
+        const submission = await media.queue(owner, args, refs);
         let guide = {};
         if (unread) {
           const profile = (await media.profiles('all', owner)).find(item => item.id === args.profile_id);
           if (profile) guide = { prompting: prompting(profile, true), guide_note: 'This profile’s prompting guide was not read before submission; apply it to later prompts.' };
           review(owner, args.profile_id);
         }
-        return mcpJson({ ...submission, ...guide, message: 'Submitted. If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=1800 and run_in_background=true, then reply immediately. Otherwise reply now. Never poll, wait in the foreground or resubmit.' });
+        return mcpJson({ ...submission, ...guide, message: `Submitted. Give the user each ref with its watch link as a markdown link, e.g. [Watch result 3](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, reply, then wait for the notification; it includes the finished image markdown. Otherwise reply now. Never poll, check tasks, wait in the foreground or resubmit.` });
       });
-      tool(server, 'Status', 'Generation Status', 'Return this account’s job status now, with signed links for finished outputs. Use Result for an inline preview. Wait only when asked, briefly.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }) => {
-        const status = await media.job(owner, job_id, capWait(wait_seconds));
-        return mcpJson({ ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, job_id, index) }] : []) });
+      tool(server, 'Status', 'Generation Status', 'Return this account’s job status now, by job_id or ref, with signed links for finished outputs. Use Result for an inline preview. Only when the user asks; never repeatedly or while a background Result is pending. Wait only when asked, briefly.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
+        const id = resolve(job_id);
+        const status = await media.job(owner, id, capWait(wait_seconds), { signal });
+        const ref = media.refOf(owner, refs, id);
+        return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', 'Show this account’s result: a finished image preview or video link, immediately by default. For automatic completion, call once per job in the background with delivery=notification, wait_seconds=1800 and run_in_background=true; it returns text only. Then call delivery=preview with wait_seconds=0. Foreground waits are capped; never poll.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800) }, ({ job_id, output_index, delivery, wait_seconds }) => media.result(owner, job_id, output_index, capWait(wait_seconds, delivery), delivery), { readOnlyHint: true });
-      tool(server, 'Cancel', 'Cancel Generation', 'Cancel this account’s job when the user asks.', job, async ({ job_id }) => {
-        media.own(owner, job_id);
-        await media.job(owner, job_id);
-        return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(job_id)}/cancel`, {}, owner));
+      tool(server, 'Result', 'Show Result', `Show this account’s result, by job_id or ref: a finished image preview or video link, immediately by default. For automatic completion, call once per job in the background with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then wait for the host's notification without checking the task. The notification is text only and self-sufficient: it carries the signed image markdown and View Original link, so render it without another Result call. Background waits are capped at ${maxResultWaitSeconds} seconds, foreground waits more briefly; a cancelled request ends the wait but never the generation. Never poll.`, { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800).describe(`Seconds to wait for completion; background waits above ${maxResultWaitSeconds} are capped at ${maxResultWaitSeconds}.`) }, ({ job_id, output_index, delivery, wait_seconds }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal }), { readOnlyHint: true });
+      tool(server, 'Cancel', 'Cancel Generation', 'Cancel this account’s job, by job_id or ref, when the user asks.', job, async ({ job_id }) => {
+        const id = resolve(job_id);
+        media.own(owner, id);
+        await media.job(owner, id);
+        return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
       tool(server, 'Upload', 'Upload Reference', 'Upload a user’s PNG, JPEG or WebP image (base64, at most 20 MB) as a reference; pass its id to Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
-      tool(server, 'Reuse', 'Reuse Image', 'Use this account’s finished image as a reference without reattaching it. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
-        const result = await media.download(owner, job_id, output_index);
+      tool(server, 'Reuse', 'Reuse Image', 'Use this account’s finished image, by job_id or ref, as a reference without reattaching it. Hidden media cannot be reused.', output, async ({ job_id, output_index }) => {
+        const result = await media.download(owner, resolve(job_id), output_index);
         if (!['image/png', 'image/jpeg', 'image/webp'].includes(result.mime)) throw new Error('Only images can be reused as references.');
         return mcpJson(await media.upload(owner, result.content.toString('base64'), `reference.${result.mime.split('/')[1]}`));
       });
@@ -152,6 +189,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     return server;
   };
   app.post('/mcp', guard, express.json({ limit: '30mb' }), async (req, res) => {
+    for (const message of [req.body].flat()) if (message?.method === 'notifications/cancelled' && message.params?.requestId !== undefined) {
+      inflight.get(inflightKey(req.mcpActor, message.params.requestId))?.abort();
+    }
     const server = create(req.mcpActor);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.once('close', () => { void transport.close(); void server.close(); });
@@ -167,6 +207,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');
       const claims = media.claims(req.params.token);
+      if (claims.page) {
+        // Account mode reads as the signed owner through MCP's loopback credential; the studio rechecks that account's access.
+        const html = await media.page(claims, accountMode ? internalCredential(claims.owner) : undefined);
+        if (!html) throw new Error('Unavailable.');
+        return res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", 'Content-Type': 'text/html; charset=utf-8' }).send(html);
+      }
       const result = accountMode
         ? await media.signedResult(claims.owner, claims.jobId, claims.index)
         : await media.download(claims.owner, claims.jobId, claims.index);
