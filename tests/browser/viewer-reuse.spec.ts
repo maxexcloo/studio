@@ -170,7 +170,7 @@ test('queued cards show each saved model', async ({ page }) => {
 });
 
 test('a running card names its profile beside Stop and holds still on hover', async ({ page }) => {
-  const items = [{ id: 'running-0', jobId: 'job-0', url: '', filename: '', type: 'image', status: 'pending', prompt: 'Running image', model: 'flux1-schnell.safetensors', settings: { profileId: 'mock-flux-schnell', modelName: 'flux1-schnell.safetensors' }, progress: { step: 2, max: 4 }, createdAt: new Date().toISOString(), width: 512, height: 512 }];
+  const items = [{ id: 'running-0', jobId: 'job-0', url: '', filename: '', type: 'image', status: 'pending', prompt: 'Running image', model: 'flux1-schnell.safetensors', settings: { profileId: 'mock-flux-schnell', modelName: 'flux1-schnell.safetensors' }, progress: { value: 2, max: 4 }, createdAt: new Date().toISOString(), width: 512, height: 512 }];
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.goto('/');
@@ -179,6 +179,7 @@ test('a running card names its profile beside Stop and holds still on hover', as
   const stop = card.getByRole('button', { name: 'Stop', exact: true });
   await expect(label).toHaveText('FLUX.1 Schnell (Demo)');
   await expect(label).toHaveCount(1);
+  await expect(card.locator('.generate-step-count')).toHaveText('2/4');
   await expect(card).toHaveCSS('opacity', '1');
   await expect(card).toHaveCSS('transform', 'none');
   const look = (element: Element) => { const style = getComputedStyle(element); return [style.height, style.borderRadius, style.fontSize, style.fontWeight, style.backgroundColor]; };

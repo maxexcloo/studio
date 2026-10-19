@@ -18,6 +18,7 @@ version opens with a `> ` summary line.
 - **Leaner MCP output:** the Models list returns only ID, label, kind, tier and a one-line summary (prompting guides stay in the profile detail), Generate returns the chosen profile and each job's ID, reference and watch link, and a background Result notification returns only its markdown unless `detail: true` is passed. For the Bento catalogue, a tier-filtered image list drops from 9.5 KB to 0.2 KB and a notification from 2.5 KB to 0.8 KB.
 
 ### Fixed
+- **Demo progress:** Demo Mode jobs report their steps in the studio's progress shape, so running tiles show "Step 1/4" instead of Queued.
 - **Running tile model label:** a running or queued tile names its profile as the model picker does, in a chip styled like Stop in the opposite corner, and it no longer shifts when the pointer is over the tile.
 
 ## [0.21.0] - 2026-10-19

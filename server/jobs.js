@@ -762,7 +762,7 @@ export function runMockJob(id, body) {
   const count = body.kind === "image" ? Math.max(1, Math.min(8, Number(body.count || 1))) : 1;
   let currentStep = 0;
 
-  updateGalleryJob(id, { status: "running", progress: { step: 1, maxSteps: steps, nodeName: "KSampler" } }, { persist: false });
+  updateGalleryJob(id, { status: "running", progress: { value: 1, max: steps, node: "KSampler" } }, { persist: false });
 
   const interval = setInterval(() => {
     if (isCanceled()) {
@@ -773,10 +773,10 @@ export function runMockJob(id, body) {
     }
     currentStep += Math.max(1, Math.ceil(steps / 4));
     if (currentStep < steps) {
-      updateGalleryJob(id, { progress: { step: currentStep, maxSteps: steps, nodeName: "KSampler" } }, { persist: false });
+      updateGalleryJob(id, { progress: { value: currentStep, max: steps, node: "KSampler" } }, { persist: false });
     } else {
       clearInterval(interval);
-      updateGalleryJob(id, { progress: { step: steps, maxSteps: steps, nodeName: "VAEDecode" } }, { persist: false });
+      updateGalleryJob(id, { progress: { value: steps, max: steps, node: "VAEDecode" } }, { persist: false });
 
       setTimeout(async () => {
         if (isCanceled()) {
