@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { ArrowUpRight, Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Globe, Info, LifeBuoy, LockKeyhole, MessageSquarePlus, Plug, Plus, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
+import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Info, LifeBuoy, LockKeyhole, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -23,7 +23,7 @@ import { useStarterPlan } from './StarterModels';
 import { InpaintDemo } from './InpaintDemo';
 import { AdapterLibraryGroup, CivitaiRow, EarlierImagesGroup, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
-import { boardUrl, openFeedback } from './feedback';
+import { openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { AccountSettings } from './AccountSettings';
 import { ModelManifestGroup } from './ModelManifestSettings';
@@ -935,38 +935,11 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </div>
             </Group>
 
-            <section className="feedback-hero">
-              <div className="feedback-hero-copy">
-                <span className="feedback-hero-eyebrow">Feedback</span>
-                <strong>Make HEISS UI better.</strong>
-                <p>Report a bug or suggest an idea on upstream HEISS UI’s public board.</p>
-                <div className="feedback-hero-actions">
-                  <button type="button" className="feedback-hero-post" onClick={() => openFeedback({ from: 'settings' })}>
-                    New post <span><Plus size={14} strokeWidth={2.4} /></span>
-                  </button>
-                  <a className="feedback-hero-link" href={boardUrl} target="_blank" rel="noreferrer">View board <ArrowUpRight size={14} /></a>
-                </div>
-              </div>
-              <a className="feedback-hero-stage" href={boardUrl} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
-                <span className="feedback-hero-sheet" />
-                <span className="feedback-hero-sheet" />
-                <span className="feedback-hero-sheet" />
-                <span className="feedback-hero-sheet" />
-                <span className="feedback-hero-window">
-                  <img src="/feedback-board.webp" alt="" width={1120} height={749} loading="lazy" decoding="async" draggable={false} />
-                </span>
-              </a>
-              <p className="feedback-hero-fine">Posts never include prompts, images or file names.</p>
-            </section>
-
             <HelpGroup copyToClipboard={copyToClipboard} />
 
             <Group title="Links">
               <div className="about-links">
                 <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={15} /><span>Source on GitHub</span><ExternalLink size={12} /></a>
-                <a href={boardUrl} target="_blank" rel="noreferrer"><MessageSquarePlus size={15} /><span>HEISS UI Feedback Board</span><ExternalLink size={12} /></a>
-                <a href={discordUrl} target="_blank" rel="noreferrer"><DiscordIcon size={15} /><span>HEISS UI Discord</span><ExternalLink size={12} /></a>
-                <a href="https://heiss-ui.vercel.app/" target="_blank" rel="noreferrer"><Globe size={15} /><span>HEISS UI Website</span><ExternalLink size={12} /></a>
                 <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer"><Scale size={15} /><span>MIT license</span><ExternalLink size={12} /></a>
                 <a href={`${githubUrl}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer"><ScrollText size={15} /><span>Changelog</span><ExternalLink size={12} /></a>
               </div>

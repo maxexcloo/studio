@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Removed
+- **Upstream links on About:** Settings › About no longer shows the feedback panel or links to upstream's feedback board, Discord and website. Source, licence, changelog and credits stay.
+
 ## [0.20.0] - 2026-10-19
 
 ### Changed
