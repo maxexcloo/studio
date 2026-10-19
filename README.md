@@ -121,7 +121,7 @@ Open `http://localhost:8787`. `/data` retains settings, galleries, histories and
 
 CI calls the Container workflow after application and browser checks pass on `main`; the Release workflow does the same for `v*` tags. The Container workflow builds the image, tests the runtime and scans for fixable high or critical vulnerabilities. Successful builds publish to `ghcr.io/<owner>/<repository>` (from `github.repository`) with SBOM and provenance: `latest` and `sha-<full commit>` from `main`, and `X.Y.Z` and `X.Y` from a release tag, whose GitHub release lists the changelog notes and the image digest. Prefer an immutable `sha-<full commit>` or version tag, or the image digest, for deployment.
 
-For local verification, run `mise run setup`, then `mise run check`. Updatecli previews action, base image and npm dependency updates.
+For local verification, run `mise run setup`, then `mise run check`. Renovate updates actions, base images and npm dependencies; `mise run dependencies:check` previews them.
 
 ### Native MCP
 

@@ -1,6 +1,3 @@
-[vars]
-actionlint_args = '-shellcheck=""'
-
 [env]
 _.path = ["node_modules/.bin"]
 

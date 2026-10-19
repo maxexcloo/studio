@@ -27,7 +27,7 @@ jobs:
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
-          tools: actionlint node python updatecli
+          tools: actionlint node node@24 npm:renovate python
       - name: Check Release Tag
         if: startsWith(github.ref, 'refs/tags/')
         run: node --input-type=module -e "import { validateReleaseTag } from './scripts/release-plan.mjs'; import fs from 'node:fs'; validateReleaseTag(JSON.parse(fs.readFileSync('package.json')).version, process.env.GITHUB_REF)"

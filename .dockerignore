@@ -5,11 +5,11 @@
 .git
 .github
 .mise.toml
-.updatecli.d
 data
 dist
 node_modules
 outputs
 playwright-report
+renovate.json5
 test-results
 tests/browser
