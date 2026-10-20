@@ -309,7 +309,7 @@ Everything else (the output folder, other devices, HTTPS, the Hugging Face token
 
 [TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems. A failed generation links straight to its section.
 
-- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. New files show once the model library sync reaches the worker and ComfyUI lists them.
+- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. New files show once ComfyUI lists them.
 - **Asking for help?** **Settings › Maintenance › Copy Diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
 
 ## Feedback and community
