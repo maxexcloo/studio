@@ -11,6 +11,24 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **One References button:** a model that reads several references (FLUX.3 [klein] takes ten) shows a single References button with the picked thumbnails and n/max, instead of a control per slot. Its chooser picks several at once, numbers them in order and has a Selected n/max tab to review, reorder and remove them; the inpaint brush and Edit | Reference sit beside it.
+- **Selected n/max for LoRAs:** the LoRA library adds a Selected view beside This Model and All Models, and drops its row animations.
+- **Several values per gallery filter:** Models, LoRAs, Size and Aspect Ratio each take several values (any of them matches; every filter together), with a tick per value, a count on the trigger and its own Clear. The gallery API takes repeated `model`, `lora`, `size` and `aspect` parameters.
+- **Animate from the select bars:** selected photos animate from the desktop and phone select bars as well as the right-click menu.
+
+### Removed
+- **Hidden:** the private vault, its password, passkeys, lock screen, settings, routes and Move to Hidden are gone. On the first start, Studio backs up its data to `backups/hidden-removal-<time>/` in the data folder, moves any vault there untouched (it needs the owner's old password to open), returns hidden-flagged records to their owner's gallery and clears the markers that kept them out of it. Nothing is deleted; see [Configuration](docs/guides/CONFIGURATION.md).
+
+### Changed
+- **Desktop viewer:** Info sits alone in the top right and the open Details panel has its own Close; the bar reads Copy · Download | Animate · Recreate · Reference · Upscale | Star · Delete, then Close.
+- **Desktop gallery switch** reads Images | Videos in words.
+- **Right-click menu:** full-width rows with muted icons, hairlines between the intent groups, an "n Selected" heading for several items and an inset focus ring.
+- **Phone Create sheet:** Prompt and Negative, then Image/Video with Model, References with LoRAs, and Size, count, Advanced and Generate.
+- **Phone More sheet:** Select, Library, Settings, Account; the status light top left is a small Studio pill.
+- **Steppers:** every number stepper has 44 px parts on touch screens; the phone's count shows an icon so its row fits.
+- **Title Case:** labels, headings, tooltips and accessible names read in Title Case with &.
+
 ## [0.31.0] - 2026-10-20
 
 > A thumb-first phone dock, one layer at a time, viewer actions by intent with Recreate and Reuse, Retry for failed items, and chat prompts written by Studio
