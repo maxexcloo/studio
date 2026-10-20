@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-20
+
 > A flat phone Create sheet with a sticky Generate, one phone top bar with a floating Create, flat lists for every step and for Settings, one chooser for References, LoRAs and Models with drag to reorder, a Sign Out that works, and the gallery staying put when the viewer closes
 
 ### Added
@@ -1474,7 +1476,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.33.1...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/maxexcloo/studio/compare/v0.33.1...v0.34.0
 [0.33.1]: https://github.com/maxexcloo/studio/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/maxexcloo/studio/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/maxexcloo/studio/compare/v0.31.0...v0.32.0
