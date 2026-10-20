@@ -87,7 +87,48 @@ test("the catalogue reports whether the local video worker answered, keeping Gro
     assert.ok(models.profiles.some((profile) => profile.id === "custom:grok-video"));
   } finally {
     video.setDown(false);
+    await api("/api/comfy/status");
   }
+});
+
+test("a video worker that did not answer is not asked again on every catalogue load or run until a status check reaches it", { timeout: 10000 }, async () => {
+  const h3 = (await api("/api/models")).body.profiles.find((profile) => profile.family === "minimax_h3");
+  const probes = () => video.requests.filter((entry) => entry.pathname === "/object_info").length;
+  try {
+    video.setDown(true);
+    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
+    const before = probes();
+    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
+    assert.deepEqual((await api("/api/models?cached=1")).body.backends, { video: { available: false } });
+    assert.equal((await api("/api/generate", generation(h3))).status, 400);
+    assert.equal(probes(), before);
+    video.setDown(false);
+    // Still remembered until something reaches the worker.
+    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
+    assert.equal((await api("/api/comfy/status")).body.backends.video.connected, true);
+    const models = (await api("/api/models")).body;
+    assert.deepEqual(models.backends, { video: { available: true } });
+    assert.ok(models.profiles.some((profile) => profile.family === "minimax_h3"));
+    assert.ok(probes() > before);
+  } finally {
+    video.setDown(false);
+    await api("/api/comfy/status");
+  }
+});
+
+test("a model type choice shows in the cached catalogue straight away", async () => {
+  const file = () => api("/api/models?cached=1").then(({ body }) => body.modelFiles.find((item) => item.name === "sd_xl_base_1.0.safetensors"));
+  const original = (await file()).choice;
+  const choice = (await api("/api/models?cached=1")).body.modelTypeChoices.checkpoint.map((item) => item.value).find((value) => value && value !== original);
+  assert.ok(choice);
+  const put = (type) => fetch(base + "/api/models/types", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: "checkpoint", name: "sd_xl_base_1.0.safetensors", type }) });
+  try {
+    assert.equal((await put(choice)).status, 200);
+    assert.equal((await file()).choice, choice);
+  } finally {
+    await put("");
+  }
+  assert.equal((await file()).choice, original);
 });
 
 test("HTTP catalogue and generate select the video node schema, keep Grok primary and cancel only target", { timeout: 10000 }, async () => {
@@ -147,6 +188,7 @@ test("offline secondary hides H3 and refuses stale H3 requests without primary s
   assert.equal(response.status, 400);
   assert.equal(primary.prompts.length, count);
   video.setDown(false);
+  await api("/api/comfy/status");
 });
 
 

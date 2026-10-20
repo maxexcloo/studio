@@ -139,6 +139,14 @@ app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 const execFileAsync = promisify(execFile);
 let comfyCache = { info: null, stats: null, fetchedAt: 0 };
 let videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+// A stopped video worker fails slowly (a name that no longer resolves, a refused
+// connection), so its failure is remembered briefly rather than retried on every
+// catalogue load and run. A status check that reaches it, or a new address, clears it.
+const videoUnreachableForMs = 30_000;
+let videoUnreachableUntil = 0;
+// Model detection for each backend's latest ComfyUI answer, reused until ComfyUI is asked again.
+const inferredModels = new Map();
+const backendUnreachable = (error) => (error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error));
 
 async function loadComfyContext({ force = false } = {}) {
   const cached = currentComfyBackend() === "video" ? videoComfyCache : comfyCache;
@@ -523,6 +531,7 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
       try {
         const stats = await comfy("/system_stats", { timeout: 1500 });
         const answer = { busy: false, connected: true, device: stats?.devices?.[0]?.name || "", url, version: stats?.system?.comfyui_version || "" };
+        if (backend === "video") videoUnreachableUntil = 0;
         backendAnswers.set(backend, answer);
         return answer;
       } catch (error) {
@@ -670,11 +679,17 @@ function comfyDownMessage(detail = "") {
 }
 
 async function backendModels(backend, force = false) {
+  if (backend === "video" && Date.now() < videoUnreachableUntil) throw new Error("The video worker did not answer just now.");
   return withComfyBackend(backend, async () => {
     try {
       const context = await loadComfyContext({ force });
-      return { ...context, models: inferModels(context.info, context.stats) };
+      const known = inferredModels.get(backend);
+      if (known?.fetchedAt === context.fetchedAt) return { ...context, models: known.models };
+      const models = inferModels(context.info, context.stats);
+      inferredModels.set(backend, { fetchedAt: context.fetchedAt, models });
+      return { ...context, models };
     } catch (error) {
+      if (backend === "video" && backendUnreachable(error)) videoUnreachableUntil = Date.now() + videoUnreachableForMs;
       if (backend === "video") videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
       else comfyCache = { info: null, stats: null, fetchedAt: 0 };
       throw error;
@@ -722,6 +737,7 @@ app.put("/api/models/types", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     setModelChoice(req.body?.source, req.body?.name, req.body?.type);
+    inferredModels.clear();
     const { info, stats } = await loadComfyContext();
     res.json(inferModels(info, stats));
   } catch (error) {
@@ -1209,6 +1225,7 @@ app.post("/api/comfy-url", async (req, res) => {
   if (backend === "video" && req.body?.save && !String(req.body?.url || "").trim()) {
     saveDeploymentSetting(key, "");
     videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+    videoUnreachableUntil = 0;
     res.json({ ok: true, url: "", reachable: false, saved: true, current: "" });
     return;
   }
@@ -1231,6 +1248,7 @@ app.post("/api/comfy-url", async (req, res) => {
       if (backend === "video") {
         saveDeploymentSetting(key, candidate);
         videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
+        videoUnreachableUntil = 0;
       } else {
         setComfyUrl(candidate);
         comfyCache = { info: null, stats: null, fetchedAt: 0 };
