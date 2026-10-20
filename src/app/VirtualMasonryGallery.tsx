@@ -277,9 +277,12 @@ export function VirtualMasonryGallery({
   // it) into view behind it, so closing the viewer lands where you are. Only a
   // change of item scrolls, and only when its tile is out of sight; new results
   // or relayouts while the viewer stays on one item leave the scroll alone.
+  // The item the viewer opened on was tapped where it is, maybe half under a bar: the gallery stays
+  // exactly where it was, so closing the viewer at once lands on the same scroll position.
   const followed = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (followed.current === followItem) return;
+    if (!followed.current && followItem) { followed.current = followItem; return; }
     const container = containerRef.current;
     if (!followItem || !scrollElement || !container) { followed.current = followItem; return; }
     const entry = layout.entries.find((item) => item.kind === "tile" && item.item.id === followItem)
