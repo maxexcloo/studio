@@ -77,3 +77,11 @@ test("a GGUF model type ComfyUI-GGUF doesn't know says so plainly", () => {
   assert.equal(failure.title, "ComfyUI-GGUF can't load this model yet");
   assert.match(failure.hint, /safetensors/);
 });
+
+test("a Radiance LoRA refusal shows its own sentence, not a generic failure", () => {
+  const message = "RadianceError: run failed\nloras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)";
+  const failure = describeFailure({ message, nodeType: "RadianceSampler" });
+  assert.equal(failure.title, "A LoRA doesn't fit this model");
+  assert.equal(failure.summary, "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)");
+  assert.equal(failure.help, "a-lora-doesnt-fit-this-model");
+});

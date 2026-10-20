@@ -54,6 +54,9 @@ export function ListItem({ label, lead, children, className, htmlFor }: { label:
   );
 }
 
+/** A switch row whose whole line toggles (UI-PATTERNS › Lists): the same row as Settings' SwitchRow. */
+export { SwitchRow as ListSwitch } from './SettingsControls';
+
 type SelectOption = { value: string; label: string; detail?: string };
 
 /**

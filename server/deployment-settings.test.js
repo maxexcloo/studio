@@ -6,20 +6,23 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-deployment-settings-"));
 const envFile = path.join(temporary, ".env");
-fs.writeFileSync(envFile, "STUDIO_ENABLE_TESSERA=0\n");
+fs.writeFileSync(envFile, "STUDIO_ENABLE_LORAS=0\n");
 process.env.HEISS_ENV_FILE = envFile;
 process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "deployment-profile";
-delete process.env.STUDIO_ENABLE_TESSERA;
+delete process.env.STUDIO_ENABLE_LORAS;
 delete process.env.STUDIO_ENABLE_GROK;
 const settings = await import("./deployment-settings.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 test("values report their source and only deployment values are locked", () => {
   assert.deepEqual(settings.settingSource("STUDIO_DEFAULT_IMAGE_PROFILE"), { source: "deployment", locked: true });
-  assert.deepEqual(settings.settingSource("STUDIO_ENABLE_TESSERA"), { source: "studio", locked: false });
+  assert.deepEqual(settings.settingSource("STUDIO_ENABLE_LORAS"), { source: "studio", locked: false });
   assert.deepEqual(settings.settingSource("STUDIO_ENABLE_GROK"), { source: "default", locked: false });
-  const tessera = settings.describeFlag(settings.catalogueFlags.find((item) => item.key === "STUDIO_ENABLE_TESSERA"));
-  assert.equal(tessera.value, false);
+  const loras = settings.describeFlag(settings.catalogueFlags.find((item) => item.key === "STUDIO_ENABLE_LORAS"));
+  assert.equal(loras.value, false);
+  // Settings no longer switches built-in profiles or Tessera; Grok reads as Cloud Models.
+  assert.equal(settings.catalogueFlags.some((item) => ["STUDIO_ENABLE_BUILTIN_PROFILES", "STUDIO_ENABLE_TESSERA"].includes(item.key)), false);
+  assert.equal(settings.catalogueFlags.find((item) => item.key === "STUDIO_ENABLE_GROK").label, "Cloud Models");
   assert.equal(settings.catalogueFlags.find((item) => item.key === "STUDIO_ENABLE_LORAS").applies, "restart");
 });
 

@@ -19,7 +19,8 @@ const publicAccountPaths = new Set([
 const ordinaryRoutes = [
   ["GET", /^\/api\/(ping|health|models|estimate|sizes|workflows|stats|paths)$/],
   ["GET", /^\/api\/comfy\/status$/],
-  ["GET", /^\/api\/accounts\/mcp-token$/],
+  ["GET", /^\/api\/accounts\/(mcp-token|me)$/],
+  ["PATCH", /^\/api\/accounts\/me$/],
   ["POST", /^\/api\/accounts\/mcp-token(\/revoke)?$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],

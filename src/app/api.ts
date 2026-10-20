@@ -265,6 +265,8 @@ export function loadPrefs(): Preferences {
     // Carry an explicit Original choice from the earlier size control into the switch.
     if (parsed.autoResizeInputs === undefined && parsed.referenceMaxEdge === 0) parsed.autoResizeInputs = false;
     delete parsed.referenceMaxEdge;
+    // Inpainting is the Studio's catalogue switch now; the per-browser switch that could hide it is gone.
+    delete parsed.inpainting;
     return { ...defaultPrefs, ...parsed };
   } catch {
     return { ...defaultPrefs };

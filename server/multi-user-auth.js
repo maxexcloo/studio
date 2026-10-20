@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { accountAccessForId, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf, endDeviceSession } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
@@ -241,6 +241,41 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   });
 
+  // Settings › Account: the signed-in account, what it may change, and its MCP token in one request.
+  get("/api/accounts/me", (req, res) => {
+    const access = accountForRequest(req);
+    const account = access && ownAccount(access.userId);
+    if (!account) return res.status(401).json({ ok: false, error: "Sign in to see your account." });
+    res.setHeader("Cache-Control", "no-store");
+    const endpointBase = process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+    res.json({ ok: true, account, mcp: { endpoint: `${endpointBase}/mcp`, ...accountMcpTokenStatus(account.id) } });
+  });
+
+  patch("/api/accounts/me", async (req, res) => {
+    const access = accountForRequest(req);
+    if (!access || access.credential === "mcp-token") return res.status(401).json({ ok: false, error: "Sign in to change your account." });
+    const body = req.body || {};
+    const changes = { displayName: body.displayName, username: body.username, currentPassword: body.currentPassword, newPassword: body.newPassword };
+    try {
+      if (typeof body.username !== "string" && !body.newPassword) return res.json({ ok: true, account: await updateOwnAccount(access.userId, { displayName: body.displayName }) });
+      validateOwnAccountChange(access.userId, changes);
+      // Checking the current password is a guess like a sign-in, so it shares the limiter.
+      const lane = `${clientOf(req).address}|me:${access.userId}`;
+      const result = await limiter.attempt(lane, false, async () => {
+        try { return await updateOwnAccount(access.userId, changes, { keepSessionToken: cookieToken(req) }); }
+        catch (error) { if (error.message === wrongCurrentPassword) return null; throw error; }
+      });
+      if (result.reason === "busy" || result.reason === "locked") {
+        res.status(429).setHeader("Retry-After", String(Math.max(1, Math.ceil((result.retryAfterMs || 1000) / 1000)))).json({ ok: false, error: result.reason === "locked" ? `Too many attempts. Try again in ${waitWords(result.retryAfterMs)}.` : "Wait a moment, then try again." });
+        return;
+      }
+      if (!result.ok || !result.value) return res.status(400).json({ ok: false, error: wrongCurrentPassword });
+      res.json({ ok: true, account: result.value });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
   get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     const profiles = await availableProfiles();
@@ -293,8 +328,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       let account;
       if (typeof body.accessProfileId === "string") account = assignAccessProfile(req.params.id, body.accessProfileId);
       else if (typeof body.disabled === "boolean") account = setAccountDisabled(req.params.id, body.disabled);
-      else if (typeof body.password === "string") account = await setAccountPassword(req.params.id, body.password);
-      else return res.status(400).json({ ok: false, error: "Choose an access profile, account status or new password." });
+      else return res.status(400).json({ ok: false, error: "Choose an access profile or account status." });
       res.json({ ok: true, account });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
