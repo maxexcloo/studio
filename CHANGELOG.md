@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Chat asks for 2K only when the user does, and imported FLUX.3 workflows can draw it
+
+### Fixed
+- **2K for imported workflows:** imported workflows take their model family's native 2K and 4K support, as they already took its size step, so `size: "2k"` works for the Bento FLUX.3 profiles.
+- **Size only on request:** MCP's instructions say to pass `size` only when the user asks for 2K or 4K; a chat model had added it to an ordinary request.
+
 ## [0.30.0] - 2026-10-20
 
 > Fast profiles by default in chat, several images in one call, prompting guides once per conversation and Result links with an All Results page

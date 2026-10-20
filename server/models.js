@@ -163,16 +163,21 @@ export function buildProfile({ id, kind, label, displayName, description, model,
  * off-step size is silently cut by ComfyUI and can come out mangled.
  */
 export function workflowFamilyStep(workflow) {
-  const own = families[workflow.family]?.sizeStep;
+  return workflowFamilyValue(workflow, "sizeStep") || 0;
+}
+
+/** A family catalogue value for an imported workflow: its declared family's, else its model file's family's. */
+export function workflowFamilyValue(workflow, key) {
+  const own = families[workflow.family]?.[key];
   if (own) return own;
   for (const node of Object.values(workflow.graph || {})) {
-    for (const [key, source] of [["unet_name", "unet"], ["ckpt_name", "checkpoint"]]) {
-      const name = node?.inputs?.[key];
+    for (const [input, source] of [["unet_name", "unet"], ["ckpt_name", "checkpoint"]]) {
+      const name = node?.inputs?.[input];
       if (typeof name !== "string" || !name) continue;
-      try { const step = families[classifyModel(source, name)?.family]?.sizeStep; if (step) return step; } catch { /* unknown file: the node's own step stands */ }
+      try { const value = families[classifyModel(source, name)?.family]?.[key]; if (value) return value; } catch { /* unknown file: no family value */ }
     }
   }
-  return 0;
+  return undefined;
 }
 
 /** A width or height range on the stricter of the node's and the model family's steps. */
@@ -269,6 +274,8 @@ export function inferModels(info, stats = {}) {
       },
       aspects: customAspectSet({ width: detectedDefault(widthRange, Number(defaults.width || 1024)), height: detectedDefault(heightRange, Number(defaults.height || 1024)) }, workflow.aspectRatios, { width: widthRange, height: heightRange }),
       aspectDefault: families[String(workflow.family || "").replaceAll("-", "_")]?.aspectDefault || "",
+      // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
+      native: workflowFamilyValue(workflow, "native"),
       options: { textEncoders: clips, vaes, clipTypes, weightDtypes, samplers, schedulers, resolutions, loras: workflow.capabilities.lora ? loras : [] },
       constraints: { prompt: textMeta, negative: textMeta, width: widthRange, height: heightRange, count: countRange, frames: frameRange, fps: fpsRange, duration: durationRange, ...samplerRange },
       imageModes: Object.fromEntries(Object.entries(workflow.imageModes || {}).map(([name, mode]) => [name, {
