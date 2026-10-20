@@ -152,9 +152,11 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 
 /**
  * What can be done to several selected items, in the same order and with the
- * same names as for one: Share on a phone that can (Download elsewhere, a zip
- * when several), Animate for the photos among them, Retry for failed ones,
- * Star and Delete. The select bars and the right-click menu offer the same.
+ * same one-word names as for one: Share on a phone that can (Download elsewhere,
+ * a zip when several), Animate for the photos among them, Retry for failed
+ * ones, Star and Delete. Their tips and accessible names are bulk wording
+ * ("Animate Selected"), never one item's copy. The select bars and the
+ * right-click menu offer the same.
  */
 export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, phone = false): ItemAction[] {
   const ready = items.filter((item) => item.status === 'done' && item.url);
@@ -164,12 +166,12 @@ export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandle
   // Without a ready first-frame model the review says so, rather than the option vanishing.
   const photos = items.filter(canAnimatePhoto);
   const actions: (ItemAction | false)[] = [
-    phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
-    !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? `Download ${ready.length} as a Zip` : 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
-    { id: 'animate', group: 'make', label: 'Animate', tip: photos.length > 1 ? `Animate ${photos.length} Images` : 'Make a Video From This Image', Icon: Clapperboard, disabled: !photos.length, run: () => handlers.animateItems(photos) },
-    failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: failed.length > 1 ? `Retry ${failed.length} Failed` : 'Retry', Icon: RotateCw, run: () => handlers.retryItems(failed) },
-    { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
-    { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
+    phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
+    !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Selected', Icon: Clapperboard, disabled: !photos.length, run: () => handlers.animateItems(photos) },
+    failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
+    { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
+    { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
   ];
   return actions.filter((action): action is ItemAction => Boolean(action));
 }

@@ -7,7 +7,7 @@ import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -178,8 +178,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         <header className="phone-bar is-selecting">
           <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
           <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span></div>
-          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}>Failed</button> : null}
-          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}>{selection.allSelected ? 'None' : 'All'}</button>
+          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={15} aria-hidden="true" />Failed</button> : null}
+          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={15} aria-hidden="true" />{selection.allSelected ? 'None' : 'All'}</button>
         </header>
       ) : null}
       {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
@@ -212,7 +212,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           {bulkActions.map((action, index) => (
             <React.Fragment key={action.id}>
               {startsGroup(bulkActions, index) ? <i className="viewer-phone-divider" aria-hidden="true" /> : null}
-              <button type="button" className={cn(action.danger && 'is-danger')} disabled={action.disabled} onClick={action.run}>
+              <button type="button" className={cn(action.danger && 'is-danger')} aria-label={action.tip || action.label} disabled={action.disabled} onClick={action.run}>
                 <action.Icon size={20} /><span>{action.label}</span>
               </button>
             </React.Fragment>
