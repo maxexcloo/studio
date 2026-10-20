@@ -77,12 +77,12 @@ To cut a release, from an up-to-date `main` with the notes written under **Unrel
 Name what the release is about in a few words. With one big change, name it; with several, name the theme ("Smoother model setup and calmer errors"); with only small ones, say so ("Smaller fixes across the studio").
 
 ```bash
-npm run release -- minor --dry-run   # checks everything, changes nothing
+npm run release -- minor --dry-run   # checks the release, changes nothing
 npm run release -- minor             # bump, date the changelog, commit "Release vX.Y.Z", tag
 git push --atomic origin main vX.Y.Z # publishes the image and the GitHub release
 ```
 
-`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, runs the tests and the build, and moves the **Unreleased** notes into the new version. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/studio:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
+`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, the lockfile and the previous tag match `package.json`, and the **Unreleased** notes open with a `> ` summary line, then moves those notes into the new version and commits and tags it. It runs no test suites; run `mise run check` while working. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the full CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/studio:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
 
 Between releases a source checkout shows how far it is past its tag in **Settings › About**, for example `v0.2.0 + 3`.
 
@@ -94,7 +94,7 @@ Between releases a source checkout shows how far it is past its tag in **Setting
 
 Keep `origin` pointed at `maxexcloo/studio` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's website in `docs/`, desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
 
-Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, an unused numeric tag, Unreleased notes, project checks, build and desktop/phone interactions without fetching, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
+Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, the lockfile and previous tag, an unused numeric tag and the Unreleased notes and their summary line, without fetching, running the test suites, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 
 Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions and the container smoke/security checks for that commit. The image is pushed as an untagged candidate, verified, and only then given its version tags.
 

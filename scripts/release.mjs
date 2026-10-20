@@ -6,17 +6,18 @@
 //   npm run release -- minor --dry-run
 //   npm run release -- minor --push   # also push main and the tag (publishes the GitHub release)
 //
-// It checks that main is clean and in sync with origin, that CHANGELOG.md has
-// notes under Unreleased, and that tests and the build pass. Then it bumps
-// package.json and the lockfile, dates the changelog section, commits
-// "Release vX.Y.Z" and makes an annotated tag with the notes. Pushing the tag
-// runs .github/workflows/release.yml, which publishes the container image and
-// the GitHub release.
+// It checks that main is clean and in sync with origin, that the version and
+// tags agree, and that CHANGELOG.md has notes under Unreleased opened by a `> `
+// summary line. Then it bumps package.json and the lockfile, dates the
+// changelog section, commits "Release vX.Y.Z" and makes an annotated tag with
+// the notes. It runs no test suites: pushing the tag runs
+// .github/workflows/release.yml, which runs the full checks before it publishes
+// the container image and the GitHub release.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changelogPath, cutRelease, section } from "./changelog.mjs";
+import { changelogPath, cutRelease, section, summaryOf } from "./changelog.mjs";
 import { releaseChanges } from './release-plan.mjs';
 import { releaseIdentity } from '../server/release-identity.js';
 
@@ -33,6 +34,8 @@ const git = (...gitArgs) => run("git", gitArgs, { quiet: true }).trim();
 const fail = (message) => { console.error(`\n✗ ${message}\n`); process.exit(1); };
 
 const current = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+const locked = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
+if (locked.version !== current || locked.packages?.[""]?.version !== current) fail(`package-lock.json does not match package.json ${current}. Run npm install first.`);
 const [major, minor, patch] = current.split(".").map(Number);
 
 function nextVersion() {
@@ -61,6 +64,8 @@ if (releaseChanges(git("status", "--porcelain")).length) fail("The working tree 
 if (git("tag", "--list", tag)) fail(`The tag ${tag} already exists.`);
 if (!dryRun) run("git", ["fetch", "--quiet", "origin", "main", "--tags"]);
 if (git("rev-list", "--count", "HEAD..origin/main") !== "0") fail("origin/main has commits this checkout lacks. Pull first.");
+if (!git("tag", "--list", `v${current}`)) fail(`package.json is at ${current}, but the tag v${current} does not exist.`);
+if (git("rev-list", "--count", `v${current}..HEAD`) === "0") fail(`main has nothing new since v${current}.`);
 
 const repository = /github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git('remote', 'get-url', 'origin'))?.[1];
 if (repository !== releaseIdentity.repository) fail('origin does not match the configured fork release repository.');
@@ -69,13 +74,9 @@ if (dryRun && push) fail('--dry-run and --push cannot be combined.');
 const changelog = fs.readFileSync(changelogPath, "utf8");
 const notes = section(changelog, "Unreleased");
 if (!notes) fail("CHANGELOG.md has nothing under Unreleased. Write the release notes first.");
+if (!summaryOf(notes)) fail("The Unreleased notes must open with a `> ` summary line.");
 const today = new Date().toISOString().slice(0, 10);
 const nextChangelog = cutRelease(changelog, version, today);
-
-console.log("\nRunning the tests and the build…");
-run("mise", ["run", "check"], { stdio: "inherit" });
-run("mise", ["run", "build"], { stdio: "inherit" });
-run(npm, ["run", "test:browser", "--", "--workers=2"], { stdio: "inherit" });
 
 if (dryRun) {
   console.log(`\nWould release ${tag} with these notes:\n\n${notes}\n`);
