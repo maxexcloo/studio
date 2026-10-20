@@ -319,8 +319,9 @@ test('grouping uses the same glass shell and inset action states as Search and S
   await select.click();
   await page.mouse.move(0, 500);
   await page.waitForTimeout(400);
-  const active = await grouping.evaluate(n => getComputedStyle(n).backgroundColor);
-  expect(await select.evaluate(n => getComputedStyle(n).backgroundColor)).toBe(active);
+  // Grouping on is a pressed button; "N Selected" is plain text beside its X.
+  expect(await grouping.evaluate(n => getComputedStyle(n).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  expect(await select.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   expect(await shell.evaluate(n => getComputedStyle(n).backgroundColor)).toBe(await toolbar.locator('.gallery-management').evaluate(n => getComputedStyle(n).backgroundColor));
   await toolbar.screenshot({ path: testInfo.outputPath('desktop-selected.png') });
   await page.keyboard.press('Tab');
@@ -385,6 +386,20 @@ test('phone search and filters retain inset neutral actions without changing hea
   await page.screenshot({ path: testInfo.outputPath('phone-selected.png') });
 });
 
+
+test('the search’s clear X is a round plain icon button', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The full studio’s search field.');
+  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+  await page.goto('/');
+  await page.locator('.gallery-search-trigger').click();
+  await page.keyboard.type('abc');
+  const close = page.getByRole('button', { name: 'Clear search', exact: true });
+  await close.hover();
+  const box = await close.boundingBox();
+  expect(Math.abs(box!.width - box!.height)).toBeLessThan(1);
+  await page.mouse.move(0, 500);
+  expect(await close.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+});
 
 test('search keeps a neutral shell without a selected input highlight', async ({ page }, testInfo) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
@@ -471,6 +486,12 @@ test('selection dims only unselected media and keeps the right-hand action order
   await tiles.first().click();
   await expect.poll(() => opacity(tiles.first())).toBe(1);
   expect(await opacity(tiles.nth(1))).toBe(.65);
+  // "1 Selected" is plain text: no fill, outline or ring once the pointer moves off, even after a click focused it.
+  const count = toolbar.getByRole('button', { name: 'Stop Selecting', exact: true });
+  await expect(count).toHaveText('1 Selected');
+  await count.focus();
+  await page.mouse.move(0, 500);
+  expect(await count.evaluate(n => { const s = getComputedStyle(n); return [s.backgroundColor, s.boxShadow]; })).toEqual(['rgba(0, 0, 0, 0)', 'none']);
   await toolbar.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
   await expect.poll(() => opacity(tiles.nth(1))).toBe(1);
 });

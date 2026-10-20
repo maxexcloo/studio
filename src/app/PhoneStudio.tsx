@@ -138,7 +138,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {selecting ? (
         <header className="phone-bar is-selecting">
           <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
-          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select Items'}</span></div>
+          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span></div>
           <button type="button" className="phone-pill" aria-label={selection.allSelected ? "Deselect All" : "Select All Loaded"} onClick={() => { haptic('tap'); selection.toggleAll(); }}>
             {selection.allSelected ? 'None' : 'All'}
             <HapticTarget />

@@ -116,8 +116,9 @@
 .gallery-toolbar .gallery-select-toggle[aria-expanded="true"] > span,
 .gallery-filter-anchor.is-expanded .gallery-filter-label { display: inline; }
 
-.gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
 .gallery-toolbar .gallery-action-shell > .zen-control-button.is-on { background: var(--selected); color: hsl(var(--foreground)); }
+/* "N Selected" reads as plain text beside its close X, not a pressed pill; it still hovers like any toolbar button. */
+.gallery-toolbar .gallery-select-toggle[aria-expanded="true"]:not(:hover) { background: transparent; }
 .gallery-action-shell { display: contents; }
 .gallery-toolbar-actions > .gallery-action-shell { display: inline-flex; flex: none; align-items: center; justify-content: center; }
 .gallery-toolbar .gallery-action-shell > .zen-control-button { position: static; inset: auto; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); margin: 0; padding: 0; border: 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
@@ -138,7 +139,8 @@
 .gallery-search input { display: block; width: 100%; min-width: 0; height: var(--control-h); border: 0; padding: 0 4px; background: transparent; color: inherit; font: inherit; font-size: 13px; outline: none; }
 .gallery-search:focus-within { border-color: var(--surface-border); }
 .gallery-search input:focus-visible { outline: none; }
-.gallery-query-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
+/* A round icon button like the toolbar's others, not a tall oval on hover. */
+.gallery-query-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .gallery-search-trigger { min-width: var(--control-h); }
 .gallery-search-clear,
 .gallery-search-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--dock-h); height: var(--dock-h); color: hsl(var(--foreground)); cursor: pointer; }
@@ -147,6 +149,8 @@
 .phone-searchbar button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
 .gallery-search-tools button:focus-visible,
 .phone-searchbar button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-toolbar button:focus:not(:focus-visible),
+.phone-searchbar button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
 .gallery-filter-anchor { position: relative; display: flex; flex: none; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
 .gallery-filter-trigger { font-size: 12px; }
 .gallery-filter-count { font-size: 10px; }
