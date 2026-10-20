@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, chooseRemoteVideo, familyMatches, findProfile, nameWords, profileFromRequest, withinFamily, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { asksForCloud, chooseProfile, familyMatches, isCloudProfile, localUnlessAsked, findProfile, nameWords, profileFromRequest, withinFamily, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -62,17 +62,18 @@ test('animating prefers a fast first-frame profile unless a tier is given', () =
   assert.equal(chooseProfile(profiles.filter(profile => !takesFirstFrame(profile)), { kind: 'video', references: 1, firstFrame: true }).id, 'ref-fast');
 });
 
-test('the remote video fallback uses only cloud profiles that fit, preferring the tier and then Standard', () => {
-  const slot = { id: 'reference', kind: 'image', label: 'Reference Image', required: false };
-  const local = { id: 'local', kind: 'video', family: 'minimax_h3', label: 'H3 · Fast', mediaInputs: [{ ...slot, label: 'Optional First Frame' }] };
-  const cloud = { id: 'cloud', kind: 'video', family: 'grok', label: 'Grok Video · Cloud', mediaInputs: [slot], imageModes: { reference: { capabilities: { startImage: true } } } };
-  const fast = { id: 'cloud-fast', kind: 'video', family: 'grok', label: 'Grok Video · Fast · Cloud', mediaInputs: [] };
-  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'fast' }).id, 'cloud-fast');
-  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'quality' }).id, 'cloud');
-  // Animating needs an image input that starts the video.
-  assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'fast', references: 1, firstFrame: true }).id, 'cloud');
-  assert.equal(chooseRemoteVideo([local, fast], { references: 1, firstFrame: true }), null);
-  assert.equal(chooseRemoteVideo([local], {}), null);
+test('cloud profiles join only when the words ask for Grok or the cloud', () => {
+  const local = { id: 'local', kind: 'video', family: 'minimax_h3', label: 'H3 · Fast' };
+  const grok = { id: 'grok-video', kind: 'video', family: 'grok', label: 'Grok Video · Cloud' };
+  assert.equal(isCloudProfile(grok), true);
+  assert.equal(isCloudProfile(local), false);
+  assert.deepEqual(localUnlessAsked([local, grok], { request: 'a wave' }).map(profile => profile.id), ['local']);
+  // "cloud" as scenery stays local; as a request for the cloud it allows it.
+  assert.equal(asksForCloud('a cloud over the hills'), false);
+  for (const request of ['a wave, with grok', 'make it in the cloud', 'use a cloud model']) assert.equal(asksForCloud(request), true, request);
+  assert.deepEqual(localUnlessAsked([local, grok], { request: 'a wave on Grok' }).map(profile => profile.id), ['local', 'grok-video']);
+  assert.deepEqual(localUnlessAsked([local, grok], { name: 'grok-video' }).map(profile => profile.id), ['local', 'grok-video']);
+  assert.deepEqual(localUnlessAsked([local, grok], { name: 'h3 fast' }).map(profile => profile.id), ['local']);
 });
 
 test('without a tier the order is Fast, Super Fast, Standard, Quality', () => {
@@ -105,8 +106,7 @@ test('a family name such as "flux 3" picks its fastest profile, and an exact id 
 // The Bento image catalogue as deployed (ai/config/studio/workflows): id, label and family.
 const bento = [
   ['custom:bento-image-boogu-base', 'Boogu Image Base · Quality · 50 Steps · Text Only · FP8 Scaled', 'boogu'],
-  ['custom:bento-image-boogu-edit-turbo-single-reference', 'Boogu Image Edit Turbo · Fast · 4 Steps · Single-Reference Edit · INT8 ConvRot · 1K Hotfix', 'boogu'],
-  ['custom:bento-image-boogu-edit-turbo', 'Boogu Image Edit Turbo · Fast · 4 Steps · Three-Reference Edit · INT8 ConvRot · 1K Hotfix (~30s)', 'boogu'],
+  ['custom:bento-image-boogu-edit-turbo', 'Boogu Image Edit Turbo · Fast · 4 Steps · 1–3 References', 'boogu'],
   ['custom:bento-image-boogu-edit', 'Boogu Image Edit · Quality · 25 Steps · Single-Reference Edit · INT8 ConvRot', 'boogu'],
   ['custom:bento-image-boogu-turbo', 'Boogu Image Turbo · Fast · 4 Steps · Text Only · INT8 ConvRot · Hotfix (~4s)', 'boogu'],
   ['custom:bento-image-fernwood-v5-int8-fast', 'fernwood V5 · Fast · 8 Steps · Optional Reference · INT8 ConvRot', 'krea2'],
@@ -132,7 +132,6 @@ const bento = [
   ['custom:bento-image-radiance-krea2-turbo', 'Krea 2 Turbo · Fast · 8 Steps · Text Only · FP8 · Radiance', 'krea2'],
   ['custom:bento-image-radiance-vesperq-v4', 'Vesper Q V4 · Quality · 25 Steps · Optional Reference · FP8 · Radiance (~32s)', 'qwen_image_21'],
   ['custom:bento-image-radiance-qwen21', 'Qwen-Image 2.1 · Quality · 40 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
-  ['custom:bento-image-radiance-turbo-stock', 'Qwen-Image 2.1 Turbo · Fast · 8 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
   ['custom:bento-image-radiance-turbo', 'Qwen-Image 2.1 Turbo Lite · Fast · 8 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
   ['custom:bento-image-z-image-turbo-int8-convrot', 'Z-Image Turbo · Fast · 8 Steps · Optional Reference · INT8 ConvRot', 'zimage']
 ].map(([id, label, family]) => ({ id, label, family, kind: 'image' }));
