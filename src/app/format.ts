@@ -131,7 +131,7 @@ export function settingsText(item: GalleryItem) {
   return lines.filter(Boolean).join("\n");
 }
 
-export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; strength: string }> };
+export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; file: string; strength: string }> };
 
 /**
  * The "Generation details" panel, most useful first: what made the picture
@@ -156,7 +156,8 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     add("Profile", names.profile || "");
     add("Weights", model ? partName(String(model)) : "");
   });
-  const loras = activeLoras(settings.loras).map((lora) => ({ name: names.lora ? names.lora(lora.name) : fileStem(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
+  // Friendly names (the catalogue's title), the file kept beside them for a tooltip and Copy Settings.
+  const loras = activeLoras(settings.loras).map((lora) => ({ name: names.lora ? names.lora(lora.name) : fileStem(lora.name), file: String(lora.name).split(/[\\/]/).pop() || String(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
   if (loras.length) {
     const modelSection = sections.find((item) => item.title === "Model");
     if (modelSection) modelSection.loras = loras;

@@ -5,6 +5,19 @@ const familyId = (value) => {
 };
 const basename = (value) => String(value || '').split(/[\\/]/).pop();
 
+/**
+ * A LoRA's friendly name: the catalogue's title, else its file name cleaned
+ * up (no folder or extension, spaces for underscores and hyphens, Title
+ * Case), so people never read "pawg_krea2.safetensors". Shared by the studio
+ * and MCP replies.
+ */
+export function loraName(name, info) {
+  const title = typeof info?.title === 'string' ? info.title.trim() : '';
+  if (title) return title;
+  const stem = basename(name).replace(/\.(safetensors|ckpt|pt|pth|bin|gguf)$/i, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return stem.replace(/(^|\s)([a-z])/g, (_, space, letter) => space + letter.toUpperCase());
+}
+
 /** Explicit publisher targets refine family compatibility; unverified variants stay unknown. */
 export function loraCompatibility(info, profile) {
   const family = familyId(profile?.family);

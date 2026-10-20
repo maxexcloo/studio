@@ -56,3 +56,20 @@ test('Details shows each prompt with Copy, Settings without a box, and a footer 
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(item.prompt);
   if (phone) await expect(page.locator('.status-message').filter({ hasText: 'Prompt copied' })).toBeVisible();
 });
+
+test('Details names each LoRA by its catalogue title, with its strength small and the file in its tooltip', async ({ page }) => {
+  const withLoras = { ...item, id: 'details-loras', settings: { ...item.settings, loras: [{ name: 'loras/pawg_krea2.safetensors', strength: 0.8, enabled: true }, { name: 'soft_light-v3.safetensors', strength: 1, enabled: true }] } };
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: [withLoras], revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.route('**/api/loras/info', (route) => route.fulfill({ json: { loras: { 'loras/pawg_krea2.safetensors': { title: 'PAWG Krea 2', families: [], triggers: [] } } } }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  const viewer = await ui.openViewer(page.locator('[data-tile-id="details-loras"] .tile'));
+  await ui.showDetails();
+  const list = viewer.getByRole('list', { name: 'LoRAs' });
+  const names = list.locator('.detail-lora-name');
+  await expect(names).toHaveText(['PAWG Krea 2', 'Soft Light V3']);
+  await expect(names.first()).toHaveAttribute('title', 'pawg_krea2.safetensors');
+  await expect(list.locator('.detail-lora-strength')).toHaveText(['0.80', '1.00']);
+  await expect(list).not.toContainText('.safetensors');
+});

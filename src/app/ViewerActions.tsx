@@ -61,11 +61,11 @@ export function DetailsFooter({ onCopyPrompts, onCopySettings, onEdit, onRerun }
   );
 }
 
-/** Generation Settings as plain text, for Copy Settings: a heading per section, then "Name: value". */
-export function settingsText(sections: Array<{ title: string; rows: Array<[string, unknown]>; loras?: Array<{ name: string; strength: unknown }> }>) {
+/** Generation Settings as plain text, for Copy Settings: a heading per section, then "Name: value"; a LoRA keeps its file in brackets, so the text can rebuild the run. */
+export function settingsText(sections: Array<{ title: string; rows: Array<[string, unknown]>; loras?: Array<{ name: string; file?: string; strength: unknown }> }>) {
   return sections.map((section) => [
     section.title,
     ...section.rows.map(([key, value]) => `${key}: ${value}`),
-    ...(section.loras || []).map((lora) => `${lora.name}: ${lora.strength}`),
+    ...(section.loras || []).map((lora) => `${lora.name}${lora.file && lora.file !== lora.name ? ` (${lora.file})` : ''}: ${lora.strength}`),
   ].join('\n')).join('\n\n');
 }
