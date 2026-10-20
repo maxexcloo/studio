@@ -71,7 +71,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const gallery = (visibleGallery || []) as GalleryItem[];
   const { selecting, selectedItems, selectable } = selection;
   const handlers = useItemActionHandlers();
-  const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, Boolean(hiddenSpace)) : [];
+  const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, Boolean(hiddenSpace), true) : [];
   const reducedMotion = useReducedMotion();
   const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
   // Tapping what is generating shows that run: its own mode, its own tile.

@@ -19,7 +19,15 @@ export function downloadUrl(item: GalleryItem) {
 const shareBlobs = new Map<string, Promise<Blob>>();
 
 /** Web Share with files needs a secure page; over plain http on the LAN it is not there. */
-export const canShareFiles = typeof navigator !== 'undefined' && typeof window !== 'undefined' && window.isSecureContext && 'share' in navigator;
+/** Whether the browser's share sheet takes files; iOS's includes Save Image. */
+export const canShareFiles = (() => {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined' || !window.isSecureContext || !('share' in navigator)) return false;
+  try {
+    return typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([''], 'image.png', { type: 'image/png' })] });
+  } catch {
+    return false;
+  }
+})();
 
 export function prefetchShare(item: GalleryItem | null, includeVideo = false) {
   if (!item?.url || !canShareFiles) return;

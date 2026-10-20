@@ -81,10 +81,11 @@ export type ItemActionExtras = {
   select?: (item: GalleryItem) => void;
 };
 
-// Where each action appears. The phone bar and sheet share where they can, so they
-// download only where the share sheet is not there to save the file.
+// Where each action appears. Share is the phone's: its bar and sheet share where
+// they can, and download only where the share sheet cannot take the file to save it.
+// The desktop downloads and never shares.
 const placement: Record<ItemActionId, readonly ItemSurface[]> = {
-  share: ['bar', 'sheet', 'dock', 'menu'],
+  share: ['bar', 'sheet'],
   download: canShareFiles ? ['dock', 'tile', 'menu'] : ['bar', 'sheet', 'dock', 'tile', 'menu'],
   copyItem: ['dock', 'menu'],
   star: ['bar', 'sheet', 'dock', 'tile', 'menu'],
@@ -154,17 +155,18 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 
 /**
  * What can be done to several selected items, in the same order and with the
- * same names as for one. `hiddenSpace` says which way Move goes.
+ * same names as for one. `hiddenSpace` says which way Move goes; on a `phone`
+ * they share, as one item does, and on the desktop they download.
  */
-export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, hiddenSpace: boolean): ItemAction[] {
+export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, hiddenSpace: boolean, phone = false): ItemAction[] {
   const ready = items.filter((item) => item.status === 'done' && item.url);
   const movable = ready.filter((item) => !item.library);
   const starrable = items.filter(canStar);
   const allStarred = starrable.length > 0 && starrable.every((item) => item.favorite);
   const photos = items.filter(canAnimatePhoto);
   const actions: (ItemAction | false)[] = [
-    canShareFiles && { id: 'share', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
-    { id: 'download', label: 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    phone && canShareFiles && { id: 'share', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
+    !(phone && canShareFiles) && { id: 'download', label: 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
     { id: 'star', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, haptic: 'tap', run: () => handlers.starItems(starrable, !allStarred) },
     { id: 'animate', label: 'Animate', Icon: Video, disabled: !photos.length, run: () => handlers.animateItems(photos) },
     hiddenSpace

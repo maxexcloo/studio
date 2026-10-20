@@ -15,6 +15,7 @@ version opens with a `> ` summary line.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed
+- **Share and Download:** the desktop viewer, tiles, context menu and selection bar download and no longer offer Share. On a phone the viewer bar, long-press sheet and selection bar offer Share instead of Download (iOS's share sheet has Save Image), and keep Download only where the browser can't share files.
 - **Faster viewer:** the viewer and its neighbour prefetch load a display-sized WebP (up to 2560 px, cached and warmed like thumbnails) instead of the full PNG, often a sixth of the bytes. The original loads only when zooming past the display copy's size; downloads still give the original.
 
 ## [0.30.2] - 2026-10-20
