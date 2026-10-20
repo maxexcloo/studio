@@ -19,6 +19,7 @@ version opens with a `> ` summary line.
 
 ### Fixed
 - **Reduced motion everywhere:** animated panels, sheets and the viewer follow the system's reduce-motion setting, as the CSS animations already did.
+- **Named sheets and number fields:** phone sheets take their name from their heading, including "Create in Hidden", and number fields are labelled; their buttons read "Images: 2" without a "click to edit" hint.
 - **Current wording and links:** About and the phone no longer mention in-app updates, the Hugging Face hint points at Settings › Integrations, `.env.example` names the `studio` storage default, and broken guide links point at existing sections.
 - **Studio names in downloads:** gallery and Hidden exports download as `studio-gallery-…`, `studio-hidden-…`, unnamed shared files fall back to `studio`, and accounts asking for Hidden see "Hidden is not available to accounts."
 

@@ -27,9 +27,9 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
       await expect(increase).toBeVisible();
       await expect(picker).not.toHaveClass(/is-density-mini/);
       await increase.click();
-      await expect(picker.getByRole('button', { name: 'Images: 3, click to edit', exact: true })).toBeVisible();
+      await expect(picker.getByRole('button', { name: 'Images: 3', exact: true })).toBeVisible();
       await decrease.click();
-      await expect(picker.getByRole('button', { name: 'Images: 2, click to edit', exact: true })).toBeVisible();
+      await expect(picker.getByRole('button', { name: 'Images: 2', exact: true })).toBeVisible();
       if (phone) for (const button of [decrease, increase]) {
         const box = await button.boundingBox();
         expect(box!.width).toBeGreaterThanOrEqual(44);

@@ -21,6 +21,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   headerAction?: React.ReactNode;
 }) {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const titleId = React.useId();
   const drag = useDragControls();
   const reduced = useReducedMotion();
   useFocusTrap(panelRef, open);
@@ -60,7 +61,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label={typeof title === 'string' ? title : undefined}
+            aria-labelledby={titleId}
             tabIndex={-1}
             className={cn('phone-sheet', full && 'is-full', className)}
             initial={reduced ? { opacity: 0 } : { y: '100%' }}
@@ -81,7 +82,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             }}>
               <div className="phone-sheet-handle" aria-hidden="true" />
               <header className="phone-sheet-head">
-                <h2>{title}</h2>
+                <h2 id={titleId}>{title}</h2>
                 {headerAction}
                 <button type="button" className="phone-icon" aria-label="Close" onClick={onClose}><X size={20} /></button>
               </header>

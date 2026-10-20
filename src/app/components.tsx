@@ -276,6 +276,7 @@ export function NumberPicker({
         <input
           ref={inputRef}
           className="number-picker-input"
+          aria-label={label}
           type="number"
           min={min}
           max={Number.isFinite(max) ? max : undefined}
@@ -291,9 +292,9 @@ export function NumberPicker({
           }}
         />
       ) : density === "full" ? (
-        <button type="button" className="number-picker-value" onClick={beginEdit} aria-label={`${label}: ${formatValue(value)}, click to edit`}><AnimatedNumber value={formatValue(value)} /></button>
+        <button type="button" className="number-picker-value" onClick={beginEdit} aria-label={`${label}: ${formatValue(value)}`}><AnimatedNumber value={formatValue(value)} /></button>
       ) : (
-        <Tip content={`${label}: ${formatValue(value)} - click to edit`}><button type="button" className="number-picker-value" onClick={beginEdit} aria-label={`${label}: ${formatValue(value)}, click to edit`}><AnimatedNumber value={formatValue(value)} /></button></Tip>
+        <Tip content={`${label}: ${formatValue(value)}`}><button type="button" className="number-picker-value" onClick={beginEdit} aria-label={`${label}: ${formatValue(value)}`}><AnimatedNumber value={formatValue(value)} /></button></Tip>
       )}
       {showSteppers ? <Tip content={`Increase ${labelLower}`}><button
         type="button"

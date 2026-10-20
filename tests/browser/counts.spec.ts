@@ -21,11 +21,11 @@ type Ui = ReturnType<typeof studioUi>;
 
 async function setCount(ui: Ui, kind: 'Images' | 'Videos', count: number) {
   const root = await ui.openComposer();
-  await root.getByRole('button', { name: new RegExp(`^${kind}: \\d+, click to edit$`) }).click();
-  const input = root.locator('.number-picker-input');
+  await root.getByRole('button', { name: new RegExp(`^${kind}: \\d+$`) }).click();
+  const input = root.getByRole('spinbutton', { name: kind, exact: true });
   await input.fill(String(count));
   await input.press('Enter');
-  await expect(root.getByRole('button', { name: `${kind}: ${count}, click to edit`, exact: true })).toBeVisible();
+  await expect(root.getByRole('button', { name: `${kind}: ${count}`, exact: true })).toBeVisible();
 }
 
 async function mode(ui: Ui, kind: 'Image' | 'Video') {
@@ -41,21 +41,21 @@ async function generate(ui: Ui, prompt: string) {
 
 test('image and video default to two, retaining independent choices and reloads', async ({ page }) => {
   const ui = await prepare(page);
-  await expect(ui.composer.getByRole('button', { name: 'Images: 2, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Images: 2', exact: true })).toBeVisible();
   await setCount(ui, 'Images', 6);
   await mode(ui, 'Video');
-  await expect(ui.composer.getByRole('button', { name: 'Videos: 2, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Videos: 2', exact: true })).toBeVisible();
   await setCount(ui, 'Videos', 3);
   await mode(ui, 'Image');
-  await expect(ui.composer.getByRole('button', { name: 'Images: 6, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Images: 6', exact: true })).toBeVisible();
   await mode(ui, 'Video');
-  await expect(ui.composer.getByRole('button', { name: 'Videos: 3, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Videos: 3', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-draft') || '{}').count)).toBe(3);
   await page.reload();
   await ui.openComposer();
-  await expect(ui.composer.getByRole('button', { name: 'Videos: 3, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Videos: 3', exact: true })).toBeVisible();
   await mode(ui, 'Image');
-  await expect(ui.composer.getByRole('button', { name: 'Images: 6, click to edit', exact: true })).toBeVisible();
+  await expect(ui.composer.getByRole('button', { name: 'Images: 6', exact: true })).toBeVisible();
   const layout = await ui.composer.evaluate((element) => ({ scroll: element.scrollWidth, width: element.clientWidth }));
   expect(layout.scroll).toBeLessThanOrEqual(layout.width + 1);
 });
@@ -88,7 +88,7 @@ test('image defaults and outgoing count honour a model maximum of one', async ({
   const ui = await prepare(page, 1);
   const root = ui.composer;
   // The phone hides a count that cannot change.
-  if (!await ui.isPhone()) await expect(root.getByRole('button', { name: 'Images: 1, click to edit', exact: true })).toBeVisible();
+  if (!await ui.isPhone()) await expect(root.getByRole('button', { name: 'Images: 1', exact: true })).toBeVisible();
   const increase = root.getByRole('button', { name: 'Increase images', exact: true });
   if (await increase.count()) await expect(increase).toBeDisabled();
   let payload: Record<string, any> | null = null;
@@ -154,7 +154,7 @@ for (const count of [1, 4]) {
       localStorage.setItem('heiss-ui-prefs', JSON.stringify({ defaultImageCount: count }));
     }, count);
     const ui = await prepare(page);
-    await expect(ui.composer.getByRole('button', { name: `Images: ${count}, click to edit`, exact: true })).toBeVisible();
+    await expect(ui.composer.getByRole('button', { name: `Images: ${count}`, exact: true })).toBeVisible();
     let payload: Record<string, any> | null = null;
     await page.route('**/api/generate', route => {
       payload = route.request().postDataJSON();
