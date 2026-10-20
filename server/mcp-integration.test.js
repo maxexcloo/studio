@@ -316,7 +316,8 @@ test('media and administrator credentials discover only their own friendly tools
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
   // (7900 since Generate says to batch several images into one call, to pass a named model as profile_id and when face detail turns on.)
   // Grok and other cloud profiles run only when the user asks for them.
-  assert.match(tools.find(tool => tool.name === 'Generate').description, /Grok only if asked\./);
+  assert.match(tools.find(tool => tool.name === 'Generate').description, /Cloud profiles only if asked\./);
+  assert.doesNotMatch(JSON.stringify(tools) + media.getInstructions(), /Grok/, 'every caller gets the same text, so none names Grok: an account may have no cloud profile');
   assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7900, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
@@ -1195,6 +1196,36 @@ test('negative prompts reach the submission only where they take effect', async 
   assert.equal(f.submitted.length, 1);
 });
 
+test('written prompts carry LoRA triggers and tags, and a guide’s recommended negative fills in unless the caller gives one', async t => {
+  const f = await fixture(t);
+  const saved = loraInfo['fixture-unknown.safetensors'];
+  loraInfo['fixture-unknown.safetensors'] = { families: [], base: '', triggers: ['inkstyle'], note: 'Put the trigger first.', promptStyle: 'tags', tags: ['ink wash', 'lighthouse', 'monochrome'], negative: 'colour bleed' };
+  t.after(() => { loraInfo['fixture-unknown.safetensors'] = saved; });
+  const guided = (effect) => ({ ...structuredClone(imageProfile), defaults: { ...imageProfile.defaults, cfg: 4 }, prompting: { id: 'neg-guide', summary: 'Natural language.', negative: { effect, ...(effect === 'none' ? {} : { default: 'blurry, low quality' }), notes: 'Short.' } } });
+  await f.profiles([guided('recommended')]);
+  const client = await f.client();
+  await call(client, 'Models', { profile_id: imageProfile.id });
+  const loras = [{ name: 'fixture-effect' }, { name: 'fixture-unknown' }];
+  // Written from the request (no writer here, so the request itself): triggers in, one line of tags, the guide's negative plus the LoRA's.
+  await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A lighthouse at dusk in ink', loras });
+  assert.equal(f.submitted.at(-1).prompt, 'inkstyle, A lighthouse at dusk in ink, glowfx\nink wash');
+  assert.equal(f.submitted.at(-1).negative, 'blurry, low quality, colour bleed');
+  // The caller's own negative wins, and an exact prompt stays as written.
+  await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A lighthouse at dusk', exact_prompt: true, negative_prompt: 'people', loras });
+  assert.deepEqual([f.submitted.at(-1).prompt, f.submitted.at(-1).negative], ['A lighthouse at dusk', 'people']);
+  // Nothing fills at cfg 1, nor where the guide calls a negative optional.
+  await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A tree', cfg: 1 });
+  assert.equal(f.submitted.at(-1).negative, undefined);
+  await f.profiles([guided('optional')]);
+  await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A tree' });
+  assert.equal(f.submitted.at(-1).negative, undefined);
+  // "none": Models never suggests one, and none is written.
+  await f.profiles([guided('none')]);
+  assert.equal(data(await call(client, 'Models', { profile_id: imageProfile.id })).controls.negative_prompt, undefined);
+  await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A tree' });
+  assert.equal(f.submitted.at(-1).negative, undefined);
+});
+
 test('account watch pages read as the signed owner through the loopback credential, not a stored bearer', async t => {
   const token = 'account-mcp-token-for-watch-page-fixture';
   const account = { userId: 'stable-account-watch', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
@@ -1504,6 +1535,13 @@ test('video never goes to the cloud by itself while the local video worker is of
     assert.match(texts(refused), /^Local video is unavailable right now: the video worker is offline\. Tell the user; they can ask for Grok/);
   }
   assert.equal(f.submitted.length, 0);
+  // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
+  await f.profiles(videoCatalogue(false).filter(profile => !/^cloud/.test(profile.id)), { defaults: { image: imageProfile.id }, videoAvailable: false });
+  const none = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
+  assert.equal(texts(none), 'Local video is unavailable right now: the video worker is offline. Tell the user to try again later.');
+  const listing = data(await call(client, 'Models', { kind: 'video' }));
+  assert.equal('cloud' in listing || 'cloud_note' in listing, false);
+  await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   // Asked for by name, the cloud runs: the profile is marked remote.
   const asked = data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'], count: 1 }));
   assert.deepEqual(asked.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });

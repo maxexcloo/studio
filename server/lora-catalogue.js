@@ -21,6 +21,17 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
     ...loraPolicyMetadata(entry),
     ...(Array.isArray(entry.triggers) ? { triggers: cleanTriggers(entry.triggers) } : {}),
     ...(typeof entry.guidance === 'string' && entry.guidance.trim() ? { guidance: entry.guidance.trim().slice(0, 1000) } : {}),
+    ...loraPromptMetadata(entry),
+  };
+}
+
+/** How the LoRA wants its prompt (lora-prompts.js): its style, up to 10 tags, and a negative of its own (reserved). */
+export function loraPromptMetadata(entry) {
+  const tags = (Array.isArray(entry?.tags) ? entry.tags : []).filter((tag) => typeof tag === 'string' && tag.trim()).map((tag) => tag.trim().slice(0, 80)).slice(0, 10);
+  return {
+    ...(['tags', 'natural', 'mixed'].includes(entry?.promptStyle) ? { promptStyle: entry.promptStyle } : {}),
+    ...(tags.length ? { tags } : {}),
+    ...(typeof entry?.negative === 'string' && entry.negative.trim() ? { negative: entry.negative.trim().slice(0, 500) } : {}),
   };
 }
 

@@ -6,7 +6,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { hostAllowed } from './request-guard.js';
-import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
+import { closest, listedControls, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
@@ -259,7 +259,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (matches.length > 1) return mcpJson(listed(matches));
         const { profile, note: tierNote } = named ? (named.id === profile_id ? { profile: named, note: '' } : withinFamily(profiles, named, wanted)) : namedInTier(profiles, profile_id, wanted);
         const infos = profile.options?.loras?.length && profile.capabilities?.lora !== false ? await media.loraInfos(owner) : {};
-        const controls = mcpControls(profile);
+        const controls = listedControls(profile);
         // A LoRA lookup answers only that question; the profile's guide and controls come without one.
         if (controls.loras && (lora_query || lora_names.length)) {
           const { loras, total, more, missing } = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
@@ -271,18 +271,18 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
           // The same merge Generate validates against when references select this mode.
           const merged = { ...profile, ...settings };
-          return [mode, { controls: mcpControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
+          return [mode, { controls: listedControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
         }));
         const { loras, total } = mcpLoras(profile, infos);
         const detail = {
           ...Object.fromEntries(['id', 'label', 'kind', 'family', 'description', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native'].filter(key => key in profile).map(key => [key, profile[key]])),
           tier: tierOf(profile), ...(tierNote ? { note: tierNote.trim() } : {}), defaults, controls, ...(modes ? { imageModes: modes, imageModes_note: 'A mode applies when its media is supplied, such as reference with references.' } : {}),
-          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Put the trigger word in the prompt.' } : {}),
+          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Studio adds trigger words to prompts it writes; with exact_prompt, put them in yourself.' } : {}),
           prompting: prompting(profile, true)
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Grok only if asked. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Cloud profiles only if asked. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
         profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
@@ -323,7 +323,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           faceNote = 'Face detail on for the full-body person. ';
           args.face_detail = true;
         }
-        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request } : {});
+        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request, styled: source !== 'exact' } : {});
         return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
       });
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
@@ -378,7 +378,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const fallback = [request ? `${item.prompt}, ${request}` : item.prompt];
           source = usePrompts(plan.args, await write(plan.profile, { request: base, changes, count, references, role: kind !== own ? 'first-frame' : references ? item.settings?.referenceRole || 'reference' : '', fallback, signal }), count);
         }
-        const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes });
+        const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes, styled: source !== 'exact' });
         const dropped = plan.droppedLoras?.length ? `Left out ${plan.droppedLoras.length === 1 ? 'a LoRA' : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(', ')}); tell the user. ` : '';
         return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source, `${plan.tierNote || ''}${dropped}`);
       });

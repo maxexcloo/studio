@@ -57,6 +57,16 @@ function fixedValue(profile, field) {
   return undefined;
 }
 
+/**
+ * The controls Models lists: a guide that says the profile takes no negative (effect "none") keeps
+ * negative_prompt out of the listing, so the chat never suggests one; a negative the user gives still runs.
+ */
+export function listedControls(profile) {
+  const controls = mcpControls(profile);
+  if (profile.prompting?.negative?.effect === 'none') delete controls.negative_prompt;
+  return controls;
+}
+
 /** Rejects a supplied control the profile does not let MCP adjust, naming it and the adjustable alternatives. */
 export function assertAdjustable(profile, args) {
   const controls = mcpControls(profile);
