@@ -125,14 +125,14 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     },
     done && canShareFiles && { id: 'share', group: 'keep', label: 'Share', Icon: Share, run: () => { void shareItem(item, handlers.showToast); } },
     Boolean(item.url) && item.status !== 'pending' && { id: 'download', group: 'keep', label: 'Download', tip: upscaled ? 'Download the Upscale' : 'Download', Icon: Download, href: downloadUrl(item), run: () => downloadItem(item) },
-    handlers.animate && canAnimatePhoto(item) && { id: 'animate', group: 'make', label: 'Animate', tip: 'Make a Video From This Image', Icon: Clapperboard, run: () => handlers.animate!(item) },
-    handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Continue This Video', Icon: FastForward, run: () => handlers.animate!(item) },
-    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Load Everything, Seed Included, Into the Prompt Box', Icon: RotateCcw, run: () => handlers.reuse(item) },
-    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Reuse', tip: 'Load Its Prompts Into the Prompt Box', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
+    handlers.animate && canAnimatePhoto(item) && { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Into a Video', Icon: Clapperboard, run: () => handlers.animate!(item) },
+    handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Extend This Video', Icon: FastForward, run: () => handlers.animate!(item) },
+    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Recreate With the Same Seed', Icon: RotateCcw, run: () => handlers.reuse(item) },
+    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Reuse', tip: 'Reuse the Prompts', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
     done && handlers.useAsReference && item.type === 'image' && !item.library && {
-      id: 'reference', group: 'make', label: 'Reference', tip: 'Use as a Reference Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
+      id: 'reference', group: 'make', label: 'Reference', tip: 'Reference This Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
     },
-    item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Run It Again as a New Job', Icon: RotateCw, run: () => handlers.retry(item) },
+    item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry as a New Job', Icon: RotateCw, run: () => handlers.retry(item) },
     handlers.smartUpscale && canUpscaleItem(item) && {
       id: 'upscale', group: 'make', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
       run: () => (item.upscale?.status === 'running' ? handlers.cancelUpscale(item) : handlers.upscale(item)),
@@ -152,9 +152,11 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 
 /**
  * What can be done to several selected items, in the same order and with the
- * same names as for one: Share on a phone that can (Download elsewhere, a zip
- * when several), Animate for the photos among them, Retry for failed ones,
- * Star and Delete. The select bars and the right-click menu offer the same.
+ * same one-word names as for one: Share on a phone that can (Download elsewhere,
+ * a zip when several), Animate for the photos among them, Retry for failed
+ * ones, Star and Delete. Their tips and accessible names are bulk wording
+ * ("Animate Selected"), never one item's copy. The select bars and the
+ * right-click menu offer the same.
  */
 export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, phone = false): ItemAction[] {
   const ready = items.filter((item) => item.status === 'done' && item.url);
@@ -164,12 +166,12 @@ export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandle
   // Without a ready first-frame model the review says so, rather than the option vanishing.
   const photos = items.filter(canAnimatePhoto);
   const actions: (ItemAction | false)[] = [
-    phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
-    !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? `Download ${ready.length} as a Zip` : 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
-    { id: 'animate', group: 'make', label: 'Animate', tip: photos.length > 1 ? `Animate ${photos.length} Images` : 'Make a Video From This Image', Icon: Clapperboard, disabled: !photos.length, run: () => handlers.animateItems(photos) },
-    failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: failed.length > 1 ? `Retry ${failed.length} Failed` : 'Retry', Icon: RotateCw, run: () => handlers.retryItems(failed) },
-    { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
-    { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
+    phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
+    !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Selected', Icon: Clapperboard, disabled: !photos.length, run: () => handlers.animateItems(photos) },
+    failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
+    { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
+    { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
   ];
   return actions.filter((action): action is ItemAction => Boolean(action));
 }

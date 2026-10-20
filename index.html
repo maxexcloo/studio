@@ -14,6 +14,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Studio" />
     <title>Studio</title>
+    <!-- Ask for what the first screen needs while the app's code downloads (src/app/api.ts takes each answer once). -->
+    <script>
+      (function () {
+        var boot = window.__studioBoot = {};
+        ['/api/accounts/status', '/api/access/status', '/api/models', '/api/comfy/status'].forEach(function (url) {
+          try { boot[url] = { at: Date.now(), response: fetch(url, { cache: 'no-store', credentials: 'same-origin', headers: { 'X-HEISS': '1' } }) }; } catch (error) { /* The app asks again. */ }
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

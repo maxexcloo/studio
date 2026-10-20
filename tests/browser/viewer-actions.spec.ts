@@ -124,12 +124,7 @@ test('each prompt copies and uses on its own; Reuse loads both prompts', async (
   await expect(ui.negativePrompt).toHaveValue(item.negative);
   await ui.prompt.fill('Something else');
   await ui.closeComposer();
-  // The copies' toasts sit over the top of the gallery; clear them to reach the tile.
-  await expect.poll(async () => {
-    const dismiss = page.locator('.toast .island-close, .toast button[aria-label="Dismiss"]').first();
-    if (await dismiss.count()) await dismiss.click({ force: true }).catch(() => {});
-    return page.locator('.toast').count();
-  }, { timeout: 15000 }).toBe(0);
+  // Messages live in the status pill and never cover the gallery: the tile is reachable at once.
   await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
   if (!await page.locator('.viewer-side').count()) await page.getByRole('button', { name: 'Info', exact: true }).click();
   await page.locator('.viewer-side').getByRole('button', { name: 'Reuse', exact: true }).click();
@@ -152,4 +147,24 @@ test('Recreate is an exact rerun: same prompts and the same seed', async ({ page
   await expect.poll(() => body?.seed).toBe('424242');
   expect(body!.prompt).toBe(item.prompt);
   expect(body!.steps).toBe(4);
+});
+
+test('a message over the viewer shows in the status pill at its top edge, clear of every control', async ({ page }) => {
+  await page.route('**/api/gallery/favorite', (route) => route.fulfill({ status: 403, json: { ok: false, error: 'Refused for the test.' } }));
+  await page.goto('/');
+  const { viewer } = await open(page);
+  await viewer.getByRole('button', { name: /^(Star|Unstar)$/ }).filter({ visible: true }).first().click();
+  const pill = viewer.locator('.status-message');
+  await expect(pill).toBeVisible();
+  // One message, one place: the dock's or bar's copy steps aside while the viewer covers it.
+  await expect(page.locator('.status-message')).toHaveCount(1);
+  const box = (await pill.boundingBox())!;
+  expect(box.y).toBeLessThan(80);
+  for (const button of await viewer.locator('button:visible').all()) {
+    if (await pill.locator('button').evaluateAll((own, target) => own.includes(target as HTMLElement), await button.elementHandle())) continue;
+    const other = await button.boundingBox();
+    if (!other) continue;
+    const overlaps = box.x < other.x + other.width && other.x < box.x + box.width && box.y < other.y + other.height && other.y < box.y + box.height;
+    expect(overlaps, `the pill covers ${await button.getAttribute('aria-label')}`).toBe(false);
+  }
 });

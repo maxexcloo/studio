@@ -90,7 +90,7 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
       <VideoPlayer key={`${item.url}:${attempt}`} title={titleFromPrompt(item.prompt || item.filename)}>
         {phone ? <Container className="heiss-phone-video" style={frame}>{media}<PlayerControls /></Container> : <VideoSkin className="heiss-desktop-video" style={frame}>{media}<PlayerControls desktop /></VideoSkin>}
       </VideoPlayer>
-      {error ? <div className="heiss-video-error" role="alert"><p>{error}</p><button type="button" onClick={() => { setError(''); setAttempt((n) => n + 1); }}><RotateCcw size={16} />Try again</button></div> : null}
+      {error ? <div className="heiss-video-error" role="alert"><p>{error}</p><button type="button" onClick={() => { setError(''); setAttempt((n) => n + 1); }}><RotateCcw size={16} />Try Again</button></div> : null}
     </div>
   );
 }

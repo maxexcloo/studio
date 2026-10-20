@@ -68,7 +68,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(loraOps.join('\n')).not.toContain(otherAccountText);
   expect(await page.evaluate(() => localStorage.getItem('heiss-ui-lora-pending:account:admin-id'))).toBeNull();
   await studioUi(page).openSettings();
-  await page.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
+  await page.getByRole('button', { name: 'Users', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
   await page.getByPlaceholder('Studio Artists').fill('Video Artists');
   await page.getByRole('switch', { name: 'video-hd' }).click();
@@ -101,11 +101,15 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByRole('button', { name: 'Dismiss Chat User', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-pending/dismiss')?.body).toEqual({ identity: 'librechat-user-7' });
 
+  // The personal token lives in Account; Users is administration only.
+  await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Create Token', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Copy Token', exact: true })).toBeVisible();
   // The one-time token stays readable if the clipboard is unavailable.
   await expect(page.getByLabel('New MCP Token')).toHaveValue('new-one-time-secret');
   await expect(page.getByText('https://studio.example.test/mcp')).toBeVisible();
+  await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Users', exact: true }).click();
   const newEmail = page.getByLabel('Email', { exact: true });
   await expect(newEmail).toHaveAttribute('type', 'email');
   await expect(newEmail).toHaveAttribute('autocapitalize', 'none');
@@ -118,6 +122,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await newEmail.fill(' new.artist@example.com ');
   await page.getByRole('button', { name: 'Create User', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users')?.body).toMatchObject({ username: 'new.artist@example.com' });
+  await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });
@@ -134,9 +139,11 @@ test('ordinary accounts open their own studio without administration sections', 
   await expect(page.getByText('Your private studio is being prepared')).toHaveCount(0);
   await studioUi(page).openSettings();
   const sections = page.getByRole('navigation', { name: 'Settings Sections' });
-  await expect(sections.getByRole('button', { name: 'Accounts & MCP', exact: true })).toBeVisible();
-  for (const name of ['Models', 'Library', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
-  await sections.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
+  await expect(sections.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
+  // Administration stays with administrators; everyone has Studio and Maintenance.
+  for (const name of ['Users', 'Models', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Studio', 'Maintenance', 'About']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
+  await sections.getByRole('button', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible();
@@ -194,7 +201,7 @@ test('phones reach account settings and sign out from the More sheet', async ({ 
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('button', { name: /^Accounts & MCP/ }).click();
+  await page.getByRole('button', { name: /^Account\b/ }).click();
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toHaveCount(0);

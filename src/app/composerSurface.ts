@@ -35,3 +35,18 @@ export function useComposerSurfaceBox(anchor: HTMLElement | null) {
   }, [anchor]);
   return { box, asSheet: Boolean(anchor?.classList.contains('phone-create')) };
 }
+
+/**
+ * While a glass surface moves in or out it skips its backdrop blur (a solid
+ * fill stands in, `[data-settling]` in 18-surfaces.css): re-blurring the page
+ * behind on every frame of the motion is what made sheets and popovers stutter.
+ * The glass returns once it settles. Spread onto the moving motion element.
+ */
+export function useSettling() {
+  const [settling, setSettling] = React.useState(true);
+  return {
+    'data-settling': settling ? '' : undefined,
+    onAnimationStart: () => setSettling(true),
+    onAnimationComplete: () => setSettling(false),
+  };
+}

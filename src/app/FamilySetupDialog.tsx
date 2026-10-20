@@ -188,7 +188,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
     : failed ? 'error'
     : 'files';
 
-  const title = plan?.title || 'Model setup';
+  const title = plan?.title || 'Model Setup';
   const name = plan?.profile?.displayName || title;
   const close = () => onOpenChange(false);
   const run = async (action: () => Promise<unknown>) => {
@@ -204,7 +204,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
 
   /* ---------------------------------------------------------- Copy */
 
-  let heading = `Set up ${name}`;
+  let heading = `Set Up ${name}`;
   let description: React.ReactNode = plan
     ? route === 'pack'
       ? `This is the official ${title} folder. Its makers’ nodes load it, text encoder and VAE included.`
@@ -212,15 +212,15 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
     : 'Checking ComfyUI…';
   if (plan && !plan.comfy.online) { heading = 'Waiting for ComfyUI'; description = 'Start ComfyUI to set this model up.'; }
   else if (step === 'files') {
-    heading = downloading ? 'Downloading' : failed ? 'The download stopped' : 'Text encoder and VAE';
+    heading = downloading ? 'Downloading' : failed ? 'The Download Stopped' : 'Text Encoder & VAE';
     description = downloading ? `${name} is ready when these land. The download continues if you close this.` : `${title} reads your prompt with one and draws the pixels with the other.`;
-  } else if (step === 'ready') { heading = `${name} is ready`; description = 'Set up with the settings its makers use.'; }
+  } else if (step === 'ready') { heading = `${name} Is Ready`; description = 'Set up with the settings its makers use.'; }
 
   /* ---------------------------------------------------------- Body */
 
   let body: React.ReactNode = null;
-  let footer: React.ReactNode = <button className="btn is-ghost" onClick={close}>Not now</button>;
-  const recheck = <button className="btn" onClick={() => reload()}><RefreshCw size={13} /> Check again</button>;
+  let footer: React.ReactNode = <button className="btn is-ghost" onClick={close}>Not Now</button>;
+  const recheck = <button className="btn" onClick={() => reload()}><RefreshCw size={13} /> Check Again</button>;
   const nextStep: Step = route === 'pack' || !parts.some((row) => !row.have) ? 'ready' : 'files';
 
   if (!plan) {
@@ -243,7 +243,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
         {route === 'native' && !plan.comfy.native ? (
           <>
             <div className="upscale-callout family-setup-gap">
-              <strong>Update ComfyUI to its newest version</strong>
+              <strong>Update ComfyUI to Its Newest Version</strong>
               <span>ComfyUI learned {title} on 16 October 2026, after release 0.41.3{plan.comfy.version ? `. This one is ${plan.comfy.version}` : ''}. Update it (<code>git pull</code> in its folder, or the nightly in ComfyUI-Manager), then restart it.</span>
             </div>
             <p className="upscale-fine">Or use the official model folder in <code>models/diffusers</code> with its makers’ nodes, which run on the ComfyUI you have. <a href={plan.page} target="_blank" rel="noreferrer">How <ExternalLink size={11} /></a></p>
@@ -319,7 +319,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
         {moving.length ? (
           <>
             <button className="btn" onClick={() => run(async () => { for (const row of moving) await pause(row.download!.id); })}><Pause size={13} /> Pause</button>
-            <button className="btn is-primary" onClick={close}>Continue in background</button>
+            <button className="btn is-primary" onClick={close}>Continue in Background</button>
           </>
         ) : pending.length && admin && plan.local !== false ? (
           <button className="btn is-primary" disabled={busy || short} onClick={getAll}>

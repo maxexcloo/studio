@@ -111,7 +111,7 @@ function BurstStack({ run, width, height, arriving = false, onOpen, titleFromPro
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 420, damping: 30 }}
     >
-      <button type="button" className="run-stack run-burst" aria-label={`${title}. ${runKind(run)}. Open the stack`} onClick={onOpen}>
+      <button type="button" className="run-stack run-burst" aria-label={`${title}. ${runKind(run)}. Open the Stack`} onClick={onOpen}>
         <span className="run-burst-edge is-2" aria-hidden="true" />
         <span className="run-burst-edge is-1" aria-hidden="true" />
         <span className="run-stack-cover run-burst-cover" style={{ top: 0, bottom: BURST_EDGE }}>
@@ -206,7 +206,7 @@ function FlowStack({ run, width, height, arriving = false, onOpen, titleFromProm
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 420, damping: 30 }}
     >
-      <button type="button" className="run-stack run-flow" aria-label={`${title}. ${runKind(run)}. Open the stack`} onClick={onOpen}>
+      <button type="button" className="run-stack run-flow" aria-label={`${title}. ${runKind(run)}. Open the Stack`} onClick={onOpen}>
         {frontReady ? <span className="run-flow-ambient" aria-hidden="true"><Still item={run.cover} /></span> : null}
         <span className="run-flow-stage" style={{ "--face-w": `${faceW}px`, "--face-h": `${faceH}px`, "--face-x": `${Math.round((width - faceW) / 2)}px`, "--face-y": `${Math.round((height - faceH) / 2)}px` } as React.CSSProperties}>
           {leaves.map(({ item, offset }) => {
@@ -316,7 +316,7 @@ export function RunCard({ run, onOpen }: { run: Run; onOpen: () => void }) {
   const ratio = Number(run.cover.width || 1) / Math.max(1, Number(run.cover.height || 1));
   return (
     <div className="run-card" style={{ "--card-ratio": ratio } as React.CSSProperties}>
-      <button type="button" className="run-card-fan" aria-label={`Open ${runTitle(run)} in the gallery`} onClick={onOpen}>
+      <button type="button" className="run-card-fan" aria-label={`Open ${runTitle(run)} in the Gallery`} onClick={onOpen}>
         {fan.map((item, index) => {
           const offset = index - middle;
           const front = index === fan.length - 1;
@@ -338,7 +338,7 @@ export function RunCard({ run, onOpen }: { run: Run; onOpen: () => void }) {
         <small>{runKind(run)}{run.model ? <><i aria-hidden="true">·</i>{modelName(run.model)}</> : null}</small>
         <strong>{runTitle(run)}</strong>
         <button type="button" className="run-card-open" onClick={onOpen}>
-          <span>Open in gallery</span>
+          <span>Open in Gallery</span>
         </button>
       </div>
     </div>

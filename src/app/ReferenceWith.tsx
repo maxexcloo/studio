@@ -6,10 +6,11 @@ import { modelGroups, modelName } from './catalogueNames';
 import { Tip } from './components';
 import { cn } from './format';
 import { modelDetails } from './modelCatalogue';
-import { composerAnchor, surfaceMotion, useComposerSurfaceBox } from './composerSurface';
+import { composerAnchor, surfaceMotion, useComposerSurfaceBox, useSettling } from './composerSurface';
 import { useDismiss } from './useDismiss';
 import type { Profile } from './types';
 import { usePhoneLayer } from './phoneLayers';
+import { SurfaceStatus } from './StatusMessage';
 
 /** The ready profiles that take a reference image, of the kind the composer makes. */
 export type ReferenceWithChoice = { profiles: Profile[]; onPick: (profileId: string) => void };
@@ -26,8 +27,9 @@ function Surface({ profiles, onPick, onClose }: { profiles: Profile[]; onPick: (
   useDismiss([surface, opener], present, close);
   // Grouped by family, as the model picker lists them.
   const groups = modelGroups(profiles);
-  return createPortal(<motion.div ref={surface} className={cn('reference-popover reference-with', asSheet && 'is-sheet')} style={asSheet ? undefined : box || undefined} role={present ? 'dialog' : undefined} aria-label="Reference With" aria-hidden={!present || undefined} inert={!present} data-open-surface {...surfaceMotion}>
-    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong><button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={15} /></button></header>
+  const settling = useSettling();
+  return createPortal(<motion.div ref={surface} className={cn('reference-popover reference-with', asSheet && 'is-sheet')} style={asSheet ? undefined : box || undefined} role={present ? 'dialog' : undefined} aria-label="Reference With" aria-hidden={!present || undefined} inert={!present} data-open-surface {...surfaceMotion} {...settling}>
+    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong><SurfaceStatus active={Boolean(asSheet && present)} /><button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={15} /></button></header>
     <div className="reference-popover-body reference-with-body">
       {groups.map((group) => (
         <section key={group.id} className="reference-with-group" aria-label={group.label || undefined}>
@@ -53,7 +55,7 @@ export function ReferenceWithButton({ profiles, onPick }: ReferenceWithChoice) {
   const close = React.useCallback(() => setOpen(false), []);
   return (
     <>
-      <Tip content="Choose a model that takes a reference image">
+      <Tip content="Choose a Model That Takes a Reference Image">
         <button type="button" data-open-trigger className={cn('ref-chip ref-add reference-with-trigger', open && 'is-open')} aria-label="Reference With" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           <ImagePlus size={15} strokeWidth={2.2} />
           <span className="ref-add-label"><span>Reference With</span></span>

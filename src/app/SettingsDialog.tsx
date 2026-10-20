@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Info, LifeBuoy, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
+import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Boxes, Github, Info, LifeBuoy, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -32,19 +32,19 @@ import { TrashRow } from './TrashRow';
 import type { ShowToast } from './toast';
 
 export const SETTINGS_SECTIONS = [
-  { id: 'general', label: 'General', icon: SlidersHorizontal, description: 'Layout, keyboard, safety and reset.' },
-  { id: 'generation', label: 'Generation', icon: Wand2, description: 'The composer, previews and starting values.' },
-  { id: 'features', label: 'Features', icon: Puzzle, description: 'Upscaling and inpainting.' },
-  { id: 'models', label: 'Models', icon: Boxes, description: 'What ComfyUI has installed and where it finds models.' },
-  { id: 'integrations', label: 'Integrations', icon: Cable, description: 'Civitai, Hugging Face, model downloads and output storage.' },
-  { id: 'library', label: 'Library', icon: Library, description: 'Where images are saved and what the gallery shows.' },
-  { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
-  { id: 'accounts', label: 'Accounts & MCP', icon: UsersRound, description: 'Manage account access profiles and personal MCP connections.' },
-  { id: 'about', label: 'About', icon: Info, description: 'Version, stats, feedback and credits.' }
+  { id: 'account', label: 'Account', icon: UserRound, description: 'Your MCP connection and this browser’s session.' },
+  { id: 'users', label: 'Users', icon: UsersRound, description: 'Accounts, access profiles and chat gateway users.' },
+  { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'Layout, the composer, features and the gallery.' },
+  { id: 'models', label: 'Models', icon: Boxes, description: 'Installed models, integrations and output folders.' },
+  { id: 'workers', label: 'Workers', icon: Plug, description: 'Reaching ComfyUI, restarting it and opening Studio on other devices.' },
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Reset, clean up, export and diagnostics.' },
+  { id: 'about', label: 'About', icon: Info, description: 'Version, stats, links and credits.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
-const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'integrations', 'library', 'connection']);
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'workers', 'users']);
+/** Sections only an account deployment has. */
+const ACCOUNT_SECTIONS: ReadonlySet<SettingsSection> = new Set(['account', 'users']);
 
 /* ------------------------------------------------------------ Primitives */
 
@@ -116,7 +116,7 @@ function ModelFolderSettings({ folders, confirmAction, onOpen, hints, onHintsCha
       {linked.map((item) => (
         <Row key={item.path} label={<span className="set-folder-path" title={item.path}>{item.label}</span>} description={item.read ? 'Added here · ComfyUI reads it' : 'Added here · ComfyUI reads it after a restart'}>
           <button className="btn is-ghost" onClick={async () => {
-            if (!await confirmAction({ title: `Stop using ${item.label}?`, description: 'ComfyUI stops reading this folder after its next restart.', action: 'Remove folder' })) return;
+            if (!await confirmAction({ title: `Stop Using ${item.label}?`, description: 'ComfyUI stops reading this folder after its next restart.', action: 'Remove Folder' })) return;
             folders.remove(item.path);
           }}>Remove</button>
         </Row>
@@ -207,21 +207,21 @@ function UpscaleReadiness({ status, reason, install, onOpenSetup, onDownload }: 
     return (
       <Row label={<Status tone="warn">Downloading the model</Status>} description={`${formatBytes(install.receivedBytes)} of ${formatBytes(install.totalBytes)}`} stacked>
         <div className="set-progress"><div style={{ width: `${Math.round(ratio * 100)}%` }} /></div>
-        <button className="btn" onClick={onOpenSetup}>Show progress</button>
+        <button className="btn" onClick={onOpenSetup}>Show Progress</button>
       </Row>
     );
   }
   if (!status) {
-    return <Row label={<Status tone="warn">Unavailable</Status>} description={reason || 'Smart upscale isn’t available right now.'}><button className="btn" onClick={onOpenSetup}>Open setup</button></Row>;
+    return <Row label={<Status tone="warn">Unavailable</Status>} description={reason || 'Smart upscale isn’t available right now.'}><button className="btn" onClick={onOpenSetup}>Open Setup</button></Row>;
   }
   if (!status.nodesInstalled) {
-    return <Row label={<Status tone="warn">Needs the SeedVR2 nodes</Status>} description="A one-time install of its ComfyUI nodes."><button className="btn is-primary" onClick={onOpenSetup}>Set up</button></Row>;
+    return <Row label={<Status tone="warn">Needs the SeedVR2 nodes</Status>} description="A one-time install of its ComfyUI nodes."><button className="btn is-primary" onClick={onOpenSetup}>Set Up</button></Row>;
   }
   if (install?.status === 'error' && !status.ready) {
     return <Row label={<Status tone="bad">Download stopped</Status>} description={install.error}><button className="btn is-primary" onClick={onOpenSetup}>Resume</button></Row>;
   }
   if (status.needsDownload) {
-    return <Row label={<Status tone="warn">Needs a download</Status>} description={`${formatBytes(status.downloadBytes)} of SeedVR2 weights, downloaded once.`}><button className="btn is-primary" onClick={onOpenSetup}>Set up</button></Row>;
+    return <Row label={<Status tone="warn">Needs a download</Status>} description={`${formatBytes(status.downloadBytes)} of SeedVR2 weights, downloaded once.`}><button className="btn is-primary" onClick={onOpenSetup}>Set Up</button></Row>;
   }
   if (status.substituting) {
     const effort = upscaleQualityLabel(status.quality);
@@ -283,7 +283,7 @@ function InpaintSuggestions({ onGetModels }: { onGetModels?: () => void }) {
             <li key={family.family} className="set-chip is-suggest" title={family.blurb || undefined}><span>{family.title}</span></li>
           )) : <li><Skeleton className="skeleton-text short" /></li>}
         </ul>
-        {onGetModels ? <button className="btn is-primary" onClick={onGetModels}><Download size={14} /> Get a model</button> : null}
+        {onGetModels ? <button className="btn is-primary" onClick={onGetModels}><Download size={14} /> Get a Model</button> : null}
       </div>
     </Row>
   );
@@ -327,10 +327,10 @@ const fileCount = (report: OutputFolderReport) => {
 function describeFolder(report: OutputFolderReport | null): { tone?: 'ok' | 'warn' | 'bad'; label: string; detail: string } {
   if (!report) return { label: 'Checking…', detail: '' };
   switch (report.state) {
-    case 'empty': return { tone: 'warn', label: 'Not set', detail: 'Needed to delete files and to remove ComfyUI’s copies.' };
-    case 'missing': return { tone: 'bad', label: 'Folder not found', detail: 'There’s nothing at that path on this computer.' };
-    case 'not-folder': return { tone: 'bad', label: 'Not a folder', detail: 'That path points at a file.' };
-    case 'mismatch': return { tone: 'warn', label: 'Recent images aren’t here', detail: `None of the last ${report.checked} images are in this folder (${fileCount(report)}). ComfyUI probably saves somewhere else; try Find automatically.` };
+    case 'empty': return { tone: 'warn', label: 'Not Set', detail: 'Needed to delete files and to remove ComfyUI’s copies.' };
+    case 'missing': return { tone: 'bad', label: 'Folder Not Found', detail: 'There’s nothing at that path on this computer.' };
+    case 'not-folder': return { tone: 'bad', label: 'Not a Folder', detail: 'That path points at a file.' };
+    case 'mismatch': return { tone: 'warn', label: 'Recent Images Aren’t Here', detail: `None of the last ${report.checked} images are in this folder (${fileCount(report)}). ComfyUI probably saves somewhere else; try Find automatically.` };
     case 'match': return { tone: 'ok', label: 'Linked', detail: `${report.found === report.checked ? `All ${report.checked}` : `${report.found} of ${report.checked}`} recent images found here · ${fileCount(report)}` };
     default: return { tone: report.looksLikeComfy ? 'ok' : 'warn', label: report.looksLikeComfy ? 'Linked' : 'Set', detail: `${fileCount(report)}${report.looksLikeComfy ? '' : ' · doesn’t look like a ComfyUI output folder'}. Checked again after the next image.` };
   }
@@ -436,7 +436,7 @@ function OutputFolderRow({ savedDir, galleryNote, onSave, onOpen, onCopy, showTo
           {!dirty && hasSaved ? (
             <span className="set-folder-tools">
               <Tip content="Open in the File Manager"><button type="button" className="set-folder-tool" aria-label="Open the Output Folder" onClick={onOpen}><FolderOpen size={14} /></button></Tip>
-              <Tip content={pathCopy.copied ? 'Copied' : 'Copy path'}><button type="button" className="set-folder-tool" aria-label="Copy the Path" onClick={() => pathCopy.copyWith(() => onCopy(report?.path || savedDir))}><CopyIcon copied={Boolean(pathCopy.copied)} /></button></Tip>
+              <Tip content={pathCopy.copied ? 'Copied' : 'Copy Path'}><button type="button" className="set-folder-tool" aria-label="Copy the Path" onClick={() => pathCopy.copyWith(() => onCopy(report?.path || savedDir))}><CopyIcon copied={Boolean(pathCopy.copied)} /></button></Tip>
             </span>
           ) : null}
         </div>
@@ -520,8 +520,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
       if (!live) return;
       setAccountMode(status.mode === 'multi-user');
       setAccountRole(status.account?.role || '');
-      if (status.mode !== 'multi-user' && section === 'accounts') onSectionChange('general');
-      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('general');
+      if (status.mode !== 'multi-user' && ACCOUNT_SECTIONS.has(section)) onSectionChange('studio');
+      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('studio');
     }).catch(() => { if (live) setAccountMode(false); });
     return () => { live = false; };
   }, [open, section, onSectionChange]);
@@ -602,8 +602,9 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
   return (
     <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" className="settings-modal" bodyClassName="set-layout" title="Settings">
       <nav className="set-nav" aria-label="Settings Sections">
-        {SETTINGS_SECTIONS.filter((item) => (thisComputer || !['models', 'integrations'].includes(item.id)) && (item.id !== 'accounts' || accountMode)
-          && !(accountMode && accountRole !== 'administrator' && ADMINISTRATION_SECTIONS.has(item.id))).map((item) => {
+        {SETTINGS_SECTIONS.filter((item) => (thisComputer || item.id !== 'models' || (accountMode && accountRole === 'administrator')) && (!ACCOUNT_SECTIONS.has(item.id) || accountMode)
+          && !(accountMode && accountRole !== 'administrator' && ADMINISTRATION_SECTIONS.has(item.id))
+          && (item.id !== 'users' || accountRole === 'administrator')).map((item) => {
           const Icon = item.icon;
           return (
             <button key={item.id} type="button" className={cn('set-nav-item', section === item.id && 'active')} aria-current={section === item.id ? 'page' : undefined} aria-controls="settings-panel" data-section={item.id} onClick={() => onSectionChange(item.id)}>
@@ -617,7 +618,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           <span>Join the Discord</span>
         </a>
         <button type="button" className="set-nav-feedback" onClick={() => openFeedback({ from: 'settings' })}>
-          <strong>Idea or bug?</strong>
+          <strong>Idea or Bug?</strong>
           <span>Send it to the board</span>
         </button>
       </nav>
@@ -629,8 +630,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           <p>{current.description}</p>
         </header>
 
-        {section === 'general' ? (
+        {section === 'account' && accountMode ? <AccountSettings part="account" showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} profileLabels={profileLabels} /> : null}
+        {section === 'users' && accountMode ? <AccountSettings part="users" showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} profileLabels={profileLabels} /> : null}
+
+        {section === 'studio' ? (
           <>
+            <h4 className="set-subhead">General</h4>
             {phoneDevice || prefs.fullStudioOnPhone ? <Group title="Layout">
               <SwitchRow label="Simple Phone Studio" description="A simpler layout for making, browsing and sharing. Everything else stays on the computer." checked={!prefs.fullStudioOnPhone} onChange={(next) => setPrefs({ fullStudioOnPhone: !next })} />
             </Group> : null}
@@ -640,30 +645,11 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <Group title="Safety">
               <SwitchRow label={preferenceLabels.confirmActions} description="Asks before deleting or stopping something. Permanent deletes always ask." checked={prefs.confirmActions} onChange={(next) => setPrefs({ confirmActions: next })} />
             </Group>
-            <Group title="Reset" tone="danger">
-              {thisComputer ? (
-                <>
-                  <Row label="Delete All Finished Images" description="Moves their files to the trash for 30 days, then deletes them.">
-                    <button className="btn is-danger-soft" onClick={clearGallery}>Delete all</button>
-                  </Row>
-                  <Row label="Clear All Cache" description="Clears the browser cache, stale queue state and ComfyUI’s memory.">
-                    <button className="btn is-danger-soft" onClick={clearAllCache}>Clear cache</button>
-                  </Row>
-                </>
-              ) : null}
-              <Row label="Reset All Settings" description="Resets prompts, layout, model choices, LoRA stacks and every preference here.">
-                <button className="btn is-danger-soft" onClick={resetAllSettings}>Reset</button>
-              </Row>
-            </Group>
-          </>
-        ) : null}
-
-        {section === 'generation' ? (
-          <>
+            <h4 className="set-subhead">Generation</h4>
             <Group title="Composer">
               <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
               <Row label="Run Variants As" description={prefs.variationQueueMode === 'separate' ? 'One job per variant. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
-                <Segmented label="Run Variants As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One batch' }, { value: 'separate', label: 'Separate jobs' }]} />
+                <Segmented label="Run Variants As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
               </Row>
               <PromptHistoryRow Row={Row} Switch={Switch} showToast={showToast} confirmAction={confirmAction} />
               <SwitchRow label="Size in Megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
@@ -683,11 +669,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               <Row label="Video Frames"><NumberPicker label="Frames" value={Number(prefs.defaultVideoFrames)} onChange={(next) => setPrefs({ defaultVideoFrames: next })} min={1} max={1000} step={4} /></Row>
               <Row label="Video FPS"><NumberPicker label="FPS" value={Number(prefs.defaultFps)} onChange={(next) => setPrefs({ defaultFps: next })} min={1} max={60} /></Row>
             </Group>
-          </>
-        ) : null}
-
-        {section === 'features' ? (
-          <>
+          
+            <h4 className="set-subhead">Features</h4>
           <Group>
             <SettingsDrawer id="set-feature-upscale" title="Smart Upscale" description={upscaleOn ? `On · ${upscaleState.label}` : 'Off'}>
               <SwitchRow label={preferenceLabels.smartUpscale} description="Shows an upscale arrow on finished images. The larger, sharper copy is saved next to the original." checked={upscaleOn} onChange={(next) => setPrefs({ smartUpscale: next })} />
@@ -737,11 +720,82 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </SettingsDrawer>
             </Group>
           ) : null}
+          
+            <h4 className="set-subhead">Gallery</h4>
+            <Group title="Display">
+              <SwitchRow label="Follow the Latest Output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
+              {features.moments ? <SwitchRow label="Group by Time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
+              <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
+              <SwitchRow label={preferenceLabels.showFailedItems} description="Interrupted and failed generations stay in the gallery." checked={prefs.showFailedItems} onChange={(next) => setPrefs({ showFailedItems: next })} />
+            </Group>
+            <Group title="Auto-Grouping" note="Similar generations group themselves into a stack, found by prompt, model and time. The button next to search switches this too.">
+              <SwitchRow label="Auto-Grouping" description="Pictures from similar prompts fold into one tile that opens to show all of them." checked={Boolean(prefs.stackRuns)} onChange={(next) => setPrefs({ stackRuns: next })} />
+              {prefs.stackRuns ? (
+                <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
+                  <Segmented
+                    label="Stacks Look Like"
+                    value={prefs.runStackStyle === 'flow' ? 'flow' : 'burst'}
+                    onChange={(next) => setPrefs({ runStackStyle: next })}
+                    options={[
+                      { value: 'burst', label: <><RunStyleGlyph kind="burst" /> Photo</> },
+                      { value: 'flow', label: <><RunStyleGlyph kind="flow" /> Cover Flow</> },
+                    ]}
+                  />
+                </Row>
+              ) : null}
+            </Group>
+            <Group title="Sharing">
+              <SwitchRow label="Share Without Settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
+            </Group>
           </>
         ) : null}
 
-        {section === 'library' ? (
+        {section === 'models' ? (
           <>
+            {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
+            {typedModels.length ? (
+              <Group title="Model Types" note="Set the type for models that weren’t recognized or were detected wrong.">
+                {typedModels.map((file) => {
+                  const key = `${file.source}:${file.name}`;
+                  const folder = file.source === 'checkpoint' ? 'Checkpoint' : 'Diffusion model';
+                  const how = file.via === 'choice' ? 'set by you' : file.via === 'file' ? 'read from its weights' : file.via === 'name' ? 'guessed from its name' : '';
+                  const status = [folder, file.label ? `${file.label}${how ? ` (${how})` : ''}` : '', file.reason || (file.supported ? '' : 'Not recognized. Pick a type to use it.')]
+                    .filter(Boolean).join(' · ');
+                  return (
+                    <Row key={key} label={<span className="set-model-name" title={file.name}>{file.name.split(/[\\/]/).pop()}</span>} description={status} disabled={typeBusy === key}>
+                      <div className="set-type-picker">
+                        <StudioSelect
+                          value={file.via === 'choice' ? file.choice : 'auto'}
+                          onChange={(type) => setModelType(file, type)}
+                          options={[{ label: file.via === 'choice' ? 'Detect Again' : file.supported ? 'Automatic' : 'Not Used', value: 'auto' }, ...(modelList?.modelTypeChoices?.[file.source] || [])]}
+                        />
+                      </div>
+                    </Row>
+                  );
+                })}
+              </Group>
+            ) : null}
+            <Group title="Installed">
+              <Row
+                label={models ? `${models.imageModels.length} image · ${models.videoModels.length} video` : <Skeleton className="skeleton-text short" />}
+                description="Rescan finds models and workflows added since ComfyUI started."
+              >
+                <button className="btn" onClick={() => { refreshModels(); refreshWorkflows(); }}><RefreshCw size={14} /> Rescan</button>
+              </Row>
+            </Group>
+            {thisComputer ? <ModelManifestGroup showToast={showToast} /> : null}
+            {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
+          
+            <AdapterLibraryGroup Group={Group} Row={Row} />
+            {thisComputer ? <>
+              {deployment.settings ? <IntegrationsOverview settings={deployment.settings} Status={Status} /> : null}
+              {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
+              <Group title="Civitai">
+                <CivitaiRow Row={Row} Switch={Switch} showToast={showToast} canChange={thisComputer} />
+              </Group>
+              <HuggingFaceTokenSettings showToast={showToast} />
+          
+            </> : null}
             {thisComputer ? <Group title="Folders">
               <OutputFolderRow
                 savedDir={paths.outputDir || ''}
@@ -755,48 +809,11 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 <button className="btn is-ghost" onClick={() => { refreshModels(); refreshWorkflows(); }}><RefreshCw size={14} /> Rescan</button>
               </Row>
             </Group> : null}
-            <Group title="Gallery">
-              <SwitchRow label="Follow the Latest Output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
-              {features.moments ? <SwitchRow label="Group by Time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
-              <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
-              <SwitchRow label={preferenceLabels.showFailedItems} description="Interrupted and failed generations stay in the gallery." checked={prefs.showFailedItems} onChange={(next) => setPrefs({ showFailedItems: next })} />
-            </Group>
-            <Group title="Auto-grouping" note="Similar generations group themselves into a stack, found by prompt, model and time. The button next to search switches this too.">
-              <SwitchRow label="Auto-grouping" description="Pictures from similar prompts fold into one tile that opens to show all of them." checked={Boolean(prefs.stackRuns)} onChange={(next) => setPrefs({ stackRuns: next })} />
-              {prefs.stackRuns ? (
-                <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
-                  <Segmented
-                    label="Stacks Look Like"
-                    value={prefs.runStackStyle === 'flow' ? 'flow' : 'burst'}
-                    onChange={(next) => setPrefs({ runStackStyle: next })}
-                    options={[
-                      { value: 'burst', label: <><RunStyleGlyph kind="burst" /> Photo</> },
-                      { value: 'flow', label: <><RunStyleGlyph kind="flow" /> Cover flow</> },
-                    ]}
-                  />
-                </Row>
-              ) : null}
-            </Group>
             {atComputer ? <EarlierImagesGroup Group={Group} Row={Row} showToast={showToast} confirmAction={confirmAction} outputDir={paths.outputDir || ''} /> : null}
-            <AdapterLibraryGroup Group={Group} Row={Row} />
-            <Group title="Sharing">
-              <SwitchRow label="Share Without Settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
-              <Row label="Export Gallery" description="Every finished image in one ZIP file.">
-                <a className="btn" href="/api/gallery/export" download><Download size={14} /> Export</a>
-              </Row>
-            </Group>
-            <Group title="Clean Up">
-              <Row label="Clear Failed Items" description="Removes failed and interrupted cards.">
-                <button className="btn" onClick={clearFailedItems}>Clear</button>
-              </Row>
-              {thisComputer ? <TrashRow confirmAction={confirmAction} showToast={showToast} Row={Row} /> : null}
-            </Group>
           </>
         ) : null}
 
-        {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} profileLabels={profileLabels} /> : null}
-
-        {section === 'connection' ? (
+        {section === 'workers' ? (
           <>
             {thisComputer && deployment.settings ? <ConnectionsGroup settings={deployment.settings} status={backendStatus} showToast={showToast} Status={Status} onSaved={() => { void deployment.refresh(); refreshHealth(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {thisComputer && deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
@@ -811,7 +828,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             </Group> : null}
             <Group title="ComfyUI">
               <Row
-                label={comfyRestarting ? <Status tone="warn">Restarting</Status> : health ? <Status tone={connected ? 'ok' : 'bad'}>{connected ? 'Connected' : 'Not connected'}</Status> : <Skeleton className="skeleton-text short" />}
+                label={comfyRestarting ? <Status tone="warn">Restarting</Status> : health ? <Status tone={connected ? 'ok' : 'bad'}>{connected ? 'Connected' : 'Not Connected'}</Status> : <Skeleton className="skeleton-text short" />}
                 description={comfyRestarting ? `Reconnects when it’s back. ${restartEta?.text || 'Usually a few seconds.'}` : health ? (connected ? health.comfyUrl : health.error || `Start ComfyUI at ${health.comfyUrl || 'http://127.0.0.1:8188'}, then check again.`) : undefined}
               >
                 {connected
@@ -840,53 +857,37 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           </>
         ) : null}
 
-        {section === 'models' ? (
+        {section === 'maintenance' ? (
           <>
-            {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
-            {typedModels.length ? (
-              <Group title="Model Types" note="Set the type for models that weren’t recognized or were detected wrong.">
-                {typedModels.map((file) => {
-                  const key = `${file.source}:${file.name}`;
-                  const folder = file.source === 'checkpoint' ? 'Checkpoint' : 'Diffusion model';
-                  const how = file.via === 'choice' ? 'set by you' : file.via === 'file' ? 'read from its weights' : file.via === 'name' ? 'guessed from its name' : '';
-                  const status = [folder, file.label ? `${file.label}${how ? ` (${how})` : ''}` : '', file.reason || (file.supported ? '' : 'Not recognized. Pick a type to use it.')]
-                    .filter(Boolean).join(' · ');
-                  return (
-                    <Row key={key} label={<span className="set-model-name" title={file.name}>{file.name.split(/[\\/]/).pop()}</span>} description={status} disabled={typeBusy === key}>
-                      <div className="set-type-picker">
-                        <StudioSelect
-                          value={file.via === 'choice' ? file.choice : 'auto'}
-                          onChange={(type) => setModelType(file, type)}
-                          options={[{ label: file.via === 'choice' ? 'Detect again' : file.supported ? 'Automatic' : 'Not used', value: 'auto' }, ...(modelList?.modelTypeChoices?.[file.source] || [])]}
-                        />
-                      </div>
-                    </Row>
-                  );
-                })}
-              </Group>
-            ) : null}
-            <Group title="Installed">
-              <Row
-                label={models ? `${models.imageModels.length} image · ${models.videoModels.length} video` : <Skeleton className="skeleton-text short" />}
-                description="Rescan finds models and workflows added since ComfyUI started."
-              >
-                <button className="btn" onClick={() => { refreshModels(); refreshWorkflows(); }}><RefreshCw size={14} /> Rescan</button>
+            <Group title="Clean Up">
+              <Row label="Clear Failed Items" description="Removes failed and interrupted cards.">
+                <button className="btn" onClick={clearFailedItems}>Clear</button>
+              </Row>
+              {thisComputer ? <TrashRow confirmAction={confirmAction} showToast={showToast} Row={Row} /> : null}
+              <Row label="Export Gallery" description="Every finished image in one ZIP file.">
+                <a className="btn" href="/api/gallery/export" download><Download size={14} /> Export</a>
               </Row>
             </Group>
-            {thisComputer ? <ModelManifestGroup showToast={showToast} /> : null}
-            {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
-          </>
-        ) : null}
-        {section === 'integrations' && thisComputer ? (
-          <>
-            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} Status={Status} /> : null}
-            {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
-            <Group title="Civitai">
-              <CivitaiRow Row={Row} Switch={Switch} showToast={showToast} canChange={thisComputer} />
+            <Group title="Reset" tone="danger">
+              {thisComputer ? (
+                <>
+                  <Row label="Delete All Finished Images" description="Moves their files to the trash for 30 days, then deletes them.">
+                    <button className="btn is-danger-soft" onClick={clearGallery}>Delete All</button>
+                  </Row>
+                  <Row label="Clear All Cache" description="Clears the browser cache, stale queue state and ComfyUI’s memory.">
+                    <button className="btn is-danger-soft" onClick={clearAllCache}>Clear Cache</button>
+                  </Row>
+                </>
+              ) : null}
+              <Row label="Reset All Settings" description="Resets prompts, layout, model choices, LoRA stacks and every preference here.">
+                <button className="btn is-danger-soft" onClick={resetAllSettings}>Reset</button>
+              </Row>
             </Group>
-            <HuggingFaceTokenSettings showToast={showToast} />
+          
+            <HelpGroup copyToClipboard={copyToClipboard} />
           </>
         ) : null}
+
 
         {section === 'about' ? (
           <>
@@ -914,10 +915,10 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 {[
                   { value: stats ? compact(stats.outputs) : null, label: 'Outputs', hint: stats ? `${compact(stats.images)} images · ${compact(stats.videos)} videos` : '' },
                   { value: stats ? formatDuration(stats.renderMs) : null, label: 'Rendering', hint: stats?.upscales ? `${compact(stats.upscales)} upscaled` : 'time in ComfyUI' },
-                  { value: stats ? `${compact(stats.megapixels)} MP` : null, label: 'Pixels made', hint: 'megapixels' },
-                  { value: stats ? `${stats.currentStreak} day${stats.currentStreak === 1 ? '' : 's'}` : null, label: 'Current streak', hint: stats?.currentStreak ? '' : 'starts with today’s first image' },
-                  { value: stats ? `${stats.longestStreak} day${stats.longestStreak === 1 ? '' : 's'}` : null, label: 'Longest streak', hint: '' },
-                  { value: stats ? (topWorkflowName || '—') : null, label: 'Most used', hint: stats?.topWorkflowCount ? `${compact(stats.topWorkflowCount)} outputs` : '' }
+                  { value: stats ? `${compact(stats.megapixels)} MP` : null, label: 'Pixels Made', hint: 'megapixels' },
+                  { value: stats ? `${stats.currentStreak} day${stats.currentStreak === 1 ? '' : 's'}` : null, label: 'Current Streak', hint: stats?.currentStreak ? '' : 'starts with today’s first image' },
+                  { value: stats ? `${stats.longestStreak} day${stats.longestStreak === 1 ? '' : 's'}` : null, label: 'Longest Streak', hint: '' },
+                  { value: stats ? (topWorkflowName || '—') : null, label: 'Most Used', hint: stats?.topWorkflowCount ? `${compact(stats.topWorkflowCount)} outputs` : '' }
                 ].map((tile) => (
                   <div className="about-stat" key={tile.label}>
                     <strong title={typeof tile.value === 'string' ? tile.value : undefined}>{tile.value ?? <Skeleton className="skeleton-text short" />}</strong>
@@ -927,8 +928,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 ))}
               </div>
             </Group>
-
-            <HelpGroup copyToClipboard={copyToClipboard} />
 
             <Group title="Links">
               <div className="about-links">

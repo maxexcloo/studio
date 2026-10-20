@@ -75,7 +75,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     expect((await toolbar.boundingBox())!.height).toBe(before!.height);
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Clear Search', exact: true }).click();
-    await reachable(page.getByRole('button', { name: 'Auto-grouping', exact: true }));
+    await reachable(page.getByRole('button', { name: 'Auto-Grouping', exact: true }));
     await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   }
 });

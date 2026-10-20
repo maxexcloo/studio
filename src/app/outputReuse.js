@@ -1,3 +1,5 @@
+import { compatibleLoras as sharedCompatibleLoras } from '../../server/lora-policy.js';
+
 const key = (value) => typeof value === 'string' ? value.trim().replaceAll('\\', '/').toLowerCase() : '';
 const aliases = (profile) => [profile.id, profile.model, profile.baseModel, profile.defaults?.model, profile.defaults?.modelName].map(key).filter(Boolean);
 const basename = (value) => value.split('/').pop();
@@ -42,7 +44,7 @@ export function reuseNumber(value, fallback, range = {}, defaultStep) {
 }
 
 /** Foreign model parts must never overwrite the selected model's usable defaults. */
-export function normaliseReusedSettings(profile, item, { available = {}, fallback = false, current = {} } = {}) {
+export function normaliseReusedSettings(profile, item, { available = {}, fallback = false, current = {}, loraInfos = {} } = {}) {
   const recorded = item.settings || {};
   const defaults = profile.defaults || {};
   const result = {};
@@ -68,7 +70,23 @@ export function normaliseReusedSettings(profile, item, { available = {}, fallbac
     return slot.options?.length && !slot.options.includes(preferred) ? slot.default || slot.options[0] : preferred;
   });
   if (!profile.encoderSlots?.length && result.textEncoder) result.textEncoders = [result.textEncoder];
-  result.loras = fallback || !profile.capabilities?.lora ? [] : (recorded.loras || []).filter((lora) => !profile.options?.loras?.length || profile.options.loras.includes(lora.name)).slice(0, profile.maxLoras || 8);
+  const offered = fallback || !profile.capabilities?.lora ? [] : (recorded.loras || []).filter((lora) => !profile.options?.loras?.length || profile.options.loras.includes(lora.name));
+  // A LoRA made for another model family never comes back with the settings (the item keeps its record).
+  const { loras: compatible, removed } = compatibleLoras(offered, profile, loraInfos);
+  result.loras = compatible.slice(0, profile.maxLoras || 8);
+  result.removedLoras = removed;
   result.hasImageInput = Boolean(profile.mediaInputs?.some((input) => input.kind === 'image') || (profile.kind === 'image' && (profile.capabilities?.startImage || profile.capabilities?.imageToImage)));
   return result;
+}
+
+/** The LoRAs a profile can take: those whose files say another family ("other") are left out and counted. */
+export function compatibleLoras(loras = [], profile, loraInfos = {}) {
+  // The server refuses the same LoRAs on submit (server/lora-policy.js).
+  const { loras: kept, dropped } = sharedCompatibleLoras(loras, loraInfos, profile);
+  return { loras: kept, removed: dropped };
+}
+
+/** "Removed 1 incompatible LoRA", or nothing. */
+export function removedLorasNote(count) {
+  return count ? `Removed ${count} incompatible ${count === 1 ? 'LoRA' : 'LoRAs'}` : '';
 }

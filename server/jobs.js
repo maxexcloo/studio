@@ -1,6 +1,8 @@
+import path from 'node:path';
 import { ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, temporaryInputFiles } from './media-store.js';
-import { flushGallery } from './gallery-store.js';
-import { withComfyBackend } from './comfy-backends.js';
+import { dataDir, flushGallery } from './gallery-store.js';
+import { createCloudJobStore, isCloudGraph } from './cloud-jobs.js';
+import { currentComfyBackend, withComfyBackend } from './comfy-backends.js';
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
 import { describeFailure } from './failures.js';
@@ -19,6 +21,7 @@ import { generationEstimate, generationWarm, recordGeneration, recordUpscale, up
 import { upscaleLeftMs, upscaleWork } from './upscale-timing.js';
 
 export const jobs = new Map();
+export const cloudJobs = createCloudJobStore(path.join(dataDir, 'cloud-jobs.json'));
 const previewSlots = new Map();
 const terminalCleanupTimers = new Map();
 const previewIntervalMs = Math.max(100, Number(process.env.HEISS_PREVIEW_INTERVAL_MS || 500));
@@ -43,6 +46,7 @@ export function setTerminalJob(id, patch) {
     terminalAt: Date.now()
   };
   jobs.set(id, next);
+  cloudJobs.forget(id);
   const previousTimer = terminalCleanupTimers.get(id);
   if (previousTimer) clearTimeout(previousTimer);
   const timer = setTimeout(() => {
@@ -491,6 +495,8 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     }
     run.promptId = queued.prompt_id;
     jobs.set(id, { ...jobs.get(id), status: "running", promptId: queued.prompt_id });
+    // The provider keeps working through a Studio restart; the restarted server resumes from this record.
+    if (isCloudGraph(prompt)) cloudJobs.remember(id, { promptId: queued.prompt_id, comfyBackend: currentComfyBackend(), kind: body.kind, profileId: body.profileId || "", ...(body.ownerId ? { ownerId: body.ownerId } : {}) });
     const tracker = promptTracker(queued.prompt_id);
     run.alive = tracker.alive;
     /**

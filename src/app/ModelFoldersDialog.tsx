@@ -64,30 +64,30 @@ function Steps({ stage }: { stage: ModelFolderStage }) {
 function copyFor(stage: ModelFolderStage, folders: StrayModelFolder[], added: ModelFolders['added'], saved = false, comfyRestarting = false): { title: string; description: string } {
   const count = folders.reduce((sum, folder) => sum + folder.count, 0);
   switch (stage) {
-    case 'scanning': return { title: 'Searching for models', description: 'Checking your folders, other ComfyUI installs and connected drives.' };
+    case 'scanning': return { title: 'Searching for Models', description: 'Checking your folders, other ComfyUI installs and connected drives.' };
     case 'found': return {
-      title: `Add ${plural(count, 'model')}`,
+      title: `Add ${plural(count, 'Model')}`,
       description: folders.length === 1
         ? folders[0].partlyRead
           ? `ComfyUI reads ${folders[0].name}’s models folder, but not ${folders[0].kinds.length === 1 ? `its ${folders[0].kinds[0].name} subfolder` : 'these subfolders'}.`
           : `They’re in ${folders[0].name}, which ComfyUI doesn’t read.`
         : `They’re in ${plural(folders.length, 'folder')} ComfyUI doesn’t fully read.`
     };
-    case 'none': return { title: 'No models found outside ComfyUI', description: 'If models are somewhere else, choose the folder.' };
-    case 'remote': return { title: 'ComfyUI runs on another computer', description: 'Only folders on the computer running Studio can be searched.' };
+    case 'none': return { title: 'No Models Found Outside ComfyUI', description: 'If models are somewhere else, choose the folder.' };
+    case 'remote': return { title: 'ComfyUI Runs on Another Computer', description: 'Only folders on the computer running Studio can be searched.' };
     case 'offline': return comfyRestarting
-      ? { title: 'ComfyUI is restarting', description: 'The search continues when it’s back, usually in a few seconds.' }
+      ? { title: 'ComfyUI Is Restarting', description: 'The search continues when it’s back, usually in a few seconds.' }
       : { title: 'Waiting for ComfyUI', description: 'Start ComfyUI to continue.' };
-    case 'adding': return { title: 'Adding folders', description: 'ComfyUI’s previous settings are saved as a backup.' };
+    case 'adding': return { title: 'Adding Folders', description: 'ComfyUI’s previous settings are saved as a backup.' };
     case 'restarting': return { title: 'Restarting ComfyUI', description: 'ComfyUI reads its model folders when it starts. This takes a few seconds.' };
-    case 'waiting': return { title: 'Restart ComfyUI to finish', description: 'ComfyUI reads its model folders when it starts. Quit ComfyUI and open it again.' };
+    case 'waiting': return { title: 'Restart ComfyUI to Finish', description: 'ComfyUI reads its model folders when it starts. Quit ComfyUI and open it again.' };
     case 'done': return {
-      title: added.count ? `${plural(added.count, 'model')} ready` : 'Folder added',
+      title: added.count ? `${plural(added.count, 'Model')} Ready` : 'Folder Added',
       description: 'New files in it show up after a rescan.'
     };
     case 'error': return saved
-      ? { title: 'Folders saved, waiting for ComfyUI', description: 'ComfyUI reads them the next time it starts.' }
-      : { title: 'Couldn’t add the folder', description: 'ComfyUI’s settings weren’t changed.' };
+      ? { title: 'Folders Saved, Waiting for ComfyUI', description: 'ComfyUI reads them the next time it starts.' }
+      : { title: 'Couldn’t Add the Folder', description: 'ComfyUI’s settings weren’t changed.' };
   }
 }
 
@@ -134,7 +134,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
   const comfyRestarting = useComfyRestarting();
   const { title, description } = copyFor(stage, folders, added, state.saved, comfyRestarting);
   const toggle = (path: string) => state.setSelected(selected.includes(path) ? selected.filter((item) => item !== path) : [...selected, path]);
-  const later = <button className="btn is-ghost" onClick={state.close}>Not now</button>;
+  const later = <button className="btn is-ghost" onClick={state.close}>Not Now</button>;
   const choose = <button className="btn" onClick={state.pick}><FolderOpen size={14} /> Choose a folder…</button>;
 
   let body: React.ReactNode = null;
@@ -202,7 +202,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
         {stage === 'waiting' ? <ComfyRestart compact className="upscale-restart" /> : null}
       </>
     );
-    footer = stage === 'waiting' ? <button className="btn is-ghost" onClick={state.close}>Finish later</button> : null;
+    footer = stage === 'waiting' ? <button className="btn is-ghost" onClick={state.close}>Finish Later</button> : null;
   } else if (stage === 'done') {
     body = (
       <>
@@ -235,8 +235,8 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
       ? <><div className="upscale-callout"><strong>{error}</strong></div><ComfyRestart compact className="upscale-restart" onBack={() => state.scan()} /></>
       : <div className="upscale-callout is-danger"><strong>{error || 'Try again, or add the folder in ComfyUI yourself.'}</strong></div>;
     footer = state.saved
-      ? <button className="btn is-ghost" onClick={state.close}>Finish later</button>
-      : <>{later}<button className="btn is-primary" onClick={() => state.scan()}>Try again</button></>;
+      ? <button className="btn is-ghost" onClick={state.close}>Finish Later</button>
+      : <>{later}<button className="btn is-primary" onClick={() => state.scan()}>Try Again</button></>;
   }
 
   const busy = stage === 'adding' || stage === 'restarting';

@@ -55,7 +55,7 @@ export function LoraMismatchChip({ mismatch, onOpenLoras, onDismiss }: { mismatc
             {" "}Sure they fit?
           </span>
           {onOpenLoras ? <button type="button" className="lora-mismatch-action" onClick={onOpenLoras}>Check</button> : null}
-          <button type="button" className="lora-mismatch-action is-quiet" onClick={() => onDismiss(mismatch.key)}>Keep them</button>
+          <button type="button" className="lora-mismatch-action is-quiet" onClick={() => onDismiss(mismatch.key)}>Keep Them</button>
           <button type="button" className="lora-mismatch-close" aria-label="Dismiss" onClick={() => onDismiss(mismatch.key)}><X size={12} /></button>
         </motion.div>
       ) : null}

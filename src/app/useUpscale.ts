@@ -116,7 +116,7 @@ export type SizePlan = {
 /**
  * How a run reaches its tab: Default is the picked preset as it is; 2K draws
  * that aspect with its long side at 2048, the model itself, no upscale after.
- * With `area` (Settings › Generation › Megapixels, which takes 2K's place),
+ * With `area` (Settings › Studio › Megapixels, which takes 2K's place),
  * Default draws the picked aspect at that many pixels instead, in the model's steps (16 at least).
  */
 export function sizePlan(tier: AutoUpscale | undefined, width: number, height: number, native: NativeSupport = {}, max = 8192, area = 0, step = 16): SizePlan {

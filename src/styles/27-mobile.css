@@ -236,22 +236,11 @@
   opacity: 0;
   pointer-events: none;
 }
-/* The locked-Hidden rule sets its own translate; keep its slide-away. */
-.is-hidden-locked .zen-prompt { translate: 0 16px; }
 
 /* -------------------------------------------------------------- Safe areas */
 
 /* viewport-fit=cover puts the page under notches and rounded corners; anything
    pinned to an edge keeps clear of them at every width, not only on phones. */
-.hidden-bar,
-.hidden-lockscreen-back {
-  top: max(var(--deck-gap, 18px), env(safe-area-inset-top));
-  left: max(var(--deck-gap, 18px), env(safe-area-inset-left));
-}
-.zen-shell .hidden-bar {
-  top: max(14px, env(safe-area-inset-top));
-  left: max(14px, env(safe-area-inset-left));
-}
 .zen-gallery-restore {
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
@@ -267,8 +256,6 @@
     padding-left: max(6px, env(safe-area-inset-left));
     padding-right: max(6px, env(safe-area-inset-right));
   }
-  /* The strip sits under the Hidden bar here; give it room. */
-  .is-hidden-space .zen-gallery-wrap { top: calc(max(10px, env(safe-area-inset-top)) + 54px); }
 }
 
 /* ------------------------------------------------------- Touch: tap targets */
@@ -353,8 +340,8 @@
   .modal-wide,
   .modal-sheet { height: calc(100dvh - 16px); max-height: none; }
   /* The lock screen's mark scales with the height it has. */
-  .hidden-lock-stage .stage-mark { width: min(520px, 92%, calc(40dvh * 2.5)); }
-  .hidden-lock-stage .stage-copy { min-height: 0; }
+  .lock-stage .stage-mark { width: min(520px, 92%, calc(40dvh * 2.5)); }
+  .lock-stage .stage-copy { min-height: 0; }
 }
 
 /* ------------------------------------------------------------- Menus: dvh */

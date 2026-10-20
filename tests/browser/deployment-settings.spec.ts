@@ -29,13 +29,13 @@ test('deployment settings show sources, keep locked values read-only and save th
   await page.goto('/');
   await studioUi(page).openSettings();
   const dialog = page.locator('.settings-modal');
-  await dialog.getByRole('button', { name: 'Connection', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Workers', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Generation Connections' })).toBeVisible();
   const images = dialog.locator('.set-row').filter({ hasText: 'http://comfyui-image:8188' });
   await expect(images).toContainText('Deployment · Locked');
   await expect(dialog.getByRole('button', { name: 'Edit Images Address', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Edit Videos Address', exact: true }).click();
-  await expect(dialog.getByLabel('Videos ComfyUI address')).toBeVisible();
+  await expect(dialog.getByLabel('Videos ComfyUI Address')).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await dialog.getByRole('button', { name: 'Models', exact: true }).click();
@@ -45,7 +45,7 @@ test('deployment settings show sources, keep locked values read-only and save th
   await dialog.getByRole('switch', { name: 'LoRAs', exact: true }).click();
   await expect.poll(() => saved).toContainEqual({ key: 'STUDIO_ENABLE_LORAS', value: false });
 
-  await dialog.getByRole('button', { name: 'Integrations', exact: true }).click();
+  // Integrations share the Models page.
   await expect(dialog.locator('.set-row').filter({ hasText: 'Output Storage' })).toContainText('Studio Media');
   await expect(dialog.getByRole('heading', { name: 'Civitai' })).toBeVisible();
 });

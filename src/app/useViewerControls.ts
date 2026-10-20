@@ -1,6 +1,7 @@
 import { fallbackAspectPresets } from './constants';
 import { clampProfileCount, outputProfile, referenceImageSize } from './generationOptions';
-import { normaliseReusedSettings } from './outputReuse';
+import { compatibleLoras, normaliseReusedSettings, removedLorasNote } from './outputReuse';
+import { fetchLoraInfo, knownLoraInfo } from './useLoraInfo';
 import { reusedNegative } from './composerSettings';
 import { clampText, settingMax } from './format';
 import { touchCenter, touchDistance } from './gallery';
@@ -183,7 +184,7 @@ export function useViewerControls(view: any) {
     if (!targetProfile) { applyPromptsOnly(item, true); return false; }
     const nextMode = targetProfile.kind;
     const matchingAspects = targetProfile.aspectPresets?.length ? targetProfile.aspectPresets : fallbackAspectPresets[nextMode];
-    const settings = normaliseReusedSettings(targetProfile, item, { available: models, fallback: !matchingProfile, current: view.draft || {} });
+    const settings = normaliseReusedSettings(targetProfile, item, { available: models, fallback: !matchingProfile, current: view.draft || {}, loraInfos: knownLoraInfo() || {} });
     if (!matchingProfile && targetProfile.aspectPolicy === 'reference' && view.referenceForAspect) {
       Object.assign(settings, referenceImageSize(targetProfile, view.referenceForAspect) || {});
     }
@@ -219,6 +220,15 @@ export function useViewerControls(view: any) {
     setWeightDtype(settings.weightDtype);
     // Save the stack under the workflow we're switching to, not the one we're leaving.
     setLoras(normalizeLoras(settings.loras), targetProfile.id);
+    // Before any LoRA panel has asked what the files are for, ask now and drop what doesn't fit.
+    if (settings.loras.length && !knownLoraInfo()) {
+      void fetchLoraInfo().then((infos) => {
+        const { loras, removed } = compatibleLoras(normalizeLoras(settings.loras), targetProfile, infos);
+        if (!removed) return;
+        setLoras(loras, targetProfile.id);
+        showToast(removedLorasNote(removed), "removed");
+      }).catch(() => undefined);
+    }
     if (matchingProfile || !settings.hasImageInput) {
       setStartImage(settings.hasImageInput ? item.referenceImage || "" : "");
       if (setStartImageId) setStartImageId(settings.hasImageInput ? item.startImageId || item.referenceImage || "" : "");
@@ -228,9 +238,10 @@ export function useViewerControls(view: any) {
     if (matchingProfile) view.onReuseReferences?.(targetProfile, itemSettings.referenceAssets);
     view.onReuseOutput?.(item);
     const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
+    const removed = settings.removedLoras ? ` ${removedLorasNote(settings.removedLoras)}.` : "";
     const message = matchingProfile
-      ? `Ready to recreate.${seedNote}`
-      : `Its model isn’t available. Settings adjusted for ${targetProfile.displayName || targetProfile.label}.${seedNote}`;
+      ? `Ready to recreate.${removed}${seedNote}`
+      : `Its model isn’t available. Settings adjusted for ${targetProfile.displayName || targetProfile.label}.${removed}${seedNote}`;
     toast(message, {
       duration: 8000,
       action: before ? { label: "Undo", onClick: () => restoreDraft(before) } : undefined
@@ -245,14 +256,17 @@ export function useViewerControls(view: any) {
     toast(unavailable ? 'A compatible model isn’t available. Only prompts applied.' : 'Prompts applied.');
   }
 
-  function applyLoras(item: GalleryItem) {
-    const loras = normalizeLoras(item.settings?.loras);
-    if (!loras.length) {
+  async function applyLoras(item: GalleryItem) {
+    const recorded = normalizeLoras(item.settings?.loras);
+    if (!recorded.length) {
       showToast("This output has no LoRAs", "error");
       return;
     }
+    const profile = models?.profiles?.find((candidate: Profile) => candidate.id === view.draft?.model);
+    const { loras, removed } = profile ? compatibleLoras(recorded, profile, knownLoraInfo() || await fetchLoraInfo().catch(() => ({}))) : { loras: recorded, removed: 0 };
+    if (!loras.length) { showToast(`${removedLorasNote(removed)}: none fit this model`, "error"); return; }
     setLoras(loras);
-    showToast("LoRAs applied", "success");
+    showToast(removed ? `LoRAs applied · ${removedLorasNote(removed)}` : "LoRAs applied", "success");
   }
 
   function moveZen(direction: 1 | -1) {

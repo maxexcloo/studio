@@ -63,7 +63,7 @@ for the computer Docker runs on (compose adds it on plain Linux, Docker Desktop
 knows it anyway, `--add-host` does it for `docker run`). ComfyUI has to listen
 beyond 127.0.0.1 for the container to reach it: start it with `--listen`.
 
-On another machine or port, change it in **Settings › Connection**; the address
+On another machine or port, change it in **Settings › Workers**; the address
 is saved on the data volume and kept. To change the starting point instead,
 set `HEISS_DOCKER_COMFY_URL` in the compose `.env` (or `-e
 HEISS_DEFAULT_COMFY_URL=...` with `docker run`).

@@ -50,7 +50,7 @@ The node graph is for building workflows. Studio is for the everyday loop of pro
 - **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
 - **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan.
 - **On your phone and every device.** A phone layout made for one thumb, and the full studio on any laptop or tablet on your network. Your PC renders, and every device shares the same models and gallery. [Set it up ↓](#on-your-phone)
-- **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Library.
+- **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Models › Civitai.
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links. The library is off by default; set `STUDIO_ENABLE_PRESETS=1` on the instances that should offer it (see [Configuration](docs/guides/CONFIGURATION.md#civitai-images--downloads)).
 - **Zen mode.** Just the prompt and the picture, fullscreen.
 
@@ -98,7 +98,7 @@ npm start
 
 `npm start` serves **http://localhost:8787** (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
 
-ComfyUI on another machine or port? Set its address in **Settings › Connection**, or copy `.env.example` to `.env` and set `COMFY_URL`.
+ComfyUI on another machine or port? Set its address in **Settings › Workers**, or copy `.env.example` to `.env` and set `COMFY_URL`.
 
 </details>
 
@@ -125,7 +125,7 @@ For local checks, run `mise run setup` and then `mise run check`. Renovate updat
 
 Studio has an optional Streamable HTTP MCP server at `/mcp`, on the same application port and in the same Node process. Set `STUDIO_MCP_API_KEY` on each studio instance to turn on its seven tools: Models, Generate, Status, Result, Cancel, Upload and Reuse. Each key only reaches its own studio. You don't need an extra service, a Python runtime, studio passwords or other studio URLs.
 
-Ordinary requests don't need a Models call. Generate takes `kind` and `tier` instead of a `profile_id` and uses a ready profile the account may use for that tier, preferring the deployment default and then its family. Without a `tier` it uses the fastest tier available, in the order Fast, Super Fast, Standard, Quality. Tiers come from the profile label: `quality` (Quality), `fast` (Fast), `turbo` (Super Fast) and `standard` (Standard or no tier in the label, otherwise Quality). Models lists profiles compactly as `id — label` lines grouped by kind, optionally for one tier. Models with a `profile_id` returns the prompting guide, controls, a compact LoRA index and reference slots. Generate makes one output unless the user asks for more; the studio's own composer keeps its default of two. The chat passes the user's `request` in their own words; with explicit `prompts`, different images go in one call as separate prompts and `count` is the number of variations per prompt. One call queues at most four jobs and waits for them together. A `count` equal to the number of prompts is read as one image each. Each account's outstanding-job limit (`STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS`, default 2) still applies, so set it to at least 4 for chat batches. Models and Generate accept a `profile_id` by ID, label or family name, such as "flux 3". When several profiles of one family match, the fastest wins; a miss names the three closest profiles, fastest first. `aspect` (`landscape`, `portrait`, `square` or a ratio such as `16:9`) picks the profile's own preset size, and `size: "2k"` or `"4k"` scales it to that long side where the profile draws it natively. Both replace invented `width` and `height` values.
+Ordinary requests don't need a Models call. Generate takes `kind` and `tier` instead of a `profile_id` and uses a ready profile the account may use for that tier, preferring the deployment default and then its family. Without a `tier` it uses the fastest tier available, in the order Fast, Super Fast, Standard, Quality. Tiers come from the profile label: `quality` (Quality), `fast` (Fast), `turbo` (Super Fast) and `standard` (Standard or no tier in the label, otherwise Quality). Models lists profiles compactly as `id — label` lines grouped by kind, optionally for one tier; `turbo` and `fast` list both speed tiers, the named one first, and Generate's `turbo` falls back to Fast when no Super Fast profile is ready. Models with a `profile_id` returns the prompting guide, controls, a compact LoRA index and reference slots. Generate makes one output unless the user asks for more; the studio's own composer keeps its default of two. The chat passes the user's `request` in their own words; with explicit `prompts`, different images go in one call as separate prompts and `count` is the number of variations per prompt. One call queues 1–10 jobs (`prompts` × `count`, each a separate job) and waits for them together; the schemas accept more so that Studio, not a client's generic schema check, refuses an excess by naming the field, its range and how to split it. A `count` equal to the number of prompts is read as one image each. Each account's outstanding-job limit (`STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS`, default 2) still applies, so set it to at least 10 for chat batches. Models and Generate accept a `profile_id` by ID, label, family name or model words, such as "flux 3", "FLUX.3" or "turbo flux 3"; the model words decide the family and speed words such as turbo or quality only choose within it ("moss turbo" is MOSS's fastest profile, never another model's Turbo). With a `tier` as well, a named profile moves to that tier within its family, or to the family's nearest tier with a note to pass on. When several profiles of one family match, the fastest wins; words naming several families ("klein") list them in Models and are refused with the list by Generate. A miss lists the ready profiles of the family the name points at, or says the model isn't available so the chat tells the user instead of substituting another; a name of speed words alone names the three closest profiles, fastest first. Without a `profile_id`, a model the `request` names by family or model word ("six baby ducks, fast moss") is used as if it were the `profile_id`, when exactly one family is named; the reply says so. Every Queued and Done reply names the profile used. Several different images belong in one call: with `count`, the prompt writer gives each output its own prompt. `aspect` (`landscape`, `portrait`, `square` or a ratio such as `16:9`) picks the profile's own preset size, and `size: "2k"` or `"4k"` scales it to that long side where the profile draws it natively. Both replace invented `width` and `height` values.
 
 Without prompt writing, the request is the prompt, so the chat writes it, and the first submission to a profile in a conversation (or, without a conversation header, for each account and profile) carries a compact prompting guide of at most 1,200 characters: the guide's summary, rules and pitfalls. Studio marks it as sent before it waits, so concurrent calls attach it once. A Models call with that `profile_id` returns the full guide and also counts as sent.
 
@@ -177,7 +177,7 @@ Set all three settings, or none (prompt writing is then off). A partial setting 
 Any Streamable HTTP MCP client (Claude Desktop, Grok, LibreChat or others) can connect in one of two ways:
 
 - **Through LiteLLM:** `https://<litellm>/studio/mcp` with a LiteLLM virtual key that may use the `studio` MCP server in `x-litellm-api-key: Bearer <key>`, and the user's identity in `X-AI-User-Id` (and optionally `X-AI-User-Email`). LiteLLM adds the shared `STUDIO_MCP_API_KEY`. Send `X-Studio-Conversation-Id` too, where the client has a conversation ID, so results are numbered per conversation.
-- **Directly:** `https://<studio>/mcp` with the account's personal MCP token from **Settings › Accounts & MCP** as `Authorization: Bearer <token>`.
+- **Directly:** `https://<studio>/mcp` with the account's personal MCP token from **Settings › Account** as `Authorization: Bearer <token>`.
 
 ## Supported models
 
@@ -187,7 +187,7 @@ Any Streamable HTTP MCP client (Claude Desktop, Grok, LibreChat or others) can c
 
 **Video (7, beta):** MiniMax H3, HunyuanVideo 1.5, Wan 2.2 (5B and 14B) and Wan 2.1, with text and image to video where the model has both.
 
-Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model types**. GGUF files work; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
+Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model Types**. GGUF files work; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
 
 ## Bring your own workflow
 
@@ -235,7 +235,7 @@ Change one part of a picture and keep the rest. Hover a reference or start image
 - **A proper brush.** Brush, eraser, hand, undo, zoom and size, on a phone too.
 - **Two dials.** **Inpaint strength** and **Edge softness** sit under the image in the sidebar (in the Advanced sheet on a phone).
 
-Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no outpainting or layers. Inpainting is in beta and on by default; **Settings › Features › Inpainting** turns it off.
+Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no outpainting or layers. Inpainting is in beta and on by default; **Settings › Studio › Inpainting** turns it off.
 
 ## Native 2K and sizes
 
@@ -243,7 +243,7 @@ Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no 
 - **See the size before you run.** A live frame shows the shape and pixels you'll get, and hovering a shape previews it.
 - **Custom, linked or not.** Width and height move together and keep the shape, or unlink them. Type, use the arrow keys or drag the label, from 256 to 4096.
 - **Saved sizes on every device.** **Save size** keeps a size of your own, to rename or remove later. Your phone and every other device see the same list.
-- **Or count in megapixels.** **Settings › Generation › Size in megapixels** puts a Megapixels field in the menu, and every shape is drawn at that many pixels.
+- **Or count in megapixels.** **Settings › Studio › Size in Megapixels** puts a Megapixels field in the menu, and every shape is drawn at that many pixels.
 
 A reference being edited or a painted mask sets the size itself, and your 2K pick comes back afterwards.
 
@@ -260,7 +260,7 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 <details>
 <summary><b>Effort and faces</b></summary>
 
-**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort is set under **Settings › Features › Smart upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort is set under **Settings › Studio › Smart Upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes.
 
 </details>
 
@@ -273,13 +273,13 @@ Making ten takes of one idea fills a gallery fast. With auto-grouping on, pictur
 - **It follows your prompts.** Similar prompts group together, and coming back to a prompt the next day starts a new stack.
 - **Your files stay put.** Grouping changes no files. Switch it off and the gallery is as it was.
 
-Turn it on with the stack button next to gallery search, or under **Settings › Library › Auto-grouping**, where you also pick the photo or cover-flow look.
+Turn it on with the stack button next to gallery search, or under **Settings › Studio › Auto-Grouping**, where you also pick the photo or cover-flow look.
 
 ## On your phone
 
 On a phone the studio switches to its own layout. Prompt, browse, share and upscale while your PC renders.
 
-Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **Settings › Connection** with your phone and sign in. Both devices need to be on the same trusted network.
+Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **Settings › Workers** with your phone and sign in. Both devices need to be on the same trusted network.
 
 <details>
 <summary><b>The phone layout</b></summary>
@@ -294,7 +294,7 @@ The gallery runs edge to edge, and one **Describe…** pill opens the prompt, re
 
 Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. Studio and ComfyUI keep running on your PC with its models and outputs; the other device needs only a browser.
 
-1. On the PC running Studio, open **Settings › Connection** and turn on **Open on other devices**.
+1. On the PC running Studio, open **Settings › Workers** and turn on **Open on other devices**.
 2. In the same settings, set a **studio password** under **Signing in**.
 3. On your other device, open the **network address** shown in Connection (for example, `http://192.168.1.20:8787`) and sign in with that password. Use your PC’s listed address, not `localhost`.
 
@@ -331,8 +331,8 @@ Everything else (the output folder, other devices, HTTPS, the Hugging Face token
 
 [TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems. A failed generation links straight to its section.
 
-- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Connection. After adding files, use **Settings › Models › Rescan**.
-- **Asking for help?** **Settings › About › Copy diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
+- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. After adding files, use **Settings › Models › Rescan**.
+- **Asking for help?** **Settings › Maintenance › Copy Diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
 
 ## Feedback and community
 

@@ -16,9 +16,9 @@ const KINDS: Array<{ value: FeedbackKind; label: React.ReactNode }> = [
 ];
 
 const COPY: Record<FeedbackKind, { title: string; heading: string; body: string; send: string }> = {
-  bug: { title: 'What goes wrong, in a few words', heading: 'Report a bug', body: 'What did you do, what happened, and what did you expect?', send: 'Send report' },
-  idea: { title: 'Short and specific', heading: 'Share an idea', body: 'What would it look like, and when would you use it?', send: 'Send idea' },
-  question: { title: 'Your question', heading: 'Ask a question', body: 'What are you trying to do?', send: 'Ask' }
+  bug: { title: 'What goes wrong, in a few words', heading: 'Report a Bug', body: 'What did you do, what happened, and what did you expect?', send: 'Send Report' },
+  idea: { title: 'Short and specific', heading: 'Share an Idea', body: 'What would it look like, and when would you use it?', send: 'Send Idea' },
+  question: { title: 'Your question', heading: 'Ask a Question', body: 'What are you trying to do?', send: 'Ask' }
 };
 
 const readName = () => { try { return localStorage.getItem(scopedStorageKey(NAME_KEY)) || ''; } catch { return ''; } };
@@ -103,7 +103,7 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
         footer={
           <>
             <button type="button" className="btn is-ghost" onClick={onClose}>Done</button>
-            <a className="btn is-primary" href={sent.url} target="_blank" rel="noreferrer"><ArrowUpRight size={14} /> Open on the board</a>
+            <a className="btn is-primary" href={sent.url} target="_blank" rel="noreferrer"><ArrowUpRight size={14} /> Open on the Board</a>
           </>
         }
       />
@@ -118,13 +118,13 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
       busy={busy}
       className="feedback-modal"
       initialFocus={draft?.title ? bodyRef : titleRef}
-      title={draft?.from === 'crash' ? 'Report what broke' : COPY[kind].heading}
+      title={draft?.from === 'crash' ? 'Report What Broke' : COPY[kind].heading}
       description={<>Goes to the public <a href={boardUrl} target="_blank" rel="noreferrer">feedback board</a>, where anyone can upvote and reply. No account needed.</>}
       footer={
         <>
-          {error ? <a className="btn is-ghost feedback-web" href={boardComposeUrl(post)} target="_blank" rel="noreferrer"><ArrowUpRight size={14} /> Send from the website</a> : null}
+          {error ? <a className="btn is-ghost feedback-web" href={boardComposeUrl(post)} target="_blank" rel="noreferrer"><ArrowUpRight size={14} /> Send from the Website</a> : null}
           <button type="button" className="btn is-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="btn is-primary" onClick={send} disabled={busy}>{busy ? 'Sending…' : error ? 'Try again' : COPY[kind].send}</button>
+          <button type="button" className="btn is-primary" onClick={send} disabled={busy}>{busy ? 'Sending…' : error ? 'Try Again' : COPY[kind].send}</button>
         </>
       }
     >
@@ -145,7 +145,7 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
           <div className="feedback-setup">
             <div className="feedback-setup-row">
               <div>
-                <strong>Include setup</strong>
+                <strong>Include Setup</strong>
                 <span>Studio, ComfyUI and Node.js versions, system and GPU.</span>
               </div>
               <Switch label="Include Setup" checked={withSetup} onChange={setWithSetup} size="sm" />

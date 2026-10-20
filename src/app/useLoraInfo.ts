@@ -11,6 +11,16 @@ export type LoraFit = 'fits' | 'other' | 'unknown';
 let cached: { key: string; loras: Record<string, LoraInfo> } | null = null;
 let pending: { key: string; promise: Promise<Record<string, LoraInfo>> } | null = null;
 
+/** What the panels last learned about the LoRAs, for checks outside them (Reuse settings); null before the first answer. */
+export function knownLoraInfo(): Record<string, LoraInfo> | null {
+  return cached?.loras || null;
+}
+
+/** The LoRA answer, asked for now when no panel has needed it yet. */
+export function fetchLoraInfo(): Promise<Record<string, LoraInfo>> {
+  return cached ? Promise.resolve(cached.loras) : load(pending?.key || '');
+}
+
 function load(key: string) {
   if (pending?.key === key) return pending.promise;
   const promise = apiJson<{ loras?: Record<string, LoraInfo> }>('/api/loras/info')

@@ -90,7 +90,13 @@ function loraPolicyMetadata(entry) {
 
 /** Applies only to user-added effects, with the server's resolved profile context. */
 export function optionalLoraPolicyIssue(item, info, profile) {
-  if (info?.compatibility && loraCompatibility(info, profile) === 'other') return `${info?.title || item.name} does not support this model or conditioning variant. Remove it from the optional LoRA stack to generate.`;
+  if (loraCompatibility(info, profile) === 'other') {
+    // Another family entirely, or a variant the publisher excludes within this family.
+    const family = loraCompatibility({ families: info?.families }, profile) === 'other' ? info?.base || info.families.join(' / ') : '';
+    return family
+      ? `${info?.title || item.name} is for ${family}, not ${profile?.displayName || profile?.label || 'this model'}. Remove it from the optional LoRA stack to generate.`
+      : `${info?.title || item.name} does not support this model or conditioning variant. Remove it from the optional LoRA stack to generate.`;
+  }
   const range = strengthRange(info);
   if (range && (item.strength < range.min || item.strength > range.max)) return `${info?.title || item.name} supports strength ${range.min} to ${range.max}. Choose a value in that published range.`;
   return '';

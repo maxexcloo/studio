@@ -66,3 +66,25 @@ test('profile-owned prompting metadata preserves structured guidance and only ex
   workflow.prompting.rules[0] = 'A local edit';
   assert.equal(raw.heissUi.prompting.rules[0], 'Keep the subject');
 });
+
+test("a synced profile's numbered reference slots chain into one stack", async () => {
+  // A real FLUX.3 [klein] Base profile: ten "Reference Image" slots, none saying they belong together.
+  const { readFile } = await import("node:fs/promises");
+  const raw = JSON.parse(await readFile(new URL("./fixtures/profiles/flux3-klein-base-10-references.json", import.meta.url), "utf8"));
+  const workflow = metadataFromJson(raw);
+  assert.equal(workflow.mediaInputs.length, 10);
+  assert.equal(workflow.mediaInputs[0].follows, undefined);
+  workflow.mediaInputs.slice(1).forEach((input, index) => assert.equal(input.follows, workflow.mediaInputs[index].id));
+});
+
+test("start and end frames and differently named slots stay separate", () => {
+  const slot = (id, label, role) => ({ id, kind: "image", label, ...(role ? { role } : {}), control: { node: "1", input: id } });
+  const workflow = metadataFromJson({
+    heissUi: { id: "frames", controls: { prompt: { node: "2", input: "prompt" } }, mediaInputs: [slot("start", "Start Frame", "start"), slot("end", "End Frame", "end"), slot("style", "Style Image"), slot("subject", "Subject Image")] },
+    "1": { class_type: "LoadImage", inputs: { image: "a.png" } },
+    "2": { class_type: "CLIPTextEncode", inputs: { text: "" } },
+    "3": { class_type: "SaveImage", inputs: { images: ["1", 0], filename_prefix: "t" } }
+  });
+  assert.deepEqual(workflow.mediaInputs.map((input) => input.follows), [undefined, undefined, undefined, undefined]);
+  assert.deepEqual(workflow.mediaInputs.slice(0, 2).map((input) => input.role), ["start", "end"]);
+});

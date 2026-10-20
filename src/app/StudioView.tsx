@@ -2,13 +2,12 @@ import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { PromptField } from './PromptField';
-import { LoraPopover } from './LoraPopover';
+import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, GalleryHorizontalEnd, Info, Library, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { scopedStorageKey } from './api';
 import { cn, nearTextLimit, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { useHorizontalWheel, useWheelRef } from './wheel';
@@ -45,7 +44,7 @@ import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
 import { usePhone, useThisComputer } from './device';
 import { ConnectedCard } from './ConnectedCard';
-import { Toaster } from './Toaster';
+import { StatusAnnouncer, StatusPill, SurfaceStatus, useStatusHost } from './StatusMessage';
 import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
@@ -148,33 +147,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [composerExpanded, setComposerExpanded] = React.useState(false);
   const [composerPrimaryTarget, setComposerPrimaryTarget] = React.useState<HTMLDivElement | null>(null);
   const [lorasOpen, setLorasOpen] = React.useState(false);
-  // Advanced settings expand inline below the composer's controls, remembered per account.
-  const advancedKey = scopedStorageKey('heiss-ui:advanced-open');
-  const [advancedOpen, setAdvancedOpenState] = React.useState(() => { try { return localStorage.getItem(advancedKey) === '1'; } catch { return false; } });
-  const setAdvancedOpen = React.useCallback((next: boolean | ((open: boolean) => boolean)) => setAdvancedOpenState((current) => {
-    const value = typeof next === 'function' ? next(current) : next;
-    try { localStorage.setItem(advancedKey, value ? '1' : '0'); } catch { /* Kept for this session. */ }
-    return value;
-  }), [advancedKey]);
-  // Escape folds it from its button or from inside it, as it closes the other composer surfaces.
-  React.useEffect(() => {
-    if (!advancedOpen || phone) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target?.closest('.composer-advanced-inline, .composer-advanced-trigger')) return;
-      event.preventDefault();
-      setAdvancedOpen(false);
-      document.querySelector<HTMLElement>('.composer-advanced-trigger')?.focus({ preventScroll: true });
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [advancedOpen, phone, setAdvancedOpen]);
+  // Advanced Settings open in a popover above the composer, like LoRAs (UI-PATTERNS › Composer).
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
   React.useEffect(() => {
     if (!composerExpanded || phone) return;
     const outside = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"]')) return;
+      // The status pill (an Undo) is never a press outside: the composer stays as it was.
+      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"], [data-status-message]')) return;
       setComposerExpanded(false);
     };
     document.addEventListener('pointerdown', outside, true);
@@ -325,7 +305,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const viewerRef = React.useRef<HTMLDivElement | null>(null);
   useFocusTrap(viewerRef, Boolean(active));
   useHistoryDismiss(Boolean(workflowGalleryOpen), () => setWorkflowGalleryOpen(false));
-  const [settingsSection, setSettingsSection] = React.useState<SettingsSection>("general");
+  const [settingsSection, setSettingsSection] = React.useState<SettingsSection>("studio");
   const openSettings = React.useCallback((section?: SettingsSection) => {
     if (section) setSettingsSection(section);
     setSettings(true);
@@ -437,6 +417,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // cancel queue) rise above it as small chips, so the dock never changes size.
   const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
   const studioDockRef = React.useRef<HTMLDivElement>(null);
+  // The gallery's top bar hosts messages; zen mode has no top bar, so its dock does.
+  const dockMessage = useStatusHost(!phone && Boolean(prefs.zenMode));
   React.useLayoutEffect(() => {
     const dock = studioDockRef.current;
     const shell = dock?.closest<HTMLElement>('.app-shell, .zen-shell');
@@ -457,9 +439,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             <motion.div key="simple" {...dockChip}>
               <button type="button" className="dock-chip" onClick={() => setPrefs({ fullStudioOnPhone: false })}>
                 <Smartphone size={14} />
-                <span>Simple view</span>
+                <span>Simple View</span>
               </button>
             </motion.div>
+          ) : null}
+          {dockMessage ? (
+            // Zen mode: messages rise above the dock, beside the status light (UI-PATTERNS › Messages).
+            <motion.div key="message" {...dockChip}><StatusPill message={dockMessage} className="is-dock" /></motion.div>
           ) : null}
           {runningCount ? (
             <motion.div key="cancel" {...dockChip}>
@@ -525,7 +511,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               device={comfyStatus?.device}
               retrying={Boolean(comfyRetrying)}
               onRetry={retryComfyStatus}
-              onOpenConnection={() => openSettings("connection")}
+              onOpenConnection={() => openSettings("workers")}
               comfyUrl={comfyStatus?.url || health?.comfyUrl}
               nearby={comfyStatus?.nearby}
               onNoComfy={() => setNoComfyOpen(true)}
@@ -537,7 +523,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           {renderedGallery.length ? <ConnectedCard at={comfyReconnectedAt} device={comfyStatus?.device} /> : null}
             {galleryLoaded && hasMoreGallery ? (
               <button className="gallery-load-more" onClick={loadMoreGalleryItems}>
-                Load more
+                Load More
               </button>
             ) : null}
     </>
@@ -638,14 +624,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               generationEstimate={view.generationEstimate}
               generateKey={view.generateKey}
             />
-            <AnimatePresence initial={false}>
-              {advancedOpen && composerExpanded ? (
-                <motion.section key="advanced" className="composer-advanced-inline" role="region" aria-label="Advanced Settings" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
->
-                  <div className="composer-advanced-body">{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</div>
-                </motion.section>
-              ) : null}
-            </AnimatePresence>
             {historyPopover}
           </ExpandingComposer>
   );
@@ -676,7 +654,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <RunCard key={zenDisplayItem.run.id} run={zenDisplayItem.run} onOpen={() => showRunInGallery(zenDisplayItem.run)} />
             ) : zenDisplayItem ? (
               <button
-                aria-label={zenDisplayItem.status === "pending" ? "Generating" : "Open in the viewer"}
+                aria-label={zenDisplayItem.status === "pending" ? "Generating" : "Open in the Viewer"}
                 className={cn("zen-output", viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging", zenDisplayItem.status === "pending" && "is-pending")}
                 onClick={() => {
                   if (zenDisplayItem.status === "pending") return;
@@ -749,7 +727,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} status={<SurfaceStatus className="is-toolbar" />} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
@@ -757,7 +735,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </>
       )}
       {settings ? <React.Suspense fallback={<Modal open title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
-      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
+      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("workers") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
       {familySetup.family ? (
         <FamilySetupDialog
@@ -773,6 +751,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
+      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</AdvancedPopover>}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
@@ -784,7 +763,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         quality={upscaleSetup.quality}
         comfyUrl={health?.comfyUrl}
         onQualityChange={(upscaleQuality) => setPrefs({ upscaleQuality })}
-        onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("library"); }}
+        onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("models"); }}
         showToast={showToast}
       />
       <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />
@@ -878,7 +857,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
                                       <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
                                       <i aria-hidden="true" />
-                                      <span className="detail-lora-strength" aria-label={`strength ${lora.strength}`}>{lora.strength}</span>
+                                      <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -924,6 +903,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {!showDetails ? <Tip content="Show Details (I)"><button type="button" data-open-trigger className="viewer-info" aria-label="Info" aria-pressed={false} onClick={() => setShowDetails(true)}><Info size={17} /></button></Tip> : null}
                 </>
                 )}
+                {/* Over the viewer, messages sit at its top edge, between the corner buttons. */}
+                <SurfaceStatus className="is-viewer" />
                 {/* Phones and tablets: the dock has no room for Close, so it sits in the corner. */}
                 <button className="viewer-close" aria-label="Close Viewer" onClick={() => setActive(null)}><X size={18} /></button>
               </div>
@@ -935,8 +916,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>
-      {/* Portaled to <body>: inside the fixed shell it would sit under every dialog's scrim. */}
-      <Toaster offset={islandsHeight ? islandsHeight + 8 : 0} />
+      <StatusAnnouncer />
     </div>
     </GenerationProfiles.Provider>
     </FavoriteContext.Provider>

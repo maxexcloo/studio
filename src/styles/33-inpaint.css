@@ -8,7 +8,7 @@
 
 .inpaint-studio {
   position: fixed;
-  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals and toasts */
+  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals */
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--r-panel);
@@ -279,7 +279,7 @@
 
 /* ------------------------------------------------------- Settings demo */
 
-/* Settings › Features › Inpainting (src/app/InpaintDemo.tsx): the studio in
+/* Settings › Studio › Inpainting (src/app/InpaintDemo.tsx): the studio in
    miniature, in place instead of floating, with the same glass and tools. */
 .inpaint-demo-wrap { display: grid; gap: 8px; max-width: 440px; padding: 12px 16px 14px; }
 /* The studio's tools at the demo's smaller scale. */

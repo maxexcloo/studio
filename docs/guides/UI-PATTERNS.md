@@ -10,7 +10,7 @@ the pattern occurs in the same piece of work.
 - **Durations:** `--motion-instant` (90 ms) for presses, `--motion-fast`
   (140 ms) for hover, focus and small state changes, `--motion-base` (200 ms)
   for surfaces entering or leaving, `--motion-slow` (320 ms) for height
-  changes such as Advanced settings expanding.
+  changes such as a row's details expanding.
 - **Easing:** `--motion-ease` for interactive state changes; `--ease-soft` for
   staged sequences and sheets; framer-motion springs (`stiffness: 420,
   damping: 40`) only for sheets that follow a finger.
@@ -48,20 +48,19 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
   only the newest shows, the ones under it step aside (`is-covered`) until it
   closes, one dimmed backdrop stays behind, and a nested sheet shows Back
   instead of Close. A destructive confirmation is the one exception.
-- Toasts and status never cover controls. On the phone they sit under the
-  status strip; over a full sheet they sit on its title row, short of Close or
-  Back; in the viewer, under its top buttons.
+- Messages and status never cover controls (see [Messages](#messages)).
 - Stacking uses the `--z-*` tokens, never raw numbers.
 
 ## Surfaces
 
 Pick the lightest surface that fits:
 
-1. **Inline expansion** for more of the same thing (Advanced settings, a row's
-   details). It pushes content down with a smooth height transition.
-2. **Anchored popover** on the desktop for choosing something (model, LoRAs,
-   references, size, filters). It opens at its trigger and closes on outside
-   click or Escape. On the phone the same content is a bottom sheet.
+1. **Inline expansion** for more of the same thing (a row's details). It
+   pushes content down with a smooth height transition.
+2. **Anchored popover** on the desktop for choosing or tuning something
+   (model, LoRAs, references, Advanced Settings, size, filters). It opens at
+   its trigger and closes on outside click or Escape. On the phone the same
+   content is a bottom sheet.
 3. **Side panel or sheet** for a task with several steps or a long list
    (Settings, the Details panel, Create on the phone). Sheets have a handle,
    swipe down to close, a backdrop, and scroll inside themselves.
@@ -73,11 +72,18 @@ two levels:
 
 | Level | Used for | Tokens |
 | --- | --- | --- |
-| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar, create pill and select bar, toasts | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
+| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar, create pill and select bar, the status pill | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
 | Panel | Popovers, menus, sheets and side panels | `--glass-panel-bg`, `--glass-panel-blur`, `--glass-border`, `--glass-panel-shadow` |
 
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
 ad-hoc alpha, blur or shadow values.
+
+**Glass never blurs while it moves.** A popover or sheet spreads
+`useSettling()` (`composerSurface.ts`) onto its moving element: during its
+entry and exit it shows `--glass-panel-solid` without a blur, and the glass
+returns when it settles. A dialog's scrim adds its blur when its fade ends.
+The viewer's backdrop is near-solid with no blur. Animate only `transform`
+and `opacity`; never `top`, `left`, `width`, `height`, margins or padding.
 
 ### Accent
 
@@ -87,6 +93,36 @@ One accent, warm amber like the lock mark's glow: `--accent-amber`,
 highlight state uses it: active filters and search, selected tabs and chips,
 pressed toggles, Star and progress. Errors and destructive actions keep their
 own colours. `--ember` is an older name for the same colour.
+
+## Messages
+
+There are no floating toasts. A message (a confirmation, a failure, an Undo)
+shows in the **Studio status pill** (`src/app/StatusMessage.tsx`): the
+status light takes the message's tone, then the words, its one action (Undo,
+View, Try Again) and Dismiss. It times out (failures wait), pauses while
+hovered or focused, and a sideways flick dismisses it. Screen readers hear it
+through one announcer (polite, failures assertive).
+
+- **Where:** the phone's top bar, where the Studio pill sits (the title steps
+  aside for the moment); the desktop gallery's top bar, before its tools
+  (narrowing rather than pushing them); above the dock in zen mode, which has
+  no top bar.
+- **Covered:** a surface that covers the bar (a sheet, a sheet-style picker, a
+  dialog, the viewer) shows the pill at its own top edge while open: on its
+  title row short of Back and Close, or between the viewer's corner buttons.
+  Only the newest open host shows it, so a message is never on screen twice.
+- **Never over controls:** the pill takes the place of a title or hint, never
+  floats over fields, and touching it never dismisses the surface under it.
+- Undo stays inside the pill; a surface never grows its own undo strip.
+
+## Pickers
+
+- The reference and LoRA choosers share one top bar: the tab pills (This
+  Model | All Models | Selected n/max), then **Clear All** beside them, shown
+  only while something is picked. Clear All empties the selection at once and
+  offers Undo in the status pill; it never asks first.
+- One tap adds or removes; a picked item shows its order number and stays
+  pinned across searches and tabs.
 
 ## Composer
 
@@ -107,17 +143,40 @@ own colours. `--ember` is an older name for the same colour.
 
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers.
-- **Advanced** expands inline below the composer's controls with a height
-  transition, remembered per account; Escape folds it. The phone shows the
-  same controls as a tall panel within the Create flow, with Back.
+- **Advanced Settings** open in the composer popover, like LoRAs and
+  References: anchored above the composer at its width, the same glass,
+  motion and dismissal (outside click, Escape, its button again; focus returns
+  to the button). The phone shows the same controls as a sheet that replaces
+  the Create sheet, with Back (one layer).
 - **Size** stays open while choosing: the resolution is a segmented toggle of
   the model's native options (Default · 2K · 4K), beside the shapes, so both
   can be picked in one go.
+
+## Settings
+
+One side panel with a list of sections on the left (a sideways row on the
+phone) and one page at a time, each with its title and one line on what it
+holds:
+
+| Section | Holds | Who |
+| --- | --- | --- |
+| Account | Your MCP connection and this browser's session | Every account |
+| Users | Access profiles, accounts, chat gateway users, password resets | Administrators |
+| Studio | General (layout, keyboard, safety), Generation, Features (Smart Upscale, Inpainting) and the gallery's display, grouping and sharing, each under a quiet subheading | Everyone |
+| Models | Defaults, model types, installed models, the manifest, LoRA library, integrations (Civitai, Hugging Face) and output folders | Administrators |
+| Workers | ComfyUI connections, restart and other devices | Administrators |
+| Maintenance | Clean up, export, reset and diagnostics | Everyone (each item as the device allows) |
+| About | Version, stats, links and credits | Everyone |
+
+A new setting goes in the section that matches who changes it and why;
+destructive actions live in Maintenance, never beside everyday switches.
 
 ## Buttons & Icon Bars
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost
   until hovered, with an accessible name and a tooltip naming the action.
+  A tooltip starts with the action's name and fits on one line ("Recreate
+  With the Same Seed"), so it never covers a neighbouring control.
 - Icon bars group related actions with a divider between groups; the same
   action has the same icon everywhere.
 - **Image/Video switches:** the composer's Image/Video mode and the phone
@@ -169,12 +228,16 @@ own colours. `--ember` is an older name for the same colour.
   (there is no long-press action sheet). The select bar offers Select All,
   Select Failed, then Download (a zip when several) or Share on a phone,
   Animate for the photos among them, Retry for failed items, Star and Delete.
+  Bulk actions keep their one-word visible names, but their tooltips,
+  accessible names and the several-item menu rows say what they act on:
+  "Animate Selected", "Download Selected as a Zip", "Delete Selected"; never
+  one item's copy such as "Make a Video From This Image".
   The desktop's right-click menu offers the same for several, under an
   "n Selected" heading, and the full list for one; its rows are full width
   with a muted icon, split by hairlines between the intent groups.
 - **Copying on phones:** call the clipboard synchronously inside the tap
   (iOS Safari requires it), fall back to a selected text box where there is
-  no clipboard API, and confirm with the button's own "Copied" and a toast.
+  no clipboard API, and confirm with the button's own "Copied" and a message.
 - The desktop downloads; phones share (iOS's share sheet has Save Image).
 - No haptics.
 
@@ -193,6 +256,7 @@ phones, default stroke):
 | Image / Video | `Image` / `Film` | Share | `Share` |
 | Use | `Undo2` | Star | `Star` (filled when on) |
 | Upscale | `UpscaleArrow` | Zoom | `Minus` / `Plus` |
+| Select All | `CheckSquare` | Select Failed | `AlertTriangle` |
 
 ## Phone
 
@@ -262,4 +326,4 @@ padding, and the page returns to where it rested once the keyboard closes.
   Model, Prompt, Negative Prompt, Reference Image, LoRAs, Animate, Star.
 - Item actions: "Use Prompt", "Use Settings", "Copy Prompt", "Retry".
 - Chat and links name results "Result N".
-- Toasts: "Couldn’t …" for failures, without a full stop; "Prompt copied".
+- Messages: "Couldn’t …" for failures, without a full stop; "Prompt copied".

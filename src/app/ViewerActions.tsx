@@ -54,7 +54,7 @@ export function DetailsFooter({ onReuse, onRecreate }: { onReuse?: () => void; o
   return (
     <div className="viewer-actions details-footer" role="group" aria-label="Reuse">
       {onReuse ? <Tip content="Load Both Prompts Into the Prompt Box"><button type="button" className="btn viewer-action" onClick={onReuse}><TextQuote size={15} /><span className="viewer-action-label">Reuse</span></button></Tip> : null}
-      {onRecreate ? <Tip content="Load Everything, Seed Included, for an Exact Rerun"><button type="button" className="btn is-primary viewer-action viewer-action-main" onClick={onRecreate}><RotateCcw size={15} /><span className="viewer-action-label">Recreate</span></button></Tip> : null}
+      {onRecreate ? <Tip content="Recreate With the Same Seed"><button type="button" className="btn is-primary viewer-action viewer-action-main" onClick={onRecreate}><RotateCcw size={15} /><span className="viewer-action-label">Recreate</span></button></Tip> : null}
     </div>
   );
 }

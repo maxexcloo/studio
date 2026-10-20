@@ -11,6 +11,31 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Clear All in the pickers:** the reference chooser and the LoRA library show Clear All beside their tabs while something is picked; Undo comes back in the status pill.
+- **Cloud generations survive a restart:** a Grok job's ComfyUI prompt is kept in `cloud-jobs.json`, so after a Studio restart the tile keeps running and delivers instead of reading "Generation missing"; a lost or failed provider job fails the tile with a clear message.
+
+### Changed
+- **Messages in the Studio pill:** toasts are gone. A message (with its Undo, View or Try Again) takes over the phone bar's Studio pill or sits in the desktop gallery's top bar; a sheet, dialog, picker sheet or the viewer that covers them shows it at its own top edge, never over controls.
+- **One References button for every reference stack:** a profile that lists its references as separate "Reference Image" slots (the synced FLUX.3 [klein] profiles' ten, Boogu Edit Turbo's and Qwen-Image 2.1's three) shows one References button and chooser; start and end frames stay separate.
+- **Advanced Settings in a popover:** above the composer like LoRAs and References, with the same glass, motion and dismissal; the phone keeps its sheet in the Create flow.
+- **Settings sections:** Account, Users (administration, split out of Accounts & MCP), Studio (General, Generation, Features and the gallery), Models (with Integrations and output folders), Workers (Connection), Maintenance (clean up, export, reset and diagnostics) and About.
+- **Labels:** Title Case with "&" for every label, tooltip and accessible name; select-mode actions read "Animate Selected", "Download Selected as a Zip", "Delete Selected"; Select Failed has its own tooltip and icon; tooltips start with the action ("Recreate With the Same Seed").
+- **Smoother motion:** popovers and sheets skip their backdrop blur while they move, a dialog's scrim adds its blur after its fade, and the viewer's backdrop is near-solid.
+- **Faster start:** the first screen's status, model and ComfyUI requests start while the code downloads, the gate's two checks run together, the models load once, and the next gallery page starts two and a half screens early.
+- **LoRAs for another model stay off the stack:** the picker lists them under All Models with the reason but never adds them, and Recreate or Use LoRAs drops them with "Removed 1 incompatible LoRA".
+- **Ten images per chat call:** MCP Generate and Reuse queue 1–10 jobs per call (`prompts` × `count`, each a separate job), stated in the tool and parameter descriptions. An excess is refused by Studio itself, naming the field, its range and how to split the request, instead of a chat client's generic schema error. The account's outstanding-job limit still applies to each job.
+- **Turbo finds the fast profiles:** MCP Models with tier `turbo` or `fast` lists both speed tiers, the named one first, and Generate's `turbo` falls back to Fast when no Super Fast profile is ready. Profile names match model words fuzzily ("flux 3", "flux3", "FLUX.3", "turbo flux 3"); words naming several models ("klein") list them.
+- **The named model is the one used:** in an MCP `profile_id`, the model words pick the family and speed words only choose within it ("moss turbo" is MOSS Image Base · Fast, not Boogu Turbo; "turbo radiance flux 3" is the Radiance FLUX.3 [klein] Distilled profile). A `tier` the family lacks falls back to its nearest tier with a note, never to another family; a miss lists that family's profiles or says the model isn't available, and the chat is told not to substitute another. When the chat leaves `profile_id` out, a model the request names ("six baby ducks, fast moss") is used, and Queued and Done replies name the profile that ran.
+- **Clearer MCP replies:** Generate's description asks for one call with `count` or `prompts` for several different images ("six photos" is count 6) instead of repeated calls, and for a named model in `profile_id`; finished replies say not to call Studio again for this request, and queued replies say to share links, not images.
+
+### Fixed
+- **Phone Upscale label:** it lines up with the other viewer bar labels.
+- **LoRAs for another model are refused:** generation refuses an optional LoRA trained for another family (a Z-Image LoRA on Tesserafine), from the studio and from MCP, instead of applying it; Studio reads a worker LoRA's family before checking. MCP Reuse leaves such a LoRA out of a rerun and says so. `compatibleLoras` in `server/lora-policy.js` filters a reused stack and counts what it dropped.
+
+### Removed
+- **Leftover Hidden styles and copy:** the vault's last CSS and text are gone; the device sign-in screen keeps its own styles.
+
 ## [0.32.0] - 2026-10-20
 
 > One References chooser for many-reference models, Hidden folded back into the gallery, multi-select gallery filters, Animate from the select bars and a tidier viewer, menu and phone sheets

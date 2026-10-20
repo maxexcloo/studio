@@ -301,7 +301,7 @@ export type Preferences = {
   inpainting: boolean;
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
-  /** Settings › Generation: the size menu sets megapixels instead of offering 2K. */
+  /** Settings › Studio: the size menu sets megapixels instead of offering 2K. */
   megapixelSizing?: boolean;
   /** The megapixels Default draws every shape at, with megapixelSizing on; unset, each model's own size. */
   megapixels?: number | null;

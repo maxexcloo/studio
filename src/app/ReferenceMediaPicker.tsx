@@ -6,13 +6,14 @@ import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
-import { surfaceMotion, useComposerSurfaceBox } from "./composerSurface";
+import { surfaceMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
+import { SurfaceStatus } from './StatusMessage';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
@@ -51,7 +52,7 @@ function assetImage(asset: ReferenceAsset) {
  * picked image takes it off again, and Selected n/max reviews, reorders and
  * removes what is picked.
  */
-function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onClearAll, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
   memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
@@ -64,6 +65,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   max: number;
   atCapacity: boolean;
   onDeselect: (asset: ReferenceAsset) => void;
+  onClearAll?: () => void;
   /** Swaps the picture at `from` with the one at `to`, in slot order. */
   onMove: (from: number, to: number) => void;
   onClose: () => void;
@@ -96,7 +98,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     return () => window.clearTimeout(timer);
   }, [search]);
   const uploadInput = React.useRef<HTMLInputElement>(null);
-  const label = (input.label || "Reference image").toLowerCase();
+  const label = (input.label || "Reference Image").toLowerCase();
   const [newId, setNewId] = React.useState("");
 
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
@@ -243,6 +245,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   React.useEffect(() => {
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
+  const settling = useSettling();
   if (!box) return null;
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
@@ -260,6 +263,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       tabIndex={-1}
       data-open-surface
       {...surfaceMotion}
+      {...settling}
     >
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
@@ -267,6 +271,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
           {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
+        {/* Clear All sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
+        {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear All</button> : null}
+        <SurfaceStatus active={Boolean(asSheet && present)} />
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
@@ -445,7 +452,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
     hoverTimer.current = window.setTimeout(() => setHover(next), next ? hoverOpenDelay : hoverCloseDelay);
   };
 
-  const label = isStart ? "Reference Image" : input.label || "Reference image";
+  const label = isStart ? "Reference Image" : input.label || "Reference Image";
 
   if (busy) {
     return (
@@ -457,7 +464,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
 
   if (!selected) {
     return (
-      <Tip content={`Choose a ${label.toLowerCase()}, or drop one on the prompt`}>
+      <Tip content={`Choose a ${label}, or Drop One on the Prompt`}>
         <button
           type="button"
           data-open-trigger
@@ -479,7 +486,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   // hover holds the choices (Edit | Reference, the brush) and the other references with a + for more.
   const menu = Boolean(role || paint);
   const editing = role?.value === "edit";
-  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
+  const name = editing ? `Picture to Edit: ${referenceName(selected.name)}` : `${isStart ? "Start Image" : label}: ${referenceName(selected.name)}`;
   return (
     <div
       className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", editing && "is-edit")}
@@ -503,8 +510,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           </span>
         ) : null}
       </div> : null}
-      <Tip content={`${name} · Click to change`}>
-        <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+      <Tip content={`${name} · Click to Change`}>
+        <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label}, Currently ${selected.name}`} aria-expanded={open}>
           {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : <ImageIcon size={15} />}
         </button>
       </Tip>
@@ -537,7 +544,7 @@ function ReferenceGroupButton({ chain, assets, max, open, busy, progress, requir
   const count = assets.length;
   const name = count ? `References, ${count} of ${max} Selected` : `Add References${required ? ", Required" : ""}`;
   return (
-    <Tip content={count ? `${count} of ${max} · Click to change` : `Choose up to ${max} references, or drop them on the prompt`}>
+    <Tip content={count ? `${count} of ${max} · Click to Change` : `Choose up to ${max} References, or Drop Them on the Prompt`}>
       <button
         type="button"
         data-open-trigger
@@ -700,8 +707,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     if (!images.length) { onError?.("Choose an image file"); return null; }
     const empty = usable.filter((input) => !selected.some((item) => item.slot === input.id)).map((input) => input.id);
     const targets = preferred ? [preferred, ...empty.filter((id) => id !== preferred)] : empty;
-    if (!targets.length) { onError?.("All reference slots are filled. Remove an image or drop onto a thumbnail to replace it."); return null; }
-    if (images.length > targets.length) onError?.(`This model has room for ${targets.length} more reference ${targets.length === 1 ? "image" : "images"}. Extra files were skipped.`);
+    if (!targets.length) { onError?.("Reference slots are full · remove one or drop on a thumbnail"); return null; }
+    if (images.length > targets.length) onError?.(`Room for ${targets.length} more · extra files skipped`);
     uploading.current = true;
     const revision = context.current.revision;
     const current = () => context.current.active && context.current.revision === revision;
@@ -918,6 +925,11 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
               if (!a || !b || !first || !second) return;
               onSelect(a.id, second);
               onSelect(b.id, first);
+            }}
+            onClearAll={() => {
+              const cleared = selected.filter(item => pickerInputs.some(input => input.id === item.slot));
+              onRemove(cleared.map(item => item.slot));
+              showToastTone("References cleared", "removed", { action: { label: "Undo", onClick: () => cleared.forEach((item) => onSelect(item.slot, item.asset)) } });
             }}
             onDeselect={asset => onRemove(selected.filter(item => item.asset.id === asset.id && pickerInputs.some(input => input.id === item.slot)).map(item => item.slot))}
             anchor={host}

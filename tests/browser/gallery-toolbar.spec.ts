@@ -17,7 +17,7 @@ test('gallery tools expand independently and clear every active filter', async (
   const clear = toolbar.getByRole('button', { name: 'Clear Search', exact: true });
   const filters = toolbar.getByRole('button', { name: 'Gallery Filters', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
-  const grouping = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const grouping = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   await expect(search).toHaveCount(0);
   await expect(clear).toHaveCount(0);
   await expect(grouping).toBeVisible();
@@ -220,7 +220,7 @@ test('grouping uses the same glass shell and inset action states as Search and S
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
-  const grouping = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const grouping = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const shell = toolbar.locator('.gallery-action-shell').first();
   const search = toolbar.locator('.gallery-search-trigger');
   const select = toolbar.locator('.gallery-select-toggle');
@@ -347,7 +347,7 @@ test('selection dims only unselected media and keeps the right-hand action order
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
-  const grouping = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const grouping = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
   expect((await grouping.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
   await select.click();
@@ -375,8 +375,8 @@ test('video gallery actions run from playback through grouping to Select', async
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
   await toolbar.getByRole('group', { name: 'Gallery Mode', exact: true }).getByRole('button', { name: 'Videos', exact: true }).click();
-  const play = toolbar.getByRole('button', { name: /^Grid autoplay:/ });
-  const group = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
+  const play = toolbar.getByRole('button', { name: /^Grid Autoplay:/ });
+  const group = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
   await expect(play).toBeVisible();
   expect((await play.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);

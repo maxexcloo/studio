@@ -1,6 +1,6 @@
 import { Modal } from './Modal';
 
-/** Every keyboard shortcut, for Settings › General and the "?" overlay. */
+/** Every keyboard shortcut, for Settings › Studio and the "?" overlay. */
 export const shortcuts: ReadonlyArray<readonly [string, string]> = [
   ['Enter', 'Generate (when “Enter to generate” is on)'],
   ['⌘/Ctrl + Enter', 'Generate, always'],

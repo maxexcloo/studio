@@ -212,7 +212,7 @@ export type ComposerBarProps = {
   applyAspect: (value: string) => void;
   /** The size menu's tab (Default · 2K · Custom), and what Custom may be. */
   sizeTier?: SizeTier;
-  /** The tabs on offer: 2K, or Megapixels in its place (Settings › Generation). */
+  /** The tabs on offer: 2K, or Megapixels in its place (Settings › Studio). */
   sizeTiers?: SizeTier[];
   sizeArea?: number;
   megapixelControl?: MegapixelControl | null;
@@ -375,7 +375,7 @@ export function ComposerBar(props: ComposerBarProps) {
             disabled={comfyRestarting || (comfyOffline ? comfyRetrying : false)}
             blocked={!comfyOffline && !comfyRestarting && generateDisabled}
             busy={comfyRestarting || (comfyOffline && comfyRetrying) || undefined}
-            aria-label={comfyRestarting ? "ComfyUI is restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI offline, check again") : generateDisabledReason || "Generate"}
+            aria-label={comfyRestarting ? "ComfyUI Is Restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI Offline, Check Again") : generateDisabledReason || "Generate"}
           >
             {comfyRestarting
               ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>
@@ -439,7 +439,7 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("aspect", aspectPicker)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
-          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" aria-label="Advanced Settings" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
+          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
           {tucked.length ? (
             <Tip content="More Settings">
               <button

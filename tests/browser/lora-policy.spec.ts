@@ -27,14 +27,18 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await picker.getByRole('button', { name: 'All Models', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
+  // Shown under All Models, an incompatible LoRA says why and can't be added.
+  const excluded = picker.getByRole('checkbox', { name: 'Select Excluded Conditioning', exact: true });
+  await expect(excluded).toBeDisabled();
+  await expect(picker.getByText('This LoRA does not support the selected model variant.', { exact: true }).first()).toBeVisible();
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
-  const value = page.getByLabel('Published Slider strength value', { exact: true }).filter({ visible: true });
+  const value = page.getByLabel('Published Slider Strength Value', { exact: true }).filter({ visible: true });
   await value.fill('10');
   await value.press('Enter');
   await expect(value).toHaveValue('10.00');
-  const slider = page.getByLabel('Published Slider strength', { exact: true }).filter({ visible: true });
+  const slider = page.getByLabel('Published Slider Strength', { exact: true }).filter({ visible: true });
   await expect(slider).toHaveAttribute('min', '-3');
   await expect(slider).toHaveAttribute('max', '10');
   await value.press('ArrowUp');
@@ -84,7 +88,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await row.focus();
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-checked', 'true');
-  const strength = picker.getByLabel('Cards Two strength value', { exact: true });
+  const strength = picker.getByLabel('Cards Two Strength Value', { exact: true });
   await expect(strength).toBeVisible();
   await strength.fill('1.25');
   await strength.press('Enter');
@@ -110,7 +114,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(strength).toHaveCount(0);
   await row.click();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
-  await expect(page.getByLabel('Cards Two strength value', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
   await picker.getByRole('button', { name: /^Save Stack/ }).click();
   await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
   await picker.getByRole('button', { name: 'Save', exact: true }).click();
@@ -121,7 +125,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(strength).toBeEnabled();
   await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
-  await picker.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'true');
   await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
@@ -209,12 +213,11 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
   await picker.getByRole('button', { name: 'All Models', exact: true }).click();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
+  // Another family's LoRA is listed with its reason, never added (a Z-Image LoRA on Tesserafine).
   const crossFamily = picker.getByRole('checkbox', { name: 'Select FLUX.3 Effect', exact: true });
-  await crossFamily.click();
-  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
+  await expect(crossFamily).toBeDisabled();
+  await expect(crossFamily).toHaveAttribute('aria-checked', 'false');
+  await expect(picker.getByText(/does not support the selected model variant \(made for FLUX\.3 Klein\)/).first()).toBeVisible();
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
-  await expect(crossFamily).toHaveCount(1);
-  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
-  await crossFamily.click();
   await expect(crossFamily).toHaveCount(0);
 });

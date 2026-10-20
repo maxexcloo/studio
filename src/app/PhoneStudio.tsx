@@ -7,7 +7,7 @@ import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -31,6 +31,7 @@ import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
+import { StatusPill, useStatusHost } from './StatusMessage';
 
 /* ---------------------------------------------------------------------------
    The phone studio
@@ -168,6 +169,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
   const statusText = restarting ? `${connectionName} is restarting` : comfyStatus?.busy ? `${connectionName} is busy` : connected ? `${connectionName} connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? `${connectionName} is offline` : `Checking ${connectionName}…`;
+  const message = useStatusHost();
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
   return (
@@ -176,18 +178,21 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         <header className="phone-bar is-selecting">
           <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
           <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span></div>
-          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}>Failed</button> : null}
-          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}>{selection.allSelected ? 'None' : 'All'}</button>
+          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={15} aria-hidden="true" />Failed</button> : null}
+          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={15} aria-hidden="true" />{selection.allSelected ? 'None' : 'All'}</button>
         </header>
       ) : null}
       {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
       <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
         <div className="phone-bar-row">
           {/* The Studio mark is the status: its light says whether generation can run, a tap checks again. */}
-          <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
-            <span /><strong>Studio</strong>
-          </button>
-          <div className="phone-title">
+          {/* A message takes the pill over for a moment (UI-PATTERNS › Messages); the title steps aside. */}
+          {message ? <StatusPill message={message} className="is-bar" /> : (
+            <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
+              <span /><strong>Studio</strong>
+            </button>
+          )}
+          <div className={cn('phone-title', message && 'is-yielding')}>
             <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
               <span>Gallery</span>
             </button>
@@ -207,7 +212,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           {bulkActions.map((action, index) => (
             <React.Fragment key={action.id}>
               {startsGroup(bulkActions, index) ? <i className="viewer-phone-divider" aria-hidden="true" /> : null}
-              <button type="button" className={cn(action.danger && 'is-danger')} disabled={action.disabled} onClick={action.run}>
+              <button type="button" className={cn(action.danger && 'is-danger')} aria-label={action.tip || action.label} disabled={action.disabled} onClick={action.run}>
                 <action.Icon size={20} /><span>{action.label}</span>
               </button>
             </React.Fragment>
@@ -228,7 +233,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
                 type="button"
                 className={cn('phone-go', pending.length > 0 && 'is-working')}
                 style={{ '--progress': progress } as React.CSSProperties}
-                aria-label={quickGo ? 'Generate' : 'Open the composer'}
+                aria-label={quickGo ? 'Generate' : 'Open the Composer'}
                 onClick={() => { if (quickGo) generate(); else setCreateOpen(true); }}
               >
                 {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
@@ -428,7 +433,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
       </button>
       {menu ? (
-        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => menu.toggleFavorite(profile.id)}>
+        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
           <Star size={18} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
         </button>
       ) : null}
@@ -521,7 +526,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
         </AnimatePresence>
         {note ? <p className="phone-control-note">{note}</p> : null}
       </div>
-      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at this size' : 'Shape'}>
+      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at This Size' : 'Shape'}>
         {rows.map((row) => (
           <button key={row.key} type="button" role="option" aria-selected={isActive(row)} className={cn('phone-row phone-size-row', isActive(row) && 'is-current')} {...pressHandlers(row)} onClick={() => pick(row)}>
             <span className="phone-size-shape"><span className="aspect-shape" style={aspectIconStyle(row.shape)} /></span>
@@ -662,12 +667,12 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
         <button type="button" className="phone-row" onClick={() => { onClose(); setPrefs({ fullStudioOnPhone: true }); }}>
           <SlidersHorizontal size={20} /><span>Use the Full Studio<small>All controls, laid out for a larger screen</small></span>
         </button>
-        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('general'); }}><Settings size={20} /><span>All Settings</span></button>
+        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('studio'); }}><Settings size={20} /><span>All Settings</span></button>
       </div>
       {hasAccountStorageScope() ? <>
         <h3 className="phone-section">Account</h3>
         <div className="phone-group">
-          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('accounts'); }}><UserRound size={20} /><span>Accounts & MCP<small>Your MCP token and session</small></span></button>
+          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('account'); }}><UserRound size={20} /><span>Account<small>Your MCP token and session</small></span></button>
           <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
         </div>
       </> : null}

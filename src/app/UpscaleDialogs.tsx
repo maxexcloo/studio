@@ -87,16 +87,16 @@ function fileLine(file: UpscaleInstallFile) {
 
 const copyFor = (stage: UpscaleSetupStage, quality: string, pending: boolean, fallback: string): { title: string; description: string } => {
   switch (stage) {
-    case "checking": return { title: "Setting up smart upscale", description: "Checking ComfyUI…" };
+    case "checking": return { title: "Setting Up Smart Upscale", description: "Checking ComfyUI…" };
     case "offline": return { title: "Waiting for ComfyUI", description: "Start ComfyUI to continue." };
     case "nodes": return { title: "Add SeedVR2 to ComfyUI", description: "Smart upscale runs on the SeedVR2 nodes. Install them through ComfyUI-Manager or a terminal." };
-    case "models": return { title: "Download the upscale model", description: `${upscaleQualityLabel(quality)} upscaling needs its SeedVR2 weights, a one-time download from Hugging Face.${fallback ? ` Until then it uses ${fallback}.` : ""}` };
+    case "models": return { title: "Download the Upscale Model", description: `${upscaleQualityLabel(quality)} upscaling needs its SeedVR2 weights, a one-time download from Hugging Face.${fallback ? ` Until then it uses ${fallback}.` : ""}` };
     case "downloading": return { title: "Downloading SeedVR2", description: pending ? "The image upscales when this finishes. The download continues if you close this." : "The download continues if you close this." };
-    case "verifying": return { title: "Checking the download", description: "Making sure the files are complete." };
+    case "verifying": return { title: "Checking the Download", description: "Making sure the files are complete." };
     case "ready": return fallback && !pending
-      ? { title: "Ready with a fallback model", description: `${upscaleQualityLabel(quality)} works, but not with its own model.` }
-      : { title: "Smart upscale is ready", description: pending ? "Starting the upscale." : "Every finished image has an upscale arrow in its corner." };
-    case "error": return { title: "The download stopped", description: "Try again to resume." };
+      ? { title: "Ready with a Fallback Model", description: `${upscaleQualityLabel(quality)} works, but not with its own model.` }
+      : { title: "Smart Upscale Is Ready", description: pending ? "Starting the upscale." : "Every finished image has an upscale arrow in its corner." };
+    case "error": return { title: "The Download Stopped", description: "Try again to resume." };
   }
 };
 
@@ -185,7 +185,7 @@ export function UpscaleSetupDialog({
     ) : !status?.canDownload ? (
       <div className="upscale-callout">
         <strong>The models folder isn’t set yet.</strong>
-        <span>Set ComfyUI’s output folder in Settings › Library, and the models folder next to it is found automatically.</span>
+        <span>Set ComfyUI’s output folder in Settings › Models, and the models folder next to it is found automatically.</span>
       </div>
     ) : (
       <>
@@ -233,7 +233,7 @@ export function UpscaleSetupDialog({
         </button>
       </>
     ) : (
-      <>{later}<button className="btn is-primary" onClick={onOpenLibrary}>Open Library settings</button></>
+      <>{later}<button className="btn is-primary" onClick={onOpenLibrary}>Open Library Settings</button></>
     );
   } else if (stage === "downloading" || stage === "verifying") {
     const files = install?.files || [];
@@ -271,7 +271,7 @@ export function UpscaleSetupDialog({
     footer = stage === "downloading" ? (
       <>
         {admin ? <button className="btn is-ghost" onClick={setup.cancelInstall}>Cancel</button> : null}
-        <button className="btn is-primary" onClick={close}>Continue in background</button>
+        <button className="btn is-primary" onClick={close}>Continue in Background</button>
       </>
     ) : null;
   } else if (stage === "ready") {
@@ -291,13 +291,13 @@ export function UpscaleSetupDialog({
     ) : null;
     footer = pending ? null : fallback && admin ? (
       <>
-        <button className="btn is-ghost" onClick={close}>Keep the fallback</button>
+        <button className="btn is-ghost" onClick={close}>Keep the Fallback</button>
         <button className="btn is-primary" onClick={setup.downloadOwnModel}>Download {upscaleQualityLabel(quality)} · {formatBytes(status?.downloadBytes)}</button>
       </>
     ) : <button className="btn is-primary" onClick={close}>Done</button>;
   } else if (stage === "error") {
     body = <div className="upscale-callout is-danger"><strong>{install?.error || "The download failed."}</strong></div>;
-    footer = admin ? <>{later}<button className="btn is-primary" onClick={setup.startDownload}>Try again</button></> : later;
+    footer = admin ? <>{later}<button className="btn is-primary" onClick={setup.startDownload}>Try Again</button></> : later;
   }
 
   return (
