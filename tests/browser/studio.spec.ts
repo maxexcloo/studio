@@ -397,9 +397,12 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.locator('.set-nav')).toBeVisible();
   expect(loaded.some((url) => /\/SettingsDialog-/.test(url))).toBe(true);
   await page.getByRole('button', { name: 'Workers', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Generation Connections' })).toBeVisible();
+  // One heading per worker, each with its own status.
+  await expect(page.getByRole('heading', { name: 'Image Worker' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Video Worker' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
-  await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
+  // Without its own address the video worker shares the image worker, so it shows no status of its own.
+  await expect(page.locator('.set-row').filter({ hasText: 'videos run on the image worker' })).toBeVisible();
   await page.locator('.settings-modal').getByRole('button', { name: 'Close', exact: true }).click();
   // Models are picked in the chooser alone: no Browse Models into a workflow modal.
   const menu = await ui.openModelPicker();

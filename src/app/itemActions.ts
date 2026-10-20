@@ -51,7 +51,6 @@ export type ItemActionHandlers = {
   star: (item: GalleryItem) => void;
   /* The same for several selected items at once. */
   retryItems: (items: GalleryItem[]) => void;
-  animateItems: (items: GalleryItem[]) => void;
   starItems: (items: GalleryItem[], favorite: boolean) => void;
   removeItems: (items: GalleryItem[]) => Promise<unknown>;
 };
@@ -153,9 +152,9 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 /**
  * What can be done to several selected items, in the same order and with the
  * same one-word names as for one: Share on a phone that can (Download elsewhere,
- * a zip when several), Animate for the photos among them, Retry for failed
- * ones, Star and Delete. Their tips and accessible names are bulk wording
- * ("Animate Selected"), never one item's copy. The select bars and the
+ * a zip when several), Retry for failed ones, Star and Delete; never Animate,
+ * which takes one photo at a time. Their tips and accessible names are bulk
+ * wording ("Star Selected"), never one item's copy. The select bars and the
  * right-click menu offer the same.
  */
 export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, phone = false): ItemAction[] {

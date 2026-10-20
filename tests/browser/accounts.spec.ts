@@ -19,6 +19,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
       return request.fulfill({ json: { ok: true } });
     }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
+    if (url.pathname === '/api/accounts/me') return request.fulfill({ json: { ok: true, account: { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator' }, mcp: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } } });
     if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
     if (url.pathname === '/api/accounts/gateway-links') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
@@ -70,25 +71,40 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await studioUi(page).openSettings();
   await page.getByRole('button', { name: 'Users', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
-  await page.getByPlaceholder('Studio Artists').fill('Video Artists');
-  await page.getByRole('switch', { name: 'video-hd' }).click();
-  await page.getByRole('switch', { name: 'LoRAs' }).click();
-  await page.getByRole('button', { name: 'Save Profile', exact: true }).click();
+  // One access profile at a time: picked from a list with New, edited with multi-selects, then saved or discarded.
+  await page.getByLabel('Access Profile to Edit').click();
+  await page.getByRole('option', { name: 'New Access Profile', exact: true }).click();
+  await page.getByLabel('Profile Name').fill('Video Artists');
+  await page.getByRole('button', { name: 'Features', exact: true }).click();
+  const features = page.getByRole('listbox', { name: 'Features', exact: true });
+  await features.getByRole('option', { name: /^Video Generation/ }).click();
+  await features.getByRole('option', { name: /^LoRAs/ }).click();
+  // Escape closes the menu alone; Settings stays open.
+  await page.keyboard.press('Escape');
+  await expect(features).toHaveCount(0);
+  await expect(page.getByLabel('Profile Name')).toBeVisible();
+  const users = page.getByRole('region', { name: 'Users', exact: true });
+  await users.getByRole('button', { name: 'Models', exact: true }).click();
+  await page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Create Profile', exact: true }).click();
   await expect.poll(() => posts.some((post) => post.url === '/api/accounts/profiles')).toBe(true);
-  const profile = posts.find((post) => post.url === '/api/accounts/profiles')?.body as { id: string; generationProfiles: string[]; features: { loras: boolean } };
+  const profile = posts.find((post) => post.url === '/api/accounts/profiles')?.body as { id: string; generationProfiles: string[]; features: { loras: boolean; videoGeneration: boolean } };
   expect(profile.id).toBe('video-artists');
   expect(profile.generationProfiles).toEqual(['video-hd']);
   expect(profile.features.loras).toBe(true);
-  await page.getByRole('button', { name: 'Disable', exact: true }).click();
+  expect(profile.features.videoGeneration).toBe(true);
+  await page.locator('.set-row').filter({ hasText: 'artist.one' }).getByRole('button', { name: 'Disable', exact: true }).click();
   // Disabling asks first; nothing is sent until it is confirmed.
   expect(posts.some((post) => post.url === '/api/accounts/users/artist-id')).toBe(false);
   await page.getByRole('button', { name: 'Disable Account', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
 
-  await page.getByRole('button', { name: 'Edit Artists', exact: true }).click();
+  await page.getByLabel('Access Profile to Edit').click();
+  await page.getByRole('option', { name: 'Artists', exact: true }).click();
   await expect(page.getByLabel('Profile Name')).toHaveValue('Artists');
-  await expect(page.getByRole('switch', { name: 'image-fast' })).toBeChecked();
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(users.getByRole('button', { name: 'Models', exact: true })).toContainText('image-fast');
 
   // The placeholder shows by name, not as its sentinel value.
   await expect(page.getByLabel('Account for librechat-user-7')).toContainText('Choose an Account');
@@ -110,6 +126,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByLabel('New MCP Token')).toHaveValue('new-one-time-secret');
   await expect(page.getByText('https://studio.example.test/mcp')).toBeVisible();
   await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Users', exact: true }).click();
+  await page.getByRole('button', { name: 'New Account', exact: true }).click();
   const newEmail = page.getByLabel('Email', { exact: true });
   await expect(newEmail).toHaveAttribute('type', 'email');
   await expect(newEmail).toHaveAttribute('autocapitalize', 'none');
@@ -117,10 +134,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Display Name', { exact: true }).fill('New Artist');
   await page.getByLabel('Temporary Password', { exact: true }).fill('a secure temporary password');
   // The username is the account's email, so a new one must look like one.
-  await expect(page.getByRole('button', { name: 'Create User', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Create Account', exact: true })).toBeDisabled();
   await expect(page.getByText('Enter an email address.', { exact: false })).toBeVisible();
   await newEmail.fill(' new.artist@example.com ');
-  await page.getByRole('button', { name: 'Create User', exact: true }).click();
+  await page.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users')?.body).toMatchObject({ username: 'new.artist@example.com' });
   await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
