@@ -12,6 +12,7 @@ version opens with a `> ` summary line.
 ## [Unreleased]
 
 ### Fixed
+- **Stars:** a star the server refuses now says why, with the HTTP status, and starring sends the picture's address as well as its id so a record is found either way.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed

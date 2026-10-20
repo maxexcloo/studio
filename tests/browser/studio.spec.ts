@@ -620,7 +620,7 @@ test('gallery selection stars several items and ends cleanly', async ({ page }, 
   await page.screenshot({ path: testInfo.outputPath('selection.png') });
   await ui.selectionBar.getByRole('button', { name: 'Star', exact: true }).click();
   await expect.poll(() => favourites.length).toBe(1);
-  expect(favourites[0].ids).toEqual(['image-0', 'image-1']);
+  expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1']));
   await page.getByRole('button', { name: 'Stop Selecting' }).click();
   await expect(page.locator('.tile.is-selected')).toHaveCount(0);
 });
@@ -647,7 +647,7 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   await page.screenshot({ path: testInfo.outputPath('desktop-selection-menu.png') });
   await menu.getByRole('menuitem', { name: 'Star', exact: true }).click();
   await expect.poll(() => favourites.length).toBe(1);
-  expect(favourites[0].ids).toEqual(['image-0', 'image-1', 'image-2', 'image-3']);
+  expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1', 'image-2', 'image-3']));
   await bar.getByRole('button', { name: 'Select All Loaded' }).click();
   await expect(bar.getByRole('status')).toHaveText('80 Selected');
   await bar.getByRole('button', { name: 'Deselect All' }).click();
