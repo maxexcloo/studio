@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-20
+
 > One image per chat request, AI Control restarts from chat, and a gallery that follows the viewer
 
 ### Added
@@ -1316,7 +1318,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/maxexcloo/studio/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/maxexcloo/studio/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/maxexcloo/studio/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/maxexcloo/studio/compare/v0.25.0...v0.26.0
