@@ -19,6 +19,18 @@ async function openLibrary(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
 }
 
+// The model choice is the phone's own picker on a phone and the studio's select on the desktop.
+async function chooseUseWith(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator, id: string, label: string | RegExp) {
+  if (await studioUi(page).isPhone()) { await dialog.getByLabel('Use With Model').selectOption(id); return; }
+  await dialog.getByRole('combobox', { name: 'Use With Model' }).click();
+  await page.getByRole('option', { name: label }).click();
+}
+async function expectUseWith(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator, id: string, label: string) {
+  if (await studioUi(page).isPhone()) await expect(dialog.getByLabel('Use With Model')).toHaveValue(id);
+  else await expect(dialog.getByRole('combobox', { name: 'Use With Model' })).toContainText(label);
+}
+const statusPill = (page: import('@playwright/test').Page) => page.locator('[data-status-message]');
+
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="640"><rect width="512" height="640" fill="#527b8f"/><circle cx="256" cy="250" r="110" fill="#a3c0b0"/></svg>');
 const preset = {
   id: '42', galleryItemId: 'civitai:42', name: 'Civitai 42', sourceUrl: 'https://civitai.com/images/42', thumbnailUrl: picture,
@@ -53,12 +65,12 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   await expect(dialog.getByRole('status').filter({ hasText: 'Importing image:' })).toBeVisible();
   finishImport();
   await expect(dialog.getByText('A watercolour landscape at dawn', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Image Saved' })).toContainText('Ready To Use');
+  await expect(dialog.getByRole('status').filter({ hasText: 'model files installed' })).toContainText('Ready To Use');
   await expect(dialog.getByText('Installed', { exact: true })).toHaveCount(2);
   await expect(dialog.getByLabel('Preset Name')).toHaveCount(0);
-  await expect(dialog.getByLabel('Use With Model')).toHaveValue('mock-flux-schnell');
+  await expectUseWith(page, dialog, 'mock-flux-schnell', 'Original Test Model');
   await expect(dialog.getByText(/Civitai Access|managed at the computer/)).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Library', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Saved Images', exact: true }).click();
   await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
   await dialog.getByRole('button', { name: /Civitai 42/ }).click();
   await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeEnabled();
@@ -113,7 +125,8 @@ test('missing LoRAs and filename conflicts remain explicit and download errors a
   await expect(dialog.getByText('Civitai requires access to this resource.', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /Download Missing Files/ })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Retry Missing Files', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toHaveText('Civitai requires access to this resource.');
+  // The failure goes to the status pill, not a box in the panel.
+  await expect(statusPill(page).filter({ hasText: 'Civitai requires access to this resource.' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Use Prompt', exact: true })).toBeEnabled();
   await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { preset: { ...missing, resources: missing.resources.map((item) => item.versionId === 18 ? { ...item, status: 'conflict' } : item) } } }));
   await dialog.getByRole('button', { name: 'Check Again', exact: true }).click();
@@ -135,7 +148,7 @@ test('model links preview their destination before download', async ({ page }) =
   await page.goto('/');
   await openLibrary(page);
   const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
-  await dialog.getByRole('radio', { name: 'Download Models', exact: true }).click();
+  await dialog.getByRole('button', { name: /^Models/ }).click();
   await dialog.getByLabel('Model Or LoRA Link').fill('https://civitai.com/models/9?modelVersionId=19');
   await dialog.getByRole('button', { name: 'Preview Download', exact: true }).click();
   await expect(dialog.getByText('film.safetensors', { exact: true })).toBeVisible();
@@ -161,7 +174,7 @@ test('missing source models can use an installed alternative and missing files c
   await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
   await dialog.getByRole('button', { name: /Civitai 42/ }).click();
   await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeDisabled();
-  await dialog.getByLabel('Use With Model').selectOption('mock-flux-schnell');
+  await chooseUseWith(page, dialog, 'mock-flux-schnell', /Schnell/);
   await expect(dialog.getByRole('button', { name: 'Use Settings', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Retry Missing Files', exact: true }).click();
   await expect.poll(() => retried).toEqual({ versionId: 17 });
@@ -174,7 +187,7 @@ test('failed library loads can be retried and saved images can be searched', asy
   let attempts = 0;
   await page.route('**/api/presets', (route) => {
     attempts += 1;
-    return attempts === 1 ? route.fulfill({ status: 503, json: { error: 'Test library unavailable' } }) : route.fulfill({ json: { presets: [preset], downloads: { available: true, backend: 'local', note: '' } } });
+    return attempts === 1 ? route.fulfill({ status: 503, json: { error: 'Test library unavailable' } }) : route.fulfill({ json: { presets: [preset, { ...preset, id: '43', galleryItemId: 'civitai:43', name: 'Civitai 43', prompt: 'A neon street at night' }], downloads: { available: true, backend: 'local', note: '' } } });
   });
   await page.route('**/api/library/downloads', (route) => route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: '' } } }));
   await page.goto('/');
@@ -185,6 +198,25 @@ test('failed library loads can be retried and saved images can be searched', asy
   await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
   await dialog.getByRole('searchbox', { name: 'Search Saved Images' }).fill('nothing matches');
   await expect(dialog.getByText('No Matching Images', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Clear Search', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: /Civitai 43/ })).toBeVisible();
   await dialog.getByRole('searchbox', { name: 'Search Saved Images' }).fill('watercolour');
   await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Civitai 43/ })).toHaveCount(0);
+});
+
+test('the library opens without waiting on its code, shows placeholders, then the grid', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/api/presets', async (route) => { await held; await route.fulfill({ json: { presets: [preset], downloads: { available: true, backend: 'local', note: '' } } }); });
+  await page.route('**/api/library/downloads', (route) => route.fulfill({ json: { downloads: [], access: { available: true, backend: 'local', note: '' } } }));
+  await page.goto('/');
+  // The code arrives while idle, before anyone opens the library.
+  await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource').some((entry) => /PresetLibrary/.test(entry.name))), { timeout: 8000 }).toBe(true);
+  await openLibrary(page);
+  const dialog = page.getByRole('dialog', { name: 'Image & Model Library' });
+  await expect(dialog.getByLabel('Loading Saved Images')).toBeVisible();
+  release();
+  await expect(dialog.getByRole('button', { name: /Civitai 42/ })).toBeVisible();
+  await expect(dialog.getByLabel('Loading Saved Images')).toHaveCount(0);
 });

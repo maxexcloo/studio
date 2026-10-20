@@ -4,6 +4,7 @@ import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } fro
 import { PromptField } from './PromptField';
 import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
+import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, GalleryHorizontalEnd, Info, Library, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
@@ -112,7 +113,7 @@ function comfyStatusLabel(status: any) {
 
 const loadSettings = () => import('./SettingsDialog');
 const SettingsDialog = React.lazy(() => loadSettings().then((module) => ({ default: module.SettingsDialog })));
-const PresetLibrary = React.lazy(() => import('./PresetLibrary').then((module) => ({ default: module.PresetLibrary })));
+const { Component: PresetLibrary, preload: loadPresetLibrary } = preloadable(() => import('./PresetLibrary').then((module) => module.PresetLibrary));
 const loadWorkflows = () => import('./WorkflowGallery');
 const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ default: module.WorkflowGallery })));
 // One empty list until models load, so the tiles' profile context holds steady.
@@ -149,6 +150,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [lorasOpen, setLorasOpen] = React.useState(false);
   // Advanced Settings open in a popover above the composer, like LoRAs (UI-PATTERNS › Composer).
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  // Where the library is offered, fetch its code while idle, so it opens at once (preloadable.ts).
+  const presetsOffered = models?.features?.presets === true;
+  React.useEffect(() => {
+    if (!presetsOffered) return;
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(() => { void loadPresetLibrary().catch(() => undefined); }, { timeout: 4000 }) : window.setTimeout(() => { void loadPresetLibrary().catch(() => undefined); }, 1500);
+    return () => { if (window.cancelIdleCallback) window.cancelIdleCallback(idle); else window.clearTimeout(idle); };
+  }, [presetsOffered]);
   React.useEffect(() => {
     if (!composerExpanded || phone) return;
     const outside = (event: PointerEvent) => {

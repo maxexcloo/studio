@@ -238,6 +238,32 @@ Settings › Account; it asks first only while something is generating.
 Gallery **Date Headers** ("Today", "This Evening") are a Studio › Gallery
 switch, off by default.
 
+## Library
+
+The Image & Model Library (administrators, where presets are on) uses the
+Settings panel's anatomy: the same sheet, a section rail (a sideways row on the
+phone) and one page at a time with its title and one line.
+
+- **Saved Images:** a link field with Save Image on one line (the button turns
+  primary once there is a link), search once there are two or more, then a grid
+  of even 4:5 cards: the picture, the name, then the base model and creator. A
+  card with files to fetch carries an amber "n Missing" badge.
+- A card opens its **review in place** (Back reads "Saved Images"), with View on
+  Civitai and Delete as icons on the right of that bar: the picture beside the
+  name, where it stands in one line (Ready To Use, Needs Review, Downloading
+  Models), the prompts and settings, then the Use With and Models & LoRAs
+  groups. Use Prompt and Use Settings sit in the footer.
+- **Models:** a link field with Preview Download, the previewed file as a row
+  with Download, then Downloads: one row per file, its folder by name ("LoRAs",
+  not `loras`), the shared `set-progress` bar while it runs, its state on the
+  right and Retry when it failed.
+- **Speed:** the list compares file names and sizes only; opening one image
+  checks its checksums (kept on disk, so a restart never reads every model
+  again). The code loads while idle (`preloadable.ts`), placeholders hold the
+  grid's place while the list arrives, and the last list shows at once on
+  reopening.
+- Failures go to the status pill; the page never grows its own error box.
+
 ## Buttons & Icon Bars
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost
