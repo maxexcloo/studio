@@ -130,7 +130,7 @@
 .wf-detail-head { display: flex; align-items: center; gap: 10px; }
 .wf-detail-recipe { margin: 0; font-size: 13px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
 .wf-detail-head h3 { flex: 1; min-width: 0; margin: 0; font-size: 19px; font-weight: 600; line-height: 1.25; letter-spacing: -.025em; overflow-wrap: anywhere; }
-.wf-heart {
+.wf-star {
   flex: none;
   width: 36px;
   height: 36px;
@@ -144,9 +144,9 @@
   cursor: pointer;
   transition: background var(--dur-fast), color var(--dur-fast), scale 120ms;
 }
-.wf-heart:hover:not(:disabled) { background: var(--control-hover); color: #fff; }
-.wf-heart.active { color: var(--accent-amber); }
-.wf-heart:active:not(:disabled) { scale: .9; }
+.wf-star:hover:not(:disabled) { background: var(--control-hover); color: #fff; }
+.wf-star.active { color: var(--accent-amber); }
+.wf-star:active:not(:disabled) { scale: .9; }
 .wf-detail-desc { margin: -6px 0 0; font-size: 13px; line-height: 1.6; color: hsl(var(--muted-foreground)); }
 
 .wf-health {
