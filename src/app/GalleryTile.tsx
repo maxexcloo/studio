@@ -157,7 +157,8 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
         <span className="tile-caption">
           <strong>{titleFromPrompt(item.prompt || item.filename)}</strong>
           {/* A failed tile already says so in its middle; "Failed" again is noise. */}
-          {item.status === "error" ? null : <em>{item.status === "pending" ? <ElapsedTime startedAt={item.createdAt} format={formatElapsed} /> : (item.timing?.runMs || item.durationMs) ? formatElapsed(item.timing?.runMs || item.durationMs || 0) : item.outputName || item.type}</em>}
+          {/* Phones show no generation time (UI-PATTERNS › Phone); the desktop shows it, or the clock while it runs. */}
+          {item.status === "error" || (phoneTiles && item.status === "pending") ? null : <em>{phoneTiles ? item.outputName || item.type : item.status === "pending" ? <ElapsedTime startedAt={item.createdAt} format={formatElapsed} /> : (item.timing?.runMs || item.durationMs) ? formatElapsed(item.timing?.runMs || item.durationMs || 0) : item.outputName || item.type}</em>}
         </span>
       </button>
       {/* Controls are siblings of the tile's button, never inside it: a button

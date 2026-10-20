@@ -362,8 +362,11 @@ phone) and one page at a time with its title and one line.
   Upscale | Star · Delete, then Close. Info sits alone in the top right (beside
   the corner Close on tablets); it opens Details, and the open Details panel
   has its own Close in its header, as Info's corner is under it.
-- **Viewer, phone:** Star top left; Info top right beside Close; the bottom
-  bar Copy · Share | Animate · Rerun · Reference · Upscale | Delete.
+- **Viewer, phone:** the desktop's title top left (the profile name and its
+  settings line; a message takes its place for a moment); Star · Info · Close
+  top right; the bottom bar Copy · Share | Animate · Rerun · Reference ·
+  Upscale | Delete, centred with even sides in a bar-height row above the home
+  indicator.
   Download replaces Share only where the browser can't share files. Info
   toggles Details: the bar is a trigger surface, so a tap on Info while
   Details is open closes it.
@@ -456,6 +459,8 @@ bar.
   filter row's Clear, its icon, Escape, or starting Select) clears the query
   and every filter. It is part of the top bar, not an
   overlay, so scrolling the gallery leaves it open.
+- **Tiles** show the prompt and the output's name or type, never the
+  generation time (the desktop shows the time).
 - **The viewer keeps the gallery's place:** opening a tile, even one half under
   the bar, never scrolls the gallery; closing lands on the same scroll position.
   Only stepping to another item brings its tile into view behind the viewer.

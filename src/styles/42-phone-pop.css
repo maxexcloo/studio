@@ -203,14 +203,15 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side-body::-webkit-scrollbar { display: none; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .details-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 
-/* Messages over the viewer: centred between the corner buttons, as tall as the bar's pill and on their centre line. */
+/* Messages over the viewer take the title's place, top left, as tall as the bar's pill and on the corner buttons' centre line. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {
   top: calc(max(10px, env(safe-area-inset-top)) + (var(--bar-h) - var(--bar-pill-h)) / 2);
-  left: 50%;
+  left: max(10px, env(safe-area-inset-left));
   height: var(--bar-pill-h);
-  max-width: calc(100% - 4 * var(--bar-h) - 40px);
-  translate: -50% 0;
+  max-width: calc(100vw - 3 * (var(--dock-h) + 8px) - 24px);
+  translate: none;
 }
+.scrim .viewer-stage:has(.viewer-phone-bar):has(.status-pill.is-viewer) .viewer-profile-summary { visibility: hidden; }
 
 /* A message while a pop-up covers the top bar: the pop-up's head hosts the pill in the title's place (UI-PATTERNS › Messages). */
 .reference-popover.is-pop .reference-popover-head:has(.status-pill) > strong,

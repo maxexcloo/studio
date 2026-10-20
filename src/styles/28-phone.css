@@ -641,7 +641,10 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   display: flex;
   align-items: center;
   gap: 0;
-  padding: 6px max(4px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  /* Even on both sides, and the buttons centred in a bar-height row above the home indicator. */
+  justify-content: center;
+  min-height: calc(var(--bar-h) + 16px + env(safe-area-inset-bottom));
+  padding: 4px max(6px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
 }
 /* The glass is on a layer of its own: a backdrop-filter on the bar would become
    the containing block of the star and Details buttons it pins to the corners. */
@@ -734,7 +737,25 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   .viewer-phone-upscale.is-indeterminate .viewer-phone-upscale-ring { animation: none; opacity: .5; }
 }
 .viewer-phone-bar button.is-danger { color: var(--danger-ink); }
-.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary { display: none; }
+/* The title, as on the desktop: the profile name and its settings, top left, clear of Star · Info · Close. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  right: auto;
+  max-width: calc(100vw - 3 * (var(--dock-h) + 8px) - max(10px, env(safe-area-inset-left)) - max(10px, env(safe-area-inset-right)) - 4px);
+  min-height: var(--dock-h);
+  align-content: center;
+  padding: 6px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.scrim .viewer-stage.with-side:has(.viewer-phone-bar) .viewer-profile-summary { display: none; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-canvas { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-arrow { display: none; } /* swipe steps through */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side { bottom: calc(96px + env(safe-area-inset-bottom)); }
@@ -870,7 +891,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .scrim .viewer-stage:has(.viewer-phone-bar) .failure-panel { width: calc(100% - 16px); max-height: calc(100% - 24px); overflow-y: auto; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .failure-actions .btn { flex: 1; min-height: 48px; font-size: 15px; }
 
-/* Viewer extras on the phone: Info beside Close at the top right, notices above the bar,
+/* Viewer extras on the phone: Star and Info beside Close at the top right, notices above the bar,
    and a comparison line you can grab. */
 .viewer-phone-bar .viewer-phone-info,
 .viewer-phone-bar .viewer-phone-star {
@@ -889,8 +910,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   box-shadow: var(--glass-bar-shadow);
 }
 .viewer-phone-bar .viewer-phone-star {
-  right: auto;
-  left: max(10px, env(safe-area-inset-left));
+  right: calc(max(10px, env(safe-area-inset-right)) + 2 * (var(--dock-h) + 8px));
 }
 .viewer-phone-notice {
   position: absolute;
@@ -936,4 +956,9 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   left: calc(max(10px, env(safe-area-inset-left)) + var(--dock-h) + 8px);
   max-width: calc(100% - 20px - 3 * var(--dock-h) - 32px);
   translate: none;
+}
+/* The phone viewer's title keeps to two short lines: the name, then the settings, each cut short. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary :is(strong, span) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+@media (max-width: 359px) {
+  .viewer-phone-bar button { font-size: 10.5px; }
 }
