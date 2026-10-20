@@ -16,10 +16,22 @@ export function tierOf(profile) {
   return 'standard';
 }
 
-/** Profiles for a tier. Standard falls back to Quality when no profile is standard. */
+// A tier with no profile falls back to its neighbour: Standard to Quality, Super Fast to Fast.
+const fallbackTiers = { standard: 'quality', turbo: 'fast' };
+/** Profiles for a tier. Standard falls back to Quality and turbo (Super Fast) to Fast when the tier has none. */
 export function profilesForTier(profiles, tier) {
   const matching = profiles.filter(profile => tierOf(profile) === tier);
-  return matching.length || tier !== 'standard' ? matching : profiles.filter(profile => tierOf(profile) === 'quality');
+  return matching.length || !fallbackTiers[tier] ? matching : profiles.filter(profile => tierOf(profile) === fallbackTiers[tier]);
+}
+
+// "Turbo" in chat means quick, and a distilled Fast profile is what most people mean by it, so the two speed tiers list together.
+const nearTiers = { turbo: ['turbo', 'fast'], fast: ['fast', 'turbo'], standard: ['standard'], quality: ['quality'] };
+/** Profiles for a tier as Models lists them: the tier itself first, then the neighbouring speed tier, each in catalogue order. */
+export function profilesNearTier(profiles, tier) {
+  const tiers = nearTiers[tier] || [tier];
+  const listed = tiers.flatMap(item => profiles.filter(profile => tierOf(profile) === item));
+  if (!listed.length && fallbackTiers[tier]) return profilesForTier(profiles, tier);
+  return [...new Set(listed)];
 }
 
 /** Profiles in preferred tier order (Fast first), keeping catalogue order within a tier. */
@@ -39,9 +51,54 @@ function fastestTier(profiles) {
 
 const squash = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 /**
+ * Words of a name or query, lowercased, with a bare number joined to the word before it,
+ * so "flux 3", "flux3" and "FLUX.3" all read as flux3.
+ */
+export function nameWords(value) {
+  const words = [];
+  for (const part of String(value || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)) {
+    if (/^\d+$/.test(part) && /[a-z]$/.test(words.at(-1) || '')) words[words.length - 1] += part;
+    else words.push(part);
+  }
+  return words;
+}
+// Speed words in a query say which tier is wanted rather than naming a model.
+const speedWords = { turbo: 'turbo', super: 'turbo', draft: 'turbo', fast: 'fast', quick: 'fast', quality: 'quality', best: 'quality', hq: 'quality', standard: 'standard' };
+const profileNames = (profile) => [profile.id, profile.label, profile.displayName, profile.family].filter(Boolean);
+/**
+ * How well a profile answers a free-text query: null when a model word ("flux 3", "klein") is missing
+ * from its id, label or family; otherwise a score that favours speed words it also matches by name or tier.
+ */
+function queryScore(profile, words) {
+  const own = new Set(profileNames(profile).flatMap(nameWords));
+  const joined = profileNames(profile).map(squash).join(' ');
+  // Longer words also match inside a name, so "klein" finds flux3klein and "tessera" finds Tesserafine.
+  const has = (word) => own.has(word) || (word.length > 2 && joined.includes(word));
+  let score = 0;
+  for (const word of words) {
+    const speed = speedWords[word];
+    if (!speed) { if (!has(word)) return null; continue; }
+    if (has(word)) score += 2;
+    if ((nearTiers[speed] || [speed]).includes(tierOf(profile))) score += tierOf(profile) === speed ? 2 : 1;
+  }
+  return score;
+}
+/**
+ * Profiles a free-text query names, best first: every model word must match (fuzzily, so "flux 3",
+ * "flux3", "FLUX.3" and "klein" all find FLUX.3 [klein]); speed words such as "turbo" or "fast" rank.
+ * A query without a model word names nothing.
+ */
+export function searchProfiles(profiles, query) {
+  const words = nameWords(query);
+  if (!words.some(word => !speedWords[word])) return [];
+  const scored = fastestFirst(profiles).map(profile => ({ profile, score: queryScore(profile, words) })).filter(item => item.score !== null);
+  return scored.sort((left, right) => right.score - left.score).map(item => item.profile);
+}
+/**
  * The profile a name means: its id, then an id, label or family match ignoring case and punctuation,
- * then a partial match. Several matches from one family ("flux 3" for every FLUX.3 profile) resolve
- * to its fastest profile; matches across families find nothing.
+ * then a partial match, then every model word of a query such as "turbo flux 3". Several matches from
+ * one family ("flux 3" for every FLUX.3 profile) resolve to its fastest profile, or the one a speed
+ * word picks; matches across families find nothing.
  */
 export function findProfile(profiles, value) {
   const exact = profiles.find(profile => profile.id === value);
@@ -49,12 +106,14 @@ export function findProfile(profiles, value) {
   const key = squash(value);
   if (!key) return null;
   const names = (profile) => [profile.id, profile.label, profile.displayName, String(profile.label || '').split('·')[0], profile.family].map(squash).filter(Boolean);
+  const oneFamily = (found) => found.length > 1 && found[0].family && found.every(profile => profile.family === found[0].family);
   for (const pick of [profile => names(profile).includes(key), profile => names(profile).some(name => name.includes(key))]) {
     const found = profiles.filter(pick);
     if (found.length === 1) return found[0];
-    if (found.length > 1 && found[0].family && found.every(profile => profile.family === found[0].family)) return fastestFirst(found)[0];
+    if (oneFamily(found)) return fastestFirst(found)[0];
   }
-  return null;
+  const found = searchProfiles(profiles, value);
+  return found.length === 1 || oneFamily(found) ? found[0] : null;
 }
 
 /** A profile whose first image slot starts the video, so an image can be animated from its first frame. */

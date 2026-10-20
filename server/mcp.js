@@ -7,9 +7,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { hostAllowed } from './request-guard.js';
 import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
-import { McpMedia, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
+import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
-import { fastestFirst, findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
+import { fastestFirst, findProfile, mcpTiers, profilesNearTier, searchProfiles, tierOf } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
@@ -36,6 +36,8 @@ const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('A job_id or ref such as "result 3".') };
 const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
 const tier = z.enum(mcpTiers).describe('turbo is Super Fast.');
+// Schemas accept more than one call queues, so Studio, not a client's generic schema check, explains the limit and how to split.
+const maxSchemaItems = 100;
 // A prompting guide is long; chat gets its essentials once, and Models returns the full guide.
 const maxGuideCharacters = 1200;
 /** A profile guide's essentials as one capped paragraph: summary, rules and pitfalls, without sources or examples. */
@@ -183,10 +185,19 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         : `${submission.error} ${note}Share the links; never resubmit.`;
       return { content: [{ type: 'text', text: `${message}\n\n${pending}${prompts}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
     };
+    /** Profiles as Models lists them: "id — label" grouped by kind. */
+    const listed = (profiles) => {
+      const list = {};
+      for (const profile of profiles) (list[profile.kind] ||= []).push(profile.label && profile.label !== profile.id ? `${profile.id} — ${profile.label}` : profile.id);
+      return list;
+    };
     /** A ready profile by id or name, the fastest of one family's matches; otherwise the closest few, fastest first, so one call corrects a guess. */
     const profileNamed = (profiles, value) => {
       const found = findProfile(profiles, value);
       if (found) return found;
+      // Words that name several models ("klein" for FLUX.2 and FLUX.3) list them, so one more call picks one.
+      const matches = searchProfiles(profiles, value);
+      if (matches.length > 1) throw new Error(`${value} matches several profiles: ${matches.slice(0, 6).map(profile => `${profile.id} (${profile.label || profile.id})`).join(', ')}. Pass one id.`);
       const near = closest(fastestFirst(profiles), value, profile => [profile.id, profile.label, tierOf(profile)]);
       throw new Error(`No ready profile matches ${value}.${near.length ? ` Closest: ${near.map(profile => `${profile.id} (${profile.label || profile.id})`).join(', ')}.` : ' Call Models for the list.'}`);
     };
@@ -221,15 +232,17 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     const toolError = server.createToolError.bind(server);
     server.createToolError = (message) => toolError(conciseError(message));
     if (scope === 'media' || scope === 'unlinked' || scope === 'anonymous') {
-      tool(server, 'Models', 'Find Models', 'List ready profiles as "id — label" by kind. With profile_id (an id or label), return its prompting guide, defaults, adjustable controls, reference slots and an index of compatible LoRAs; lora_query or lora_names returns full details for up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
+      tool(server, 'Models', 'Find Models', 'List ready profiles as "id — label" by kind; tier turbo or fast lists both. With profile_id (id, label or words: "flux 3"), return its prompting guide, defaults, controls, reference slots and compatible LoRAs; lora_query or lora_names details up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {
-          if (wanted) profiles = profilesForTier(profiles, wanted);
-          const list = {};
-          for (const profile of profiles) (list[profile.kind] ||= []).push(profile.label && profile.label !== profile.id ? `${profile.id} — ${profile.label}` : profile.id);
-          return mcpJson(list);
+          if (wanted) profiles = profilesNearTier(profiles, wanted);
+          return mcpJson(listed(profiles));
         }
-        const profile = profileNamed(profiles, profile_id);
+        // Words that name several models ("klein", "flux") list them instead of choosing one.
+        const named = findProfile(profiles, profile_id);
+        const matches = named ? [] : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
+        if (matches.length > 1) return mcpJson(listed(matches));
+        const profile = named || profileNamed(profiles, profile_id);
         const infos = profile.options?.loras?.length && profile.capabilities?.lora !== false ? await media.loraInfos(owner) : {};
         const controls = mcpControls(profile);
         // A LoRA lookup answers only that question; the profile's guide and controls come without one.
@@ -254,17 +267,19 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. count: images, at most four per call. profile_id (id, label or family) and loras (names) choose the model. prompts (one per different image), or exact_prompt, use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. count: 1–${maxJobsPerCall} per call, one job each; split more. profile_id (id, label or family) and loras (names) choose the model. prompts (one per different image), or exact_prompt, use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
-        profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4).optional(),
+        profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
-        width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('Default 1; per prompt with prompts.'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
+        width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async ({ kind, tier: wanted, wait_seconds, aspect, size, request, exact_prompt, ...args }, signal) => {
         if (Boolean(request) === Boolean(args.prompts)) throw new Error(request ? 'Pass request or prompts, not both.' : "Pass request with the user's words.");
         // "count: 4" beside four prompts means one image each, not sixteen.
         if (args.count > 1 && args.count === args.prompts?.length && args.count * args.prompts.length > maxJobsPerCall) args.count = 1;
+        // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
+        assertJobCount(args.prompts?.length || 1, args.count ?? 1);
         const profile = args.profile_id === undefined
           ? await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0, loras: args.loras || [] })
           : profileNamed(await media.profiles(kind || 'all', owner), args.profile_id);
@@ -296,9 +311,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       tool(server, 'Upload', 'Upload Reference', 'Upload a PNG, JPEG or WebP image (base64, at most 20 MB) as a reference asset for Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
       tool(server, 'Reuse', 'Reuse Result', `Follow up on one finished result. Same kind: run again with a new seed; request applies a change, prompt replaces it, tier or profile_id picks another model. kind=video animates an image. Without kind, returns it as a Generate reference.`, {
         ...output, job_id: z.string().min(1).max(200).describe('Its ref as the reply header shows it ("result 1") or job_id, never "all". Link ids work; refs are preferred.'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), profile_id: z.string().min(1).optional(),
-        request: z.string().trim().min(1).max(2000).optional(), prompt: z.string().trim().min(1).optional(), count: z.number().int().min(1).max(4).default(1),
+        request: z.string().trim().min(1).max(2000).optional(), prompt: z.string().trim().min(1).optional(), count: z.number().int().min(1).max(maxSchemaItems).default(1).describe(`1–${maxJobsPerCall}.`),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional()
       }, async ({ job_id, output_index, kind, tier: wanted, profile_id, request, prompt, count, wait_seconds }, signal) => {
+        assertJobCount(1, count);
         const id = resolve(job_id);
         if (!kind) {
           if (wanted || prompt || request || profile_id) throw new Error('Pass kind to generate from this result.');

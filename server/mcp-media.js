@@ -5,7 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
-import { assertAdjustable, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
+import { assertAdjustable, maxJobsPerCall, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
@@ -25,8 +25,21 @@ const previewSize = 1024;
 const maxListedResults = 24;
 const maxShownResults = 8;
 export const maxResultWaitSeconds = 1500;
-/** Jobs one Generate call may queue: every prompt times count. */
-export const maxJobsPerCall = 4;
+export { maxJobsPerCall };
+/**
+ * Refuses a call that would queue more than maxJobsPerCall jobs, naming the field, its range and how to split.
+ * Schemas accept more than this on purpose: a client's own schema check would refuse with a generic message.
+ */
+export function assertJobCount(prompts = 1, count = 1) {
+  const range = `1–${maxJobsPerCall}`;
+  if (!Number.isInteger(count) || count < 1) throw new Error(`count must be a whole number from ${range}.`);
+  if (prompts > maxJobsPerCall) throw new Error(`prompts has ${prompts} entries; one call takes ${range}, one job each. Split them into calls of at most ${maxJobsPerCall} prompts.`);
+  if (prompts === 1 && count > maxJobsPerCall) throw new Error(`count ${count} is over the limit: count must be ${range} per call, each a separate job. For ${count} images, make ${Math.ceil(count / maxJobsPerCall)} calls of at most ${maxJobsPerCall}.`);
+  if (prompts * count > maxJobsPerCall) {
+    const fix = count > 1 ? `For ${prompts} different images, pass the ${prompts} prompts without count, or split them into calls whose prompts × count is at most ${maxJobsPerCall}.` : `Pass count ${maxJobsPerCall} or less.`;
+    throw new Error(`count is images per prompt, so ${prompts} prompts × count ${count} would queue ${prompts * count} jobs; one call queues at most ${maxJobsPerCall}. ${fix}`);
+  }
+}
 // A cloud provider that refused for authorisation or quota is skipped this long, so fallbacks don't queue doomed jobs.
 export const cloudPauseMilliseconds = 10 * 60 * 1000;
 export const cloudQuotaMessage = 'Cloud video unavailable (quota).';
@@ -242,10 +255,7 @@ export class McpMedia {
       controls.autoUpscale = { quality: upscale_quality, faceDetail: face_detail };
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
-    if (prompts.length * runs > maxJobsPerCall) {
-      const fix = prompts.length > 1 ? `For ${prompts.length} different images, pass the ${prompts.length} prompts without count.` : `Pass count ${maxJobsPerCall} or less.`;
-      throw new Error(`count is images per prompt, so ${prompts.length} prompt${prompts.length > 1 ? 's' : ''} × count ${runs} would queue ${prompts.length * runs} jobs; one call queues at most ${maxJobsPerCall}. ${prompts.length > maxJobsPerCall ? `Pass at most ${maxJobsPerCall} prompts.` : fix}`);
-    }
+    assertJobCount(prompts.length, runs);
     const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.

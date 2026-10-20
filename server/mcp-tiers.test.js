@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, chooseRemoteVideo, findProfile, profilesForTier, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo, findProfile, nameWords, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -33,7 +33,9 @@ test('the chosen profile prefers the default, then its family, then unrestricted
   assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'quality', defaultId: 'default' }).id, 'default');
   assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'fast', defaultId: 'default' }).id, 'kin');
   assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'fast', defaultId: 'missing' }).id, 'plain');
-  assert.throws(() => chooseProfile(profiles, { kind: 'image', tier: 'turbo' }), /Available image tiers: quality, standard, fast\./);
+  // Super Fast falls back to Fast; a tier with neither names what is available.
+  assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'turbo', defaultId: 'default' }).id, 'kin');
+  assert.throws(() => chooseProfile(profiles.filter(profile => profile.id !== 'default'), { kind: 'image', tier: 'quality' }), /Available image tiers: fast, turbo\./);
   assert.throws(() => chooseProfile([], { kind: 'video' }), /No ready video profile/);
 });
 
@@ -96,6 +98,63 @@ test('a family name such as "flux 3" picks its fastest profile, and an exact id 
   ];
   for (const name of ['flux 3', 'flux3', 'FLUX.3', 'FLUX.3 [klein]', 'flux3 klein']) assert.equal(findProfile(profiles, name)?.id, 'custom:bento-image-flux3-klein-distilled-int8', name);
   assert.equal(findProfile(profiles, 'custom:bento-image-flux3-klein-base-int8')?.id, 'custom:bento-image-flux3-klein-base-int8');
-  assert.equal(findProfile(profiles, 'FLUX.3 Base')?.id, undefined, 'words out of order are not a name');
+  assert.equal(findProfile(profiles, 'FLUX.3 Base')?.id, 'custom:bento-image-flux3-klein-base-int8', 'every model word matches');
   assert.equal(findProfile(profiles, 'klein'), null, 'matches across families stay ambiguous');
+});
+
+// The Bento image catalogue as deployed (ai/config/studio/workflows): id, label and family.
+const bento = [
+  ['custom:bento-image-boogu-base', 'Boogu Image Base · Quality · 50 Steps · Text Only · FP8 Scaled', 'boogu'],
+  ['custom:bento-image-boogu-edit-turbo-single-reference', 'Boogu Image Edit Turbo · Fast · 4 Steps · Single-Reference Edit · INT8 ConvRot · 1K Hotfix', 'boogu'],
+  ['custom:bento-image-boogu-edit-turbo', 'Boogu Image Edit Turbo · Fast · 4 Steps · Three-Reference Edit · INT8 ConvRot · 1K Hotfix (~30s)', 'boogu'],
+  ['custom:bento-image-boogu-edit', 'Boogu Image Edit · Quality · 25 Steps · Single-Reference Edit · INT8 ConvRot', 'boogu'],
+  ['custom:bento-image-boogu-turbo', 'Boogu Image Turbo · Fast · 4 Steps · Text Only · INT8 ConvRot · Hotfix (~4s)', 'boogu'],
+  ['custom:bento-image-fernwood-v5-int8-fast', 'fernwood V5 · Fast · 8 Steps · Optional Reference · INT8 ConvRot', 'krea2'],
+  ['custom:bento-image-fernwood-v5-int8', 'fernwood V5 · Quality · 12 Steps · Optional Reference · INT8 ConvRot', 'krea2'],
+  ['custom:bento-image-flux-2-klein-base-9b-fp8', 'FLUX.2 [klein] 9B Base · Quality · 50 Steps · Optional 3 References · FP8', 'flux2_klein_9b'],
+  ['custom:bento-image-flux3-klein-base-int8', 'FLUX.3 [klein] Base · Quality · 50 Steps · Optional 10 References · INT8 ConvRot', 'flux3_klein'],
+  ['custom:bento-image-flux3-klein-distilled-int8', 'FLUX.3 [klein] Distilled · Fast · 16 Steps · Optional 10 References · INT8 ConvRot (~15s)', 'flux3_klein'],
+  ['custom:bento-image-ideogram4-int8-convrot', 'Ideogram 4 · Quality · 20 Steps · JSON Prompt · INT8 ConvRot', 'ideogram4'],
+  ['custom:bento-image-klein9b-kv-fp8', 'FLUX.2 [klein] 9B KV · Fast · 4 Steps · Optional Reference · FP8', 'flux2_klein_9b'],
+  ['custom:bento-image-krea2-turbo-fast2', 'Krea 2 Turbo · Super Fast · 2 Steps · Text Only · INT8 ConvRot · 2-Step LoRA', 'krea2'],
+  ['custom:bento-image-krea2-turbo-int8-convrot', 'Krea 2 Turbo · Quality · 8 Steps · Optional Reference · INT8 ConvRot', 'krea2'],
+  ['custom:bento-image-tessera-turbo-w8a8-quality', 'Tessera V0.3.1 Turbo OPD · Quality · 12 Steps · Optional Reference · W8A8', 'krea2'],
+  ['custom:bento-image-tessera-turbo-w8a8', 'Tessera V0.3.1 Turbo OPD · Fast · 8 Steps · Optional Reference · W8A8', 'krea2'],
+  ['custom:bento-image-tesserafine-turbo-int8-convrot-quality', 'Tesserafine Turbo V1.0 · Quality · 12 Steps · Optional Reference · INT8', 'krea2'],
+  ['custom:bento-image-tesserafine-turbo-int8-convrot', 'Tesserafine Turbo V1.0 · Fast · 8 Steps · Optional Reference · INT8', 'krea2'],
+  ['custom:bento-image-moss-base-dmd8', 'MOSS Image Base · Fast · 8 Steps · Text Only · INT8 ConvRot · DMD8 LoRA', 'moss_image'],
+  ['custom:bento-image-moss-sft', 'MOSS Image SFT · Quality · 50 Steps · Text Only · INT8 ConvRot', 'moss_image'],
+  ['custom:bento-image-qwen-image-2-1-int8-convrot', 'Qwen-Image 2.1 · Quality · 40 Steps · Optional 3 References · INT8 ConvRot', 'qwen_image_21'],
+  ['custom:bento-image-qwen21-turbo-int8', 'Qwen-Image 2.1 Turbo · Fast · 8 Steps · Optional Reference · INT8 ConvRot', 'qwen_image_21'],
+  ['custom:bento-image-radiance-flux3-klein-base', 'FLUX.3 [klein] Base · Quality · 50 Steps · Optional Reference · FP8 · Radiance', 'flux3_klein'],
+  ['custom:bento-image-radiance-flux3-klein', 'FLUX.3 [klein] Distilled · Fast · 16 Steps · Optional Reference · FP8 · Radiance', 'flux3_klein'],
+  ['custom:bento-image-radiance-krea2-raw', 'Krea 2 Raw · Quality · 28 Steps · Text Only · FP8 · Radiance', 'krea2'],
+  ['custom:bento-image-radiance-krea2-turbo', 'Krea 2 Turbo · Fast · 8 Steps · Text Only · FP8 · Radiance', 'krea2'],
+  ['custom:bento-image-radiance-vesperq-v4', 'Vesper Q V4 · Quality · 25 Steps · Optional Reference · FP8 · Radiance (~32s)', 'qwen_image_21'],
+  ['custom:bento-image-radiance-qwen21', 'Qwen-Image 2.1 · Quality · 40 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
+  ['custom:bento-image-radiance-turbo-stock', 'Qwen-Image 2.1 Turbo · Fast · 8 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
+  ['custom:bento-image-radiance-turbo', 'Qwen-Image 2.1 Turbo Lite · Fast · 8 Steps · Optional Reference · FP8 · Radiance', 'qwen_image_21'],
+  ['custom:bento-image-z-image-turbo-int8-convrot', 'Z-Image Turbo · Fast · 8 Steps · Optional Reference · INT8 ConvRot', 'zimage']
+].map(([id, label, family]) => ({ id, label, family, kind: 'image' }));
+
+test('on the Bento catalogue, turbo lists Super Fast then the distilled Fast profiles, and model words find FLUX.3', () => {
+  const tiers = Object.fromEntries(bento.map(profile => [profile.id.replace('custom:bento-image-', ''), tierOf(profile)]));
+  assert.equal(tiers['krea2-turbo-fast2'], 'turbo');
+  assert.equal(tiers['flux3-klein-distilled-int8'], 'fast');
+  assert.equal(tiers['flux3-klein-base-int8'], 'quality');
+  const turbo = profilesNearTier(bento, 'turbo').map(profile => profile.id);
+  assert.equal(turbo[0], 'custom:bento-image-krea2-turbo-fast2', 'Super Fast leads');
+  assert.ok(turbo.includes('custom:bento-image-flux3-klein-distilled-int8'));
+  assert.ok(!turbo.includes('custom:bento-image-flux3-klein-base-int8'));
+  assert.deepEqual(profilesNearTier(bento, 'fast').slice(0, 2).map(tierOf), ['fast', 'fast']);
+  for (const name of ['turbo flux 3', 'flux 3 turbo', 'flux3', 'FLUX.3', 'fast flux 3', 'FLUX.3 [klein] distilled']) assert.equal(findProfile(bento, name)?.id, 'custom:bento-image-flux3-klein-distilled-int8', name);
+  assert.equal(findProfile(bento, 'flux 3 quality')?.id, 'custom:bento-image-flux3-klein-base-int8');
+  assert.equal(findProfile(bento, 'tesserafine')?.id, 'custom:bento-image-tesserafine-turbo-int8-convrot', 'one family resolves to its Fast profile');
+  assert.equal(findProfile(bento, 'klein'), null, 'FLUX.2 and FLUX.3 both say klein');
+  const klein = searchProfiles(bento, 'klein');
+  assert.deepEqual(new Set(klein.map(profile => profile.family)), new Set(['flux3_klein', 'flux2_klein_9b']));
+  assert.equal(tierOf(klein[0]), 'fast', 'fastest first');
+  assert.deepEqual(searchProfiles(bento, 'turbo'), [], 'speed words alone name no model');
+  assert.deepEqual(nameWords('FLUX.3 [klein]'), ['flux3', 'klein']);
+  assert.deepEqual(nameWords('flux 3'), ['flux3']);
 });

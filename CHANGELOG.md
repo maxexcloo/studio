@@ -11,6 +11,10 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Ten images per chat call:** MCP Generate and Reuse queue 1–10 jobs per call (`prompts` × `count`, each a separate job), stated in the tool and parameter descriptions. An excess is refused by Studio itself, naming the field, its range and how to split the request, instead of a chat client's generic schema error. The account's outstanding-job limit still applies to each job.
+- **Turbo finds the fast profiles:** MCP Models with tier `turbo` or `fast` lists both speed tiers, the named one first, and Generate's `turbo` falls back to Fast when no Super Fast profile is ready. Profile names match model words fuzzily ("flux 3", "flux3", "FLUX.3", "turbo flux 3"); words naming several models ("klein") list them.
+
 ## [0.32.0] - 2026-10-20
 
 > One References chooser for many-reference models, Hidden folded back into the gallery, multi-select gallery filters, Animate from the select bars and a tidier viewer, menu and phone sheets
