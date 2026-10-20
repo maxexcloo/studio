@@ -55,6 +55,8 @@ export function normaliseReusedSettings(profile, item, { available = {}, fallbac
     const value = name in dimensions ? dimensions[name] : recorded[name];
     result[name] = reuseNumber(value, defaults[name] ?? current[name] ?? conventional[name], { ...limits[name], ...profile.constraints?.[name] }, name === 'width' || name === 'height' ? 8 : undefined);
   }
+  // A distilled profile has no CFG to set (capabilities.cfg false): Edit and Rerun keep its own, never the recorded one.
+  if (profile.capabilities?.cfg === false) result.cfg = reuseNumber(defaults.cfg, current.cfg ?? 1, { min: 0, max: 100, ...profile.constraints?.cfg });
   if (profile.aspectPolicy === 'fixed') {
     result.width = reuseNumber(defaults.width, current.width || 1024, profile.constraints?.width, 8);
     result.height = reuseNumber(defaults.height, current.height || 1024, profile.constraints?.height, 8);

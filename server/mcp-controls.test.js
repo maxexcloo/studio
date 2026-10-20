@@ -89,3 +89,13 @@ test('Result waits are capped below LibreChat’s 1800-second background deadlin
   await media.result('owner', 'job-1', 0, 1800, 'notification');
   assert.equal(waited, 1500);
 });
+
+test('a distilled profile without CFG offers no cfg and refuses one with a clear note', () => {
+  const distilled = { ...profile, id: 'image:tesserafine-fast', label: 'Tesserafine Fast', capabilities: { ...profile.capabilities, cfg: false }, defaults: { ...profile.defaults, cfg: 1 } };
+  assert.equal(mcpControls(distilled).cfg, undefined);
+  assert.throws(() => assertAdjustable(distilled, { cfg: 3 }), /cfg cannot be adjusted for Tesserafine Fast\. This profile is guidance-distilled and runs at its own CFG; leave cfg out\./);
+  // The reference mode decides on its own.
+  const modes = { ...profile, imageModes: { reference: { capabilities: { ...profile.capabilities, cfg: false } } } };
+  assert.equal(mcpControls({ ...modes, ...modes.imageModes.reference }).cfg, undefined);
+  assert.ok(mcpControls(modes).cfg);
+});
