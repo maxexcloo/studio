@@ -246,7 +246,7 @@
 }
 /* Generation Settings sit on the panel like Prompt and Negative: a quiet label, no box. */
 .detail-settings { display: grid; gap: 12px; min-width: 0; }
-.detail-settings-title { color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 500; letter-spacing: -0.005em; }
+.detail-settings-title { margin: 0; color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 500; letter-spacing: -0.005em; }
 .detail-settings .detail-section { display: grid; gap: 8px; }
 .detail-settings .detail-grid { margin-top: 0; grid-template-columns: 72px minmax(0, 1fr); }
 .settings-disclosure {

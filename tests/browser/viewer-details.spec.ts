@@ -42,11 +42,12 @@ test('Details lists its actions in name order and Generation Settings without a 
   // Copy Prompt sits straight above Use Settings.
   const copy = actions.getByRole('button', { name: 'Copy Prompt', exact: true });
   const settings = actions.getByRole('button', { name: 'Use Settings', exact: true });
-  const [copyBox, settingsBox] = [await copy.boundingBox(), await settings.boundingBox()];
-  expect(copyBox!.y + copyBox!.height).toBeLessThanOrEqual(settingsBox!.y);
-  expect(copyBox!.x).toBeGreaterThanOrEqual(settingsBox!.x - 1);
-  expect(copyBox!.x + copyBox!.width).toBeLessThanOrEqual(settingsBox!.x + settingsBox!.width + 1);
-  expect(settingsBox!.y - (copyBox!.y + copyBox!.height)).toBeLessThan(12);
+  // Measured once the panel has finished coming in.
+  await expect.poll(async () => {
+    const [copyBox, settingsBox] = [await copy.boundingBox(), await settings.boundingBox()];
+    const gap = settingsBox!.y - (copyBox!.y + copyBox!.height);
+    return gap >= 0 && gap < 12 && copyBox!.x >= settingsBox!.x - 1 && copyBox!.x + copyBox!.width <= settingsBox!.x + settingsBox!.width + 1;
+  }).toBe(true);
   // Generation Settings: a label like Prompt's, no box and no Copy as Text.
   const side = viewer.locator('.viewer-side');
   await expect(side.getByRole('region', { name: 'Generation Settings' })).toBeVisible();

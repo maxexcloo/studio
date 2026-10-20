@@ -949,7 +949,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       />
                       {generationDetailEntries(active).length ? (
                         <section className="detail-settings" aria-labelledby="viewer-generation-settings">
-                          <span id="viewer-generation-settings" className="detail-settings-title">Generation Settings</span>
+                          <h3 id="viewer-generation-settings" className="detail-settings-title">Generation Settings</h3>
                           {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
