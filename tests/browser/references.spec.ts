@@ -1,9 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
 const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '', privacyDomain: 'gallery' });
 
-async function prepare(page: Page, phone: boolean, capacity: number, inpaint = false) {
+async function prepare(page: Page, capacity: number, inpaint = false) {
   const models = await (await page.request.get('/api/models')).json();
   for (const profile of models.profiles) if (profile.kind === 'image') {
     if (inpaint) profile.capabilities = { ...profile.capabilities, inpaint: true };
@@ -18,21 +19,21 @@ async function prepare(page: Page, phone: boolean, capacity: number, inpaint = f
   });
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [image('library-image')], nextCursor: '' } }));
   await page.goto('/');
-  if (phone) await page.locator('.phone-create-open').click();
-  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-  return uploads;
+  const ui = studioUi(page);
+  await ui.openComposer();
+  return { phone: await ui.isPhone(), ui, uploads };
 }
 
-async function drop(page: Page, count: number, selector = '.zen-prompt, .phone-create') {
-  await page.locator(selector).evaluate((element, count) => {
+async function drop(target: Locator, count: number) {
+  await target.evaluate((element, count) => {
     const transfer = new DataTransfer();
     for (let index = 0; index < count; index++) transfer.items.add(new File(['image'], `image-${index}.png`, { type: 'image/png' }));
     element.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
   }, count);
 }
 
-test('multiple upload selection fills declared slots and removal closes gaps', async ({ page, isMobile }) => {
-  const uploads = await prepare(page, isMobile, 3);
+test('multiple upload selection fills declared slots and removal closes gaps', async ({ page }) => {
+  const { ui, uploads } = await prepare(page, 3);
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
   const input = page.locator('.reference-popover input[type="file"]');
   await expect(input).toHaveAttribute('multiple', '');
@@ -48,7 +49,7 @@ test('multiple upload selection fills declared slots and removal closes gaps', a
   await expect(page.locator('.ref-thumb').first()).toHaveAttribute('aria-label', /uploaded-2.png/);
   await expect(page.locator('.reference-count')).toHaveText('2/3 References');
   await expect(page.getByRole('button', { name: 'Add Reference 3', exact: true })).toBeVisible();
-  const layout = await page.locator(isMobile ? '.phone-create' : '.zen-prompt').evaluate((element) => {
+  const layout = await ui.composer.evaluate((element) => {
     const prompt = element.querySelector('textarea')!.getBoundingClientRect();
     const references = element.querySelector('.composer-reference-tools')!.getBoundingClientRect();
     return { promptBottom: prompt.bottom, promptRight: prompt.right, referenceLeft: references.left, referenceTop: references.top, right: references.right, viewport: innerWidth, width: element.clientWidth, scroll: element.scrollWidth };
@@ -58,30 +59,29 @@ test('multiple upload selection fills declared slots and removal closes gaps', a
   expect(layout.scroll).toBeLessThanOrEqual(layout.width + 1);
   let generated: Record<string, any> | null = null;
   await page.route('**/api/generate', async (route) => { generated = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
-  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A scene with both references');
-  const generate = isMobile ? page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }) : page.getByRole('button', { name: 'Generate', exact: true });
-  await generate.click();
+  await ui.prompt.fill('A scene with both references');
+  await ui.generate.click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.referenceAssets).toEqual([{ slot: 'reference', assetId: 'uploaded-2' }, { slot: 'reference_2', assetId: 'uploaded-3' }]);
 });
 
-test('multi-file drops add references, respect capacity and allow explicit replacement', async ({ page, isMobile }) => {
-  const uploads = await prepare(page, isMobile, 3);
-  await drop(page, 2);
+test('multi-file drops add references, respect capacity and allow explicit replacement', async ({ page }) => {
+  const { ui, uploads } = await prepare(page, 3);
+  await drop(ui.composer, 2);
   await expect(page.locator('.ref-thumb')).toHaveCount(2);
-  await drop(page, 2);
+  await drop(ui.composer, 2);
   await expect(page.locator('.reference-count')).toHaveText('3/3 References');
   expect(uploads).toHaveLength(3);
-  await drop(page, 1);
+  await drop(ui.composer, 1);
   await expect(page.getByText('All reference slots are filled.', { exact: false })).toBeVisible();
   expect(uploads).toHaveLength(3);
-  await drop(page, 1, '.ref-thumb[data-reference-slot="reference_2"]');
+  await drop(page.locator('.ref-thumb[data-reference-slot="reference_2"]'), 1);
   await expect(page.locator('[data-reference-slot="reference_2"]')).toHaveAttribute('aria-label', /uploaded-4.png/);
   await expect(page.locator('.ref-thumb').first()).toHaveAttribute('aria-label', /uploaded-1.png/);
 });
 
-test('single-reference models keep one slot and show the full image if the thumbnail expires', async ({ page, isMobile }) => {
-  const uploads = await prepare(page, isMobile, 1);
+test('single-reference models keep one slot and show the full image if the thumbnail expires', async ({ page }) => {
+  const { ui, uploads } = await prepare(page, 1);
   await page.route('**/expired-thumbnail.png', (route) => route.fulfill({ status: 404, body: '' }));
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [{ ...image('fallback-reference'), thumbnailUrl: '/expired-thumbnail.png' }], nextCursor: '' } }));
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
@@ -91,17 +91,17 @@ test('single-reference models keep one slot and show the full image if the thumb
   await page.keyboard.press('Escape');
   await expect(page.locator('.ref-thumb img')).toHaveAttribute('src', picture);
   await expect.poll(() => page.locator('.ref-thumb img').evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0);
-  await drop(page, 2);
+  await drop(ui.composer, 2);
   expect(uploads).toHaveLength(0);
   await expect(page.locator('.ref-thumb')).toHaveCount(1);
   await page.getByRole('group', { name: 'Reference Images', exact: true }).getByRole('button', { name: 'Remove reference image', exact: true }).click();
-  await drop(page, 2);
+  await drop(ui.composer, 2);
   await expect(page.locator('.ref-thumb')).toHaveCount(1);
   expect(uploads).toHaveLength(1);
 });
 
-test('late uploads do not attach after leaving the composer context', async ({ page, isMobile }) => {
-  await prepare(page, isMobile, 3);
+test('late uploads do not attach after leaving the composer context', async ({ page }) => {
+  const { ui } = await prepare(page, 3);
   let finish!: () => void;
   const pending = new Promise<void>((resolve) => { finish = resolve; });
   let uploads = 0;
@@ -110,16 +110,12 @@ test('late uploads do not attach after leaving the composer context', async ({ p
     await pending;
     await route.fulfill({ json: { asset: image('late-reference') } });
   });
-  await drop(page, 2);
+  await drop(ui.composer, 2);
   await expect.poll(() => uploads).toBe(1);
-  if (isMobile) {
-    await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(page.locator('.phone-create')).toHaveCount(0);
-    await page.locator('.phone-create-open').click();
-  } else {
-    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Videos', exact: true }).click();
-    await page.locator('.gallery-generation-mode').getByRole('button', { name: 'Images', exact: true }).click();
-  }
+  await ui.closeComposer();
+  await ui.switchMode('video');
+  await ui.switchMode('image');
+  await ui.openComposer();
   const completed = page.waitForResponse('**/api/reference-assets/upload');
   finish();
   await completed;
@@ -129,8 +125,8 @@ test('late uploads do not attach after leaving the composer context', async ({ p
 });
 
 
-test('the image editor fills a usable workspace with reachable mobile tools', async ({ page, isMobile }) => {
-  await prepare(page, isMobile, 1, true);
+test('the image editor fills a usable workspace with reachable mobile tools', async ({ page }) => {
+  const { phone } = await prepare(page, 1, true);
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
   await page.getByRole('button', { name: 'library-image.png', exact: true }).click();
   await expect(page.locator('.reference-popover')).toBeVisible();
@@ -138,7 +134,7 @@ test('the image editor fills a usable workspace with reachable mobile tools', as
   await page.getByRole('button', { name: 'Paint the part to change', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Paint the part to change' });
   await expect(editor).toBeVisible();
-  await expect.poll(() => editor.locator('.inpaint-stage img').evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(isMobile ? 300 : 500);
+  await expect.poll(() => editor.locator('.inpaint-stage img').evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(phone ? 300 : 500);
   const tools = await editor.getByRole('toolbar').boundingBox();
   const close = await editor.getByRole('button', { name: 'Done painting' }).boundingBox();
   const viewport = page.viewportSize()!;
@@ -148,19 +144,20 @@ test('the image editor fills a usable workspace with reachable mobile tools', as
   expect(tools!.x).toBeGreaterThanOrEqual(0);
   expect(tools!.x + tools!.width).toBeLessThanOrEqual(viewport.width);
   expect(tools!.y + tools!.height).toBeLessThanOrEqual(viewport.height);
-  if (isMobile) expect(tools!.y).toBeGreaterThan(close!.y + close!.height);
+  // The phone puts the tools below Done; the full studio may share a row.
+  if (phone) expect(tools!.y).toBeGreaterThan(close!.y + close!.height);
   await editor.getByRole('button', { name: 'Done painting' }).click();
   await expect(editor).toHaveCount(0);
 });
 
 
-test('reference sources name their search and keep one upload action', async ({ page, isMobile }) => {
-  await prepare(page, isMobile, 2);
+test('reference sources name their search and keep one upload action', async ({ page }) => {
+  const { phone } = await prepare(page, 2);
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
   await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
   const picker = page.locator('.reference-popover');
   // Open and type on desktop; the phone sheet takes focus itself so no keyboard pops up.
-  if (!isMobile) await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
+  if (!phone) await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
   await expect(picker.getByRole('button', { name: 'Close References', exact: true })).toBeVisible();
   await picker.getByRole('tab', { name: 'Library', exact: true }).click();
   await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveAttribute('placeholder', 'Search Library');
@@ -173,8 +170,8 @@ test('reference sources name their search and keep one upload action', async ({ 
 });
 
 
-test('reference selection stays open, pins selections across searches and tabs, and frees capacity immediately', async ({ page, isMobile }) => {
-  await prepare(page, isMobile, 2);
+test('reference selection stays open, pins selections across searches and tabs, and frees capacity immediately', async ({ page }) => {
+  await prepare(page, 2);
   await page.route('**/api/reference-assets?*', route => route.fulfill({ json: {
     items: new URL(route.request().url()).searchParams.get('q') ? [] : [image('first'), image('second'), image('third')], nextCursor: '',
   } }));

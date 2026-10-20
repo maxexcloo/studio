@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 
-test('generation completion stays compact and swipes away', async ({ page, isMobile }) => {
+test('generation completion stays compact and swipes away', async ({ page }) => {
   const images = Array.from({ length: 80 }, (_, index) => ({ id: `notice-image-${index}`, url: picture, filename: `${index}.png`, type: 'image', status: 'done', prompt: 'A calm landscape', createdAt: new Date(Date.now() - (index + 1) * 60000).toISOString(), width: 512, height: 512 }));
   const pending = { ...images[0], id: 'notice-pending', jobId: 'notice-job', status: 'pending', createdAt: new Date().toISOString(), progress: { value: 1, max: 4 } };
   let complete = false;
@@ -10,16 +11,19 @@ test('generation completion stays compact and swipes away', async ({ page, isMob
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: complete ? 2 : 1, upserts: complete ? [{ ...pending, status: 'done' }] : [], removes: [] } }));
   await page.goto('/');
   await expect(page.locator('[data-tile-id="notice-pending"]')).toBeVisible();
-  const scroller = page.locator(isMobile ? '.phone-gallery' : '.stage-gallery');
+  const ui = studioUi(page);
+  const phone = await ui.isPhone();
+  const scroller = ui.gallery;
   await scroller.evaluate((element) => element.scrollTo({ top: 1400, behavior: 'instant' }));
-  if (!isMobile) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
+  // The full studio shows progress in its activity island; the phone shows a running badge.
+  if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
   complete = true;
-  const notification = page.locator(isMobile ? '.toast' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  const notification = page.locator(phone ? '.toast' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   await expect(notification).toBeVisible();
   await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
   const box = await notification.boundingBox();
   expect(box!.height).toBeLessThanOrEqual(56);
-  const drag = page.locator(isMobile ? '.toast-drag' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  const drag = page.locator(phone ? '.toast-drag' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   const origin = await drag.boundingBox();
   await page.mouse.move(origin!.x + origin!.width / 2, origin!.y + origin!.height / 2);
   await page.mouse.down();

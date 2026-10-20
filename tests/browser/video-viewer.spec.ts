@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 import ffmpeg from 'ffmpeg-static';
 
 const video = execFileSync(ffmpeg!, ['-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '2', '-an', '-c:v', 'libx264', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', '-loglevel', 'error', 'pipe:1']);
 
-test('swiping in either direction autoplays videos even after a slow load', async ({ page, isMobile }) => {
+test('swiping in either direction autoplays videos even after a slow load', async ({ page }) => {
   test.setTimeout(45000);
   const items = [0, 1].map((index) => ({ id: `autoplay-${index}`, url: `/autoplay-${index}.mp4`, filename: `clip-${index}.mp4`, type: 'video', status: 'done', prompt: 'A blue frame', createdAt: new Date(Date.now() - index * 1000).toISOString(), width: 64, height: 64 }));
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
@@ -14,7 +15,7 @@ test('swiping in either direction autoplays videos even after a slow load', asyn
     await route.fulfill({ body: video, contentType: 'video/mp4' });
   });
   await page.goto('/');
-  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
+  await studioUi(page).switchMode('video');
   await page.locator('[data-tile-id="autoplay-0"]').click();
   const canvas = page.locator('.viewer-canvas');
   const playing = () => canvas.locator('video').evaluate((element: HTMLVideoElement) => !element.paused && element.currentTime > 0);

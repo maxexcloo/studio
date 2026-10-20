@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 import sharp from 'sharp';
 
 const poster = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#527b8f' } }).jpeg().toBuffer();
 
-test('imported video previews use media URLs and recover after exhausting retries', async ({ page, isMobile }) => {
+test('imported video previews use media URLs and recover after exhausting retries', async ({ page }) => {
   await page.clock.install();
   await page.addInitScript(() => localStorage.setItem('heiss-grid-autoplay', 'on'));
   const item = { id: 'civitai:42', url: '/api/presets/42/media', thumbnailUrl: '/api/presets/42/thumbnail', filename: 'clip.mp4', type: 'video', status: 'done', prompt: 'A blue frame', createdAt: new Date().toISOString(), width: 64, height: 64 };
@@ -20,7 +21,7 @@ test('imported video previews use media URLs and recover after exhausting retrie
     await route.fulfill({ status: 503, body: 'Offline' });
   });
   await page.goto('/');
-  await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
+  await studioUi(page).switchMode('video');
   const tile = page.locator('[data-tile-id="civitai:42"]');
   await expect(tile).toBeVisible();
   await expect.poll(() => attempts.has(0)).toBe(true);

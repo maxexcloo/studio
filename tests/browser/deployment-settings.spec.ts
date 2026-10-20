@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 const settings = {
   ok: true,
@@ -19,18 +20,14 @@ const settings = {
   storage: { outputs: 'studio', source: 'default', locked: false, workerToken: true, multiUser: true }
 };
 
-test('deployment settings show sources, keep locked values read-only and save the rest', async ({ page, isMobile }) => {
+test('deployment settings show sources, keep locked values read-only and save the rest', async ({ page }) => {
   const saved: unknown[] = [];
   await page.route('**/api/settings/deployment', (route) => {
     if (route.request().method() === 'POST') { saved.push(route.request().postDataJSON()); return route.fulfill({ json: { ok: true, setting: { applies: 'restart' } } }); }
     return route.fulfill({ json: settings });
   });
   await page.goto('/');
-  if (isMobile) {
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: /Use the full studio/ }).click();
-  }
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await studioUi(page).openSettings();
   const dialog = page.locator('.settings-modal');
   await dialog.getByRole('button', { name: 'Connection', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Generation Connections' })).toBeVisible();
@@ -53,7 +50,7 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.getByRole('heading', { name: 'Civitai' })).toBeVisible();
 });
 
-test('the model manifest reports problems and restores what it can', async ({ page, isMobile }) => {
+test('the model manifest reports problems and restores what it can', async ({ page }) => {
   const posts: string[] = [];
   const items = [
     { path: 'models/comfyui/loras/good.safetensors', size: 4, status: 'verified' },
@@ -67,11 +64,7 @@ test('the model manifest reports problems and restores what it can', async ({ pa
     return route.fulfill({ json: { ok: true, source: 'deployment', total: 4, counts: { verified: 1, present: 0, missing: 2, 'wrong-size': 0, mismatch: 1, external: 0 }, restorable: 1, items, verify: { running: false, done: 0, total: 0, current: '', error: '' } } });
   });
   await page.goto('/');
-  if (isMobile) {
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: /Use the full studio/ }).click();
-  }
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await studioUi(page).openSettings();
   const dialog = page.locator('.settings-modal');
   await dialog.getByRole('button', { name: 'Models', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Model Manifest' })).toBeVisible();

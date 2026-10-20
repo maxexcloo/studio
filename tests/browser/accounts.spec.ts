@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
-test('administrators can manage access profiles, accounts and a personal MCP token', async ({ page, isMobile }) => {
+test('administrators can manage access profiles, accounts and a personal MCP token', async ({ page }) => {
   const otherAccountText = 'private-draft-from-another-account';
   const posts: { url: string; body: unknown }[] = [];
   const loraOps: string[] = [];
@@ -66,11 +67,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(await page.evaluate(() => localStorage.getItem('heiss-ui-draft:account:admin-id'))).not.toContain(otherAccountText);
   expect(loraOps.join('\n')).not.toContain(otherAccountText);
   expect(await page.evaluate(() => localStorage.getItem('heiss-ui-lora-pending:account:admin-id'))).toBeNull();
-  if (isMobile) {
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: /Use the full studio/ }).click();
-  }
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await studioUi(page).openSettings();
   await page.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
   await page.getByPlaceholder('Studio Artists').fill('Video Artists');
@@ -125,7 +122,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });
 
-test('ordinary accounts open their own studio without administration sections', async ({ page, isMobile }) => {
+test('ordinary accounts open their own studio without administration sections', async ({ page }) => {
   await page.route('**/api/accounts/**', async (request) => {
     const url = new URL(request.request().url());
     if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn: true, account: { id: 'artist-id', role: 'user', generationProfiles: [], features: {} } } });
@@ -135,11 +132,7 @@ test('ordinary accounts open their own studio without administration sections', 
   });
   await page.goto('/');
   await expect(page.getByText('Your private studio is being prepared')).toHaveCount(0);
-  if (isMobile) {
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await page.getByRole('button', { name: /Use the full studio/ }).click();
-  }
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await studioUi(page).openSettings();
   const sections = page.getByRole('navigation', { name: 'Settings sections' });
   await expect(sections.getByRole('button', { name: 'Accounts & MCP', exact: true })).toBeVisible();
   for (const name of ['Models', 'Library', 'Hidden', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);

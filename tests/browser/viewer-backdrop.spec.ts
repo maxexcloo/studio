@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 import { execFileSync } from 'node:child_process';
 import ffmpeg from 'ffmpeg-static';
 
@@ -12,7 +13,8 @@ for (const kind of ['image', 'video']) {
     await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
     await page.route('**/backdrop-video.mp4*', (route) => route.fulfill({ body: video, contentType: 'video/mp4' }));
     await page.goto('/');
-    if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
+    const ui = studioUi(page);
+    if (kind === 'video') await ui.switchMode('video');
     await page.locator('[data-tile-id]').first().locator('.tile').click();
     const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
     const canvas = viewer.locator('.viewer-canvas');
@@ -29,7 +31,7 @@ for (const kind of ['image', 'video']) {
     if (isMobile) await page.touchscreen.tap(mediaBox!.x + mediaBox!.width / 2, mediaBox!.y + mediaBox!.height / 2);
     else await page.mouse.click(mediaBox!.x + mediaBox!.width / 2, mediaBox!.y + mediaBox!.height / 2);
     await expect(viewer).toBeVisible();
-    // Desktop image clicks toggle zoom; restore fit so the backdrop is exposed.
+    // Mouse clicks on an image toggle zoom; restore fit so the backdrop is exposed.
     if (kind === 'image' && !isMobile) {
       await page.mouse.click(mediaBox!.x + mediaBox!.width / 2, mediaBox!.y + mediaBox!.height / 2);
       await expect(canvas).not.toHaveClass(/is-zoomed/);

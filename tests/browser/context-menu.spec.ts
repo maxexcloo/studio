@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const image = { id: 'native-context-image', url: picture, filename: 'native-context.png', type: 'image', status: 'done', prompt: 'Native image actions', createdAt: '2026-01-01T00:00:00Z', width: 512, height: 512 };
@@ -36,8 +37,7 @@ test('gallery keeps management actions and Shift-right-click permits native imag
   test.skip(isMobile, 'Phones use their existing action sheet on gallery long press.');
   await page.goto('/');
   const tile = page.locator('[data-tile-id]').first().locator('.tile');
-  await tile.click({ button: 'right' });
-  await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
+  await expect(await studioUi(page).openItemActions(tile)).toHaveAccessibleName('Item Actions');
   await page.keyboard.press('Escape');
   const allowed = await tile.locator('img').evaluate((element) => element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true })));
   expect(allowed).toBe(true);
@@ -47,12 +47,11 @@ test('gallery keeps management actions and Shift-right-click permits native imag
   await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
 });
 
-test('phone image actions stay compact and expose Copy Prompt', async ({ page, isMobile }) => {
+test('phone image actions stay compact, expose Copy Prompt and start selecting', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'The compact action sheet belongs to the phone gallery.');
   await page.goto('/');
-  await page.locator('[data-tile-id]').first().locator('.tile').dispatchEvent('contextmenu');
-  const sheet = page.locator('.phone-item-actions');
-  await expect(sheet).toBeVisible();
+  const ui = studioUi(page);
+  const sheet = await ui.openItemActions(page.locator('[data-tile-id]').first().locator('.tile'));
   await expect(sheet.getByRole('button', { name: 'Copy Prompt', exact: true })).toBeVisible();
   const bounds = await sheet.boundingBox();
   expect(bounds!.height).toBeLessThan(440);
@@ -63,6 +62,9 @@ test('phone image actions stay compact and expose Copy Prompt', async ({ page, i
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   }
+  await sheet.getByRole('button', { name: 'Select', exact: true }).click();
+  await expect(ui.selectionBar).toBeVisible();
+  await expect(page.locator('.tile.is-selected')).toHaveCount(1);
 });
 
 test('phone viewer keeps Star at the top and copies prompts directly', async ({ page, isMobile }) => {
@@ -75,8 +77,7 @@ test('phone viewer keeps Star at the top and copies prompts directly', async ({ 
     } });
   });
   await page.goto('/');
-  await page.locator('[data-tile-id]').first().locator('.tile').click();
-  const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
+  const viewer = await studioUi(page).openViewer(page.locator('[data-tile-id]').first().locator('.tile'));
   const star = viewer.getByRole('button', { name: 'Star', exact: true });
   await expect(star).toBeVisible();
   expect((await star.boundingBox())!.y).toBeLessThan(80);

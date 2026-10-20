@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 import ffmpeg from 'ffmpeg-static';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#527b8f"/></svg>');
@@ -29,16 +30,16 @@ async function capture(page: Page, { h3 = true } = {}) {
   return { profile, references, generated };
 }
 
-async function openTile(page: Page, isMobile: boolean, id: string, kind: 'Images' | 'Videos') {
+async function openTile(page: Page, id: string, kind: 'Images' | 'Videos') {
   await page.goto('/');
-  if (kind === 'Videos') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
-  await page.locator(`[data-tile-id="${id}"] .tile`).click();
-  return page.getByRole('dialog', { name: 'Image Viewer', exact: true });
+  const ui = studioUi(page);
+  if (kind === 'Videos') await ui.switchMode('video');
+  return ui.openViewer(page.locator(`[data-tile-id="${id}"] .tile`));
 }
 
-test('the image viewer animates its picture from the first frame', async ({ page, isMobile }) => {
+test('the image viewer animates its picture from the first frame', async ({ page }) => {
   const { profile, references, generated } = await capture(page);
-  const viewer = await openTile(page, isMobile, image.id, 'Images');
+  const viewer = await openTile(page, image.id, 'Images');
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toBeVisible();
   await viewer.getByRole('button', { name: 'Animate', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Animate', exact: true });
@@ -54,9 +55,9 @@ test('the image viewer animates its picture from the first frame', async ({ page
   expect(generated[0].prompt).toContain(image.prompt);
 });
 
-test('the video viewer extends a video from its last frame with its prompt', async ({ page, isMobile }) => {
+test('the video viewer extends a video from its last frame with its prompt', async ({ page }) => {
   const { profile, references, generated } = await capture(page);
-  const viewer = await openTile(page, isMobile, clip.id, 'Videos');
+  const viewer = await openTile(page, clip.id, 'Videos');
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
   await expect(viewer.getByRole('button', { name: 'Extend Video', exact: true })).toBeVisible();
   await viewer.getByRole('button', { name: 'Extend Video', exact: true }).click();
@@ -72,9 +73,9 @@ test('the video viewer extends a video from its last frame with its prompt', asy
   expect(generated[0]).toMatchObject({ kind: 'video', profileId: profile.id, count: 1, prompt: 'The boat reaches the far shore.', referenceAssets: [{ slot: 'first-frame', assetId: `gallery:${clip.id}:last-frame` }] });
 });
 
-test('the viewer offers neither action without a first-frame video profile', async ({ page, isMobile }) => {
+test('the viewer offers neither action without a first-frame video profile', async ({ page }) => {
   await capture(page, { h3: false });
-  const viewer = await openTile(page, isMobile, image.id, 'Images');
+  const viewer = await openTile(page, image.id, 'Images');
   await expect(viewer.locator('.viewer-canvas img.generation-result')).toBeVisible();
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
   await expect(viewer.getByRole('button', { name: 'Extend Video', exact: true })).toHaveCount(0);
