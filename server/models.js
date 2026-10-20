@@ -286,7 +286,9 @@ export function inferModels(info, stats = {}) {
       capabilities: workflow.capabilities,
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,
-      maxLoras: workflow.loraStack?.max
+      maxLoras: workflow.loraStack?.max,
+      // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
+      ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1" ? { loraNote: "Up to rank 64 in total" } : {})
     }));
   }
 

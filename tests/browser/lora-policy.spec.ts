@@ -196,7 +196,7 @@ test('LoRA library offers direct list selection with inline strengths and access
 test('fine-tunes retain their family, version and format while optional LoRAs filter by architecture', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const original = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
-  const fineTune = { ...original, family: 'krea2', baseModel: 'tesserafineTurboBF16FP8_v10_3291478.safetensors', label: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', displayName: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', recipe: { modelLabel: 'Tesserafine Turbo', conditioning: 'Image', label: 'Turbo · 8 Steps', adapters: [] }, options: { ...original.options, loras: ['krea.safetensors', 'flux3.safetensors', 'unknown.safetensors'] } };
+  const fineTune = { ...original, family: 'krea2', baseModel: 'tesserafineTurboBF16FP8_v10_3291478.safetensors', label: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', displayName: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', recipe: { modelLabel: 'Tesserafine Turbo', conditioning: 'Image', label: 'Turbo · 8 Steps', adapters: [] }, loraNote: 'Up to rank 64 in total', options: { ...original.options, loras: ['krea.safetensors', 'flux3.safetensors', 'unknown.safetensors'] } };
   models.profiles = [...models.profiles.filter((profile: any) => profile.kind !== 'image'), fineTune];
   models.loras = fineTune.options.loras;
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
@@ -222,6 +222,8 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
   const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
+  // A profile's LoRA limit shows above the search (Radiance video's single rank-64 slot).
+  await expect(picker.getByText('Up to rank 64 in total', { exact: true })).toBeVisible();
   await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);

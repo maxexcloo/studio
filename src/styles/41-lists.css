@@ -424,3 +424,6 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   .set-panel .list-row .set-type-picker, .set-panel .list-row .account-field { width: 100%; }
   .set-panel .list-switch { flex-wrap: nowrap; }
 }
+
+/* A model's LoRA limit in a line above the search (Radiance video: "Up to rank 64 in total"). */
+.lora-picker-note { margin: 0 2px 6px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }

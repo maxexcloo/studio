@@ -148,6 +148,8 @@ export type Profile = {
   aspectPolicy?: "manual" | "reference";
   /** LoRAs the workflow's loader accepts; rgthree stacks take 4. */
   maxLoras?: number;
+  /** A short limit the LoRA picker shows, such as Radiance video's single rank-64 slot. */
+  loraNote?: string;
   /** Built-in families: where the file sits, which variant it is, and what fills its parts. */
   source?: ModelSource | "sana";
   variant?: string;

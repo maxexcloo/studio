@@ -315,6 +315,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
         <button type="button" className="btn is-ghost lora-picker-back" onClick={onClose}><ArrowLeft size={14} /> Back</button>
         <span>{swapping ? <>Replace <strong>{fileName(swapping)}</strong></> : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
       </div> : null}
+      {profile?.loraNote ? <p className="lora-picker-note">{profile.loraNote}</p> : null}
       <label className={cn("lora-picker-search", libraryView && "picker-search")}>
         <Search size={14} />
         <input
