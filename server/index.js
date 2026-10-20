@@ -12,6 +12,7 @@ import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGall
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
+import { registerProfileEditorRoutes } from './profile-editor.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
@@ -913,6 +914,11 @@ app.post("/api/workflows/import", async (req, res) => {
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
+});
+
+registerProfileEditorRoutes(app, {
+  objectInfo: async (kind) => (await withComfyBackend(kind === "video" ? "video" : "primary", () => loadComfyContext())).info,
+  accountName: (req) => req.heissAccount?.userId || ""
 });
 
 registerGalleryBundleRoutes(app);
