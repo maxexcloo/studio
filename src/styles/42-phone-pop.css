@@ -192,7 +192,7 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 /* -------------------------------------------------------------- Phone viewer & Details */
 
 /* With Details open the bar steps aside (its actions are in the footer); Star and Info stay in their corners. */
-.viewer-phone-bar.is-details { padding: 0; }
+.viewer-phone-bar.is-details { min-height: 0; padding: 0; }
 .viewer-phone-bar.is-details::before { display: none; }
 /* Details: a sheet from under the corner buttons to the bottom edge, clean edges, the footer clear of the home indicator. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side {

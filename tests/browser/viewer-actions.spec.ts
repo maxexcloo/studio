@@ -27,7 +27,7 @@ async function barOrder(bar) {
   }));
 }
 
-test('the action bar is ordered by intent, with Star and Info in the phone’s top corners', async ({ page }) => {
+test('the action bar is ordered by intent, with Star · Info · Close in the phone’s top right', async ({ page }) => {
   await page.goto('/');
   const { viewer, phone } = await open(page);
   if (phone) {
@@ -38,7 +38,8 @@ test('the action bar is ordered by intent, with Star and Info in the phone’s t
     const star = await viewer.getByRole('button', { name: 'Star', exact: true }).boundingBox();
     const info = await viewer.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await viewer.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
-    expect(star!.x).toBeLessThan(80);
+    expect(star!.x).toBeGreaterThan(150);
+    expect(star!.x).toBeLessThan(info!.x);
     expect(star!.y).toBeLessThan(80);
     expect(info!.y).toBeLessThan(80);
     expect(info!.x).toBeGreaterThan(200);

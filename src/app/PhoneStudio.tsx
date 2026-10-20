@@ -213,10 +213,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             </button> : null}
             {/* Centre: Images | Videos as two icons; a message takes the slot for a moment (UI-PATTERNS › Messages). */}
             {message ? <StatusPill message={message} className="is-bar" /> : <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />}
+            {/* A question takes the whole row but "Studio": its answers need the room, and nothing else applies until it is answered. */}
+            {message?.confirm ? null : <>
             <span className="phone-bar-gap" />
             <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
             <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
+            </>}
           </div>
         )}
         {/* Search or the filters, full width under the bar, one at a time. */}
