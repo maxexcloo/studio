@@ -44,6 +44,7 @@ import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
 import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
+import { derivedMediaCache, immutableMediaCache } from './media-response.js';
 import { startMediaWarmup } from './media-warmup.js';
 import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
@@ -1113,6 +1114,7 @@ app.get('/api/library/video-preview', async (req, res) => {
  * address is only a file name, so it is checked every time.
  */
 function thumbnailCacheControl(req) {
+  if (req.query.type === mediaType) return derivedMediaCache;
   return req.query.v ? "private, max-age=600, stale-while-revalidate=2592000" : "private, no-cache";
 }
 
@@ -1748,9 +1750,10 @@ app.get('/comfy/video-preview', async (req, res) => {
     res.status(404).end(); return;
   }
   try {
+    const cacheControl = type === mediaType ? derivedMediaCache : undefined;
     // The still comes from the original, ahead of any preview still being encoded.
-    if (req.query.poster === '1') await sendVideoPoster(req, res, await getComfyVideoPoster(filename, subfolder, type));
-    else sendVideoPreview(req, res, await getComfyVideoPreview(filename, subfolder, type));
+    if (req.query.poster === '1') await sendVideoPoster(req, res, await getComfyVideoPoster(filename, subfolder, type), cacheControl);
+    else sendVideoPreview(req, res, await getComfyVideoPreview(filename, subfolder, type), cacheControl);
   }
   catch { if (!res.headersSent) res.status(503).end(); }
 });
@@ -1764,6 +1767,11 @@ app.get("/comfy/thumb", async (req, res) => {
   // The same outputs /comfy/view serves, and nothing else.
   if (!["output", "input", "temp", mediaType].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
+    // A video's thumbnail is its poster, so every small view that asks for one gets a picture.
+    if (/\.(mp4|webm|mov|mkv|m4v)$/i.test(filename)) {
+      await sendVideoPoster(req, res, await getComfyVideoPoster(filename, subfolder, type), thumbnailCacheControl(req));
+      return;
+    }
     const thumbnail = await getThumbnail(filename, subfolder, type);
     if (!thumbnail) { res.status(404).json({ error: "Source image is unavailable." }); return; }
     // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
@@ -1854,7 +1862,7 @@ app.get("/comfy/*path", async (req, res) => {
         return;
       }
       if (req.query.download === "1") res.attachment(path.basename(file));
-      sendLocal(file);
+      res.sendFile(file, { headers: { "Cache-Control": immutableMediaCache } });
       return;
     }
     if (req.query.clean === "1") {

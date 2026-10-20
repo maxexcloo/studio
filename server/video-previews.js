@@ -314,10 +314,10 @@ export async function extractLastFrame(buffer) {
   }), { poster: true });
 }
 
-export function sendVideoPreview(req, res, file) {
+export function sendVideoPreview(req, res, file, cacheControl = 'private, max-age=60') {
   const now = new Date();
   fs.promises.stat(file).then((stat) => fs.promises.utimes(file, now, stat.mtime)).catch(() => {});
-  res.sendFile(file, { dotfiles: 'allow', headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'private, max-age=60', 'Content-Disposition': 'inline' } });
+  res.sendFile(file, { dotfiles: 'allow', headers: { 'Content-Type': 'video/mp4', 'Cache-Control': cacheControl, 'Content-Disposition': 'inline' } });
 }
 
 /** Extract a still from the small preview; private frames remain in memory. */
@@ -344,8 +344,8 @@ export async function getVideoPoster(preview) {
 }
 
 /** Sends a still: a cached file, or bytes kept in memory (Hidden). `preview` may already be the still. */
-export async function sendVideoPoster(req, res, preview) {
+export async function sendVideoPoster(req, res, preview, cacheControl = 'private, max-age=60') {
   const poster = typeof preview === 'string' && preview.endsWith('.jpg') ? preview : await getVideoPoster(preview);
-  if (typeof poster === 'string') res.sendFile(poster, { dotfiles: 'allow', headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=60' } });
+  if (typeof poster === 'string') res.sendFile(poster, { dotfiles: 'allow', headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': cacheControl } });
   else res.type('image/jpeg').send(poster);
 }

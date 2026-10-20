@@ -17,3 +17,12 @@ export function sendMediaBuffer(req, res, buffer, mime = 'video/mp4') {
   res.setHeader('Content-Length', end - start + 1);
   res.send(buffer.subarray(start, end + 1));
 }
+
+/**
+ * Studio media is stored under unique names and never rewritten
+ * (media-store.js), so a browser keeps an original for good. Thumbnails,
+ * posters and previews made from it are kept a week, then checked again by
+ * ETag in the background, so a change to their size settings still arrives.
+ */
+export const immutableMediaCache = 'private, max-age=31536000, immutable';
+export const derivedMediaCache = 'private, max-age=604800, stale-while-revalidate=2592000';
