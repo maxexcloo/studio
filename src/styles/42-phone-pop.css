@@ -211,3 +211,8 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
   max-width: calc(100% - 4 * var(--bar-h) - 40px);
   translate: -50% 0;
 }
+
+/* A message while a pop-up covers the top bar: the pop-up's head hosts the pill in the title's place (UI-PATTERNS › Messages). */
+.reference-popover.is-pop .reference-popover-head:has(.status-pill) > strong,
+.reference-popover.is-pop .reference-popover-head:has(.status-pill) > .reference-upload { display: none; }
+.reference-popover.is-pop .reference-popover-head .status-pill.is-surface { flex: 1 1 auto; min-width: 0; height: var(--bar-pill-h, 36px); margin: 0 4px 0 0; }

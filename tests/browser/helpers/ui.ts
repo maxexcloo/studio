@@ -15,8 +15,8 @@ export function studioUi(page: Page) {
   const galleryMode = page.getByRole('group', { name: 'Gallery Mode', exact: true });
   const more = page.getByRole('menu', { name: 'Menu', exact: true });
   const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
-  // The model picker has no shared role yet: a sheet on the phone, a popover menu in the full studio.
-  const modelPicker = page.locator('.phone-model-sheet, .model-menu');
+  // The model picker has no shared role yet: a pop-up over Create on the phone, a popover menu in the full studio.
+  const modelPicker = page.locator('.phone-model-pop, .model-menu');
 
   /** Whether the page shows the phone studio. */
   async function isPhone() {
@@ -112,8 +112,8 @@ export function studioUi(page: Page) {
     generate: composer.getByRole('button', { name: 'Generate', exact: true }),
     negativePrompt: composer.getByRole('textbox', { name: 'Negative Prompt', exact: true, includeHidden: true }),
     prompt: composer.getByRole('textbox', { name: 'Prompt', exact: true }),
-    /** The model rows: buttons in the phone sheet, options in the full studio's listbox. */
-    modelOptions: modelPicker.locator('.phone-model-option, [role="option"]'),
+    /** The model rows: buttons in the phone pop-up, options in the full studio's listbox. */
+    modelOptions: modelPicker.locator('.model-pop-pick, [role="option"]'),
     selectionBar: page.getByRole('navigation', { name: 'Selected Items', exact: true }).or(page.getByRole('group', { name: 'Gallery Management', exact: true })),
 
     async switchMode(kind: 'image' | 'video') {
@@ -122,7 +122,7 @@ export function studioUi(page: Page) {
 
     async chooseModel(name: string | RegExp) {
       await openModelPicker();
-      await modelPicker.locator('.phone-model-option, [role="option"]').filter({ hasText: name }).first().click();
+      await modelPicker.locator('.model-pop-pick, [role="option"]').filter({ hasText: name }).first().click();
     },
 
     /** Opens a tile's actions: a long press on the phone, a right click in the full studio. */

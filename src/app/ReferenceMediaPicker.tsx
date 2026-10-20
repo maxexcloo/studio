@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Check, GripVertical, Image as ImageIcon, ImagePlus, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
+import { SurfaceStatus } from "./StatusMessage";
 import { Tip } from "./components";
 import { EmptyState } from "./EmptyState";
 import { useDismiss } from "./useDismiss";
@@ -279,6 +280,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
           <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
         </button>
+        {onPhone ? <SurfaceStatus active={present} /> : null}
         <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={15} /></button></Tip>
       </header>

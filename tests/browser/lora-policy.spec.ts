@@ -216,7 +216,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await row.click();
   await ui.composer.getByRole('button', { name: /^LoRAs/ }).click();
   const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
-  await expect(surface).toHaveClass(await ui.isPhone() ? /is-sheet/ : /composer-loras/);
+  await expect(surface).toHaveClass(await ui.isPhone() ? /is-pop/ : /composer-loras/);
   await expect.poll(() => surface.evaluate(element => {
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
