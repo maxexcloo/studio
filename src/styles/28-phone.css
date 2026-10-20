@@ -6,12 +6,19 @@
    else. Sizes are for thumbs: 44px icons, 56px rows, 16-17px type.
 --------------------------------------------------------------------------- */
 
+/* The main screen scrolls the document, not a box inside it: iOS scrolls only
+   the document to the top on a tap on the status bar. The bars, pill and
+   search are fixed over it; sheets and the viewer scroll themselves and lock
+   the page behind (below). */
+html:has(.phone-shell),
+html:has(.phone-shell) body,
+html:has(.phone-shell) #root { height: auto; min-height: 100%; }
+html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .reference-popover.is-sheet) { overflow: hidden; }
 .phone-shell {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  min-height: 100dvh;
   /* Down over the strip a Home Screen app's window stops short of (use-keyboard-inset.ts). */
-  bottom: calc(-1 * var(--pwa-gap, 0px));
-  overflow: hidden;
+  padding-bottom: var(--pwa-gap, 0px);
   background: #0a0a0a;
   color: hsl(var(--foreground));
   -webkit-tap-highlight-color: transparent;
@@ -131,13 +138,10 @@
 /* ------------------------------------------------------------- Gallery */
 
 .phone-gallery {
-  position: absolute;
-  inset: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  display: block;
+  min-height: 100dvh;
+  overflow-x: clip;
   touch-action: pan-y pinch-zoom;
-  -webkit-overflow-scrolling: touch;
   padding:
     calc(max(6px, env(safe-area-inset-top)) + 56px)
     max(6px, env(safe-area-inset-right))

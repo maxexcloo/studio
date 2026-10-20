@@ -9,6 +9,10 @@ import { useEffect, useRef } from 'react';
 
 type Entry = { id: number; close: () => void };
 
+// The phone gallery scrolls the document, and an overlay's entries are not
+// pages: going back must not put the scroll where it was when one opened.
+if (typeof history !== 'undefined' && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 const stack: Entry[] = [];
 let nextId = 1;
 let ignoreNextPop = 0;

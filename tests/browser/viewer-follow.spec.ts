@@ -16,7 +16,7 @@ test('the gallery follows the viewer to another item and stays put otherwise', a
   await expect(first).toBeVisible();
   const scrollTop = () => first.evaluate((tile) => {
     for (let node = tile.parentElement; node; node = node.parentElement) if (['auto', 'scroll'].includes(getComputedStyle(node).overflowY)) return node.scrollTop;
-    return -1;
+    return document.scrollingElement!.scrollTop;
   });
   // Opening a tile already on screen leaves the gallery where it is.
   await ui.openViewer(first.locator('.tile'));

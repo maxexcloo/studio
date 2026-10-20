@@ -24,6 +24,10 @@ export function useKeyboardInset() {
       ? Math.min(window.screen.width, window.screen.height)
       : Math.max(window.screen.width, window.screen.height);
     let frame = 0;
+    // Where the page rested before the keyboard came up: the phone gallery scrolls
+    // the document, so a pan iOS leaves behind returns there, not to the top.
+    let resting = 0;
+    let wasOpen = false;
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -31,6 +35,8 @@ export function useKeyboardInset() {
         // Browser chrome sliding in and out moves this by a few dozen pixels;
         // only a keyboard-sized gap counts.
         const open = inset > 120;
+        if (open && !wasOpen) resting = window.scrollY;
+        wasOpen = open;
         root.style.setProperty('--kb-inset', `${open ? inset : 0}px`);
         root.classList.toggle('kb-open', open);
         if (open) {
@@ -40,7 +46,7 @@ export function useKeyboardInset() {
           // Closed: the layout comes back to 100dvh, and any pan iOS left behind goes with it.
           root.style.removeProperty('--vv-height');
           root.style.removeProperty('--vv-top');
-          if (viewport.offsetTop > 0 && window.scrollY > 0) window.scrollTo(0, 0);
+          if (viewport.offsetTop > 0 && window.scrollY !== resting) window.scrollTo(0, resting);
         }
         // A Home Screen app drawn under the status bar (black-translucent) gets a
         // window one status bar shorter than the screen, so whatever is pinned to

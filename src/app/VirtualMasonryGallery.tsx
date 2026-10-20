@@ -5,6 +5,7 @@ import { GalleryTile } from './GalleryTile';
 import { RunShelf, RunStack, MomentHeading } from './RunStack';
 import { itemKey, layoutGallery, placementKey, type LayoutEntry, type RunStackStyle } from './galleryLayout';
 import { cn } from './format';
+import { scrollEvents, scrollerTop } from './scroller';
 import type { MasonrySlot } from './masonry';
 import type { UpscaleNotice } from './useUpscale';
 import type { GalleryGroups, Run } from './runs';
@@ -50,12 +51,15 @@ type VirtualMasonryGalleryProps = {
 };
 
 /** The nearest ancestor that scrolls vertically: the gallery's stage in every layout. */
+// The phone lays its gallery out in the document, so iOS's tap on the status
+// bar scrolls it to the top; with no scrolling ancestor, the page itself scrolls.
 function scrollParent(node: HTMLElement | null) {
-  for (let current = node?.parentElement || null; current; current = current.parentElement) {
+  if (!node?.isConnected) return null;
+  for (let current = node.parentElement; current && current !== document.body; current = current.parentElement) {
     const overflow = getComputedStyle(current).overflowY;
     if (overflow === "auto" || overflow === "scroll") return current;
   }
-  return null;
+  return (document.scrollingElement as HTMLElement | null) || null;
 }
 
 function useElementWidth<T extends HTMLElement>() {
@@ -240,7 +244,7 @@ export function VirtualMasonryGallery({
     if (!just || !element || !container || performance.now() - just.at > 400) return;
     const stack = layout.entries.find((entry) => entry.kind === "stack" && entry.run.id === just.runId);
     if (!stack) return;
-    const offset = container.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+    const offset = container.getBoundingClientRect().top - scrollerTop(element) + element.scrollTop;
     const top = offset + stack.y;
     if (top < element.scrollTop + 60) element.scrollTo({ top: Math.max(0, top - 96), behavior: reducedMotion ? "auto" : "smooth" });
   }, [layout]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -252,7 +256,7 @@ export function VirtualMasonryGallery({
     const shelf = layout.entries.find((entry) => entry.kind === "shelf" && entry.run.id === runId);
     if (!shelf) return;
     reveal.current = null;
-    const offset = container.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
+    const offset = container.getBoundingClientRect().top - scrollerTop(scrollElement) + scrollElement.scrollTop;
     const top = offset + shelf.y;
     const view = scrollElement.clientHeight;
     const visible = top > scrollElement.scrollTop + 40 && top < scrollElement.scrollTop + view * 0.55;
@@ -264,7 +268,7 @@ export function VirtualMasonryGallery({
     if (!focusRun || !scrollElement || !containerRef.current) return;
     const tray = layout.entries.find((entry) => (entry.kind === "shelf" || entry.kind === "stack") && entry.run.id === focusRun);
     if (!tray) return;
-    const offset = containerRef.current.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
+    const offset = containerRef.current.getBoundingClientRect().top - scrollerTop(scrollElement) + scrollElement.scrollTop;
     scrollElement.scrollTo({ top: Math.max(0, offset + tray.y - 96), behavior: reducedMotion ? "auto" : "smooth" });
     onFocused?.();
   }, [focusRun, layout, scrollElement]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -283,7 +287,7 @@ export function VirtualMasonryGallery({
     // Not laid out yet (a page still loading): tried again with the next layout.
     if (!entry) return;
     followed.current = followItem;
-    const offset = container.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
+    const offset = container.getBoundingClientRect().top - scrollerTop(scrollElement) + scrollElement.scrollTop;
     const top = offset + entry.y;
     const view = scrollElement.clientHeight;
     if (top >= scrollElement.scrollTop && top + entry.h <= scrollElement.scrollTop + view) return;
@@ -309,7 +313,7 @@ export function VirtualMasonryGallery({
       let band = Math.floor(Math.max(0, element.scrollTop - origin) / step);
       if (!geometryChanged && band === lastBand) return;
       // Read layout only when tiles enter/leave, rather than on every scroll frame.
-      origin = container.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+      origin = container.getBoundingClientRect().top - scrollerTop(element) + element.scrollTop;
       view = element.clientHeight || window.innerHeight;
       geometryChanged = false;
       step = Math.max(200, Math.round(view / 2));
@@ -322,12 +326,15 @@ export function VirtualMasonryGallery({
     };
     const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
     measure();
-    element.addEventListener("scroll", schedule, { passive: true });
+    const events = scrollEvents(element);
+    events.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
     const observer = new ResizeObserver(() => { geometryChanged = true; schedule(); });
     observer.observe(element);
     observer.observe(container);
     return () => {
-      element.removeEventListener("scroll", schedule);
+      events.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
       observer.disconnect();
       if (frame) window.cancelAnimationFrame(frame);
     };
@@ -350,7 +357,7 @@ export function VirtualMasonryGallery({
     const element = scrollElement;
     const container = containerRef.current;
     if (!element || !container || previous === layout) return;
-    const offset = container.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+    const offset = container.getBoundingClientRect().top - scrollerTop(element) + element.scrollTop;
     const top = element.scrollTop - offset;
     if (top < 200) return;
     const now = new Map(layout.entries.map((entry) => [entry.key, entry.y]));

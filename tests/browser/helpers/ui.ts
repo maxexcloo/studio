@@ -104,6 +104,8 @@ export function studioUi(page: Page) {
 
     /** The scrolling gallery: the page's only main landmark in both layouts. */
     gallery: page.getByRole('main'),
+    /** What scrolls the gallery: its pane in the full studio, the document on the phone (so a tap on iOS's status bar reaches the top). */
+    scroller: page.locator('main.stage-gallery').or(page.locator('html:has(.phone-shell)')),
     generate: composer.getByRole('button', { name: 'Generate', exact: true }),
     negativePrompt: composer.getByRole('textbox', { name: 'Negative Prompt', exact: true }),
     prompt: composer.getByRole('textbox', { name: 'Prompt', exact: true }),

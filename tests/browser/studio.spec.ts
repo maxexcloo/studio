@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 test('image and video keep their own scroll positions through repeated switches', async ({ page }) => {
   await page.goto('/');
   const ui = studioUi(page);
-  const scroller = ui.gallery;
+  const scroller = ui.scroller;
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   // The full studio keeps the mode switch in the gallery; the phone keeps it in its header.
   if (!await ui.isPhone()) expect(await ui.galleryMode.evaluate((element) => Boolean(element.closest('main')))).toBe(true);
@@ -32,6 +32,36 @@ test('image and video keep their own scroll positions through repeated switches'
     await ui.switchMode('video');
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeCloseTo(videoTop, 0);
   }
+});
+
+test('the phone gallery scrolls the document so a tap on the status bar reaches the top', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'iOS scrolls only the document to the top.');
+  await page.goto('/');
+  await expect(page.locator('[data-tile-id]').first()).toBeVisible();
+  // The document is the scroller: no box inside it scrolls the gallery.
+  const scrolled = await page.evaluate(() => {
+    const page = document.scrollingElement!;
+    page.scrollTo({ top: 1500, behavior: 'instant' });
+    const tile = document.querySelector('[data-tile-id]')!;
+    const boxes = [];
+    for (let node = tile.parentElement; node && node !== document.body; node = node.parentElement) if (['auto', 'scroll'].includes(getComputedStyle(node).overflowY)) boxes.push(node.className);
+    return { top: page.scrollTop, boxes };
+  });
+  expect(scrolled.boxes).toEqual([]);
+  expect(scrolled.top).toBeGreaterThan(1400);
+  // Tiles further down are drawn as the page scrolls (the grid is virtual), and the bars stay put.
+  await expect(page.locator('[data-tile-id="image-20"]')).toBeAttached();
+  const bar = await page.locator('.phone-bar').first().boundingBox();
+  expect(bar!.y).toBe(0);
+  // A sheet locks the page behind it and keeps the place, also after it closes.
+  await page.locator('.phone-create-open').click();
+  await expect(page.locator('html')).toHaveCSS('overflow-y', 'hidden');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('html')).not.toHaveCSS('overflow-y', 'hidden');
+  expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBeGreaterThan(1400);
+  // iOS's status-bar tap scrolls the document to the top, as scrollTo does here.
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect(page.locator('[data-tile-id="image-0"]')).toBeInViewport();
 });
 
 test('the phone mode picker keeps large targets at every phone size', async ({ page, isMobile }, testInfo) => {
@@ -251,7 +281,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
   await page.route('**/api/jobs/browser-job', (route) => route.fulfill({ json: { status: done ? 'done' : 'running', progress: { value: 1, max: 4 }, outputs: done ? [{ ...images[0], type: body.kind, id: 'completed-browser-job' }] : [] } }));
   await page.goto('/');
   const ui = studioUi(page);
-  const scroller = ui.gallery;
+  const scroller = ui.scroller;
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   for (const kind of ['image', 'video']) {
     await ui.switchMode(kind as 'image' | 'video');
@@ -830,7 +860,7 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
   await page.goto('/');
   const ui = studioUi(page);
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
-  const scroller = ui.gallery;
+  const scroller = ui.scroller;
   await scroller.evaluate((element) => element.scrollTo({ top: 1200, behavior: 'instant' }));
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
   await ui.openComposer();

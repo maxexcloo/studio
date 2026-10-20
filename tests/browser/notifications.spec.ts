@@ -13,7 +13,7 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   await expect(page.locator('[data-tile-id="notice-pending"]')).toBeVisible();
   const ui = studioUi(page);
   const phone = await ui.isPhone();
-  const scroller = ui.gallery;
+  const scroller = ui.scroller;
   await scroller.evaluate((element) => element.scrollTo({ top: 1400, behavior: 'instant' }));
   // The full studio shows progress in its activity island; the phone shows a running badge.
   if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();

@@ -1500,7 +1500,7 @@ function App() {
     pendingScroll.current = null;
   }
 
-  function onGalleryScroll(event: React.UIEvent<HTMLElement>) {
+  function onGalleryScroll(event: { currentTarget: HTMLElement }) {
     if (!hasMoreGallery) return;
     const target = event.currentTarget;
     const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;

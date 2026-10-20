@@ -73,6 +73,19 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const handlers = useItemActionHandlers();
   const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, Boolean(hiddenSpace), true) : [];
   const reducedMotion = useReducedMotion();
+  // The gallery scrolls the document, so iOS's tap on the status bar takes it to the top.
+  const loadMore = React.useRef(onGalleryScroll);
+  loadMore.current = onGalleryScroll;
+  React.useLayoutEffect(() => {
+    const page = document.scrollingElement as HTMLElement;
+    galleryStageRef.current = page;
+    const onScroll = () => loadMore.current({ currentTarget: page });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (galleryStageRef.current === page) galleryStageRef.current = null;
+    };
+  }, [galleryStageRef]);
   const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
   // Tapping what is generating shows that run: its own mode, its own tile.
   const revealRunning = () => {
@@ -170,7 +183,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       </header>
       {<PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchExpanded} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} filterTriggerRef={filterTriggerRef} searchTriggerRef={searchTriggerRef} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} items={gallery} />}
 
-      <main ref={galleryStageRef} className="phone-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
+      <main className="phone-gallery" onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
         {galleryBody}
       </main>
 
