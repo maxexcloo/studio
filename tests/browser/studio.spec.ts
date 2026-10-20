@@ -880,7 +880,7 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
   await request;
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
   if (await ui.isPhone()) {
-    // The phone names a running generation beside its title; tapping it scrolls back to it.
+    // The phone names a running generation beside its title; its menu's Show Running scrolls back to it.
     const indicator = page.locator('.phone-bar .phone-running-inline');
     await expect(indicator).toBeVisible();
     await expect(page.locator('.phone-running')).toHaveCount(0);
@@ -888,6 +888,9 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
     const badge = await indicator.boundingBox();
     expect(Math.abs(badge!.y - galleryTitle!.y)).toBeLessThan(3);
     await indicator.click();
+    const running = page.getByRole('menu');
+    await expect(running.getByRole('menuitem', { name: /^Stop All \(\d+\)$/ })).toBeVisible();
+    await running.getByRole('menuitem', { name: 'Show Running', exact: true }).click();
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
   }
 });
