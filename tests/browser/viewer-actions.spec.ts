@@ -52,28 +52,40 @@ test('the action bar is ordered by intent, with Star and Info in the phone’s t
     }
   } else {
     const order = await barOrder(viewer.getByRole('toolbar', { name: 'Image Actions' }));
-    expect(order).toEqual(['Copy', 'Download', '|', 'Recreate', 'Reference', 'Upscale', '|', 'Star', 'Delete', '|', 'Info', 'Close']);
+    expect(order).toEqual(['Copy', 'Download', '|', 'Recreate', 'Reference', 'Upscale', '|', 'Star', 'Delete', '|', 'Close']);
+    // Info sits on its own in the top right.
+    const info = await viewer.getByRole('button', { name: 'Info', exact: true }).boundingBox();
+    const viewport = page.viewportSize()!;
+    expect(info!.y).toBeLessThan(80);
+    expect(info!.x + info!.width).toBeGreaterThan(viewport.width - 80);
   }
 });
 
-test('Info toggles Details open and shut', async ({ page }) => {
+test('Info opens Details, which closes with its own Close (or Info on a phone)', async ({ page }) => {
   await page.goto('/');
-  const { viewer } = await open(page);
+  const { viewer, phone } = await open(page);
   const info = viewer.getByRole('button', { name: 'Info', exact: true });
   const details = page.locator('.viewer-side');
-  if (await details.count()) { await info.click(); await expect(details).toHaveCount(0); }
+  const closeDetails = details.getByRole('button', { name: 'Close Details', exact: true });
+  if (await details.count()) { await closeDetails.click(); await expect(details).toHaveCount(0); }
   await info.click();
   await expect(details).toBeVisible();
-  await expect(info).toHaveAttribute('aria-pressed', 'true');
-  await info.click();
+  if (phone) {
+    await expect(info).toHaveAttribute('aria-pressed', 'true');
+    await info.click();
+    await expect(details).toHaveCount(0);
+    await expect(info).toHaveAttribute('aria-pressed', 'false');
+    await info.click();
+  } else await expect(info).toHaveCount(0);
+  await closeDetails.click();
   await expect(details).toHaveCount(0);
-  await expect(info).toHaveAttribute('aria-pressed', 'false');
+  await expect(info).toBeVisible();
 });
 
 test('zoom is a small − % + pill, bottom middle, whose percentage cycles the fit', async ({ page }) => {
   await page.goto('/');
   const { viewer, phone } = await open(page);
-  if (await page.locator('.viewer-side').count()) await viewer.getByRole('button', { name: 'Info', exact: true }).click();
+  if (await page.locator('.viewer-side').count()) await page.locator('.viewer-side').getByRole('button', { name: 'Close Details', exact: true }).click();
   const zoom = viewer.getByRole('group', { name: 'Image Zoom' });
   const viewport = page.viewportSize()!;
   // Centred once Details has gone and the pill has slid back.

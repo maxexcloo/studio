@@ -749,7 +749,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
@@ -847,6 +847,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()}>
                     <div className="viewer-side-head">
                       <h3>Details</h3>
+                      {/* The panel closes itself; on the desktop it covers the corner Info sits in. */}
+                      <Tip content="Close Details (I)"><button type="button" className="icon-button viewer-side-close" aria-label="Close Details" onClick={() => setShowDetails(false)}><X size={16} /></button></Tip>
                     </div>
                     <div className="viewer-side-body">
                       {phone ? <DetailsShortcuts
@@ -916,9 +918,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
                   />
                   <span className="viewer-divider" />
-                  <Tip content={showDetails ? "Hide Info" : "Show Info (I)"}><button className={cn("icon-button", showDetails && "active")} aria-label="Info" aria-pressed={showDetails} onClick={() => setShowDetails((value: boolean) => !value)}><Info size={16} /></button></Tip>
                   <Tip content="Close (Esc)"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>
                 </div>
+                {/* Info opens Details from the top right; the open panel has its own Close. */}
+                {!showDetails ? <Tip content="Show Details (I)"><button type="button" data-open-trigger className="viewer-info" aria-label="Info" aria-pressed={false} onClick={() => setShowDetails(true)}><Info size={17} /></button></Tip> : null}
                 </>
                 )}
                 {/* Phones and tablets: the dock has no room for Close, so it sits in the corner. */}

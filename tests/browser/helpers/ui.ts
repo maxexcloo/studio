@@ -191,10 +191,11 @@ export function studioUi(page: Page) {
     },
 
     /** Shows the viewer's Details, from Info. */
+    /** Opens Details with Info; on the desktop Info then makes way for the panel's own Close. */
     async showDetails() {
-      const toggle = viewer.getByRole('button', { name: 'Info', exact: true });
-      if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
-      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      const details = page.locator('.viewer-side');
+      if (!await details.count()) await viewer.getByRole('button', { name: 'Info', exact: true }).click();
+      await expect(details).toBeVisible();
     },
 
     async openViewer(tile: Locator) {

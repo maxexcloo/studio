@@ -518,3 +518,33 @@
 @media (prefers-reduced-motion: reduce) {
   .viewer-canvas .generation-surface img.generation-result:not(.is-loading) { transition: none; }
 }
+
+/* Info in the viewer's top right on the desktop and tablets, as on phones;
+   the open Details panel takes its place and carries its own Close. */
+.viewer-info {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  width: var(--dock-h);
+  height: var(--dock-h);
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+.viewer-info:hover { background: var(--control-hover); }
+.viewer-info:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--glass-bar-shadow); }
+.viewer-side-close { flex: none; margin: -8px -10px -8px 0; }
+@media (max-width: 1024px) {
+  /* Beside the corner Close. */
+  .viewer-info { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px); }
+}
