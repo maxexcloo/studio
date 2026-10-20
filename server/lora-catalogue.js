@@ -6,7 +6,9 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return info;
   const requested = familiesFromMetadata({ base_model: String(entry.baseModel || '') });
   const detected = info?.families || [];
-  const compatible = !detected.length || requested.some((id) => detected.includes(id));
+  // Qwen-Image 2.1 LoRAs read as Qwen-Image from their weights alone; the catalogue says which.
+  const compatible = !detected.length || requested.some((id) => detected.includes(id))
+    || detected.includes('qwen_image') && requested.includes('qwen_image_21');
   const ids = requested.length && compatible ? requested : detected;
   const title = typeof entry.title === 'string' ? entry.title.trim().slice(0, 300) : '';
   return {
@@ -17,7 +19,14 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
     ...loraDescriptionMetadata(entry),
     ...loraRoleMetadata(entry),
     ...loraPolicyMetadata(entry),
+    ...(Array.isArray(entry.triggers) ? { triggers: cleanTriggers(entry.triggers) } : {}),
+    ...(typeof entry.guidance === 'string' && entry.guidance.trim() ? { guidance: entry.guidance.trim().slice(0, 1000) } : {}),
   };
+}
+
+/** Trigger words, without blanks or a literal "[]" some providers list for "none". */
+export function cleanTriggers(values) {
+  return (Array.isArray(values) ? values : []).filter((value) => typeof value === 'string' && value.trim() && value.trim() !== '[]').map((value) => value.trim()).slice(0, 30);
 }
 
 function loraDescriptionMetadata(entry) {
@@ -48,7 +57,7 @@ export function enrichLoraInfo(info, name, sources, familiesFromMetadata, famili
   const sameArchitecture = !detected.length || providerFamilies.some((id) => detected.includes(id))
     || detected.includes('qwen_image') && providerFamilies.includes('qwen_image_21');
   const ids = providerFamilies.length && sameArchitecture ? providerFamilies : detected;
-  const triggers = Array.isArray(source.trainedWords) ? source.trainedWords.filter((value) => typeof value === 'string' && value.trim()).slice(0, 30) : [];
+  const triggers = cleanTriggers(source.trainedWords);
   return {
     ...info,
     ...loraDescriptionMetadata(source),
@@ -57,7 +66,7 @@ export function enrichLoraInfo(info, name, sources, familiesFromMetadata, famili
     ...(title ? { title, about: title } : {}),
     families: ids,
     base: ids.length ? [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(' / ') : info?.base || '',
-    triggers: triggers.length ? triggers : info?.triggers || [],
+    triggers: triggers.length ? triggers : cleanTriggers(info?.triggers),
   };
 }
 

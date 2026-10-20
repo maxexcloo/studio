@@ -89,3 +89,19 @@ test('existing descriptions and safe source links survive local and provider enr
   }
   assert.equal(enrich(info, source.file, { source: { ...source, sourceUrl: 'javascript:alert(1)' } }).sourceUrl, undefined);
 });
+
+test('the local catalogue places Qwen-Image 2.1 LoRAs that their weights read as Qwen-Image', () => {
+  const result = enrichLocalLoraInfo(info, 'local.safetensors', { 'local.safetensors': { baseModel: 'Qwen-Image 2.1', title: 'Local Slider' } }, detect, families);
+  assert.deepEqual(result.families, ['qwen_image_21']);
+  assert.equal(result.base, 'Qwen-Image 2.1');
+  assert.equal(result.title, 'Local Slider');
+});
+
+test('the local catalogue carries triggers and guidance, and drops a literal [] trigger', () => {
+  const entry = { baseModel: 'Krea 2', triggers: ['[]', ' muscular ', ''], guidance: '  Use with a full-body prompt.  ' };
+  const result = enrichLocalLoraInfo({ families: ['krea2'], triggers: [] }, 'slider.safetensors', { 'slider.safetensors': entry }, detect, families);
+  assert.deepEqual(result.triggers, ['muscular']);
+  assert.equal(result.guidance, 'Use with a full-body prompt.');
+  const provider = enrich({ families: ['krea2'], triggers: [] }, source.file, { source: { ...source, baseModel: 'Krea 2', trainedWords: ['[]'] } });
+  assert.deepEqual(provider.triggers, []);
+});

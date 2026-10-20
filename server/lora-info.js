@@ -311,6 +311,9 @@ export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [],
   let sources = {};
   let catalogue = {};
   try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
-  try { catalogue = JSON.parse(fs.readFileSync(path.join(dataDir, 'lora-catalogue.json'), 'utf8')); } catch { /* Optional local display metadata. */ }
+  // Optional local display metadata: the synced config/ copy (like prompting.json) wins over one installed by hand.
+  for (const file of [path.join(dataDir, 'lora-catalogue.json'), path.join(dataDir, 'config', 'lora-catalogue.json')]) {
+    try { catalogue = { ...catalogue, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch { /* Not there. */ }
+  }
   return enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
 }

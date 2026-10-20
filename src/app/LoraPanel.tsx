@@ -137,6 +137,7 @@ function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
     <div>
       {description ? <p>{description}</p> : <p>No description is available.</p>}
       {info?.note ? <p>{info.note}</p> : null}
+      {info?.guidance ? <p className="lora-guidance">{info.guidance}</p> : null}
       {info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
       {source ? <a href={source} target="_blank" rel="noopener noreferrer">View Source</a> : null}
     </div>
