@@ -38,7 +38,7 @@ export function ViewerActions({ item, onUseSettings, onUseLoras, onUseAsReferenc
   const hasSecondary = loraCount > 0 || Boolean(onUseAsReference);
   if (!canUse && !hasSecondary) return null;
   return (
-    <div className="viewer-actions">
+    <div className="viewer-actions" role="group" aria-label="Reuse">
       {canUse ? (
         <ViewerReuseAction onUseSettings={onUseSettings} />
       ) : null}
