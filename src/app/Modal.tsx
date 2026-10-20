@@ -82,7 +82,8 @@ export function Modal({
               // Return focus to whatever opened us, if it still exists.
               if (opener?.isConnected) { event.preventDefault(); opener.focus(); }
             }}
-            onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
+            // A menu open inside the dialog (a multi-select, a size menu) takes its own Escape first.
+            onEscapeKeyDown={(event) => { if (busy || (event.target instanceof Element && event.target.closest('[data-own-escape]'))) event.preventDefault(); }}
             onPointerDownOutside={(event) => { if (busy || !dismissOnOutside || isToast(event.target)) event.preventDefault(); }}
             onInteractOutside={(event) => { if (busy || !dismissOnOutside || isToast(event.target)) event.preventDefault(); }}
           >
