@@ -351,7 +351,10 @@ The gallery scrolls `document.scrollingElement`, not a box inside the page:
 iOS only scrolls the document to the top on a tap on the status bar. The top
 bar with its search row, the Create button and the select bar are `position: fixed` with safe-area
 insets. Sheets and the viewer scroll inside themselves and lock the page behind
-them (`overflow: hidden` on `html`), so the gallery keeps its place. Code that
+them (`overflow: hidden` on `html`), so the gallery keeps its place. Never put
+`overflow: hidden` on `body` under the phone shell: while `html` is visible it
+passes to the viewport and stops touch and wheel scrolling
+(`phone-touch-scroll.spec.ts` drags with a real touch). Code that
 reads the gallery's scroller uses `src/app/scroller.ts`, which treats the
 document and a scrolling box alike. History entries for overlays never restore
 scroll (`history.scrollRestoration = 'manual'`).

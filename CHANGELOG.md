@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Phone scrolling works again
+
+### Fixed
+- **Phone scrolling:** the phone gallery scrolls again by touch, wheel and trackpad (also in a desktop browser's device mode). The narrow-screen `body { overflow: hidden }` passed to the page while the phone shell scrolls the document; the phone shell now keeps its body visible and locks the page only on `html` while a sheet or the viewer is open (`phone-touch-scroll.spec.ts`).
+
 ## [0.34.2] - 2026-10-20
 
 > LoRAs for Radiance workflows

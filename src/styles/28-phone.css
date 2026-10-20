@@ -13,6 +13,11 @@
 html:has(.phone-shell),
 html:has(.phone-shell) body,
 html:has(.phone-shell) #root { height: auto; min-height: 100%; }
+/* The narrow-screen `body { overflow: hidden }` (06-responsive.css) passes to
+   the viewport while html is visible and stops touch scrolling; the phone
+   shell scrolls the document, so its body stays visible and only the lock
+   below (on html) stops it. */
+html:has(.phone-shell) body { overflow: visible; }
 html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .reference-popover.is-sheet) { overflow: hidden; }
 .phone-shell {
   position: relative;
