@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> One References chooser for many-reference models, Hidden folded back into the gallery, multi-select gallery filters, Animate from the select bars and a tidier viewer, menu and phone sheets
+
 ### Added
 - **One References button:** a model that reads several references (FLUX.3 [klein] takes ten) shows a single References button with the picked thumbnails and n/max, instead of a control per slot. Its chooser picks several at once, numbers them in order and has a Selected n/max tab to review, reorder and remove them; the inpaint brush and Edit | Reference sit beside it.
 - **Selected n/max for LoRAs:** the LoRA library adds a Selected view beside This Model and All Models, and drops its row animations.
