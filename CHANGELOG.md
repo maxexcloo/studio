@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Messages move into the Studio pill, every reference stack gets one References button, Advanced Settings become a popover, Settings regroup, chat queues ten images per call, and motion and start-up get quicker
+
 ### Added
 - **Clear All in the pickers:** the reference chooser and the LoRA library show Clear All beside their tabs while something is picked; Undo comes back in the status pill.
 - **Cloud generations survive a restart:** a Grok job's ComfyUI prompt is kept in `cloud-jobs.json`, so after a Studio restart the tile keeps running and delivers instead of reading "Generation missing"; a lost or failed provider job fails the tile with a clear message.
