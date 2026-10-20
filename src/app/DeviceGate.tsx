@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, RefreshCw } from 'lucide-react';
-import { emailFieldProps, looksLikeEmail } from './accounts';
+import { emailFieldProps, looksLikeEmail, rememberAccountStatus } from './accounts';
 import { ApiError, apiJson, setAccountStorageScope, signedOutEvent } from './api';
 import { setAtComputer, setThisComputer } from './device';
 import { LockMark, type LockMarkStage } from './LockMark';
@@ -34,6 +34,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   const check = useCallback(async () => {
     try {
       const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; setupTokenAccepted?: boolean; oidc?: { label: string }; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
+      rememberAccountStatus(accountMode);
       if (accountMode.mode === 'multi-user') {
         const signedIn = accountMode.signedIn === true;
         setAccountStorageScope(signedIn ? accountMode.account?.id : undefined);

@@ -5,6 +5,7 @@ import { loraRoleLabel } from './modelRecipes';
 import type { LoraInfo } from './useLoraInfo';
 import { apiJson } from './api';
 import { BetaTag } from './components';
+import { SwitchRow } from './SettingsControls';
 import { clearPrompts, setPromptHistoryEnabled, usePromptHistory } from './recentPrompts';
 import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
@@ -66,7 +67,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
   const post = (url: string, body?: unknown) => apiJson<ImportResult>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
 
   return (
-    <Group title="Earlier Images" note="Images stay where they are and aren’t copied. Prompts saved in the files by ComfyUI or AUTOMATIC1111 can be searched.">
+    <Group title="Earlier Images" note="Images stay where they are and aren’t copied. Prompts saved in the files can be searched.">
       {(folders || []).map((folder) => (
         <Row
           key={folder.id}
@@ -88,7 +89,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
           }}>Remove</button>
         </Row>
       ))}
-      <Row label="Add a Folder" description="Older ComfyUI outputs, or an AUTOMATIC1111 or Forge folder. Subfolders are included.">
+      <Row label="Add a Folder" description="Older ComfyUI outputs or another tool’s output folder. Subfolders are included.">
         <button className="btn" disabled={Boolean(busy)} onClick={() => run('add', () => post('/api/library/folders', { start: outputDir || '' }), 'from that folder')}>
           <FolderPlus size={14} /> {busy === 'add' ? 'Looking…' : 'Choose…'}
         </button>
@@ -124,13 +125,14 @@ export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'G
     }
   };
   return (
-    <Row
-      label={<>Civitai-Ready Images<BetaTag /></>}
-      description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG the way AUTOMATIC1111 does, so Civitai fills them in on upload. ComfyUI’s workflow stays in the file."
+    <SwitchRow
+      label="Civitai-Ready Images"
+      tag={<BetaTag />}
+      description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG in the form Civitai reads, so it fills them in on upload. ComfyUI’s workflow stays in the file."
+      checked={Boolean(enabled)}
+      onChange={change}
       disabled={enabled === null || !canChange}
-    >
-      <Switch label="Civitai-Ready Images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
-    </Row>
+    />
   );
 }
 
@@ -146,12 +148,12 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
   };
   return (
     <>
-      <Row
+      <SwitchRow
         label="Keep Recent Prompts"
         description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one. Shared with other devices.${enabled && prompts.length ? ` ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}.` : ''}`}
-      >
-        <Switch label="Keep Recent Prompts" checked={enabled} onChange={toggle} />
-      </Row>
+        checked={enabled}
+        onChange={(next) => void toggle(next)}
+      />
       {enabled && recent ? (
         <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
           <button className="btn" onClick={async () => {

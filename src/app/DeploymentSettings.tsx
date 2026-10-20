@@ -1,9 +1,9 @@
 import React from 'react';
-import { Check, Lock, Pencil, PlugZap, RefreshCw, X } from 'lucide-react';
+import { Check, ExternalLink, Lock, Pencil, PlugZap, RefreshCw, X } from 'lucide-react';
 import { apiFetch, apiJson } from './api';
 import { StudioSelect } from './components';
 import { cn } from './format';
-import { Group, Row, Switch } from './SettingsControls';
+import { Group, Row, Status, SwitchRow } from './SettingsControls';
 import type { ShowToast } from './toast';
 
 /** What /api/settings/deployment reports (server/deployment-settings.js). */
@@ -22,6 +22,8 @@ export type DeploymentSettings = {
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
 
 const FIRST_READY = '__first-ready__';
+// Kept as deployment variables, no longer switches here: Studio has no built-in profiles, and Tessera is one more family.
+const hiddenCatalogueKeys = new Set(['STUDIO_ENABLE_BUILTIN_PROFILES', 'STUDIO_ENABLE_TESSERA']);
 const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment', studio: 'This Studio', default: 'Default' };
 
 /** Where a value comes from, and a lock when the deployment owns it. */
@@ -84,22 +86,46 @@ function AddressEditor({ connection, showToast, onSaved, onClose }: { connection
   </Row>;
 }
 
-/** Image and video backends in one layout: status, what each runs, its address and who owns it. */
-export function ConnectionsGroup({ settings, status, showToast, onSaved, Status }: { settings: DeploymentSettings; status: (backend: 'primary' | 'video') => BackendStatus | null; showToast: ShowToast; onSaved: () => void; Status: React.ComponentType<React.PropsWithChildren<{ tone?: 'ok' | 'bad' | 'warn' }>> }) {
+/** What a worker can say about itself (the app's status poll and /api/health). */
+export type WorkerStatus = { connected: boolean; device?: string; restarting?: boolean; url?: string } | null;
+const workerTitle = (backend: 'primary' | 'video') => backend === 'video' ? 'Video Worker' : 'Image Worker';
+
+/**
+ * Settings › Workers: one group per ComfyUI worker, with its address (locked
+ * when the deployment sets it), its connection, what it runs and, where Studio
+ * can, a restart. Nothing about a worker shows twice.
+ */
+export function WorkerGroups({ settings, status, showToast, onSaved, onCheck, restart }: {
+  settings: DeploymentSettings;
+  status: (backend: 'primary' | 'video') => WorkerStatus;
+  showToast: ShowToast;
+  onSaved: () => void;
+  onCheck: () => void;
+  /** The restart control for a worker Studio can restart, or nothing. */
+  restart: (backend: 'primary' | 'video') => React.ReactNode;
+}) {
   const [editing, setEditing] = React.useState('');
-  return <Group title="Generation Connections" note="Each connection is a ComfyUI worker. Locked addresses come from the deployment configuration.">
+  return <>
     {settings.connections.map((connection) => {
       const current = status(connection.backend);
+      const shared = connection.backend === 'video' && !connection.value;
       const tone = current?.restarting ? 'warn' : current?.connected ? 'ok' : 'bad';
-      return <React.Fragment key={connection.backend}>
-        <Row label={<>{connection.label} <SourceTag source={connection.source} locked={connection.locked} /></>} description={<>{connection.value || 'Not set'} · {connection.routes}{current?.device ? ` · ${current.device}` : ''}</>}>
-          {current ? <Status tone={tone}>{current.restarting ? 'Restarting' : current.connected ? 'Ready' : 'Offline'}</Status> : null}
+      const restartControl = shared ? null : restart(connection.backend);
+      return <Group key={connection.backend} title={workerTitle(connection.backend)} note={connection.locked ? 'The address comes from the deployment configuration. Change it there.' : undefined}>
+        <Row label={<>Address <SourceTag source={connection.source} locked={connection.locked} /></>} description={shared ? 'Not set: videos run on the image worker.' : <code className="set-path is-oneline">{connection.value || 'Not set'}</code>}>
           {connection.locked ? null : <button className="btn is-ghost" aria-label={`Edit ${connection.label} Address`} onClick={() => setEditing(editing === connection.backend ? '' : connection.backend)}><Pencil size={14} /> Edit</button>}
         </Row>
         {editing === connection.backend ? <AddressEditor connection={connection} showToast={showToast} onSaved={onSaved} onClose={() => setEditing('')} /> : null}
-      </React.Fragment>;
+        {shared ? null : <Row label="Connection" description={current ? (current.restarting ? 'Reconnects when it’s back.' : current.connected ? current.device || 'Ready to generate.' : 'Studio can’t reach it.') : 'Checking…'}>
+          {current ? <Status tone={tone}>{current.restarting ? 'Restarting' : current.connected ? 'Ready' : 'Offline'}</Status> : null}
+          {current && !current.connected && !current.restarting ? <button className="btn is-ghost" onClick={onCheck}><RefreshCw size={14} /> Check Again</button> : null}
+          {current?.connected && current.url ? <a className="btn is-ghost" href={current.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a> : null}
+        </Row>}
+        <Row label="Runs" description={connection.routes} />
+        {restartControl ? <Row label="Restart" description="Loads new custom nodes and files, and frees memory. Running and queued generations stop.">{restartControl}</Row> : null}
+      </Group>;
     })}
-  </Group>;
+  </>;
 }
 
 /** The profiles a fresh composer starts on, and what the catalogue offers. */
@@ -130,16 +156,14 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
       {defaultRow('image')}
       {defaultRow('video')}
     </Group>
-    <Group title="Catalogue" note="What the generation catalogue offers. Some changes apply after Studio restarts.">
-      {settings.catalogue.map((item) => <Row key={item.key} label={<>{item.label} <SourceTag source={item.source} locked={item.locked} /></>} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} disabled={busy === item.key}>
-        <Switch label={item.label} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />
-      </Row>)}
+    <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
+      {settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key)).map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
     </Group>
   </>;
 }
 
 /** Third-party services and storage at a glance: what is on, configured and available. */
-export function IntegrationsOverview({ settings, Status }: { settings: DeploymentSettings; Status: React.ComponentType<React.PropsWithChildren<{ tone?: 'ok' | 'bad' | 'warn' }>> }) {
+export function IntegrationsOverview({ settings }: { settings: DeploymentSettings }) {
   const { civitai, huggingFace } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <>

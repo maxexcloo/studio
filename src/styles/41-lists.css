@@ -400,3 +400,8 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .set-row + .set-row, .set-row + .set-drawer, .set-drawer + .set-row, .set-drawer + .set-drawer { box-shadow: inset 0 1px 0 var(--list-hairline); }
 .set-card > :first-child { box-shadow: none; }
 .set-note { margin: 2px 2px 0; font-size: 11.5px; }
+
+/* A switch row (SheetList › ListSwitch): the whole line is the switch. */
+.list-switch .list-row-label { display: grid; gap: 1px; max-width: none; white-space: normal; }
+.list-switch .list-row-detail { font-size: 12px; color: hsl(var(--muted-foreground)); white-space: normal; }
+.list-switch > .switch { flex: none; }

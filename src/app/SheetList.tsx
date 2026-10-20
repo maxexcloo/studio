@@ -54,6 +54,22 @@ export function ListItem({ label, lead, children, className, htmlFor }: { label:
   );
 }
 
+/**
+ * A switch row whose whole line toggles (UI-PATTERNS › Lists): role="switch"
+ * on the row, Space and Enter as on any switch, the knob only drawn. The same
+ * pattern as Settings' SwitchRow.
+ */
+export function ListSwitch({ label, description, lead, checked, onChange, disabled, className }: { label: string; description?: React.ReactNode; lead?: React.ReactNode; checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; className?: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} disabled={disabled} className={cn('list-row list-switch', className)} onClick={() => onChange(!checked)}>
+      {lead ? <span className="list-row-lead" aria-hidden="true">{lead}</span> : null}
+      <span className="list-row-label">{label}{description ? <small className="list-row-detail">{description}</small> : null}</span>
+      <span className="list-row-gap" />
+      <span className="switch" data-checked={checked} aria-hidden="true"><span className="switch-thumb" /></span>
+    </button>
+  );
+}
+
 type SelectOption = { value: string; label: string; detail?: string };
 
 /**

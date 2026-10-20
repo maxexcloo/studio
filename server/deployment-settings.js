@@ -20,7 +20,7 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
 export const catalogueFlags = [
   flag("STUDIO_ENABLE_BUILTIN_PROFILES", "Built-In Profiles", "Detected model profiles and bundled workflow templates."),
   flag("STUDIO_ENABLE_LORAS", "LoRAs", "LoRA browsing and LoRA settings on generations.", { applies: "restart" }),
-  flag("STUDIO_ENABLE_GROK", "Grok", "Provider-backed Grok workflows.", { applies: "restart" }),
+  flag("STUDIO_ENABLE_GROK", "Cloud Models", "Grok image and video models, run by the provider rather than a worker.", { applies: "restart" }),
   flag("STUDIO_ENABLE_TESSERA", "Tessera", "Tessera model profiles."),
   flag("HEISS_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" }),
   flag("STUDIO_ENABLE_PRESETS", "Presets & Civitai Imports", "Saved image presets and Civitai image imports.", { defaultOn: false })

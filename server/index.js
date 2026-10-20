@@ -1281,7 +1281,7 @@ app.get("/api/settings/deployment", async (req, res) => {
     ok: true,
     connections: [
       { backend: "primary", label: "Images", key: "COMFY_URL", value: comfyUrl, ...settingSource("COMFY_URL"), routes: process.env.COMFY_VIDEO_URL ? "Image workflows and provider-backed video" : "All workflows" },
-      { backend: "video", label: "Videos", key: "COMFY_VIDEO_URL", value: process.env.COMFY_VIDEO_URL || "", ...settingSource("COMFY_VIDEO_URL"), routes: process.env.COMFY_VIDEO_URL ? "Local video workflows" : "Uses the image connection" }
+      { backend: "video", label: "Videos", key: "COMFY_VIDEO_URL", value: process.env.COMFY_VIDEO_URL || "", ...settingSource("COMFY_VIDEO_URL"), routes: process.env.COMFY_VIDEO_URL ? "Local video workflows" : "Uses the image worker" }
     ],
     defaults: {
       image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),

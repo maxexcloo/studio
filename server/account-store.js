@@ -236,6 +236,7 @@ export function ownAccount(accountId) {
     provider: provider ? "pocket-id" : "local",
     canChangePassword: !provider && Boolean(account.password),
     canChangeEmail: !provider,
+    accessProfile: account.role === accountRoles.user && account.accessProfileId ? { id: account.accessProfileId, name: readStore().profiles[account.accessProfileId]?.name || account.accessProfileId } : null,
     createdAt: account.createdAt || ""
   };
 }

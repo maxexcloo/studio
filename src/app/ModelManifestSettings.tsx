@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, RefreshCw, ShieldCheck, Upload } from 'lucide-react';
+import { Download, RefreshCw, Upload } from 'lucide-react';
 import { apiFetch, apiJson } from './api';
 import { Group, Row } from './SettingsControls';
 import type { ShowToast } from './toast';
@@ -28,12 +28,6 @@ export function ModelManifestGroup({ showToast }: { showToast: ShowToast }) {
     try { setStatus(await apiJson<ManifestStatus & { ok: boolean }>('/api/models/manifest', { cache: 'no-store' })); } catch { setStatus(null); }
   }, []);
   React.useEffect(() => { void refresh(); }, [refresh]);
-  // Follows a running verification.
-  React.useEffect(() => {
-    if (!status?.verify.running) return;
-    const timer = window.setTimeout(() => void refresh(), 1500);
-    return () => window.clearTimeout(timer);
-  }, [status, refresh]);
 
   const post = async (url: string, body: unknown, done: (data: Record<string, unknown>) => string) => {
     setBusy(true);
@@ -60,13 +54,10 @@ export function ModelManifestGroup({ showToast }: { showToast: ShowToast }) {
     </Group>;
   }
   const problems = status.items.filter((item) => problemWords[item.status]);
-  const { counts, verify } = status;
+  const { counts } = status;
   return <Group title="Model Manifest" note={status.source === 'imported' ? 'Using an imported manifest. The deployment’s copy stays the disaster-recovery record.' : 'From the deployment’s manifest. Studio checks it and restores what it can; the deployment’s tooling covers the rest.'}>
     {status.error ? <Row label="Manifest Unreadable" description={status.error} /> : null}
-    <Row label={`${status.total} Models`} description={`${counts.verified} verified · ${counts.present} present, not yet verified · ${counts.missing} missing · ${counts['wrong-size'] + counts.mismatch} wrong · ${counts.external} outside ComfyUI’s folder`}>
-      <button className="btn is-ghost" disabled={busy || verify.running || !(counts.present + counts.verified + counts.mismatch)} onClick={() => void post('/api/models/manifest/verify', {}, () => 'Verifying Checksums')}><ShieldCheck size={14} /> {verify.running ? `Verifying ${verify.done}/${verify.total}` : 'Verify'}</button>
-    </Row>
-    {verify.running && verify.current ? <Row label="Checking" description={shortPath(verify.current)} /> : null}
+    <Row label={`${status.total} Models`} description={`${counts.verified + counts.present} here · ${counts.missing} missing · ${counts['wrong-size'] + counts.mismatch} wrong · ${counts.external} outside ComfyUI’s folder`} />
     {counts.missing ? <Row label="Restore Missing" description={status.restorable ? `${status.restorable} of ${counts.missing} can download here, checked against their SHA-256.` : 'None of the missing files can download here; restore them with the deployment’s tooling.'}>
       <button className="btn is-primary" disabled={busy || !status.restorable} onClick={() => void post('/api/models/manifest/restore', {}, (data) => `${(data.queued as string[] | undefined)?.length || 0} Downloads Queued`)}><RefreshCw size={14} /> Restore</button>
     </Row> : null}
