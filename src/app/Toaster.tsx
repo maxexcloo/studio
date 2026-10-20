@@ -71,7 +71,7 @@ function CellGlyph({ glyph }: { glyph: ToastGlyph }) {
 const isGlyphName = (value: unknown): value is ToastGlyph => typeof value === 'string' && value in GLYPHS;
 
 /* -------------------------------------------------------------- Title
-   With a plural, the count sits inside the words ("3 images deleted") and only
+   With a plural, the count sits inside the words ("3 items deleted") and only
    the digits roll; without one, repeats show as a small ×N after the title. */
 
 function numberAt(text: string, number: string) {

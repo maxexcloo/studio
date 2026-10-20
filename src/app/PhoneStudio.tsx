@@ -19,6 +19,7 @@ import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
 import { progressReading } from './GenerationProgress';
+import { generatingLabel } from './itemWording';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
@@ -95,7 +96,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const upscalingCount = gallery.filter((item) => item.upscale?.status === 'running' || (item.status === 'pending' && item.progress?.upscaling)).length;
   const generatingCount = Math.max(0, runningCount - upscalingCount);
   const runningLabel = !upscalingCount
-    ? generatingCount === 1 ? 'Generating 1 image' : `Generating ${generatingCount}`
+    ? generatingLabel(generatingCount, pending)
     : !generatingCount
       ? upscalingCount === 1 ? 'Upscaling 1 image' : `Upscaling ${upscalingCount}`
       : `Generating ${generatingCount} · upscaling ${upscalingCount}`;

@@ -34,7 +34,7 @@ export type ToastOptions = {
   group?: string;
   /** How many things this one is about; merged toasts add theirs up. Default 1. */
   count?: number;
-  /** The title once the count is over one, e.g. `(n) => `${n} images deleted``. The number in it rolls. */
+  /** The title once the count is over one, e.g. `(n) => `${n} items deleted``. The number in it rolls. */
   plural?: (count: number) => string;
   description?: ReactNode;
   /** Milliseconds on screen. Hovering pauses it. `Infinity` waits for a dismiss. */

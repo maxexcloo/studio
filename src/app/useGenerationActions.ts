@@ -9,6 +9,7 @@ import { downloadActions } from './useModelDownloads';
 import { referenceRoleFor } from './referenceSlots';
 import { sizePlan, tiledDecodeFor } from './useUpscale';
 import { generationPlan } from './generationOptions';
+import { deleteConfirmation, itemNoun } from './itemWording';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -489,11 +490,7 @@ export function useGenerationActions(view: any) {
   }, []);
 
   async function deleteItem(item: GalleryItem, confirmed = false) {
-    if (!confirmed && !await confirmAction(item.privateVault
-      ? {"title": "Delete from Hidden?", "description": "This image and its upscale are erased. There’s no other copy.", "action": "Delete", "destructive": true}
-      : item.library
-        ? {"title": "Remove from the gallery?", "description": "The file stays in its folder.", "action": "Remove"}
-        : {"title": "Delete this image?", "description": "The file is deleted from disk.", "action": "Delete", "destructive": true})) return;
+    if (!confirmed && !await confirmAction(deleteConfirmation(item))) return;
     // In the viewer, step to the next image rather than closing, so culling a batch stays in place.
     if (active?.id === item.id) {
       const items = ((visibleGallery || []) as GalleryItem[]).filter((entry) => entry.status === "pending" || entry.status === "done" || entry.status === "error");
@@ -513,10 +510,11 @@ export function useGenerationActions(view: any) {
   function offerUndo(targets: GalleryItem[]) {
     targets.forEach((item) => pendingDeletes.current.set(item.id, item));
     const hiddenOnes = targets.some((item) => item.privateVault);
-    toast.removed(hiddenOnes ? "Deleted from Hidden" : "Image deleted", {
+    const noun = itemNoun(targets[0]);
+    toast.removed(hiddenOnes ? "Deleted from Hidden" : `${noun === "video" ? "Video" : "Image"} deleted`, {
       group: hiddenOnes ? "delete-hidden" : "delete",
       count: targets.length,
-      plural: (count) => hiddenOnes ? `${count} deleted from Hidden` : `${count} images deleted`,
+      plural: (count) => hiddenOnes ? `${count} deleted from Hidden` : `${count} items deleted`,
       duration: UNDO_MS,
       action: {
         label: "Undo",
