@@ -17,12 +17,12 @@ import { createControlClient } from './ai-control.js';
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
 export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
-// Every client gets the same workflow rules from Studio itself; tool descriptions and each reply carry the details,
-// so hosts that resend these every step stay small.
+// Every client gets the same workflow rules from Studio itself, so a client needs no prompt prefix; tool descriptions
+// and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords = '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = (writing) => `Studio makes images and videos. For a new request, call Generate once with request (the user's words, with anything they refer back to), kind and tier (${tierWords}). ${writing
+const mediaInstructions = (writing) => `Studio makes images and videos. For each one the user asks for, follow their instructions: call Generate once with request (the user's words, with anything they refer back to), kind and tier (${tierWords}). ${writing
   ? "Studio writes the prompt; don't expand the request."
-  : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all" for all). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute.`;
+  : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply briefly as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all"). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.';
 const anonymousMessage = 'The gateway must forward its user identity.';

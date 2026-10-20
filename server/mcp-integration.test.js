@@ -299,6 +299,9 @@ test('media and administrator credentials discover only their own friendly tools
   const admin = await f.client('administrator', controlKey);
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
+  // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
+  assert.match(media.getInstructions(), /^Studio makes images and videos\. For each one the user asks for, follow their instructions: call Generate/);
+  assert.match(media.getInstructions(), /Reply briefly as each result says/);
   assert.match(media.getInstructions(), /call Generate once with request \(the user's words, with anything they refer back to\), kind and tier/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(media.getInstructions(), /share the result links and end the turn\. Call Result only when the user asks/);
