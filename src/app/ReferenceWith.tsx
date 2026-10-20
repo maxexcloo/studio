@@ -9,6 +9,7 @@ import { modelDetails } from './modelCatalogue';
 import { composerAnchor, surfaceMotion, useComposerSurfaceBox } from './composerSurface';
 import { useDismiss } from './useDismiss';
 import type { Profile } from './types';
+import { usePhoneLayer } from './phoneLayers';
 
 /** The ready profiles that take a reference image, of the kind the composer makes. */
 export type ReferenceWithChoice = { profiles: Profile[]; onPick: (profileId: string) => void };
@@ -19,6 +20,8 @@ function Surface({ profiles, onPick, onClose }: { profiles: Profile[]; onPick: (
   const opener = React.useRef(document.querySelector<HTMLElement>('[data-open-trigger][aria-label="Reference With"][aria-expanded="true"]') || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   const [anchor] = React.useState(() => composerAnchor(opener.current));
   const { box, asSheet } = useComposerSurfaceBox(anchor);
+  // As a phone sheet it replaces the Create sheet rather than stacking on it.
+  usePhoneLayer(Boolean(asSheet && present));
   const close = React.useCallback(() => { onClose(); opener.current?.focus({ preventScroll: true }); }, [onClose]);
   useDismiss([surface, opener], present, close);
   // Grouped by family, as the model picker lists them.

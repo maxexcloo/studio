@@ -92,7 +92,10 @@ test('phone filter tools stay on screen and yield to create and reference sheets
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
-    await expect.poll(() => page.getByRole('group', { name: 'Gallery Filters', exact: true }).evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    // One line that scrolls sideways rather than wrapping.
+    await expect.poll(() => panel.evaluate(n => getComputedStyle(n).flexWrap === 'nowrap' && getComputedStyle(n).overflowX === 'auto')).toBe(true);
+    await page.getByLabel('Filter By Aspect Ratio', { exact: true }).scrollIntoViewIfNeeded();
+    await reachable(page.getByLabel('Filter By Aspect Ratio', { exact: true }));
     await page.getByLabel('Filter By Model', { exact: true }).scrollIntoViewIfNeeded();
     await reachable(page.getByLabel('Filter By Model', { exact: true }));
     await panel.getByRole('button', { name: 'Show Hidden', exact: true }).scrollIntoViewIfNeeded();

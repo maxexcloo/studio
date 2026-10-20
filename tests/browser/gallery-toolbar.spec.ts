@@ -89,65 +89,6 @@ test('size and aspect filters reach the server and clear with the others', async
   await expect.poll(() => queries.at(-1)?.includes('size=') ?? true).toBe(false);
 });
 
-test('phone opens inline filters from its header without a separate Hidden control', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'Compact phone header.');
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: /^Open Hidden/ })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
-  const tools = page.getByRole('group', { name: 'Gallery Filters', exact: true });
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
-  await expect(page.locator('.phone-bar:not(.is-behind)').getByRole('button', { name: 'Search Gallery', exact: true })).toHaveAttribute('aria-expanded', 'false');
-  await expect(tools.getByRole('button', { name: 'Show Hidden', exact: true })).toBeVisible();
-  for (const label of ['Model', 'LoRA', 'Size', 'Aspect Ratio']) {
-    const select = tools.getByRole('button', { name: `Filter By ${label}`, exact: true });
-    await select.scrollIntoViewIfNeeded();
-    await expect(select).toBeInViewport();
-  }
-  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
-  await expect(tools).toHaveCount(0);
-});
-
-test.describe('Select animation with visible scrollbars', () => {
-  test('Select expands horizontally without moving toolbar controls vertically', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Desktop gallery toolbar at responsive widths.');
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
-  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
-  await page.goto('/');
-  // A classic horizontal scrollbar must not change the toolbar's block size.
-  await page.addStyleTag({ content: '.gallery-selection-actions { scrollbar-width: auto; } .gallery-selection-actions::-webkit-scrollbar { height: 12px; }' });
-  await page.evaluate(() => document.fonts.ready);
-  for (const width of [1440, 900, 640]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const opening of [true, false]) {
-      const frames = await page.evaluate(async () => {
-        const toolbar = document.querySelector<HTMLElement>('.gallery-toolbar')!;
-        const button = toolbar.querySelector<HTMLButtonElement>('.gallery-select-toggle')!;
-        const dock = toolbar.querySelector<HTMLElement>('.gallery-toolbar-actions')!;
-        const sample = () => {
-          const bar = toolbar.getBoundingClientRect(), control = button.getBoundingClientRect(), pill = dock.getBoundingClientRect();
-          const strip = toolbar.querySelector('.gallery-selection-actions')?.getBoundingClientRect();
-          return { barY: bar.y, barHeight: bar.height, buttonY: control.y, buttonHeight: control.height, dockY: pill.y, dockHeight: pill.height, stripHeight: strip?.height || 0 };
-        };
-        const values = [sample()];
-        button.click();
-        const start = performance.now();
-        await new Promise<void>(resolve => {
-          function frame() { values.push(sample()); if (performance.now() - start < 450) requestAnimationFrame(frame); else resolve(); }
-          requestAnimationFrame(frame);
-        });
-        return values;
-      });
-      for (const field of ['barY', 'barHeight', 'buttonY', 'buttonHeight', 'dockY', 'dockHeight'] as const) {
-        const values = frames.map(frame => frame[field]);
-        expect(Math.max(...values) - Math.min(...values), `${width}px ${opening ? 'opening' : 'closing'} ${field}: ${JSON.stringify(frames)}`).toBeLessThanOrEqual(0.5);
-      }
-    }
-  }
-});
-
-});
-
 test('empty search dismisses outside while active queries and filters stay open', async ({ page, isMobile }) => {
   test.skip(isMobile, 'Desktop search expansion.');
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
@@ -183,7 +124,8 @@ test('empty search dismisses outside while active queries and filters stay open'
 });
 
 
-test('search closes smoothly while retaining its input until the animation ends', async ({ page }) => {
+test('search closes smoothly while retaining its input until the animation ends', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The phone’s shared search row is checked in phone-dock.spec.ts.');
   await page.goto('/');
   // The phone's search overlay fades from its close button; the full studio's field narrows into its trigger.
   const phone = await studioUi(page).isPhone();
@@ -270,27 +212,6 @@ test('custom gallery filters support keyboard selection and dismiss only their o
 });
 
 
-test('phone filter-only mode keeps every wrapped control visible without opening a query', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'Compact phone filter row.');
-  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
-  await page.setViewportSize({ width: 320, height: 844 });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
-  const panel = page.getByRole('group', { name: 'Gallery Filters', exact: true });
-  await panel.getByRole('button', { name: 'Filter By Model', exact: true }).click();
-  await page.getByRole('option', { name: 'Flux', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
-  await expect(page.locator('.gallery-search-count,.gallery-filter-count')).toHaveCount(0);
-  await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  for (const button of await panel.getByRole('button').all()) await expect(button).toBeInViewport();
-  expect(await panel.locator('.gallery-filter-select > span').evaluateAll(nodes => nodes.every(n => n.scrollWidth <= n.clientWidth))).toBe(true);
-  const row = await panel.boundingBox(), trigger = await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).boundingBox();
-  expect(row!.x).toBeGreaterThanOrEqual(0);
-  expect(row!.x + row!.width).toBeLessThanOrEqual(320);
-  // The overlay hangs under the header button and leaves it uncovered.
-  expect(row!.y).toBeGreaterThanOrEqual(trigger!.y + trigger!.height);
-});
-
 test('grouping uses the same glass shell and inset action states as Search and Select', async ({ page, isMobile }, testInfo) => {
   test.skip(isMobile, 'Full studio action shells.');
   await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ stackRuns: false })));
@@ -331,62 +252,6 @@ test('grouping uses the same glass shell and inset action states as Search and S
   expect(await select.evaluate(n => ({ outline: getComputedStyle(n).outline, offset: getComputedStyle(n).outlineOffset }))).toEqual(focus);
 });
 
-test('phone search and filters float over the gallery without moving it', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'Phone overlay.');
-  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
-  await page.goto('/');
-  const tile = page.locator('.phone-gallery .tile').first();
-  await expect(tile).toBeVisible();
-  const before = await tile.boundingBox();
-  for (const name of ['Search Gallery', 'Open Gallery Filters']) {
-    const opener = page.getByRole('button', { name, exact: true }).first();
-    await opener.click();
-    await expect(page.locator('.phone-searchbar')).toBeVisible();
-    await page.waitForTimeout(400);
-    expect(await tile.boundingBox()).toEqual(before);
-    const bar = await page.locator('.phone-searchbar > *').first().boundingBox(), button = await opener.boundingBox();
-    expect(bar!.y).toBeGreaterThanOrEqual(button!.y + button!.height);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.phone-searchbar')).toHaveCount(0);
-  }
-  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
-  await expect(page.locator('.phone-searchbar')).toBeVisible();
-  await page.mouse.click(195, 800);
-  await expect(page.locator('.phone-searchbar')).toHaveCount(0);
-});
-
-test('phone search and filters retain inset neutral actions without changing header controls', async ({ page, isMobile }, testInfo) => {
-  test.skip(!isMobile, 'Phone inset actions.');
-  await page.goto('/');
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: testInfo.outputPath('phone-default.png') });
-  const header = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
-  await header.click();
-  const bar = page.locator('.phone-searchbar');
-  // Filters open on their own: no search control comes with them.
-  await expect(bar.getByRole('button', { name: 'Expand Search', exact: true })).toHaveCount(0);
-  await expect(bar.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
-  await bar.getByRole('button', { name: 'Only favourites', exact: true }).click();
-  await page.mouse.move(0, 500);
-  await page.waitForTimeout(400);
-  const favourite = bar.getByRole('button', { name: 'Only favourites', exact: true });
-  const filter = bar.getByRole('button', { name: 'Gallery Filters', exact: true });
-  expect(await favourite.evaluate(n => getComputedStyle(n).backgroundColor)).toBe(await filter.evaluate(n => getComputedStyle(n).backgroundColor));
-  // Active filters stay applied when the bar closes; its button says so.
-  await header.click();
-  await expect(bar).toHaveCount(0);
-  await expect(header).toHaveClass(/has-dot/);
-  // Search toggles open and shut from its own button.
-  const searchButton = page.getByRole('button', { name: 'Search Gallery', exact: true }).first();
-  await searchButton.click();
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toBeVisible();
-  await expect(page.locator('.phone-searchbar .gallery-filter-anchor')).toHaveCount(0);
-  await searchButton.click();
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
-  await page.screenshot({ path: testInfo.outputPath('phone-selected.png') });
-});
-
-
 test('the search’s clear X is a round plain icon button', async ({ page, isMobile }) => {
   test.skip(isMobile, 'The full studio’s search field.');
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
@@ -401,7 +266,8 @@ test('the search’s clear X is a round plain icon button', async ({ page, isMob
   await expect.poll(() => close.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
 
-test('search keeps a neutral shell without a selected input highlight', async ({ page }, testInfo) => {
+test('search keeps a neutral shell without a selected input highlight', async ({ page, isMobile }, testInfo) => {
+  test.skip(isMobile, 'The phone’s shared search row is checked in phone-dock.spec.ts.');
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
   // The phone searches in an overlay; the full studio searches in its toolbar beside the filters and Select.

@@ -34,16 +34,82 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   left: 0;
   right: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+  padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--glass-border);
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
 }
-.phone-bar > * { pointer-events: auto; }
+.phone-bar.is-selecting { display: flex; align-items: center; gap: 2px; height: calc(env(safe-area-inset-top) + 41px); }
+.phone-bar.is-selecting .phone-icon,
+.phone-bar.is-selecting .phone-pill { height: 40px; min-height: 40px; }
+.phone-bar-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: 40px; }
+.phone-bar-row .phone-status { width: 40px; height: 40px; }
+.phone-bar-row .phone-title { font-size: 16px; }
+.phone-bar-row .phone-scroll-top { min-height: 40px; }
+/* The Images/Videos pair is as tall as the icons beside it, and as the search row above them. */
+.phone-dock .phone-gallery-mode { margin: 0 2px; padding: 0; border-radius: var(--r-pill); background: rgb(255 255 255 / .06); }
+.phone-dock .phone-gallery-mode button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); }
+.phone-dock .phone-gallery-mode button[aria-pressed="true"] { background: rgb(255 255 255 / .14); color: hsl(var(--foreground)); }
+/* Search and Filter: tinted with a count while something is applied, filled while their row is open. */
+.phone-tool.is-active { color: var(--ember); }
+.phone-tool.is-open { background: rgb(255 255 255 / .1); }
+.phone-tool-count {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--ember);
+  color: #1a0d04;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+/* The shared row under the bar: the search field or the filters, full width, as tall as the icons. */
+.phone-tools-row { overflow: hidden; }
+.phone-tools-inner { display: flex; align-items: center; gap: 4px; padding-bottom: 6px; }
+.phone-tools-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / .08);
+  color: hsl(var(--muted-foreground));
+}
+.phone-tools-field input { flex: 1; min-width: 0; height: 44px; padding: 0; border: 0; border-radius: 0; -webkit-appearance: none; appearance: none; box-shadow: none; background: transparent; color: hsl(var(--foreground)); font-size: 16px; outline: none; }
+.phone-tools-row:has(.phone-tools-field input:not(:placeholder-shown)) .phone-tools-field,
+.phone-tools-row.is-filters:has(.is-on) .phone-filter-row { box-shadow: inset 0 0 0 1px rgb(255 154 82 / .45); }
+.phone-tools-row.is-filters:has(.is-on) .phone-filter-row { border-radius: var(--r-pill); }
+/* One line of filters that scrolls sideways, in the desktop's order. */
+.phone-filter-row.gallery-filter-controls {
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.phone-filter-row::-webkit-scrollbar { display: none; }
+.phone-filter-row .gallery-filter-select,
+.phone-filter-row .gallery-filter-icon { flex: none; height: 44px; min-height: 44px; max-width: 200px; padding: 0 12px; background: rgb(255 255 255 / .06); font-size: 14px; }
+.phone-filter-row .gallery-filter-icon { width: 44px; padding: 0; }
+.phone-filter-row .gallery-filter-select.is-on,
+.phone-filter-row .gallery-filter-icon.is-on { background: var(--ember-soft); color: var(--ember); }
 .phone-title {
   flex: 1;
   min-width: 0;
@@ -145,9 +211,9 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   overflow-x: clip;
   touch-action: pan-y pinch-zoom;
   padding:
-    calc(max(6px, env(safe-area-inset-top)) + 56px)
+    calc(var(--phone-bar-h, calc(env(safe-area-inset-top) + 40px)) + 6px)
     max(6px, env(safe-area-inset-right))
-    calc(max(12px, env(safe-area-inset-bottom)) + 96px)
+    calc(var(--phone-dock-h, 128px) + max(10px, env(safe-area-inset-bottom)) + 16px)
     max(6px, env(safe-area-inset-left));
 }
 .phone-gallery .empty.stage-empty { min-height: calc(100dvh - 200px); }
@@ -168,25 +234,33 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 
 /* --------------------------------------------------------- Create pill */
 
-.phone-create-pill {
+/* The dock: Search/Filter expanding upwards, the create pill, then Images/Videos, Search, Filter and More. */
+.phone-dock {
   position: fixed;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) - var(--pwa-drop, 0px) + var(--pwa-gap, 0px));
   z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 64px;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid var(--glass-border);
-  border-radius: 32px;
+  border-radius: 30px;
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
   box-shadow: var(--glass-bar-shadow);
 }
-.phone-create-pill.is-hidden { border-color: rgb(255 140 90 / .28); }
+.phone-dock-row { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
+.phone-dock-gap { flex: 1; }
+.phone-create-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 56px;
+  padding: 6px;
+  border-radius: 24px;
+  background: rgb(255 255 255 / .06);
+}
+.phone-create-pill.is-hidden { box-shadow: inset 0 0 0 1px rgb(255 140 90 / .28); }
 .phone-mode-select {
   flex: none;
   display: flex;
@@ -286,6 +360,10 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* The keyboard's own safe area is the keyboard: no home-indicator padding above it. */
 .kb-open .phone-sheet { padding-bottom: 10px; }
 .phone-sheet-grab { flex: none; touch-action: none; }
+/* One layer above the main screen: a sheet under another hides until that one closes (phoneLayers.ts). */
+.phone-sheet.is-covered { opacity: 0; pointer-events: none; }
+.phone-sheet-backdrop.is-nested { background: transparent; }
+.phone-sheet.is-nested .phone-sheet-head { padding-left: 8px; }
 .phone-sheet-handle {
   width: 40px;
   height: 5px;
@@ -1054,3 +1132,10 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
   margin: 0;
   visibility: hidden;
 }
+
+/* Toasts never cover controls (docs/guides/UI-PATTERNS.md): under the top bar,
+   under a full sheet's header, or under the viewer's top buttons. */
+html:has(.phone-shell) .toasts { top: calc(var(--phone-bar-h, 56px) + 8px + var(--toasts-offset, 0px)); }
+/* Over a full sheet: on its title row, short of its Close or Back, never over the fields below. */
+html:has(.phone-shell):has(.phone-sheet.is-full:not(.is-covered)) .toasts { top: calc(max(12px, env(safe-area-inset-top)) + 8px); left: 12px; width: calc(100vw - 76px); translate: none; }
+html:has(.phone-shell):has(.scrim) .toasts { top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 12px); }

@@ -62,7 +62,10 @@ export function studioUi(page: Page) {
 
   /** Closes the phone's Create sheet. The full studio's box never covers the gallery, so stays. */
   async function closeComposer() {
-    if (!await isPhone() || !await composer.isVisible()) return;
+    if (!await isPhone() || !await composer.count()) return;
+    // A picker opened from Create replaces it; Escape steps back to Create first.
+    for (let step = 0; step < 3 && await page.locator('.phone-sheet.phone-create.is-covered').count(); step++) await page.keyboard.press('Escape');
+    if (!await composer.isVisible()) return;
     await composer.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(composer).toHaveCount(0);
   }
@@ -107,7 +110,7 @@ export function studioUi(page: Page) {
     /** What scrolls the gallery: its pane in the full studio, the document on the phone (so a tap on iOS's status bar reaches the top). */
     scroller: page.locator('main.stage-gallery').or(page.locator('html:has(.phone-shell)')),
     generate: composer.getByRole('button', { name: 'Generate', exact: true }),
-    negativePrompt: composer.getByRole('textbox', { name: 'Negative Prompt', exact: true }),
+    negativePrompt: composer.getByRole('textbox', { name: 'Negative Prompt', exact: true, includeHidden: true }),
     prompt: composer.getByRole('textbox', { name: 'Prompt', exact: true }),
     /** The model rows: buttons in the phone sheet, options in the full studio's listbox. */
     modelOptions: modelPicker.locator('.phone-model-option, [role="option"]'),

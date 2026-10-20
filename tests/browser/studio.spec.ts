@@ -64,8 +64,8 @@ test('the phone gallery scrolls the document so a tap on the status bar reaches 
   await expect(page.locator('[data-tile-id="image-0"]')).toBeInViewport();
 });
 
-test('the phone mode picker keeps large targets at every phone size', async ({ page, isMobile }, testInfo) => {
-  test.skip(!isMobile, 'The phone header and creation pill.');
+test('the phone dock keeps Images/Videos, the prompt and large targets in thumb reach at every phone size', async ({ page, isMobile }, testInfo) => {
+  test.skip(!isMobile, 'The phone dock and creation pill.');
   await page.goto('/');
   const mode = studioUi(page).galleryMode;
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
@@ -85,8 +85,10 @@ test('the phone mode picker keeps large targets at every phone size', async ({ p
     expect(selector!.height).toBeGreaterThanOrEqual(44);
     expect(selector!.x).toBeGreaterThanOrEqual(0);
     expect(selector!.x + selector!.width).toBeLessThanOrEqual(viewport.width);
-    expect(selector!.y).toBeLessThan(viewport.height / 2);
+    // Bottom-up: the pair sits in the dock under the prompt, and the top keeps only a thin strip.
+    expect(selector!.y).toBeGreaterThan(prompt!.y);
     expect(prompt!.y).toBeGreaterThan(viewport.height / 2);
+    expect((await page.locator('.phone-bar').first().boundingBox())!.height).toBeLessThanOrEqual(48);
     expect(prompt!.width).toBeGreaterThan(100);
     expect(pill!.x + pill!.width).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
@@ -783,13 +785,14 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
     const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
     await opener.click();
     await expect(search).toHaveValue('');
-    // Its own button closes the overlay and keeps the query.
+    // Closing clears: its own button closes the row and empties the query.
     await search.fill('Image');
+    await expect(opener).toHaveClass(/is-active/);
     await opener.click();
     await expect(search).toHaveCount(0);
-    await expect(opener).toHaveClass(/has-dot/);
+    await expect(opener).not.toHaveClass(/is-active/);
     await opener.click();
-    await expect(search).toHaveValue('Image');
+    await expect(search).toHaveValue('');
   } else {
     const mode = await ui.galleryMode.boundingBox();
     const box = await search.boundingBox();

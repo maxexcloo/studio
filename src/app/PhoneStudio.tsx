@@ -1,6 +1,6 @@
 import { PromptField } from './PromptField';
 import { CatalogueFilters } from './CatalogueFilters';
-import { ComposerModeSelect } from './ComposerModeSelect';
+import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
 import React from 'react';
 import { recipesFor } from './modelRecipes';
 import { modelName } from './catalogueNames';
@@ -26,7 +26,7 @@ import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
 import { PromptHistorySheet } from './PromptHistory';
-import { PhoneSearchBar } from './GallerySearch';
+import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
 import { StackRunsButton } from './StackRunsButton';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
@@ -131,15 +131,46 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const [moreOpen, setMoreOpen] = React.useState(false);
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
-  const searchTriggerRef = React.useRef<HTMLButtonElement>(null);
+  // Search and the filter row share one row under the bar; one is open at a time.
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const filterTriggerRef = React.useRef<HTMLButtonElement>(null);
   const searchOpen = Boolean(view.phoneSearchOpen);
-  const activeFilters = Boolean(hiddenSpace || gallerySearch.favorites || gallerySearch.model || gallerySearch.workflow || gallerySearch.lora);
-  // Search and filters toggle independently; what is active stays applied while closed (the dot says so).
-  const searchExpanded = searchOpen;
-  const filtersExpanded = filtersOpen;
   const setSearchOpen = view.setPhoneSearchOpen as (open: boolean) => void;
+  const expanded = searchOpen ? 'search' : filtersOpen ? 'filters' : '';
+  const queryCount = gallerySearch.q.trim() ? 1 : 0;
+  const filterCount = filterCountOf(gallerySearch) + Number(Boolean(hiddenSpace));
+  const searchRef = React.useRef(gallerySearch);
+  searchRef.current = gallerySearch;
+  // Closing clears: the query and every filter go with the row.
+  const closeTools = React.useCallback(() => {
+    setSearchOpen(false);
+    setFiltersOpen(false);
+    if (searchActive(searchRef.current)) setGallerySearch(clearedSearch(searchRef.current));
+  }, [setSearchOpen, setGallerySearch]);
+  const toggleTools = (which: 'search' | 'filters') => {
+    haptic('tap');
+    if (expanded === which) { closeTools(); return; }
+    setSearchOpen(which === 'search');
+    setFiltersOpen(which === 'filters');
+  };
+  // The strip's and dock's heights, for the gallery to clear and toasts to sit under the strip.
+  const barRef = React.useRef<HTMLElement>(null);
+  const dockRef = React.useRef<HTMLElement>(null);
+  React.useLayoutEffect(() => {
+    // On the root: toasts are portalled outside the shell.
+    const root = document.documentElement;
+    const measure = () => {
+      // Hidden behind the selection header it measures 0; that header is as tall, so the last height stands.
+      const bar = barRef.current?.getBoundingClientRect().height || 0;
+      if (bar) root.style.setProperty('--phone-bar-h', `${Math.round(bar)}px`);
+      if (dockRef.current) root.style.setProperty('--phone-dock-h', `${Math.round(dockRef.current.getBoundingClientRect().height)}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (barRef.current) observer.observe(barRef.current);
+    if (dockRef.current) observer.observe(dockRef.current);
+    return () => observer.disconnect();
+  }, [selecting, hiddenLocked]);
+  React.useEffect(() => () => { document.documentElement.style.removeProperty('--phone-bar-h'); document.documentElement.style.removeProperty('--phone-dock-h'); }, []);
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
@@ -158,30 +189,24 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           </button>
         </header>
       ) : null}
-      <header className={cn('phone-bar', selecting && 'is-behind')}>
-        <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} onClick={retryComfyStatus}>
-          <span />
-        </button>
-        <div className="phone-title">
-          {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the Gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
-          <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
-            {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
-            <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
+      {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
+      <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
+        <div className="phone-bar-row">
+          <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} onClick={retryComfyStatus}>
+            <span />
           </button>
-          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
-            <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
-          </button> : null}
-        </div>
-        {!hiddenLocked ? <button type="button" className={cn('phone-icon', Boolean(gallerySearch.q.trim()) && 'has-dot')} ref={searchTriggerRef} aria-label="Search Gallery" aria-expanded={searchExpanded} onClick={() => setSearchOpen(!searchExpanded)}><Search size={20} /></button> : null}
-        <button type="button" className={cn('phone-icon', activeFilters && 'has-dot')} ref={filterTriggerRef} aria-label="Open Gallery Filters" title="Filters" aria-expanded={filtersExpanded} onClick={() => setFiltersOpen(!filtersExpanded)}><SlidersHorizontal size={20} /></button>
-        <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
-        <div className="phone-gallery-mode-row">
-          <div className="phone-mode-select phone-gallery-mode" role="group" aria-label="Gallery Mode">
-            {(['image', 'video'] as const).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => { haptic('tap'); changeMode(value); }}>{value === 'image' ? 'Images' : 'Videos'}</button>)}
+          <div className="phone-title">
+            {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the Gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
+            <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
+              {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
+              <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
+            </button>
+            {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
+              <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
+            </button> : null}
           </div>
         </div>
       </header>
-      {<PhoneSearchBar search={gallerySearch} setSearch={setGallerySearch} open={searchExpanded} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} filterTriggerRef={filterTriggerRef} searchTriggerRef={searchTriggerRef} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen} items={gallery} />}
 
       <main className="phone-gallery" onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
         {galleryBody}
@@ -197,28 +222,56 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         </nav>
       ) : null}
 
-      {!hiddenLocked && !selecting ? (
-        <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
-          <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
-            <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() || 'Prompt...'}</strong>
-          </button>
-          <button
-            type="button"
-            className={cn('phone-go', pending.length > 0 && 'is-working')}
-            style={{ '--progress': progress } as React.CSSProperties}
-            aria-label={quickGo ? 'Generate' : 'Open the composer'}
-            onClick={() => { haptic('tap'); if (quickGo) generate(); else setCreateOpen(true); }}
-          >
-            {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
-            <HapticTarget />
-          </button>
-        </div>
+      {!selecting ? (
+        // Bottom-up: what a thumb reaches for most sits in one dock above the home indicator.
+        <nav ref={dockRef} className="phone-dock" aria-label="Gallery Controls">
+          <PhoneGalleryTools expanded={hiddenLocked && expanded === 'search' ? '' : expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} />
+          {!hiddenLocked ? (
+            <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
+              <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
+                <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() || 'Prompt...'}</strong>
+              </button>
+              <button
+                type="button"
+                className={cn('phone-go', pending.length > 0 && 'is-working')}
+                style={{ '--progress': progress } as React.CSSProperties}
+                aria-label={quickGo ? 'Generate' : 'Open the composer'}
+                onClick={() => { haptic('tap'); if (quickGo) generate(); else setCreateOpen(true); }}
+              >
+                {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
+                <HapticTarget />
+              </button>
+            </div>
+          ) : null}
+          <div className="phone-dock-row">
+            <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} onPress={() => haptic('tap')} />
+            {!hiddenLocked ? <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} /> : null}
+            <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
+            <span className="phone-dock-gap" />
+            <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
+          </div>
+        </nav>
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
-      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => selection.start() : undefined} />
+      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => {
+        // Clearing the search changes the view, which ends a selection: start once that has landed.
+        const cleared = searchActive(searchRef.current);
+        closeTools();
+        if (cleared) window.requestAnimationFrame(() => selection.start()); else selection.start();
+      } : undefined} />
       <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} onSelect={(item) => { haptic('press'); selection.start([item.id]); }} />
     </>
+  );
+}
+
+/** A top-bar tool: tinted with a count badge while it has something applied, pressed while its row is open. */
+function ToolButton({ label, Icon, count, open, onClick }: { label: string; Icon: typeof Search; count: number; open: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className={cn('phone-icon phone-tool', count > 0 && 'is-active', open && 'is-open')} aria-label={label} aria-description={count ? `${count} active` : undefined} aria-expanded={open} onClick={onClick}>
+      <Icon size={20} />
+      {count ? <span className="phone-tool-count" aria-hidden="true">{count}</span> : null}
+    </button>
   );
 }
 

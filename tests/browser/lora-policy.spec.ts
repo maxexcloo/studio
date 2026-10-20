@@ -65,7 +65,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   const ui = studioUi(page);
   const composer = await ui.openComposer();
   const phone = await ui.isPhone();
-  await composer.getByRole('button', { name: 'LoRAs', exact: true }).click();
+  await composer.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true }).click();
   const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
   // A sheet on the phone, a popover over the full studio's composer.
   await expect(surface).toHaveClass(phone ? /is-sheet/ : /composer-loras/);
@@ -144,7 +144,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
-  const open = ui.composer.getByRole('button', { name: 'LoRAs', exact: true });
+  const open = ui.composer.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true });
   await open.click();
   await expect(surface).toBeVisible();
   await expect(open).toHaveAttribute('aria-expanded', 'true');

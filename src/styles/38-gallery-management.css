@@ -131,8 +131,7 @@
 /* Native scrollbar tracks must not change height while an action strip animates. */
 .gallery-selection-actions { display: flex; align-items: center; gap: 2px; min-width: 0; height: var(--control-h); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .gallery-selection-actions::-webkit-scrollbar { display: none; }
-.app-shell .gallery-toolbar .gallery-search,
-.phone-searchbar .gallery-search { position: relative; inset: auto; display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: var(--dock-h); height: var(--dock-h); margin: 0; overflow: hidden; translate: initial; transform: none; }
+.app-shell .gallery-toolbar .gallery-search { position: relative; inset: auto; display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: var(--dock-h); height: var(--dock-h); margin: 0; overflow: hidden; translate: initial; transform: none; }
 /* `initial` survives production minification, unlike translate:none beside transform:none. */
 .app-shell .gallery-toolbar .gallery-search.is-expanded { min-width: 64px; max-width: 260px; }
 .gallery-search-field { flex: 1; min-width: 0; overflow: hidden; }
@@ -145,12 +144,9 @@
 .gallery-search-clear,
 .gallery-search-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--dock-h); height: var(--dock-h); color: hsl(var(--foreground)); cursor: pointer; }
 .gallery-search-close { width: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
-.gallery-toolbar button:hover:not(:disabled),
-.phone-searchbar button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-.gallery-search-tools button:focus-visible,
-.phone-searchbar button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-.gallery-toolbar button:focus:not(:focus-visible),
-.phone-searchbar button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+.gallery-toolbar button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.gallery-search-tools button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-toolbar button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
 .gallery-filter-anchor { position: relative; display: flex; flex: none; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
 .gallery-filter-trigger { font-size: 12px; }
 .gallery-filter-count { font-size: 10px; }
@@ -184,30 +180,6 @@
   .gallery-search-tools { grid-column: 1; grid-row: 2; }
   .gallery-toolbar-actions { grid-column: 1; grid-row: 3; }
 }
-/* Phone: search and filters float over the gallery, hung under the header button that opened them. */
-.phone-shell .phone-searchbar {
-  position: fixed;
-  top: var(--phone-search-top, calc(max(6px, env(safe-area-inset-top)) + 50px));
-  left: max(8px, env(safe-area-inset-left));
-  right: max(8px, env(safe-area-inset-right), var(--phone-search-right, 0px));
-  z-index: var(--z-deck);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  min-width: 0;
-  max-height: calc(100dvh - var(--phone-search-top, 56px) - max(12px, env(safe-area-inset-bottom)));
-  pointer-events: none;
-}
-.phone-searchbar > * { pointer-events: auto; }
-.phone-searchbar button { min-width: 44px; min-height: 44px; }
-.phone-searchbar .gallery-search { flex: none; width: min(340px, 100%); min-width: var(--dock-h); height: auto; min-height: 52px; }
-.phone-searchbar .gallery-search input { height: 44px; font-size: 16px; }
-.phone-searchbar .gallery-filter-anchor { position: static; flex-direction: column; align-items: stretch; width: min(448px, 100%); overflow: auto; overscroll-behavior: contain; border-radius: var(--r-panel); padding: 4px; }
-.phone-searchbar .gallery-filter-trigger { align-self: flex-start; }
-.phone-searchbar .gallery-filter-panel { position: static; max-width: none; padding: 0; border: 0; border-radius: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
-.phone-searchbar .gallery-filter-controls { width: 100%; max-width: none; }
-.phone-searchbar .gallery-filter-select { height: 44px; }
 .phone-running-inline { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px; min-width: 36px; min-height: 44px; padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ember); font-size: 12px; }
 .phone-gallery-options .zen-control-button { position: static; display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 48px; margin: 0; padding: 10px 16px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font-size: 14px; }
 .phone-gallery-options .zen-control-button:disabled { opacity: .4; }

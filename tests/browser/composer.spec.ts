@@ -191,7 +191,7 @@ test('creation pickers expose their open state and ignore exiting surfaces when 
   const ui = studioUi(page);
   const root = await ui.openComposer();
   await ui.prompt.fill('A neutral control state');
-  const loras = root.getByRole('button', { name: 'LoRAs', exact: true });
+  const loras = root.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true });
   const advanced = root.getByRole('button', { name: 'Advanced Settings', exact: true, includeHidden: true });
   const model = ui.modelTrigger;
   await loras.click();
@@ -226,7 +226,7 @@ test('secondary creation controls share muted, hover and neutral open states wit
     probe.remove();
     return result;
   });
-  const loras = root.getByRole('button', { name: 'LoRAs', exact: true });
+  const loras = root.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true });
   const advanced = root.getByRole('button', { name: 'Advanced Settings', exact: true, includeHidden: true });
   const reset = root.getByRole('button', { name: 'Reset Creation', exact: true });
   const model = ui.modelTrigger;

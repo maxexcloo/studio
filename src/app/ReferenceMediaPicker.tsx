@@ -13,6 +13,7 @@ import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl
 import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
+import { usePhoneLayer } from './phoneLayers';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
@@ -95,6 +96,8 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
   // the bar's own backdrop blur would stop this one from blurring the gallery.
   const { box, asSheet } = useComposerSurfaceBox(anchor);
+  // As a phone sheet it replaces the Create sheet rather than stacking on it.
+  usePhoneLayer(Boolean(asSheet && present));
   React.useEffect(() => {
     if (!box) return;
     // Open and type: search takes focus on desktop. On the phone the sheet does, so no keyboard pops up.

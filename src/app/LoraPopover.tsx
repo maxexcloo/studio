@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { Layers, X } from 'lucide-react';
 import { useDismiss } from './useDismiss';
 import { composerAnchor, surfaceMotion, useComposerSurfaceBox } from './composerSurface';
+import { usePhoneLayer } from './phoneLayers';
 
 function Surface({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   const present = useIsPresent();
@@ -11,6 +12,8 @@ function Surface({ onClose, children }: { onClose: () => void; children: React.R
   const opener = React.useRef(document.querySelector<HTMLElement>('[data-open-trigger][aria-label="LoRAs"][aria-expanded="true"]') || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   const [anchor] = React.useState(() => composerAnchor(opener.current));
   const { box, asSheet } = useComposerSurfaceBox(anchor);
+  // As a phone sheet it replaces the Create sheet rather than stacking on it.
+  usePhoneLayer(Boolean(asSheet && present));
   const close = React.useCallback(() => { onClose(); opener.current?.focus({ preventScroll: true }); }, [onClose]);
   useDismiss([surface, opener], present, close);
   return createPortal(<motion.div ref={surface} className={`reference-popover composer-loras${asSheet ? ' is-sheet' : ''}`} style={asSheet ? undefined : box || undefined} role={present ? 'dialog' : undefined} aria-label="LoRAs" aria-hidden={!present || undefined} inert={!present} data-open-surface {...surfaceMotion}>

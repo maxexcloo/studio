@@ -35,10 +35,13 @@ the pattern occurs in the same piece of work.
   first-run setup).
 - **Phone:** at most one layer above the main screen. A new surface replaces
   the current one, or navigates within it with a back step; it never stacks on
-  top. A picker opened from the Create sheet replaces the sheet's content and
-  shows Back.
-- Toasts and status never cover controls: on the phone they sit above the
-  create pill or select bar, never over the top bar or a sheet's buttons.
+  top. Every sheet and sheet-style picker registers with `phoneLayers.ts`:
+  only the newest shows, the ones under it step aside (`is-covered`) until it
+  closes, one dimmed backdrop stays behind, and a nested sheet shows Back
+  instead of Close. A destructive confirmation is the one exception.
+- Toasts and status never cover controls. On the phone they sit under the
+  status strip; over a full sheet they sit on its title row, short of Close or
+  Back; in the viewer, under its top buttons.
 - Stacking uses the `--z-*` tokens, never raw numbers.
 
 ## Surfaces
@@ -112,18 +115,27 @@ reads the gallery's scroller uses `src/app/scroller.ts`, which treats the
 document and a scrolling box alike. History entries for overlays never restore
 scroll (`history.scrollRestoration = 'manual'`).
 
-### Top bar
+### Bottom-up
 
-- One row: status, title, the Images/Videos icon pair, then Search, Filter and
-  More. The search field and the icon pair share one height.
-- **Search and Filter share one space.** Opening one expands it to the full
-  width of the bar's second row and collapses the other to its icon; opening
-  the other swaps them. Only one is expanded at a time.
-- **Active indication:** with a query or any filter applied, the collapsed
-  icon is tinted and carries a count badge, and the expanded bar shows the
-  same tint.
-- **Closing clears:** closing the expanded search or filter row clears the
-  query and every filter. Tapping outside closes it too.
+Frequently used controls sit within thumb reach, above the home indicator and
+Safari's bottom bar (safe-area insets). The top keeps only a thin status strip
+(status, title, what is running), so a tap on the iOS status bar still scrolls
+the document to the top.
+
+The **dock** at the bottom holds, from the top down: the shared Search/Filter
+row when open, the create pill (prompt preview and Generate), then the
+Images/Videos icon pair, Search, Filter and More. Prefer tall, vertically
+scrolling surfaces over small floating popovers on the phone.
+
+- **Search and Filter share one row.** Opening one expands it, full width and
+  as tall as the Images/Videos icons, upwards above the create pill; the other
+  stays an icon. Opening the other swaps them. Only one is open at a time.
+- **Active indication:** with a query or any filter applied, the Search or
+  Filter icon is tinted with the accent and carries a count badge; the open
+  row shows an accent outline.
+- **Closing clears:** closing the row (its X, its icon, Escape, or starting
+  Select) clears the query and every filter. It is part of the dock, not an
+  overlay, so scrolling the gallery leaves it open.
 
 ### Filter row
 

@@ -1,8 +1,33 @@
+import { Film, Image as ImageIcon } from 'lucide-react';
+import { Tip } from './components';
 import { cn } from './format';
 import type { Mode } from './types';
 
-export function ComposerModeSelect({ mode, onChange }: { mode: string; onChange: (mode: Mode) => void }) {
-  return <div className="mode-tabs composer-mode-select" role="group" aria-label="Generation Mode">
-    {(['image', 'video'] as const).map((value) => <button key={value} type="button" className={cn(mode === value && 'active')} aria-pressed={mode === value} onClick={() => onChange(value)}>{value === 'image' ? 'Image' : 'Video'}</button>)}
+const modes = ['image', 'video'] as const;
+
+/**
+ * Image/Video as a pair of icons: the same segmented toggle for the gallery
+ * (Images/Videos) and for generation (Image/Video), on the desktop and phones.
+ */
+export function MediaModeToggle({ mode, onChange, kind, className, tips = true, onPress }: {
+  mode: string;
+  onChange: (mode: Mode) => void;
+  kind: 'gallery' | 'generation';
+  className?: string;
+  /** Tooltips need a pointer; on a phone the names are for assistive tech. */
+  tips?: boolean;
+  onPress?: () => void;
+}) {
+  const label = (value: Mode) => kind === 'gallery' ? (value === 'image' ? 'Images' : 'Videos') : (value === 'image' ? 'Image' : 'Video');
+  return <div className={cn('mode-tabs media-mode-toggle', className)} role="group" aria-label={kind === 'gallery' ? 'Gallery Mode' : 'Generation Mode'}>
+    {modes.map((value) => {
+      const Icon = value === 'image' ? ImageIcon : Film;
+      const button = <button key={value} type="button" className={cn(mode === value && 'active')} aria-pressed={mode === value} aria-label={label(value)} onClick={() => { onPress?.(); onChange(value); }}><Icon size={17} aria-hidden="true" /></button>;
+      return tips ? <Tip key={value} content={label(value)}>{button}</Tip> : button;
+    })}
   </div>;
+}
+
+export function ComposerModeSelect({ mode, onChange, tips = true }: { mode: string; onChange: (mode: Mode) => void; tips?: boolean }) {
+  return <MediaModeToggle kind="generation" className="composer-mode-select" mode={mode} onChange={onChange} tips={tips} />;
 }

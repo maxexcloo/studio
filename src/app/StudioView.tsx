@@ -41,6 +41,7 @@ import { HiddenActionsContext } from './hiddenContext';
 import { LockMark } from './LockMark';
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
+import { MediaModeToggle } from './ComposerModeSelect';
 import { PhoneViewerBar, ViewerDockActions } from './ItemActionSurfaces';
 import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
@@ -811,13 +812,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Gallery Mode">
-              {(["image", "video"] as const).map((nextMode) => (
-                <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
-                  {nextMode === "image" ? "Images" : "Videos"}
-                </button>
-              ))}
-            </div>} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
