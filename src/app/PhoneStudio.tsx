@@ -11,6 +11,7 @@ import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
+import { preferenceLabels, Switch } from './SettingsControls';
 import { ItemActionSheet } from './ItemActionSurfaces';
 import { bulkItemActions, useItemActionHandlers } from './itemActions';
 import type { GallerySelection } from './gallerySelection';
@@ -571,10 +572,10 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
   const { prefs, setPrefs, hidden, retryComfyStatus, comfyRetrying } = view;
   const [signingOut, setSigningOut] = React.useState(false);
   const toggle = (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => (
-    <button type="button" role="switch" aria-checked={checked} className="phone-row" onClick={() => onChange(!checked)}>
+    <label className="phone-row">
       <span>{label}<small>{description}</small></span>
-      <span className={cn('phone-switch', checked && 'is-on')} aria-hidden="true"><i /></span>
-    </button>
+      <Switch label={label} checked={checked} onChange={onChange} />
+    </label>
   );
   return (
     <Sheet open={open} onClose={onClose} title="More">
@@ -601,9 +602,9 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
       </div>
       <h3 className="phone-section">Studio</h3>
       <div className="phone-group">
-        {toggle('Smart upscale', 'Shows an upscale arrow on finished images', prefs.smartUpscale !== false, (next) => setPrefs({ smartUpscale: next }))}
-        {toggle('Show failed generations', 'Keeps them in the gallery so you can see why', prefs.showFailedItems !== false, (next) => setPrefs({ showFailedItems: next }))}
-        {toggle('Ask before deleting', 'Also asks before stopping generations', prefs.confirmActions !== false, (next) => setPrefs({ confirmActions: next }))}
+        {toggle(preferenceLabels.smartUpscale, 'Shows an upscale arrow on finished images', prefs.smartUpscale, (next) => setPrefs({ smartUpscale: next }))}
+        {toggle(preferenceLabels.showFailedItems, 'Keeps them in the gallery so you can see why', prefs.showFailedItems, (next) => setPrefs({ showFailedItems: next }))}
+        {toggle(preferenceLabels.confirmActions, 'Also asks before stopping generations', prefs.confirmActions, (next) => setPrefs({ confirmActions: next }))}
       </div>
       <div className="phone-group">
         <button type="button" className="phone-row" onClick={() => { onClose(); setPrefs({ fullStudioOnPhone: true }); }}>

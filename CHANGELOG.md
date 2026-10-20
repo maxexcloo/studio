@@ -13,6 +13,7 @@ version opens with a `> ` summary line.
 
 ### Changed
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
+- **Matching phone switches:** the phone's More sheet names its switches as Settings does (Smart upscale, Show failed items, Confirm before removing things) and uses the same switch control.
 
 ## [0.28.0] - 2026-10-20
 

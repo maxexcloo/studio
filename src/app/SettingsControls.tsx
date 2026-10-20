@@ -1,6 +1,13 @@
 import React from 'react';
 import { cn } from './format';
 
+/** Preference switches shown both in Settings and on the phone's More sheet, under one name. */
+export const preferenceLabels = {
+  confirmActions: 'Confirm before removing things',
+  showFailedItems: 'Show failed items',
+  smartUpscale: 'Smart upscale',
+} as const;
+
 export function Switch({ checked, onChange, disabled, label, size = 'md' }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; label: string; size?: 'sm' | 'md' }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className={cn('switch', size === 'sm' && 'is-sm')} onClick={() => onChange(!checked)}>
