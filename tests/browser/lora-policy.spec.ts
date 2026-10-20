@@ -201,7 +201,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await page.goto('/');
   const ui = studioUi(page);
   const menu = await ui.openModelPicker();
-  await expect(menu.getByText('Krea (Fine Tunes)', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Krea 2', { exact: true })).toBeVisible();
   const row = ui.modelOptions.filter({ hasText: 'Tesserafine Turbo' }).first();
   await expect(row).toContainText('V1.0');
   await expect(row).toContainText('INT8 ConvRot');

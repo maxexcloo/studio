@@ -12,40 +12,30 @@ test('imported workflows share stock family headings, including aliases and clou
     { id: 'custom:unknown', family: 'custom', label: 'Unclassified Workflow' },
   ];
   const groups = modelGroups(profiles);
-  assert.deepEqual(groups.map((group) => group.label), ['FLUX', 'Grok', 'MiniMax', 'Other Workflows']);
+  assert.deepEqual(groups.map((group) => group.label), ['FLUX', 'Grok', 'MiniMax H3', 'Other Workflows']);
   assert.deepEqual(groups.find((group) => group.label === 'FLUX').rows.map((profile) => profile.id), ['custom:flux', 'image:flux']);
-  assert.deepEqual(groups.find((group) => group.label === 'MiniMax').rows.map((profile) => profile.id), ['custom:h3', 'video:h3']);
+  assert.deepEqual(groups.find((group) => group.label === 'MiniMax H3').rows.map((profile) => profile.id), ['custom:h3', 'video:h3']);
   assert.equal(groups.flatMap((group) => group.rows).length, profiles.length);
   assert.deepEqual(profiles.map((profile) => profile.id), ['image:flux', 'custom:flux', 'video:h3', 'custom:h3', 'custom:grok', 'custom:unknown']);
 });
 
-test('Singularity has a fine tune heading without changing the H3 generation family', () => {
-  const stock = { id: 'custom:h3', family: 'minimax-h3', label: 'MiniMax H3 · Generate' };
-  const imported = { id: 'custom:singularity', family: 'minimax-h3', label: 'Singularity · Reference · 20 Steps' };
-  const checkpoint = { id: 'video:singularity', family: 'minimax_h3', label: 'Reference', baseModel: 'Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors' };
-  const groups = modelGroups([stock, imported, checkpoint]);
-  assert.deepEqual(groups.map((group) => group.label), ['MiniMax', 'MiniMax (Fine Tunes)']);
-  assert.deepEqual(groups[0].rows.map((profile) => profile.id), ['custom:h3']);
-  assert.equal(groups[1].rows.length, 2);
-  assert.equal(imported.family, 'minimax-h3');
-  assert.equal(checkpoint.family, 'minimax_h3');
+test('fine tunes sit in their family: Singularity under MiniMax H3', () => {
+  const stock = { id: 'custom:h3', family: 'minimax-h3', label: 'MiniMax H3 · Fast · 8 Steps' };
+  const imported = { id: 'custom:singularity', family: 'minimax-h3', label: 'Singularity · Quality · 20 Steps' };
+  const groups = modelGroups([stock, imported]);
+  assert.deepEqual(groups.map((group) => group.label), ['MiniMax H3']);
+  assert.equal(groups[0].rows.length, 2);
   assert.equal(loraCompatibility({ families: ['minimax_h3'] }, imported), 'fits');
 });
 
-test('model names keep model identity separate from precision and workflow settings', () => {
-  assert.deepEqual(modelName({ kind: 'video', label: 'MiniMax H3 [INT8 ConvRot] · Reference · Sol & PDD · 8 Steps · 4B Encoder (≈72 s)' }), { name: 'MiniMax H3 · Animate Image', detail: 'INT8 · Sol & PDD · 8 Steps · 4B Encoder · ~72 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B [FP8] · Distilled' }), { name: 'FLUX.2 [klein] 9B', detail: 'FP8' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 [INT8 ConvRot] · Standard · 25 Steps (≈15 s)' }), { name: 'Qwen-Image 2.1', detail: 'INT8 · 25 Steps · ~15 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Qwen-Image 2.1 Turbo [BF16] · 8 Steps (≈7 s)' }), { name: 'Qwen-Image 2.1 Turbo', detail: 'BF16 · 8 Steps · ~7 s' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.2 [klein] 9B KV [FP8] · Reference · 4 Steps (≈4 s)' }), { name: 'FLUX.2 [klein] 9B · Edit', detail: 'FP8 · KV Cache · 4 Steps · ~4 s' });
-  assert.deepEqual(modelName({ kind: 'video', label: 'Grok Imagine Video 1.5 Preview · Animate Image · Cloud · 720p · 6 Seconds' }), { name: 'Grok Imagine Video 1.5 Preview · Animate Image', detail: 'Cloud · 720p · 6 Seconds' });
-  assert.deepEqual(modelName({ kind: 'image', label: 'Grok Imagine Image 2.0 · Edit · Cloud' }), { name: 'Grok Imagine Image 2.0 · Edit', detail: 'Cloud' });
-  assert.deepEqual(modelName({ kind: 'image', family: 'grok', defaults: { steps: 20 }, label: 'Grok Image Edit' }), { name: 'Grok Image · Edit', detail: 'grok' });
-  assert.deepEqual(modelName({ kind: 'video', family: 'grok', label: 'Grok Image To Video' }), { name: 'Grok Video · Animate Image', detail: 'grok' });
-  assert.deepEqual(modelName({ kind: 'image', defaults: { steps: 28 }, label: 'Krea 2 Center SemiRaw v1 [FP8]' }), { name: 'Krea 2 Center SemiRaw v1', detail: 'FP8 · 28 Steps' });
-  assert.deepEqual(modelName({ kind: 'video', family: 'minimax_h3', defaults: { steps: 20 }, label: 'Minimax H3 Singularity Ref2va Pruned V1.3 Int8 · MiniMax H3' }), { name: 'MiniMax H3 Singularity v1.3 · Animate Image', detail: 'INT8 · 20 Steps' });
-  assert.deepEqual(modelName({ kind: 'video', family: 'minimax-h3', label: 'MiniMax H3 [INT8 ConvRot] · Non-Reference · Stock · 20 Steps · 4B Encoder' }), { name: 'MiniMax H3 · Generate', detail: 'INT8 · 20 Steps · 4B Encoder' });
-  assert.deepEqual(modelName({ kind: 'video', family: 'grok', label: 'Grok Imagine Video 1.5 · Generate · 20 Steps · Cloud · 720p' }), { name: 'Grok Imagine Video 1.5 · Generate', detail: 'Cloud · 720p' });
+test('model names show the title as it is, with tier, steps and tags on the second line', () => {
+  assert.deepEqual(modelName({ kind: 'image', label: 'Krea 2 Turbo Radiance · Fast · 8 Steps · ~7 s' }), { name: 'Krea 2 Turbo Radiance', detail: 'Fast · 8 Steps · ~7 s' });
+  assert.deepEqual(modelName({ kind: 'image', label: 'FLUX.3 [klein] Distilled · Fast · 4 Steps' }), { name: 'FLUX.3 [klein] Distilled', detail: 'Fast · 4 Steps' });
+  assert.deepEqual(modelName({ kind: 'video', label: 'MiniMax H3 Singularity · Quality · 20 Steps · Reference' }), { name: 'MiniMax H3 Singularity', detail: 'Quality · 20 Steps · Reference' });
+  assert.deepEqual(modelName({ kind: 'image', family: 'grok', label: 'Grok Imagine Image 2.0 · Cloud' }), { name: 'Grok Imagine Image 2.0', detail: 'Cloud' });
+  assert.deepEqual(modelName({ kind: 'image', defaults: { steps: 28 }, label: 'Krea 2 Center SemiRaw v1' }), { name: 'Krea 2 Center SemiRaw v1', detail: '28 Steps' });
+  assert.deepEqual(modelName({ kind: 'image', family: 'moss_image', label: 'MOSS Image Base' }), { name: 'MOSS Image Base', detail: 'moss_image' });
+  assert.deepEqual(modelName({ kind: 'video', label: 'Wan 2.1 (≈72 s)' }).name, 'Wan 2.1 (≈72 s)');
 });
 
 test('LoRA names prefer metadata, preserve useful version information and leave identity untouched', () => {
@@ -100,41 +90,29 @@ test('model lists sort visible names naturally before precision and recipe detai
 });
 
 
-test('combined image and video profiles omit redundant generation actions', () => {
-  for (const kind of ['image', 'video']) {
-    const profile = { kind, label: 'Combined Model · Generate · 8 Steps', imageModes: { generate: {}, reference: {} } };
-    assert.deepEqual(modelName(profile), { name: 'Combined Model', detail: '8 Steps' });
-    assert.equal(modelName({ ...profile, imageModes: undefined }).name, 'Combined Model · Generate');
-  }
-});
-
-
-test('fine tunes share parent headings without changing workflow identities', () => {
+test('fine tunes share their family heading without changing workflow identities', () => {
   const profiles = [
     { id: 'tessera', family: 'krea2', label: 'Tessera Turbo' },
     { id: 'noct', family: 'qwen_image_21', label: 'Vesper Q V4' },
-    { id: 'noct-lite', family: 'qwen_image_21', label: 'Vesper-Q Lite' },
     { id: 'stock', family: 'qwen_image_21', label: 'Qwen Turbo' },
   ];
-  assert.deepEqual(modelGroups(profiles).map(({label}) => label), ['Krea (Fine Tunes)', 'Qwen', 'Qwen (Fine Tunes)']);
-  assert.deepEqual(profiles.map(({id}) => id), ['tessera', 'noct', 'noct-lite', 'stock']);
+  assert.deepEqual(modelGroups(profiles).map(({label}) => label), ['Krea 2', 'Qwen-Image 2.1']);
+  assert.deepEqual(profiles.map(({id}) => id), ['tessera', 'noct', 'stock']);
 });
 
 
 test('imported Boogu and MOSS profiles use readable model groups and specific adapter family labels', () => {
   const profiles = [{ id: 'boogu', family: 'boogu', label: 'Boogu Edit' }, { id: 'moss', family: 'moss_image', label: 'MOSS Image SFT' }];
-  assert.deepEqual(modelGroups(profiles).map((group) => group.label), ['Boogu', 'MOSS']);
+  assert.deepEqual(modelGroups(profiles).map((group) => group.label), ['Boogu', 'MOSS Image']);
   assert.equal(modelFamilyLabel(profiles[0]), 'Boogu');
   assert.equal(modelFamilyLabel(profiles[1]), 'MOSS Image');
   assert.equal(modelFamilyLabel({ family: 'flux3_klein' }), 'FLUX.3 Klein');
 });
 
-test('actual model weights distinguish fine-tunes from accelerator recipe names', () => {
-  assert.equal(modelFamily({ family: 'minimax_h3', baseModel: 'minimax_h3_fl2va_pruned_int8_convrot.safetensors', label: 'MiniMax H3 · DMAD · 4 Steps' }), 'MiniMax');
-  assert.equal(modelFamily({ family: 'minimax_h3', baseModel: 'Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors', label: 'Reference' }), 'MiniMax (Fine Tunes)');
+test('every Krea 2 fine tune sits under Krea 2 and keeps its LoRA fit', () => {
   for (const baseModel of ['lumenTESSERAKrea2Fp8Bf16_krea2Fp8.safetensors', 'serendipityV5INT8C_rays.safetensors', 'tesserafineTurboBF16FP8_v10_3291478.safetensors']) {
     const profile = { family: 'krea2', baseModel, label: 'Quality · 8 Steps' };
-    assert.equal(modelFamily(profile), 'Krea (Fine Tunes)');
+    assert.equal(modelFamily(profile), 'Krea 2');
     assert.equal(loraCompatibility({ families: ['krea2'] }, profile), 'fits');
     assert.equal(loraCompatibility({ families: ['flux3_klein'] }, profile), 'other');
   }

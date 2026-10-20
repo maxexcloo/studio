@@ -1,63 +1,39 @@
-/** Keep the model and action on the title, with settings on the second line. */
+/**
+ * A profile's name is "Title · Tier · N Steps[ · tags]" (the profiles repo's
+ * convention): the title shows as it is, the rest on the second line. A
+ * workflow without its steps in the name gets them from its defaults.
+ */
 export function modelName(profile) {
   const raw = String(profile?.displayName || profile?.label || 'No Model');
   const [lead, ...details] = raw.split(/\s*·\s*/);
-  const precision = [];
-  let name = lead.replace(/\[(FP\d+|BF\d+|INT\d+[^\]]*|W\d+A\d+)\]/gi, (_, value) => { precision.push(value.replace(/\s+ConvRot/gi, '')); return ''; })
-    .replace(/\s+/g, ' ').trim();
-  let action = details.find((detail) => /^(Generate|Edit|Reference|Non-Reference|Animate Image)$/i.test(detail));
-  if (/^Minimax H3 Singularity Ref2va Pruned V([\d.]+) Int8$/i.test(name)) {
-    name = name.replace(/^Minimax H3 Singularity Ref2va Pruned V([\d.]+) Int8$/i, 'MiniMax H3 Singularity v$1');
-    precision.push('INT8');
-    action = 'Animate Image';
-  }
-  if (action === 'Reference') action = profile?.kind === 'video' ? 'Animate Image' : 'Edit';
-  if (action === 'Non-Reference') action = 'Generate';
-  if (!action && / Image Edit$/.test(name)) {
-    name = name.replace(/ Edit$/, '');
-    action = 'Edit';
-  }
-  if (!action && / Image To Video$/.test(name)) {
-    name = name.replace(/Image To Video$/, 'Video');
-    action = 'Animate Image';
-  }
-  if (/\s+KV\b/.test(name)) {
-    name = name.replace(/\s+KV\b/, '');
-    precision.push('KV Cache');
-  }
-  const settings = details.filter((detail) => !/^(Generate|Edit|Reference|Non-Reference|Animate Image|Standard|Default|Distilled|Stock)$/i.test(detail))
-    .filter((detail) => !(profile?.family === 'grok' && /\bSteps\b/i.test(detail)))
-    .filter((detail) => !(String(profile?.family || '').replace(/-/g, '_') === 'minimax_h3' && detail === 'MiniMax H3'))
-    .flatMap((detail) => detail.replace(/\s*\(≈([\d.]+)\s*s\)/g, ' · ~$1 s').split(' · '));
-  if (profile?.family !== 'grok' && profile?.defaults?.steps && !settings.some((detail) => /\bSteps\b/i.test(detail))) settings.push(`${profile.defaults.steps} Steps`);
-  if (action === 'Generate' && profile?.imageModes?.generate && profile.imageModes.reference) action = undefined;
-  return { name: `${name || lead}${action ? ` · ${action}` : ''}`, detail: [...precision, ...settings].join(' · ') || profile?.familyName || profile?.family || '' };
+  const settings = details.flatMap((detail) => detail.replace(/\s*\(≈([\d.]+)\s*s\)/g, ' · ~$1 s').split(' · ')).filter(Boolean);
+  if (profile?.family !== 'grok' && profile?.defaults?.steps && !settings.some((detail) => /\bSteps?\b/i.test(detail))) settings.push(`${profile.defaults.steps} Steps`);
+  return { name: lead.trim() || raw, detail: settings.join(' · ') || profile?.familyName || profile?.family || '' };
 }
 
+// Group headings: one per family, fine tunes included (Tessera and Tesserafine under Krea 2, Vesper Q under Qwen-Image 2.1, Singularity and 10Eros under MiniMax H3).
 const familyNames = {
   boogu: 'Boogu',
   checkpoint: 'Checkpoint',
+  flux2_klein_4b: 'FLUX',
   flux2_klein_9b: 'FLUX',
   flux3: 'FLUX',
   flux3_klein: 'FLUX',
   grok: 'Grok',
-  ideogram4: 'Ideogram',
-  krea2: 'Krea',
-  minimax_h3: 'MiniMax',
-  moss_image: 'MOSS',
-  qwen_image_21: 'Qwen',
+  ideogram4: 'Ideogram 4',
+  krea2: 'Krea 2',
+  minimax_h3: 'MiniMax H3',
+  moss_image: 'MOSS Image',
+  qwen_image_21: 'Qwen-Image 2.1',
   wan: 'Wan',
-  z_image: 'Z-Image',
-  zimage: 'Z-Image',
+  z_image: 'Z-Image Turbo',
+  zimage: 'Z-Image Turbo',
 };
 
 export function modelFamily(profile) {
   if (!profile) return '';
   const family = String(profile.family || '').replace(/-/g, '_');
-  const name = familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
-  const variant = profile.baseModel || [profile.displayName, profile.label].filter(Boolean).join(' ');
-  const fineTune = { krea2: /tessera|serendipity/i, qwen_image_21: /noct[ _-]*q/i, minimax_h3: /singularity|fused|dmad/i }[family];
-  return fineTune?.test(variant) ? name + ' (Fine Tunes)' : name;
+  return familyNames[family] || profile.familyName || (family && family !== 'custom' ? profile.family : 'Other Workflows');
 }
 
 /** Specific family names for adapter filters, independent of broader model group headings. */
