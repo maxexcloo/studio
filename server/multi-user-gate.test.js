@@ -30,13 +30,14 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   for (const [method, path] of [
     ["GET", "/api/gallery"], ["GET", "/api/gallery/delta"], ["POST", "/api/generate"], ["GET", "/api/jobs/abc-1"],
     ["POST", "/api/jobs/abc-1/cancel"], ["GET", "/api/reference-assets/a1/thumbnail"], ["POST", "/api/reference-assets/upload"],
-    ["GET", "/api/loras/library"], ["GET", "/api/comfy/status"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
+    ["GET", "/api/loras/library"], ["GET", "/api/comfy/status"], ["GET", "/api/ai-control"], ["GET", "/api/ai-control/status"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
   ]) assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
     ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
     ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"], ["PUT", "/api/sizes"],
     ["PUT", "/api/workflows/preferences"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
-    ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"]
+    ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"],
+    ["POST", "/api/ai-control/plan"], ["POST", "/api/ai-control/apply"], ["POST", "/api/ai-control/restart"], ["GET", "/api/ai-control/jobs/abc"]
   ]) {
     const denied = call(path, user, method);
     assert.equal(denied.continued, false, `${method} ${path}`);

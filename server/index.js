@@ -31,6 +31,7 @@ import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.j
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
+import { registerAiControlRoutes } from './ai-control-routes.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
@@ -257,6 +258,8 @@ function requireSignedIn(req, res, next) {
 
 app.use(requireSignedIn);
 registerAccessRoutes(app);
+// What each GPU runs, through AI Control with the server's key; administrators change it by hand.
+registerAiControlRoutes(app, { isAdmin: canAdmin });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
 registerMultiUserAuthRoutes(app, {
   availableProfiles: async () => {
