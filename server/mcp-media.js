@@ -158,8 +158,9 @@ export class McpMedia {
     const models = await this.catalogue(owner);
     let profiles = await this.profiles(kind, owner);
     if (!cloud) {
+      const cloudOffered = profiles.some(isCloudProfile);
       profiles = profiles.filter(profile => !isCloudProfile(profile));
-      if (kind === 'video' && models.backends?.video?.available === false) throw new Error(localVideoUnavailable);
+      if (kind === 'video' && models.backends?.video?.available === false) throw new Error(localVideoUnavailable(cloudOffered));
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.

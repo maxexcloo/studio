@@ -316,7 +316,8 @@ test('media and administrator credentials discover only their own friendly tools
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
   // (7900 since Generate says to batch several images into one call, to pass a named model as profile_id and when face detail turns on.)
   // Grok and other cloud profiles run only when the user asks for them.
-  assert.match(tools.find(tool => tool.name === 'Generate').description, /Grok only if asked\./);
+  assert.match(tools.find(tool => tool.name === 'Generate').description, /Cloud profiles only if asked\./);
+  assert.doesNotMatch(JSON.stringify(tools) + media.getInstructions(), /Grok/, 'every caller gets the same text, so none names Grok: an account may have no cloud profile');
   assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7900, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
@@ -1534,6 +1535,13 @@ test('video never goes to the cloud by itself while the local video worker is of
     assert.match(texts(refused), /^Local video is unavailable right now: the video worker is offline\. Tell the user; they can ask for Grok/);
   }
   assert.equal(f.submitted.length, 0);
+  // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
+  await f.profiles(videoCatalogue(false).filter(profile => !/^cloud/.test(profile.id)), { defaults: { image: imageProfile.id }, videoAvailable: false });
+  const none = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
+  assert.equal(texts(none), 'Local video is unavailable right now: the video worker is offline. Tell the user to try again later.');
+  const listing = data(await call(client, 'Models', { kind: 'video' }));
+  assert.equal('cloud' in listing || 'cloud_note' in listing, false);
+  await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   // Asked for by name, the cloud runs: the profile is marked remote.
   const asked = data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'], count: 1 }));
   assert.deepEqual(asked.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });

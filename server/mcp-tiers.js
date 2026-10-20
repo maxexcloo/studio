@@ -13,8 +13,11 @@ export const asksForCloud = (request) => cloudWords.test(String(request || '').r
 export const namesCloud = (name) => /\b(?:grok|cloud)\b/i.test(String(name || '').replace(/[-_]/g, ' '));
 /** The profiles MCP may pick from a request or name: cloud ones only when it asks for the cloud. */
 export const localUnlessAsked = (profiles, { request, name } = {}) => asksForCloud(request) || namesCloud(name) ? profiles : profiles.filter(profile => !isCloudProfile(profile));
-/** What MCP says instead of sending video to the cloud while the local video worker is down. */
-export const localVideoUnavailable = 'Local video is unavailable right now: the video worker is offline. Tell the user; they can ask for Grok to make it in the cloud instead.';
+/**
+ * What MCP says instead of sending video to the cloud while the local video worker is down. It names Grok
+ * only when the account may use a cloud profile; with none granted, there is nothing to offer.
+ */
+export const localVideoUnavailable = (cloudOffered = false) => `Local video is unavailable right now: the video worker is offline. ${cloudOffered ? 'Tell the user; they can ask for Grok to make it in the cloud instead.' : 'Tell the user to try again later.'}`;
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 export const preferredTiers = ['fast', 'turbo', 'standard', 'quality'];
 const labels = { 'super fast': 'turbo', fast: 'fast', quality: 'quality', standard: 'standard' };
