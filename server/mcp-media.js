@@ -7,7 +7,7 @@ import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, maxJobsPerCall, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { compatibleLoras, loraCompatibility } from './lora-policy.js';
-import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
+import { chooseProfile, isCloudProfile, localVideoUnavailable } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
@@ -46,7 +46,7 @@ export function assertJobCount(prompts = 1, count = 1) {
     throw new Error(`count is images per prompt, so ${prompts} prompts × count ${count} would queue ${prompts * count} jobs; one call queues at most ${maxJobsPerCall}. ${fix}`);
   }
 }
-// A cloud provider that refused for authorisation or quota is skipped this long, so fallbacks don't queue doomed jobs.
+// A cloud provider that refused for authorisation or quota is skipped this long, so cloud video the user asks for doesn't queue doomed jobs.
 export const cloudPauseMilliseconds = 10 * 60 * 1000;
 export const cloudQuotaMessage = 'Cloud video unavailable (quota).';
 const cloudRefusal = /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
@@ -150,12 +150,16 @@ export class McpMedia {
   }
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
-   * While the studio reports its local video worker unavailable, video goes to a ready remote (cloud) profile,
-   * marked `remote` so the reply can say so.
+   * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
+   * unavailable, video is refused with what to tell the user, never sent to the cloud by itself.
    */
-  async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false, loras = [] } = {}) {
+  async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false, loras = [], cloud = false } = {}) {
     const models = await this.catalogue(owner);
     let profiles = await this.profiles(kind, owner);
+    if (!cloud) {
+      profiles = profiles.filter(profile => !isCloudProfile(profile));
+      if (kind === 'video' && models.backends?.video?.available === false) throw new Error(localVideoUnavailable);
+    }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
       const infos = await this.loraInfos(owner);
@@ -167,8 +171,7 @@ export class McpMedia {
       if (!profiles.length) throw new Error(`No ready ${kind} profile can use ${loras.map(({ name }) => name).join(', ')}. Call Models with lora_query to look it up.`);
     }
     const defaultId = models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'];
-    const remote = kind === 'video' && models.backends?.video?.available === false ? chooseRemoteVideo(profiles, { tier, defaultId, references, firstFrame }) : null;
-    return remote ? { ...remote, remote: true } : chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
+    return chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
   }
   async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
@@ -514,10 +517,10 @@ export class McpMedia {
     return { profile, args };
   }
   /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
-  async animate(owner, jobId, index, item, { tier, prompt, count = 1 } = {}) {
+  async animate(owner, jobId, index, item, { tier, prompt, count = 1, cloud = false } = {}) {
     const output = await this.download(owner, jobId, index);
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) throw new Error('Only image results can be animated.');
-    const base = await this.choose(owner, { kind: 'video', tier, references: 1, firstFrame: true });
+    const base = await this.choose(owner, { kind: 'video', tier, references: 1, firstFrame: true, cloud });
     const { asset } = await this.upload(owner, output.content.toString('base64'), `first-frame.${output.mime.split('/')[1]}`);
     const profile = { ...base, ...base.imageModes?.reference };
     const args = { profile_id: base.id, prompts: [prompt || item.prompt], count, reference_asset_ids: [asset.id] };

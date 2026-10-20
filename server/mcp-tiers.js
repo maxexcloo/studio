@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Speed tiers for MCP: read from the tier segment of a profile label such as "Krea 2 Turbo · Super Fast · 2 Steps".
-import { isLocalVideoProfile } from './comfy-backends.js';
 
 export const mcpTiers = ['quality', 'standard', 'fast', 'turbo'];
+
+/** A provider-backed cloud profile (Grok). MCP never chooses one by itself. */
+export const isCloudProfile = (profile) => profile?.family === 'grok' || /^grok/i.test(String(profile?.id || ''));
+// "grok" anywhere; "cloud" only as a request for it ("in the cloud", "a cloud model"), so "a cloud over the hills" stays local.
+const cloudWords = /\bgrok\b|\b(?:in|on|via|use|using|with|through|to)\s+(?:the\s+)?cloud\b|\bcloud\s+(?:models?|profiles?|videos?|images?|generation|version)\b/i;
+/** Whether the user's request asks for the cloud: "grok", or "cloud" as a request for it. */
+export const asksForCloud = (request) => cloudWords.test(String(request || '').replace(/[-_]/g, ' '));
+/** Whether a model name or profile_id names the cloud: "grok", "cloud" or a grok-* id. */
+export const namesCloud = (name) => /\b(?:grok|cloud)\b/i.test(String(name || '').replace(/[-_]/g, ' '));
+/** The profiles MCP may pick from a request or name: cloud ones only when it asks for the cloud. */
+export const localUnlessAsked = (profiles, { request, name } = {}) => asksForCloud(request) || namesCloud(name) ? profiles : profiles.filter(profile => !isCloudProfile(profile));
+/** What MCP says instead of sending video to the cloud while the local video worker is down. */
+export const localVideoUnavailable = 'Local video is unavailable right now: the video worker is offline. Tell the user; they can ask for Grok to make it in the cloud instead.';
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 export const preferredTiers = ['fast', 'turbo', 'standard', 'quality'];
 const labels = { 'super fast': 'turbo', fast: 'fast', quality: 'quality', standard: 'standard' };
@@ -154,20 +166,6 @@ export function chooseProfile(profiles, { kind, tier, defaultId, references = 0,
   if (!tier) pool = fastestTier(pool);
   const score = (profile) => [profile.id === defaultId, Boolean(fallback?.family) && profile.family === fallback.family, !profile.restricted].reduce((total, value) => total * 2 + Number(value), 0);
   return pool.reduce((best, profile) => score(profile) > score(best) ? profile : best);
-}
-
-/**
- * The video profile to use while the local video worker is unavailable: a ready profile
- * that runs elsewhere (a provider-backed cloud profile), fits the references and, when
- * animating, starts from an image. The requested tier wins when one matches, otherwise
- * Standard. Null when the account has no such profile, so the usual choice and error apply.
- */
-export function chooseRemoteVideo(profiles, { tier, defaultId, references = 0, firstFrame = false }) {
-  const remote = profiles.filter(profile => !isLocalVideoProfile(profile) && fits(profile, references)
-    && (!firstFrame || takesFirstFrame(profile) || Boolean({ ...profile, ...profile.imageModes?.reference }.capabilities?.startImage)));
-  if (!remote.length) return null;
-  const preferred = [tier, 'standard'].find(item => item && profilesForTier(remote, item).length);
-  return chooseProfile(remote, { kind: 'video', tier: preferred, defaultId, references });
 }
 
 // From a wanted tier, the order of the nearest others.

@@ -315,6 +315,8 @@ test('media and administrator credentials discover only their own friendly tools
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
   // (7900 since Generate says to batch several images into one call, to pass a named model as profile_id and when face detail turns on.)
+  // Grok and other cloud profiles run only when the user asks for them.
+  assert.match(tools.find(tool => tool.name === 'Generate').description, /Grok only if asked\./);
   assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7900, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
@@ -1491,50 +1493,59 @@ const videoCatalogue = (local = true) => [
   cloudVideo('cloud-video-fast', 'Cloud Video · Fast · Cloud')
 ];
 
-test('video goes to a cloud profile for the tier while the local video worker is off', async t => {
+test('video never goes to the cloud by itself while the local video worker is off', async t => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   const client = await f.client();
-  const plain = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
-  const result = data(plain);
-  assert.deepEqual(result.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
-  assert.match(texts(plain), /local video worker is unavailable, so this video runs on the cloud profile Cloud Video 1\.5 · Cloud/);
-  assert.equal(f.submitted.at(-1).profileId, 'cloud-video');
+  // No automatic fallback: the reply says local video is unavailable and that Grok can be asked for.
+  for (const args of [{ kind: 'video', prompts: ['A wave'], count: 1 }, { kind: 'video', tier: 'fast', prompts: ['A wave'] }, { kind: 'video', request: 'A cloud over the sea' }]) {
+    const refused = await call(client, 'Generate', args);
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), /^Local video is unavailable right now: the video worker is offline\. Tell the user; they can ask for Grok/);
+  }
+  assert.equal(f.submitted.length, 0);
+  // Asked for by name, the cloud runs: the profile is marked remote.
+  const asked = data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'], count: 1 }));
+  assert.deepEqual(asked.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
   assert.equal(f.submitted.at(-1).referenceAssets.length, 0, 'plain video is text only');
-  // A matching cloud tier wins, turbo falls back to Fast, and otherwise Standard.
-  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'fast', prompts: ['A wave'], count: 1 })).profile.id, 'cloud-video-fast');
-  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'], count: 1 })).profile.id, 'cloud-video-fast');
-  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 })).profile.id, 'cloud-video');
-  // An explicit profile stays explicit: the local profile is not ready, so it fails clearly.
+  // Words that ask for Grok or the cloud allow it, and the tier then chooses within it.
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'fast', request: 'A wave, made with Grok', exact_prompt: true })).profile.id, 'cloud-video-fast');
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', tier: 'standard', request: 'A wave in the cloud', exact_prompt: true })).profile.id, 'cloud-video');
+  // An explicit local profile stays explicit: it is not ready, so it fails clearly.
   await f.profiles(videoCatalogue(false).concat({ ...structuredClone(localFirstFrame), ready: false }));
   await failure(client, 'Generate', { profile_id: 'fl-fast', prompts: ['A wave'] });
-  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video', 'cloud-video-fast', 'cloud-video-fast', 'cloud-video']);
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video', 'cloud-video-fast', 'cloud-video']);
 });
 
-test('Reuse animates an image on a cloud profile while the local video worker is off', async t => {
+test('Reuse animates on the cloud only when asked while the local video worker is off', async t => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   const client = await f.client();
   data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
   finish(f);
-  const animation = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
-  const animated = data(animation);
-  assert.deepEqual(animated.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
-  assert.match(texts(animation), /cloud profile Cloud Video 1\.5 · Cloud/);
+  const refused = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /^Local video is unavailable right now/);
+  const animation = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', request: 'animate it with Grok' });
+  // Without a tier, the fastest cloud profile that takes the image.
+  assert.deepEqual(data(animation).profile, { id: 'cloud-video-fast', label: 'Cloud Video · Fast · Cloud', tier: 'fast', remote: true });
   const body = f.submitted.at(-1);
-  assert.equal(body.profileId, 'cloud-video');
+  assert.equal(body.profileId, 'cloud-video-fast');
   assert.equal(body.referenceAssets.length, 1);
   assert.ok(f.assets.has(body.referenceAssets[0].assetId), 'the image was uploaded as the starting frame');
-  assert.equal(data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'fast' })).profile.id, 'cloud-video-fast');
+  assert.equal(data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'standard', request: 'on Grok' })).profile.id, 'cloud-video');
 });
 
-test('video stays local while the worker is up, and without cloud access keeps the usual error', async t => {
+test('video stays local while the worker is up, and a plain request never reaches the cloud', async t => {
   const tokens = { 'restricted-account-token-long-enough-for-the-fixture': 'restricted', 'full-account-token-that-is-long-enough-for-fixture': 'full' };
   const accounts = Object.fromEntries(Object.entries(tokens).map(([token, userId]) => [token, { userId, role: 'user', authenticated: true, generationProfiles: [], features: {} }]));
   const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => accounts[value] || null });
   const visibleTo = (authorization, profile) => !String(authorization).includes('restricted') || profile.family !== 'grok';
   await f.profiles(videoCatalogue(), { defaults: { image: imageProfile.id, video: videoProfile.id }, visibleTo, videoAvailable: true });
   const full = await f.client('', Object.keys(tokens)[1]);
+  // A cloud default still never wins a plain request while the worker is up.
+  await f.profiles(videoCatalogue(), { defaults: { image: imageProfile.id, video: 'cloud-video' }, visibleTo, videoAvailable: true });
+  assert.equal(data(await call(full, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 })).profile.id, 'fl-fast');
   const localResult = await call(full, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 });
   assert.deepEqual(data(localResult).profile, { id: videoProfile.id, label: 'Video · Quality · 20 Steps', tier: 'quality' });
   assert.doesNotMatch(texts(localResult), /cloud/);
@@ -1549,11 +1560,11 @@ test('video stays local while the worker is up, and without cloud access keeps t
   const restricted = await f.client('', Object.keys(tokens)[0]);
   const refused = await call(restricted, 'Generate', { kind: 'video', prompts: ['A wave'] });
   assert.equal(refused.isError, true);
-  assert.match(refused.content[0].text, /No ready video profile is available to this account\./);
+  assert.match(refused.content[0].text, /^Local video is unavailable right now/);
   data(await call(restricted, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
   finish(f);
   await failure(restricted, 'Reuse', { job_id: 'result 1', kind: 'video' });
-  assert.deepEqual(f.submitted.map(body => body.profileId), [videoProfile.id, 'fl-fast', imageProfile.id, 'fl-fast', imageProfile.id]);
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['fl-fast', videoProfile.id, 'fl-fast', imageProfile.id, 'fl-fast', imageProfile.id]);
 });
 
 /** A client in one LibreChat conversation, named by the header the gateway forwards. */
@@ -1937,14 +1948,14 @@ test('a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   const client = await f.client();
-  const first = data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] }));
+  const first = data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'] }));
   assert.equal(first.profile.remote, true);
   Object.assign(f.jobs.get(first.jobs[0].job_id), { status: 'error', error: 'CLIProxyAPI returned HTTP 401' });
   // The next cloud video reads the failed job first, so it queues nothing that would fail.
-  const refused = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] });
+  const refused = await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'] });
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /^Cloud video unavailable \(quota\)\. .*about 10 more minutes\. Tell the user video needs the local video worker/);
-  await failure(client, 'Reuse', { job_id: 'result 1', kind: 'video' });
+  await failure(client, 'Reuse', { job_id: 'result 1', kind: 'video', request: 'with Grok' });
   assert.equal(f.submitted.length, 1);
   assert.match(texts(await call(client, 'Result', { job_id: 'result 1' })), /^Cloud video unavailable \(quota\)\. Result 1 did not run/);
   assert.match(await (await fetch(localLink(f, first.jobs[0].link))).text(), /Cloud video unavailable \(quota\)\. This generation did not run\./);
@@ -1953,8 +1964,8 @@ test('a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   const now = Date.now();
   t.mock.method(Date, 'now', () => now + 11 * 60 * 1000);
   assert.match(texts(await call(client, 'Result', { job_id: 'result 1' })), /^Cloud video unavailable \(quota\)/);
-  assert.equal(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })).profile.id, 'cloud-video');
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'] })).profile.id, 'cloud-video');
   // Other failures are ordinary failures and do not pause cloud video.
   Object.assign(f.jobs.get(f.submitted.at(-1).clientJobId), { status: 'error', error: 'Prompt was moderated' });
-  assert.equal(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })).status, 'queued');
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', profile_id: 'cloud-video', prompts: ['A wave'] })).status, 'queued');
 });
