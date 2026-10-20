@@ -98,8 +98,8 @@ test('phone filter tools stay on screen and yield to create and reference sheets
     await reachable(page.getByLabel('Filter By Aspect Ratio', { exact: true }));
     await page.getByLabel('Filter By Model', { exact: true }).scrollIntoViewIfNeeded();
     await reachable(page.getByLabel('Filter By Model', { exact: true }));
-    await panel.getByRole('button', { name: 'Show Hidden', exact: true }).scrollIntoViewIfNeeded();
-    await reachable(panel.getByRole('button', { name: 'Show Hidden', exact: true }));
+    await panel.getByRole('button', { name: 'Starred', exact: true }).scrollIntoViewIfNeeded();
+    await reachable(panel.getByRole('button', { name: 'Starred', exact: true }));
     await page.keyboard.press('Escape');
   }
   await page.setViewportSize({ width: 390, height: 844 });

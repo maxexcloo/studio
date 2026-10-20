@@ -6,7 +6,7 @@ import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, EyeOff, GalleryHorizontalEnd, Info, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, GalleryHorizontalEnd, Info, Library, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { scopedStorageKey } from './api';
 import { cn, nearTextLimit, type GenerationDetailSection } from './format';
@@ -36,10 +36,6 @@ import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, DetailsShortcuts, PromptReadout, settingsText } from './ViewerActions';
 
-import { HiddenLockScreen, HiddenUnlockSheet } from './HiddenLock';
-import { HiddenSetupDialog } from './HiddenSetup';
-import { HiddenActionsContext } from './hiddenContext';
-import { LockMark } from './LockMark';
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
 import { MediaModeToggle } from './ComposerModeSelect';
@@ -65,7 +61,6 @@ import { GallerySearchBar, SearchEmpty, useGallerySearchKeys } from './GallerySe
 import { canStar, emptySearch, FavoriteContext, searchActive, type GallerySearch } from './favorites';
 import { refreshPrompts, usePromptHistory } from './recentPrompts';
 import type { GalleryItem } from './types';
-import type { HiddenState } from './useHidden';
 import { memoLatest } from '@/lib/memo-latest';
 
 // App rebuilds every prop on each render (a keystroke in the prompt, a poll);
@@ -136,7 +131,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
@@ -147,42 +142,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
   const searchOn = searchActive(gallerySearch);
   const [searchOpen, setSearchOpen] = React.useState(false);
-  const hidden = view.hidden as HiddenState;
-  // Hidden, locked (or mid-unlock): the lock takes the gallery's place.
-  const hiddenLocked = hiddenSpace && (!hidden.unlocked || hidden.unlockStage === "opening");
-  // Stable across renders, so the memoised tiles do not all redraw when anything changes.
-  const hideRef = React.useRef(hideItems);
-  const unhideRef = React.useRef(unhideItems);
-  hideRef.current = hideItems;
-  unhideRef.current = unhideItems;
-  const hiddenRef = React.useRef(hidden);
-  hiddenRef.current = hidden;
-  const hiddenActions = React.useMemo(() => ({
-    space: hidden.space,
-    enabled: hidden.enabled,
-    unlocked: hidden.unlocked,
-    hide: (items: GalleryItem[]) => hideRef.current(items),
-    unhide: (items: GalleryItem[]) => unhideRef.current(items),
-    unlock: () => {
-      const current = hiddenRef.current;
-      // Straight from the click, so the system's Touch ID sheet is allowed to show.
-      if (current.usablePasskey && current.support?.available) current.unlockBiometric();
-      else current.requestUnlock(null);
-    }
-  }), [hidden.space, hidden.enabled, hidden.unlocked]);
-  // Crossing between the gallery and Hidden (or unlocking) fades the stage in anew.
-  // Two identical animations, alternated, so each crossing restarts it.
-  const passageKey = `${hidden.space}|${hiddenLocked ? "shut" : "open"}`;
-  const passage = React.useRef({ key: passageKey, count: 0 });
-  if (passage.current.key !== passageKey) passage.current = { key: passageKey, count: passage.current.count + 1 };
-  const passageClass = passage.current.count ? `hidden-pass-${passage.current.count % 2 ? "a" : "b"}` : null;
-  const toggleHiddenSpace = () => {
-    if (hiddenSpace) { hidden.setSpace("gallery"); return; }
-    hidden.setSpace("hidden");
-    if (!hidden.enabled) { hidden.ensureReady({ kind: "enter" }); return; }
-    // Straight from the click, so the system's Touch ID sheet is allowed to show.
-    if (!hidden.unlocked && hidden.usablePasskey && hidden.support?.available) hidden.unlockBiometric();
-  };
   // Phones get the simplified phone studio, unless someone chose the full one.
   const phoneDevice = usePhone();
   const phone = phoneDevice && !prefs.fullStudioOnPhone;
@@ -268,14 +227,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       open={historyOpen && !phone}
       onClose={(reason) => { setHistoryOpen(false); if (reason === "escape") (historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : zenPromptRef.current as HTMLTextAreaElement | null)?.focus(); }}
       onPick={insertPrompt}
-      hiddenSpace={Boolean(hiddenSpace)}
       onError={(message) => showToast(message, "error")}
     />
   );
   const [phoneCreate, setPhoneCreate] = React.useState(false);
   const [animationItems, setAnimationItems] = React.useState<GalleryItem[] | null>(null);
-  // Selecting several, in either layout. A change of layout, privacy domain or filtered view ends it.
-  const selection = useGallerySelection(renderedGallery, JSON.stringify([phone, hiddenSpace, hiddenLocked, mode, gallerySearch]));
+  // Selecting several, in either layout. A change of layout or filtered view ends it.
+  const selection = useGallerySelection(renderedGallery, JSON.stringify([phone, mode, gallerySearch]));
   useHistoryDismiss(Boolean(phone && selection.selecting), selection.end);
   // A long press selects: the item's actions live in the viewer and the select bar.
   const startSelection = React.useRef(selection.start);
@@ -291,7 +249,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     setSearchOpen(true);
     document.querySelector<HTMLInputElement>('.gallery-search input, .phone-searchbar input')?.focus();
   }, []);
-  useGallerySearchKeys(!prefs.zenMode && !hiddenLocked, openSearch);
+  useGallerySearchKeys(!prefs.zenMode, openSearch);
   // The viewer stars with F, as the tile's star and the dock's do.
   React.useEffect(() => {
     if (!active || !canStar(active)) return;
@@ -351,8 +309,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         if (phoneRef.current) { live().setActive(null); setPhoneCreate(true); }
       } : undefined,
       animate: canAnimate ? (item) => setAnimationItems([item]) : undefined,
-      hide: (item) => live().hideItems([item]),
-      unhide: (item) => live().unhideItems([item]),
       remove: (item) => live().deleteItem(item),
       star: (item) => live().toggleFavorite([item], !item.favorite),
       starItems: (items, favorite) => live().toggleFavorite(items, favorite),
@@ -363,12 +319,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       retryItems: (items) => { void (async () => { for (const item of items) await live().failureFixes?.retry(item); })(); },
     };
   }, [smartUpscale, canUseStartImage, canAnimate]);
-  const hiddenCount = hiddenSpace ? renderedGallery.filter((item: GalleryItem) => item.status === "done").length : 0;
-  const hiddenLockScreen = (
-    <AnimatePresence>
-      {hiddenLocked ? <HiddenLockScreen key="lock" hidden={hidden} onLeave={() => hidden.setSpace("gallery")} onSetup={() => hidden.ensureReady({ kind: "enter" })} /> : null}
-    </AnimatePresence>
-  );
   const comfyOffline = comfyStatus && !comfyStatus.connected && !comfyStatus.checking;
   // Back closes the viewer and the workflow gallery rather than leaving the app.
   useHistoryDismiss(Boolean(active), () => setActive(null));
@@ -408,13 +358,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const starterModels = (
     <StarterModels showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} />
   );
-  // Leaving Hidden setup to pick the output folder comes back to setup afterwards.
-  const resumeHiddenSetup = React.useRef(false);
-  React.useEffect(() => {
-    if (settings || !resumeHiddenSetup.current) return;
-    resumeHiddenSetup.current = false;
-    if (!hidden.enabled) hidden.setSetupOpen(true);
-  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps
   // A run opened from somewhere other than its stack (zen, a phone's sheet) is scrolled to once laid out.
   const [focusRun, setFocusRun] = React.useState("");
   const [runSheet, setRunSheet] = React.useState<Run | null>(null);
@@ -442,9 +385,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const watchingGeneration = active ? active.status === "pending" : prefs.zenMode ? zenDisplayItem?.status === "pending" : pendingTileOnScreen;
   const generationActivity = useGenerationActivity({
     items: visibleGallery || [],
-    enabled: !phone && !hiddenLocked,
+    enabled: !phone,
     watching: watchingGeneration,
-    reveal: (item) => !item.privateVault || hiddenSpace,
+    reveal: () => true,
     onJump: (item) => {
       if (active) setActive(null);
       if (prefs.zenMode) { selectZenItem(item.id); return; }
@@ -539,30 +482,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : null}
     </div>
   );
-  const hiddenBar = (
-    <AnimatePresence>
-      {hiddenSpace && !hiddenLocked ? (
-        <motion.div
-          key="hidden-bar"
-          className="hidden-bar"
-          initial={{ opacity: 0, y: -10, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -8, scale: 0.97 }}
-          transition={{ type: "spring", duration: 0.4, bounce: 0.1 }}
-        >
-          <Tip content="Back to the Gallery"><button type="button" data-hidden-exit className="hidden-bar-back" aria-label="Back to the Gallery" onClick={toggleHiddenSpace}><ArrowLeft size={14} /></button></Tip>
-          <span className="hidden-bar-title"><LockKeyhole size={13} /> Hidden{hiddenCount ? <i><AnimatedNumber value={hiddenCount} /></i> : null}</span>
-          <Tip content="Lock Hidden"><button type="button" className="hidden-bar-lock" onClick={() => hidden.lock(true)}><Lock size={12} /> Lock</button></Tip>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
   // The gallery, its empty and offline stages and the lock: the same in every layout.
   const galleryBody = (
     <>
-          {hiddenLocked || galleryCrossing ? <section className="gallery" /> : !galleryLoaded ? <section className="gallery virtual-gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}><GallerySkeleton columns={galleryColumnCount} /></section> : renderedGallery.length ? (
+          {galleryCrossing ? <section className="gallery" /> : !galleryLoaded ? <section className="gallery virtual-gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}><GallerySkeleton columns={galleryColumnCount} /></section> : renderedGallery.length ? (
             <StableGallery
-              key={`${hiddenSpace ? "hidden" : "gallery"}:${mode}`}
+              key={mode}
               cancelJob={cancelJob}
               groups={galleryGroups}
               moments={features.moments && prefs.showMoments}
@@ -591,15 +516,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               titleFromPrompt={titleFromPrompt}
             />
           ) : searchOn ? (
-            <SearchEmpty search={gallerySearch} hiddenSpace={Boolean(hiddenSpace)} onClear={() => { setGallerySearch(emptySearch); setSearchOpen(false); }} />
-          ) : hiddenSpace && !comfyOffline ? (
-            <section className="gallery"><div className="empty stage-empty hidden-empty">
-              <div className="stage-mark"><LockMark className="stage-layer" stage="open" /></div>
-              <div className="stage-copy">
-                <h2>Nothing Hidden Yet</h2>
-                <p>Generate here, or hide images from the gallery with <EyeOff size={13} className="inline-icon" />.</p>
-              </div>
-            </div></section>
+            <SearchEmpty search={gallerySearch} onClear={() => { setGallerySearch(emptySearch); setSearchOpen(false); }} />
           ) : (
             <EmptyStage
               known={Boolean(comfyStatus?.checked)}
@@ -617,9 +534,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               starter={mode === "image" ? starterModels : undefined}
             />
           )}
-            {hiddenLockScreen}
-          {renderedGallery.length && !hiddenLocked ? <ConnectedCard at={comfyReconnectedAt} device={comfyStatus?.device} /> : null}
-            {galleryLoaded && hasMoreGallery && !hiddenSpace ? (
+          {renderedGallery.length ? <ConnectedCard at={comfyReconnectedAt} device={comfyStatus?.device} /> : null}
+            {galleryLoaded && hasMoreGallery ? (
               <button className="gallery-load-more" onClick={loadMoreGalleryItems}>
                 Load more
               </button>
@@ -632,7 +548,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
-              <PromptField kind="positive" value={prompt} textareaRef={zenPromptRef} ariaLabel={hiddenSpace ? "Prompt (Hidden)" : "Prompt"} onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
+              <PromptField kind="positive" value={prompt} textareaRef={zenPromptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
               <div className="composer-primary-actions" ref={setComposerPrimaryTarget} />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
@@ -696,7 +612,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               setCount={setCount}
               loraActiveCount={loraActiveCount}
               loraSummary={loraSummary}
-              hiddenSpace={Boolean(hiddenSpace)}
               lorasOpen={lorasOpen}
               onOpenLoras={() => setLorasOpen(open => !open)}
               canUseNegativePrompt={canUseNegativePrompt}
@@ -737,13 +652,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
 
   return (
     <GenerationPreviewMode.Provider value={prefs.generationPreviewMode}>
-    <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <ItemActionsContext.Provider value={itemActionHandlers}>
     <GallerySelectionContext.Provider value={selection}>
     <FavoriteContext.Provider value={toggleFavorite}>
     <GenerationProfiles.Provider value={models?.profiles || noProfiles}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
+    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", (searchOpen || searchOn) && "is-searching")} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -751,8 +665,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           galleryBody={galleryBody}
           canUseNegativePrompt={canUseNegativePrompt}
           comfyOffline={Boolean(comfyOffline)}
-          hiddenLocked={Boolean(hiddenLocked)}
-          toggleHiddenSpace={toggleHiddenSpace}
           createOpen={phoneCreate}
           setCreateOpen={setPhoneCreate}
           selection={selection}
@@ -760,7 +672,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : prefs.zenMode ? (
         <>
           <div className="zen-stage">
-            {hiddenLocked ? null : zenDisplayItem?.run ? (
+            {zenDisplayItem?.run ? (
               <RunCard key={zenDisplayItem.run.id} run={zenDisplayItem.run} onOpen={() => showRunInGallery(zenDisplayItem.run)} />
             ) : zenDisplayItem ? (
               <button
@@ -791,17 +703,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <div className="zen-empty skeleton-stage">
                 <Skeleton className="skeleton-logo" />
               </div>
-            ) : hiddenSpace ? (
-              <div className="zen-empty hidden-empty">
-                <div className="stage-mark"><LockMark className="stage-layer" stage="open" /></div>
-                <p>Nothing Hidden Yet</p>
-              </div>
             ) : (
               <div className="zen-empty">
                 <img src="/heiss-mark-white.svg" alt="Studio" />
               </div>
             )}
-            {hiddenLockScreen}
             <div className="zen-fade" />
             <div className="bottom-fade" />
           </div>
@@ -822,9 +728,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             </button></Tip>
           ) : null}
           {studioDock}
-          {hiddenBar}
           {composer}
-          {zenGallery.length && zenGalleryOpen && !hiddenLocked ? (
+          {zenGallery.length && zenGalleryOpen ? (
             <div data-open-surface className="zen-gallery-wrap">
               <Tip content="Hide Gallery"><button className="zen-gallery-toggle" aria-label="Hide Gallery" onClick={() => setZenGalleryOpen(false)}><ChevronUp size={16} /></button></Tip>
               {zenGallery[0]?.id !== zenItem?.id ? <Tip content="Jump to latest output"><button className="zen-latest" onClick={goLatestZen}>Latest</button></Tip> : null}
@@ -844,11 +749,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
-          {hiddenBar}
           {composer}
         </>
       )}
@@ -884,8 +788,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         showToast={showToast}
       />
       <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />
-      <HiddenSetupDialog hidden={hidden} comfyOnline={Boolean(comfyStatus?.connected)} comfyUrl={health?.comfyUrl} onRecheck={refreshComfyStatus} onDone={() => { if (!hidden.intent || hidden.intent.kind === "enter") hidden.setSpace("hidden"); }} onChooseFolder={() => { resumeHiddenSetup.current = true; hidden.setSetupOpen(false); openSettings("library"); }} />
-      <HiddenUnlockSheet hidden={hidden} />
       {active ? (() => {
         const hasNeighbors = ((view.viewerGallery || []) as GalleryItem[]).length > 1;
         // What made this output, at the top of its preview: the profile it ran
@@ -1038,7 +940,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </GallerySelectionContext.Provider>
     </ItemActionsContext.Provider>
     </TileLongPressContext.Provider>
-    </HiddenActionsContext.Provider>
     </GenerationPreviewMode.Provider>
   );
 }

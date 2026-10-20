@@ -7,7 +7,7 @@ import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X } from 'lucide-react';
+import { ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -50,19 +50,17 @@ import { hasAccountStorageScope } from './api';
 
 /* ------------------------------------------------------------ The shell */
 
-export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, selection }: {
+export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, createOpen, setCreateOpen, selection }: {
   view: Record<string, any>;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
   comfyOffline: boolean;
-  hiddenLocked: boolean;
-  toggleHiddenSpace: () => void;
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
   selection: GallerySelection;
 }) {
   const {
-    prompt, hiddenSpace, runningCount, comfyStatus, retryComfyStatus, mode, changeMode,
+    prompt, runningCount, comfyStatus, retryComfyStatus, mode, changeMode,
     galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, showToast
   } = view;
   const gallery = (visibleGallery || []) as GalleryItem[];
@@ -133,7 +131,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const setSearchOpen = view.setPhoneSearchOpen as (open: boolean) => void;
   const expanded = searchOpen ? 'search' : filtersOpen ? 'filters' : '';
   const queryCount = gallerySearch.q.trim() ? 1 : 0;
-  const filterCount = filterCountOf(gallerySearch) + Number(Boolean(hiddenSpace));
+  const filterCount = filterCountOf(gallerySearch);
   const searchRef = React.useRef(gallerySearch);
   searchRef.current = gallerySearch;
   // Closing clears: the query and every filter go with the row.
@@ -164,7 +162,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     if (barRef.current) observer.observe(barRef.current);
     if (dockRef.current) observer.observe(dockRef.current);
     return () => observer.disconnect();
-  }, [selecting, hiddenLocked]);
+  }, [selecting]);
   React.useEffect(() => () => { document.documentElement.style.removeProperty('--phone-bar-h'); document.documentElement.style.removeProperty('--phone-dock-h'); }, []);
   const restarting = Boolean(comfyStatus?.restarting);
   const connected = Boolean(comfyStatus?.connected);
@@ -189,10 +187,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             <span />
           </button>
           <div className="phone-title">
-            {hiddenSpace ? <button type="button" className="phone-icon" aria-label="Back to the Gallery" onClick={toggleHiddenSpace}><ArrowLeft size={20} /></button> : null}
             <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
-              {hiddenSpace ? <LockKeyhole size={16} className="phone-ember" /> : null}
-              <span>{hiddenSpace ? 'Hidden' : 'Gallery'}</span>
+              <span>Gallery</span>
             </button>
             {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
               <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
@@ -221,9 +217,9 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {!selecting ? (
         // Bottom-up: what a thumb reaches for most sits in one dock above the home indicator.
         <nav ref={dockRef} className="phone-dock" aria-label="Gallery Controls">
-          <PhoneGalleryTools expanded={hiddenLocked && expanded === 'search' ? '' : expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} hiddenSpace={Boolean(hiddenSpace)} onToggleHidden={toggleHiddenSpace} />
-          {!hiddenLocked ? (
-            <div className={cn('phone-create-pill', hiddenSpace && 'is-hidden')}>
+          <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />
+          {(
+            <div className="phone-create-pill">
               <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
                 <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() || 'Prompt...'}</strong>
               </button>
@@ -237,10 +233,10 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
                 {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
               </button>
             </div>
-          ) : null}
+          )}
           <div className="phone-dock-row">
             <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false}  />
-            {!hiddenLocked ? <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} /> : null}
+            <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
             <span className="phone-dock-gap" />
             <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
@@ -249,7 +245,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
-      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => {
+      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={selectable.length ? () => {
         // Clearing the search changes the view, which ends a selection: start once that has landed.
         const cleared = searchActive(searchRef.current);
         closeTools();
@@ -290,7 +286,7 @@ function practicalStepRange(profile: Profile | null | undefined, meta: { min?: n
 
 function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }: { view: Record<string, any>; open: boolean; onClose: () => void; canUseNegativePrompt: boolean; comfyOffline: boolean }) {
   const {
-    prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile, hiddenSpace,
+    prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
@@ -329,7 +325,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       onClose={onClose}
       full
       className="phone-create"
-      title={hiddenSpace ? <span className="phone-title-inline"><LockKeyhole size={16} className="phone-ember" /> Create in Hidden</span> : 'Create'}
+      title="Create"
       footer={
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
@@ -354,7 +350,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     >
       <div className="phone-compose">
         <ReferenceSlots
-          scope={`${mode}:${view.model}:${hiddenSpace}`}
+          scope={`${mode}:${view.model}`}
           inputs={referenceInputs || []}
           referenceWith={view.referenceWith}
           openRequest={view.referenceOpenRequest}
@@ -386,7 +382,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <PromptField kind="positive" value={prompt} ariaLabel={hiddenSpace ? 'Prompt (Hidden)' : 'Prompt'} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+        <PromptField kind="positive" value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
         {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
       </div>
       <PromptHistorySheet
@@ -628,7 +624,7 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
 /* ------------------------------------------------------------ More */
 
 function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void; statusText: string }) {
-  const { prefs, setPrefs, hidden, retryComfyStatus, comfyRetrying } = view;
+  const { prefs, setPrefs, retryComfyStatus, comfyRetrying } = view;
   const [signingOut, setSigningOut] = React.useState(false);
   const toggle = (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => (
     <label className="phone-row">
@@ -643,14 +639,6 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
         <button type="button" className="phone-row" onClick={retryComfyStatus}>
           <RefreshCw size={20} className={cn(comfyRetrying && 'spin')} /><span>{statusText}<small>Tap to check again</small></span>
         </button>
-      </div>
-      <h3 className="phone-section">Hidden</h3>
-      <div className="phone-group">
-        {!hidden.enabled
-          ? <p className="phone-note">Set up Hidden on the computer running Studio, in Settings › Hidden. Then unlock it here with its password.</p>
-          : hidden.unlocked
-            ? <button type="button" className="phone-row" onClick={() => { hidden.lock(); onClose(); }}><LockKeyhole size={20} /><span>Lock Hidden<small>Also locks when idle</small></span></button>
-            : <button type="button" className="phone-row" onClick={() => { onClose(); hidden.requestUnlock(null); }}><LockKeyhole size={20} /><span>Unlock Hidden</span></button>}
       </div>
       <h3 className="phone-section">Gallery</h3>
       <div className="phone-group phone-gallery-options">

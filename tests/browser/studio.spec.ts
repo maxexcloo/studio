@@ -731,7 +731,6 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   const bar = ui.selectionBar;
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
   await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  await expect(bar.getByRole('button', { name: 'Move to Hidden', exact: true })).toHaveCount(0);
   await page.locator('[data-tile-id="image-0"] .tile').click();
   await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();
   await expect(bar.getByRole('button', { name: 'Download', exact: true })).toBeDisabled();

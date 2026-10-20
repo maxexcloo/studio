@@ -2,7 +2,7 @@ import { imageDimension } from './generationOptions';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, EyeOff, CircleDotDashed, Film, Images, Layers, Plus, ChevronUp, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, ChevronUp, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
@@ -24,7 +24,7 @@ import type { SideLimits } from './sizing';
    Priority (largest kept longest): model > private > aspect > images > steps.
 --------------------------------------------------------------------------- */
 
-type ControlId = "workflow" | "private" | "negative" | "aspect" | "steps" | "variants" | "lora";
+type ControlId = "workflow" | "negative" | "aspect" | "steps" | "variants" | "lora";
 type Demotion = ControlDensity | "drawer";
 
 const LADDER: Array<[ControlId, Demotion]> = [
@@ -36,7 +36,6 @@ const LADDER: Array<[ControlId, Demotion]> = [
   ["steps", "mini"],
   ["variants", "mini"],
   ["aspect", "mini"],
-  ["private", "compact"],
   ["workflow", "compact"],
   ["steps", "drawer"],
   ["lora", "drawer"],
@@ -44,15 +43,14 @@ const LADDER: Array<[ControlId, Demotion]> = [
   ["aspect", "drawer"],
   ["workflow", "mini"],
 ];
-/* Note: workflow and private never reach the drawer - they are the top of the
-   hierarchy, and an icon-only pair plus a mini workflow chip still fits a
-   320px screen. */
+/* Note: workflow never reaches the drawer - it is the top of the hierarchy,
+   and a mini workflow chip still fits a 320px screen. */
 
 type Plan = Record<ControlId, { density: ControlDensity; drawer: boolean }>;
 
 function planForLevel(level: number): Plan {
   const plan = {} as Plan;
-  (["workflow", "private", "negative", "aspect", "steps", "variants", "lora"] as ControlId[])
+  (["workflow", "negative", "aspect", "steps", "variants", "lora"] as ControlId[])
     .forEach((id) => { plan[id] = { density: "full", drawer: false }; });
   for (let index = 0; index < Math.min(level, LADDER.length); index += 1) {
     const [id, to] = LADDER[index];
@@ -185,19 +183,6 @@ function GenerateButton({ children, className, disabled, blocked, busy, onClick,
   );
 }
 
-/** Where this generation lands, shown only in Hidden: a quiet ember chip, not a switch. */
-function HiddenChip({ density = "full" }: { density?: ControlDensity }) {
-  return (
-    <Tip content="New images go into Hidden">
-      <span className={cn("hidden-chip", density !== "full" && `is-density-${density}`)} role="status" aria-label="Generating into Hidden">
-        {/* Eye-off, as on Hide: "this lands out of sight". The dock's lock is the place itself. */}
-        <EyeOff size={12} strokeWidth={2.2} aria-hidden="true" />
-        {density === "full" ? <span>Hidden</span> : null}
-      </span>
-    </Tip>
-  );
-}
-
 export type ComposerBarProps = {
   models: unknown;
   model: string;
@@ -258,7 +243,6 @@ export type ComposerBarProps = {
   loraActiveCount: number;
   /** The active stack in a few words ("Film Grain +1"), shown on the closed composer. */
   loraSummary?: string;
-  hiddenSpace: boolean;
   lorasOpen?: boolean;
   onOpenLoras?: () => void;
   canUseNegativePrompt: boolean;
@@ -298,7 +282,7 @@ export function ComposerBar(props: ComposerBarProps) {
     aspectPickerValue, aspectOptions, aspectValue, defaultAspectSize, applyAspect, sizeTier = "none", sizeTiers, sizeArea = 0, megapixelControl = null, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
     customSize, aspectLocked = false, width, widthMeta, setWidth, height, heightMeta, setHeight,
     steps, stepsMeta, setSteps, count, countMeta, setCount, loraActiveCount, loraSummary = "",
-    hiddenSpace, lorasOpen = false, onOpenLoras,
+    lorasOpen = false, onOpenLoras,
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
     referenceInputs = [], referenceWith = null, referenceOpenRequest = 0, referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
@@ -309,7 +293,7 @@ export function ComposerBar(props: ComposerBarProps) {
   const countLabel = mode === "video" ? "Videos" : "Images";
   const displayCount = showVariants ? count : 1;
   const workflowName = currentProfile?.displayName || currentProfile?.label || "";
-  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, hiddenSpace, canUseNegativePrompt, Boolean(models), pinnedSeed.trim(), Boolean(primaryTarget)].join("|");
+  const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, canUseNegativePrompt, Boolean(models), pinnedSeed.trim(), Boolean(primaryTarget)].join("|");
   const { rowRef, plan, level } = useDensityLevel(contentKey);
   useComposerHeightVar(rowRef);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -367,11 +351,8 @@ export function ComposerBar(props: ComposerBarProps) {
     </Tip>
   ) : null;
 
-  const privateToggle = (density: ControlDensity) => hiddenSpace ? <HiddenChip density={density} /> : null;
-
   const CONTROLS: Array<[ControlId, string, (density: ControlDensity) => React.ReactNode]> = [
     ["workflow", "Model", workflowPicker],
-    ["private", "Hidden", privateToggle],
     ["aspect", "Aspect Ratio", aspectPicker],
     ["steps", "Steps", stepsPicker],
     ["variants", countLabel, variantsPicker],
@@ -408,7 +389,7 @@ export function ComposerBar(props: ComposerBarProps) {
     <>
       {primaryTarget ? createPortal(submitActions, primaryTarget) : null}
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
-      <ReferenceSlots scope={`${mode}:${model}:${hiddenSpace}`} inputs={referenceInputs} referenceWith={referenceWith} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
+      <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} referenceWith={referenceWith} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
       <AnimatePresence initial={false}>
         {drawerOpen && tucked.length ? (
         <motion.div
@@ -439,7 +420,6 @@ export function ComposerBar(props: ComposerBarProps) {
       <div className="zen-prompt-actions" ref={rowRef} data-density-level={level}>
         <div className="prompt-left-actions" data-fluid-group>
           {onModeChange ? <ComposerModeSelect mode={mode} onChange={onModeChange} /> : null}
-          {inline("private", privateToggle)}
           {pinnedSeed.trim() && onRandomSeed ? (
             <Tip content={`Every run uses seed ${pinnedSeed.trim()}. Click for a random seed.`}>
               <button type="button" className="seed-chip" aria-label={`Seed ${pinnedSeed.trim()} is fixed. Use a random seed`} onClick={onRandomSeed}>

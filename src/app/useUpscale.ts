@@ -26,7 +26,7 @@ export function upscaledWithRun(item: GalleryItem) {
 
 export function canUpscaleItem(item: GalleryItem) {
   // Images added from another folder stay where they are, so there is nothing to upscale into.
-  return item.status === "done" && (item.type === "image" || (item.type === "video" && !item.privateVault)) && !item.vaultLocked && !item.library && Boolean(item.url) && !upscaledWithRun(item);
+  return item.status === "done" && (item.type === "image" || item.type === "video") && !item.library && Boolean(item.url) && !upscaledWithRun(item);
 }
 
 /**
@@ -220,10 +220,6 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
       const before = seen.get(item.id);
       if (before === "running" && now === "error") {
         setNotice(item.id, { reason: "failed", title: noticeTitles.failed, message: item.upscale?.error || "ComfyUI stopped the upscale. Check its window for details." });
-      }
-      // Sealed into Hidden, but ComfyUI's own copy is still readable where HEISS UI could not reach it.
-      if (before === "running" && now === "done" && item.upscale?.leftBehind) {
-        showToast("Upscaled in Hidden. ComfyUI’s copy is still in its output folder (heiss-ui). If ComfyUI runs on this computer, set that folder in Settings › Library to remove these copies.", "warning");
       }
       seen.set(item.id, now);
     }

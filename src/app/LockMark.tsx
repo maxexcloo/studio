@@ -3,16 +3,16 @@ import { SCENE_CELL, ease, fillRects, useCellScene } from './cellScene';
 import { OFFLINE_GRID } from './OfflineMark';
 
 /**
- * Hidden's mark: a pixel padlock in the same cell mosaic and grid as the
- * offline plug and the empty canvas, so Hidden's lock screen and empty state
- * sit in the gallery the way those do. One glyph, a quiet field, heat only
+ * The sign-in mark: a pixel padlock in the same cell mosaic and grid as the
+ * offline plug and the empty canvas, so the sign-in screen sits in the
+ * gallery the way those do. One glyph, a quiet field, heat only
  * where something happens:
  *
  * - locked: gray and closed, the keyhole breathing ember.
  * - asking: a warm scan line passes over the lock while the system asks.
  * - opening: the shackle springs up, the body flashes warm and cools to white.
  * - failed: a short shiver and a dull red keyhole.
- * - open: Hidden with nothing in it yet, the shackle up and at rest.
+ * - open: the shackle up and at rest.
  */
 
 export type LockMarkStage = 'locked' | 'asking' | 'opening' | 'failed' | 'open';

@@ -7,12 +7,12 @@ import { SafeImg } from './SafeImg';
 import type { GalleryItem, Profile } from './types';
 
 export function canAnimatePhoto(item: GalleryItem) {
-  return item.status === 'done' && item.type === 'image' && Boolean(item.url) && !item.vaultLocked && !item.library;
+  return item.status === 'done' && item.type === 'image' && Boolean(item.url) && !item.library;
 }
 
 /** A finished video can be extended: its last frame starts a new video. */
 export function canExtendVideo(item: GalleryItem) {
-  return item.status === 'done' && item.type === 'video' && Boolean(item.url) && !item.vaultLocked && !item.library;
+  return item.status === 'done' && item.type === 'video' && Boolean(item.url) && !item.library;
 }
 
 /** Ready MiniMax H3 video profiles that start from a single image. */
@@ -78,7 +78,6 @@ export function AnimatePhotos({ items, profiles, autoResizeInputs, onClose }: {
               count: 1,
               kind: 'video',
               model: profile.model,
-              privateVault: Boolean(draft.item.privateVault),
               profileId: profile.id,
               prompt: draft.prompt.trim(),
               referenceAssets: [{ slot: profile.mediaInputs!.find((input) => input.kind === 'image')!.id, assetId: asset.id }],

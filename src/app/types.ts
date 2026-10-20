@@ -21,7 +21,7 @@ export type MediaInput = {
 };
 export type ReferenceAsset = {
   id: string;
-  source: "upload" | "generation" | "vault";
+  source: "upload" | "generation";
   name: string;
   mime: string;
   width: number;
@@ -30,7 +30,6 @@ export type ReferenceAsset = {
   createdAt: string;
   thumbnailUrl: string;
   url?: string;
-  privacyDomain?: "gallery" | "vault";
   galleryItemId?: string;
 };
 export type SelectedReferenceAsset = { slot: string; asset: ReferenceAsset };
@@ -78,8 +77,6 @@ export type UpscaleState = {
   error?: string;
   startedAt?: string;
   completedAt?: string;
-  /** A Hidden item's upscale whose plaintext copy HEISS UI could not remove from ComfyUI's output folder. */
-  leftBehind?: boolean;
   /** Made as part of the run (Smart upscale's 2K / 4K): the picture itself, not a version to switch to. */
   withRun?: boolean;
   /** The run's upscale stopped or failed after the picture was saved, so the picture was kept without it. */
@@ -97,7 +94,7 @@ export type GenerationFailure = {
   /** What a retry after running out of memory may change. */
   retry?: { smaller?: boolean; tiledDecode?: boolean };
 };
-export type GalleryItem = Output & { failure?: GenerationFailure; id: string; jobId?: string; status: "done" | "pending" | "error" | "canceled"; progress?: Progress; preview?: string; width?: number; height?: number; createdAt?: string; durationMs?: number; timing?: RunTiming; model?: string; settings?: GenerationSettings; index?: number; referenceImage?: string; referenceImageName?: string; startImageId?: string; optimistic?: boolean; promptProtected?: boolean; privateVault?: boolean; vaultLocked?: boolean; thumbnailUrl?: string; upscale?: UpscaleState; upscaleActive?: boolean; /** A stacked run standing in for its outputs (zen's strip). */ run?: Run; /** Starred. */ favorite?: boolean; /** Added from another folder and shown where it is (server/library.js). */ library?: { folder: string; path: string } };
+export type GalleryItem = Output & { failure?: GenerationFailure; id: string; jobId?: string; status: "done" | "pending" | "error" | "canceled"; progress?: Progress; preview?: string; width?: number; height?: number; createdAt?: string; durationMs?: number; timing?: RunTiming; model?: string; settings?: GenerationSettings; index?: number; referenceImage?: string; referenceImageName?: string; startImageId?: string; optimistic?: boolean; promptProtected?: boolean; thumbnailUrl?: string; upscale?: UpscaleState; upscaleActive?: boolean; /** A stacked run standing in for its outputs (zen's strip). */ run?: Run; /** Starred. */ favorite?: boolean; /** Added from another folder and shown where it is (server/library.js). */ library?: { folder: string; path: string } };
 export type Job = { status: string; outputs: GalleryItem[]; error?: string; progress?: Progress; preview?: string; previews?: string[]; /** Its pictures were kept without their Smart upscale, and why, for a toast. */ kept?: string };
 export type TouchGesture =
   | { mode: "swipe"; id: number; x: number; y: number; dx: number; dy: number; axis: "x" | "y" | null; velocity: import("./viewerGesture").Velocity; moved: boolean }
@@ -313,8 +310,6 @@ export type Preferences = {
   /** Models whose first reference frames the output: edit that image, or only take it as a reference. */
   referenceRole?: ReferenceRole;
   upscaleFaceDetail: boolean;
-  /** Minutes untouched before Hidden locks itself; 0 leaves it to the session. */
-  hiddenAutoLockMinutes: number;
   /** Point out models in folders ComfyUI doesn’t read (sidebar notice, model menu, first-run dialog). */
   modelFolderHints: boolean;
   mobileZenDefaulted?: boolean;
@@ -322,8 +317,6 @@ export type Preferences = {
   fullStudioOnPhone?: boolean;
   /** Downloads and shares from the gallery leave out the prompt and workflow saved in the file. */
   shareWithoutSettings: boolean;
-  /** The same for Hidden; on unless turned off. */
-  hiddenShareWithoutSettings: boolean;
 };
 
 export type UpscaleModelInfo = { key: string; file: string; label: string; detail?: string; bytes: number; present: boolean; partialBytes: number };
@@ -376,19 +369,6 @@ export type UpscaleDownloadPreview = {
   remainingBytes: number;
   freeBytes: number | null;
   files: Array<{ key: string; file: string; label: string; detail?: string; bytes: number; partialBytes: number }>;
-};
-
-export type HiddenPasskey = { id: string; name?: string; kind?: "prf" | "device"; createdAt?: string; lastUsedAt?: string };
-/** Hidden, as this browser sees it. Locked, it learns nothing about what is inside. */
-export type PrivacyStatus = {
-  enabled: boolean;
-  unlocked: boolean;
-  cookieName?: string;
-  passkeys?: HiddenPasskey[];
-  vault?: { unlocked: boolean; revision: number };
-  readiness?: { outputDir: boolean; outputPath: string };
-  /** This browser is another device on the network, which has to unlock before anything else. */
-  remote?: boolean;
 };
 
 /** A models folder ComfyUI is not reading (server/model-folders.js). */

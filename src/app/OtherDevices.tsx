@@ -5,7 +5,6 @@ import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer } from './device';
 import { cn } from './format';
 import { SettingsDrawer } from './SettingsDrawer';
-import { passwordStrength } from './HiddenSetup';
 import { QrCode } from './QrCode';
 import { Skeleton } from './components';
 import type { ConfirmAction } from './useConfirmation';
@@ -91,7 +90,7 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
 }
 
 type DeviceSession = { id: string; label: string; createdAt: string; lastSeenAt: string; expiresAt: string; current: boolean };
-type AccessSettings = { adminFromDevices: boolean; studioPassword: { set: boolean; hidden: boolean }; devices: DeviceSession[] };
+type AccessSettings = { adminFromDevices: boolean; studioPassword: { set: boolean; hidden?: boolean }; devices: DeviceSession[] };
 
 type Pieces = {
   Group: React.ComponentType<React.PropsWithChildren<{ title?: string; note?: React.ReactNode; tone?: 'danger' }>>;
@@ -112,7 +111,14 @@ function ago(value: string) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-/** The studio password: set or changed here, typed twice like Hidden's, since devices can't reset it. */
+/** A rough 0–1 strength: length first, then the kinds of character used. */
+function passwordStrength(value: string) {
+  if (!value) return 0;
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/, /\s/].filter((pattern) => pattern.test(value)).length;
+  return Math.min(1, (value.length / 16) * 0.75 + (classes / 5) * 0.35);
+}
+
+/** The studio password: set or changed here, typed twice, since devices can't reset it. */
 function StudioPasswordRow({ access, onSaved, showToast, Row, Status }: { access: AccessSettings | null; onSaved: () => void; showToast: ShowToast } & Pick<Pieces, 'Row' | 'Status'>) {
   const atComputer = useAtComputer();
   const [editing, setEditing] = React.useState(false);
@@ -135,19 +141,17 @@ function StudioPasswordRow({ access, onSaved, showToast, Row, Status }: { access
     }
   };
   const canSave = password.length >= 8 && password === again && !busy;
-  const hint = !password ? 'At least 8 characters. Separate from the Hidden password; it only lets devices in.'
+  const hint = !password ? 'At least 8 characters. It only lets devices in.'
     : password.length < 8 ? `${8 - password.length} more character${8 - password.length === 1 ? '' : 's'}.`
     : again && again !== password ? 'The two don’t match yet.'
     : !again ? 'Type it again.'
     : passwordStrength(password) > 0.6 ? 'Strong enough.' : 'It works, but a longer one is safer.';
   const label = !state ? <Skeleton className="skeleton-text short" />
     : state.set ? <Status tone="ok">Studio password set</Status>
-    : state.hidden ? <Status tone="warn">Using the Hidden password</Status>
     : <Status tone="warn">No studio password</Status>;
   const description = !state ? undefined
     : !atComputer ? 'Other devices sign in with it. Set it on the computer running Studio.'
     : state.set ? 'Other devices sign in with it. Changing it signs every device out.'
-    : state.hidden ? 'Other devices sign in with the Hidden password for now. Set a studio password to keep them separate.'
     : 'Other devices need it to sign in.';
   return (
     <Row label={label} description={description} stacked={editing}>
@@ -273,7 +277,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
     : pending ? `${lan.saved ? 'Turns on' : 'Turns off'} the next time you start Studio.`
     : on ? 'Phones and other computers on this network can open the studio after signing in.'
     : 'Lets phones and other computers on this network open the studio, from the next start.';
-  const noPassword = Boolean(access && !access.studioPassword.set && !access.studioPassword.hidden);
+  const noPassword = Boolean(access && !access.studioPassword.set);
   const devices = access?.devices || [];
 
   return (

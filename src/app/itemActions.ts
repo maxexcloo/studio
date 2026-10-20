@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Columns2, Copy, Download, Eye, EyeOff, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, TextQuote, Trash2, Clapperboard } from 'lucide-react';
+import { CheckCircle2, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, TextQuote, Trash2, Clapperboard } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
 import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
@@ -15,7 +15,7 @@ import type { ShowToast } from './toast';
  * each surface picks the ones it has room for, always in this order, with
  * these one-word names and icons, grouped by intent (docs/guides/UI-PATTERNS.md):
  * keep it (Copy, Download or Share) | make more (Animate or Extend, Recreate,
- * Reuse, Reference, Upscale, Compare) | organise (Star, Move, Select, Delete).
+ * Reuse, Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete).
  */
 
 export type ItemSurface = 'bar' | 'dock' | 'tile' | 'menu';
@@ -25,7 +25,7 @@ export type ItemActionGroup = 'keep' | 'make' | 'organise';
 
 export type ItemActionId =
   | 'copyItem' | 'share' | 'download' | 'animate' | 'extend' | 'reuse' | 'promptsOnly' | 'reference'
-  | 'retry' | 'upscale' | 'compare' | 'star' | 'move' | 'select' | 'delete';
+  | 'retry' | 'upscale' | 'compare' | 'star' | 'select' | 'delete';
 
 export type ItemActionHandlers = {
   showToast: ShowToast;
@@ -47,8 +47,6 @@ export type ItemActionHandlers = {
   animate?: (item: GalleryItem) => void;
   /** Runs a failed item again as a new job, with its own model, prompts, settings and references. */
   retry: (item: GalleryItem) => void;
-  hide: (item: GalleryItem) => void;
-  unhide: (item: GalleryItem) => void;
   remove: (item: GalleryItem) => void;
   star: (item: GalleryItem) => void;
   /* The same for several selected items at once. */
@@ -104,7 +102,6 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   upscale: ['bar', 'dock', 'menu'],
   compare: ['bar', 'dock'],
   star: ['dock', 'tile', 'menu'],
-  move: ['menu'],
   select: ['menu'],
   delete: ['bar', 'dock', 'tile', 'menu'],
 };
@@ -132,7 +129,7 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Continue This Video', Icon: FastForward, run: () => handlers.animate!(item) },
     Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Load Everything, Seed Included, Into the Prompt Box', Icon: RotateCcw, run: () => handlers.reuse(item) },
     Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Reuse', tip: 'Load Its Prompts Into the Prompt Box', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
-    done && handlers.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library && {
+    done && handlers.useAsReference && item.type === 'image' && !item.library && {
       id: 'reference', group: 'make', label: 'Reference', tip: 'Use as a Reference Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
     },
     item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Run It Again as a New Job', Icon: RotateCw, run: () => handlers.retry(item) },
@@ -144,12 +141,9 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
       id: 'compare', group: 'make', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare With the Original', Icon: Columns2, pressed: extras.compare.open, run: extras.compare.toggle,
     },
     canStar(item) && { id: 'star', group: 'organise', label: item.favorite ? 'Unstar' : 'Star', Icon: Star, pressed: Boolean(item.favorite), run: () => handlers.star(item) },
-    done && !item.library && (item.privateVault
-      ? { id: 'move', group: 'organise', label: 'Move to Gallery', short: 'Unhide', Icon: Eye, run: () => handlers.unhide(item) }
-      : { id: 'move', group: 'organise', label: 'Move to Hidden', short: 'Hide', Icon: EyeOff, run: () => handlers.hide(item) }),
     extras.select && (item.status === 'done' || item.status === 'error') && { id: 'select', group: 'organise', label: 'Select', Icon: CheckCircle2, run: () => extras.select!(item) },
     item.status !== 'pending' && {
-      id: 'delete', group: 'organise', label: item.library ? 'Remove' : 'Delete', tip: item.privateVault ? 'Delete From Hidden' : item.library ? 'Remove From Gallery' : 'Delete',
+      id: 'delete', group: 'organise', label: item.library ? 'Remove' : 'Delete', tip: item.library ? 'Remove From Gallery' : 'Delete',
       Icon: Trash2, danger: true, run: () => handlers.remove(item),
     },
   ];

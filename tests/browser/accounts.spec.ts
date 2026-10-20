@@ -135,7 +135,7 @@ test('ordinary accounts open their own studio without administration sections', 
   await studioUi(page).openSettings();
   const sections = page.getByRole('navigation', { name: 'Settings sections' });
   await expect(sections.getByRole('button', { name: 'Accounts & MCP', exact: true })).toBeVisible();
-  for (const name of ['Models', 'Library', 'Hidden', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Models', 'Library', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
   await sections.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();

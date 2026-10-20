@@ -54,7 +54,6 @@ export function retryRequest(item: GalleryItem, options: RetryOptions = {}): Ret
     referenceRole: settings.referenceRole === 'reference' ? 'reference' : 'edit',
     startImageId: item.startImageId || item.referenceImage || '',
     startImageName: item.referenceImageName || String(settings.referenceImageName || ''),
-    privateVault: Boolean(item.privateVault),
     ...(options.tiledDecode ? { tiledDecode: true } : {})
   };
   const label = options.smaller ? 'Trying again smaller' : options.tiledDecode ? 'Trying again, decoding in tiles' : 'Trying again';

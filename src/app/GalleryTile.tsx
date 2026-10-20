@@ -176,7 +176,7 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
               {actions.map((action) => {
                 if (action.id === 'star') return null;
                 const name = action.tip || action.label;
-                const className = action.danger ? "tile-delete" : cn("tile-icon", action.id === "move" && "tile-hide");
+                const className = action.danger ? "tile-delete" : "tile-icon";
                 const body = <><ActionIcon action={action} size={action.href ? 13 : 14} /><span className="tile-menu-label">{action.label}</span></>;
                 return (
                   <Tip key={action.id} content={name} side="left">

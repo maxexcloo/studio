@@ -12,7 +12,7 @@ import type { ShowToast } from './toast';
 /* ---------------------------------------------------------------------------
    Settings › Library additions: earlier images, Civitai-ready files (beta),
    and forgetting recent prompts. The row pieces come from SettingsDialog, as
-   HiddenSettings takes them, so every row reads the same.
+   every section takes them, so every row reads the same.
 --------------------------------------------------------------------------- */
 
 type GroupProps = React.PropsWithChildren<{ title?: string; note?: React.ReactNode; tone?: 'danger' }>;
@@ -104,7 +104,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
   );
 }
 
-/** Civitai-ready PNGs: off unless switched on, and never for Hidden. A row of Library › Sharing. */
+/** Civitai-ready PNGs: off unless switched on. A row of Library › Sharing. */
 export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'Group'> & { canChange: boolean }) {
   const [enabled, setEnabled] = React.useState<boolean | null>(null);
   React.useEffect(() => {
@@ -126,7 +126,7 @@ export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'G
   return (
     <Row
       label={<>Civitai-ready images<BetaTag /></>}
-      description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG the way AUTOMATIC1111 does, so Civitai fills them in on upload. ComfyUI’s workflow stays in the file; Hidden images are left alone."
+      description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG the way AUTOMATIC1111 does, so Civitai fills them in on upload. ComfyUI’s workflow stays in the file."
       disabled={enabled === null || !canChange}
     >
       <Switch label="Civitai-ready images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
@@ -148,7 +148,7 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
     <>
       <Row
         label="Keep recent prompts"
-        description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one. Shared with other devices; prompts from Hidden aren’t saved.${enabled && prompts.length ? ` ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}.` : ''}`}
+        description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one. Shared with other devices.${enabled && prompts.length ? ` ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}.` : ''}`}
       >
         <Switch label="Keep recent prompts" checked={enabled} onChange={toggle} />
       </Row>

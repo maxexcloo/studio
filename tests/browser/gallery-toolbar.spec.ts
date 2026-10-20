@@ -27,7 +27,7 @@ test('gallery tools expand independently and clear every active filter', async (
   await expect(toolbar.getByRole('group', { name: 'Gallery Mode' }).getByRole('button', { name: 'Images', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await filters.click();
   const filterTools = toolbar.getByRole('group', { name: 'Gallery Filters', exact: true });
-  await expect(filterTools.getByRole('button', { name: 'Show Hidden', exact: true })).toBeVisible();
+  await expect(filterTools.getByRole('button', { name: 'Starred', exact: true })).toBeVisible();
   await expect.poll(() => filterTools.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   await page.getByRole('button', { name: 'Filter By Model' }).scrollIntoViewIfNeeded();
   expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);

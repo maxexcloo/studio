@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
 import { AlertTriangle, CheckSquare, X } from 'lucide-react';
 import { GallerySelectionContext, type GallerySelection } from './gallerySelection';
-import { useHiddenActions } from './hiddenContext';
 import { bulkItemActions, useItemActionHandlers, useItemActions, type ItemAction } from './itemActions';
 import { ActionIcon, startsGroup } from './ItemActionSurfaces';
 import { useDismiss } from './useDismiss';
@@ -23,7 +22,6 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   const menuRef = useRef<HTMLDivElement>(null);
   const menuOpener = useRef<HTMLElement | null>(null);
   const handlers = useItemActionHandlers();
-  const hidden = useHiddenActions();
   const { selecting, selectedItems: selected, selectable } = selection;
   const closeMenu = useCallback(() => {
     if (menuRef.current?.contains(document.activeElement)) menuOpener.current?.focus({ preventScroll: true });

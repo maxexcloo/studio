@@ -63,12 +63,11 @@ function useRowActions(onError: (message: string) => void, kind: PromptKind) {
 
 /* ------------------------------------------------------------ Desktop */
 
-export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = false, onError, kind = 'positive' }: {
+export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'positive' }: {
   open: boolean;
   /** "escape" hands the keyboard back to the prompt; a click elsewhere leaves focus where it went. */
   onClose: (reason: 'escape' | 'outside') => void;
   onPick: (text: string) => void;
-  hiddenSpace?: boolean;
   kind?: PromptKind;
   onError: (message: string) => void;
 }) {
@@ -85,14 +84,14 @@ export function PromptHistoryPopover({ open, onClose, onPick, hiddenSpace = fals
           exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.99 }}
           transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
         >
-          <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} hiddenSpace={hiddenSpace} onError={onError} />
+          <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} onError={onError} />
         </motion.div>
       ) : null}
     </AnimatePresence>
   );
 }
 
-function HistoryPanel({ onClose, onPick, hiddenSpace, onError, kind }: { onClose: (reason: 'escape' | 'outside') => void; onPick: (text: string) => void; hiddenSpace: boolean; kind: PromptKind; onError: (message: string) => void }) {
+function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'escape' | 'outside') => void; onPick: (text: string) => void; kind: PromptKind; onError: (message: string) => void }) {
   const { prompts, ready } = usePromptHistory(true, kind);
   const [query, setQuery] = React.useState('');
   const sections = React.useMemo(() => sectionsFor(prompts, query), [prompts, query]);
@@ -207,7 +206,6 @@ function HistoryPanel({ onClose, onPick, hiddenSpace, onError, kind }: { onClose
         <span><kbd>↑</kbd><kbd>↓</kbd> choose</span>
         <span><kbd>↵</kbd> use</span>
         <span><kbd>esc</kbd> close</span>
-        {hiddenSpace ? <em>From the gallery. Prompts from Hidden aren’t saved.</em> : null}
       </footer>
     </div>
   );

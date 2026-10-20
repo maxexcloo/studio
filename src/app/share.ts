@@ -3,14 +3,10 @@ import type { ShowToast } from './toast';
 import { sharesWithoutSettings } from './shareSettings';
 import { upscaleDisplayUrl } from './useUpscale';
 
-/**
- * Hidden files are served inline; asking for an attachment gets them a real
- * file name. "Share without settings" asks the server for the file without
- * the prompt and workflow inside it.
- */
+/** "Share without settings" asks the server for the file without the prompt and workflow inside it. */
 export function downloadUrl(item: GalleryItem) {
   const url = upscaleDisplayUrl(item) || "";
-  const params = [item.privateVault ? "download=1" : "", url && sharesWithoutSettings(item) ? "clean=1" : ""].filter(Boolean).join("&");
+  const params = url && sharesWithoutSettings(item) ? "clean=1" : "";
   return params ? `${url}${url.includes("?") ? "&" : "?"}${params}` : url;
 }
 

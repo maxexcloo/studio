@@ -22,7 +22,7 @@ export function useGenerationActions(view: any) {
   const {
     active, canUseStartImage, confirmAction, count, currentProfile, denoise,
     frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loras, missingRequiredReference, mode,
-    model, negative, prefs, hiddenSpace, hidden, prompt, sampler, scheduler, seed, setActive, setGallery,
+    model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
     referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
@@ -124,9 +124,6 @@ export function useGenerationActions(view: any) {
       return;
     }
     const runMode: "image" | "video" = retry ? retry.kind : mode;
-    const toHidden = retry ? Boolean(retry.body.privateVault) : Boolean(hiddenSpace);
-    // Asked before anything is sent, so a Hidden prompt never runs in the open.
-    if (toHidden && !hidden.ensureReady({ kind: "generate" })) return;
     generatePostingRef.current = true;
     const postingRevision = queueRevision.current;
     const optimisticJobIds: string[] = [];
@@ -187,8 +184,7 @@ export function useGenerationActions(view: any) {
         // A painted mask on the first reference: change only that part.
         ...(inpaint ? { inpaint } : {}),
         startImageId: canUseStartImage ? startImageId : "",
-        startImageName,
-        privateVault: Boolean(hiddenSpace)
+        startImageName
       };
       const queuedJobs: string[] = [];
       let postingError = "";
@@ -221,7 +217,7 @@ export function useGenerationActions(view: any) {
           showToast(`${queuedJobs.length ? `${queuedJobs.length} of ${imageRuns} generations queued. ` : ""}${postingError}`, "error");
           break;
         }
-        const { jobId, items, hidden: wentHidden, notice } = response;
+        const { jobId, items, notice } = response;
         queuedJobs.push(jobId);
         if (postingRevision !== queueRevision.current) {
           galleryRemove([clientJobId]);
@@ -230,12 +226,6 @@ export function useGenerationActions(view: any) {
         }
         if (notice) showToast(notice, "error");
         firstItemOf.set(jobId, items?.[0] || optimisticItems[0]);
-        if (wentHidden && !toHidden) {
-          // Made from a Hidden image, so it stays hidden: the tile leaves this gallery and says where it went.
-          galleryRemove([clientJobId, jobId]);
-          if (index === 0) showToast("Made from a Hidden image, so it’s saved in Hidden", "default");
-          continue;
-        }
         if (items?.length) {
           galleryUpsert(items);
           if (prefs.zenMode) setZenSelectedId(items[0].id);
@@ -302,11 +292,11 @@ export function useGenerationActions(view: any) {
         }
       }));
       await (latest.current.loadGalleryDelta ? latest.current.loadGalleryDelta() : latest.current.loadGallery());
-      if (latest.current.prefs.zenMode && latest.current.prefs.followLatest && !toHidden && !latest.current.hiddenSpace && latest.current.mode === runMode) {
+      if (latest.current.prefs.zenMode && latest.current.prefs.followLatest && latest.current.mode === runMode) {
         const data = await apiJson<GalleryPayload>(`/api/gallery?type=${encodeURIComponent(runMode)}&limit=80`).catch(() => null);
         const outputs = payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled");
         const newest = outputs.find((item: GalleryItem) => item.type === runMode && item.status === "done");
-        if (newest && latest.current.prefs.zenMode && latest.current.prefs.followLatest && !latest.current.hiddenSpace && latest.current.mode === runMode) {
+        if (newest && latest.current.prefs.zenMode && latest.current.prefs.followLatest && latest.current.mode === runMode) {
           galleryUpsert(outputs);
           setZenSelectedId(newest.id);
         }
@@ -388,7 +378,7 @@ export function useGenerationActions(view: any) {
     const where = outputDir ? ` in ${outputDir}` : " in ComfyUI’s output folder";
     if (!await confirmAction({
       title: "Delete all finished images?",
-      description: `Their files${where} move to Studio’s trash there for 30 days. Hidden isn’t affected.`,
+      description: `Their files${where} move to Studio’s trash there for 30 days.`,
       action: "Delete all",
       destructive: true
     })) return;
@@ -505,16 +495,15 @@ export function useGenerationActions(view: any) {
   /**
    * One toast for a run of deletes: clicking through a batch counts up in it
    * ("4 images deleted") instead of stacking toasts, and its Undo brings back
-   * all of them. Gallery and Hidden deletes count separately.
+   * all of them.
    */
   function offerUndo(targets: GalleryItem[]) {
     targets.forEach((item) => pendingDeletes.current.set(item.id, item));
-    const hiddenOnes = targets.some((item) => item.privateVault);
     const noun = itemNoun(targets[0]);
-    toast.removed(hiddenOnes ? "Deleted from Hidden" : `${noun === "video" ? "Video" : "Image"} deleted`, {
-      group: hiddenOnes ? "delete-hidden" : "delete",
+    toast.removed(`${noun === "video" ? "Video" : "Image"} deleted`, {
+      group: "delete",
       count: targets.length,
-      plural: (count) => hiddenOnes ? `${count} deleted from Hidden` : `${count} items deleted`,
+      plural: (count) => `${count} items deleted`,
       duration: UNDO_MS,
       action: {
         label: "Undo",
@@ -534,13 +523,11 @@ export function useGenerationActions(view: any) {
     const targets = items.filter(Boolean);
     if (!targets.length) return;
     if (targets.length === 1) return deleteItem(targets[0]);
-    const hiddenOnes = targets.some((item) => item.privateVault);
     const libraryOnly = targets.every((item) => item.library);
     const includesLibrary = targets.some((item) => item.library);
     if (!await confirmAction({
       title: `${libraryOnly ? "Remove" : "Delete"} ${targets.length} Items?`,
-      description: hiddenOnes ? "They and their upscales are erased. There’s no other copy."
-        : libraryOnly ? "The files stay in their folders."
+      description: libraryOnly ? "The files stay in their folders."
           : includesLibrary ? "Generated files are deleted from disk. Files linked from library folders stay in their folders."
             : "Their files are deleted from disk.",
       action: `${libraryOnly ? "Remove" : "Delete"} ${targets.length}`,

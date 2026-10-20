@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "framer-motion";
 import { RefreshCw } from "lucide-react";
-import { showToastTone as showToast, toast } from "./app/toast";
+import { showToastTone as showToast } from "./app/toast";
 import "./styles.css";
 
 import { useComposerState } from "./app/useComposerState";
@@ -41,11 +41,9 @@ import { useRunSettling } from './app/useRunSettling';
 import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
-import { sizePlan, tiledDecodeFor, upscaleDisplayThumbnail, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
+import { sizePlan, tiledDecodeFor, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
 import { closestPreset, fitRatio, MEGAPIXEL, sameRatio, snapSide } from './app/sizing';
 import type { MegapixelControl, SizeTier } from './app/SizeMenu';
-import { useHidden, type HiddenIntent } from './app/useHidden';
-import { flyInto, hiddenDockTarget } from './app/hiddenMotion';
 import { useVisibleInterval } from './hooks/use-visible-interval';
 import { useKeyboardInset } from './hooks/use-keyboard-inset';
 import { setAtComputer, setThisComputer, usePhone } from './app/device';
@@ -133,8 +131,6 @@ function App() {
   const [backendStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
   // Read by every download link and share as it is made (shareSettings.ts); kept in step here.
   setShareSettings(prefs);
-  const hidden = useHidden({ autoLockMinutes: prefs.hiddenAutoLockMinutes ?? 15, showToast });
-  const hiddenSpace = hidden.space === "hidden";
   const comfyStatus = statusForProfile(backendStatus, { kind: mode, family: models?.profiles.find((profile) => profile.id === model)?.family });
   const primaryConnected = backendStatus.backends?.primary?.connected ?? backendStatus.connected;
   const [paths, setPaths] = useState<Paths>({});
@@ -202,7 +198,7 @@ function App() {
     removeGalleryItems,
     removeGalleryItemsWhere,
     patchGalleryItems,
-  } = useGalleryStore({ mode, showFailedItems: prefs.showFailedItems, space: hidden.space, onLocked: hidden.refresh, search: gallerySearch });
+  } = useGalleryStore({ mode, showFailedItems: prefs.showFailedItems, search: gallerySearch });
   const toggleFavorite = useFavorites({ patchGalleryItems, removeGalleryItems, setActive, search: gallerySearch, showToast });
 
   // Moments and runs: a way of looking at the gallery, worked out from what is
@@ -272,18 +268,6 @@ function App() {
     load();
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [loadGallery]);
-
-  // Locking or unlocking changes what Hidden can show; so does another device doing it.
-  useEffect(() => {
-    if (!hiddenSpace) return;
-    if (!hidden.unlocked) setActive(null);
-    loadGallery().catch(() => null);
-  }, [hidden.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Nothing from one space stays open in the other.
-  useEffect(() => {
-    setActive(null);
-  }, [hidden.space]);
 
   // The LoRA library lives on the server and syncs edit by edit. Speak up only
   // when edits are actually stuck (a server restart with nothing to sync is not
@@ -384,8 +368,7 @@ function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useVisibleInterval(refreshComfyStatus, comfyRestarting ? 1500 : 5000);
 
-  // A locked Hidden has nothing to poll for.
-  useVisibleInterval(loadGalleryDelta, 2500, !hiddenSpace || hidden.unlocked);
+  useVisibleInterval(loadGalleryDelta, 2500);
 
   useEffect(() => {
     if (!prefs.zenMode || active || settings || zenControls) return;
@@ -504,50 +487,35 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [settings, active]);
 
-  // Each space keeps its own prompt. Hidden's lives in memory only: it never
-  // reaches the saved draft, never follows you out, and goes when Hidden locks.
-  const spacePrompts = useRef({ gallery: modePrompts(initialDraft), hidden: modePrompts() });
-  const promptSelection = useRef({ space: hidden.space, mode });
-  if (promptSelection.current.space === hidden.space && promptSelection.current.mode === mode) spacePrompts.current[hidden.space][mode] = { prompt, negative };
+  // Each mode keeps its own prompts and references.
+  const modePromptsRef = useRef(modePrompts(initialDraft));
+  const promptSelection = useRef(mode);
+  if (promptSelection.current === mode) modePromptsRef.current[mode] = { prompt, negative };
   useEffect(() => {
-    if (promptSelection.current.space === hidden.space && promptSelection.current.mode === mode) return;
-    promptSelection.current = { space: hidden.space, mode };
-    const next = spacePrompts.current[hidden.space][mode];
+    if (promptSelection.current === mode) return;
+    promptSelection.current = mode;
+    const next = modePromptsRef.current[mode];
     setPrompt(next.prompt);
     setNegative(next.negative);
-  }, [hidden.space, mode]);
-  useEffect(() => {
-    if (hidden.unlocked) return;
-    spacePrompts.current.hidden = modePrompts();
-    if (hiddenSpace) { setPrompt(""); setNegative(""); }
-  }, [hidden.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
-  const reusedImages = useRef<Record<"gallery" | "hidden", Pick<GalleryItem, "id"> | null>>({ gallery: null, hidden: null });
+  }, [mode]);
+  const reusedImage = useRef<Pick<GalleryItem, "id"> | null>(null);
   const referenceEditRevision = useRef(0);
   const [reuseReferencePending, setReuseReferencePending] = useState(false);
-  const emptyReferences = () => ({ assets: [] as SelectedReferenceAsset[], image: "", id: "", name: "" });
   type ModeReference = { assets: SelectedReferenceAsset[]; image: string; id: string; name: string };
-  const spaceReferences = useRef<Record<"gallery" | "hidden", Record<Mode, ModeReference>>>({
-    gallery: modeReferences(initialDraft),
-    hidden: { image: emptyReferences(), video: emptyReferences() }
-  });
-  const referenceSelection = useRef({ space: hidden.space, mode });
-  if (referenceSelection.current.space === hidden.space && referenceSelection.current.mode === mode) {
-    spaceReferences.current[hidden.space][mode] = { assets: referenceAssets, image: startImage, id: startImageId, name: startImageName };
+  const modeReferencesRef = useRef<Record<Mode, ModeReference>>(modeReferences(initialDraft));
+  const referenceSelection = useRef(mode);
+  if (referenceSelection.current === mode) {
+    modeReferencesRef.current[mode] = { assets: referenceAssets, image: startImage, id: startImageId, name: startImageName };
   }
   useEffect(() => {
-    if (referenceSelection.current.space === hidden.space && referenceSelection.current.mode === mode) return;
-    referenceSelection.current = { space: hidden.space, mode };
-    const next = spaceReferences.current[hidden.space][mode];
+    if (referenceSelection.current === mode) return;
+    referenceSelection.current = mode;
+    const next = modeReferencesRef.current[mode];
     setReferenceAssets(next.assets);
     setStartImage(next.image);
     setStartImageId(next.id);
     setStartImageName(next.name);
-  }, [hidden.space, mode]);
-  useEffect(() => {
-    if (hidden.unlocked) return;
-    spaceReferences.current.hidden = { image: emptyReferences(), video: emptyReferences() };
-    reusedImages.current.hidden = null;
-  }, [hidden.unlocked]);
+  }, [mode]);
   // Each mode keeps its own place in the gallery. The grid measures itself
   // after mount, so the saved position goes back once it has a height to
   // scroll to (two frames, the second after that measurement has landed).
@@ -563,13 +531,13 @@ function App() {
     });
     return () => cancelAnimationFrame(frame);
   }, [galleryLoaded, mode]);
-  const draftPrompt = { current: spacePrompts.current.gallery[mode] };
+  const draftPrompt = { current: modePromptsRef.current[mode] };
   useEffect(() => {
-    const galleryReferences = savedModeReferences(spaceReferences.current.gallery);
+    const galleryReferences = savedModeReferences(modeReferencesRef.current);
     const galleryReference = galleryReferences[mode];
     const draft = {
       mode,
-      modePrompts: { ...spacePrompts.current.gallery },
+      modePrompts: { ...modePromptsRef.current },
       modeSettings: { ...composerByMode.current },
       modeReferences: galleryReferences,
       prompt: draftPrompt.current.prompt,
@@ -622,7 +590,7 @@ function App() {
       window.clearTimeout(timer);
       window.removeEventListener("pagehide", save);
     };
-  }, [mode, prompt, negative, model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, duration, resolution, sampler, scheduler, loras, customSize, startImageId, startImageName, referenceAssets, advanced, showDetails, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId, hiddenSpace]);
+  }, [mode, prompt, negative, model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, duration, resolution, sampler, scheduler, loras, customSize, startImageId, startImageName, referenceAssets, advanced, showDetails, showNegativePrompt, zenGalleryOpen, zenControls, zenSelectedId]);
 
   useEffect(() => {
     if (!active) return;
@@ -883,61 +851,6 @@ function App() {
     }
   }
 
-  /** Moves finished images into Hidden, each flying into the dock's lock as it goes. */
-  async function hideItems(items: GalleryItem[]) {
-    const movable = items.filter((item) => item.status === "done" && item.url && !item.privateVault);
-    if (!movable.length) return;
-    if (!hidden.ensureReady({ kind: "hide", items: movable })) return;
-    const target = hiddenDockTarget();
-    movable.forEach((item, index) => {
-      const tile = document.querySelector(`[data-tile-id="${CSS.escape(item.id)}"]`) || (active?.id === item.id ? document.querySelector(".viewer-canvas img, .viewer-canvas video") : null);
-      if (tile) flyInto(tile.getBoundingClientRect(), target, upscaleDisplayThumbnail(item) || item.url, { delay: index * 60 });
-    });
-    if (active && movable.some((item) => item.id === active.id)) setActive(null);
-    removeGalleryItems(movable.flatMap((item) => [item.id, item.url]).filter(Boolean));
-    const result = await hidden.hide(movable);
-    if (!result || result.failed?.length) { loadGallery().catch(() => null); return; }
-    const hiddenIds = result.hiddenIds || [];
-    toast.success("Moved to Hidden", {
-      group: "hide",
-      count: movable.length,
-      plural: (count) => `Moved ${count} images to Hidden`,
-      glyph: "lock",
-      action: hiddenIds.length ? {
-        label: "Undo",
-        onClick: async () => {
-          await hidden.unhide(hiddenIds.map((id) => ({ id } as GalleryItem)));
-          loadGallery().catch(() => null);
-        }
-      } : undefined
-    });
-  }
-
-  /** Puts Hidden images back in the gallery. */
-  async function unhideItems(items: GalleryItem[]) {
-    const movable = items.filter((item) => item.status === "done" && item.privateVault);
-    if (!movable.length) return;
-    const target = document.querySelector("[data-hidden-exit]");
-    movable.forEach((item, index) => {
-      const tile = document.querySelector(`[data-tile-id="${CSS.escape(item.id)}"]`) || (active?.id === item.id ? document.querySelector(".viewer-canvas img, .viewer-canvas video") : null);
-      if (tile) flyInto(tile.getBoundingClientRect(), target, upscaleDisplayThumbnail(item) || item.url, { delay: index * 60 });
-    });
-    if (active && movable.some((item) => item.id === active.id)) setActive(null);
-    removeGalleryItems(movable.map((item) => item.id));
-    const result = await hidden.unhide(movable);
-    if (!result) loadGallery();
-    else toast.success("Moved to gallery", { group: "unhide", count: movable.length, plural: (count) => `Moved ${count} images to gallery` });
-  }
-
-  // Whatever was asked for before Hidden was set up or unlocked happens now.
-  useEffect(() => {
-    if (!hidden.unlocked || hidden.setupOpen || hidden.unlockOpen || !hidden.intent) return;
-    const intent: HiddenIntent | null = hidden.takeIntent();
-    if (intent?.kind === "hide") hideItems(intent.items);
-    if (intent?.kind === "enter") hidden.setSpace("hidden");
-    if (intent?.kind === "generate") window.setTimeout(() => generate(), 0);
-  }, [hidden.unlocked, hidden.setupOpen, hidden.unlockOpen, hidden.intent]); // eslint-disable-line react-hooks/exhaustive-deps
-
   function applyProfile(profile: Profile, setModelId = true) {
     if (setModelId) setModel(profile.id);
     // A custom size is yours, so it stays across models of the same kind, fitted to the new one's limits.
@@ -1017,41 +930,26 @@ function App() {
     });
   }
 
-  // Restore previews of Hidden references once Hidden is open again.
-  useEffect(() => {
-    if (!hidden.unlocked) return;
-    const pending = referenceAssets.filter(({ asset }) => asset.source === "vault" && !asset.thumbnailUrl && asset.galleryItemId);
-    if (!pending.length) return;
-    let live = true;
-    Promise.all(pending.map(({ slot, asset }) => referenceAssetFromGallery(asset.galleryItemId || "").then((resolved) => ({ slot, resolved })).catch(() => null)))
-      .then((results) => {
-        if (!live) return;
-        const found = results.filter(Boolean) as Array<{ slot: string; resolved: ReferenceAsset }>;
-        if (found.length) setReferenceAssets((current) => current.map((item) => found.find((hit) => hit.slot === item.slot)?.resolved ? { slot: item.slot, asset: found.find((hit) => hit.slot === item.slot)!.resolved } : item));
-      });
-    return () => { live = false; };
-  }, [hidden.unlocked, referenceAssets]);
-
   const loraStrengthForCurrentWorkflow = (name: string, fallback: number) => rememberedLoraStrength(model, name, fallback);
 
   function changeMode(next: Mode) {
     if (next === mode) return;
-    galleryScroll.current[`${hidden.space}:${mode}`] = galleryStageRef.current?.scrollTop || 0;
-    pendingScroll.current = `${hidden.space}:${next}`;
-    const nextReferences = spaceReferences.current[hidden.space][next];
-    referenceSelection.current = { space: hidden.space, mode: next };
+    galleryScroll.current[mode] = galleryStageRef.current?.scrollTop || 0;
+    pendingScroll.current = next;
+    const nextReferences = modeReferencesRef.current[next];
+    referenceSelection.current = next;
     setReferenceAssets(nextReferences.assets);
     setStartImage(nextReferences.image);
     setStartImageId(nextReferences.id);
     setStartImageName(nextReferences.name);
-    const nextPrompt = spacePrompts.current[hidden.space][next];
-    promptSelection.current = { space: hidden.space, mode: next };
+    const nextPrompt = modePromptsRef.current[next];
+    promptSelection.current = next;
     setPrompt(nextPrompt.prompt);
     setNegative(nextPrompt.negative);
     setMode(next);
     const saved = composerByMode.current[next];
     const savedProfile = models?.profiles.find((profile) => profile.id === (saved?.model || models.defaults[next === 'video' ? 'videoModel' : 'imageModel']) && profile.kind === next);
-    if (next === 'video' && reusedImages.current[hidden.space] && !imageInputsForProfile(savedProfile).length) {
+    if (next === 'video' && reusedImage.current && !imageInputsForProfile(savedProfile).length) {
       const candidates = models?.profiles.filter((profile) => profile.kind === 'video' && profile.ready !== false && imageInputsForProfile(profile).length) || [];
       const compatible = candidates.find((profile) => profile.family === savedProfile?.family) || candidates[0];
       if (compatible) { applyProfile(compatible); return; }
@@ -1271,16 +1169,14 @@ function App() {
   const storedReferenceAsset = referenceInput ? arrangedReferenceAssets.find((item) => item.slot === referenceInput.id)?.asset || null : null;
   const referenceAsset: ReferenceAsset | null = storedReferenceAsset || (referenceInput && startImageId ? {
     id: startImageId,
-    source: startImageId.startsWith("vault:") ? "vault" : "upload",
-    ...(startImageId.startsWith("vault:") ? { privacyDomain: "vault" as const } : {}),
+    source: "upload",
     name: startImageName || "Reference image",
     mime: "",
     width: 0,
     height: 0,
     size: 0,
     createdAt: "",
-    // Only the id survives a reload for images kept out of the saved draft (Hidden ones);
-    // uploads can still be previewed from it, anything else falls back to an icon.
+    // Only the id survives a reload; uploads can still be previewed from it, anything else falls back to an icon.
     thumbnailUrl: `/api/reference-assets/${encodeURIComponent(startImageId)}/thumbnail`
   } : null);
   const composerReferenceAssets = referenceAsset && referenceInput && !storedReferenceAsset
@@ -1288,15 +1184,14 @@ function App() {
     : arrangedReferenceAssets;
   // A reused output becomes the first video reference once a compatible workflow is active.
   useEffect(() => {
-    const space = hidden.space;
-    const item = reusedImages.current[space];
+    const item = reusedImage.current;
     if (mode !== 'video' || !item || !referenceInput) return;
     const revision = referenceEditRevision.current;
     let live = true;
     setReuseReferencePending(true);
     referenceAssetFromGallery(item.id).then((asset) => {
-      if (!live || reusedImages.current[space] !== item) return;
-      reusedImages.current[space] = null;
+      if (!live || reusedImage.current !== item) return;
+      reusedImage.current = null;
       if (referenceEditRevision.current === revision) {
         setReferenceAssets((current) => withReference(current, referenceInputs, referenceInput.id, asset));
         setStartImage('');
@@ -1306,12 +1201,12 @@ function App() {
       setReuseReferencePending(false);
     }).catch((error) => {
       if (!live) return;
-      reusedImages.current[space] = null;
+      reusedImage.current = null;
       setReuseReferencePending(false);
       showToast(error instanceof Error ? error.message : 'Couldn’t use the reused image as a video reference', 'error');
     });
     return () => { live = false; setReuseReferencePending(false); };
-  }, [mode, model, hidden.space, referenceInput?.id]);
+  }, [mode, model, referenceInput?.id]);
   const canUseStartImage = Boolean(referenceInput);
   // Without a reference slot, the composer offers the ready models of this kind that take one.
   const [referenceOpenRequest, setReferenceOpenRequest] = useState(0);
@@ -1541,7 +1436,7 @@ function App() {
     if (fit.blockers.length) { showToast(fit.blockers[0], 'error'); return; }
     changeMode(preset.type || 'image');
     applyProfile(profile);
-    reusedImages.current[hidden.space] = preset.galleryItemId ? { id: preset.galleryItemId } : null;
+    reusedImage.current = preset.galleryItemId ? { id: preset.galleryItemId } : null;
     setPrompt(clampText(preset.prompt, settingMax(profile.constraints?.prompt)));
     setNegative(clampText(preset.negative, settingMax(profile.constraints?.negative)));
     setShowNegativePrompt(Boolean(preset.negative));
@@ -1667,7 +1562,7 @@ function App() {
   }
 
   async function useOutputAsStartImage(item: GalleryItem) {
-    if (!canUseStartImage || item.status !== "done" || item.type !== "image" || !item.url || item.vaultLocked) {
+    if (!canUseStartImage || item.status !== "done" || item.type !== "image" || !item.url) {
       showToast("This model can’t use this image as a reference", "error");
       return;
     }
@@ -1713,7 +1608,7 @@ function App() {
 
 
   const generationActions = useGenerationActions({
-    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, hiddenSpace, hidden, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
+    active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir: paths.outputDir, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
     refreshModels
@@ -1722,8 +1617,8 @@ function App() {
 
   const viewerActions = useViewerControls({
     onReuseProfile: applyProfileReferences, onReuseReferences: applyReusedReferences, referenceForAspect,
-    onReuseOutput: (item: GalleryItem | null) => { reusedImages.current[hidden.space] = item?.type === 'image' && item.status === 'done' && item.url && !item.vaultLocked && !item.library ? item : null; },
-    negativeForMode: (next: Mode) => spacePrompts.current[hidden.space][next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt, clipType, customSize, denoise, fps, frames, sampler, scheduler, textEncoder, textEncoders, vae, weightDtype, startImage, startImageId, startImageName }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
+    onReuseOutput: (item: GalleryItem | null) => { reusedImage.current = item?.type === 'image' && item.status === 'done' && item.url && !item.library ? item : null; },
+    negativeForMode: (next: Mode) => modePromptsRef.current[next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt, clipType, customSize, denoise, fps, frames, sampler, scheduler, textEncoder, textEncoders, vae, weightDtype, startImage, startImageId, startImageName }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
   });
   const { fitViewer, cycleViewerSize, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
@@ -1812,7 +1707,7 @@ function App() {
   const phoneVideoDurationControls = <VideoDurationControls view={sidebarView} phone />;
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { referenceWith, referenceOpenRequest, fitViewer, cycleViewerSize, viewerNativeZoom, presetLibraryOpen, setPresetLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, openOutputFolder, paths, prefs, hidden, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showNegativePrompt, showToast, sidebarControls, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { referenceWith, referenceOpenRequest, fitViewer, cycleViewerSize, viewerNativeZoom, presetLibraryOpen, setPresetLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, confirmAction, clearAllCache, clearFailedItems, clearGallery, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, doneGallery, zenGallery, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryRevision, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, goLatestZen, hasMoreGallery, health, height, heightMeta, importWorkflowFile, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, openOutputFolder, paths, prefs, profileBadges, prompt, promptLimit, referenceAsset, referenceInput, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, saveOutputDirectory, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, setZenControls, setZenGalleryOpen, setZenMode, showDetails, showNegativePrompt, showToast, sidebarControls, modelLoraControls, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitZenPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenSelectedId, zenStripDragRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt , zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, upscaleNotices, dismissUpscaleNotice, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, openLoras: () => { setSidebarTab('loras'); setZenControls(true); }, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {

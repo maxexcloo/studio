@@ -18,7 +18,7 @@ export function useNeighborPrefetch(active: GalleryItem | null, items: GalleryIt
     for (let step = 1; step <= REACH; step += 1) {
       for (const offset of [step, -step]) {
         const item = items[(index + offset + items.length) % items.length];
-        if (!item || item.id === active?.id || item.status !== "done" || item.type !== "image" || item.vaultLocked) continue;
+        if (!item || item.id === active?.id || item.status !== "done" || item.type !== "image") continue;
         const url = viewerSources(item).display;
         if (url && !urls.includes(url)) urls.push(url);
       }

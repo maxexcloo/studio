@@ -5,7 +5,7 @@ import { NodeInstall } from './NodeInstall';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
-import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Info, LifeBuoy, LockKeyhole, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
+import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Puzzle, Boxes, Github, Info, LifeBuoy, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UsersRound, Wand2, Library, Cable } from 'lucide-react';
 import { discordUrl, features, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
@@ -16,7 +16,6 @@ import { apiFetch, apiJson } from './api';
 import type { ModelFile, Models, Profile, OutputFolderReport, UpscaleInstall, UpscaleStatus } from './types';
 import type { ModelFolders } from './useModelFolders';
 import { formatBytes, upscaleEfforts, upscaleQualityLabel } from './useUpscale';
-import { HiddenSettings } from './HiddenSettings';
 import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { useStarterPlan } from './StarterModels';
@@ -39,14 +38,13 @@ export const SETTINGS_SECTIONS = [
   { id: 'models', label: 'Models', icon: Boxes, description: 'What ComfyUI has installed and where it finds models.' },
   { id: 'integrations', label: 'Integrations', icon: Cable, description: 'Civitai, Hugging Face, model downloads and output storage.' },
   { id: 'library', label: 'Library', icon: Library, description: 'Where images are saved and what the gallery shows.' },
-  { id: 'privacy', label: 'Hidden', icon: LockKeyhole, description: 'Images you keep to yourself, encrypted and unlocked with a password, Touch ID or Windows Hello.' },
   { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
   { id: 'accounts', label: 'Accounts & MCP', icon: UsersRound, description: 'Manage account access profiles and personal MCP connections.' },
   { id: 'about', label: 'About', icon: Info, description: 'Version, stats, feedback and credits.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
-const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'integrations', 'library', 'privacy', 'connection']);
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'integrations', 'library', 'connection']);
 
 /* ------------------------------------------------------------ Primitives */
 
@@ -329,7 +327,7 @@ const fileCount = (report: OutputFolderReport) => {
 function describeFolder(report: OutputFolderReport | null): { tone?: 'ok' | 'warn' | 'bad'; label: string; detail: string } {
   if (!report) return { label: 'Checking…', detail: '' };
   switch (report.state) {
-    case 'empty': return { tone: 'warn', label: 'Not set', detail: 'Needed to delete files and to remove ComfyUI’s copies of hidden images.' };
+    case 'empty': return { tone: 'warn', label: 'Not set', detail: 'Needed to delete files and to remove ComfyUI’s copies.' };
     case 'missing': return { tone: 'bad', label: 'Folder not found', detail: 'There’s nothing at that path on this computer.' };
     case 'not-folder': return { tone: 'bad', label: 'Not a folder', detail: 'That path points at a file.' };
     case 'mismatch': return { tone: 'warn', label: 'Recent images aren’t here', detail: `None of the last ${report.checked} images are in this folder (${fileCount(report)}). ComfyUI probably saves somewhere else; try Find automatically.` };
@@ -502,7 +500,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
     upscaleStatus, upscaleUnavailableReason, upscaleInstall, upscaleSetup,
     gallery, galleryLoaded, paths, saveOutputDirectory, openOutputFolder, copyToClipboard, showToast,
     clearFailedItems, clearGallery, clearAllCache, resetAllSettings, confirmAction,
-    hidden,
     health, refreshHealth, models, refreshModels, refreshWorkflows, modelFolders,
     workflows, modelProfiles
   } = view;
@@ -646,7 +643,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <Group title="Reset" tone="danger">
               {thisComputer ? (
                 <>
-                  <Row label="Delete all finished images" description="Moves their files to the trash for 30 days, then deletes them. Hidden isn’t affected.">
+                  <Row label="Delete all finished images" description="Moves their files to the trash for 30 days, then deletes them.">
                     <button className="btn is-danger-soft" onClick={clearGallery}>Delete all</button>
                   </Row>
                   <Row label="Clear all cache" description="Clears the browser cache, stale queue state and ComfyUI’s memory.">
@@ -784,7 +781,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <AdapterLibraryGroup Group={Group} Row={Row} />
             <Group title="Sharing">
               <SwitchRow label="Share without settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
-              <Row label="Export gallery" description="Every finished image in one ZIP file. Hidden has its own export.">
+              <Row label="Export gallery" description="Every finished image in one ZIP file.">
                 <a className="btn" href="/api/gallery/export" download><Download size={14} /> Export</a>
               </Row>
             </Group>
@@ -795,10 +792,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               {thisComputer ? <TrashRow confirmAction={confirmAction} showToast={showToast} Row={Row} /> : null}
             </Group>
           </>
-        ) : null}
-
-        {section === 'privacy' ? (
-          <HiddenSettings hidden={hidden} prefs={prefs} setPrefs={setPrefs} showToast={showToast} confirmAction={confirmAction} Group={Group} Row={Row} Status={Status} Switch={Switch} />
         ) : null}
 
         {section === 'accounts' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} isAdmin={accountRole === 'administrator'} profileLabels={profileLabels} /> : null}

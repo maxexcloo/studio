@@ -1,11 +1,11 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Boxes, ChevronDown, Eye, EyeOff, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { Boxes, Check, ChevronDown, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { galleryAspects, gallerySizeBands, otherAspect } from '../../server/gallery-filters.js';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
-import { emptySearch, searchActive, type GallerySearch } from './favorites';
+import { searchFilterKeys, type GallerySearch } from './favorites';
 import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
@@ -14,10 +14,14 @@ const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.labe
 const aspectLabels = new Map([...galleryAspects.map((aspect) => [aspect.id, aspect.id] as const), [otherAspect, 'Other']]);
 export const filterLabel = (key: 'size' | 'aspect', value?: string) => (value ? (key === 'size' ? sizeLabels : aspectLabels).get(value) || value : '');
 
-function GalleryFilterPicker({ name, label = name, value, values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; label?: string; value: string; values: string[]; icon: typeof Boxes; onChange: (value: string) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
+/**
+ * One multi-select filter: its trigger shows how many values are picked, its
+ * menu toggles values (any of them matches) and has its own Clear.
+ */
+function GalleryFilterPicker({ name, label = name, values: picked, options: values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; label?: string; values: string[]; options: string[]; icon: typeof Boxes; onChange: (values: string[]) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
-  const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 240 });
+  const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 280 });
   const anchor = React.useRef<HTMLButtonElement>(null);
   const menu = React.useRef<HTMLDivElement>(null);
   const list = React.useRef<HTMLDivElement>(null);
@@ -43,8 +47,8 @@ function GalleryFilterPicker({ name, label = name, value, values, icon: Icon, on
       const viewportTop = viewport?.offsetTop || 0;
       const below = bottom - rect.bottom - 16;
       const above = rect.top - viewportTop - 16;
-      const height = Math.max(0, Math.min(240, bottom - viewportTop - 16, Math.max(below, above)));
-      const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - 248)), top: below >= Math.min(180, above) ? rect.bottom + 8 : Math.max(viewportTop + 8, rect.top - height - 8), maxHeight: height };
+      const height = Math.max(0, Math.min(320, bottom - viewportTop - 16, Math.max(below, above)));
+      const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - 268)), top: below >= Math.min(200, above) ? rect.bottom + 8 : Math.max(viewportTop + 8, rect.top - height - 8), maxHeight: height };
       setPosition(current => current.left === next.left && current.top === next.top && current.maxHeight === next.maxHeight ? current : next);
     };
     place();
@@ -54,56 +58,61 @@ function GalleryFilterPicker({ name, label = name, value, values, icon: Icon, on
     return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); window.visualViewport?.removeEventListener('resize', place); };
   }, [open]);
   React.useEffect(() => {
-    if (open) focusOption(list.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]'));
+    if (open) focusOption(list.current?.querySelector<HTMLButtonElement>('[role="option"]'));
   }, [open, focusOption]);
-  const choose = (next: string) => { onChange(next); close(); };
+  const toggle = (value: string) => onChange(picked.includes(value) ? picked.filter((item) => item !== value) : [...picked, value]);
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = values.filter(option => terms.every(term => labelFor(option).toLocaleLowerCase().includes(term)));
+  const short = (value: string) => searchable ? value : labelFor(value).replace(/ \(.*\)$/, '');
+  const summary = picked.length === 1 ? short(picked[0]) : label;
   return <>
-    <button ref={anchor} type="button" className={cn('gallery-filter-select', value && 'is-on')} aria-label={`Filter By ${name}`} title={`${name}: ${value ? labelFor(value) : 'Any'}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{value ? (searchable ? value : labelFor(value).replace(/ \(.*\)$/, '')) : label}</span><ChevronDown size={12} /></button>
+    <button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} title={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button>
     {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={position} data-own-escape onKeyDown={event => {
       const options = [...list.current!.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const index = options.indexOf(document.activeElement as HTMLButtonElement);
       const typing = event.target instanceof HTMLInputElement;
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || (!typing && (event.key === 'Home' || event.key === 'End'))) {
         event.preventDefault();
-        focusOption(options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : index < 0 ? (event.key === 'ArrowDown' ? (terms.length && matches.length ? 1 : 0) : options.length - 1) : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length]);
+        focusOption(options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : index < 0 ? (event.key === 'ArrowDown' ? 0 : options.length - 1) : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length]);
       }
-      if (typing && event.key === 'Enter' && matches.length) { event.preventDefault(); choose(matches[0]); }
+      if (typing && event.key === 'Enter' && matches.length) { event.preventDefault(); toggle(matches[0]); }
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
-      {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${name === 'LoRA' ? 'LoRAs' : 'Models'}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
-      <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-label={`${name} Filter`}>{['', ...matches].map(option => <button type="button" key={option} className={cn('aspect-option', option === value && 'active')} role="option" tabIndex={option === value ? 0 : -1} aria-selected={option === value} onClick={() => choose(option)}>{option ? labelFor(option) : `Any ${name}`}</button>)}{!matches.length && query ? <p className="gallery-filter-empty" role="status">No Matches</p> : null}</div>
+      <div className="gallery-filter-menu-head"><strong>{label}</strong>{picked.length ? <span>{picked.length} Selected</span> : null}<button type="button" className="gallery-filter-clear" disabled={!picked.length} onClick={() => onChange([])}>Clear</button></div>
+      {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
+      <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
+        const on = picked.includes(option);
+        return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={3} /> : null}</span>{labelFor(option)}</button>;
+      })}{!matches.length ? <p className="gallery-filter-empty" role="status">{query ? 'No Matches' : 'Nothing to Filter Yet'}</p> : null}</div>
     </div>, document.body) : null}
   </>;
 }
 
-export const clearedSearch = (search: GallerySearch): GallerySearch => ({ ...search, q: '', favorites: false, lora: '', model: '', workflow: '', size: '', aspect: '' });
-export const filterCountOf = (search: GallerySearch) => [search.lora, search.model, search.workflow, search.size, search.aspect].filter((value) => value?.trim()).length + Number(search.favorites);
+export const clearedSearch = (search: GallerySearch): GallerySearch => ({ ...search, q: '', favorites: false, workflow: '', ...Object.fromEntries(searchFilterKeys.map((key) => [key, []])) });
+export const filterCountOf = (search: GallerySearch) => searchFilterKeys.filter((key) => search[key]?.length).length + Number(Boolean(search.workflow?.trim())) + Number(search.favorites);
 
 /**
  * The gallery's filters, in one order on the desktop and phones: Starred,
- * Models, LoRAs, Size, Aspect Ratio (docs/guides/UI-PATTERNS.md). Structured
- * filters apply to the whole gallery and stay local in Hidden.
+ * Models, LoRAs, Size, Aspect Ratio (docs/guides/UI-PATTERNS.md). Values
+ * within a filter combine with OR, filters with AND, over the whole gallery.
  */
-function FilterControls({ search, setSearch, items, hiddenSpace, onToggleHidden, floatingRef, clearable }: { search: GallerySearch; setSearch: (next: GallerySearch) => void; items: GalleryItem[]; hiddenSpace: boolean; onToggleHidden?: () => void; floatingRef: React.RefObject<HTMLDivElement | null>; clearable?: boolean }) {
-  const suggestions = (values: unknown[]) => [...new Set(values.flatMap((value) => typeof value === 'string' && value ? [value] : []))].sort();
+function FilterControls({ search, setSearch, items, floatingRef, clearable }: { search: GallerySearch; setSearch: (next: GallerySearch) => void; items: GalleryItem[]; floatingRef: React.RefObject<HTMLDivElement | null>; clearable?: boolean }) {
+  const suggestions = (values: unknown[]) => [...new Set(values.flatMap((value) => typeof value === 'string' && value ? [value] : []))].sort((a, b) => a.localeCompare(b));
   const options = {
     lora: items.flatMap((item) => (Array.isArray(item.settings?.loras) ? item.settings.loras : []).map((lora) => lora.name)),
     model: items.flatMap((item) => [item.model, item.settings?.modelName]),
   };
   const count = filterCountOf(search);
   return <>
-    {onToggleHidden ? <button type="button" className={cn('gallery-filter-icon', hiddenSpace && 'is-on')} aria-label={hiddenSpace ? 'Show Gallery' : 'Show Hidden'} title={hiddenSpace ? 'Show Gallery' : 'Show Hidden'} aria-pressed={hiddenSpace} onClick={onToggleHidden}>{hiddenSpace ? <Eye size={16} /> : <EyeOff size={16} />}</button> : null}
     <button type="button" className={cn('gallery-filter-select', search.favorites && 'is-on')} aria-pressed={search.favorites} title="Only Starred" onClick={() => setSearch({ ...search, favorites: !search.favorites })}><Star size={16} fill={search.favorites ? 'currentColor' : 'none'} /><span>Starred</span></button>
     {(['model', 'lora'] as const).map((key) => {
       const name = key === 'lora' ? 'LoRA' : 'Model';
       const Icon = key === 'model' ? Boxes : Layers;
-      return <GalleryFilterPicker key={key} name={name} label={key === 'lora' ? 'LoRAs' : 'Models'} value={search[key] || ''} values={suggestions([search[key], ...options[key]])} icon={Icon} onChange={value => setSearch({ ...search, [key]: value })} floatingRef={floatingRef} />;
+      return <GalleryFilterPicker key={key} name={name} label={key === 'lora' ? 'LoRAs' : 'Models'} values={search[key] || []} options={suggestions([...(search[key] || []), ...options[key]])} icon={Icon} onChange={values => setSearch({ ...search, [key]: values })} floatingRef={floatingRef} />;
     })}
-    <GalleryFilterPicker name="Size" value={search.size || ''} values={gallerySizeBands.map((band) => band.id)} icon={Ruler} labelFor={(value) => filterLabel('size', value)} searchable={false} onChange={value => setSearch({ ...search, size: value })} floatingRef={floatingRef} />
-    <GalleryFilterPicker name="Aspect Ratio" value={search.aspect || ''} values={[...galleryAspects.map((aspect) => aspect.id), otherAspect]} icon={Ratio} labelFor={(value) => filterLabel('aspect', value)} searchable={false} onChange={value => setSearch({ ...search, aspect: value })} floatingRef={floatingRef} />
-    {clearable && (count || hiddenSpace) ? <button type="button" className="gallery-filter-icon" aria-label="Clear Filters" title="Clear Filters" onClick={() => { setSearch({ ...clearedSearch(search), q: search.q }); if (hiddenSpace) onToggleHidden?.(); }}><X size={16} /></button> : null}
+    <GalleryFilterPicker name="Size" values={search.size || []} options={gallerySizeBands.map((band) => band.id)} icon={Ruler} labelFor={(value) => filterLabel('size', value)} searchable={false} onChange={values => setSearch({ ...search, size: values })} floatingRef={floatingRef} />
+    <GalleryFilterPicker name="Aspect Ratio" values={search.aspect || []} options={[...galleryAspects.map((aspect) => aspect.id), otherAspect]} icon={Ratio} labelFor={(value) => filterLabel('aspect', value)} searchable={false} onChange={values => setSearch({ ...search, aspect: values })} floatingRef={floatingRef} />
+    {clearable && count ? <button type="button" className="gallery-filter-icon" aria-label="Clear Filters" title="Clear Filters" onClick={() => setSearch({ ...clearedSearch(search), q: search.q })}><X size={16} /></button> : null}
   </>;
 }
 
@@ -139,8 +148,6 @@ type SearchProps = {
   count?: number;
   open: boolean;
   setOpen: (open: boolean) => void;
-  hiddenSpace?: boolean;
-  onToggleHidden?: () => void;
   filterTriggerRef?: React.RefObject<HTMLElement | null>;
   /** The button outside the bar that toggles search, so pressing it is not an outside click. */
   searchTriggerRef?: React.RefObject<HTMLElement | null>;
@@ -148,7 +155,7 @@ type SearchProps = {
   setFiltersOpen?: (open: boolean) => void;
 };
 
-export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace = false, onToggleHidden, filterTriggerRef, searchTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [], phone = false }: SearchProps & { islandsHeight?: number; items?: GalleryItem[]; phone?: boolean }) {
+export function GallerySearchBar({ search, setSearch, open, setOpen, filterTriggerRef, searchTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [], phone = false }: SearchProps & { islandsHeight?: number; items?: GalleryItem[]; phone?: boolean }) {
   const present = useIsPresent();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const toolsRef = React.useRef<HTMLDivElement>(null);
@@ -157,7 +164,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
   const [filterHeight, setFilterHeight] = React.useState(0);
   const [localFiltersOpen, setLocalFiltersOpen] = React.useState(false);
   const filterCount = filterCountOf(search);
-  const filterActive = filterCount > 0 || hiddenSpace;
+  const filterActive = filterCount > 0;
   const queryActive = Boolean(search.q.trim());
   const active = queryActive || filterActive;
   // On the phone each opens only from its own button; on desktop an active one stays open.
@@ -216,22 +223,22 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
   }, [open]);
   return <motion.div ref={toolsRef} className={cn(phone ? 'phone-searchbar' : 'gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px`, ...(phone && anchor ? { '--phone-search-top': `${anchor.top}px`, '--phone-search-right': `${anchor.right}px` } : {}) } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={phone ? { opacity: 0, y: -6 } : false} animate={{ opacity: 1, y: 0 }} exit={phone ? { opacity: 0, y: -6 } : undefined} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
     {phone && !searchExpanded ? null : <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={phone ? undefined : { width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-      <button type="button" className="gallery-search-trigger" aria-label={phone ? 'Expand Search' : hiddenSpace ? 'Search Hidden' : 'Search Gallery'} aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
+      <button type="button" className="gallery-search-trigger" aria-label={phone ? 'Expand Search' : 'Search Gallery'} aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
       <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}
           onKeyDown={(event) => {
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!queryActive) setOpen(false); event.currentTarget.blur(); }
             if (event.key === 'Enter') event.currentTarget.blur();
-          }} placeholder="Search" aria-label={hiddenSpace ? 'Search Hidden' : 'Search the gallery'} spellCheck={false} autoComplete="off" enterKeyHint="search" />
+          }} placeholder="Search" aria-label="Search Gallery" spellCheck={false} autoComplete="off" enterKeyHint="search" />
       </motion.div>
-      {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
+      {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear Search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
     </motion.div>}
     {phone && !filtersOpen ? null : <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-      <button type="button" className={cn('gallery-filter-trigger', (filterCount > 0 || hiddenSpace) && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
+      <button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
       <AnimatePresence initial={false}>
         {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
           <div className="gallery-filter-controls" ref={filterControlsRef}>
-          <FilterControls search={search} setSearch={setSearch} items={items} hiddenSpace={hiddenSpace} onToggleHidden={onToggleHidden} floatingRef={floatingRef} clearable />
+          <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} clearable />
           </div>
         </motion.div> : null}
       </AnimatePresence>
@@ -241,8 +248,8 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, hiddenSpace
 }
 
 /** What an empty result says, and the one way back. */
-export function SearchEmpty({ search, onClear, hiddenSpace = false }: { search: GallerySearch; onClear: () => void; hiddenSpace?: boolean }) {
-  const words = search.q.trim() || [search.model, search.workflow, search.lora, filterLabel('size', search.size), filterLabel('aspect', search.aspect)].filter(Boolean).join(" · ");
+export function SearchEmpty({ search, onClear }: { search: GallerySearch; onClear: () => void }) {
+  const words = search.q.trim() || [...(search.model || []), search.workflow, ...(search.lora || []), ...(search.size || []).map((value) => filterLabel('size', value)), ...(search.aspect || []).map((value) => filterLabel('aspect', value))].filter(Boolean).join(" · ");
   const onlyStars = search.favorites && !words;
   return (
     <section className="gallery">
@@ -251,7 +258,7 @@ export function SearchEmpty({ search, onClear, hiddenSpace = false }: { search: 
         <div className="stage-copy">
           <h2>{onlyStars ? 'No Favourites Yet' : <>Nothing Matches “{words}”{search.favorites ? ' in Favourites' : ''}</>}</h2>
           <p>{onlyStars
-            ? `Star an image${hiddenSpace ? ' in Hidden' : ''} and it shows up here.`
+            ? 'Star an image and it shows up here.'
             : 'Search covers prompts, models and LoRAs. Try fewer words.'}</p>
           <div className="empty-actions">
             <button type="button" className="reconnect-btn primary" onClick={onClear}><X size={13} /> {onlyStars ? 'Show Everything' : 'Clear Search'}</button>
@@ -270,14 +277,12 @@ export function SearchEmpty({ search, onClear, hiddenSpace = false }: { search: 
  * there, tinted with a count while it has something applied. Closing it, by
  * its X, its icon, Escape or starting Select, clears the query and every filter.
  */
-export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items = [], hiddenSpace = false, onToggleHidden }: {
+export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items = [] }: {
   expanded: '' | 'search' | 'filters';
   search: GallerySearch;
   setSearch: (next: GallerySearch) => void;
   onClose: () => void;
   items?: GalleryItem[];
-  hiddenSpace?: boolean;
-  onToggleHidden?: () => void;
 }) {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const floatingRef = React.useRef<HTMLDivElement>(null);
@@ -301,11 +306,11 @@ export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items 
       <div className="phone-tools-inner">
         {expanded === 'search' ? <label className="phone-tools-field">
           <Search size={17} aria-hidden="true" />
-          <input ref={inputRef} value={search.q} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder={hiddenSpace ? 'Search Hidden' : 'Search'} aria-label={hiddenSpace ? 'Search Hidden' : 'Search the gallery'} spellCheck={false} autoComplete="off" enterKeyHint="search" />
+          <input ref={inputRef} value={search.q} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="Search" aria-label="Search Gallery" spellCheck={false} autoComplete="off" enterKeyHint="search" />
         </label> : <div className="phone-filter-row gallery-filter-controls" role="group" aria-label="Gallery Filters">
-          <FilterControls search={search} setSearch={setSearch} items={items} hiddenSpace={hiddenSpace} onToggleHidden={onToggleHidden} floatingRef={floatingRef} />
+          <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} />
         </div>}
-        <button type="button" className="phone-icon phone-tools-close" aria-label={expanded === 'search' ? 'Clear search' : 'Clear Filters'} title="Clear & Close" onClick={onClose}><X size={20} /></button>
+        <button type="button" className="phone-icon phone-tools-close" aria-label={expanded === 'search' ? 'Clear Search' : 'Clear Filters'} title="Clear & Close" onClick={onClose}><X size={20} /></button>
       </div>
     </motion.div> : null}
   </AnimatePresence>;

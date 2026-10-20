@@ -10,7 +10,7 @@ import { needsOriginal, viewerMediaSize, viewerSources } from './viewerMedia';
 
 export function generationIdentity(item: GalleryItem) {
   return !item.run && item.jobId && Number.isInteger(item.index)
-    ? `${item.privateVault ? 'vault' : 'gallery'}:${item.jobId}:${item.index}`
+    ? `gallery:${item.jobId}:${item.index}`
     : item.id;
 }
 

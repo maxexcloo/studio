@@ -31,7 +31,7 @@ function onScreen(run: Run) {
  * joining a run starts its clock again. Once quiet, it folds into a stack,
  * but only while none of it is on screen, so nobody watches a fold they
  * didn't ask for, and a toast says so with Undo. Runs that were already quiet
- * when first seen (opening the app, Hidden, a page further down) are simply
+ * when first seen (opening the app, a page further down) are simply
  * stacked.
  *
  * Returns the groups with only the settled runs in them: everything else is
@@ -118,7 +118,7 @@ export function useRunSettling(groups: GalleryGroups, { enabled, showToast }: { 
   const visible = useMemo(() => {
     if (!enabled) return groups;
     const now = Date.now();
-    // A quiet run seen for the first time (opening the app, Hidden, the next
+    // A quiet run seen for the first time (opening the app, the next
     // page) is stacked in this very render, as check() is about to decide, so
     // it never shows loose for a frame and then jumps into its stack.
     const runs = groups.runs.filter((run) => !runIsActive(run, now) && (settled.has(run.id) || (!seen.current.has(run.id) && !held.current.has(run.id))));

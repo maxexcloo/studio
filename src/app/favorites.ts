@@ -4,20 +4,32 @@ import type { GalleryItem } from './types';
 import type { ShowToast } from './toast';
 
 /**
- * Stars on images. A star is kept with the image on the server (the gallery's
- * list, or Hidden's encrypted one), shows at once here, and is taken back if
- * the server says no. "Favourites" in the gallery search shows only these.
+ * Stars on images. A star is kept with the image on the server, shows at once
+ * here, and is taken back if the server says no. Starred in the gallery
+ * filters shows only these.
  */
 
-export type GallerySearch = { q: string; favorites: boolean; lora?: string; model?: string; workflow?: string; size?: string; aspect?: string };
+/** The multi-value filters: any value within one matches (OR), every filter must match (AND). */
+export const searchFilterKeys = ["model", "lora", "size", "aspect"] as const;
+export type SearchFilterKey = typeof searchFilterKeys[number];
+export type GallerySearch = { q: string; favorites: boolean; workflow?: string } & Partial<Record<SearchFilterKey, string[]>>;
 export const emptySearch: GallerySearch = { q: "", favorites: false };
 
 export function searchActive(search?: GallerySearch | null) {
-  return Boolean(search && (search.q.trim() || search.favorites || search.model?.trim() || search.workflow?.trim() || search.lora?.trim() || search.size || search.aspect));
+  return Boolean(search && (search.q.trim() || search.favorites || search.workflow?.trim() || searchFilterKeys.some((key) => search[key]?.length)));
+}
+
+/** The gallery query for a search: repeated parameters for each filter's values. */
+export function galleryQuery(search: GallerySearch) {
+  if (!searchActive(search)) return "";
+  const q = search.q.trim();
+  const parts = [q ? `q=${encodeURIComponent(q)}` : "", search.favorites ? "favorites=1" : "", search.workflow?.trim() ? `workflow=${encodeURIComponent(search.workflow.trim())}` : ""];
+  for (const key of searchFilterKeys) for (const value of search[key] || []) parts.push(`${key}=${encodeURIComponent(value)}`);
+  return parts.filter(Boolean).map((part) => `&${part}`).join("");
 }
 
 export function canStar(item: GalleryItem | null | undefined) {
-  return Boolean(item && item.status === "done" && item.url && !item.vaultLocked && !item.run);
+  return Boolean(item && item.status === "done" && item.url && !item.run);
 }
 
 function withStar(item: GalleryItem, favorite: boolean): GalleryItem {
@@ -52,14 +64,9 @@ export function useFavorites({ patchGalleryItems, removeGalleryItems, setActive,
       ? apiJson(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids: keysOf(list), favorite }) })
       : Promise.resolve(null);
     try {
-      await Promise.all([
-        post("/api/gallery/favorite", targets.filter((item) => !item.privateVault)),
-        post("/api/hidden/favorite", targets.filter((item) => item.privateVault))
-      ]);
-      // Showing only favourites: an image unstarred there leaves the list. The
-      // gallery's list is the server's filtered page, so it goes from it; Hidden
-      // keeps its whole list here and filters in memory, so it stays in it.
-      const leaving = targets.filter((item) => !item.privateVault).map((item) => item.id);
+      await post("/api/gallery/favorite", targets);
+      // Showing only starred items: one unstarred there leaves the server's filtered page.
+      const leaving = targets.map((item) => item.id);
       if (!favorite && latest.current.search.favorites && leaving.length) latest.current.removeGalleryItems(leaving);
     } catch (error) {
       apply(!favorite);

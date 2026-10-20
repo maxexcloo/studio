@@ -28,11 +28,11 @@ type Landed = { key: string; items: GalleryItem[] };
 export function useGenerationActivity({ items, enabled, watching, reveal, onJump, onView }: {
   /** The gallery as shown: its pending items are the work, its finished ones the results. */
   items: GalleryItem[];
-  /** Off on the phone (it has its own activity chip) and while Hidden is locked. */
+  /** Off on the phone (it has its own activity chip). */
   enabled: boolean;
   /** The rendering work is on screen already, so there is nothing to stand in for. */
   watching: boolean;
-  /** Whether this item's pictures and prompt may show here (Hidden's only inside Hidden). */
+  /** Whether this item's pictures and prompt may show here. */
   reveal: (item: GalleryItem) => boolean;
   onJump: (item: GalleryItem) => void;
   onView: (item: GalleryItem) => void;

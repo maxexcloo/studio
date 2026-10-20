@@ -11,7 +11,7 @@ export type AccessStatus = {
   thisComputer: boolean;
   signedIn: boolean;
   canAdmin: boolean;
-  studioPassword: { set: boolean; hidden: boolean };
+  studioPassword: { set: boolean };
 };
 
 type GateState =
@@ -71,10 +71,10 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'refused') return <GateMessage title={state.title} text={state.text} />;
   if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} oidcLabel={state.oidcLabel} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
-  if (!studioPassword.set && !studioPassword.hidden) {
+  if (!studioPassword.set) {
     return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Connection, then reload this page." />;
   }
-  return <SignIn legacy={studioPassword.hidden} onSignedIn={() => { window.location.reload(); }} />;
+  return <SignIn onSignedIn={() => { window.location.reload(); }} />;
 }
 
 /** What a single sign-on redirect came back with (server/multi-user-auth.js). */
@@ -181,7 +181,7 @@ function GateMessage({ title, text }: { title: string; text: string }) {
   );
 }
 
-function SignIn({ legacy, onSignedIn }: { legacy: boolean; onSignedIn: () => void }) {
+function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [password, setPassword] = useState('');
   const [stage, setStage] = useState<LockMarkStage>('locked');
   const [error, setError] = useState('');
@@ -213,9 +213,7 @@ function SignIn({ legacy, onSignedIn }: { legacy: boolean; onSignedIn: () => voi
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
           <h2>{stage === 'opening' ? 'Signed in' : 'Sign in to Studio'}</h2>
-          <p>{legacy
-            ? 'Enter the studio password. Until one is set, it’s the Hidden password.'
-            : 'Enter the studio password set on the computer running Studio.'}</p>
+          <p>Enter the studio password set on the computer running Studio.</p>
           <div className="empty-actions">
             {stage !== 'opening' ? (
               <div className="hidden-unlock">
