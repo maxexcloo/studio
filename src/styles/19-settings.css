@@ -101,6 +101,10 @@
 .set-suggest { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .set-model-name { display: block; overflow-wrap: anywhere; }
 .set-type-picker { width: 200px; }
+/* Settings › Workers › AI Control: a GPU's workload, named in full where there is room. */
+.set-gpu-picker { display: flex; justify-content: flex-end; width: 280px; min-width: 0; }
+.set-gpu-picker > * { min-width: 0; max-width: 100%; }
+@media (max-width: 760px) { .set-gpu-picker { width: auto; max-width: 52vw; } }
 
 .set-inline-form { display: flex; gap: 8px; }
 .set-inline-form .modal-input { flex: 1; min-width: 0; }

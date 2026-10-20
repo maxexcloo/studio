@@ -12,6 +12,7 @@ import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js'
 import { loadMcpPrompting } from './mcp-prompting.js';
 import { familyMatches, fastestFirst, findProfile, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
+import { createControlClient } from './ai-control.js';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
 export const generateWaitSeconds = 60;
@@ -375,12 +376,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source, `${plan.tierNote || ''}${dropped}`);
       });
     } else {
+      const ask = createControlClient(environment, fetchImpl);
       const control = async (method, route, body) => {
-        try {
-          const response = await fetchImpl(`${environment.CONTROL_URL.replace(/\/+$/, '')}/api/${route}`, { method, headers: { Authorization: `Bearer ${environment.CONTROL_API_KEY}`, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(15000) });
-          if (![200, 202].includes(response.status)) throw new Error('refused');
-          return await response.json();
-        } catch { throw new Error('AI Control is unavailable or refused the request. Refresh its status and preview before retrying.'); }
+        try { return await ask(method, route, body); }
+        catch { throw new Error('AI Control is unavailable or refused the request. Refresh its status and preview before retrying.'); }
       };
       const request = async (method, route, body) => mcpJson(await control(method, route, body));
       /** A preset board: image with text, image with video, or video on both GPUs. Text keeps the running single-GPU model unless one is named. */
