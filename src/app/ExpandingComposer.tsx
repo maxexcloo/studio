@@ -24,6 +24,7 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
   }, []);
   return <motion.section
     className={cn('zen-prompt', expanded && 'is-expanded')}
+    aria-label="Create"
     initial={false}
     animate={{ height: height ?? 'auto' }}
     transition={reduced ? { duration: 0 } : springs.slow}
