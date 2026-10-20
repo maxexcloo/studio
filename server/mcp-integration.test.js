@@ -1631,6 +1631,11 @@ test('replies label links Result N with one All Results page, and Result "all" s
   // Another conversation and another account see only their own results.
   await failure(await chat(t, f, 'alice', 'other-chat'), 'Result', { job_id: 'all' });
   assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, 'AAAAAAAAAA'))).status, 404);
+  // A result link or its id from a reply names its job, only for its own account.
+  const linkId = /\/mcp\/results\/([A-Za-z0-9]{10})/.exec(first.link)[1];
+  assert.equal(data(await call(client, 'Status', { job_id: linkId })).job_id, first.job_id);
+  assert.equal(data(await call(client, 'Status', { job_id: first.link })).job_id, first.job_id);
+  await failure(await chat(t, f, 'bob', 'plush-chat'), 'Status', { job_id: linkId });
   // A pending Result names its link Result N.
   assert.match(texts(await call(client, 'Result', { job_id: 'result 3' })), /\[Result 3\]\(https:/);
 });

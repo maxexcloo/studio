@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Result links work as references
+
+### Fixed
+- **Result links as references:** Status, Result, Cancel and Reuse accept a result link or its short id from an earlier reply, for the same account; a chat model had passed the link id instead of "result 1".
+
 ## [0.30.1] - 2026-10-20
 
 > Chat asks for 2K only when the user does, and imported FLUX.3 workflows can draw it

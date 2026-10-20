@@ -273,6 +273,10 @@ export class McpMedia {
   }
   /** Accepts a job ID or a reference such as "result 3" from this conversation. */
   resolve(owner, scope, value) {
+    // A result link (or its id) from an earlier reply names its job, when it belongs to this account.
+    const short = /^(?:https?:\/\/\S+\/mcp\/results\/)?([A-Za-z0-9]{10})(?:\.jpg)?$/.exec(String(value || '').trim())?.[1];
+    const linked = short && Object.hasOwn(this.state.links, short) ? this.state.links[short] : null;
+    if (linked?.jobId && linked.owner === owner) return linked.jobId;
     const match = referencePattern.exec(String(value || ''));
     if (!match) return value;
     const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[Number(match[1])];
