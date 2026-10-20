@@ -311,7 +311,8 @@ test('media and administrator credentials discover only their own friendly tools
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
-  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7500, 'media tool schemas and instructions exceed their context budget');
+  // (7600 since Generate says to batch several images into one call instead of repeating it.)
+  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7600, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
   await call(admin, 'GPUStatus');
@@ -374,7 +375,7 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   assert.equal(data(await call(client, 'Models', { profile_id: 'fixture-turbo-image' })).id, imageProfile.id);
   const missed = await call(client, 'Models', { profile_id: 'fixture-sdxl-image' });
   assert.equal(missed.isError, true);
-  assert.equal(missed.content[0].text, `No ready profile matches fixture-sdxl-image. Closest: ${imageProfile.id} (${imageProfile.label}), ${videoProfile.id} (${videoProfile.label}).`);
+  assert.equal(missed.content[0].text, `No ready profile matches fixture-sdxl-image. Ready profiles for it: ${imageProfile.id} (${imageProfile.label}), ${videoProfile.id} (${videoProfile.label}).`);
 });
 
 test('Generate attaches a compact guide once per account unless it read the selected profile, not discovery or another profile', async t => {
@@ -750,7 +751,7 @@ test('background Result collects a later completion without another submission',
   // Self-sufficient: the woken agent renders this markdown without another Result call.
   const [message] = result.content;
   assert.match(message.text, /\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
-  assert.match(message.text, /Do not call Studio again/);
+  assert.match(message.text, /Don't call Studio again for this request\./);
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
@@ -1292,7 +1293,7 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(texts(slowResult), /^Queued\. Share the links below and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
+  assert.match(texts(slowResult), /^Queued\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
   once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
@@ -1540,6 +1541,30 @@ test('"turbo flux 3" finds the distilled FLUX.3 profile, and words naming severa
   assert.match(texts(ambiguous), /^klein matches several profiles: custom:bento-image-flux3-klein-distilled-int8 .*Pass one id\.$/);
 });
 
+test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it with a note, and a missing model is never substituted', async t => {
+  const f = await fixture(t);
+  await f.profiles([
+    tiered('custom:bento-image-boogu-turbo', 'Boogu Image Turbo · Fast · 4 Steps · Text Only · INT8 ConvRot · Hotfix (~4s)', { family: 'boogu' }),
+    tiered('custom:bento-image-moss-base-dmd8', 'MOSS Image Base · Fast · 8 Steps · Text Only · INT8 ConvRot · DMD8 LoRA', { family: 'moss_image' }),
+    tiered('custom:bento-image-moss-sft', 'MOSS Image SFT · Quality · 50 Steps · Text Only · INT8 ConvRot', { family: 'moss_image' }),
+    tiered('custom:bento-image-krea2-turbo-fast2', 'Krea 2 Turbo · Super Fast · 2 Steps · Text Only · INT8 ConvRot · 2-Step LoRA', { family: 'krea2' })
+  ], { defaults: { image: 'custom:bento-image-boogu-turbo', video: videoProfile.id } });
+  const client = await f.client();
+  const models = data(await call(client, 'Models', { profile_id: 'moss turbo', tier: 'turbo' }));
+  assert.equal(models.id, 'custom:bento-image-moss-base-dmd8');
+  assert.match(models.note, /^MOSS Image Base has no Super Fast profile; used MOSS Image Base · Fast/);
+  const generated = await call(client, 'Generate', { profile_id: 'MOSS Image SFT', tier: 'turbo', prompts: ['A heron'] });
+  assert.equal(data(generated).profile.id, 'custom:bento-image-moss-base-dmd8');
+  assert.match(texts(generated), /MOSS Image Base has no Super Fast profile; used MOSS Image Base · Fast .*Tell the user\./);
+  assert.equal(data(await call(client, 'Generate', { profile_id: 'custom:bento-image-moss-sft', tier: 'turbo', prompts: ['A heron'] })).profile.id, 'custom:bento-image-moss-sft', 'an exact id stays');
+  const missing = await call(client, 'Generate', { profile_id: 'moss xl', prompts: ['A heron'] });
+  assert.equal(texts(missing), 'No ready profile matches moss xl. Ready profiles for it: custom:bento-image-moss-base-dmd8 (MOSS Image Base · Fast · 8 Steps · Text Only · INT8 ConvRot · DMD8 LoRA), custom:bento-image-moss-sft (MOSS Image SFT · Quality · 50 Steps · Text Only · INT8 ConvRot).');
+  const unknown = await call(client, 'Generate', { profile_id: 'sdxl turbo', prompts: ['A heron'] });
+  assert.equal(texts(unknown), "No ready profile matches sdxl turbo; that model isn't available to this account. Tell the user instead of using another model.");
+  assert.match(client.getInstructions(), /If a named model is unavailable, say so; don't substitute\./);
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['custom:bento-image-moss-base-dmd8', 'custom:bento-image-moss-sft']);
+});
+
 test('a family name such as "flux 3" picks its Fast profile, and near misses list the fastest first', async t => {
   const f = await fixture(t);
   await f.profiles(flux3(), { defaults: { image: 'qwen-quality', video: videoProfile.id } });
@@ -1568,7 +1593,7 @@ test('one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(texts(excess), 'count is images per prompt, so 2 prompts × count 6 would queue 12 jobs; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.');
   const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
-  assert.match(generate.description, /count: 1–10 per call, one job each; split more\. .*prompts \(one per different image\)/);
+  assert.match(generate.description, /For several different images, use one call with count \(1–10\) or prompts; don't make repeated calls\. .*prompts \(one per different image\)/);
   assert.equal(generate.inputSchema.properties.count.description, '1–10 per prompt; default 1.');
   assert.equal(generate.inputSchema.properties.prompts.description, '1–10.');
   assert.equal(f.submitted.length, 4);
@@ -1767,6 +1792,19 @@ test('Studio writes every prompt of a Generate call in one writer call from the 
   assert.equal(f.writerRequests.length, 2);
   await failure(client, 'Generate', { kind: 'image' });
   await failure(client, 'Generate', { kind: 'image', request: 'An egg', prompts: ['An egg'] });
+});
+
+test('six individual photos are one Generate call: six jobs, each with its own written prompt', async t => {
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
+  assert.match(generate.description, /For several different images, use one call with count \(1–10, a distinct prompt each\) or prompts; don't make repeated calls\./);
+  const result = data(await call(client, 'Generate', { kind: 'image', request: 'six individual photos of a plush, unique colours', count: 6 }));
+  assert.equal(result.jobs.length, 6);
+  assert.equal(f.writerRequests.length, 1, 'one writer call for all six');
+  assert.equal(new Set(f.submitted.map(item => item.prompt)).size, 6, 'no copies of one prompt');
+  assert.deepEqual(f.submitted.map(item => item.count), Array(6).fill(1));
 });
 
 test('tweaks and model changes re-expand the original request for the target profile', async t => {

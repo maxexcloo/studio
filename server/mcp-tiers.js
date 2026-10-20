@@ -64,10 +64,13 @@ export function nameWords(value) {
 }
 // Speed words in a query say which tier is wanted rather than naming a model.
 const speedWords = { turbo: 'turbo', super: 'turbo', draft: 'turbo', fast: 'fast', quick: 'fast', quality: 'quality', best: 'quality', hq: 'quality', standard: 'standard' };
+/** Words that ask for a speed rather than name a model. */
+export const speedWordList = new Set(Object.keys(speedWords));
 const profileNames = (profile) => [profile.id, profile.label, profile.displayName, profile.family].filter(Boolean);
 /**
- * How well a profile answers a free-text query: null when a model word ("flux 3", "klein") is missing
- * from its id, label or family; otherwise a score that favours speed words it also matches by name or tier.
+ * How well a profile answers a free-text query: null when a model word ("flux 3", "moss") is missing
+ * from its id, label or family. Speed words never name a model ("Turbo" in a label does not count);
+ * they only rank by tier, so "moss turbo" means MOSS's fastest profile.
  */
 function queryScore(profile, words) {
   const own = new Set(profileNames(profile).flatMap(nameWords));
@@ -78,7 +81,6 @@ function queryScore(profile, words) {
   for (const word of words) {
     const speed = speedWords[word];
     if (!speed) { if (!has(word)) return null; continue; }
-    if (has(word)) score += 2;
     if ((nearTiers[speed] || [speed]).includes(tierOf(profile))) score += tierOf(profile) === speed ? 2 : 1;
   }
   return score;
@@ -89,16 +91,19 @@ function queryScore(profile, words) {
  * A query without a model word names nothing.
  */
 export function searchProfiles(profiles, query) {
+  return scoredSearch(profiles, query).map(item => item.profile);
+}
+function scoredSearch(profiles, query) {
   const words = nameWords(query);
   if (!words.some(word => !speedWords[word])) return [];
   const scored = fastestFirst(profiles).map(profile => ({ profile, score: queryScore(profile, words) })).filter(item => item.score !== null);
-  return scored.sort((left, right) => right.score - left.score).map(item => item.profile);
+  return scored.sort((left, right) => right.score - left.score);
 }
 /**
  * The profile a name means: its id, then an id, label or family match ignoring case and punctuation,
  * then a partial match, then every model word of a query such as "turbo flux 3". Several matches from
  * one family ("flux 3" for every FLUX.3 profile) resolve to its fastest profile, or the one a speed
- * word picks; matches across families find nothing.
+ * word picks within it; matches across families find nothing.
  */
 export function findProfile(profiles, value) {
   const exact = profiles.find(profile => profile.id === value);
@@ -112,6 +117,7 @@ export function findProfile(profiles, value) {
     if (found.length === 1) return found[0];
     if (oneFamily(found)) return fastestFirst(found)[0];
   }
+  // The model words decide the family; speed words only choose within it, never across families.
   const found = searchProfiles(profiles, value);
   return found.length === 1 || oneFamily(found) ? found[0] : null;
 }
@@ -162,4 +168,40 @@ export function chooseRemoteVideo(profiles, { tier, defaultId, references = 0, f
   if (!remote.length) return null;
   const preferred = [tier, 'standard'].find(item => item && profilesForTier(remote, item).length);
   return chooseProfile(remote, { kind: 'video', tier: preferred, defaultId, references });
+}
+
+// From a wanted tier, the order of the nearest others.
+const tierDistance = { turbo: ['turbo', 'fast', 'standard', 'quality'], fast: ['fast', 'turbo', 'standard', 'quality'], standard: ['standard', 'quality', 'fast', 'turbo'], quality: ['quality', 'standard', 'fast', 'turbo'] };
+const tierNames = { turbo: 'Super Fast', fast: 'Fast', standard: 'Standard', quality: 'Quality' };
+/**
+ * A named profile moved to the wanted tier within its own family: the family's profile in that tier,
+ * otherwise its nearest tier with a note to pass on. Never another family; without a family the
+ * profile stays as named.
+ */
+export function withinFamily(profiles, profile, tier) {
+  if (!tier || !profile || tierOf(profile) === tier) return { profile, note: '' };
+  const family = profile.family ? profiles.filter(item => item.family === profile.family && item.kind === profile.kind) : [profile];
+  for (const item of tierDistance[tier] || [tier]) {
+    const match = item === tierOf(profile) ? profile : family.find(candidate => tierOf(candidate) === item);
+    if (!match) continue;
+    if (item === tier) return { profile: match, note: '' };
+    const name = String(match.label || match.id).split('·')[0].trim();
+    return { profile: match, note: `${name} has no ${tierNames[tier]} profile; used ${match.label || match.id}. Tell the user. ` };
+  }
+  return { profile, note: '' };
+}
+
+// Words most profile names share, which say nothing about the model.
+const genericWords = new Set(['image', 'images', 'video', 'videos', 'model', 'models', 'profile', 'custom', 'bento', 'steps', 'step', 'the', 'a', 'an']);
+/**
+ * Profiles that share a model word with a name that matched nothing, so a miss lists the family the
+ * user meant ("moss xl" lists MOSS) instead of unrelated models. Empty when no model word matches.
+ */
+export function familyMatches(profiles, value) {
+  const words = nameWords(value).filter(word => !speedWords[word] && !genericWords.has(word));
+  return fastestFirst(profiles).filter(profile => {
+    const own = new Set(profileNames(profile).flatMap(nameWords));
+    const joined = profileNames(profile).map(squash).join(' ');
+    return words.some(word => own.has(word) || (word.length > 3 && joined.includes(word)));
+  });
 }

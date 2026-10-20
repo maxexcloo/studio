@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, chooseRemoteVideo, findProfile, nameWords, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo, familyMatches, findProfile, nameWords, withinFamily, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -149,6 +149,11 @@ test('on the Bento catalogue, turbo lists Super Fast then the distilled Fast pro
   assert.deepEqual(profilesNearTier(bento, 'fast').slice(0, 2).map(tierOf), ['fast', 'fast']);
   for (const name of ['turbo flux 3', 'flux 3 turbo', 'flux3', 'FLUX.3', 'fast flux 3', 'FLUX.3 [klein] distilled']) assert.equal(findProfile(bento, name)?.id, 'custom:bento-image-flux3-klein-distilled-int8', name);
   assert.equal(findProfile(bento, 'flux 3 quality')?.id, 'custom:bento-image-flux3-klein-base-int8');
+  // From LibreChat: the first try named the Radiance runtime too.
+  for (const name of ['turbo radiance flux 3', 'radiance flux3 fast', 'Radiance FLUX.3 [klein]']) assert.equal(findProfile(bento, name)?.id, 'custom:bento-image-radiance-flux3-klein', name);
+  assert.equal(findProfile(bento, 'radiance flux 3 quality')?.id, 'custom:bento-image-radiance-flux3-klein-base');
+  assert.equal(findProfile(bento, 'krea 2 turbo super fast')?.id, 'custom:bento-image-krea2-turbo-fast2');
+  assert.equal(findProfile(bento, 'turbo klein'), null, 'speed words never choose between families');
   assert.equal(findProfile(bento, 'tesserafine')?.id, 'custom:bento-image-tesserafine-turbo-int8-convrot', 'one family resolves to its Fast profile');
   assert.equal(findProfile(bento, 'klein'), null, 'FLUX.2 and FLUX.3 both say klein');
   const klein = searchProfiles(bento, 'klein');
@@ -157,4 +162,24 @@ test('on the Bento catalogue, turbo lists Super Fast then the distilled Fast pro
   assert.deepEqual(searchProfiles(bento, 'turbo'), [], 'speed words alone name no model');
   assert.deepEqual(nameWords('FLUX.3 [klein]'), ['flux3', 'klein']);
   assert.deepEqual(nameWords('flux 3'), ['flux3']);
+});
+
+test('the family decides and speed words only choose within it: "moss turbo" is MOSS, never Boogu Turbo', () => {
+  // MOSS has no Super Fast profile; Boogu has "Turbo" in its labels, which must not win.
+  assert.equal(findProfile(bento, 'moss turbo')?.id, 'custom:bento-image-moss-base-dmd8');
+  assert.equal(findProfile(bento, 'turbo moss')?.id, 'custom:bento-image-moss-base-dmd8');
+  assert.equal(findProfile(bento, 'moss quality')?.id, 'custom:bento-image-moss-sft');
+  assert.equal(findProfile(bento, 'turbo radiance flux 3')?.id, 'custom:bento-image-radiance-flux3-klein');
+  assert.equal(findProfile(bento, 'flux 3 quality')?.id, 'custom:bento-image-flux3-klein-base-int8');
+  assert.equal(findProfile(bento, 'krea turbo')?.id, 'custom:bento-image-krea2-turbo-fast2', "turbo is the family's fastest");
+  // An explicit tier the family lacks takes its nearest tier, with a note; never another family.
+  const moss = bento.find(profile => profile.id === 'custom:bento-image-moss-sft');
+  const moved = withinFamily(bento, moss, 'turbo');
+  assert.equal(moved.profile.id, 'custom:bento-image-moss-base-dmd8');
+  assert.equal(moved.note, 'MOSS Image Base has no Super Fast profile; used MOSS Image Base · Fast · 8 Steps · Text Only · INT8 ConvRot · DMD8 LoRA. Tell the user. ');
+  assert.deepEqual(withinFamily(bento, moss, 'quality'), { profile: moss, note: '' });
+  assert.equal(withinFamily(bento, moss, 'fast').note, '', 'an exact tier needs no note');
+  // A miss lists the family the name points at, not unrelated models.
+  assert.deepEqual(familyMatches(bento, 'moss xl turbo').map(profile => profile.id), ['custom:bento-image-moss-base-dmd8', 'custom:bento-image-moss-sft']);
+  assert.deepEqual(familyMatches(bento, 'sdxl turbo'), []);
 });

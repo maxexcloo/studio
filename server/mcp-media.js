@@ -582,7 +582,7 @@ export class McpMedia {
     // A preview shows the asked-for output; a notification carries every output of the job.
     const shown = delivery === 'notification' ? job : { ...job, outputs: job.outputs.map((item, position) => position === index ? item : {}) };
     const { outputs, markdown } = await this.markdown(owner, jobId, shown, label);
-    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.`;
+    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.`;
     // Only the markdown re-enters the chat by default; detail restores the full record.
     if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(ref ? { ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
@@ -657,7 +657,7 @@ export class McpMedia {
     const pendingLinks = pending.map(({ number, jobId }) => `[Result ${number}](${this.pageUrl(owner, jobId)})`);
     const markdown = [...blocks.map(block => block.markdown), [...pendingLinks, all].filter(Boolean).join(' · ')].filter(Boolean).join('\n\n');
     const message = shown.length
-      ? `${shown.length === 1 ? 'One result is' : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ''}. Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.`
+      ? `${shown.length === 1 ? 'One result is' : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ''}. Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.`
       : 'No result has finished yet. Share the links below and end your turn; do not poll.';
     return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { status: pending.length ? 'running' : 'done', results: jobs.map(({ number, jobId, job }) => ({ ref: `result ${number}`, job_id: jobId, status: job.status })) } };
   }
