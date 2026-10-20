@@ -249,7 +249,7 @@
 }
 .reference-tabs button:hover { color: hsl(var(--foreground)); }
 .reference-tabs button.active { background: var(--selected); color: #fff; }
-/* Clear All beside a picker's tabs (references and LoRAs), only while something is picked. */
+/* Clear Selection beside a picker's tabs (references and LoRAs), only while something is picked. */
 .picker-clear-all {
   flex: none;
   display: inline-flex;
@@ -342,9 +342,6 @@
 .reference-skeleton { aspect-ratio: 1; border-radius: var(--r-media); background: rgb(255 255 255 / .03); animation: mosaic-flicker 2.4s steps(3, jump-none) infinite; }
 .reference-skeleton:nth-child(3n) { animation-delay: -.8s; }
 .reference-skeleton:nth-child(3n + 1) { animation-delay: -1.6s; }
-.reference-empty { display: grid; justify-items: center; align-content: center; gap: 6px; height: 100%; min-height: 200px; text-align: center; color: hsl(var(--muted-foreground)); }
-.reference-empty strong { margin-top: 4px; font-size: 13.5px; font-weight: 550; color: hsl(var(--foreground)); }
-.reference-empty p { margin: 0 0 8px; font-size: 12.5px; }
 .reference-more { display: flex; margin: 12px auto 0; }
 .reference-page-error { display: grid; justify-items: center; gap: 8px; margin: 12px 0; text-align: center; }
 .reference-page-error p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; }

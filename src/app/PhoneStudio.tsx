@@ -32,6 +32,7 @@ import { usePromptHistory } from './recentPrompts';
 import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
 import { StatusPill, useStatusHost } from './StatusMessage';
+import { EmptyState } from './EmptyState';
 
 /* ---------------------------------------------------------------------------
    The phone studio
@@ -451,9 +452,9 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         ) : null}
         {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
       </div>
-      {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Add a model to ComfyUI to see it here.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
+      {!profiles.length ? (view.comfyStatus?.connected ? <EmptyState title="No Models Yet">Add a model to ComfyUI to see it here.</EmptyState> : <EmptyState title="ComfyUI Is Offline">Models show up when it’s back.</EmptyState>) : null}
       {sections.map((section) => <React.Fragment key={section.id}>{section.label ? <h3 className="phone-section">{section.label}</h3> : null}<div className="phone-group">{section.rows.map(row)}</div></React.Fragment>)}
-      {profiles.length && !sections.length ? <p className="phone-empty">{noMatchText}</p> : null}
+      {profiles.length && !sections.length ? <EmptyState title="No Matching Models">{noMatchText}</EmptyState> : null}
     </Sheet>
   );
 }

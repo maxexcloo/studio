@@ -118,11 +118,27 @@ through one announcer (polite, failures assertive).
 ## Pickers
 
 - The reference and LoRA choosers share one top bar: the tab pills (This
-  Model | All Models | Selected n/max), then **Clear All** beside them, shown
-  only while something is picked. Clear All empties the selection at once and
-  offers Undo in the status pill; it never asks first.
+  Model | All Models | Selected n/max), then **Clear Selection** beside them,
+  shown only while something is picked. Clear Selection empties the selection
+  at once and offers Undo in the status pill; it never asks first.
 - One tap adds or removes; a picked item shows its order number and stays
-  pinned across searches and tabs.
+  picked across searches and tabs. It never moves: every item keeps its place
+  in the list, and only the Selected tab lists the picks, in their order.
+
+## Empty States
+
+A picker, tab or list with nothing to show uses `EmptyState`
+(`src/app/EmptyState.tsx`) and nothing else:
+
+- Plain muted words centred horizontally and vertically in the space the list
+  would fill. No box, border, background or icon.
+- A short Title Case heading that says what is missing ("No Uploads Yet",
+  "No Matching LoRAs", "This Model Doesn’t Support LoRAs"), then at most one
+  sentence-case line on what to do ("Try a different name."). Never name
+  implementation details (loaders, nodes, built-in workflows).
+- At most one action, such as Try Again or Clear Search, under the words.
+- In a short list (a filter menu, the model menu's search results) use
+  `compact`, which drops the reserved height.
 
 ## Composer
 

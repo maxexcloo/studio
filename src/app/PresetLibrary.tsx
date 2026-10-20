@@ -9,6 +9,7 @@ import { presetFit, type ImagePreset, type PresetResource } from './presets';
 import type { ModelDownload, Models, Profile } from './types';
 import type { ShowToast } from './toast';
 import type { ConfirmAction } from './useConfirmation';
+import { EmptyState } from './EmptyState';
 
 type Access = { available: boolean; backend: string; note: string };
 type ModelFile = { id: string; file: string; folder: string; label: string; bytes: number };
@@ -137,7 +138,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         {loading ? <p role="status">Loading images…</p> : visible.length ? <div className="preset-grid">{visible.map((preset) => <button className="preset-card" disabled={busy} key={preset.id} onClick={() => { select(preset); void run(async () => { await resolve(preset.id); }); }}>
           <span className="preset-card-image"><SafeImg src={preset.thumbnailUrl} loading="lazy" fallback={<Image size={26} />} /></span>
           <strong>{preset.name}</strong><small>{[preset.baseModel, preset.creator && `by ${preset.creator}`].filter(Boolean).join(' · ') || 'Civitai'}</small>
-        </button>)}</div> : <div className="preset-empty"><Library size={28} /><strong>{saved.length ? 'No Matching Images' : 'Save Your First Image'}</strong><p>{saved.length ? 'Try a different model, creator or prompt.' : 'Paste a Civitai image link above. Save its original image, prompt and model settings together.'}</p></div>}
+        </button>)}</div> : <EmptyState title={saved.length ? 'No Matching Images' : 'No Saved Images Yet'}>{saved.length ? 'Try a different model, creator or prompt.' : 'Paste a Civitai image link above to save its image, prompt and settings.'}</EmptyState>}
       </> : <>
         <div className="preset-review-head"><button className="btn" disabled={busy} onClick={() => { setSelected(null); setError(''); }}><ArrowLeft size={15} />Library</button><a className="btn" href={selected.sourceUrl} target="_blank" rel="noreferrer">View On Civitai<ExternalLink size={14} /></a></div>
         <div className="preset-message" role="status"><strong>{selected.galleryItemId ? 'Image Saved' : 'Image Not Yet Saved'} · {selected.resources.some((resource) => activeFor(resource.versionId)) ? 'Downloading Models' : fit?.blockers.length ? 'Needs Review' : 'Ready To Use'}</strong><p>{selected.resources.filter((resource) => resource.status === 'installed').length} of {selected.resources.length} model files installed. Source settings are shown below; custom workflows and additional processing may need manual setup.</p></div>

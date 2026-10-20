@@ -9,6 +9,7 @@ import { searchFilterKeys, type GallerySearch } from './favorites';
 import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
+import { EmptyState } from './EmptyState';
 
 const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.label} (${band.detail})`]));
 const aspectLabels = new Map([...galleryAspects.map((aspect) => [aspect.id, aspect.id] as const), [otherAspect, 'Other']]);
@@ -83,7 +84,7 @@ function GalleryFilterPicker({ name, label = name, values: picked, options: valu
       <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
         const on = picked.includes(option);
         return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={3} /> : null}</span>{labelFor(option)}</button>;
-      })}{!matches.length ? <p className="gallery-filter-empty" role="status">{query ? 'No Matches' : 'Nothing to Filter Yet'}</p> : null}</div>
+      })}{!matches.length ? <EmptyState title={query ? 'No Matches' : 'Nothing to Filter Yet'} compact /> : null}</div>
     </div>, document.body) : null}
   </>;
 }

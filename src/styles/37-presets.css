@@ -13,9 +13,6 @@
 .preset-import > p, .preset-note, .preset-byline, .preset-card small, .preset-resource small { color: hsl(var(--muted-foreground)); }
 .preset-input-row { display: flex; gap: 8px; align-items: center; }
 .preset-input-row .btn { flex: none; }
-.preset-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 38px 22px; border: 1px dashed var(--surface-border); border-radius: var(--r-item); text-align: center; color: hsl(var(--muted-foreground)); }
-.preset-empty strong { color: hsl(var(--foreground)); font-size: 15px; }
-.preset-empty p { max-width: 360px; }
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 .preset-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; padding: 0 0 12px; overflow: hidden; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: transparent; color: inherit; text-align: left; cursor: pointer; transition: border-color 120ms; }
 .preset-card:hover { border-color: hsl(var(--foreground) / .35); }

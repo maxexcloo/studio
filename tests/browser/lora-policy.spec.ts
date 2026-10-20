@@ -123,7 +123,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(strength).toBeDisabled();
   await picker.getByRole('button', { name: 'Enable All', exact: true }).click();
   await expect(strength).toBeEnabled();
-  await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
+  await picker.getByRole('button', { name: 'Clear Selection', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'true');
@@ -137,15 +137,19 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
   await expect(picker.getByRole('link', { name: 'View Source' })).toHaveAttribute('href', 'https://example.com/cards');
   await expect(other).toHaveAttribute('aria-checked', 'true');
+  // Rows never move: the stack order shows in the Move buttons and the Selected tab.
+  const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).press('ArrowUp');
-  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
+  await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Move Cards One Down', exact: true }).click();
   await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).dragTo(picker.getByRole('checkbox', { name: 'Select Cards Two', exact: true }));
-  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards Two');
+  await expect(picker.getByRole('button', { name: 'Move Cards Two Up', exact: true })).toBeDisabled();
+  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', firstRow!);
   await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
-  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
+  await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
+  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', firstRow!);
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
   const open = ui.composer.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true });

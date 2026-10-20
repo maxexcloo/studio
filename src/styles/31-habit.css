@@ -120,13 +120,6 @@
   .prompt-history-icon { opacity: .6; }
 }
 
-.prompt-history-empty {
-  margin: 0;
-  padding: 16px 10px 14px;
-  color: rgb(255 255 255 / .5);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
 
 .prompt-history-foot {
   flex: none;

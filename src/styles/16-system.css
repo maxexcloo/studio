@@ -278,6 +278,39 @@
 }
 .zen-prompt-actions .generate.is-offline:hover { background: rgb(255 120 100 / .2); }
 
+/* ---------------------------------------------------------- Empty states
+   A picker, tab or list with nothing to list (EmptyState.tsx): plain muted
+   words centred in the space it would fill. No box, border or icon. */
+
+.empty-state {
+  flex: 1 1 auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 160px;
+  margin: 0;
+  padding: 24px 20px;
+  border: 0;
+  background: none;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+.empty-state strong { font-size: 13.5px; font-weight: 550; letter-spacing: -.005em; }
+.empty-state p { margin: 0; max-width: 36ch; font-size: 12.5px; line-height: 1.5; color: hsl(var(--muted-foreground) / .78); overflow-wrap: anywhere; }
+.empty-state-action { margin-top: 10px; }
+/* In a short list (a filter menu, the model menu's search): no reserved height. */
+.empty-state.is-compact { min-height: 0; padding: 16px 12px; }
+.phone-shell .empty-state strong,
+.phone-sheet .empty-state strong { font-size: 15px; }
+.phone-shell .empty-state p,
+.phone-sheet .empty-state p { font-size: 14px; }
+/* The lists that hold one grow to fill their picker, so the words sit in its middle. */
+:is(.lora-panel, .lora-picker-list, .reference-popover-body, .wf-list, .wf-detail):has(> .empty-state) { display: flex; flex-direction: column; }
+.lora-panel:has(> .empty-state:only-child) { flex: 1 1 auto; }
+
 /* --------------------------------------------------------------- 7. Tooltip */
 
 .heiss-tooltip {

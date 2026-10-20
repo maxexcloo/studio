@@ -59,13 +59,11 @@ function loraSetup(view: any) {
     .map((option: unknown) => typeof option === "string" ? option : String((option as { name?: string })?.name || ""))
     .filter(Boolean);
   const loraLimit = Math.min(maxLoras, currentProfile?.maxLoras || maxLoras);
-  const loraUnavailable = currentProfile && !currentProfile.capabilities.lora && mode !== "image"
-    ? "This video workflow has no LoRA loader. Built-in video models take LoRAs."
-    : currentProfile && !currentProfile.capabilities.lora
-      ? "This workflow has no LoRA loader, so it can’t use LoRAs."
-      : !loraOptions.length
-        ? "No LoRAs found. Put .safetensors files in ComfyUI’s models/loras folder, then rescan in Settings › Models."
-        : "";
+  const loraUnavailable = currentProfile && !currentProfile.capabilities.lora
+    ? { title: "This Model Doesn’t Support LoRAs" }
+    : !loraOptions.length
+      ? { title: "No LoRAs Yet", hint: "Add LoRA files to ComfyUI, then rescan in Settings › Models." }
+      : null;
   return { loraOptions, loraLimit, loraUnavailable };
 }
 

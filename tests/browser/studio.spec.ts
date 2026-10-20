@@ -463,7 +463,7 @@ test('Fast and Quality filters retain all reference variants and All clears them
   await expect(rows).toHaveCount(4);
   await filters.getByRole('button', { name: 'Favourites', exact: true }).click();
   await expect(rows).toHaveCount(0);
-  await expect(menu.getByText('No Models Match These Filters.')).toBeVisible();
+  await expect(menu.getByText('No Matching Models')).toBeVisible();
   await filters.getByRole('button', { name: 'All', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
@@ -551,7 +551,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(2);
   await menu.getByRole('button', { name: 'Quality', exact: true }).click();
   await expect(rows).toHaveCount(2);
-  await expect(menu.getByText('No Models Match These Filters.')).toHaveCount(0);
+  await expect(menu.getByText('No Matching Models')).toHaveCount(0);
   if (!phone) {
     await expect(rows.filter({ hasText: 'Model 28' }).first()).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Escape');

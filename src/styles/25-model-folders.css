@@ -296,7 +296,6 @@
   color: rgb(255 255 255 / .6);
 }
 .model-menu-search { margin-bottom: 4px; }
-.model-menu-none { padding: 14px 10px; font-size: 12.5px; color: rgb(255 255 255 / .5); }
 .model-menu .model-menu-find { flex: none; margin-top: 6px; }
 
 .model-row { position: relative; }

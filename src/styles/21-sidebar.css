@@ -104,19 +104,6 @@
 
 .lora-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 
-.lora-empty {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 22px 14px;
-  border-radius: var(--r-item);
-  background: rgb(255 255 255 / .02);
-  border: 1px dashed rgb(255 255 255 / .1);
-  color: hsl(var(--muted-foreground));
-  text-align: center;
-}
-.lora-empty p { margin: 0; max-width: 34ch; font-size: 12.5px; line-height: 1.55; }
-.lora-empty.is-unavailable { border-style: solid; border-color: var(--surface-border); }
 
 /* Header: count on the left, quiet bulk actions on the right. */
 .lora-head { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 2px; }

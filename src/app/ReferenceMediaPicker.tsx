@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Brush, Check, Image as ImageIcon, Images, ListCheck
 import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
+import { EmptyState } from "./EmptyState";
 import { useDismiss } from "./useDismiss";
 import { surfaceMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
@@ -232,8 +233,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   }
 
   const page = pages[source];
-  // Selected references remain available across source tabs and filtered server pages.
-  const items = [...new Map([...selected, ...page.items].map(asset => [asset.id, asset])).values()];
+  // Picked images keep their place in the list (the number shows the pick); ones
+  // from another tab or outside this page's results follow at the end.
+  const items = [...new Map([...page.items, ...selected].map(asset => [asset.id, asset])).values()];
   React.useEffect(() => {
     if (!page.hasMore || page.loading || page.error || search.trim() !== query || !moreRef.current) return;
     const observer = new IntersectionObserver(([entry]) => {
@@ -271,8 +273,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
           {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
-        {/* Clear All sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
-        {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear All</button> : null}
+        {/* Clear Selection sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
+        {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear Selection</button> : null}
         <SurfaceStatus active={Boolean(asSheet && present)} />
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
@@ -289,7 +291,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
       </div> : null}
       <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null && tab !== "selected") memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
-        {tab === "selected" ? (
+        {tab === "selected" && !selected.length ? (
+          <EmptyState title="Nothing Selected">Pick images from Library or Uploads.</EmptyState>
+        ) : tab === "selected" ? (
           <ol className="reference-selected-list" aria-label="Selected References">
             {selected.map((asset, index) => (
               <li key={asset.id} className="reference-selected-row">
@@ -309,13 +313,11 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
             {Array.from({ length: 12 }, (_, index) => <div className="reference-skeleton" key={index} />)}
           </div>
         ) : page.error && !items.length ? (
-          <div className="reference-empty"><ImageIcon size={22} /><strong>Images Unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(source)}>Try Again</button></div>
+          <EmptyState title="Images Unavailable" action={<button className="btn" onClick={() => load(source)}>Try Again</button>}>{page.error}</EmptyState>
         ) : !items.length ? (
-          <div className="reference-empty">
-            <ImageIcon size={22} />
-            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : "No Uploads Yet"}</strong>
-            <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : "Upload one, or drop it on the prompt."}</p>
-          </div>
+          <EmptyState title={query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : "No Uploads Yet"}>
+            {query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : "Upload one, or drop it on the prompt."}
+          </EmptyState>
         ) : (
           <>
             <ReferenceGrid items={items} render={(asset, index, style, tabIndex) => {

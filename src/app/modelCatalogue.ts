@@ -76,6 +76,6 @@ export function useModelCatalogue(modelProfiles: Profile[], selectedId: string, 
     setFilters,
     sections,
     flat,
-    noMatchText: needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'
+    noMatchText: needle ? 'Try a different name.' : 'Clear a filter to see more.'
   };
 }

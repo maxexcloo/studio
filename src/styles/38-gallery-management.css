@@ -211,6 +211,5 @@
 .gallery-filter-search button { display: grid; flex: none; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: inherit; }
 .gallery-filter-options { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .gallery-filter-options .aspect-option { flex: none; }
-.gallery-filter-empty { margin: 6px 10px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .tile .generation-surface { transition: opacity var(--motion-base) var(--motion-ease); }
 .tile.is-selecting:not(.is-selected) .generation-surface { opacity: .65; }

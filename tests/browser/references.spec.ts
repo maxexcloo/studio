@@ -175,11 +175,11 @@ test('reference sources name their search and keep one upload action', async ({ 
   await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
   await expect(picker.getByRole('searchbox', { name: 'Search Uploads', exact: true })).toHaveAttribute('placeholder', 'Search Uploads');
   await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
-  await expect(picker.locator('.reference-empty button')).toHaveCount(0);
+  await expect(picker.locator('.empty-state button')).toHaveCount(0);
 });
 
 
-test('reference selection stays open, pins selections across searches and tabs, and frees capacity immediately', async ({ page }) => {
+test('reference selection stays open, keeps picks in place across searches and tabs, and frees capacity immediately', async ({ page }) => {
   await prepare(page, 2);
   await page.route('**/api/reference-assets?*', route => route.fulfill({ json: {
     items: new URL(route.request().url()).searchParams.get('q') ? [] : [image('first'), image('second'), image('third')], nextCursor: '',
@@ -188,7 +188,9 @@ test('reference selection stays open, pins selections across searches and tabs, 
   const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
   await picker.getByRole('button', { name: 'second.png', exact: true }).click();
   await expect(picker).toBeVisible();
-  await expect(picker.locator('.reference-tile-select').first()).toHaveAttribute('aria-label', 'Selected: second.png');
+  // A pick keeps its place in the list; only its state changes.
+  await expect(picker.locator('.reference-tile-select').nth(1)).toHaveAttribute('aria-label', 'Selected: second.png');
+  await expect(picker.locator('.reference-tile-select').first()).toHaveAttribute('aria-label', 'first.png');
   await picker.getByRole('button', { name: 'first.png', exact: true }).click();
   await expectPicked(page, 2, 2);
   await expect(picker.getByRole('button', { name: 'third.png', exact: true })).toHaveAttribute('aria-disabled', 'true');
@@ -225,14 +227,14 @@ test('a real ten-slot profile shows one References button, however its slots are
   await expect(picker.getByRole('tab', { name: 'Selected 0 of 10', exact: true })).toBeVisible();
 });
 
-test('Clear All beside the chooser tabs empties every reference and Undo brings them back', async ({ page }) => {
+test('Clear Selection beside the chooser tabs empties every reference and Undo brings them back', async ({ page }) => {
   await prepare(page, 3);
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
-  await expect(picker.getByRole('button', { name: 'Clear All', exact: true })).toHaveCount(0);
+  await expect(picker.getByRole('button', { name: 'Clear Selection', exact: true })).toHaveCount(0);
   await picker.locator('input[type="file"]').setInputFiles([1, 2].map((index) => ({ name: `reference-${index}.png`, mimeType: 'image/png', buffer: Buffer.from('image') })));
   await expectPicked(page, 2, 3);
-  await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
+  await picker.getByRole('button', { name: 'Clear Selection', exact: true }).click();
   await expectPicked(page, 0, 3);
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expectPicked(page, 2, 3);

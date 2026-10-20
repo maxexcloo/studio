@@ -8,6 +8,7 @@ import { useDismiss } from './useDismiss';
 import { Brush, Check, ChevronDown, ImagePlus, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
+import { EmptyState } from './EmptyState';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
 import { MEGAPIXEL, presetRatio, type SideLimits } from './sizing';
@@ -624,11 +625,9 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
       {presence.mounted ? (
         <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
           {profiles.length ? null : (
-            <div className="model-menu-empty">
-              <strong>No Models Yet</strong>
-              <span>{emptyHint || "No usable models in ComfyUI yet."}</span>
-              {onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}
-            </div>
+            <EmptyState title="No Models Yet" action={onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}>
+              {emptyHint || "No usable models in ComfyUI yet."}
+            </EmptyState>
           )}
           {searchable ? (
             <label className="model-menu-search picker-search">
@@ -678,7 +677,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                   })}
                 </div>
               ))}
-              {!flat.length ? <div className="model-menu-none">{noMatchText}</div> : null}
+              {!flat.length ? <EmptyState title="No Matching Models" compact>{noMatchText}</EmptyState> : null}
             </div>
           ) : null}
           {onBrowseModels ? <button type="button" className="model-option model-menu-browse" aria-label="Browse Models" onClick={() => { close(); onBrowseModels(); }}><span className="model-copy"><strong>Browse Models</strong><em>View Models & Workflows</em></span><SlidersHorizontal size={15} /></button> : null}

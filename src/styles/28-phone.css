@@ -486,7 +486,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   line-height: 1.45;
 }
 .phone-group .phone-note { margin: 10px 12px; }
-.phone-empty { margin: 30px 10px; color: hsl(var(--muted-foreground)); font-size: 15px; text-align: center; }
 
 .phone-row > .switch { margin-left: auto; }
 

@@ -4,6 +4,7 @@ import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './Sheet';
 import { forgetPrompt, matchPrompt, pinPrompt, usePromptHistory, whenUsed, type PromptEntry, type PromptKind } from './recentPrompts';
+import { EmptyState } from './EmptyState';
 
 /* ---------------------------------------------------------------------------
    Recent prompts
@@ -197,9 +198,7 @@ function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'e
           </div>
         ))}
         {!flat.length && ready ? (
-          <p className="prompt-history-empty">
-            {query.trim() ? <>No prompt matches “{query.trim()}”.</> : <>Prompts you generate with show up here.</>}
-          </p>
+          query.trim() ? <EmptyState title="No Matching Prompts">Try different words.</EmptyState> : <EmptyState title="No Prompts Yet">Prompts you generate with show up here.</EmptyState>
         ) : null}
       </div>
       <footer className="prompt-history-foot">
@@ -248,7 +247,7 @@ export function PromptHistorySheet({ open, onClose, onPick, onError, kind = 'pos
           </div>
         </React.Fragment>
       ))}
-      {!count && ready ? <p className="phone-empty">{query.trim() ? `No prompt matches “${query.trim()}”.` : 'Prompts you generate with show up here.'}</p> : null}
+      {!count && ready ? (query.trim() ? <EmptyState title="No Matching Prompts">Try different words.</EmptyState> : <EmptyState title="No Prompts Yet">Prompts you generate with show up here.</EmptyState>) : null}
     </Sheet>
   );
 }

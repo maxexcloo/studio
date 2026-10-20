@@ -17,6 +17,7 @@ import { useThisComputer } from './device';
 import type { ShowToast } from './toast';
 import { CopyIcon, useCopyFeedback } from "./CopyFeedback";
 import { agentPrompt, agentPromptFor, controlLabel, loraNodes, workflowControls } from "./workflowAgentGuide";
+import { EmptyState } from './EmptyState';
 
 type ImportDraft = { raw: unknown; filename: string; preview: WorkflowImportPreview; metadata: WorkflowImportPreview["detected"] };
 type Filter = "all" | "favorites" | "attention";
@@ -458,12 +459,12 @@ export function WorkflowGallery({ view }: { view: any }) {
             ))}
           </div>
         ) : (
-          <div className="wf-empty">
-            <Search size={20} />
-            <h3>{query ? "Nothing Matches" : filter === "favorites" ? "No Favourites Yet" : `No ${kind === "video" ? "Video" : "Image"} Workflows Yet`}</h3>
-            <p>{query ? "Try another name or clear the search." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : "Import a workflow."}</p>
-            {query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
-          </div>
+          <EmptyState
+            title={query ? "No Matching Workflows" : filter === "favorites" ? "No Favourites Yet" : `No ${kind === "video" ? "Video" : "Image"} Workflows Yet`}
+            action={query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
+          >
+            {query ? "Try another name." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : thisComputer ? "Import one to start." : ""}
+          </EmptyState>
         )}
       </section>
 
@@ -515,7 +516,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             </dl>
           </>
         ) : (
-          <div className="wf-empty"><Wand2 size={22} /><h3>No Workflow Selected</h3><p>Choose one to see its details.</p></div>
+          <EmptyState title="No Workflow Selected">Choose one to see its details.</EmptyState>
         )}
       </aside>
 
@@ -596,7 +597,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                 </div>
               );
             })}
-            {!imports.length ? <div className="wf-empty"><FileJson size={20} /><h3>Nothing to Import</h3><p>Add a file or paste JSON.</p></div> : null}
+            {!imports.length ? <EmptyState title="Nothing to Import">Add a file or paste JSON.</EmptyState> : null}
           </div>
         )}
       </Modal>
