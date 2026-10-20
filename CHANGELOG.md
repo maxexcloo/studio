@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-20
+
 > Messages move into the Studio pill, every reference stack gets one References button, Advanced Settings become a popover, Settings regroup, chat queues ten images per call, and motion and start-up get quicker
 
 ### Added
@@ -1438,7 +1440,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/maxexcloo/studio/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/maxexcloo/studio/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/maxexcloo/studio/compare/v0.30.2...v0.31.0
 [0.30.2]: https://github.com/maxexcloo/studio/compare/v0.30.1...v0.30.2
