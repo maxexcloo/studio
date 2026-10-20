@@ -15,6 +15,7 @@ export function modelName(profile) {
 const familyNames = {
   boogu: 'Boogu',
   checkpoint: 'Checkpoint',
+  flux: 'FLUX',
   flux2_klein_4b: 'FLUX',
   flux2_klein_9b: 'FLUX',
   flux3: 'FLUX',
@@ -25,6 +26,7 @@ const familyNames = {
   minimax_h3: 'MiniMax H3',
   moss_image: 'MOSS Image',
   qwen_image_21: 'Qwen-Image 2.1',
+  sdxl: 'SDXL',
   wan: 'Wan',
   z_image: 'Z-Image Turbo',
   zimage: 'Z-Image Turbo',

@@ -192,8 +192,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
             <span className="phone-bar-title">{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span>
             <span className="phone-bar-gap" />
-            {selection.failedCount ? <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={20} /></button> : null}
             <button type="button" className={cn('phone-icon', selection.allSelected && 'is-on')} aria-pressed={selection.allSelected} aria-label={selection.allSelected ? 'Select None' : 'Select All'} title={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={20} /></button>
+            {selection.failedCount ? <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={20} /></button> : null}
           </div>
         ) : (
           <div className={cn('phone-bar-row', message && 'has-message')}>

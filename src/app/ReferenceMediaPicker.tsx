@@ -107,7 +107,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
 
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
   // the bar's own backdrop blur would stop this one from blurring the gallery.
-  const { box, onPhone } = useComposerSurfaceBox(anchor);
+  // On the phone it anchors to the References row it opened from, like the other pop-ups over Create.
+  const [opener] = React.useState(() => document.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(input.id)}"], [data-reference-chain~="${CSS.escape(input.id)}"]`) || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  const { box, onPhone } = useComposerSurfaceBox(anchor, opener);
   // On the phone it pops up over the Create sheet, which stays in view behind it.
   usePhoneLayer(Boolean(onPhone && present), 'pop');
   React.useEffect(() => {
