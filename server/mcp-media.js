@@ -10,6 +10,12 @@ import { compatibleLoras, loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
 
+/** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
+function failedReason(job) {
+  const text = String(job?.failure?.summary || job?.error || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+  return text ? (/[.!?)]$/.test(text) ? text : `${text}.`) : '';
+}
+
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
 const safeId = (id) => encodeURIComponent(id);
@@ -572,7 +578,8 @@ export class McpMedia {
       const message = pending
         ? `${ref ? label : 'This job'} is still ${job.status || 'running'}. Reply now with its link; do not poll. It continues in the studio and appears at the link when done.`
         : job.cloudQuota ? `${cloudQuotaMessage} ${ref ? label : 'This job'} did not run; video needs the local video worker until the quota returns. Do not resubmit.`
-          : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
+          : failedReason(job) ? `${ref ? label : 'This job'} failed: ${failedReason(job)} Do not resubmit unless the user asks.`
+            : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       const summary = { ...named, ...this.summary(job), message };
       // The agent needs only the sentence and result link; detail adds the status fields.
       const lean = { job_id: jobId, ...(ref ? { ref } : {}), status: job.status || 'running' };

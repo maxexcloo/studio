@@ -61,6 +61,10 @@ ComfyUI answered """Value not in list""". A model, LoRA, text encoder or VAE pic
 
 <a name="parts-that-do-not-fit-together"></a>
 
+### A LoRA doesn't fit this model
+
+A Radiance worker checks each LoRA against the model and refuses one made for another model, saying "loras: none of the adapters' modules is a module of this model" with the LoRA it means. Studio shows that sentence as it is. Take the LoRA off, or pick one made for this model's family; the LoRA picker lists those first.
+
 ### A part doesn't match the model
 
 The text encoder, VAE or a LoRA is made for a different model family, for example a Flux LoRA on SDXL. Check the picks in **Advanced** and turn off LoRAs that don't match the model.

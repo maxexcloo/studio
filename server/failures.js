@@ -12,6 +12,13 @@ const hints = [
     fix: "redownload"
   },
   {
+    // Radiance refuses a LoRA made for another model; its own sentence names the LoRA and the model, so it shows as is.
+    test: /loras:\s*none of the adapters'? modules is a module of this model/i,
+    title: "A LoRA doesn't fit this model",
+    hint: "Take that LoRA off, or pick a LoRA made for this model's family.",
+    verbatim: /loras:\s*none of the adapters'? modules is a module of this model[^\n]*/i
+  },
+  {
     test: /out of memory|OutOfMemoryError|Allocation on device/i,
     title: "The GPU ran out of memory",
     hint: "Free ComfyUI's memory and try again, or use a smaller size, fewer images per run, or a lighter model.",
@@ -132,7 +139,7 @@ export function describeFailure({ message = "", friendly = "", nodeType = "", no
     title: learned ? learnedTitle : damaged && part ? `The ${part} file is damaged` : match?.title || genericTitle,
     // "The VAE file is damaged" is explained under the general damaged-file heading.
     help: troubleshootingAnchor(learned ? learnedTitle : match?.title || genericTitle),
-    summary: learned || (damaged ? `${file || "A model file"} couldn't be read. It may not have finished downloading.` : headline(friendly || raw)) || "ComfyUI execution failed",
+    summary: learned || (damaged ? `${file || "A model file"} couldn't be read. It may not have finished downloading.` : match?.verbatim ? (`${raw}\n${trace}`.match(match.verbatim)?.[0] || headline(raw)).trim().slice(0, 400) : headline(friendly || raw)) || "ComfyUI execution failed",
     hint: learned ? "" : match?.hint || "",
     fix: learned ? "rescan" : match?.fix || "",
     ...(match?.fix === "node" && missingNodeIn(raw) ? { missingNode: missingNodeIn(raw) } : {}),
