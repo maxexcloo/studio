@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.34.3] - 2026-10-20
+
 > Phone scrolling works again
 
 ### Fixed
@@ -1496,7 +1498,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.34.2...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.34.3...HEAD
+[0.34.3]: https://github.com/maxexcloo/studio/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/maxexcloo/studio/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/maxexcloo/studio/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/maxexcloo/studio/compare/v0.33.1...v0.34.0
