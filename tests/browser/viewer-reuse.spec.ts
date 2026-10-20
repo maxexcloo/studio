@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import ffmpeg from 'ffmpeg-static';
+import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const video = execFileSync(ffmpeg!, ['-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '2', '-an', '-c:v', 'libx264', '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov', '-loglevel', 'error', 'pipe:1']);
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const kind of ['image', 'video'] as const) {
   for (const failed of [false, true]) {
-    test(`reusing ${failed ? 'failed' : 'completed'} ${kind} settings keeps its viewer open`, async ({ page, isMobile }) => {
+    test(`reusing ${failed ? 'failed' : 'completed'} ${kind} settings keeps its viewer open`, async ({ page }) => {
       const item = {
         id: `reuse-${kind}`,
         url: failed ? '' : kind === 'image' ? picture : '/reuse-video.mp4',
@@ -34,26 +35,26 @@ for (const kind of ['image', 'video'] as const) {
       await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
       await page.route('**/reuse-video.mp4*', (route) => route.fulfill({ body: video, contentType: 'video/mp4' }));
       await page.goto('/');
-      if (kind === 'video') await page.locator(isMobile ? '.phone-mode-select' : '.gallery-generation-mode').getByRole('button', { name: /^Videos?$/ }).click();
-      await page.locator(`[data-tile-id="${item.id}"]`).click();
-      const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
-      await expect(viewer).toBeVisible();
+      const ui = studioUi(page);
+      if (kind === 'video') await ui.switchMode('video');
+      const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
       await viewer.evaluate((element) => { element.setAttribute('data-reuse-check', 'original-viewer'); });
       const media = viewer.locator(`.viewer-canvas ${kind === 'video' ? 'video' : 'img'}`).first();
       const source = failed ? null : await media.getAttribute('src');
-      const reuse = isMobile
-        ? viewer.locator('.viewer-phone-bar').getByRole('button', { name: 'Use This Prompt', exact: true })
-        : (failed ? viewer.locator('.failure-panel') : viewer.locator('.viewer-actions')).getByRole('button', { name: failed ? /Use (?:This Prompt|these settings)/ : 'Use This Prompt', exact: true });
+      const phone = await ui.isPhone();
+      // The full studio offers a failed run's reuse in its failure panel.
+      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: /Use (?:This Prompt|these settings)/ }) : await ui.reuseButton();
 
-      for (const dismiss of isMobile ? ['button', 'escape', 'back'] : ['viewer']) {
+      // Reuse opens the phone's Create sheet over the viewer, which each dismissal must leave open.
+      for (const dismiss of phone ? ['button', 'escape', 'back'] : ['viewer']) {
         await reuse.click();
         await expect(viewer).toHaveAttribute('data-reuse-check', 'original-viewer');
-        if (isMobile) {
-          const composer = page.locator('.phone-create');
+        if (phone) {
+          const composer = ui.composer;
           await expect(composer).toBeVisible();
-          await expect(composer.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(item.prompt);
-          await expect(composer.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue(item.negative);
-          if (dismiss === 'button') await composer.getByRole('button', { name: 'Close', exact: true }).click();
+          await expect(ui.prompt).toHaveValue(item.prompt);
+          await expect(ui.negativePrompt).toHaveValue(item.negative);
+          if (dismiss === 'button') await ui.closeComposer();
           else if (dismiss === 'escape') await page.keyboard.press('Escape');
           else await page.evaluate(() => window.history.back());
           await expect(composer).toHaveCount(0);
@@ -64,16 +65,15 @@ for (const kind of ['image', 'video'] as const) {
         else await expect(media).toHaveAttribute('src', source!);
       }
 
-      await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
-      await expect(viewer).toHaveCount(0);
-      if (isMobile) await page.locator('.phone-create-open').click();
-      await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(item.prompt);
+      await ui.closeViewer();
+      await ui.openComposer();
+      await expect(ui.prompt).toHaveValue(item.prompt);
     });
   }
 }
 
 for (const promptsOnly of [false, true]) {
-  test(`${promptsOnly ? 'prompts-only reuse preserves' : 'missing-model reuse safely adapts to'} the current model`, async ({ page, isMobile }) => {
+  test(`${promptsOnly ? 'prompts-only reuse preserves' : 'missing-model reuse safely adapts to'} the current model`, async ({ page }) => {
     const models = await (await page.request.get('/api/models')).json();
     const current = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
     current.capabilities.negativePrompt = true;
@@ -89,28 +89,27 @@ for (const promptsOnly of [false, true]) {
     let body: Record<string, any> | null = null;
     await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Test request captured' } }); });
     await page.goto('/');
-    if (isMobile) await page.locator('.phone-create-open').click();
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Original draft');
+    const ui = studioUi(page);
+    await ui.openComposer();
+    await ui.prompt.fill('Original draft');
     await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
     await page.getByRole('button', { name: reference.name, exact: true }).click();
-    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
-    await page.locator(`[data-tile-id="${item.id}"]`).click();
-    const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
+    await ui.closeComposer();
+    const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
     if (promptsOnly) {
       await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
-      if (isMobile) await viewer.getByRole('button', { name: 'Details', exact: true }).click();
+      await ui.showDetails();
       const readouts = viewer.locator('.prompt-readout');
       await readouts.getByRole('button', { name: 'Use This Prompt', exact: true }).click();
       await readouts.getByRole('button', { name: 'Use This Negative Prompt', exact: true }).click();
-    } else await viewer.locator(isMobile ? '.viewer-phone-bar' : '.viewer-actions').getByRole('button', { name: 'Use This Prompt', exact: true }).click();
-    if (isMobile && await page.locator('.phone-create').isVisible()) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+    } else await (await ui.reuseButton()).click();
+    await ui.closeComposer();
     await expect(viewer).toBeVisible();
-    await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
-    if (isMobile) await page.locator('.phone-create-open').click();
-    else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(item.prompt);
-    await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue(item.negative);
-    await (isMobile ? page.locator('.phone-create') : page).getByRole('button', { name: 'Generate', exact: true }).click();
+    await ui.closeViewer();
+    await ui.openComposer();
+    await expect(ui.prompt).toHaveValue(item.prompt);
+    await expect(ui.negativePrompt).toHaveValue(item.negative);
+    await ui.generate.click();
     await expect.poll(() => body).not.toBeNull();
     expect(body!.profileId).toBe(current.id);
     expect(body!.width % 32).toBe(0);
@@ -134,18 +133,18 @@ for (const promptsOnly of [false, true]) {
 }
 
 for (const field of ['prompt', 'negative'] as const) {
-  test(`reusing only ${field} text preserves the other draft`, async ({ page, isMobile }) => {
+  test(`reusing only ${field} text preserves the other draft`, async ({ page }) => {
     const item = { id: 'text-reuse', url: picture, filename: 'text.png', type: 'image', status: 'done', prompt: 'Saved positive text', negative: 'Saved negative text', model: 'flux1-schnell.safetensors', createdAt: new Date().toISOString(), width: 512, height: 512 };
     await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
     await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
     await page.goto('/');
-    if (isMobile) await page.locator('.phone-create-open').click();
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Positive draft');
-    await page.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('Negative draft');
-    if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
-    await page.locator('[data-tile-id="text-reuse"]').click();
-    const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
-    if (isMobile) await viewer.getByRole('button', { name: 'Details', exact: true }).click();
+    const ui = studioUi(page);
+    await ui.openComposer();
+    await ui.prompt.fill('Positive draft');
+    await ui.negativePrompt.fill('Negative draft');
+    await ui.closeComposer();
+    const viewer = await ui.openViewer(page.locator('[data-tile-id="text-reuse"]'));
+    await ui.showDetails();
     const readout = viewer.locator('.prompt-readout').nth(field === 'prompt' ? 0 : 1);
     const copy = readout.getByRole('button', { name: /^Copy/ });
     const reuse = readout.getByRole('button', { name: /^Use This/ });
@@ -153,11 +152,10 @@ for (const field of ['prompt', 'negative'] as const) {
     const reuseBox = await reuse.boundingBox();
     expect(reuseBox!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);
     await reuse.click();
-    await viewer.getByRole('button', { name: isMobile ? 'Close Viewer' : 'Close', exact: true }).click();
-    if (isMobile) await page.locator('.phone-create-open').click();
-    else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue(field === 'prompt' ? item.prompt : 'Positive draft');
-    await expect(page.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue(field === 'negative' ? item.negative : 'Negative draft');
+    await ui.closeViewer();
+    await ui.openComposer();
+    await expect(ui.prompt).toHaveValue(field === 'prompt' ? item.prompt : 'Positive draft');
+    await expect(ui.negativePrompt).toHaveValue(field === 'negative' ? item.negative : 'Negative draft');
   });
 }
 

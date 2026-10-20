@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
-test('optional LoRAs show unverified variants and expose full published strength bounds', async ({ page, isMobile }) => {
+test('optional LoRAs show unverified variants and expose full published strength bounds', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const base = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
   Object.assign(base, { family: 'boogu', baseModel: 'boogu_edit.safetensors', recipe: { modelLabel: 'Boogu Edit Test', conditioning: 'Generate', label: 'Standard', adapters: [] }, options: { ...base.options, loras: ['slider.safetensors', 'excluded.safetensors', 'unknown.safetensors'] } });
@@ -13,15 +14,8 @@ test('optional LoRAs show unverified variants and expose full published strength
     'unknown.safetensors': { title: 'Unknown Effect', families: [], base: '', triggers: [] },
   } } }));
   await page.goto('/');
-  if (isMobile) {
-    await page.locator('.phone-create-open').click();
-    const openLoras = page.locator('.phone-create').getByRole('button', { name: /^LoRAs/ });
-    if (await openLoras.count()) await openLoras.click();
-  } else {
-    await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    const openLoras = page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
-    await openLoras.click();
-  }
+  const composer = await studioUi(page).openComposer();
+  await composer.getByRole('button', { name: /^LoRAs/ }).click();
   const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
   await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
@@ -52,7 +46,7 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(value).toHaveValue('-3.00');
 });
 
-test('LoRA library offers direct list selection with inline strengths and accessible dismissal', async ({ page, isMobile }) => {
+test('LoRA library offers direct list selection with inline strengths and accessible dismissal', async ({ page }) => {
   await page.route('**/api/loras/library/ops', async route => {
     const library = await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-lora-library') || '{}'));
     await route.fulfill({ json: { library } });
@@ -68,11 +62,13 @@ test('LoRA library offers direct list selection with inline strengths and access
     'cards-two.safetensors': { title: 'Cards Two', families: [], base: '', triggers: [] }
   } } }));
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-  await page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
+  const ui = studioUi(page);
+  const composer = await ui.openComposer();
+  const phone = await ui.isPhone();
+  await composer.getByRole('button', { name: 'LoRAs', exact: true }).click();
   const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
-  await expect(surface).toHaveClass(isMobile ? /is-sheet/ : /composer-loras/);
+  // A sheet on the phone, a popover over the full studio's composer.
+  await expect(surface).toHaveClass(phone ? /is-sheet/ : /composer-loras/);
   await expect.poll(() => surface.evaluate(element => {
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
@@ -94,16 +90,16 @@ test('LoRA library offers direct list selection with inline strengths and access
   await strength.press('Enter');
   await expect(strength).toHaveValue('1.25');
   await expect(row).toHaveAttribute('aria-checked', 'true');
-  for (const width of isMobile ? [390, 320] : [900]) {
-    await page.setViewportSize({ width, height: isMobile ? 844 : 1000 });
+  for (const width of phone ? [390, 320] : [900]) {
+    await page.setViewportSize({ width, height: phone ? 844 : 1000 });
     await expect.poll(() => surface.evaluate(element => {
       const bounds = element.getBoundingClientRect();
       const children = [...element.querySelectorAll('.lora-library-row, .lora-library-settings, .lora-library-settings input')];
       return children.every(child => { const box = child.getBoundingClientRect(); return box.left >= bounds.left && box.right <= bounds.right + 1; });
     })).toBe(true);
-    if (!isMobile) {
+    if (!phone) {
       await expect.poll(async () => {
-        const composer = await page.locator('.zen-prompt').boundingBox();
+        const composer = await ui.composer.boundingBox();
         const popover = await surface.boundingBox();
         return Math.abs(popover!.width - composer!.width) < 1 && Math.abs(popover!.x - composer!.x) < 1;
       }).toBe(true);
@@ -148,11 +144,12 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', 'Select Cards One');
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
-  const open = page.locator(isMobile ? '.phone-create' : '.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true });
+  const open = ui.composer.getByRole('button', { name: 'LoRAs', exact: true });
   await open.click();
   await expect(surface).toBeVisible();
   await expect(open).toHaveAttribute('aria-expanded', 'true');
-  if (!isMobile) {
+  // The phone sheet covers its own trigger; the full studio's toggles from it.
+  if (!phone) {
     await open.click();
     await expect(surface).not.toBeVisible();
     await expect(open).toHaveAttribute('aria-expanded', 'false');
@@ -165,9 +162,9 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(surface).toBeVisible();
   await page.mouse.click(4, 4);
   await expect(surface).not.toBeVisible();
-  if (!isMobile) {
+  if (!phone) {
     await page.setViewportSize({ width: 900, height: 700 });
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A detailed landscape\n'.repeat(60));
+    await ui.prompt.fill('A detailed landscape\n'.repeat(60));
     await open.click();
     await expect(surface).toBeVisible();
     await expect.poll(() => surface.evaluate(element => {
@@ -178,7 +175,7 @@ test('LoRA library offers direct list selection with inline strengths and access
 });
 
 
-test('fine-tunes retain their family, version and format while optional LoRAs filter by architecture', async ({ page, isMobile }) => {
+test('fine-tunes retain their family, version and format while optional LoRAs filter by architecture', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const original = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
   const fineTune = { ...original, family: 'krea2', baseModel: 'tesserafineTurboBF16FP8_v10_3291478.safetensors', label: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', displayName: 'Tesserafine Turbo · Fast · 8 Steps · V1.0 · INT8 ConvRot', recipe: { modelLabel: 'Tesserafine Turbo', conditioning: 'Image', label: 'Turbo · 8 Steps', adapters: [] }, options: { ...original.options, loras: ['krea.safetensors', 'flux3.safetensors', 'unknown.safetensors'] } };
@@ -192,27 +189,16 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
     'unknown.safetensors': { title: 'Unknown Effect', families: [], base: '', triggers: [] },
   } } }));
   await page.goto('/');
-  if (isMobile) {
-    await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
-  } else {
-    await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await page.locator('.model-trigger').filter({ visible: true }).click();
-  }
-  const menu = page.locator(isMobile ? '.phone-model-sheet' : '.model-menu');
+  const ui = studioUi(page);
+  const menu = await ui.openModelPicker();
   await expect(menu.getByText('Krea (Fine Tunes)', { exact: true })).toBeVisible();
-  const row = menu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Tesserafine Turbo' }).first();
+  const row = ui.modelOptions.filter({ hasText: 'Tesserafine Turbo' }).first();
   await expect(row).toContainText('V1.0');
   await expect(row).toContainText('INT8 ConvRot');
   await row.click();
-  if (isMobile) {
-    const open = page.locator('.phone-create').getByRole('button', { name: /^LoRAs/ });
-    if (await open.count()) await open.click();
-  } else {
-    await page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
-  }
+  await ui.composer.getByRole('button', { name: /^LoRAs/ }).click();
   const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
-  await expect(surface).toHaveClass(isMobile ? /is-sheet/ : /composer-loras/);
+  await expect(surface).toHaveClass(await ui.isPhone() ? /is-sheet/ : /composer-loras/);
   await expect.poll(() => surface.evaluate(element => {
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
