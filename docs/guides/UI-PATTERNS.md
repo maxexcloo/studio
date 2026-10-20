@@ -231,7 +231,8 @@ A picker, tab or list with nothing to show uses `EmptyState`
   Size and Advanced; each opens its pop-up list over Create. The sticky footer
   has two lines, always in view: Steps and the image count, labelled, then
   Image/Video · Clear · Generate. Nothing reaches past the right edge at
-  320–430 px (`phone-create.spec.ts`).
+  320–430 px (`phone-create.spec.ts`). Editing Prompt or Negative with the keyboard up
+  shows only that field (see [Keyboard & visual viewport](#keyboard--visual-viewport)).
 
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers. Every control stays in its bar: as room runs out they
@@ -515,6 +516,16 @@ phone's running menu.
 toggles `.kb-open` on `html`. While the keyboard is up, sheets size and place
 themselves in the visual viewport (`--vv-height`), drop their home-indicator
 padding, and the page returns to where it rested once the keyboard closes.
+
+**Focused text:** while a long text field (Prompt, Negative Prompt, the
+profile JSON in Settings) has the focus and the on-screen keyboard is up, it
+is the only thing on screen (`useTextFocus.ts`): it fills the visible height
+above the keyboard, the other Create rows, the footer, the handle and the
+page's bars hide, and nothing scrolls under it. Its actions (Select All,
+History, Clear) sit in a row along its top with a small **Done** at the end,
+and a tap on one keeps the keyboard up. Done, a blur, Back or hiding the
+keyboard puts the sheet back; a hardware keyboard leaves the layout alone.
+The caret stays in view.
 
 ## Labels
 

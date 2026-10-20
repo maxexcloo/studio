@@ -113,7 +113,11 @@ test('phone prompt keeps a usable height when tapped with the keyboard up', asyn
     const boxes = [field, field.closest('.phone-sheet-body')!, field.closest('.phone-sheet')!].map((box) => box.getBoundingClientRect());
     return Math.round(Math.min(...boxes.map((box) => box.bottom)) - Math.max(...boxes.map((box) => box.top)));
   })).toBeGreaterThanOrEqual(60);
+  // With the keyboard up the prompt is all there is (UI-PATTERNS › Phone › Keyboard); Done brings Generate back.
   const send = ui.generate;
+  await expect(send).toBeHidden();
+  await sheet.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.evaluate(() => (window as unknown as { keyboard: (height: number) => void }).keyboard(0));
   await send.scrollIntoViewIfNeeded();
   await expect(send).toBeInViewport();
 });
@@ -146,6 +150,12 @@ test('the phone Create sheet stays in the visible viewport while the keyboard is
   await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeLessThanOrEqual(visible.bottom + 1);
   const inside = async (box: { y: number; height: number } | null) => box!.y >= visible.top - 1 && box!.y + box!.height <= visible.bottom + 1;
   await expect.poll(async () => inside(await prompt.boundingBox())).toBe(true);
+  // The focused prompt is all there is above the keyboard; its Done is in view and brings Generate back.
+  await expect(send).toBeHidden();
+  const done = sheet.getByRole('button', { name: 'Done', exact: true });
+  await expect.poll(async () => inside(await done.boundingBox())).toBe(true);
+  await done.click();
+  await expect(send).toBeVisible();
   await send.scrollIntoViewIfNeeded();
   await expect.poll(async () => inside(await send.boundingBox())).toBe(true);
   // Keyboard down: the sheet goes back where it was.
