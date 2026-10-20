@@ -67,7 +67,7 @@ Pick the lightest surface that fits:
 2. **Anchored popover** on the desktop for choosing or tuning something
    (model, LoRAs, references, Advanced Settings, size, filters). It opens at
    its trigger and closes on outside click or Escape. On the phone the same
-   content is a bottom sheet.
+   content is a pop-up list over Create (see [Layering](#layering)).
 3. **Side panel or sheet** for a task with several steps or a long list
    (Settings, the Details panel, Create on the phone). Sheets have a handle,
    swipe down to close, a backdrop, and scroll inside themselves.
@@ -499,6 +499,7 @@ padding, and the page returns to where it rested once the keyboard closes.
   "Catalogue", "Colour").
 - Standard words: Images/Videos (gallery modes), Image/Video (generation),
   Model, Prompt, Negative Prompt, Reference Image, LoRAs, Animate, Star.
-- Item actions: "Use Prompt", "Use Settings", "Copy Prompt", "Retry".
+- Item actions: "Edit", "Rerun", "Copy Prompts", "Copy Settings", "Retry";
+  the Library's "Use Prompt" and "Use Settings".
 - Chat and links name results "Result N".
 - Messages: "Couldn’t …" for failures, without a full stop; "Prompt copied".
