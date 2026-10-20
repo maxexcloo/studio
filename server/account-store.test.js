@@ -51,5 +51,7 @@ test("profile assignment, duplicate names and account disabling fail closed", as
 
 test("ordinary accounts cannot be created without one existing profile", async () => {
   await assert.rejects(store.createLocalAccount({ username: "no.profile", password: "a valid long password", accessProfileId: "missing" }), /existing access profile/);
-  await assert.rejects(store.createLocalAccount({ username: "empty.pass", password: "" }), /Enter a password/);
+  // An ordinary account may go without a password (single sign-on only); an administrator may not.
+  await assert.rejects(store.createLocalAccount({ username: "empty.pass", password: "" }), /existing access profile/);
+  await assert.rejects(store.createLocalAccount({ username: "empty.admin", password: "", role: "administrator" }), /Enter a password/);
 });

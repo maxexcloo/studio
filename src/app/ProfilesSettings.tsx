@@ -107,14 +107,14 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
           setText(`${text.slice(0, from)}  ${text.slice(to)}`);
           requestAnimationFrame(() => { field.selectionStart = field.selectionEnd = from + 2; });
         }} /> : <Skeleton className="profile-editor-text" />}
-        {parseError ? <p className="set-note is-error" role="alert">Not valid JSON: {parseError}</p> : null}
+        {parseError ? <p className="list-note is-error" role="alert">Not valid JSON: {parseError}</p> : null}
       </div>
-      {dirty && !reviewing ? <div className="set-row set-save-row" role="group" aria-label="Unsaved Changes">
-        <div className="set-row-text"><strong>Unsaved Changes</strong><span>Review the changes and Studio’s check before saving.</span></div>
-        <div className="set-row-control">
+      {dirty && !reviewing ? <div className="list-row is-static set-row set-save-row" role="group" aria-label="Unsaved Changes">
+        <span className="list-row-text"><span className="list-row-label">Unsaved Changes</span><span className="list-row-detail">Review the changes and Studio’s check before saving.</span></span>
+        <span className="list-row-control">
           <button type="button" className="btn is-ghost" disabled={busy} onClick={discard}>Discard</button>
           <button type="button" className="btn is-primary" disabled={busy || Boolean(parseError)} onClick={() => void runCheck()}>{busy ? 'Checking…' : 'Review Changes'}</button>
-        </div>
+        </span>
       </div> : null}
     </Group>
     {reviewing && diff ? <Group title={`Changes · ${diff.added} added · ${diff.removed} removed`}>

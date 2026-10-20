@@ -16,7 +16,7 @@ import { registerProfileEditorRoutes } from './profile-editor.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
-import { configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
+import { backendUrl, configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -1664,8 +1664,28 @@ app.get("/api/comfy/manager", async (_req, res) => {
 });
 
 // ComfyUI is started outside HEISS UI, so only ComfyUI-Manager can restart it in place.
+// The video worker restarts through its own ComfyUI-Manager; its status poll shows it going and coming back.
+async function restartVideoWorker(res) {
+  let url;
+  try { url = withComfyBackend("video", () => backendUrl(comfyUrl)); }
+  catch (error) { res.status(400).json({ ok: false, error: error.message }); return; }
+  const up = await fetch(`${url}/system_stats`, { signal: AbortSignal.timeout(4000) }).then((response) => response.ok, () => false);
+  if (!up) { res.status(503).json({ ok: false, error: "The video worker isn’t running. Start it and Studio connects." }); return; }
+  let sawManager = false;
+  for (const [method, route] of [["POST", "/v2/manager/reboot"], ["POST", "/manager/reboot"], ["GET", "/v2/manager/reboot"], ["GET", "/api/manager/reboot"], ["GET", "/manager/reboot"]]) {
+    let response;
+    try { response = await fetch(`${url}${route}`, { method, signal: AbortSignal.timeout(5000) }); }
+    catch { res.json({ ok: true, backend: "video" }); return; }
+    if (response.ok) { res.json({ ok: true, backend: "video" }); return; }
+    if (response.status === 403) { res.status(403).json({ ok: false, error: "ComfyUI-Manager’s security level blocks the restart. Set security_level = normal in Manager’s config.ini, or restart the worker yourself." }); return; }
+    if (response.status !== 404 && response.status !== 405) sawManager = true;
+  }
+  res.status(501).json({ ok: false, error: sawManager ? "ComfyUI-Manager couldn’t restart the video worker." : "Restarting needs ComfyUI-Manager on the video worker. Start its ComfyUI with --enable-manager." });
+}
+
 app.post("/api/comfy/restart", async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  if (req.body?.backend === "video") { await restartVideoWorker(res); return; }
   // A dropped connection below means "already going down" only if ComfyUI was
   // up to begin with; otherwise "restarting" would show for minutes over nothing.
   const up = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(4000) }).then((response) => response.ok, () => false);

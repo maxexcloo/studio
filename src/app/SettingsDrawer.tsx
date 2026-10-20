@@ -14,10 +14,10 @@ export function SettingsDrawer({ id, title, description, defaultOpen = false, ch
   React.useEffect(() => { if (open) setSeen(true); }, [open]);
   return (
     <div className={cn('set-drawer', open && 'is-open')}>
-      <button type="button" className="set-row set-drawer-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        <span className="set-row-text">
-          <strong>{title}</strong>
-          {description ? <span>{description}</span> : null}
+      <button type="button" className="list-row set-row set-drawer-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
+        <span className="list-row-text">
+          <span className="list-row-label">{title}</span>
+          {description ? <span className="list-row-detail">{description}</span> : null}
         </span>
         <span className="set-drawer-knob" aria-hidden="true"><ChevronDown size={14} className="set-drawer-chevron" /></span>
       </button>

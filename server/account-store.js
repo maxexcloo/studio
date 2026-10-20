@@ -105,13 +105,15 @@ export function assignAccessProfile(accountId, profileId) {
 export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
   if (!validUsername(username)) throw new Error("Use an email address of up to 128 characters.");
-  if (!String(password || "")) throw new Error("Enter a password.");
+  // An ordinary account may start without a password and sign in through single sign-on only.
+  const withPassword = Boolean(String(password || ""));
+  if (!withPassword && role !== accountRoles.user) throw new Error("Enter a password.");
   if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
   if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign an existing access profile to this user.");
   if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("An account with that email already exists.");
 
   const salt = crypto.randomBytes(16);
-  const hash = await scryptAsync(password, salt);
+  const hash = withPassword ? await scryptAsync(password, salt) : null;
   const account = {
     id: crypto.randomBytes(18).toString("base64url"),
     username: String(username).trim().normalize("NFKC"),
@@ -120,7 +122,7 @@ export async function createLocalAccount({ username, displayName = "", password,
     ...(role === accountRoles.user ? { accessProfileId } : {}),
     ...(identity ? { identity } : {}),
     disabled: false,
-    password: { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") },
+    ...(hash ? { password: { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") } } : {}),
     createdAt: new Date().toISOString()
   };
   // Recheck after the asynchronous KDF before inserting.
@@ -205,21 +207,6 @@ export function revokeAccountSession(token) {
   store.sessions = store.sessions.filter((item) => item.tokenHash !== tokenHash(token));
   if (store.sessions.length !== previous) saveStore({ scrubBackup: true });
   return store.sessions.length !== previous;
-}
-
-/** An administrator reset ends the account's browser sessions; its MCP token and data stay. */
-export async function setAccountPassword(accountId, password) {
-  if (!String(password || "")) throw new Error("Enter a password.");
-  if (!readStore().accounts.some((item) => item.id === accountId && item.identity?.provider !== "pocket-id")) throw new Error("That local account was not found.");
-  const salt = crypto.randomBytes(16);
-  const hash = await scryptAsync(password, salt);
-  const store = readStore();
-  const account = store.accounts.find((item) => item.id === accountId);
-  if (!account) throw new Error("That local account was not found.");
-  account.password = { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") };
-  store.sessions = store.sessions.filter((item) => item.accountId !== accountId);
-  saveStore({ scrubBackup: true });
-  return { id: account.id };
 }
 
 /** What an account may see and change about itself. Provider accounts have no password here. */

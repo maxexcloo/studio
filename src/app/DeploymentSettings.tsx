@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ExternalLink, Lock, Pencil, PlugZap, RefreshCw, X } from 'lucide-react';
+import { Check, ExternalLink, Lock, Pencil, PlugZap, RefreshCw, RotateCw, X } from 'lucide-react';
 import { apiFetch, apiJson } from './api';
 import { StudioSelect } from './components';
 import { cn } from './format';
@@ -22,8 +22,9 @@ export type DeploymentSettings = {
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
 
 const FIRST_READY = '__first-ready__';
-// Kept as deployment variables, no longer switches here: Studio has no built-in profiles, and Tessera is one more family.
-const hiddenCatalogueKeys = new Set(['STUDIO_ENABLE_BUILTIN_PROFILES', 'STUDIO_ENABLE_TESSERA']);
+// Inpainting is switched in Studio › Features, beside Smart Upscale.
+export const inpaintFlagKey = 'HEISS_ENABLE_INPAINT';
+const hiddenCatalogueKeys = new Set([inpaintFlagKey]);
 const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment', studio: 'This Studio', default: 'Default' };
 
 /** Where a value comes from, and a lock when the deployment owns it. */
@@ -101,10 +102,22 @@ export function WorkerGroups({ settings, status, showToast, onSaved, onCheck, re
   showToast: ShowToast;
   onSaved: () => void;
   onCheck: () => void;
-  /** The restart control for a worker Studio can restart, or nothing. */
+  /** The restart control for a worker. */
   restart: (backend: 'primary' | 'video') => React.ReactNode;
 }) {
   const [editing, setEditing] = React.useState('');
+  const [testing, setTesting] = React.useState('');
+  const [tested, setTested] = React.useState<Record<string, string>>({});
+  // Asks the worker at its saved address without changing anything, then refreshes the status.
+  const test = async (connection: Connection) => {
+    setTesting(connection.backend);
+    try {
+      const { response, data } = await postJson('/api/comfy-url', { url: connection.value, save: false, backend: connection.backend });
+      setTested((current) => ({ ...current, [connection.backend]: !response.ok ? data.error || 'Couldn’t test it.' : data.reachable ? 'Answered just now.' : data.detail || 'Didn’t answer.' }));
+      onCheck();
+    } catch { setTested((current) => ({ ...current, [connection.backend]: 'Can’t reach Studio.' })); }
+    finally { setTesting(''); }
+  };
   return <>
     {settings.connections.map((connection) => {
       const current = status(connection.backend);
@@ -116,10 +129,10 @@ export function WorkerGroups({ settings, status, showToast, onSaved, onCheck, re
           {connection.locked ? null : <button className="btn is-ghost" aria-label={`Edit ${connection.label} Address`} onClick={() => setEditing(editing === connection.backend ? '' : connection.backend)}><Pencil size={14} /> Edit</button>}
         </Row>
         {editing === connection.backend ? <AddressEditor connection={connection} showToast={showToast} onSaved={onSaved} onClose={() => setEditing('')} /> : null}
-        {shared ? null : <Row label="Connection" description={current ? (current.restarting ? 'Reconnects when it’s back.' : current.connected ? current.device || 'Ready to generate.' : 'Studio can’t reach it.') : 'Checking…'}>
+        {shared ? null : <Row label="Status" description={tested[connection.backend] || (current ? (current.restarting ? 'Reconnects when it’s back.' : current.connected ? current.device || 'Ready to generate.' : 'Studio can’t reach it.') : 'Checking…')}>
           {current ? <Status tone={tone}>{current.restarting ? 'Restarting' : current.connected ? 'Ready' : 'Offline'}</Status> : null}
-          {current && !current.connected && !current.restarting ? <button className="btn is-ghost" onClick={onCheck}><RefreshCw size={14} /> Check Again</button> : null}
-          {current?.connected && current.url ? <a className="btn is-ghost" href={current.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a> : null}
+          <button className="btn is-ghost" disabled={testing === connection.backend} aria-label={`Test the ${workerTitle(connection.backend)}`} onClick={() => void test(connection)}><PlugZap size={14} /> {testing === connection.backend ? 'Testing…' : 'Test'}</button>
+          {current?.connected && (current.url || connection.value) ? <a className="btn is-ghost" href={current.url || connection.value} target="_blank" rel="noreferrer" aria-label={`Open the ${workerTitle(connection.backend)}`}><ExternalLink size={14} /> Open</a> : null}
         </Row>}
         <Row label="Runs" description={connection.routes} />
         {restartControl ? <Row label="Restart" description="Loads new custom nodes and files, and frees memory. Running and queued generations stop.">{restartControl}</Row> : null}
@@ -152,7 +165,7 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
     </Row>;
   };
   return <>
-    <Group title="Model Defaults" note="Deployment settings override these until they are removed from its configuration.">
+    <Group title="Defaults" note="Deployment settings override these until they are removed from its configuration.">
       {defaultRow('image')}
       {defaultRow('video')}
     </Group>
@@ -163,18 +176,35 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
 }
 
 /** Third-party services and storage at a glance: what is on, configured and available. */
-export function IntegrationsOverview({ settings }: { settings: DeploymentSettings }) {
-  const { civitai, huggingFace } = settings.integrations;
+export function IntegrationsOverview({ settings, children }: React.PropsWithChildren<{ settings: DeploymentSettings }>) {
+  const { civitai } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
-  return <>
-    <Group title="Overview">
-      <Row label="Civitai" description={`Browsing ${civitai.browsing ? 'on' : 'off'} · token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}`}>{state(civitai.browsing || civitai.presets, ['On', 'Off'])}</Row>
-      <Row label="Hugging Face" description={huggingFace.token.set ? `Token ${huggingFace.token.editable ? 'saved here' : 'set by the deployment'}; gated models can download.` : 'No token; public models only.'}>{state(huggingFace.token.set, ['Configured', 'Public Only'])}</Row>
-      <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
-    </Group>
-  </>;
+  return <Group title="Integrations">
+    <Row label="Civitai" description={`Browsing ${civitai.browsing ? 'on' : 'off'} · token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}`}>{state(civitai.browsing || civitai.presets, ['On', 'Off'])}</Row>
+    {children}
+    <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
+  </Group>;
 }
 
 export function DeploymentSettingsError({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return <Group><Row label="Deployment Settings Unavailable" description={error}><button className="btn is-ghost" onClick={onRetry}><RefreshCw size={14} /> Retry</button></Row></Group>;
+  return <Group><Row label="Deployment Settings Unavailable" description={error}><button className="btn is-ghost" onClick={onRetry}><RefreshCw size={14} /> Try Again</button></Row></Group>;
+}
+
+/** The video worker's Restart: it asks its ComfyUI-Manager, then the status row follows it down and back. */
+export function VideoWorkerRestart({ confirm, showToast }: { confirm: () => Promise<boolean>; showToast: ShowToast }) {
+  const [phase, setPhase] = React.useState<'' | 'busy' | 'sent'>('');
+  const restart = async () => {
+    if (!await confirm()) return;
+    setPhase('busy');
+    try {
+      const { response, data } = await postJson('/api/comfy/restart', { backend: 'video' });
+      if (!response.ok) { showToast(data.error || 'Couldn’t restart the video worker', 'error'); setPhase(''); return; }
+      setPhase('sent');
+      window.setTimeout(() => setPhase(''), 20_000);
+    } catch { showToast('Can’t reach Studio. Make sure it’s running.', 'error'); setPhase(''); }
+  };
+  return <button type="button" className="btn" disabled={Boolean(phase)} onClick={() => void restart()}>
+    {phase === 'sent' ? <Check size={14} /> : <RotateCw size={14} className={phase === 'busy' ? 'is-spinning' : undefined} />}
+    {phase === 'sent' ? 'Restarting' : phase === 'busy' ? 'Asking…' : 'Restart'}
+  </button>;
 }

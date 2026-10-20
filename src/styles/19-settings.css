@@ -70,39 +70,11 @@
 .set-subhead { margin: 18px 2px -4px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .set-subhead:first-of-type { margin-top: 4px; }
 
-.set-group { display: grid; gap: 8px; }
-.set-group-title {
-  margin: 0 0 2px 4px;
-  font-size: 11.5px;
-  font-weight: 550;
-  letter-spacing: .02em;
-  color: hsl(var(--muted-foreground));
-}
-.set-card {
-  border-radius: calc(var(--r-item) + 4px);
-  background: rgb(255 255 255 / .025);
-  box-shadow: inset 0 0 0 1px var(--surface-border);
-}
-.set-card.is-danger { background: rgb(255 120 100 / .035); box-shadow: inset 0 0 0 1px rgb(255 120 100 / .16); }
 .set-note { margin: 0 4px; font-size: 12px; line-height: 1.55; color: hsl(var(--muted-foreground) / .85); }
 .set-note code,
 .set-path { font: 500 11.5px/1.5 var(--font-mono); overflow-wrap: anywhere; }
 .set-note code { padding: 1px 5px; border-radius: 6px; background: var(--control-fill); color: hsl(var(--foreground)); }
 
-/* ------------------------------------------------------------------- Row */
-
-.set-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 52px;
-  padding: 9px 12px 9px 16px;
-}
-.set-row + .set-row,
-.set-row + .set-drawer,
-.set-drawer + .set-row,
-.set-drawer + .set-drawer { box-shadow: inset 0 1px 0 var(--surface-border); }
-.set-row-control > .set-status { font-size: 12.5px; font-weight: 550; }
 /* Models as chips: name, then its family, quieter. */
 .set-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .set-chip {
@@ -127,16 +99,8 @@
 .set-chip.is-more:hover { background: rgb(255 255 255 / .06); color: hsl(var(--foreground)); }
 .set-chip.is-more:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .set-suggest { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.set-row-text { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
-.set-row-text strong { font-size: 13px; font-weight: 550; color: hsl(var(--foreground)); }
-.set-row-text > span { font-size: 12px; line-height: 1.45; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
-.set-row-control { flex: none; display: flex; align-items: center; gap: 8px; }
 .set-model-name { display: block; overflow-wrap: anywhere; }
 .set-type-picker { width: 200px; }
-.set-row.is-disabled .set-row-text strong { color: hsl(var(--muted-foreground)); }
-
-.set-row.is-stacked { flex-direction: column; align-items: stretch; gap: 12px; }
-.set-row.is-stacked .set-row-control { flex-direction: column; align-items: stretch; }
 
 .set-inline-form { display: flex; gap: 8px; }
 .set-inline-form .modal-input { flex: 1; min-width: 0; }
@@ -209,7 +173,6 @@
 
 .set-progress { height: 6px; border-radius: var(--r-pill); background: var(--well); overflow: hidden; }
 .set-progress > div { height: 100%; border-radius: inherit; background: var(--ember); transition: width 300ms var(--ease-out); }
-.set-row.is-stacked .set-row-control > .btn { align-self: flex-start; }
 
 /* Status: a square dot and a word, never colour alone. */
 .set-status { display: inline-flex; align-items: center; gap: 8px; }
@@ -302,14 +265,7 @@
   .set-nav-item { flex: none; min-height: 40px; }
   .set-nav-item.active::after { display: none; }
   .set-panel { padding: 20px 14px 28px; gap: 22px; }
-  .set-row { flex-wrap: wrap; padding: 10px 12px 10px 14px; }
-  .set-row-control { flex-wrap: wrap; }
-  .set-row:has(.segmented) .set-row-control,
-  .set-row:has(.number-picker) .set-row-control,
-  .set-row:has(.set-type-picker) .set-row-control,
-  .set-type-picker { width: 100%; }
-  .set-row .segmented { width: 100%; }
-  .set-row .segmented button { flex: 1; }
+
   }
 
 /* A row that opens a drawer of rows below it (Settings › Studio › Keyboard).
@@ -320,7 +276,6 @@
   padding-block: 6px;
   border: 0;
   background: none;
-  font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -342,10 +297,10 @@
 }
 .set-drawer-knob .set-drawer-chevron { color: inherit; }
 .set-drawer-toggle:hover .set-drawer-knob { background: var(--control-hover); color: hsl(var(--foreground)); }
-.set-drawer-toggle:hover .set-row-text > strong { color: hsl(var(--foreground)); }
-.set-drawer-toggle .set-row-text { display: flex; align-items: baseline; gap: 10px; }
-.set-drawer-toggle .set-row-text > strong { flex: none; }
-.set-drawer-toggle .set-row-text > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.set-drawer-toggle:hover .list-row-label { color: hsl(var(--foreground)); }
+.set-drawer-toggle .list-row-text { display: flex; align-items: baseline; gap: 10px; }
+.set-drawer-toggle .list-row-text > .list-row-label { flex: none; }
+.set-drawer-toggle .list-row-text > .list-row-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .set-drawer-toggle .set-kbd { font-size: 11px; }
 .set-drawer-toggle code { padding: 1px 5px; border-radius: 6px; background: var(--control-fill); color: hsl(var(--foreground)); font: 500 11.5px/1.5 var(--font-mono); }
 .set-drawer-chevron { flex: none; color: hsl(var(--muted-foreground)); transition: transform var(--dur-base) var(--ease-out), color var(--dur-fast); }
@@ -481,32 +436,8 @@
 .set-row .btn .is-spinning { animation: spin .9s linear infinite; }
 .set-row .btn.is-done:disabled { opacity: 1; color: #7fd49a; }
 
-.set-note.is-error { color: hsl(var(--destructive)); }
+.set-note.is-error, .list-note.is-error { color: var(--danger-ink); }
 
-/* ------------------------------------------------------- Other devices
-   An address as a code to scan: dark on white, which phone cameras read
-   best in any theme, in a quiet card under its row. */
-
-.btn.is-ghost.is-active { background: var(--control-hover); color: hsl(var(--foreground)); }
-.set-qr {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 4px 18px 16px;
-}
-.set-qr .qr-code {
-  flex: none;
-  width: 132px;
-  height: 132px;
-  padding: 6px;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 0 0 1px var(--surface-border);
-}
-.set-qr p { margin: 0; max-width: 32ch; font-size: 12.5px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
-@media (max-width: 760px) {
-  .set-qr { flex-direction: column; align-items: flex-start; padding: 4px 14px 14px; }
-}
 
 .account-profile-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 16px; margin: 8px 18px 16px; padding: 10px 12px; border: 1px solid var(--surface-border); border-radius: var(--r-item); }
 .account-profile-list legend { padding: 0 6px; color: hsl(var(--muted-foreground)); font-size: 12px; }
@@ -514,7 +445,6 @@
 .account-profile-list label { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 32px; font-size: 12px; cursor: pointer; }
 .account-profile-list label span { min-width: 0; overflow-wrap: anywhere; }
 .account-field { width: 220px; max-width: 100%; }
-@media (max-width: 760px) { .set-row:has(.account-field) .set-row-control, .account-field { width: 100%; } }
 
 /* Where a deployment setting comes from (DeploymentSettings.tsx): quiet, beside its label. */
 .set-source {
@@ -533,27 +463,15 @@
 .set-source.is-deployment { background: var(--control-hover); }
 .set-locked-value { font-size: 13px; color: hsl(var(--muted-foreground)); }
 
-/* A switch row is one target (SettingsControls › SwitchRow): the whole line
-   toggles, lights up on hover and dims slightly on a press; the knob is drawn
-   from the row's state. */
 .switch[data-checked="true"] { background: var(--action); box-shadow: none; }
 .switch[data-checked="true"] .switch-thumb { transform: translateX(16px); background: var(--action-ink); }
-.set-switch-row { cursor: pointer; border-radius: 0; transition: background-color var(--motion-fast) var(--motion-ease); -webkit-tap-highlight-color: transparent; user-select: none; }
-.set-switch-row:hover { background-color: var(--control-hover); }
-.set-switch-row:active { background-color: var(--control-press, var(--control-hover)); }
-.set-switch-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-amber); }
-.set-switch-row.is-disabled { cursor: default; }
-.set-switch-row.is-disabled:hover,
-.set-switch-row.is-disabled:active { background-color: transparent; }
-.set-switch-row.is-disabled .switch { opacity: .4; }
-.set-switch-row .set-row-text strong { display: inline-flex; align-items: center; gap: 8px; }
 @media (forced-colors: active) {
   .switch[data-checked="true"] { forced-color-adjust: none; background: Highlight; }
   .switch[data-checked="true"] .switch-thumb { background: HighlightText; }
 }
 
 /* Save & Discard: the last row of an edited form, only while it differs. */
-.set-save-row .set-row-text strong { color: var(--accent-amber); }
+.set-save-row .list-row-label { color: var(--accent-amber); }
 
 /* Several values from one dropdown (MultiSelect.tsx), in the studio's select style. */
 .multi-select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 220px; max-width: 100%; cursor: pointer; }
@@ -574,8 +492,6 @@
 .multi-select-text { display: grid; min-width: 0; }
 .multi-select-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multi-select-text > small { font-size: 11px; color: hsl(var(--muted-foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.set-row-control .account-field { flex: none; }
-@media (max-width: 760px) { .set-row:has(.multi-select-trigger) .set-row-control, .multi-select-trigger { width: 100%; } }
 
 /* Settings › Profiles: one profile's JSON, then its review (ProfilesSettings.tsx). */
 .set-sections { display: flex; flex-direction: column; gap: 22px; }

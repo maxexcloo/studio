@@ -28,71 +28,66 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-export function Group({ title, note, tone, children }: React.PropsWithChildren<{ title?: string; note?: React.ReactNode; tone?: 'danger' }>) {
+/*
+ * Settings rows are the flat list every phone sheet uses (SheetList.tsx,
+ * 41-lists.css, UI-PATTERNS › Lists and › Settings): a quiet heading over
+ * full-width rows split by hairlines, no cards. A Settings row may carry one
+ * line of description under its label.
+ */
+export function Group({ title, note, tone, children, className }: React.PropsWithChildren<{ title?: string; note?: React.ReactNode; tone?: 'danger'; className?: string }>) {
   return (
-    <section className="set-group">
-      {title ? <h4 className="set-group-title">{title}</h4> : null}
-      <div className={cn('set-card', tone === 'danger' && 'is-danger')}>{children}</div>
-      {note ? <p className="set-note">{note}</p> : null}
+    <section className={cn('list-section set-group', tone === 'danger' && 'is-danger', className)}>
+      {title ? <h4 className="list-section-title">{title}</h4> : null}
+      <div className="list-group">{children}</div>
+      {note ? <p className="list-note">{note}</p> : null}
     </section>
+  );
+}
+
+function RowText({ label, description, descriptionId }: { label: React.ReactNode; description?: React.ReactNode; descriptionId?: string }) {
+  return (
+    <span className="list-row-text">
+      <span className="list-row-label">{label}</span>
+      {description ? <span className="list-row-detail" id={descriptionId}>{description}</span> : null}
+    </span>
   );
 }
 
 export function Row({ label, description, children, stacked, disabled, className }: React.PropsWithChildren<{ label: React.ReactNode; description?: React.ReactNode; stacked?: boolean; disabled?: boolean; className?: string }>) {
   return (
-    <div className={cn('set-row', stacked && 'is-stacked', disabled && 'is-disabled', className)}>
-      <div className="set-row-text">
-        <strong>{label}</strong>
-        {description ? <span>{description}</span> : null}
-      </div>
-      {children ? <div className="set-row-control">{children}</div> : null}
+    <div className={cn('list-row is-static set-row', stacked && 'is-stacked', disabled && 'is-disabled', className)}>
+      <RowText label={label} description={description} />
+      {children ? <span className="list-row-control">{children}</span> : null}
     </div>
   );
 }
 
 /**
- * A switch row whose whole line is the switch (UI-PATTERNS › Settings): a
- * click or tap anywhere on the label, description or switch toggles it, and
- * Space or Enter does too. The row carries role="switch"; the knob inside is
- * drawn only.
+ * A switch row whose whole line is the switch (UI-PATTERNS › Settings): the
+ * row is the button with role="switch", so a click or tap anywhere on the
+ * label, description or knob toggles it, and Space or Enter does too. The
+ * knob is drawn from its state. The phone lists use the same (ListSwitch).
  */
 export function SwitchRow({ label, tag, description, checked, onChange, disabled }: { label: string; tag?: React.ReactNode; description?: React.ReactNode; checked: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
   const descriptionId = React.useId();
   return (
-    <div
-      className={cn('set-row set-switch-row', disabled && 'is-disabled')}
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      aria-describedby={description ? descriptionId : undefined}
-      aria-disabled={disabled || undefined}
-      tabIndex={disabled ? -1 : 0}
-      onClick={() => { if (!disabled) onChange(!checked); }}
-      onKeyDown={(event) => {
-        if (disabled || (event.key !== ' ' && event.key !== 'Enter') || event.target !== event.currentTarget) return;
-        event.preventDefault();
-        onChange(!checked);
-      }}
-    >
-      <div className="set-row-text">
-        <strong>{label}{tag}</strong>
-        {description ? <span id={descriptionId}>{description}</span> : null}
-      </div>
-      <div className="set-row-control"><span className={cn('switch', checked && 'is-on')} aria-hidden="true" data-checked={checked}><span className="switch-thumb" /></span></div>
-    </div>
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} aria-describedby={description ? descriptionId : undefined} disabled={disabled} className="list-row list-switch set-row" onClick={() => onChange(!checked)}>
+      <RowText label={<>{label}{tag}</>} description={description} descriptionId={descriptionId} />
+      <span className="switch" data-checked={checked} aria-hidden="true"><span className="switch-thumb" /></span>
+    </button>
   );
 }
 
-/** Save & Discard for an edited form, shown only while something changed. */
+/** Save & Discard for an edited form, its last row, shown only while something changed. */
 export function SaveRow({ dirty, busy, onSave, onDiscard, saveLabel = 'Save', note, canSave = true }: { dirty: boolean; busy?: boolean; onSave: () => void; onDiscard: () => void; saveLabel?: string; note?: React.ReactNode; canSave?: boolean }) {
   if (!dirty) return null;
   return (
-    <div className="set-row set-save-row" role="group" aria-label="Unsaved Changes">
-      <div className="set-row-text"><strong>Unsaved Changes</strong>{note ? <span>{note}</span> : null}</div>
-      <div className="set-row-control">
+    <div className="list-row is-static set-row set-save-row" role="group" aria-label="Unsaved Changes">
+      <RowText label="Unsaved Changes" description={note} />
+      <span className="list-row-control">
         <button type="button" className="btn is-ghost" disabled={busy} onClick={onDiscard}>Discard</button>
         <button type="button" className="btn is-primary" disabled={busy || !canSave} onClick={onSave}>{busy ? 'Saving…' : saveLabel}</button>
-      </div>
+      </span>
     </div>
   );
 }

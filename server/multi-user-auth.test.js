@@ -123,9 +123,9 @@ test("ordinary accounts keep stored profile grants and explicit administration c
   assert.equal(blocked.statusCode, 401);
   await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: false } });
 
+  // Administrators no longer reset passwords; the account changes its own in Settings › Account.
   const reset = await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { password: "a replacement password" } });
-  assert.equal(reset.statusCode, 200);
-  assert.equal(accountForRequest({ ...local(), headers: { ...local().headers, cookie: userCookie } }), null);
+  assert.equal(reset.statusCode, 400);
 
   // Saving while discovery is degraded keeps existing grants but adds no new unknown ones.
   const { saveAccessProfile } = await import("./account-store.js");

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf, endDeviceSession } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
@@ -328,8 +328,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       let account;
       if (typeof body.accessProfileId === "string") account = assignAccessProfile(req.params.id, body.accessProfileId);
       else if (typeof body.disabled === "boolean") account = setAccountDisabled(req.params.id, body.disabled);
-      else if (typeof body.password === "string") account = await setAccountPassword(req.params.id, body.password);
-      else return res.status(400).json({ ok: false, error: "Choose an access profile, account status or new password." });
+      else return res.status(400).json({ ok: false, error: "Choose an access profile or account status." });
       res.json({ ok: true, account });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });

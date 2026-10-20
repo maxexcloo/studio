@@ -87,6 +87,16 @@ test("display name, email and password changes, with the current password where 
   await signIn("painter@example.test", secret("second"));
 });
 
+test("an ordinary account may start without a password and links to single sign-on by its email", async () => {
+  const created = await store.createLocalAccount({ username: "nopass@example.test", displayName: "No Pass", accessProfileId: "artists" });
+  assert.equal("password" in created, false);
+  assert.equal(store.ownAccount(created.id).canChangePassword, false);
+  assert.equal(await store.verifyLocalAccount("nopass@example.test", ""), null);
+  await assert.rejects(store.createLocalAccount({ username: "admin2@example.test", role: "administrator" }), /Enter a password/);
+  const linked = store.signInWithOidcIdentity({ issuer: "https://id.example.test", subject: "sub-np", email: "nopass@example.test", emailVerified: true });
+  assert.equal(linked.access.userId, created.id);
+});
+
 test("single sign-on accounts can't change their email or password here", async () => {
   const result = store.signInWithOidcIdentity({ issuer: "https://id.example.test", subject: "sub-1", email: "sso@example.test", emailVerified: true, name: "SSO" });
   assert.equal(result.pending, true);
