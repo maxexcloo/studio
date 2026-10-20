@@ -20,10 +20,10 @@ import { probeVideo } from "./video-previews.js";
  * or A1111's "parameters") so it can be searched and shown. Nothing else is
  * taken from it.
  *
- * What is never read: HEISS UI's own folders (its data, where Hidden and
- * the thumbnail cache live, and the app itself), dot folders, and the
- * heiss-ui folder inside the output folder, whose files are either in the
- * gallery already, deleted on purpose, or a copy Hidden could not remove.
+ * What is never read: HEISS UI's own folders (its data, where the thumbnail
+ * cache lives, and the app itself), dot folders, and the heiss-ui folder
+ * inside the output folder, whose files are either in the gallery already
+ * or deleted on purpose.
  */
 
 const foldersPath = path.join(dataDir, "library-folders.json");
@@ -34,7 +34,7 @@ export const scanFileLimit = 20000;
 const scanDepth = 8;
 // heiss-ui is where HEISS UI saves into an output folder. Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in
-// the gallery already, deleted on purpose, or a copy Hidden could not remove.
+// the gallery already or deleted on purpose.
 const ownOutputName = "heiss-ui";
 const skippedNames = new Set(["node_modules", "__pycache__", "$RECYCLE.BIN", "System Volume Information", ownOutputName]);
 
@@ -233,7 +233,7 @@ let filling = null;
 export function fillVideoSizes() {
   if (filling) return filling;
   filling = (async () => {
-    const missing = gallery.filter((item) => item.type === "video" && item.status === "done" && !item.privateVault && !(Number(item.width) > 0 && Number(item.height) > 0));
+    const missing = gallery.filter((item) => item.type === "video" && item.status === "done" && !(Number(item.width) > 0 && Number(item.height) > 0));
     let filled = 0;
     let batch = new Map();
     const flush = () => {

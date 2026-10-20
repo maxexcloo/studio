@@ -23,8 +23,6 @@ ComfyUI Desktop usually uses port 8000, a manual or portable install 8188. Both 
 
 Open the address the server log shows under **Open**, usually `http://localhost:8787`, or the address and port the container is published on.
 
-Use `localhost` rather than `127.0.0.1`. Passkeys for Hidden only work on a name.
-
 ### The port is taken, or Studio is already running
 
 When port 8787 is in use, the next free one (8788, 8789, …) is used instead. The log says which. To keep one fixed port, set `PORT` in `.env`.
@@ -146,7 +144,7 @@ Free space is checked before a large download. Free some space on the disk that 
 
 ### Going back to an earlier version
 
-The first time a new version starts, it saves a copy of the settings, the gallery list, Hidden's records and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and Hidden's images aren't copied, because updates don't change them. To go back, stop Studio, deploy the earlier image, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, at most three are kept, and erasing Hidden removes them all.
+The first time a new version starts, it saves a copy of the settings, the gallery list and sign-ins in `data/.backups/`, in a folder named after the two versions (for example `0.11.0-to-0.12.0-…`). Thumbnails, reference images and `data/backups/` aren't copied, because updates don't change them. To go back, stop Studio, deploy the earlier image, copy everything from that folder back into `data/`, and start it. Copies are removed after 14 days, and at most three are kept.
 
 ## Phones and other devices
 

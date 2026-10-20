@@ -7,8 +7,7 @@ import { addUpscale, estimateUpscale } from "./upscale-timing.js";
 
 /**
  * How long things take on this machine, kept only for HEISS UI's own
- * estimates. Nothing here leaves the data folder, and Hidden runs never
- * enter it.
+ * estimates. Nothing here leaves the data folder.
  */
 export const timingsPath = path.join(dataDir, "timings.json");
 
@@ -69,7 +68,7 @@ export function upscaleEstimate(params) {
   return estimateUpscale(load().upscales, params);
 }
 
-/** A finished upscale, from the gallery's arrow or inside a run. Never a Hidden one. */
+/** A finished upscale, from the gallery's arrow or inside a run. */
 export function recordUpscale(entry) {
   const current = load();
   const upscales = addUpscale(current.upscales, entry);

@@ -1,5 +1,4 @@
-import crypto from 'node:crypto';
-import { comfyFileRef, ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, temporaryInputFiles } from './media-store.js';
+import { ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, temporaryInputFiles } from './media-store.js';
 import { flushGallery } from './gallery-store.js';
 import { withComfyBackend } from './comfy-backends.js';
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
@@ -9,10 +8,8 @@ import { withFixes } from './failure-fixes.js';
 import { nextProgress } from './progress-phase.js';
 import { rememberMissingParts } from './model-families.js';
 import { imageGraph, videoGraph } from './graphs.js';
-import { gallery, generationSettings, hideGalleryItems, outputsFrom, removeGalleryJob, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
-import { forgetComfyRun } from './hidden-traces.js';
-import { releaseHiddenRun, rememberHiddenRun } from './hidden-runs.js';
-import { attachVaultUpscale, patchVaultItem, storeHiddenOutputs } from './vault.js';
+import { generationSettings, outputsFrom, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
+import { forgetComfyRun } from './comfy-traces.js';
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from './run-upscale.js';
 import { writeCivitaiParameters } from './civitai.js';
 import { warmNewOutputs } from './media-warmup.js';
@@ -43,7 +40,6 @@ export function setTerminalJob(id, patch) {
     previews: undefined,
     prompt: undefined,
     items: undefined,
-    vaultKey: null,
     terminalAt: Date.now()
   };
   jobs.set(id, next);
@@ -99,7 +95,6 @@ function applyPreviewBuffer(id, buffer) {
   if (image.length < 16) return true;
   const preview = `data:${mime};base64,${image.toString("base64")}`;
   const current = jobs.get(id) || {};
-  // A Hidden run's previews live in memory only and are shown in Hidden alone.
   jobs.set(id, { ...current, preview });
   if ((current.items?.length || 1) <= 1) updateGalleryJob(id, { preview }, { persist: false });
   return true;
@@ -393,13 +388,10 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
   return socket;
 }
 
-/**
- * A normal run that used a Hidden image as its reference: the staged copy
- * goes. A Hidden run itself is finished by hidden-runs.js once ComfyUI lets
- * go of it (see the end of runJob).
- */
-function forgetHiddenInputs(body) {
-  if (!body?.privateVault && body?.hiddenInputNames?.length) forgetComfyRun({ inputNames: body.hiddenInputNames }).catch(() => null);
+
+/** A run's temporary input copies (resized references, legacy uploads) go when it ends. */
+function forgetTemporaryInputs(body) {
+  if (body?.temporaryInputNames?.length) forgetComfyRun({ inputNames: body.temporaryInputNames }).catch(() => null);
 }
 
 // What each running job asked for, so a failure can be read against it.
@@ -466,10 +458,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
   runTimings.set(id, timing);
   refreshQueueEstimates();
   let socket = null;
-  // A Hidden run is written down before ComfyUI has it, so it is finished
-  // even when this job loses it; `hiddenDone` says how far this job got.
-  let hiddenPromptId = "";
-  let hiddenDone = {};
   try {
     let prompt = body.kind === "video" ? await videoGraph(body) : await imageGraph(body);
     const upscale = prepare ? await prepare(prompt) : null;
@@ -489,22 +477,11 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     // `saved`: Smart upscale's source pictures, by save node, as ComfyUI reported them; `missed`: why their upscale did not finish.
     const run = { promptId: null, wake: null, alive: null, pairs, saved: new Map(), missed: null };
     watchProgress(id, run, socket, prompt);
-    if (body.privateVault) {
-      hiddenPromptId = crypto.randomUUID();
-      rememberHiddenRun(jobs.get(id)?.vaultKey, hiddenPromptId, { body, inputNames: body.stagedInputNames });
-    }
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      // heiss_hidden stays with the run in ComfyUI's history, so no recovery ever takes it for a gallery image.
-      body: JSON.stringify({ prompt, client_id: id, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "auto", ...(hiddenPromptId ? { heiss_hidden: true } : { heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}) } }) } })
+      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}) } } })
     });
-    // An older ComfyUI names the run itself.
-    if (hiddenPromptId && queued.prompt_id && queued.prompt_id !== hiddenPromptId) {
-      rememberHiddenRun(jobs.get(id)?.vaultKey, queued.prompt_id, { body, inputNames: body.stagedInputNames });
-      releaseHiddenRun(hiddenPromptId, { clean: true });
-      hiddenPromptId = queued.prompt_id;
-    }
     if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
       // It may already have started on an idle ComfyUI; this stops it either way, and only it.
       await cancelPrompt(queued.prompt_id).catch(() => null);
@@ -517,14 +494,14 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const tracker = promptTracker(queued.prompt_id);
     run.alive = tracker.alive;
     /**
-     * Into the gallery (or Hidden): each picture with its upscale riding on it.
+     * Into the gallery: each picture with its upscale riding on it.
      * `missed` is set when the upscale stopped or failed after the pictures were
      * saved; they are kept at their generated size and the toast says so.
      */
     const deliver = async (results, missed = null) => {
       // ComfyUI as a worker: the pictures move into HEISS media before anything shows them.
       let comfyCopies = [];
-      if (mediaStorageEnabled && !body.privateVault) {
+      if (mediaStorageEnabled) {
         const moved = await ingestRunResults(results, body.ownerId || "");
         results = moved.results;
         comfyCopies = moved.comfyFiles;
@@ -534,61 +511,32 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       const outputs = results.map((result) => result.output);
       const kept = missed ? keptMessage({ canceled: Boolean(missed.canceled), count: outputs.length }) : "";
       const skipped = upscale?.skipped ? { status: "error", quality: upscale.quality, progress: null, error: upscale.skipped } : null;
-      // Every upscale it made teaches the next estimate; a Hidden run never does.
+      // Every upscale it made teaches the next estimate.
       const clock = timing.upscale;
-      if (clock?.startAt && !missed && !body.privateVault && results.some((result) => result.upscale)) {
+      if (clock?.startAt && !missed && results.some((result) => result.upscale)) {
         recordUpscale({ ...clock.learn, ms: (clock.endAt ?? Date.now()) - clock.startAt, predicted: clock.estimate });
       }
-      if (body.privateVault) {
-        const { items, leftBehind } = await storeHiddenOutputs(jobs.get(id)?.vaultKey, outputs, body, gallery.filter((item) => item.jobId === id));
-        const key = jobs.get(id)?.vaultKey;
-        for (const [index, result] of results.entries()) {
-          const item = items[index];
-          if (!item) continue;
-          const done = upscaled(result);
-          try {
-            // Sealed into the item; ComfyUI's address for the file means nothing once it is gone.
-            if (done) {
-              const { url: _url, thumbnailUrl: _thumb, outputName: _name, ...state } = done;
-              Object.assign(item, (await attachVaultUpscale(key, item.id, result.upscale, state)).item);
-            }
-            else if (missedState(result) || skipped) patchVaultItem(key, item.id, { upscale: missedState(result) || skipped });
-          } catch { /* the picture is in Hidden; only its upscale is missing */ }
-        }
-        removeGalleryJob(id);
-        // No thumbnail for the workflow card: that list is not encrypted.
-        markWorkflowUsed(body.profileId || body.model || body.workflow || "", "");
-        setTerminalJob(id, { status: "done", outputs: items, leftBehind, ...(kept ? { kept } : {}) });
-        // A copy that could not be removed is marked, so no import of the output folder brings it in.
-        if (leftBehind) hideGalleryItems(outputs);
-        // Without a shared folder, the worker node removes ComfyUI's copies of what went into Hidden.
-        if (mediaStorageEnabled && leftBehind) await removeComfyFiles(outputs.map((output) => comfyFileRef(output?.url)).filter(Boolean));
-        const historyGone = await forgetComfyRun({ promptIds: [queued.prompt_id], inputNames: body.stagedInputNames });
-        hiddenDone = { stored: true, clean: historyGone };
-      } else {
-        // Before the gallery shows them, so no browser reads a file mid-write.
-        writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
-        // Thumbnails now, from the final files, rather than on first view.
-        warmNewOutputs([...outputs, ...results.map((result) => result.upscale).filter(Boolean)]);
-        const withUpscales = results.map((result) => {
-          const done = upscaled(result);
-          if (done) return { ...result.output, upscale: done, upscaleActive: true };
-          const state = missedState(result) || skipped;
-          return state ? { ...result.output, upscale: state } : result.output;
-        });
-        const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
-        markWorkflowUsed(body.profileId || body.model || body.workflow || "", completed[0]?.url || "");
-        setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
-        // A Hidden image used as the reference for a normal run: only its staged copy goes.
-        if (body.hiddenInputNames?.length) await forgetComfyRun({ inputNames: body.hiddenInputNames });
-        // The gallery has HEISS's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
-        // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
-        if (mediaStorageEnabled) {
-          await flushGallery();
-          noteIngested([id]);
-          await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
-          if (comfyCopies.length) await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
-        }
+      // Before the gallery shows them, so no browser reads a file mid-write.
+      writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
+      // Thumbnails now, from the final files, rather than on first view.
+      warmNewOutputs([...outputs, ...results.map((result) => result.upscale).filter(Boolean)]);
+      const withUpscales = results.map((result) => {
+        const done = upscaled(result);
+        if (done) return { ...result.output, upscale: done, upscaleActive: true };
+        const state = missedState(result) || skipped;
+        return state ? { ...result.output, upscale: state } : result.output;
+      });
+      const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
+      markWorkflowUsed(body.profileId || body.model || body.workflow || "", completed[0]?.url || "");
+      setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
+      if (body.temporaryInputNames?.length) await forgetComfyRun({ inputNames: body.temporaryInputNames });
+      // The gallery has HEISS's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
+      // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
+      if (mediaStorageEnabled) {
+        await flushGallery();
+        noteIngested([id]);
+        await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
+        if (comfyCopies.length) await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
       }
       socket?.close();
     };
@@ -614,13 +562,13 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         updateGalleryJob(id, { status: "canceled" });
         setTerminalJob(id, { status: "canceled" });
         socket?.close();
-        forgetHiddenInputs(body);
+        forgetTemporaryInputs(body);
         return;
       }
       // The socket already recorded the failure; history would only add an empty result.
       if (jobs.get(id)?.status === "error") {
         socket?.close();
-        forgetHiddenInputs(body);
+        forgetTemporaryInputs(body);
         return;
       }
       const checked = await tracker.check();
@@ -680,10 +628,8 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     setTerminalJob(id, { status: "error", error: failure.summary, failure });
     updateGalleryJob(id, { status: "error", filename: failure.title, failure });
     socket?.close();
-    forgetHiddenInputs(body);
+    forgetTemporaryInputs(body);
   } finally {
-    // Anything short of sealed and cleaned up is finished later, from the list of Hidden runs.
-    if (hiddenPromptId) releaseHiddenRun(hiddenPromptId, hiddenDone);
     // The progress socket can report an error a moment after this loop ends.
     setTimeout(() => jobBodies.delete(id), 60_000).unref?.();
     runTimings.delete(id);
@@ -692,7 +638,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
 }
 
 /**
- * A finished run's timing: learned from (never for a Hidden run), and kept on
+ * A finished run's timing: learned from, and kept on
  * the job so its images say how long they took and whether steps were far
  * slower than usual. A run whose end the socket missed is not learned from,
  * since its tail would be off by a poll.
@@ -700,7 +646,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
 function recordTiming(id, body, timing) {
   const result = timing.timer?.result();
   if (!result) return;
-  if (!body.privateVault) recordGeneration({ body, result, predicted: timing.estimate, warm: timing.warm });
+  recordGeneration({ body, result, predicted: timing.estimate, warm: timing.warm });
   const slow = slowSteps(result, timing.estimate);
   jobs.set(id, { ...jobs.get(id), timing: { runMs: Math.round(result.runMs), ...(result.stepMs ? { stepMs: Math.round(result.stepMs) } : {}), ...(slow ? { slow: true } : {}) } });
 }
@@ -808,18 +754,7 @@ export function runMockJob(id, body) {
           };
         });
 
-        if (body.privateVault) {
-          storeHiddenOutputs(jobs.get(id)?.vaultKey, outputs, body, gallery.filter((item) => item.jobId === id))
-            .then(({ items }) => {
-              removeGalleryJob(id);
-              setTerminalJob(id, { status: "done", outputs: items });
-            })
-            .catch((error) => {
-              setTerminalJob(id, { status: "error", error: error.message });
-              updateGalleryJob(id, { status: "error", filename: "Couldn’t save to Hidden" });
-            });
-          return;
-        }
+
         await replaceGalleryJob(id, outputs, body, jobs);
         markWorkflowUsed(body.profileId || body.model || body.workflow || "", outputs[0]?.url || "");
         setTerminalJob(id, { status: "done", outputs });

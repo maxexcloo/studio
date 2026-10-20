@@ -50,7 +50,6 @@ The node graph is for building workflows. Studio is for the everyday loop of pro
 - **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
 - **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan.
 - **On your phone and every device.** A phone layout made for one thumb, and the full studio on any laptop or tablet on your network. Your PC renders, and every device shares the same models and gallery. [Set it up ↓](#on-your-phone)
-- **Hidden.** A locked place for images you keep to yourself, opened with Touch ID, Windows Hello or a password. Generate into it, or hide anything later.
 - **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Library.
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links. The library is off by default; set `STUDIO_ENABLE_PRESETS=1` on the instances that should offer it (see [Configuration](docs/guides/CONFIGURATION.md#civitai-images--downloads)).
 - **Zen mode.** Just the prompt and the picture, fullscreen.
@@ -142,7 +141,7 @@ The text-only completion is short and self-contained: one instruction line, then
 
 Studio's own server instructions and tool descriptions carry every workflow rule, so any MCP client behaves the same: pass the request with kind and tier, Reuse for follow-ups, reply as each result says and never poll. Each reply carries its own collection steps. Enable `serverInstructions: true` in LibreChat, and keep a client's own prompt to a line. The instructions and every tool schema stay within a small budget that a test checks, since chat hosts resend them on every model step. AI Control connections only get the GPU approval rule. MCP catalogue reads reuse the existing backend metadata cache, and studio rescans still refresh it. Completed-result visibility checks target the exact job and keep Hidden/deletion revocation.
 
-Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/studio`, and result links keep that prefix. Without it, links use the studio's local loopback address. Result links are short opaque IDs under `/mcp/results/`, mapped in `mcp-ownership.json` to their owner and output. Adding `.jpg` serves a JPEG preview at most 1024 pixels on its long side. Sealed links issued by earlier versions keep working. Original links open inline in the browser and don't expire, but stop working when outputs are hidden or deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid. Set and preserve `MCP_SIGNING_KEY`, and keep `mcp-ownership.json` in `HEISS_DATA_DIR` across updates.
+Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/studio`, and result links keep that prefix. Without it, links use the studio's local loopback address. Result links are short opaque IDs under `/mcp/results/`, mapped in `mcp-ownership.json` to their owner and output. Adding `.jpg` serves a JPEG preview at most 1024 pixels on its long side. Sealed links issued by earlier versions keep working. Original links open inline in the browser and don't expire, but stop working when outputs are deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid. Set and preserve `MCP_SIGNING_KEY`, and keep `mcp-ownership.json` in `HEISS_DATA_DIR` across updates.
 
 Keep shared provider credentials at the trusted gateway, which sets `x-ai-user-id` to partition job and reference ownership. In multi-user mode the gateway can also forward the user's email in `x-ai-user-email`, such as LibreChat's `{{LIBRECHAT_USER_EMAIL}}` passed through LiteLLM's `extra_headers`. An unlinked ID whose email is an enabled account's username is then linked to that account automatically. Other unlinked IDs get tools that only ask for an administrator's link (see [Configuration](docs/guides/CONFIGURATION.md)). Direct provider calls use a separate fallback owner, and the forwarded header alone grants no access.
 
@@ -254,7 +253,7 @@ On desktop, images open at 1:1, with one image pixel per CSS pixel; on a phone t
 
 Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler), without leaving the studio.
 
-- **Any picture, one click.** The upscale arrow on a tile or in the viewer takes anything in the gallery to 2K or 4K, Hidden included. The upscale is saved next to the original, and a slider drags across both to show what changed.
+- **Any picture, one click.** The upscale arrow on a tile or in the viewer takes anything in the gallery to 2K or 4K. The upscale is saved next to the original, and a slider drags across both to show what changed.
 - **Time left, not a spinner.** The ring, the buttons and the queue count down the seconds that are left.
 - **Set up when you need it.** The first upscale without the SeedVR2 nodes or model offers to install them, with sizes shown before anything downloads. Weights kept in any folder ComfyUI reads are found.
 
@@ -309,18 +308,6 @@ Laptops and desktops get the full studio and phones get the phone layout. Only e
 </details>
 
 Signing in, admin rights, HTTPS and proxies are covered in [SECURITY.md](./docs/guides/SECURITY.md#other-devices-signing-in-admin-https-and-proxies).
-
-## Hidden
-
-Hidden is a place for the images you'd rather keep to yourself. Open it from the lock in the dock. The first time, it walks you through a password and, where the browser supports it, Touch ID or Windows Hello.
-
-- **Generate straight into it.** Anything made while Hidden is open renders there, with the same live previews, and stays out of the gallery.
-- **Hide from the gallery.** The eye on a tile (or in the viewer) moves an image into Hidden, or back out. Upscale, compare, remix and video all work inside it.
-- **Locked means out of sight.** A locked Hidden shows no thumbnails and no count, and its prompts stay out of Recent prompts. It locks after a while without activity (Settings › Hidden › Auto-lock), or right away with **Lock**.
-
-Images, prompts, settings and upscales in Hidden are encrypted on disk with a key that only your password or a passkey can open, and ComfyUI's own copies are removed. Hidden keeps things out of casual view; it isn't forensic-grade protection. [SECURITY.md](./docs/guides/SECURITY.md) has the details, including what passkeys need.
-
-There's no password reset. If the password and every passkey are lost, **Erase Hidden** in Settings › Hidden starts over and takes everything in Hidden with it.
 
 ## Updating
 

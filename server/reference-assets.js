@@ -5,14 +5,13 @@ import path from "node:path";
 import Busboy from "busboy";
 import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
 import { dataDir, importedImageFile, filterVisibleGallery, gallery, galleryKey, outputFileCandidates } from "./gallery-store.js";
-import { encryptionKeyFromRequest } from "./privacy.js";
-import { galleryItemBytes, readVaultAsset, vaultGalleryItemsForRequest } from "./vault.js";
+
 import { extractLastFrame } from "./video-previews.js";
 import { renameWithRetry } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
-import { forgetComfyRun } from "./hidden-traces.js";
+import { forgetComfyRun } from "./comfy-traces.js";
 import { families } from "./family-catalog.js";
 import { mimeExtension, referenceInputName } from "./reference-names.js";
 import { ownerIdForRequest, recordBelongsToRequest, recordsForRequest } from "./account-ownership.js";
@@ -68,8 +67,7 @@ function publicUploadAsset(record) {
     size: record.size,
     createdAt: record.createdAt,
     thumbnailUrl: `/api/reference-assets/${encodeURIComponent(record.id)}/thumbnail`,
-    url: `/api/reference-assets/${encodeURIComponent(record.id)}/media`,
-    privacyDomain: "gallery"
+    url: `/api/reference-assets/${encodeURIComponent(record.id)}/media`
   };
 }
 
@@ -78,10 +76,9 @@ function encodedGalleryId(item) {
 }
 
 function galleryAsset(item) {
-  const vault = Boolean(item.privateVault || item.id && String(item.url || "").startsWith("/api/vault/"));
   return {
-    id: vault ? `vault:${item.id}` : encodedGalleryId(item),
-    source: vault ? "vault" : "generation",
+    id: encodedGalleryId(item),
+    source: "generation",
     name: item.outputName || item.filename || "Generated image",
     mime: item.mime || mimeFromName(item.outputName || item.filename || item.url),
     width: Number(item.width || 0),
@@ -91,7 +88,6 @@ function galleryAsset(item) {
     // The version on show: the upscale when it is switched on, as a run will use.
     thumbnailUrl: (item.upscaleActive && item.upscale?.url ? item.upscale.thumbnailUrl || item.upscale.url : item.thumbnailUrl) || item.url || "",
     url: item.url || "",
-    privacyDomain: vault ? "vault" : "gallery",
     galleryItemId: item.id
   };
 }
@@ -109,10 +105,7 @@ function paginate(items, cursor = "", limit = 60, map = (item) => item) {
 const finishedImage = (item) => item.status === "done" && item.type === "image" && item.url;
 const newestFirst = (a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
 
-/**
- * Generations and Hidden are separate shelves: an unlocked Hidden never spills
- * into the gallery's list, and its own list answers "locked" until it is open.
- */
+/** One shelf of references: uploads (the default) or finished generations. */
 export function listReferenceAssets(req, { source = "upload", cursor = "", limit = 60, q = "" } = {}) {
   const words = String(q).trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = (item) => {
@@ -123,10 +116,7 @@ export function listReferenceAssets(req, { source = "upload", cursor = "", limit
   if (source === "generation") {
     return paginate(filterVisibleGallery(recordsForRequest(gallery, req)).filter((item) => finishedImage(item) && !item.library && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
   }
-  if (source === "hidden") {
-    if (!encryptionKeyFromRequest(req)) return { items: [], nextCursor: "", hasMore: false, locked: true };
-    return paginate(vaultGalleryItemsForRequest(req, { bundles: false }).filter((item) => finishedImage(item) && matches(item)).sort(newestFirst), cursor, limit, galleryAsset);
-  }
+
   const items = loadManifest()
     .filter((item) => item.source === "upload" && recordBelongsToRequest(item, req) && matches(item))
     .sort(newestFirst);
@@ -302,29 +292,21 @@ const lastFrameSuffix = ":last-frame";
 
 /**
  * A finished video of this request's own, as the reference for its last frame.
- * Nothing is stored: the id carries the video's own reference (vault: for
- * Hidden, so every Hidden rule still applies) and the frame is cut when used.
+ * Nothing is stored: the id carries the video's own reference and the frame
+ * is cut when used.
  */
 function lastFrameAsset(req, galleryItemId) {
   const finishedVideo = (item) => item.type === "video" && item.status === "done" && item.url && !item.library;
-  const item = filterVisibleGallery(recordsForRequest(gallery, req)).find((candidate) => finishedVideo(candidate) && (candidate.id === galleryItemId || galleryKey(candidate) === galleryItemId))
-    || vaultGalleryItemsForRequest(req, { bundles: false }).find((candidate) => finishedVideo(candidate) && candidate.id === galleryItemId);
+  const item = filterVisibleGallery(recordsForRequest(gallery, req)).find((candidate) => finishedVideo(candidate) && (candidate.id === galleryItemId || galleryKey(candidate) === galleryItemId));
   if (!item) throw new Error("That video is no longer in the gallery.");
   const asset = galleryAsset(item);
   return { ...asset, id: `${asset.id}${lastFrameSuffix}`, name: `${String(asset.name).replace(/\.[a-z0-9]+$/i, "")} last frame.png`, mime: "image/png", size: 0, url: "", thumbnailUrl: item.thumbnailUrl || "" };
 }
 
 async function lastFrameBytes(req, videoId) {
-  let video;
-  if (videoId.startsWith("vault:")) {
-    const vault = readVaultAsset(req, videoId.slice(6));
-    if (!vault || vault.item?.type !== "video") throw new Error("This Hidden video is locked or gone.");
-    video = { buffer: vault.buffer, name: vault.item.outputName || "hidden-video" };
-  } else {
-    const item = findGalleryItem(videoId, req);
-    if (!item || item.type !== "video" || item.status !== "done" || item.library) throw new Error("That video is no longer in the gallery.");
-    video = { ...await galleryItemBytes(item, item.url), name: item.outputName || item.filename || "video" };
-  }
+  const item = findGalleryItem(videoId, req);
+  if (!item || item.type !== "video" || item.status !== "done" || item.library) throw new Error("That video is no longer in the gallery.");
+  const video = { buffer: (await publicGalleryBuffer(item)).buffer, name: item.outputName || item.filename || "video" };
   return { buffer: await extractLastFrame(video.buffer), mime: "image/png", name: `${String(video.name).replace(/\.[a-z0-9]+$/i, "")}-last-frame.png` };
 }
 
@@ -333,8 +315,6 @@ export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {
   // Images added from another folder are shown in place, not ComfyUI outputs it can read back.
   const publicItem = filterVisibleGallery(recordsForRequest(gallery, req)).find((item) => item.type === "image" && item.status === "done" && !item.library && (item.id === galleryItemId || item.url === galleryItemId || galleryKey(item) === galleryItemId));
   if (publicItem) return galleryAsset(publicItem);
-  const vaultItem = vaultGalleryItemsForRequest(req, { bundles: false }).find((item) => item.type === "image" && item.status === "done" && item.id === galleryItemId);
-  if (vaultItem) return galleryAsset(vaultItem);
   throw new Error("That image is no longer in the gallery.");
 }
 
@@ -366,14 +346,7 @@ async function preferUpscale(original, readUpscale) {
 /** The bytes a run gets for a reference (exported for tests). */
 export async function bytesForReference(req, id) {
   if (String(id).endsWith(lastFrameSuffix)) return lastFrameBytes(req, String(id).slice(0, -lastFrameSuffix.length));
-  if (String(id).startsWith("vault:")) {
-    const vaultId = String(id).slice(6);
-    const vault = readVaultAsset(req, vaultId);
-    if (!vault || vault.item?.type !== "image") throw new Error("This Hidden image is locked or gone.");
-    const original = { buffer: vault.buffer, mime: vault.item.mime || mimeFromName(vault.item.outputName), name: vault.item.outputName || "private-reference.png" };
-    if (!vault.item.upscaleActive) return original;
-    return preferUpscale(original, async () => readVaultAsset(req, vaultId, "upscale"));
-  }
+
   const ownerId = ownerIdForRequest(req);
   const upload = loadManifest().find((item) => item.id === id && item.source === "upload" && String(item.ownerId || "") === ownerId);
   if (upload) {
@@ -391,7 +364,7 @@ export async function bytesForReference(req, id) {
 
 export async function uploadBufferToComfy({ buffer, mime, name }, { unique = false } = {}) {
   await inspectImage(buffer, mime);
-  // Content-named files are shared between runs; a Hidden run gets its own copy,
+  // Content-named files are shared between runs; a run-only copy gets its own name,
   // so removing it afterwards can never pull an input out from under another job.
   const filename = unique ? `heiss-ui-${crypto.randomUUID()}.${mimeExtension(mime)}` : referenceInputName(buffer, mime);
   const form = new FormData();
@@ -421,7 +394,7 @@ export async function stageReferenceAssets(req, references = [], { unique = fals
       const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
       // Remote ComfyUI has no native input-delete endpoint. Reuse content names there
       // instead of accumulating a new public resized file on every run.
-      const temporary = unique || assetId.startsWith("vault:") || Boolean(bytes.resized && comfyInputDir());
+      const temporary = unique || Boolean(bytes.resized && comfyInputDir());
       const uploaded = await uploadBufferToComfy(bytes, { unique: temporary });
       staged.push({ slot, assetId, source: String(reference?.source || ""), ...uploaded, ...(temporary ? { temporary: true } : {}), ...(bytes.width ? { width: bytes.width, height: bytes.height } : {}) });
     }

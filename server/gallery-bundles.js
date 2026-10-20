@@ -21,10 +21,6 @@ import { readJsonFile, writeJsonFile } from './json-store.js';
  * - Grouping uses exact local fingerprints (same job, or same normalised
  *   prompt) rather than semantic similarity. Predictable, fast, and it cannot
  *   accidentally pull unrelated work together.
- * - Private Vault items are never candidates here. They get their own bundle
- *   records inside the encrypted vault manifest (see vault.js) - this file's
- *   records are plaintext, so a private relationship must never be written
- *   into it, locked or unlocked.
  */
 
 export const bundlesPath = path.join(dataDir, "gallery-bundles.json");
@@ -50,7 +46,6 @@ function persist() {
 
 export function bundleCandidate(item) {
   if (!item || item.status !== "done") return false;
-  if (item.privateVault || item.vaultLocked) return false;
   return Boolean(item.id) && !String(item.id).startsWith("bundle:");
 }
 

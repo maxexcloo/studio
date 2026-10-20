@@ -65,18 +65,6 @@ test("valid dates precede missing and invalid dates, retaining batch indices and
   assert.deepEqual(ids(sortGalleryItems(items)), expected);
 });
 
-test("concealed or encrypted prompts keep chronological ordering without inspecting secrets", () => {
-  const concealed = [
-    { privateVault: true }, { vaultLocked: true }, { promptProtected: true },
-    { promptEncrypted: "opaque envelope" }, { negativeEncrypted: "opaque envelope" }, { prompt: "enc:v1:opaque" }
-  ].map((extra, index) => item(`private-${index}`, "2026-01-02", { prompt: "", ...extra }));
-  for (const hidden of concealed) assert.equal(galleryBucket(hidden), 0);
-  const sorted = sortGallery([...concealed, item("older-generation", "2026-01-01"), item("new-import", "2026-01-03", { prompt: "" })]);
-  assert.equal(sorted.at(-1).id, "new-import");
-  assert.equal(sorted.at(-2).id, "older-generation");
-  assert.deepEqual(ids(sortGalleryItems(sorted)), ids(sorted));
-});
-
 test("moments and runs stay separated when blank imports are newer than generated outputs", () => {
   const generated = [0, 1, 2].map((index) => item(`generated-${index}`, `2026-01-01T00:0${index}:00Z`, { jobId: "same-job" }));
   const imported = [0, 1, 2].map((index) => item(`imported-${index}`, `2026-01-01T00:1${index}:00Z`, { jobId: "same-job", prompt: "" }));

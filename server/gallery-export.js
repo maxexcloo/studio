@@ -72,7 +72,7 @@ function zipEnd(count, centralSize, centralOffset) {
  * gallery file is read only when its turn comes, so exporting a gallery of
  * tens of thousands never holds more than one file in memory.
  */
-function archiveEntries(privateAssets, includeGallery = true, req = null, ids = null) {
+function archiveEntries(req = null, ids = null) {
   const entries = [];
   const names = new Set();
   const add = (folder, item, source) => {
@@ -89,7 +89,7 @@ function archiveEntries(privateAssets, includeGallery = true, req = null, ids = 
   };
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.STUDIO_MULTI_USER === "1" ? [] : gallery;
-  for (const item of includeGallery ? filterVisibleGallery(sourceGallery) : []) {
+  for (const item of filterVisibleGallery(sourceGallery)) {
     if (ids && ![item.id, item.url].some((key) => ids.has(String(key)))) continue;
     // HEISS media lives in its own folder; everything else in ComfyUI's.
     const itemBase = isMediaUrl(item.url) ? mediaRoot : base;
@@ -100,7 +100,6 @@ function archiveEntries(privateAssets, includeGallery = true, req = null, ids = 
     });
     if (file) add("gallery", item, { file });
   }
-  for (const asset of privateAssets) add(includeGallery ? "private" : "hidden", asset.item, { buffer: asset.buffer });
   return entries;
 }
 
@@ -126,7 +125,7 @@ async function measure(file) {
 export const exportFilename = (kind, extension, date = new Date()) => `studio-${kind}-${date.toISOString().slice(0, 10)}.${extension}`;
 
 /** `ids`: only these items (a selection), by id or address. */
-export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true, req = null, ids = null } = {}) {
+export async function sendGalleryExport(res, { req = null, ids = null } = {}) {
   let closed = false;
   res.on("close", () => { closed = true; });
   const write = (chunk) => new Promise((resolve) => {
@@ -138,20 +137,18 @@ export async function sendGalleryExport(res, privateAssets = [], { gallery: incl
   try {
     const central = [];
     let offset = 0;
-    for (const entry of archiveEntries(privateAssets, includeGallery, req, ids)) {
+    for (const entry of archiveEntries(req, ids)) {
       if (closed) return;
       // Most files are read once, into memory, and checked from that copy; a
       // big one (a video) is read through for its CRC and then streamed. A file
       // that disappears or changes size during the export is left out.
-      let body = entry.buffer;
+      let body = null;
       let measured = null;
-      if (!body) {
-        try {
-          const { size } = await fs.promises.stat(entry.file);
-          if (size <= 16 * 1024 * 1024) body = await fs.promises.readFile(entry.file);
-          else measured = await measure(entry.file);
-        } catch { continue; }
-      }
+      try {
+        const { size } = await fs.promises.stat(entry.file);
+        if (size <= 16 * 1024 * 1024) body = await fs.promises.readFile(entry.file);
+        else measured = await measure(entry.file);
+      } catch { continue; }
       if (body) measured = { size: body.length, checksum: crc32(body) };
       if (!measured || measured.size >= MAX32) continue;
       const headers = zipHeaders(entry.name, measured.size, measured.checksum, offset, dosTime(new Date(entry.createdAt || Date.now())));

@@ -12,7 +12,7 @@ HEISS_DATA_DIR=./data
 COMFY_OUTPUT_DIR=
 ```
 
-`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards and to remove ComfyUI's copies of what goes into Hidden. Settings only accepts a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). **Delete all finished images** moves them to `.heiss-trash` in that folder, where they wait 30 days (`HEISS_TRASH_DAYS`) in case you want them back.
+`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. Settings only accepts a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). **Delete all finished images** moves them to `.heiss-trash` in that folder, where they wait 30 days (`HEISS_TRASH_DAYS`) in case you want them back.
 
 For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `HEISS_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `HEISS_TLS_CERT`, `HEISS_TLS_KEY` and `HEISS_HTTPS_PORT` for HTTPS. See [Other devices](./SECURITY.md#other-devices-signing-in-admin-https-and-proxies) and [Phones and other devices](./TROUBLESHOOTING.md#phones-and-other-devices).
 
@@ -46,7 +46,7 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 - **Single sign-on (Pocket ID or another OpenID Connect provider):** set `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_CLIENT_ID` and `STUDIO_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`). Public PKCE clients need no secret; `STUDIO_OIDC_CLIENT_SECRET` supports confidential clients, and `STUDIO_OIDC_LABEL` names the button (Single Sign-On by default). Setting only some of these stops Studio at startup and names the missing ones. The provider only proves identity. A verified email that matches an account's username links that account. Any other identity becomes a pending account, which an administrator approves by assigning an access profile. Roles never come from the provider.
 - **Probes stay open:** `/api/ping` (liveness) and `/api/ready` (readiness: the data folder is writable) answer without an account. ComfyUI workers being down does not make Studio unready.
 - **Administrators** have full access. **Ordinary accounts** get one access profile, which lists the generation profiles they may use and switches for galleries, prompt history, LoRAs, references and image/video generation. New generation profiles stay administrator-only until a profile grants them.
-- **Each account's outputs, prompt history, LoRA stacks, references and jobs are private** and saved under its own output subfolder. Ordinary accounts only reach reviewed, owner-checked routes; studio administration (models, library folders, Hidden, connection, updates, presets, trash) stays with administrators. Hidden and run grouping are unavailable to accounts.
+- **Each account's outputs, prompt history, LoRA stacks, references and jobs are private** and saved under its own output subfolder. Ordinary accounts only reach reviewed, owner-checked routes; studio administration (models, library folders, connection, updates, presets, trash) stays with administrators. Run grouping is unavailable to accounts.
 - **Personal MCP tokens** are issued once in Settings, stored only as hashes, and work only for MCP. They are never an administrator credential. Rotating or revoking a token leaves existing result links working; a result link ends when its output is hidden or deleted.
 - **Records from single-user mode have no owner** and stay out of every account's gallery until they are explicitly migrated to an account.
 
@@ -63,7 +63,7 @@ node scripts/import-studio.mjs --undo <batch>
 ```
 
 - **What moves:** finished gallery outputs and their upscales (copied into the account's media folder), prompt and negative-prompt history, LoRA stacks and library, uploaded references, and MCP job and reference ownership.
-- **What doesn't:** Hidden (it is encrypted and unavailable to accounts), presets and workflow preferences (studio-wide), pending or failed records, and library-folder items. Each of these is counted in the dry run.
+- **What doesn't:** Hidden items from an older studio (they are encrypted), presets and workflow preferences (studio-wide), pending or failed records, and library-folder items. Each of these is counted in the dry run.
 - **Without `--apply`,** nothing is written; the dry run lists every count and conflict.
 - **The source is never changed.** Every target file that changes is backed up under `<HEISS_DATA_DIR>/imports/<batch>/`, and `--undo` removes exactly what that import added.
 - **Refused:** an import whose jobs are already in the gallery, an account that already has its own history files, or a result above `HEISS_GALLERY_LIMIT`.
@@ -90,7 +90,7 @@ Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a to
 
 Image & Model Library is disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer it; keep it unset or `0` everywhere else. The server enforces this switch for preset data, thumbnails, imports, provider downloads and Civitai token settings, and the desktop and phone controls follow the server’s feature flag. Existing catalogue downloads remain available independently.
 
-Open **Image & Model Library** from the desktop toolbar or phone gallery. **Images** accepts a Civitai image link and downloads the full image into this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations. Missing supported resources queue automatically through the configured downloader; filename conflicts and unavailable resources remain explicit. Existing saved presets migrate to gallery images when the library opens. Imported images use the normal viewer, settings reuse, reference selection, Hidden and deletion behaviour. Deleting an image keeps downloaded models.
+Open **Image & Model Library** from the desktop toolbar or phone gallery. **Images** accepts a Civitai image link and downloads the full image into this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations. Missing supported resources queue automatically through the configured downloader; filename conflicts and unavailable resources remain explicit. Existing saved presets migrate to gallery images when the library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models.
 
 **Use Settings** applies the image’s recipe to its installed image workflow without starting a generation. Exact resource matches use SHA-256, including renamed files. Missing LoRAs, unknown weights and unsupported resource types require attention; **Use Prompt** is available independently. Civitai metadata is optional, and additional processing such as ControlNet, high-resolution passes and CLIP skip needs a matching workflow. Imported settings cannot guarantee an identical image.
 

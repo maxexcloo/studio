@@ -23,7 +23,7 @@ test("a folder of earlier images joins the gallery in place, with its prompts", 
   fs.writeFileSync(path.join(earlier, "comfy.png"), withPngText(await image("#999"), "prompt", JSON.stringify({ 6: { class_type: "CLIPTextEncode", inputs: { text: "an owl in snow" } } })));
   fs.writeFileSync(path.join(earlier, "notes.txt"), "not an image");
   fs.writeFileSync(path.join(earlier, "2024", ".cache", "thumb.png"), await image());
-  // An output folder HEISS UI does not know as one (yet): its own heiss-ui folder may hold what Hidden could not remove.
+  // An output folder HEISS UI does not know as one (yet): its own heiss-ui folder holds what the gallery already has.
   fs.mkdirSync(path.join(earlier, "output", "heiss-ui"), { recursive: true });
   fs.writeFileSync(path.join(earlier, "output", "heiss-ui", "image_00001_.png"), await image("#111"));
 

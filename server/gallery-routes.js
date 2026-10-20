@@ -1,11 +1,8 @@
 import { addGalleryItems, deleteGalleryFiles, filterVisibleGallery, gallery, galleryKey, hideGalleryItems, saveGallery, setGallery, cleanupGalleryState, pageGallery, galleryDelta, galleryRevisionValue, sortGallery } from './gallery-store.js';
 import { galleryFilter, setGalleryFavorites } from './gallery-store.js';
-import { forgetPrivateVideoPreviews } from './video-previews.js';
 import { emptyTrash, restoreTrash, trashGalleryItems, trashSummary } from './gallery-trash.js';
 import { jobs } from './jobs.js';
 import { applyBundles, createBundles, DEFAULT_COOLDOWN_MINUTES, dissolveBundle, listBundles, pendingSummary, setBundleCover } from './gallery-bundles.js';
-import { encryptionKeyFromRequest, revealGalleryItemsForRequest } from './privacy.js';
-import { deleteVaultItems, vaultConfigured } from './vault.js';
 import { exportFilename, sendGalleryExport } from './gallery-export.js';
 import { ownerIdForRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { mayUseFeature } from './account-policy.js';
@@ -26,8 +23,7 @@ export function registerGalleryBundleRoutes(app) {
   }
 
   function bundleSourceItems(req) {
-    // Hidden items group only with each other, inside Hidden.
-    return revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req)).filter((item) => item.status !== "canceled"));
+    return filterVisibleGallery(recordsForRequest(gallery, req)).filter((item) => item.status !== "canceled");
   }
 
   app.get("/api/gallery/bundles", (req, res) => {
@@ -108,8 +104,8 @@ export function registerGalleryReadRoutes(app) {
     cleanupGalleryState(jobs);
     const items = filterVisibleGallery(recordsForRequest(gallery, req).filter((item) => item.jobId === req.params.id));
     // Prompts and settings only on request: MCP reads them to run a finished result again or animate it.
-    const fields = ["jobId", "index", "status", "type", "url", ...(req.query.settings === "1" ? ["prompt", "negative", "width", "height", "settings"] : []), "privateVault", "vaultLocked", "promptProtected", "promptEncrypted", "hidden"];
-    res.json({ items: revealGalleryItemsForRequest(items).map((item) => Object.fromEntries(
+    const fields = ["jobId", "index", "status", "type", "url", ...(req.query.settings === "1" ? ["prompt", "negative", "width", "height", "settings"] : [])];
+    res.json({ items: items.map((item) => Object.fromEntries(
       fields.filter((key) => key in item).map((key) => [key, item[key]])
     )) });
   });
@@ -126,11 +122,8 @@ export function registerGalleryReadRoutes(app) {
       : pageGallery({ type, limit: limit || 200, cursor, includeFailed, filter: (item) => recordBelongsToRequest(item, req) && (!searchFilter(req) || searchFilter(req)(item)) });
     res.json({
       ...page,
-      items: revealGalleryItemsForRequest(page.items).map((item) => item.bundle
-        ? { ...item, bundle: { ...item.bundle, items: revealGalleryItemsForRequest(item.bundle.items || []) } }
-        : item),
       // The whole list, for callers from before paging. A page is in `items` already.
-      ...(cursor || limit ? {} : { outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) })
+      ...(cursor || limit ? {} : { outputs: filterVisibleGallery(recordsForRequest(gallery, req)) })
     });
   });
 
@@ -140,7 +133,7 @@ export function registerGalleryReadRoutes(app) {
     if (req.heissAccount) {
       // Bundles are off in account mode, so the owner's own changes patch in place.
       const delta = galleryDelta({ since, type: String(req.query.type || ""), includeFailed: req.query.includeFailed !== "0", owner: ownerIdForRequest(req), filter: searchFilter(req) });
-      res.json({ ...delta, upserts: revealGalleryItemsForRequest(delta.upserts || []) });
+      res.json(delta);
       return;
     }
     // Collapsed runs only come out of a full page, so with any run grouped the
@@ -154,7 +147,7 @@ export function registerGalleryReadRoutes(app) {
     const type = String(req.query.type || "");
     const includeFailed = req.query.includeFailed !== "0";
     const delta = galleryDelta({ since, type, includeFailed, filter: (item) => recordBelongsToRequest(item, req) && (!searchFilter(req) || searchFilter(req)(item)) });
-    res.json({ ...delta, upserts: revealGalleryItemsForRequest(delta.upserts || []) });
+    res.json(delta);
   });
 }
 
@@ -166,7 +159,7 @@ export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory })
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${exportFilename(ids.length ? "selection" : "gallery", "zip")}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    sendGalleryExport(res, [], { req, ids: ids.length ? new Set(ids) : null });
+    sendGalleryExport(res, { req, ids: ids.length ? new Set(ids) : null });
   });
 
   app.post("/api/gallery/recover", async (req, res) => {
@@ -182,7 +175,7 @@ export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory })
     const requested = new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500));
     const ids = recordsForRequest(gallery, req).filter((item) => [item.id, item.url, galleryKey(item)].some((key) => requested.has(String(key)))).flatMap((item) => [item.id, item.url, galleryKey(item)]);
     const changed = setGalleryFavorites(ids, Boolean(req.body?.favorite));
-    res.json({ ok: true, items: revealGalleryItemsForRequest(changed), revision: galleryRevisionValue() });
+    res.json({ ok: true, items: changed, revision: galleryRevisionValue() });
   });
 }
 
@@ -190,17 +183,16 @@ export function registerGalleryTrashRoutes(app) {
   app.post("/api/gallery/clear", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
     if (!requireAdmin(req, res)) return;
-    // Clearing the gallery never touches Hidden; that has its own erase. Nor images
-    // shown from another folder (library.js): their files are not in the output
+    // Clearing the gallery never touches images shown from another folder (library.js): their files are not in the output
     // folder, so no trash could bring them back; Settings › Library removes those.
-    const clears = (item) => recordBelongsToRequest(item, req) && item.status === "done" && !item.privateVault && !item.library;
+    const clears = (item) => recordBelongsToRequest(item, req) && item.status === "done" && !item.library;
     const cleared = gallery.filter(clears);
     // Into the trash, not deleted: it can be put back until the trash empties itself (gallery-trash.js).
     const trash = trashGalleryItems(cleared);
     hideGalleryItems(cleared);
     setGallery(gallery.filter((item) => !clears(item)));
     saveGallery();
-    res.json({ ok: true, files: { deleted: trash.moved, skipped: trash.skipped }, trash: { batch: trash.batch, moved: trash.moved, days: trashSummary(undefined, ownerIdForRequest(req)).days }, outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
+    res.json({ ok: true, files: { deleted: trash.moved, skipped: trash.skipped }, trash: { batch: trash.batch, moved: trash.moved, days: trashSummary(undefined, ownerIdForRequest(req)).days }, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
   });
 
   app.get("/api/gallery/trash", (req, res) => {
@@ -216,7 +208,7 @@ export function registerGalleryTrashRoutes(app) {
     try {
       const { restored, missing } = restoreTrash(String(req.body?.batch || ""), undefined, ownerIdForRequest(req));
       if (restored.length) addGalleryItems(restored);
-      res.json({ ok: true, restored: restored.length, missing, revision: galleryRevisionValue(), trash: trashSummary(undefined, ownerIdForRequest(req)), outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
+      res.json({ ok: true, restored: restored.length, missing, revision: galleryRevisionValue(), trash: trashSummary(undefined, ownerIdForRequest(req)), outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
     } catch (error) {
       res.status(500).json({ ok: false, error: error.message });
     }
@@ -240,7 +232,7 @@ export function registerGalleryTrashRoutes(app) {
     hideGalleryItems(cleared);
     setGallery(gallery.filter((item) => !clears(item)));
     saveGallery();
-    res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
+    res.json({ ok: true, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
   });
 }
 
@@ -252,24 +244,10 @@ export function registerGalleryDeleteRoute(app) {
     const removed = owned.filter((item) => item.id === id || item.url === id);
     // Accounts never learn whether another owner's item exists.
     if (req.heissAccount && !removed.length) { res.status(404).json({ ok: false, error: "That item was not found." }); return; }
-    const inGallery = gallery.some((item) => item.id === id || item.url === id);
-    // Only an id the gallery does not know can be a Hidden one, and only then is a key needed.
-    let vault = { removed: 0 };
-    if (!inGallery && vaultConfigured()) {
-      if (req.heissAccount) { res.status(404).json({ ok: false, error: "That item was not found." }); return; }
-      const key = encryptionKeyFromRequest(req);
-      if (!key) {
-        res.status(401).json({ ok: false, locked: true, error: "Unlock Hidden to delete from it." });
-        return;
-      }
-      vault = deleteVaultItems(key, [id]);
-      forgetPrivateVideoPreviews(id);
-    }
-    const before = removed.length;
     const files = deleteGalleryFiles(removed);
     hideGalleryItems(removed);
     setGallery(gallery.filter((item) => !recordBelongsToRequest(item, req) || item.id !== id && item.url !== id));
     if (removed.length) saveGallery();
-    res.json({ ok: true, files, vault, removed: removed.length + vault.removed, outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
+    res.json({ ok: true, files, removed: removed.length, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
   });
 }

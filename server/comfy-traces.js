@@ -4,11 +4,10 @@ import { comfy, comfyInputDir } from "./comfy.js";
 
 /**
  * ComfyUI keeps its own record of every run: the prompt graph in /history and
- * any image it was handed in its input folder. For a Hidden run both are
- * plaintext copies of something that now only exists encrypted, so they go as
- * soon as the run is done. Best effort: a ComfyUI that is gone or a file that
- * is locked must never fail the run itself. Resolves to whether ComfyUI took
- * the history entries out, so a Hidden run can be finished later if not.
+ * any image it was handed in its input folder. Once a run's outputs are in
+ * Studio's media, or a staged input was only a temporary copy, both can go.
+ * Best effort: a ComfyUI that is gone or a file that is locked must never fail
+ * the run itself. Resolves to whether ComfyUI took the history entries out.
  */
 export async function forgetComfyRun({ promptIds = [], inputNames = [] } = {}) {
   const ids = [...new Set(promptIds.filter(Boolean).map(String))];

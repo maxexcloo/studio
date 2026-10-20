@@ -1,8 +1,7 @@
 import { canAdmin, checkStudioPassword, clientOf, deviceSession, devicesMayAdmin, endAllDeviceSessions, endDeviceSession, listDeviceSessions, setDevicesMayAdmin, setStudioPassword, startDeviceSession, studioPasswordSet } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
-import { clearUnlockCookie, isPrivacyEnabled, unlockWithPassword } from "./privacy.js";
 
-/** One limiter for every password this server checks: the studio's and Hidden's. */
+/** One limiter for every password this server checks. */
 export const guessLimiter = createGuessLimiter();
 
 /**
@@ -27,14 +26,6 @@ export async function limitedCheck(req, res, check, wrongMessage) {
   return null;
 }
 
-/**
- * Until a studio password is set, the Hidden password signs devices in, the
- * way it did before the two were split, so phones that already knew it keep
- * working after an update.
- */
-export function hiddenPasswordSignsIn() {
-  return !studioPasswordSet() && isPrivacyEnabled();
-}
 
 function requireThisComputer(req, res) {
   if (clientOf(req).thisComputer) return true;
@@ -51,7 +42,7 @@ function accessStatus(req) {
     signedIn: client.thisComputer || Boolean(session),
     canAdmin: canAdmin(req),
     // What a device that is not signed in needs to know to sign in, and no more.
-    studioPassword: { set: studioPasswordSet(), hidden: hiddenPasswordSignsIn() },
+    studioPassword: { set: studioPasswordSet() },
     ...(session ? { session: { expiresAt: new Date(Number(session.expiresAt)).toISOString() } } : {})
   };
 }
@@ -66,22 +57,18 @@ export function registerAccessRoutes(app) {
     const client = clientOf(req);
     if (client.thisComputer) { res.json(accessStatus(req)); return; }
     const password = String(req.body?.password || "");
-    if (!studioPasswordSet() && !isPrivacyEnabled()) {
+    if (!studioPasswordSet()) {
       res.status(409).json({ ok: false, reason: "setup", error: "Set a studio password first, on the computer running Studio (Settings › Connection)." });
       return;
     }
-    const legacy = hiddenPasswordSignsIn();
-    const right = await limitedCheck(req, res, async () => (legacy ? Boolean(await unlockWithPassword(password)) : checkStudioPassword(password)), "That password is incorrect.");
+    const right = await limitedCheck(req, res, async () => checkStudioPassword(password), "That password is incorrect.");
     if (!right) return;
     startDeviceSession(req, res);
     res.json(accessStatus(req));
   });
 
   app.post("/api/access/sign-out", (req, res) => {
-    if (!clientOf(req).thisComputer) {
-      endDeviceSession(req, res);
-      clearUnlockCookie(res);
-    }
+    if (!clientOf(req).thisComputer) endDeviceSession(req, res);
     res.json({ ok: true });
   });
 
@@ -98,7 +85,7 @@ export function registerAccessRoutes(app) {
     res.json({
       ok: true,
       adminFromDevices: devicesMayAdmin(),
-      studioPassword: { set: studioPasswordSet(), hidden: hiddenPasswordSignsIn() },
+      studioPassword: { set: studioPasswordSet() },
       devices: canAdmin(req) ? listDeviceSessions(deviceSession(req)) : []
     });
   });
@@ -112,7 +99,7 @@ export function registerAccessRoutes(app) {
     if (!requireThisComputer(req, res)) return;
     try {
       await setStudioPassword(String(req.body?.password || ""));
-      res.json({ ok: true, studioPassword: { set: true, hidden: false }, devices: [] });
+      res.json({ ok: true, studioPassword: { set: true }, devices: [] });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

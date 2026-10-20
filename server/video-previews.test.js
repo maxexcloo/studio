@@ -18,7 +18,7 @@ after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test('real encoder produces a small silent preview, reuses it, and invalidates/removes derivatives', { skip: !available }, async () => {
   const source = path.join(dir, 'original.mp4');
-  // Leave MP4 metadata at the end: the private seekable input must handle this too.
+  // Leave MP4 metadata at the end: the seekable loopback input must handle this too.
   execFileSync(encoder, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-f', 'lavfi', '-i', 'sine=frequency=440', '-t', '10', '-c:v', 'libx264', '-threads', '1', '-crf', '18', '-c:a', 'aac', source]);
   const identity = 'library:fixture:original.mp4';
   const [one, same] = await Promise.all([previews.getFileVideoPreview(source, identity), previews.getFileVideoPreview(source, identity)]);
@@ -49,21 +49,10 @@ test('real encoder produces a small silent preview, reuses it, and invalidates/r
     assert.equal(response.headers.get('content-type'), 'video/mp4');
     assert.equal((await response.arrayBuffer()).byteLength, 8);
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
-  const before = fs.readdirSync(path.dirname(one));
-  const [privateBuffer, sameTime] = await Promise.all([previews.getPrivateVideoPreview(fs.readFileSync(source), 'vault:one'), previews.getPrivateVideoPreview(fs.readFileSync(source), 'vault:one')]);
-  assert.ok(privateBuffer.length > 100);
-  assert.equal(sameTime, privateBuffer, 'requests at the same time share one encode');
-  assert.equal(await previews.getPrivateVideoPreview(fs.readFileSync(source), 'vault:one'), privateBuffer, 'a Hidden preview is encoded once, then kept in memory');
-  previews.forgetPrivateVideoPreviews('vault:one');
-  assert.notEqual(await previews.getPrivateVideoPreview(fs.readFileSync(source), 'vault:one'), privateBuffer, 'forgetting drops it');
-  assert.deepEqual(fs.readdirSync(path.dirname(one)), before, 'Hidden preview leaves no plaintext file');
-  const privateFile = path.join(dir, 'private-preview.mp4');
-  fs.writeFileSync(privateFile, privateBuffer); // Test-only output so its decoder/streams can be inspected.
-  inspect(privateFile);
   const now = new Date(Date.now() + 2000); fs.utimesSync(source, now, now);
   const changed = await previews.getFileVideoPreview(source, identity);
   assert.notEqual(changed, one);
-  // Both previews and the still go: nothing of a hidden or deleted video stays in the cache.
+  // Both previews and the still go: nothing of a deleted video stays in the cache.
   assert.equal(await previews.forgetItemVideoPreviews({ type: 'video', url: '/api/library/file?folder=fixture&path=original.mp4' }), 3);
   assert.equal(fs.existsSync(poster), false);
   assert.equal(fs.existsSync(one), false); assert.equal(fs.existsSync(changed), false);

@@ -244,42 +244,6 @@ export async function forgetItemVideoPreviews(item) {
   return removed;
 }
 
-/**
- * Hidden previews never touch disk, so they're kept in memory instead: a grid
- * asks for each one several times (the poster, then the video in byte ranges),
- * and encoding it again for every request left Hidden tiles waiting for minutes.
- * Keyed by item id and the source's digest; the route decrypts the original
- * with the caller's own unlock first, so a locked Hidden still serves nothing.
- */
-const privateCacheBytes = 96 * 1024 * 1024;
-const privatePreviews = new Map();
-const privatePending = new Map();
-
-/** Seekable loopback input supports MP4s whose metadata is at the end. No plaintext vault file is written. */
-export async function getPrivateVideoPreview(buffer, id = '') {
-  if (buffer.length > maxSourceBytes) throw new Error('This video is too large for a grid preview.');
-  const key = `${id}:${crypto.createHash('sha256').update(buffer).digest('hex')}`;
-  const cached = privatePreviews.get(key);
-  if (cached) { privatePreviews.delete(key); privatePreviews.set(key, cached); return cached; }
-  if (privatePending.has(key)) return privatePending.get(key);
-  const work = queued(() => encodePrivate(buffer)).then((preview) => {
-    privatePreviews.set(key, preview);
-    let total = 0;
-    for (const [entry, bytes] of [...privatePreviews].reverse()) {
-      total += bytes.length;
-      if (total > privateCacheBytes) privatePreviews.delete(entry);
-    }
-    return preview;
-  }).finally(() => privatePending.delete(key));
-  privatePending.set(key, work);
-  return work;
-}
-
-/** Drops Hidden previews from memory: one item's, or all of them. */
-export function forgetPrivateVideoPreviews(id = '') {
-  for (const key of privatePreviews.keys()) if (!id || key.startsWith(`${id}:`)) privatePreviews.delete(key);
-}
-
 /** Serves the bytes to ffmpeg over a seekable loopback URL, so MP4s with trailing metadata work and no plaintext file is written. */
 async function withLoopback(buffer, work) {
   const token = crypto.randomBytes(24).toString('hex');
@@ -295,9 +259,6 @@ async function withLoopback(buffer, work) {
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
 }
 
-function encodePrivate(buffer) {
-  return withLoopback(buffer, (input) => encode(input));
-}
 
 /**
  * A video's final frame at full size, as a PNG: the first frame of its
@@ -343,7 +304,7 @@ export async function getVideoPoster(preview) {
   return file ? coalesce(`poster:${file}`, work, { poster: true }) : queued(work, { poster: true });
 }
 
-/** Sends a still: a cached file, or bytes kept in memory (Hidden). `preview` may already be the still. */
+/** Sends a still: a cached file, or bytes in memory. `preview` may already be the still. */
 export async function sendVideoPoster(req, res, preview, cacheControl = 'private, max-age=60') {
   const poster = typeof preview === 'string' && preview.endsWith('.jpg') ? preview : await getVideoPoster(preview);
   if (typeof poster === 'string') res.sendFile(poster, { dotfiles: 'allow', headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': cacheControl } });

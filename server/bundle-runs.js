@@ -1,13 +1,9 @@
 import crypto from "node:crypto";
 
 /**
- * Pure run-detection engine shared by the plaintext gallery store
- * (gallery-bundles.js) and the encrypted vault store (vault.js). Nothing here
- * touches the filesystem or a privacy key - every function takes the items and
- * the current bundle records as plain arguments and returns new values. The
- * two callers differ only in how they read/persist the bundle array:
- * plaintext writes a JSON file, the vault writes inside its encrypted
- * manifest. The grouping rules themselves must stay identical either way.
+ * Pure run-detection engine for the gallery's bundles (gallery-bundles.js).
+ * Nothing here touches the filesystem: every function takes the items and the
+ * current bundle records as plain arguments and returns new values.
  */
 
 export const DEFAULT_COOLDOWN_MINUTES = 1;

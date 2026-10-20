@@ -32,7 +32,7 @@ async function archive(req, ids = null) {
     end(chunk) { if (chunk) this.chunks.push(Buffer.from(chunk)); this.emit('finish'); }
     destroy() { this.emit('close'); }
   }();
-  await sendGalleryExport(response, [], { req, ids });
+  await sendGalleryExport(response, { req, ids });
   return Buffer.concat(response.chunks).toString('latin1');
 }
 
@@ -62,5 +62,5 @@ test('a selection exports only its own items, still within the account', async (
 test('downloads are named for Studio with the date', () => {
   const date = new Date('2026-10-20T12:00:00Z');
   assert.equal(exportFilename('gallery', 'zip', date), 'studio-gallery-2026-10-20.zip');
-  assert.equal(exportFilename('hidden', 'backup', date), 'studio-hidden-2026-10-20.backup');
+  assert.equal(exportFilename('selection', 'zip', date), 'studio-selection-2026-10-20.zip');
 });

@@ -9,7 +9,6 @@ function fixture() {
   };
   state.recover = createJobRecovery({
     backends: () => Object.keys(state.snapshots),
-    filterHistory: (history) => Object.fromEntries(Object.entries(history).filter(([, entry]) => !entry.prompt[3].heiss_hidden)),
     finishJob: (id, patch) => state.jobs.set(id, { ...state.jobs.get(id), ...patch, terminalAt: 1 }),
     getGallery: () => state.gallery,
     jobs: state.jobs,
@@ -20,7 +19,7 @@ function fixture() {
       return path === '/queue' ? snapshot.queue : snapshot.history;
     },
     setGallery: (items) => { state.gallery = items; state.writes++; },
-    visible: (items) => items.filter((item) => !item.privateVault && !item.hidden),
+    visible: (items) => items.filter((item) => !item.deleted),
     withBackend: async (backend, run) => { state.backend = backend; await run(); },
   });
   return state;
@@ -130,11 +129,11 @@ test('zero configured backends cannot establish that a pending job is lost', asy
   assert.equal(s.gallery[0].status, 'pending');
 });
 
-test('hidden, deleted and cancelled tiles stay private or absent; live delivery stays with its runner', async () => {
+test('deleted and cancelled tiles stay absent; live delivery stays with its runner', async () => {
   const s = fixture();
-  s.gallery = [{ ...tile('hidden'), privateVault: true }, tile('cancelled', 'canceled'), tile('live', 'pending')];
+  s.gallery = [{ ...tile('removed'), deleted: true }, tile('cancelled', 'canceled'), tile('live', 'pending')];
   s.jobs.set('live', { status: 'running', comfyBackend: 'video' });
-  s.snapshots.video.queue = { queue_running: [queued('hidden'), queued('cancelled'), queued('deleted')] };
+  s.snapshots.video.queue = { queue_running: [queued('removed'), queued('cancelled'), queued('deleted')] };
   s.snapshots.video.history = { 'live-prompt': result('live') };
   await s.recover();
   assert.equal(s.jobs.size, 1);

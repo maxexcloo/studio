@@ -31,10 +31,9 @@ test("bundled Flux edit graph binds its reference, prompt policy, and rgthree Lo
   assert.equal(graph["374"].inputs.lora_02, "None");
 });
 
-test("a Hidden run from an imported workflow saves into the heiss-ui folder, a normal one where the workflow says", async () => {
+test("a single-user run from an imported workflow saves where the workflow says; saveIntoHeissFolder moves it", async () => {
   const request = { workflow: "custom:flux2-real-dream-image-edit", prompt: "Remove the hat", width: 1024, height: 1024, steps: 2, cfg: 1, seed: 42 };
   assert.equal((await customWorkflowGraph(request))["375"].inputs.filename_prefix, "Flux2_dev");
-  assert.equal((await customWorkflowGraph({ ...request, privateVault: true }))["375"].inputs.filename_prefix, "heiss-ui/Flux2_dev");
 
   const graph = saveIntoHeissFolder({
     1: { class_type: "SaveImage", inputs: { filename_prefix: "%date:yyyy-MM-dd%/renders/portrait" } },
@@ -43,7 +42,7 @@ test("a Hidden run from an imported workflow saves into the heiss-ui folder, a n
     4: { class_type: "KSampler", inputs: { seed: 1 } }
   });
   assert.equal(graph[1].inputs.filename_prefix, "heiss-ui/portrait");
-  assert.equal(graph[2].inputs.filename_prefix, "heiss-ui/hidden", "a prefix fed by another node becomes a plain one");
+  assert.equal(graph[2].inputs.filename_prefix, "heiss-ui/output", "a prefix fed by another node becomes a plain one");
   assert.equal(graph[3].inputs.filename_prefix, "heiss-ui/elsewhere");
   assert.equal("filename_prefix" in graph[4].inputs, false);
 });
@@ -66,7 +65,7 @@ test("legacy start images resize before upload and register their temporary copy
   assert.equal(meta.width % 8, 0);
   assert.deepEqual([body.width, body.height], [meta.width, meta.height]);
   assert.deepEqual(body.requestedSize, { width: 1024, height: 1024 });
-  assert.deepEqual(body.hiddenInputNames, [name]);
+  assert.deepEqual(body.temporaryInputNames, [name]);
   assert.deepEqual(body.stagedInputNames, [name]);
   await uploadReferenceImage(url, { width: 1024, height: 1024, autoResizeInputs: false });
   assert.deepEqual(uploads[1], buffer);

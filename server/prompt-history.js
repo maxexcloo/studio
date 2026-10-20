@@ -1,7 +1,6 @@
 import path from "node:path";
 import { dataDir, gallery } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { hasLegacyPrompt } from "./privacy.js";
 import crypto from "node:crypto";
 
 /**
@@ -11,10 +10,6 @@ import crypto from "node:crypto";
  *
  * It can be turned off (Settings › Generation): then nothing new is kept and
  * the recent ones are forgotten; starred prompts stay until unstarred.
- *
- * Nothing from Hidden is ever written here: the generate route records only
- * runs that land in the gallery, and hiding an image takes its prompt out
- * unless the gallery still shows it elsewhere.
  */
 
 export const promptHistoryPath = path.join(dataDir, "prompt-history.json");
@@ -93,8 +88,7 @@ function createHistory(field, historyPath, initiallyEnabled = () => true, initia
       enabled = initiallyEnabled();
       let entries = [];
       const seeds = (enabled ? (seedItems ?? initialSeedItems()) : [])
-        // Prompts still sealed by the old privacy scheme are not readable text, so they stay out.
-        .filter((item) => item?.[field] && !item.privateVault && !item.promptProtected && !hasLegacyPrompt(item) && !String(item[field]).startsWith("enc:v1:") && item.status === "done")
+        .filter((item) => item?.[field] && item.status === "done")
         .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
       for (const item of seeds) entries = addPrompt(entries, item[field], Date.parse(item.createdAt || "") || Date.now());
       cache = entries;
@@ -105,7 +99,7 @@ function createHistory(field, historyPath, initiallyEnabled = () => true, initia
 
   /**
    * `forget`: the store keeps the previous copy as .bak, and a prompt taken out
-   * (forgotten, cleared, or hidden along with its image) must not stay in it.
+   * (forgotten, or cleared along with its image) must not stay in it.
    */
   function save({ forget = false } = {}) {
     writeJsonFile(historyPath, { version: 1, enabled, entries: cache || [] });

@@ -12,7 +12,6 @@ import { isLocalVideoProfile } from './comfy-backends.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
-const hidden = (item) => ['privateVault', 'vaultLocked', 'promptProtected', 'promptEncrypted', 'hidden'].some(key => item?.[key]);
 const safeId = (id) => encodeURIComponent(id);
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 /** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
@@ -292,7 +291,7 @@ export class McpMedia {
     const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}?settings=1`, undefined, owner, options);
     const outputs = new Map();
     let kind, profileId;
-    for (const item of items) if (item.jobId === jobId && item.status === 'done' && !hidden(item) && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
+    for (const item of items) if (item.jobId === jobId && item.status === 'done' && Number.isInteger(item.index) && item.index >= 0 && item.index < 1000 && mcpOutputPath(item.url)) {
       outputs.set(item.index, { url: item.url });
       kind = item.type;
       profileId ||= item.settings?.profileId;
@@ -347,9 +346,8 @@ export class McpMedia {
     while (true) {
       if (signal?.aborted) throw aborted(signal);
       let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner, { signal, credential });
-      if (hidden(job)) throw new Error('Hidden outputs are unavailable to MCP.');
       if (job.status === 'missing' || finished.has(job.status)) {
-        // A subsequently hidden/deleted output is revoked even while its terminal job remains cached.
+        // A subsequently deleted output is revoked even while its terminal job remains cached.
         const visible = await this.galleryJob(jobId, owner, { signal, credential });
         job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind, profileId: visible.profileId };
       }
@@ -455,7 +453,7 @@ export class McpMedia {
   }
   url(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}`; }
   available(job, index) {
-    if (!finished.has(job.status) || hidden(job) || !Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
+    if (!finished.has(job.status) || !Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
     return job.outputs[index];
   }
   async download(owner, jobId, index, options = {}) {
@@ -467,7 +465,7 @@ export class McpMedia {
   async source(owner, jobId, index) {
     this.available(await this.job(owner, jobId), index);
     const { items = [] } = await this.request('GET', `/api/gallery/jobs/${safeId(jobId)}?settings=1`, undefined, owner);
-    const item = items.find(entry => entry.jobId === jobId && entry.index === index && entry.status === 'done' && !hidden(entry));
+    const item = items.find(entry => entry.jobId === jobId && entry.index === index && entry.status === 'done');
     if (!item?.settings?.profileId || !item.prompt) throw new Error('This result has no recorded profile or prompt to reuse. Call Generate instead.');
     return item;
   }
@@ -546,7 +544,7 @@ export class McpMedia {
     const form = new FormData();
     form.append('image', new Blob([content], { type: `image/${metadata.format}` }), path.basename(filename));
     const result = await this.request('POST', '/api/reference-assets/upload', form, owner);
-    if (!result.asset?.id || hidden(result.asset) || result.asset.privacyDomain === 'hidden') throw new Error('Studio could not accept this reference image.');
+    if (!result.asset?.id) throw new Error('Studio could not accept this reference image.');
     this.state.assets[result.asset.id] = [...new Set([...(this.state.assets[result.asset.id] ? [this.state.assets[result.asset.id]].flat() : []), owner])];
     this.save();
     return result;
@@ -630,7 +628,7 @@ export class McpMedia {
         return null;
       }
     }));
-    return jobs.filter(item => item && !hidden(item.job) && item.job.status !== 'missing');
+    return jobs.filter(item => item && item.job.status !== 'missing');
   }
   /**
    * Every finished result of a conversation as one reply ("show me all"): the most recent few as
@@ -674,7 +672,6 @@ export class McpMedia {
   async page(claims, credential) {
     let job;
     try { job = await this.job(claims.owner, claims.jobId, 0, { credential }); } catch { return null; }
-    if (hidden(job)) return null;
     const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.shortId(claims.owner, claims.jobId, index)] : []) : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);

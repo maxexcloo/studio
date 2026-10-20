@@ -36,7 +36,7 @@ export async function uploadReferenceImage(dataUrl, body = {}) {
   const comfyName = uploaded.name || filename;
   body.stagedInputNames = [...(body.stagedInputNames || []), comfyName];
   // Legacy uploads are unique too; release their temporary copy when the run ends.
-  body.hiddenInputNames = [...(body.hiddenInputNames || []), comfyName];
+  body.temporaryInputNames = [...(body.temporaryInputNames || []), comfyName];
   return comfyName;
 }
 
@@ -64,7 +64,7 @@ export async function imageGraph(body) {
 export async function videoGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
   const graph = await builtInGraph(body);
-  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : body.privateVault ? saveIntoHeissFolder(graph) : graph;
+  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
 }
 
 /**
@@ -213,9 +213,7 @@ function applyRgthreeLoraStack(graph, body, config) {
 
 /**
  * Points every save node (SaveImage, SaveVideo, VHS_VideoCombine and anything
- * else with a filename_prefix) at the heiss-ui folder. A Hidden run from an
- * imported workflow must save where HEISS UI's own runs do: a copy Hidden
- * cannot remove then stays out of "Everything in the output folder" too.
+ * else with a filename_prefix) at the heiss-ui folder, or an account's folder.
  */
 export function saveIntoHeissFolder(graph, ownerId = "") {
   const accountPrefix = accountOutputSubfolder(ownerId);
@@ -224,7 +222,7 @@ export function saveIntoHeissFolder(graph, ownerId = "") {
     if (!inputs || !Object.hasOwn(inputs, "filename_prefix")) continue;
     // Only the name part is kept; a linked or empty prefix becomes a plain one.
     const name = typeof inputs.filename_prefix === "string" ? inputs.filename_prefix.split(/[\\/]/).filter((part) => part && part !== "." && part !== "..").pop() : "";
-    inputs.filename_prefix = `${accountPrefix || "heiss-ui"}/${name || "hidden"}`;
+    inputs.filename_prefix = `${accountPrefix || "heiss-ui"}/${name || "output"}`;
   }
   return graph;
 }
@@ -237,5 +235,5 @@ export async function customWorkflowGraph(body) {
   await applyMappedInputs(graph, workflow, body);
   if (workflow.loraStack?.adapter === "rgthree-stack-v1") applyRgthreeLoraStack(graph, body, workflow.loraStack);
   else applyPowerLoraStack(graph, body, workflow.loraStack);
-  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : body.privateVault ? saveIntoHeissFolder(graph) : graph;
+  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
 }

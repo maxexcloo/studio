@@ -9,11 +9,10 @@ process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"
 const { setGallery } = await import("./gallery-store.js");
 const history = await import("./prompt-history.js");
 
-test("the first list starts from the gallery, never from Hidden", () => {
+test("the first list starts from the gallery's finished runs", () => {
   setGallery([
     { id: "a", url: "a", status: "done", prompt: "a red fox", createdAt: "2026-01-01T00:00:00Z" },
     { id: "b", url: "b", status: "done", prompt: "A  red fox", createdAt: "2026-01-03T00:00:00Z" },
-    { id: "c", url: "c", status: "done", prompt: "a secret", privateVault: true, createdAt: "2026-01-04T00:00:00Z" },
     { id: "d", url: "d", status: "pending", prompt: "still running", createdAt: "2026-01-05T00:00:00Z" },
     { id: "e", url: "e", status: "done", prompt: "a blue owl", createdAt: "2026-01-02T00:00:00Z" }
   ], { persist: false });
@@ -70,18 +69,6 @@ test("clearing keeps pinned prompts unless asked not to", () => {
   assert.ok(!fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("red fox"), "cleared from the backup too");
 });
 
-test("prompts still sealed by the old privacy scheme never seed the list", () => {
-  fs.rmSync(history.promptHistoryPath, { force: true });
-  fs.rmSync(`${history.promptHistoryPath}.bak`, { force: true });
-  history.resetPromptHistoryCache();
-  setGallery([
-    { id: "f", url: "f", status: "done", prompt: "enc:v1:abc", createdAt: "2026-01-01T00:00:00Z" },
-    { id: "g", url: "g", status: "done", prompt: "a title", promptEncrypted: "enc:v1:def", createdAt: "2026-01-02T00:00:00Z" },
-    { id: "h", url: "h", status: "done", prompt: "a grey cat", createdAt: "2026-01-03T00:00:00Z" }
-  ], { persist: false });
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["a grey cat"]);
-});
-
 test("turned off, nothing new is kept and the recent prompts go; starred ones stay, and it survives a restart", () => {
   history.clearPromptHistory({ keepPinned: false });
   history.recordPrompt("a kept star");
@@ -101,12 +88,10 @@ test("turned off, nothing new is kept and the recent prompts go; starred ones st
   assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["remembered again", "a kept star"]);
 });
 
-test("negative history is independent and excludes Hidden and sealed gallery entries", () => {
+test("negative history is independent of the positive one", () => {
   setGallery([
     { id: "normal", status: "done", prompt: "A landscape", negative: "Blur and noise", createdAt: "2026-01-01T00:00:00Z" },
-    { id: "hidden", status: "done", negative: "Private exclusions", privateVault: true },
-    { id: "sealed", status: "done", negative: "enc:v1:sealed" },
-    { id: "legacy", status: "done", negative: "Protected exclusions", negativeEncrypted: "enc:v1:sealed" }
+    { id: "pending", status: "pending", negative: "Still running" }
   ], { persist: false });
   fs.rmSync(history.negativePromptHistoryPath, { force: true });
   fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });

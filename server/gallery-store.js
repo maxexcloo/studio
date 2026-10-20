@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir, localOutputFile, root } from './comfy.js';
-import { hasLegacyPrompt, openLegacyPrompt } from './privacy.js';
+
 import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from './json-store.js';
 import { isInside } from './paths.js';
 import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from './gallery-order.js';
@@ -43,9 +43,9 @@ function loadGallery() {
 export let gallery = loadGallery();
 
 /*
- * Markers for outputs that were deleted, cleared or hidden, so they never come
- * back out of ComfyUI's history. Their keys are output names, and a list of
- * what was hidden should not say what was hidden: each marker is stored as a
+ * Markers for outputs that were deleted or cleared, so they never come back
+ * out of ComfyUI's history. Their keys are output names, and a list of what
+ * was deleted should not say what was deleted: each marker is stored as a
  * keyed digest (HMAC-SHA256 under data/.gallery-marker-key), which can be
  * checked against a name but never read back into one. Lists from before are
  * turned into digests the first time they are read.
@@ -205,9 +205,6 @@ export function isGalleryHidden(item) {
 
 export function filterVisibleGallery(items) {
   return items.filter((item) => {
-    // A Hidden job only passes through this list while ComfyUI renders it; it
-    // is shown in Hidden, never in the gallery.
-    if (item.privateVault) return false;
     if (isGalleryHidden(item)) return false;
     if (isComfyOutputItem(item)) return hasExistingOutputFile(item);
     if (item.library) return libraryFileCheck ? libraryFileCheck(item) : true;
@@ -397,7 +394,7 @@ export function galleryDelta({ since = 0, type = "", includeFailed = true, filte
   const upserts = [...upsertMap.values()].filter((item) => {
     if (type && item.type !== type) return false;
     if (!includeFailed && item.status === "error") return false;
-    if (item.status === "canceled" || item.privateVault || isGalleryHidden(item)) return false;
+    if (item.status === "canceled" || isGalleryHidden(item)) return false;
     // With a search on, what no longer matches (unstarred, or a run that
     // finished with another prompt) leaves the results instead of going stale.
     if (filter && !filter(item)) {
@@ -516,7 +513,7 @@ function outputFileExistsIn(item, baseDir) {
  */
 export function outputFolderMatch(baseDir = comfyOutputDir, items = gallery, sampleSize = 12) {
   if (!baseDir) return { checked: 0, found: 0 };
-  const sample = sortGallery(items.filter((item) => item?.status === "done" && !item.privateVault && isComfyOutputItem(item))).slice(0, sampleSize);
+  const sample = sortGallery(items.filter((item) => item?.status === "done" && isComfyOutputItem(item))).slice(0, sampleSize);
   return { checked: sample.length, found: sample.filter((item) => outputFileExistsIn(item, baseDir)).length };
 }
 
@@ -649,12 +646,9 @@ let writing = null;
 let writeSequence = 0;
 let committedSequence = 0;
 
-// Private-vault jobs exist only while Comfy is rendering. Their finished records
-// live in the encrypted vault manifest, never in the ordinary gallery JSON.
 function persistableGallery() {
   const items = [];
   for (const item of gallery) {
-    if (item.privateVault) continue;
     items.push(item.preview ? withoutPreview(item) : item);
     if (items.length >= galleryLimit) break;
   }
@@ -729,31 +723,14 @@ for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SI
   });
 }
 
-/**
- * Opens prompts the old privacy scheme sealed in the normal gallery, once, with
- * the first unlocked key that can. Returns how many came back.
- */
-export function migrateLegacyPrompts(key) {
-  if (!key || !gallery.some(hasLegacyPrompt)) return 0;
-  let opened = 0;
-  const next = gallery.map((item) => {
-    const plain = openLegacyPrompt(item, key);
-    if (!plain) return item;
-    opened += 1;
-    return plain;
-  });
-  if (opened) setGallery(next);
-  return opened;
-}
-
-/** Hidden items drop out of the gallery as if deleted, without a hide marker left behind. */
+/** Items drop out of the gallery as if deleted, without a delete marker left behind. */
 export function removeGalleryItems(items) {
   const keys = new Set(items.map(galleryKey).filter(Boolean));
   if (!keys.size) return;
   setGallery(gallery.filter((item) => !keys.has(galleryKey(item))));
 }
 
-/** Items put back from Hidden, newest first like everything else. */
+/** Items added or put back, newest first like everything else. */
 export function addGalleryItems(items) {
   // A name ComfyUI reused may carry a delete marker from an older image; this one is wanted.
   let cleared = false;
@@ -897,8 +874,7 @@ export function makePendingItems(id, body) {
     referenceImageName: body.startImageName || "",
     startImageId: body.startImageId || "",
     settings: generationSettings(body),
-    ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
-    privateVault: Boolean(body.privateVault)
+    ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {})
   }));
 }
 
@@ -1009,8 +985,8 @@ export function generationSettings(body) {
     if (body.inpaint?.box) {
       settings.inpaint = { box: body.inpaint.box, strength: body.inpaint.strength, feather: body.inpaint.feather };
       if (body.inpaint.image?.width) settings.inpaint.image = { width: body.inpaint.image.width, height: body.inpaint.image.height };
-      // The reference's id lets the live preview draw over the original; a Hidden one stays out of the record.
-      if (body.inpaint.referenceId && !body.privateVault && !String(body.inpaint.referenceId).startsWith("vault:")) settings.inpaint.referenceId = body.inpaint.referenceId;
+      // The reference's id lets the live preview draw over the original.
+      if (body.inpaint.referenceId) settings.inpaint.referenceId = body.inpaint.referenceId;
     }
   }
   if (body.kind === "video" && !body.duration) {

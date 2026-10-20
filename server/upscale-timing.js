@@ -10,7 +10,7 @@
  * Like generation estimates, these stay quiet until they have earned trust:
  * two upscales of the weight (or of the effort, when the weight is unknown),
  * a size not far outside what it has seen, and recent predictions that landed
- * within about 35%. Hidden upscales never enter it.
+ * within about 35%.
  */
 
 const PER_KEY = 30;

@@ -35,7 +35,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   for (const [method, path] of [
     ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
     ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"], ["PUT", "/api/sizes"],
-    ["PUT", "/api/workflows/preferences"], ["GET", "/api/hidden/gallery"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
+    ["PUT", "/api/workflows/preferences"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
     ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"]
   ]) {
     const denied = call(path, user, method);

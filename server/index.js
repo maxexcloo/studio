@@ -10,7 +10,7 @@ import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGall
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
-import { registerPrivacyStatusRoute, registerPrivacyRoutes, registerVaultBundleRoutes, registerVaultMediaRoutes, registerHiddenFavoriteRoute } from "./privacy-routes.js";
+
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
 import { configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
@@ -60,9 +60,7 @@ import { setDismissed } from './dismissals.js';
 import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
 import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
-import { encryptionKeyFromRequest, isPrivacyEnabled, revealGalleryItemsForRequest } from './privacy.js';
-import { findVaultItem, patchVaultItem } from './vault.js';
-import { settleHiddenRuns, withoutHiddenRuns } from './hidden-runs.js';
+
 import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary, saveLoraStack } from './lora-stacks.js';
 import { deleteUploadedReference, listReferenceAssets, readMultipartImage, readUploadedReference, referenceAssetFromGallery, saveUploadedReference, stageReferenceAssets } from './reference-assets.js';
 import { nodePack, nodePacks } from './node-packs.js';
@@ -81,7 +79,7 @@ import { diagnostics, diagnosticsText } from './diagnostics.js';
 import { isMediaUrl, mediaStorageEnabled, mediaType } from './media-paths.js';
 import { gatedPath } from './gated-path.js';
 import { ingestRecords, noteIngested, removeComfyFiles, wasIngested } from './media-store.js';
-import { forgetComfyRun } from './hidden-traces.js';
+import { forgetComfyRun } from './comfy-traces.js';
 import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
@@ -100,7 +98,7 @@ app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
 async function resolveSignedMcpResult(owner, jobId, index) {
   if (!mayUseFeature(accountAccessForId(owner), 'gallery')) return null;
   const item = gallery.find((entry) => entry.ownerId === owner && entry.jobId === jobId && entry.index === index
-    && entry.status === 'done' && !entry.privateVault && !entry.hidden);
+    && entry.status === 'done');
   if (!item || !mcpOutputPath(item.url)) return null;
   const source = new URL(item.url, 'http://localhost');
   const filename = source.searchParams.get('filename') || '';
@@ -174,7 +172,7 @@ function refreshComfyContextSoon() {
 }
 
 const recoverRunningJobs = createJobRecovery({
-  backends: configuredBackends, filterHistory: withoutHiddenRuns, finishJob: setTerminalJob,
+  backends: configuredBackends, finishJob: setTerminalJob,
   getGallery: () => gallery, jobs, recordsFromHistory: recordsFromComfyHistory,
   request: comfy, setGallery, visible: filterVisibleGallery, withBackend: withComfyBackend,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : [])
@@ -208,12 +206,10 @@ setInterval(() => recoverRunningJobs(), 5000).unref();
 async function recoverGalleryFromHistory() {
   await recoverRunningJobs();
   cleanupGalleryState(jobs);
-  // Hidden runs HEISS UI lost track of are sealed first, and never join the gallery either way.
-  await settleHiddenRuns().catch(() => null);
   const recovered = [];
   for (const backend of configuredBackends()) {
     await withComfyBackend(backend, async () => {
-      const history = withoutHiddenRuns(await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({})));
+      const history = await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({}));
       const records = recordsFromComfyHistory(history);
       const owned = multiUserEnabled ? records.filter((item) => item.ownerId) : records;
       // Already delivered (and so already in HEISS media): never imported a second time.
@@ -267,7 +263,6 @@ function openFolder(folder) {
   return execFile("xdg-open", [folder]);
 }
 
-registerPrivacyStatusRoute(app);
 
 app.get("/api/network", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -280,7 +275,7 @@ app.get("/api/network", (req, res) => {
   res.json({
     addresses: interfaces.map((item) => item.address), interfaces, port, listening: lanListening,
     // saved: what the next start does. source: who decides it now (flag and shell outrank the switch).
-    lan: { saved: lan.saved, source: lan.source, hiddenReady: isPrivacyEnabled() },
+    lan: { saved: lan.saved, source: lan.source },
     // HTTPS for other devices (tls.js). `next`: what .env says now, used from the next start.
     tls: networkTls(clientOf(req).thisComputer)
   });
@@ -336,7 +331,6 @@ app.post("/api/network/lan", (req, res) => {
   res.json({ ok: true, saved: enabled, restartNeeded: lan.source === "setting" && enabled !== lanListening });
 });
 
-registerPrivacyRoutes(app);
 
 const appVersion = (() => {
   try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
@@ -916,7 +910,6 @@ app.post("/api/workflows/import", async (req, res) => {
 
 registerGalleryBundleRoutes(app);
 
-registerVaultBundleRoutes(app);
 
 registerGalleryBundleActions(app);
 
@@ -937,7 +930,6 @@ app.delete("/api/workflows/:id", (req, res) => {
 
 registerGalleryReadRoutes(app);
 
-registerVaultMediaRoutes(app);
 
 app.delete("/api/loras", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -999,7 +991,6 @@ app.put("/api/loras/:workflowId", (req, res) => {
 
 registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory });
 
-registerHiddenFavoriteRoute(app);
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
@@ -1147,9 +1138,8 @@ app.post("/api/start-image", (req, res) => {
 
 app.get("/api/reference-assets", (req, res) => {
   try {
-    const source = ["generation", "hidden"].includes(req.query.source) ? req.query.source : "upload";
+    const source = req.query.source === "generation" ? "generation" : "upload";
     const canReference = !req.heissAccount || mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences');
-    if (req.heissAccount && source === 'hidden') return res.json({ items: [], hasMore: false, locked: true });
     if (req.heissAccount && (!canReference || source === 'generation' && !mayUseFeature(req.heissAccount, 'gallery'))) return res.json({ items: [], hasMore: false });
     res.json(listReferenceAssets(req, {
       source,
@@ -1421,16 +1411,13 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   // Say exactly why an image cannot be upscaled; the tile shows this in a popover.
-  const hiddenKey = encryptionKeyFromRequest(req);
-  // A Hidden image upscales the same way; only where the result goes differs.
-  const hiddenItem = findUpscaleTarget(itemId) ? null : findVaultItem(hiddenKey, itemId);
-  const item = findUpscaleTarget(itemId) || hiddenItem;
+  const item = findUpscaleTarget(itemId);
   if (!item) {
     res.status(404).json({ ok: false, reason: "missing", error: "This image is no longer in the gallery. It may have been deleted on another device. Reload the page." });
     return;
   }
-  if (!["image", "video"].includes(item.type) || (hiddenItem && item.type === "video")) {
-    res.status(400).json({ ok: false, reason: "video", error: "Upscale supports gallery images and videos. Hidden videos are not supported." });
+  if (!["image", "video"].includes(item.type)) {
+    res.status(400).json({ ok: false, reason: "video", error: "Upscale supports gallery images and videos." });
     return;
   }
   if (item.library) {
@@ -1468,7 +1455,7 @@ app.post("/api/upscale", async (req, res) => {
     return;
   }
   const customWorkflow = String(item.model || "").startsWith("custom:") ? getCustomWorkflow(item.model) : null;
-  const { jobId, plan } = startUpscale({ item: upscaleItem, imageName, quality, faceDetail, info, customWorkflow, hiddenKey: hiddenItem ? hiddenKey : null });
+  const { jobId, plan } = startUpscale({ item: upscaleItem, imageName, quality, faceDetail, info, customWorkflow });
   res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
 });
 
@@ -1497,15 +1484,6 @@ app.post("/api/upscale/toggle", (req, res) => {
     const itemId = String(req.body?.galleryItemId || "");
     const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
     if (req.heissAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
-    const key = encryptionKeyFromRequest(req);
-    const hiddenItem = findUpscaleTarget(itemId) ? null : findVaultItem(key, itemId);
-    if (hiddenItem) {
-      if (!hiddenItem.upscale?.url) throw new Error("This image has no upscale to switch to.");
-      const active = typeof req.body?.active === "boolean" ? req.body.active : !hiddenItem.upscaleActive;
-      patchVaultItem(key, itemId, { upscaleActive: active });
-      res.json({ ok: true, upscaleActive: active, revision: galleryRevisionValue() });
-      return;
-    }
     const item = toggleUpscaleView(itemId, req.body?.active);
     res.json({ ok: true, upscaleActive: Boolean(item.upscaleActive), revision: galleryRevisionValue() });
   } catch (error) {
@@ -1523,13 +1501,7 @@ app.get("/api/jobs/:id", (req, res) => {
     res.json({ status: "missing" });
     return;
   }
-  const { vaultKey, ...safeJob } = job;
-  // What a Hidden run made, or even what it was asked, is for an unlocked browser only.
-  if (job.privateVault && !encryptionKeyFromRequest(req)) {
-    res.json({ status: safeJob.status, privateVault: true });
-    return;
-  }
-  res.json({ ...safeJob, items: revealGalleryItemsForRequest(safeJob.items || []) });
+  res.json({ ...job, items: job.items || [] });
 });
 
 app.post("/api/jobs/:id/cancel", async (req, res) => {
@@ -1575,7 +1547,7 @@ app.post("/api/cache/clear", async (req, res) => {
   saveGallery();
   await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
   await freeComfyMemory().catch(() => null);
-  res.json({ ok: true, outputs: revealGalleryItemsForRequest(filterVisibleGallery(recordsForRequest(gallery, req))) });
+  res.json({ ok: true, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
 });
 
 // Unloads models and frees what ComfyUI caches, without touching any run: ComfyUI does it between prompts.
@@ -1944,7 +1916,7 @@ startServers(app, {
     setListeningPort(listening);
     if (moved) console.log(`\n  Port ${requestedPort} is in use, so Studio is on ${listening} this time.`);
     // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
-    // (Touch ID, Windows Hello for Hidden) on a name, never on an address.
+    // on a name, never on an address.
     const shownHost = host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
     const pagePort = dev ? 5173 : listening;
     Promise.resolve(printBanner({ version: appVersion, url: `http://${shownHost}:${pagePort}`, comfyUrl })).then(async () => {
@@ -1956,9 +1928,7 @@ startServers(app, {
         for (const address of addresses) console.log(`    ➜  Network   ${address}`);
         if (addresses.length) console.log(studioPasswordSet()
           ? "    Other devices sign in with the studio password.\n"
-          : isPrivacyEnabled()
-            ? "    Other devices sign in with your Hidden password until you set a studio password (Settings › Connection).\n"
-            : "    Other devices sign in with a studio password: set one in Settings › Connection first.\n");
+          : "    Other devices sign in with a studio password: set one in Settings › Connection first.\n");
       }
       // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
       const answering = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(3000) }).then((response) => response.ok, () => false);

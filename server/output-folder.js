@@ -43,7 +43,7 @@ function hasComfySiblings(dir) {
 
 /** Newest Comfy outputs to test a folder against, from the gallery or, if empty, Comfy's history. */
 async function sampleOutputs() {
-  const known = gallery.filter((item) => item?.status === "done" && !item.privateVault && isComfyOutputItem(item));
+  const known = gallery.filter((item) => item?.status === "done" && isComfyOutputItem(item));
   if (known.length) return known;
   const history = await comfy("/history?max_items=12").catch(() => ({}));
   const createdAt = new Date().toISOString();

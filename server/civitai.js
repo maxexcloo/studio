@@ -17,8 +17,6 @@ import { withPngText } from "./png-text.js";
  *
  * It is written into the file in ComfyUI's output folder right after a run,
  * so the file you download, share or pick up from the folder all carry it.
- * Never for Hidden: those runs are sealed before this could see them, and
- * the caller skips them anyway.
  */
 
 const prefsPath = path.join(dataDir, "civitai.json");
@@ -216,7 +214,7 @@ function outputFile(output) {
  * left as it is. Never throws: a run's images matter more than their tags.
  */
 export function writeCivitaiParameters(outputs, body) {
-  if (!prefs.enabled || body?.privateVault) return 0;
+  if (!prefs.enabled) return 0;
   let written = 0;
   const hashes = hashesFor(body);
   for (const output of outputs || []) {

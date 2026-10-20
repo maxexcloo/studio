@@ -27,13 +27,13 @@ let shown = new Set();
 
 /** The Studio media files an item shows: its original and its upscale. */
 function itemMedia(item) {
-  if (item?.status !== 'done' || item.privateVault || item.hidden || isGalleryHidden(item)) return [];
+  if (item?.status !== 'done' || isGalleryHidden(item)) return [];
   return [item.url, item.upscale?.url].map(viewParams)
     .filter((params) => params?.type === mediaType && (videoPattern.test(params.filename) || imagePattern.test(params.filename)))
     .map((params) => ({ ...params, video: videoPattern.test(params.filename) }));
 }
 
-/** Whether a file is still in the gallery: one hidden or deleted meanwhile is never built. */
+/** Whether a file is still in the gallery: one deleted meanwhile is never built. */
 function stillShown({ filename, subfolder, type }) {
   if (shownRevision !== galleryRevisionValue()) {
     shownRevision = galleryRevisionValue();

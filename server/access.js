@@ -12,9 +12,7 @@ import { accountSession } from "./account-store.js";
  * they may do once in.
  *
  * - The studio password lets a phone or another computer open the studio.
- *   It is its own password, set in Settings › Connection on this computer;
- *   Hidden keeps its own. (Until one is set, the Hidden password still signs
- *   devices in, as it did before the two were split; see index.js.)
+ *   It is set in Settings › Connection on this computer.
  * - Signing in makes a device session: a random token in an HttpOnly cookie,
  *   with only its hash kept here, so "Sign out all devices" ends every one
  *   of them at once. Sessions last a week (HEISS_DEVICE_SESSION_DAYS).

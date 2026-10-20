@@ -28,7 +28,6 @@ const urls = (filename) => {
 const record = (filename, type, minutesAgo, extra = {}) => ({ ...urls(filename), id: urls(filename).url, filename, type, status: 'done', createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(), ...extra });
 fs.writeFileSync(path.join(dataDir, 'gallery.json'), JSON.stringify([
   record('a-newest.png', 'image', 1),
-  record('b-private.png', 'image', 2, { privateVault: true }),
   ...(canEncode ? [record('clip.mp4', 'video', 3)] : [])
 ]));
 
@@ -36,9 +35,9 @@ const { warmGallery, warmNewOutputs } = await import('./media-warmup.js');
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 const files = (folder, pattern) => { try { return fs.readdirSync(path.join(dataDir, folder)).filter((name) => pattern.test(name)); } catch { return []; } };
 
-test('a pass builds the gallery’s thumbnails, display copies, posters and previews, and none for Hidden items', async () => {
+test('a pass builds the gallery’s thumbnails, display copies, posters and previews', async () => {
   await warmGallery();
-  assert.equal(files('.thumbnails', /\.webp$/).length, 2, 'the visible image’s thumbnail and display copy only');
+  assert.equal(files('.thumbnails', /\.webp$/).length, 2, 'the image’s thumbnail and display copy');
   if (canEncode) {
     assert.equal(files('.video-previews', /\.jpg$/).length, 1, 'the video’s poster');
     assert.equal(files('.video-previews', /\.mp4$/).length, 1, 'the video’s grid preview');

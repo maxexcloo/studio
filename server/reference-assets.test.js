@@ -136,7 +136,6 @@ test('search filters the full reference library before pagination and matches pr
     assert.equal(found.items[0].galleryItemId, 'search-119');
     assert.equal(found.hasMore, false);
     assert.equal(referenceAssets.listReferenceAssets({}, { source: 'generation', q: 'not found' }).items.length, 0);
-    assert.equal(referenceAssets.listReferenceAssets({}, { source: 'hidden', q: 'mountain' }).locked, true);
   } finally { for (const item of items) gallery.splice(gallery.indexOf(item), 1); }
 });
 

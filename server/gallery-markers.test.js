@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-leaks-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-markers-"));
 const dataDir = path.join(temporary, "data");
 fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
 process.env.HEISS_DATA_DIR = dataDir;
@@ -18,7 +18,7 @@ fs.writeFileSync(path.join(dataDir, "gallery-hidden.json"), JSON.stringify({ [vi
 const store = await import("./gallery-store.js");
 const thumbnails = await import("./thumbnails.js");
 
-test("the list of hidden and deleted outputs no longer says what they were", () => {
+test("the list of deleted outputs no longer says what they were", () => {
   const onDisk = fs.readFileSync(path.join(dataDir, "gallery-hidden.json"), "utf8");
   assert.ok(!onDisk.includes("image_00007_"), "the old readable list was turned into digests");
   assert.ok(!fs.readFileSync(path.join(dataDir, "gallery-hidden.json.bak"), "utf8").includes("image_00007_"), "its backup too");
@@ -30,12 +30,12 @@ test("the list of hidden and deleted outputs no longer says what they were", () 
   assert.ok(!after.includes("image_00008_"));
   assert.equal(store.isGalleryHidden({ url: view("image_00008_.png"), createdAt: new Date(0).toISOString() }), true);
   assert.equal(store.isGalleryHidden({ url: view("image_00009_.png") }), false);
-  // Unhiding (or ComfyUI reusing the name) clears it again.
+  // Putting it back (or ComfyUI reusing the name) clears it again.
   store.addGalleryItems([{ id: view("image_00008_.png"), url: view("image_00008_.png"), status: "done", createdAt: new Date(0).toISOString() }]);
   assert.equal(store.isGalleryHidden({ url: view("image_00008_.png"), createdAt: new Date(0).toISOString() }), false);
 });
 
-test("hiding an image deletes its cached thumbnails, and its upscale's", async () => {
+test("forgetting an image deletes its cached thumbnails, and its upscale's", async () => {
   const cacheName = (filename) => crypto.createHash("sha1").update(`output:heiss-ui:${filename}:768:72`).digest("hex");
   const dir = path.join(dataDir, ".thumbnails");
   for (const name of ["image_00010_.png", "upscale_00010_.png", "image_00011_.png"]) fs.writeFileSync(path.join(dir, `${cacheName(name)}-${"a".repeat(64)}.webp`), "thumb");
@@ -45,9 +45,4 @@ test("hiding an image deletes its cached thumbnails, and its upscale's", async (
   assert.ok(left.some((name) => name.startsWith(cacheName("image_00011_.png"))), "other images keep theirs");
   assert.ok(!left.some((name) => name.startsWith(cacheName("image_00010_.png"))));
 
-  // Images hidden before this cleanup existed: found by name once, on the first unlock.
-  fs.writeFileSync(path.join(dir, `${cacheName("image_00012_.png")}-${"b".repeat(64)}.webp`), "thumb");
-  assert.equal(thumbnails.forgetLegacyHiddenThumbnails(["image_00012_.png"]), 1);
-  fs.writeFileSync(path.join(dir, `${cacheName("image_00013_.png")}-${"c".repeat(64)}.webp`), "thumb");
-  assert.equal(thumbnails.forgetLegacyHiddenThumbnails(["image_00013_.png"]), 0, "only once");
 });

@@ -150,9 +150,7 @@ export async function prepareInpaint(req, body) {
     feather: body.inpaint.feather
   });
   if (!files) return null;
-  // A Hidden image's crop gets its own name, so cleaning up after the run never touches another job's input.
-  const unique = Boolean(body.privateVault) || String(reference.assetId).startsWith("vault:");
-  const upload = (buffer, name) => uploadBufferToComfy({ buffer, mime: "image/png", name }, { unique });
+  const upload = (buffer, name) => uploadBufferToComfy({ buffer, mime: "image/png", name });
   const crop = await upload(files.crop, "inpaint-crop.png");
   const mask = await upload(files.samplingMask, "inpaint-mask.png");
   const composite = await upload(files.compositeMask, "inpaint-stitch.png");
@@ -171,7 +169,7 @@ export async function prepareInpaint(req, body) {
   };
 }
 
-/** The staged file names an inpaint run adds, for cleanup after Hidden runs. */
+/** The staged file names an inpaint run adds. */
 export function inpaintInputNames(inpaint) {
   return inpaint ? [inpaint.crop, inpaint.mask, inpaint.composite].filter(Boolean) : [];
 }

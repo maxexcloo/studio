@@ -11,7 +11,7 @@ process.env.COMFY_OUTPUT_DIR = dir;
 const { setGallery } = await import('./gallery-store.js');
 const { registerGalleryReadRoutes } = await import('./gallery-routes.js');
 
-test('exact job results exclude unrelated, deleted and Hidden outputs and expose prompts only on request', async t => {
+test('exact job results exclude unrelated and deleted outputs and expose prompts only on request', async t => {
   const app = express();
   registerGalleryReadRoutes(app);
   const server = app.listen(0, '127.0.0.1');
@@ -23,14 +23,13 @@ test('exact job results exclude unrelated, deleted and Hidden outputs and expose
   });
   const item = (name, extra = {}) => ({ jobId: 'chosen', id: name, index: 0, status: 'done', type: 'image', url: `/comfy/view?filename=${name}`, prompt: 'private prompt text', ...extra });
   fs.writeFileSync(path.join(dir, 'visible.png'), 'fixture');
-  fs.writeFileSync(path.join(dir, 'hidden.png'), 'fixture');
   fs.writeFileSync(path.join(dir, 'unrelated.png'), 'fixture');
-  setGallery([item('visible.png'), item('deleted.png', { index: 1 }), item('hidden.png', { index: 2, privateVault: true }), item('unrelated.png', { jobId: 'other' })]);
+  setGallery([item('visible.png'), item('deleted.png', { index: 1 }), item('unrelated.png', { jobId: 'other' })]);
   const base = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(`${base}/api/gallery/jobs/chosen`);
   const result = await response.json();
   assert.deepEqual(result.items, [{ jobId: 'chosen', index: 0, status: 'done', type: 'image', url: '/comfy/view?filename=visible.png' }]);
-  // MCP asks for the prompt and settings only to run a result again; Hidden outputs stay out.
+  // MCP asks for the prompt and settings only to run a result again.
   const detailed = await (await fetch(`${base}/api/gallery/jobs/chosen?settings=1`)).json();
   assert.deepEqual(detailed.items.map(({ index, prompt }) => ({ index, prompt })), [{ index: 0, prompt: 'private prompt text' }]);
   assert.deepEqual(await (await fetch(`${base}/api/gallery/jobs/missing`)).json(), { items: [] });

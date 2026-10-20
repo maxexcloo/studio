@@ -1,29 +1,27 @@
 // Reattach persisted tiles to their existing prompts; never submit replacement work.
-export function createJobRecovery({ backends, filterHistory, finishJob, getGallery, jobs, recordsFromHistory, request, setGallery, visible, withBackend, ingest = async (records) => records }) {
+export function createJobRecovery({ backends, finishJob, getGallery, jobs, recordsFromHistory, request, setGallery, visible, withBackend, ingest = async (records) => records }) {
   let active;
   const missing = new Map();
   function replace(items) {
     if (JSON.stringify(items) !== JSON.stringify(getGallery())) setGallery(items);
   }
   async function recover() {
-    if (!getGallery().some((item) => !item.privateVault && !item.url && ['pending', 'error', 'canceled'].includes(item.status))) return;
+    if (!getGallery().some((item) => !item.url && ['pending', 'error', 'canceled'].includes(item.status))) return;
     const untracked = new Set(visible(getGallery().filter((item) =>
-      !item.privateVault && !item.url && item.status === 'pending' && !jobs.has(item.jobId)
+      !item.url && item.status === 'pending' && !jobs.has(item.jobId)
     )).map((item) => item.jobId).filter(Boolean));
     const configured = backends();
     let scanned = 0;
     for (const backend of configured) {
       await withBackend(backend, async () => {
         // Both must answer before a missing prompt can count as lost.
-        const [queue, rawHistory] = await Promise.all([
+        const [queue, history] = await Promise.all([
           request('/queue', { timeout: 10000 }),
           request('/history?max_items=500', { timeout: 15000 }),
         ]);
-        const history = filterHistory(rawHistory);
         const places = new Map();
         for (const [key, status] of [['queue_running', 'running'], ['queue_pending', 'queued']]) {
           for (const entry of queue[key] || []) {
-            if (entry[3]?.heiss_hidden) continue;
             const id = entry[3]?.heiss_generation?.jobId;
             if (id) places.set(id, { promptId: entry[1], status });
           }
@@ -34,7 +32,7 @@ export function createJobRecovery({ backends, filterHistory, finishJob, getGalle
           if (id) completed.set(id, { entry, promptId });
         }
         const candidates = new Set(visible(getGallery().filter((item) =>
-          !item.privateVault && !item.url && (['pending', 'error'].includes(item.status)
+          !item.url && (['pending', 'error'].includes(item.status)
             || item.status === 'canceled' && jobs.get(item.jobId)?.recovered)
         )).map((item) => item.jobId).filter(Boolean));
         for (const id of candidates) {
@@ -94,7 +92,7 @@ export function createJobRecovery({ backends, filterHistory, finishJob, getGalle
     }
     // An untracked tile has no backend identity; every backend must confirm absence.
     for (const id of untracked) {
-      if (jobs.has(id) || !visible(getGallery()).some((item) => item.jobId === id && !item.privateVault && !item.url && item.status === 'pending')) {
+      if (jobs.has(id) || !visible(getGallery()).some((item) => item.jobId === id && !item.url && item.status === 'pending')) {
         missing.delete(id);
         continue;
       }

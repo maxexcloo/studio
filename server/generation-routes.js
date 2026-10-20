@@ -10,8 +10,8 @@ import { recordPrompt } from './prompt-history.js';
 import { jobs, runJob, runMockJob } from './jobs.js';
 import { getCustomWorkflow } from './custom-workflows.js';
 import { markWorkflowUsed } from './workflow-catalog.js';
-import { encryptionKeyFromRequest, isPrivacyEnabled } from './privacy.js';
-import { forgetComfyRun } from './hidden-traces.js';
+
+import { forgetComfyRun } from './comfy-traces.js';
 import { inpaintInputNames, prepareInpaint } from './inpaint.js';
 import { stageReferenceAssets } from './reference-assets.js';
 import { comfyRestarting } from './comfy-restart.js';
@@ -52,7 +52,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
 
   async function dispatchGenerate(req, res) {
     const accountUser = req.heissAccount?.role === "user";
-    if (accountUser && req.body?.privateVault) return res.status(403).json({ ok: false, error: "Hidden is not available to accounts." });
+
     if (!accountUser && configuredBackends().length === 1) return generateOnBackend(req, res);
     try {
       const available = await mediaModels();
@@ -82,17 +82,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
   }
 
   async function generateOnBackend(req, res) {
-    const requestKey = encryptionKeyFromRequest(req);
-    const hidden = Boolean(req.body?.privateVault);
-    // Checked before anything reaches ComfyUI, so a Hidden prompt never runs in the open.
-    if (hidden && !isPrivacyEnabled()) {
-      res.status(400).json({ ok: false, reason: "setup", error: "Set up Hidden before generating into it." });
-      return;
-    }
-    if (hidden && !requestKey) {
-      res.status(401).json({ ok: false, locked: true, reason: "locked", error: "Hidden is locked. Unlock it to generate." });
-      return;
-    }
     const duplicateId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     const existing = duplicateId && jobs.get(duplicateId);
     // In account mode a job ID belongs to one owner for good: a reused ID must never touch
@@ -104,10 +93,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       if (foreign) return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
     }
     if (existing) {
-      if ((hidden && !existing.privateVault) || (existing.privateVault && (!requestKey || (existing.vaultKey && !existing.vaultKey.equals(requestKey))))) {
-        return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
-      }
-      return res.json({ jobId: duplicateId, items: existing.items || existing.outputs || [], hidden: existing.privateVault, revision: galleryRevisionValue() });
+      return res.json({ jobId: duplicateId, items: existing.items || existing.outputs || [], revision: galleryRevisionValue() });
     }
     let body;
     let isMockJob = false;
@@ -159,31 +145,23 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         startImageName: String(req.body?.startImageName || "")
       };
     }
-    // What is made from a Hidden image stays hidden, wherever it was asked for.
-    const fromHidden = [...(req.body?.referenceAssets || []).map((item) => item?.assetId), req.body?.startImageId].some((id) => String(id || "").startsWith("vault:"));
-    if (fromHidden && !requestKey) {
-      res.status(401).json({ ok: false, locked: true, reason: "locked", error: "That reference is in Hidden. Unlock Hidden to use it." });
-      return;
-    }
     body.comfyBackend = currentComfyBackend();
     body.ownerId = ownerIdForRequest(req);
-    body.privateVault = hidden || fromHidden;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
       ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
       : null;
-    // Recent prompts are the gallery's: nothing made for Hidden is ever written there.
-    if (!body.privateVault && (!req.heissAccount || mayUseFeature(req.heissAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
+    if ((!req.heissAccount || mayUseFeature(req.heissAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
-      body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: body.privateVault || Boolean(body.ownerId), generation: body }).catch(() => []);
+      body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: Boolean(body.ownerId), generation: body }).catch(() => []);
     }
     if (!isMockJob && body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
       try {
-        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: body.privateVault || Boolean(body.ownerId), generation: body });
+        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: Boolean(body.ownerId), generation: body });
         body.startImageId ||= body.referenceAssets[0]?.assetId || "";
         body.startImageName ||= body.referenceAssets[0]?.name || "";
       } catch (error) {
@@ -212,7 +190,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssets(req, [first], { unique: body.privateVault || Boolean(body.ownerId), generation: body });
+        const [replacement] = await stageReferenceAssets(req, [first], { unique: Boolean(body.ownerId), generation: body });
         if (first.temporary) await forgetComfyRun({ inputNames: [first.comfyName] });
         body.referenceAssets = [replacement, ...others];
       } catch (error) {
@@ -230,16 +208,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       body.height = startSize.height;
     }
     if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize), referenceRole: body.referenceRole })) body.autoUpscale = null;
-    // Every image this run handed ComfyUI: all of them go after a Hidden run, and
-    // after a normal one, temporary resized copies and any Hidden references.
+    // Every image this run handed ComfyUI; temporary resized copies go when it ends.
     const staged = (body.referenceAssets || []).filter((item) => item.comfyName);
-    const inpaintNames = inpaintInputNames(body.inpaint);
-    body.stagedInputNames = [...staged.map((item) => item.comfyName), ...inpaintNames];
-    const fromHiddenImage = String(body.referenceAssets?.[0]?.assetId || "").startsWith("vault:");
-    body.hiddenInputNames = [
-      ...staged.filter((item) => item.temporary || String(item.assetId || "").startsWith("vault:")).map((item) => item.comfyName),
-      ...(fromHiddenImage ? inpaintNames : [])
-    ];
+    body.stagedInputNames = [...staged.map((item) => item.comfyName), ...inpaintInputNames(body.inpaint)];
+    body.temporaryInputNames = [...(body.temporaryInputNames || []), ...staged.filter((item) => item.temporary).map((item) => item.comfyName)];
     // A random seed is drawn here rather than inside the graph, so the gallery
     // records the number that actually ran and the image can be made again.
     if (!/^\d+$/.test(String(body.seed ?? "").trim())) {
@@ -254,8 +226,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
     setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-    jobs.set(id, { status: "queued", ownerId: body.ownerId || undefined, comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt, privateVault: body.privateVault, vaultKey: body.privateVault ? requestKey : null });
-    res.json({ jobId: id, items, hidden: body.privateVault, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
+    jobs.set(id, { status: "queued", ownerId: body.ownerId || undefined, comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt });
+    res.json({ jobId: id, items, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
     if (isMockJob) {
       setTimeout(() => runMockJob(id, body), 0);
     } else {

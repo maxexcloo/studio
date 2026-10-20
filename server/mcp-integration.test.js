@@ -67,17 +67,17 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
   });
   app.get('/api/jobs/:id', (req, res) => jobLookupFails ? res.status(503).json({ error: 'Fixture result retrieval offline' }) : res.json(jobs.get(req.params.id) || { status: 'missing' }));
   app.post('/api/jobs/:id/cancel', (req, res) => { const job = jobs.get(req.params.id); if (job) job.status = 'cancelled'; res.json({ ok: true }); });
-  app.get('/api/gallery', (_req, res) => res.json({ items: [...jobs.values()].flatMap(job => job.gallery ?? (job.status === 'done' && !job.privateVault ? job.outputs.map((output, index) => ({ id: `${job.id}:${index}`, jobId: job.id, index, status: 'done', type: job.kind, ...output })) : [])), hasMore: false, nextCursor: '' }));
+  app.get('/api/gallery', (_req, res) => res.json({ items: [...jobs.values()].flatMap(job => job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ id: `${job.id}:${index}`, jobId: job.id, index, status: 'done', type: job.kind, ...output })) : [])), hasMore: false, nextCursor: '' }));
   app.get('/api/gallery/jobs/:id', (req, res) => {
     const job = jobs.get(req.params.id);
     // Like the studio's gallery record: the prompt and generation settings only on request.
     const body = job?.settings || {};
     const recorded = req.query.settings === '1' ? { prompt: body.prompt, negative: body.negative || '', width: body.width, height: body.height, settings: { profileId: body.profileId, steps: body.steps, cfg: body.cfg, sampler: body.sampler || '', scheduler: body.scheduler || '', seed: body.seed || 'Random', referenceAssets: body.referenceAssets || [], ...(body.loras?.length ? { loras: body.loras } : {}) } } : {};
-    res.json({ items: !job || job.privateVault ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...recorded, ...output })) : []) });
+    res.json({ items: !job ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...recorded, ...output })) : []) });
   });
   app.post('/api/reference-assets/upload', async (req, res) => {
     for await (const _chunk of req) { /* Consume the multipart body. */ }
-    const asset = { id: deduplicateUploads ? 'fixture-shared-asset' : `fixture-asset-${assets.size + 1}`, name: 'reference.png', source: 'upload', mime: 'image/png', privacyDomain: 'gallery', url: '/fixture-reference.png' };
+    const asset = { id: deduplicateUploads ? 'fixture-shared-asset' : `fixture-asset-${assets.size + 1}`, name: 'reference.png', source: 'upload', mime: 'image/png', url: '/fixture-reference.png' };
     assets.set(asset.id, asset);
     res.json({ asset });
   });
@@ -569,12 +569,12 @@ test('video results return signed links without eagerly downloading video bytes'
   assert.equal(f.downloads.length, 0);
 });
 
-test('Hidden jobs and unsafe result URLs never produce previews, references or download links', async t => {
+test('unsafe result URLs never produce previews, references or download links', async t => {
   const f = await fixture(t);
   const client = await f.client();
   const id = jobId(await generate(client));
   const job = f.jobs.get(id);
-  for (const value of [{ privateVault: true, outputs: [{ url: '/comfy/view?filename=private.png' }] }, { privateVault: false, outputs: [{ url: 'https://external.invalid/private.png' }] }, { privateVault: false, outputs: [{ url: '//external.invalid/private.png' }] }, { privateVault: false, outputs: [{ url: '/api/vault/secret' }] }]) {
+  for (const value of [{ outputs: [{ url: 'https://external.invalid/private.png' }] }, { outputs: [{ url: '//external.invalid/private.png' }] }, { outputs: [{ url: '/api/settings/secret' }] }]) {
     Object.assign(job, { status: 'done', ...value });
     const status = await call(client, 'Status', { job_id: id });
     if (!status.isError) assert.deepEqual(data(status).outputs, []);
@@ -1393,7 +1393,7 @@ test('Reuse animates an image from its first frame with the default first-frame 
   await failure(client, 'Reuse', { job_id: 'result 1', prompt: 'A heron at dusk' });
 });
 
-test('Reuse follow-ups respect ownership and Hidden results', async t => {
+test('Reuse follow-ups respect ownership', async t => {
   const f = await fixture(t);
   const alice = await f.client('alice');
   const bob = await f.client('bob');
@@ -1401,8 +1401,6 @@ test('Reuse follow-ups respect ownership and Hidden results', async t => {
   finish(f);
   const submitted = f.submitted.length;
   for (const kind of ['image', 'video']) await failure(bob, 'Reuse', { job_id: id, kind });
-  f.jobs.get(id).privateVault = true;
-  for (const kind of ['image', 'video']) await failure(alice, 'Reuse', { job_id: id, kind });
   assert.equal(f.submitted.length, submitted);
 });
 

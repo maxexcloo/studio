@@ -2,17 +2,15 @@
  * A copy of HEISS UI's own state, taken the first time a new version starts.
  *
  * Updates can change what is in data/ in ways an older version can't read
- * back (Hidden's list of names, sign-in sessions, the gallery file). Before
+ * back (sign-in sessions, the gallery file). Before
  * anything else loads, the files a version may rewrite are copied to
  * data/.backups/<from>-to-<to>-<time>/, so going back to the previous version
  * is a matter of stopping HEISS UI and copying them back (docs/guides/TROUBLESHOOTING.md).
  *
  * Only the small state files are copied. Thumbnails, reference images and
- * Hidden's encrypted image files stay where they are: no update rewrites
- * them, and copying them could take gigabytes. A snapshot can still hold what
- * the new version cleans up (an older Hidden list, say), so snapshots are
- * readable by this user only, go after 14 days (3 at most), and go with Hidden
- * when it is erased (dropSnapshots).
+ * the backups in data/backups stay where they are: no update rewrites them,
+ * and copying them could take gigabytes. Snapshots are readable by this user
+ * only and go after 14 days (3 at most).
  *
  * Imported first by server/index.js, so it runs before any store loads.
  * Node built-ins only, for the same reason.
@@ -28,9 +26,9 @@ const markerName = ".version";
 const backupsName = ".backups";
 const keepDays = 14;
 const keepCount = 3;
-// Large, or never rewritten by an update, or not ours to keep.
-const skipped = new Set([".thumbnails", backupsName, "reference-assets", "setup-demo", ".heiss-trash", ".DS_Store", "Thumbs.db"]);
-const skippedPaths = [path.join(".private-vault", "assets")];
+// Large, or never rewritten by an update, or not ours to keep. An encrypted
+// vault from before Hidden was removed moves into backups/ on its first start.
+const skipped = new Set([".thumbnails", backupsName, "backups", ".private-vault", "reference-assets", "setup-demo", ".heiss-trash", ".DS_Store", "Thumbs.db"]);
 
 function currentVersion() {
   try {
@@ -79,11 +77,6 @@ export function pruneSnapshots({ dataDir = defaultDataDir, now = Date.now() } = 
   return removed;
 }
 
-/** Deletes every snapshot, e.g. when Hidden is erased and nothing of it may stay. */
-export function dropSnapshots({ dataDir = defaultDataDir } = {}) {
-  fs.rmSync(path.join(dataDir, backupsName), { recursive: true, force: true });
-}
-
 /**
  * Copies data/'s state when `version` differs from the one that last ran
  * here. Returns the snapshot's folder, or "" when none was needed. A failed
@@ -108,14 +101,7 @@ export function snapshotIfNewVersion({ dataDir = defaultDataDir, version = curre
       fs.mkdirSync(target, { recursive: true, mode: 0o700 });
       for (const name of fs.readdirSync(dataDir)) {
         if (skipped.has(name) || name === markerName) continue;
-        fs.cpSync(path.join(dataDir, name), path.join(target, name), {
-          recursive: true,
-          preserveTimestamps: true,
-          filter: (source) => {
-            const relative = path.relative(dataDir, source);
-            return !skippedPaths.some((skip) => relative === skip || relative.startsWith(`${skip}${path.sep}`));
-          }
-        });
+        fs.cpSync(path.join(dataDir, name), path.join(target, name), { recursive: true, preserveTimestamps: true });
       }
       fs.chmodSync(target, 0o700);
       // preserveTimestamps gives the folder data/'s own date; its age counts from now.

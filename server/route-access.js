@@ -1,5 +1,5 @@
 import { canAdmin, clientOf, deviceSession } from './access.js';
-import { encryptionKeyFromRequest } from './privacy.js';
+
 import { multiUserEnabled } from './multi-user-auth.js';
 
 /** This computer, or another device that signed in (the gate below has already checked). */
@@ -28,7 +28,7 @@ export function requireAdmin(req, res) {
   return false;
 }
 
-/** Creating, erasing or re-keying Hidden happens at the computer it runs on, never from the network. */
+/** Settings that only the computer running Studio may change, never from the network. */
 export function requireThisComputer(req, res) {
   if (multiUserEnabled) {
     if (clientOf(req).thisComputer && canAdmin(req)) return true;
@@ -38,10 +38,4 @@ export function requireThisComputer(req, res) {
   if (clientOf(req).thisComputer) return true;
   res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can do this." });
   return false;
-}
-
-export function requireHiddenKey(req, res) {
-  const key = encryptionKeyFromRequest(req);
-  if (!key) res.status(401).json({ ok: false, locked: true, error: "Hidden is locked." });
-  return key;
 }

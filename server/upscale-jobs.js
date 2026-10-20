@@ -8,9 +8,8 @@ import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
 import { saveIntoHeissFolder } from "./graphs.js";
 import { ingestRunResults, mediaStorageEnabled, removeComfyFiles } from "./media-store.js";
-import { forgetComfyRun } from "./hidden-traces.js";
-import { releaseHiddenRun, rememberHiddenRun } from "./hidden-runs.js";
-import { attachVaultUpscale, patchVaultItem, setRuntimeUpscale } from "./vault.js";
+import { forgetComfyRun } from "./comfy-traces.js";
+
 
 export function findUpscaleTarget(id) {
   return gallery.find((item) => item.id === id || item.url === id) || null;
@@ -40,70 +39,6 @@ function galleryTarget(itemId) {
         error: ""
       });
       updateGalleryJob(itemId, { upscaleActive: true });
-    }
-  };
-}
-
-/**
- * A Hidden item's upscale: progress in memory, the result encrypted straight
- * into the item, and ComfyUI's copies of both images gone once it lands. Like
- * a Hidden generation it is written down before ComfyUI gets it
- * (hidden-runs.js), so one that ends any other way is finished from there.
- */
-export function hiddenTarget(itemId, key, inputNames = []) {
-  let promptId = "";
-  let details = null;
-  const forget = async ({ stored = false } = {}) => {
-    const historyGone = stored ? await forgetComfyRun({ promptIds: [promptId], inputNames }).catch(() => false) : false;
-    releaseHiddenRun(promptId, { clean: historyGone, stored });
-  };
-  return {
-    hidden: true,
-    begin(id, plan) {
-      promptId = id;
-      details = { kind: "upscale", itemId, state: { quality: plan.quality, scale: plan.scale, width: plan.estimatedWidth, height: plan.estimatedHeight }, inputNames };
-      rememberHiddenRun(key, id, details);
-    },
-    setPromptId(value) {
-      // An older ComfyUI names the run itself.
-      if (details && value && value !== promptId) {
-        rememberHiddenRun(key, value, details);
-        releaseHiddenRun(promptId, { clean: true });
-      }
-      promptId = value;
-    },
-    patch(patch) {
-      if (patch.status === "error" || patch.status === "canceled") {
-        setRuntimeUpscale(itemId, null);
-        // An earlier upscale that worked stays; this attempt only leaves its reason.
-        try {
-          patchVaultItem(key, itemId, (item) => ({
-            upscale: item.upscale?.assetFile
-              ? { ...item.upscale, error: patch.error || "" }
-              : { status: patch.status, error: patch.error || "" }
-          }));
-        } catch { /* the item may be gone */ }
-        forget();
-        return;
-      }
-      setRuntimeUpscale(itemId, patch);
-    },
-    async finish(output, plan) {
-      let stored = false;
-      try {
-        await attachVaultUpscale(key, itemId, output, {
-          quality: plan.quality,
-          scale: plan.scale,
-          width: plan.estimatedWidth,
-          height: plan.estimatedHeight,
-          completedAt: new Date().toISOString(),
-          error: ""
-        });
-        stored = true;
-      } finally {
-        setRuntimeUpscale(itemId, null);
-        await forget({ stored });
-      }
     }
   };
 }
@@ -165,24 +100,19 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
     run.clock = clock;
     socket = watchUpscaleProgress(jobId, target, run);
     await waitForOpen(socket);
-    const hiddenPromptId = target.hidden ? crypto.randomUUID() : "";
-    if (hiddenPromptId) target.begin(hiddenPromptId, plan);
-    run.promptId = hiddenPromptId;
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt: graph, client_id: jobId, ...(hiddenPromptId ? { prompt_id: hiddenPromptId } : {}), extra_data: { preview_method: "none", ...(hiddenPromptId ? { heiss_hidden: true } : {}) } })
+      body: JSON.stringify({ prompt: graph, client_id: jobId, extra_data: { preview_method: "none" } })
     });
     // Canceled while ComfyUI was taking the prompt: take it back out instead of running it.
     if (jobs.get(jobId)?.terminalAt) {
       await cancelPrompt(queued.prompt_id).catch(() => null);
-      target.setPromptId?.(queued.prompt_id);
       target.patch({ status: "canceled", progress: null });
       socket?.close();
       return;
     }
     jobs.set(jobId, { ...jobs.get(jobId), status: "running", promptId: queued.prompt_id });
-    target.setPromptId?.(queued.prompt_id);
     run.promptId = queued.prompt_id;
     const tracker = promptTracker(queued.prompt_id);
     run.alive = tracker.alive;
@@ -207,16 +137,16 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         if (!output) throw new Error("The upscale ended without a saved result.");
         // ComfyUI as a worker: the upscale moves into HEISS media beside its source.
         let comfyCopies = [];
-        if (mediaStorageEnabled && !target.hidden) {
+        if (mediaStorageEnabled) {
           const moved = await ingestRunResults([{ output }], body.ownerId || "");
           output = moved.results[0].output;
           comfyCopies = moved.comfyFiles;
         }
-        // Learned from, unless it is Hidden's or its start was never heard.
+        // Learned from, unless its start was never heard.
         const startAt = clock.startAt();
-        if (startAt && !target.hidden) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
+        if (startAt) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
         await target.finish(output, plan);
-        setTerminalJob(jobId, { status: "done", outputs: target.hidden ? [] : [output] });
+        setTerminalJob(jobId, { status: "done", outputs: [output] });
         if (comfyCopies.length) {
           await flushGallery();
           await removeComfyFiles(comfyCopies);
@@ -251,7 +181,7 @@ function waitForOpen(socket) {
  * upscale arrow on a finished image. Smart upscale as part of a run is
  * run-upscale.js.
  */
-export function startUpscale({ item, imageName, quality, faceDetail = false, info, customWorkflow = null, hiddenKey = null }) {
+export function startUpscale({ item, imageName, quality, faceDetail = false, info, customWorkflow = null }) {
   const jobId = crypto.randomUUID();
   const body = {
     galleryItemId: item.id,
@@ -267,9 +197,7 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
   };
   const plan = upscalePlan(body);
   jobs.set(jobId, { status: "queued", kind: "upscale", ...(item.ownerId ? { ownerId: item.ownerId } : {}), galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
-  setTimeout(() => hiddenKey
-    ? runUpscaleJob(jobId, body, info, hiddenTarget(item.id, hiddenKey, [imageName]))
-    : runUpscaleJob(jobId, body, info), 0);
+  setTimeout(() => runUpscaleJob(jobId, body, info), 0);
   return { jobId, plan };
 }
 

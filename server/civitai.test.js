@@ -56,11 +56,3 @@ test("off by default; on, a finished PNG in the output folder carries it", async
   assert.match(info.text.parameters, /Size: 8x6/, "the file's own size, not the one asked for");
   assert.equal((await sharp(file).metadata()).width, 8);
 });
-
-test("never for Hidden", async () => {
-  const file = path.join(outputDir, "hidden.png");
-  fs.writeFileSync(file, await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } }).png().toBuffer());
-  const outputs = [{ url: `/comfy/view?${new URLSearchParams({ filename: "hidden.png", subfolder: "", type: "output" })}`, filename: "hidden.png", type: "image" }];
-  assert.equal(writeCivitaiParameters(outputs, { ...body, privateVault: true }), 0);
-  assert.equal(readPngInfo(file).text.parameters, undefined);
-});

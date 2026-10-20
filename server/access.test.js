@@ -11,7 +11,6 @@ process.env.COMFY_URL = "http://127.0.0.1:9";
 process.env.HEISS_ALLOW_LAN = "1";
 
 const access = await import("./access.js");
-const privacy = await import("./privacy.js");
 const { createGuessLimiter } = await import("./guess-limit.js");
 
 function response() {
@@ -108,29 +107,6 @@ test("the Connection settings are for signed-in devices only, though /api/access
   access.startDeviceSession(request("192.168.1.78"), signedIn);
   assert.equal(call(request("192.168.1.78", signedIn)).body.ok, true);
   assert.equal(call(request("127.0.0.1")).body.ok, true);
-});
-
-test("another device's Hidden unlock is tied to its sign-in and ends with it", async () => {
-  const key = await privacy.setupPrivacy("hidden password");
-  const signIn = response();
-  access.startDeviceSession(request("192.168.1.40"), signIn);
-  const unlock = response();
-  privacy.setUnlockCookie(unlock, key, 60 * 60 * 24 * 30, request("192.168.1.40", signIn));
-  const unlockCookie = [].concat(unlock.headers["Set-Cookie"]).join("\n");
-  assert.match(unlockCookie, /Max-Age=60479\d;/, "capped at the device session");
-  const both = { ...request("192.168.1.40", signIn), headers: { cookie: `${request("192.168.1.40", signIn).headers.cookie}; ${unlockCookie.split(";")[0]}` } };
-  assert.deepEqual(privacy.encryptionKeyFromRequest(both), key);
-  // The same unlock cookie on another device's sign-in, or none, opens nothing.
-  const other = response();
-  access.startDeviceSession(request("192.168.1.50"), other);
-  assert.equal(privacy.encryptionKeyFromRequest({ socket: { remoteAddress: "192.168.1.50" }, headers: { cookie: `${request("192.168.1.50", other).headers.cookie}; ${unlockCookie.split(";")[0]}` } }), null);
-  assert.equal(privacy.encryptionKeyFromRequest({ socket: { remoteAddress: "192.168.1.40" }, headers: { cookie: unlockCookie.split(";")[0] } }), null);
-  access.endAllDeviceSessions();
-  assert.equal(privacy.encryptionKeyFromRequest({ ...both, heissSession: undefined }), null);
-  // This computer's own unlock needs no device session.
-  const local = response();
-  privacy.setUnlockCookie(local, key, 120, request("127.0.0.1"));
-  assert.deepEqual(privacy.encryptionKeyFromRequest({ socket: { remoteAddress: "127.0.0.1" }, headers: { cookie: [].concat(local.headers["Set-Cookie"])[0].split(";")[0] } }), key);
 });
 
 test("guessing: a few free tries, then doubling lockouts, one try at a time, and this computer untouched", async () => {

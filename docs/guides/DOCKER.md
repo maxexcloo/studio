@@ -78,7 +78,7 @@ studio still runs, but the gallery stays empty.
 
 ## Notes
 
-- **Data**: the `heiss-data` volume keeps the gallery, the vault, downloads and
+- **Data**: the `heiss-data` volume keeps the gallery, downloads and
   saved settings across rebuilds and new containers. To use a folder instead
   (`-v /some/folder:/data`), make it writable for the container's user first:
   `sudo chown 1000:1000 /some/folder`.

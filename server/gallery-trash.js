@@ -16,8 +16,7 @@ import { forgetItemVideoPreviews } from './video-previews.js';
  * a batch.json listing the gallery records and where each file came from.
  * A batch can be put back until it is purged, after HEISS_TRASH_DAYS (30).
  *
- * Only what the gallery cleared goes in: Hidden lives in its own encrypted
- * store and is never part of a clear. Folders starting with a dot are not
+ * Only what the gallery cleared goes in. Folders starting with a dot are not
  * served as outputs (comfy.js), so the trash is not visible as one either.
  */
 
