@@ -1,14 +1,15 @@
 import { PromptField } from './PromptField';
-import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
+import { CatalogueFilters } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
-import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes';
-import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
+import { recipesFor } from './modelRecipes';
+import { modelName } from './catalogueNames';
+import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
-import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
+import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
 import { ItemActionSheet } from './ItemActionSurfaces';
 import { bulkItemActions, useItemActionHandlers } from './itemActions';
@@ -352,27 +353,19 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
 }
 
 function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
-  const { modelProfiles, model, pickModel, modelMenu } = view as { modelProfiles: Profile[]; model: string; pickModel: (id: string) => void; modelMenu?: { favorites: string[]; recents: string[]; toggleFavorite: (id: string) => void } };
-  const [query, setQuery] = React.useState('');
-  const [filters, setFilters] = React.useState(emptyCatalogueFilter);
-  React.useEffect(() => { if (!open) setQuery(''); }, [open]);
-  const profiles = React.useMemo(() => modelRecipeOptions(modelProfiles || [], model).sort(compareModelNames), [modelProfiles, model]);
-  const menu = recipeModelMenu(modelMenu, modelProfiles || [], model);
-  const favorites = new Set(menu?.favorites || []);
-  const needle = query.trim().toLowerCase();
-  const matches = (profile: Profile) => profileMatchesFilters(profile, filters, menu?.favorites) && (!needle || `${profile.displayName || ''} ${profile.label || ''} ${familyLabel(profile)} ${profile.model || ''}`.toLowerCase().includes(needle));
-  const starred = profiles.filter((profile) => favorites.has(profile.id) && matches(profile));
-  const rest = profiles.filter(matches);
+  const { modelProfiles, model, pickModel, modelMenu } = view as { modelProfiles: Profile[]; model: string; pickModel: (id: string) => void; modelMenu?: ModelMenuState };
+  const { profiles, menu, isFavourite, query, setQuery, filters, setFilters, sections, noMatchText } = useModelCatalogue(modelProfiles, model, modelMenu);
+  React.useEffect(() => { if (!open) setQuery(''); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const recipes = recipesFor(modelProfiles || [], model);
   const row = (profile: Profile) => (
     <div key={profile.id} className="phone-row-wrap">
       <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
         {profile.id === model ? <Check size={18} className="model-selection-tick" aria-hidden="true" /> : null}
         <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
-
       </button>
-      {modelMenu ? (
-        <button type="button" className={cn('phone-icon', favorites.has(profile.id) && 'is-on')} aria-pressed={favorites.has(profile.id)} aria-label={favorites.has(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => menu?.toggleFavorite(profile.id)}>
-          <Star size={18} fill={favorites.has(profile.id) ? 'currentColor' : 'none'} />
+      {menu ? (
+        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => menu.toggleFavorite(profile.id)}>
+          <Star size={18} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
         </button>
       ) : null}
     </div>
@@ -380,7 +373,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
   return (
     <Sheet open={open} onClose={onClose} title="Model" full className="phone-model-sheet">
       <div className="phone-model-tools">
-        {recipesFor(modelProfiles || [], model).length ? <label className="phone-row">Recipe<select aria-label="Recipe" value={model} onChange={(event) => pickModel(event.target.value)}>{recipesFor(modelProfiles || [], model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
+        {recipes.length ? <label className="phone-row">Recipe<select aria-label="Recipe" value={model} onChange={(event) => pickModel(event.target.value)}>{recipes.map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
         {profiles.length ? (
           <label className="phone-search picker-search">
             <Search size={17} aria-hidden="true" />
@@ -390,9 +383,8 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
       </div>
       {!profiles.length ? <p className="phone-empty">{(view.comfyStatus?.connected) ? 'No models yet. Add a model to ComfyUI to see it here.' : 'ComfyUI is offline. Models show up when it’s back.'}</p> : null}
-      {starred.length ? <><h3 className="phone-section">Favourites</h3><div className="phone-group">{starred.map(row)}</div></> : null}
-      {modelGroups(rest).map((group) => <React.Fragment key={group.id}><h3 className="phone-section">{group.label}</h3><div className="phone-group">{group.rows.map(row)}</div></React.Fragment>)}
-      {!starred.length && !rest.length ? <p className="phone-empty">{needle ? `Nothing matches “${query.trim()}”.` : 'No Models Match These Filters.'}</p> : null}
+      {sections.map((section) => <React.Fragment key={section.id}>{section.label ? <h3 className="phone-section">{section.label}</h3> : null}<div className="phone-group">{section.rows.map(row)}</div></React.Fragment>)}
+      {profiles.length && !sections.length ? <p className="phone-empty">{noMatchText}</p> : null}
     </Sheet>
   );
 }

@@ -1,5 +1,6 @@
-import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
-import { compareModelNames, modelFamily, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
+import { CatalogueFilters } from './CatalogueFilters';
+import { modelFamily, modelName } from './catalogueNames';
+import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
@@ -495,41 +496,12 @@ export function familyLabel(profile: Profile | null) {
   return modelFamily(profile);
 }
 
-/** What an unready model still lacks, in the words the gallery badges use; "" when it can run. */
-export function setupNote(profile: Profile | null) {
-  const missing = profile?.missing || [];
-  if (!missing.length) return "";
-  if (missing.some((item) => item.part === "comfy" && !item.nodePack)) return "Needs a newer ComfyUI";
-  if (missing.some((item) => item.nodePack)) return "Needs ComfyUI nodes";
-  return `Needs ${missing.length} file${missing.length === 1 ? "" : "s"}`;
-}
-
-/** Favorites and recents for the model menu, and how to change them. */
-export type ModelMenuState = {
-  favorites: string[];
-  /** Profile ids, most recently used first. */
-  recents: string[];
-  toggleFavorite: (id: string) => void;
-};
-
-function profileText(profile: Profile) {
-  return `${profile.displayName || ""} ${profile.label || ""} ${profile.description || ""} ${familyLabel(profile)} ${profile.model || ""}`.toLowerCase();
-}
+export type { ModelMenuState };
 
 /** The model file's size, quietly, and whether it fits the memory ComfyUI has (never a warning). */
 function sizeNote(profile: Profile, hardware: ReturnType<typeof useHardware>) {
   const bytes = Number(profile.weightBytes) || 0;
   return { size: formatDownload(bytes), fits: modelFits(hardware, bytes, profile.model) };
-}
-
-/** Metadata supplied by the model profile, shared by desktop and phone model menus. */
-export function modelDetails(profile: Profile) {
-  const name = modelName(profile);
-  const images = profile.mediaInputs?.filter(input => input.kind === "image") || [];
-  const capacity = images.length && images.every(input => Number.isFinite(input.max) && Number(input.max) > 0)
-    ? images.reduce((sum, input) => sum + Number(input.max), 0) : 0;
-  const references = capacity ? `${capacity} Reference Image${capacity === 1 ? "" : "s"}` : images.length ? "Reference Images" : "";
-  return [...new Set([name.detail, profile.label !== name.name ? profile.label : "", familyLabel(profile), profile.kind === "video" ? "Video" : "Image", references].filter(Boolean))].join(" · ");
 }
 
 /**
@@ -551,44 +523,24 @@ function ModelAbilities({ profile, showInpaint = true, onHover }: { profile: Pro
   );
 }
 
-export function ModelPicker({ value, profiles, showInpaint = true, onChange, compact = false, badges = {}, density = "full", emptyHint = "", onGetModels, onBrowseModels, menu }: { value: string; profiles: Profile[]; showInpaint?: boolean; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string>; density?: ControlDensity; emptyHint?: string; onFindModels?: () => void; onGetModels?: () => void; onBrowseModels?: () => void; strayCount?: number; menu?: ModelMenuState }) {
-  const [filters, setFilters] = useState(emptyCatalogueFilter);
+/** The desktop model menu. `profiles` and `menu` are the studio's own; recipes fold into one row each here. */
+export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true, onChange, compact = false, badges = {}, density = "full", emptyHint = "", onGetModels, onBrowseModels, menu: modelMenu }: { value: string; profiles: Profile[]; showInpaint?: boolean; onChange: (value: string) => void; compact?: boolean; badges?: Record<string, string>; density?: ControlDensity; emptyHint?: string; onFindModels?: () => void; onGetModels?: () => void; onBrowseModels?: () => void; strayCount?: number; menu?: ModelMenuState }) {
+  const { profiles, selected, menu, isFavourite, query, setQuery, filters, setFilters, sections, flat, noMatchText } = useModelCatalogue(modelProfiles, value, modelMenu);
   const hardware = useHardware();
   const [abilityRow, setAbilityRow] = React.useState("");
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(-1);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
-  const selected = profiles.find((profile) => profile.id === value) || profiles[0] || null;
   // The search clears once the menu has finished closing, so its list doesn't jump on the way out.
   const close = useCallback(() => setOpen(false), []);
   const presence = usePresence(open);
-  useEffect(() => { if (!presence.mounted) { setQuery(""); setCursor(-1); } }, [presence.mounted]);
+  useEffect(() => { if (!presence.mounted) { setQuery(""); setCursor(-1); } }, [presence.mounted]); // eslint-disable-line react-hooks/exhaustive-deps
   useDismiss(pickerRef, open, close);
   const searchable = profiles.length > 0;
   const menuId = React.useId();
-
-  const sections = React.useMemo(() => {
-    const matching = profiles.filter((profile) => profileMatchesFilters(profile, filters, menu?.favorites)).sort(compareModelNames);
-    const needle = query.trim().toLowerCase();
-    if (needle) {
-      const words = needle.split(/\s+/);
-      return [{ id: "results", label: "", rows: matching.filter((profile) => words.every((word) => profileText(profile).includes(word))) }];
-    }
-    if (!menu) return [{ id: "all", label: "", rows: matching }];
-    const favorites = new Set(menu.favorites);
-    const starred = matching.filter((profile) => favorites.has(profile.id));
-    // The rest by family, so seven Sana variants sit together instead of scattering.
-    const rest = matching;
-    return [
-      { id: "favorites", label: "Favourites", rows: starred },
-      ...modelGroups(rest)
-    ].filter((section) => section.rows.length);
-  }, [filters, menu, profiles, query]);
-  const flat = React.useMemo(() => sections.flatMap((section) => section.rows), [sections]);
 
   React.useLayoutEffect(() => {
     if (!open) return;
@@ -665,7 +617,6 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
     }
   };
 
-  const favorites = new Set(menu?.favorites || []);
   let rowIndex = -1;
   return (
     <div className={cn("model-picker", compact && "is-compact", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
@@ -705,7 +656,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                   {section.label ? <div className="model-menu-label">{section.label}</div> : null}
                   {section.rows.map((profile) => {
                     rowIndex += 1;
-                    const starred = favorites.has(profile.id);
+                    const starred = isFavourite(profile.id);
                     const badge = menu || /^recent$/i.test(badges[profile.id] || "") ? "" : badges[profile.id] || "";
                     const { size, fits } = sizeNote(profile, hardware);
                     return (
@@ -738,7 +689,7 @@ export function ModelPicker({ value, profiles, showInpaint = true, onChange, com
                   })}
                 </div>
               ))}
-              {!flat.length ? <div className="model-menu-none">{query ? `Nothing matches “${query.trim()}”.` : "No Models Match These Filters."}</div> : null}
+              {!flat.length ? <div className="model-menu-none">{noMatchText}</div> : null}
             </div>
           ) : null}
           {onBrowseModels ? <button type="button" className="model-option model-menu-browse" aria-label="Browse Models" onClick={() => { close(); onBrowseModels(); }}><span className="model-copy"><strong>Browse Models</strong><em>View Models & Workflows</em></span><SlidersHorizontal size={15} /></button> : null}
