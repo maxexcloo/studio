@@ -51,4 +51,3 @@ export const fallbackAspectPresets: Record<Mode, AspectPreset[]> = {
 export const fallbackSamplers = ["euler_ancestral", "euler", "uni_pc", "dpmpp_2m", "dpmpp_sde"];
 export const fallbackSchedulers = ["beta", "simple", "normal", "karras", "sgm_uniform"];
 export const githubUrl = `https://github.com/${releaseIdentity.repository}`;
-export const discordUrl = "https://discord.gg/Hf7ysvDeGa";

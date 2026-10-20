@@ -1,8 +1,6 @@
 import React from 'react';
 import { Bug, RotateCw } from 'lucide-react';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
-import { FeedbackHost } from './FeedbackDialog';
-import { openFeedback } from './feedback';
 import { copyText } from './api';
 
 /** The error as a report: message, then the top of the stack, without this page's address. */
@@ -50,16 +48,14 @@ function CrashScreen({ error, componentStack }: { error: Error; componentStack: 
             <ul>
               {culprits.map((c) => <li key={c.id}><strong>{c.title}.</strong> {c.hint}</li>)}
             </ul>
-            <p>Try those, then reload. If it keeps happening, report it.</p>
+            <p>Try those, then reload. If it keeps happening, copy the details for whoever runs Studio.</p>
           </div>
         ) : null}
         <div className="crash-actions">
           <button type="button" className="btn is-primary" onClick={() => location.reload()}><RotateCw size={14} /> Reload</button>
-          <button type="button" className="btn" onClick={() => openFeedback({ kind: 'bug', title: `Studio crashed: ${(error.message || error.name).slice(0, 90)}`, body: report, withSetup: true, from: 'crash' })}><Bug size={14} /> Report This Bug</button>
           <button type="button" className="btn is-ghost" onClick={() => copyWith(() => copyText(report))}><CopyIcon copied={Boolean(copied)} /> {copied ? 'Copied' : 'Copy details'}</button>
         </div>
       </div>
-      <FeedbackHost />
     </main>
   );
 }

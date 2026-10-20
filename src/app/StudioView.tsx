@@ -52,7 +52,6 @@ import { hasAccountStorageScope } from './api';
 import { GetModelsSheet, StarterModels } from './StarterModels';
 import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
-import { FeedbackHost } from './FeedbackDialog';
 import { ShortcutsSheet } from './shortcuts';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { useFocusTrap } from './useFocusTrap';
@@ -752,7 +751,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         />
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-      <FeedbackHost />
       {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</AdvancedPopover>}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}

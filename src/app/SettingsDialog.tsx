@@ -6,12 +6,10 @@ import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
 import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Boxes, Github, Info, LifeBuoy, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
-import { discordUrl, githubUrl } from './constants';
-import { DiscordIcon } from './DiscordIcon';
+import { githubUrl } from './constants';
 import { cn } from './format';
 import { BetaTag, NumberPicker, Skeleton, StudioSelect, Tip } from './components';
 import { Modal } from './Modal';
-import { HeatMark } from './HeatMark';
 import { apiFetch, apiJson } from './api';
 import type { ModelFile, Models, Profile, OutputFolderReport, UpscaleInstall, UpscaleStatus } from './types';
 import type { ModelFolders } from './useModelFolders';
@@ -22,7 +20,6 @@ import { useStarterPlan } from './StarterModels';
 import { InpaintDemo } from './InpaintDemo';
 import { AdapterLibraryGroup, CivitaiRow, EarlierImagesGroup, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
-import { openFeedback } from './feedback';
 import { HuggingFaceTokenSettings } from './HuggingFaceToken';
 import { AccountSettings } from './AccountSettings';
 import { ModelManifestGroup } from './ModelManifestSettings';
@@ -38,7 +35,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'models', label: 'Models', icon: Boxes, description: 'Installed models, integrations and output folders.' },
   { id: 'workers', label: 'Workers', icon: Plug, description: 'Reaching ComfyUI, restarting it and opening Studio on other devices.' },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Reset, clean up, export and diagnostics.' },
-  { id: 'about', label: 'About', icon: Info, description: 'Version, stats, links and credits.' }
+  { id: 'about', label: 'About', icon: Info, description: 'The version running here and where to find its source.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
@@ -613,14 +610,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             </button>
           );
         })}
-        <a className="set-nav-discord" href={discordUrl} target="_blank" rel="noreferrer">
-          <DiscordIcon size={13} />
-          <span>Join the Discord</span>
-        </a>
-        <button type="button" className="set-nav-feedback" onClick={() => openFeedback({ from: 'settings' })}>
-          <strong>Idea or Bug?</strong>
-          <span>Send it to the board</span>
-        </button>
       </nav>
 
       {/* A region named by its heading, so a screen reader hears where it landed. */}
@@ -796,7 +785,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               <HuggingFaceTokenSettings showToast={showToast} />
           
             </> : null}
-            {thisComputer ? <Group title="Folders">
+            {thisComputer && !accountMode ? <Group title="Folders">
               <OutputFolderRow
                 savedDir={paths.outputDir || ''}
                 galleryNote={galleryLoaded ? `${gallery.length} item${gallery.length === 1 ? '' : 's'} in the gallery` : undefined}
@@ -835,7 +824,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                   ? <button className="btn is-ghost" onClick={() => window.open(health?.comfyUrl || 'http://127.0.0.1:8188', '_blank')}><ExternalLink size={14} /> Open ComfyUI</button>
                   : <button className="btn is-primary" onClick={refreshHealth} disabled={comfyRestarting}>{comfyRestarting ? 'Waiting…' : 'Check Again'}</button>}
               </Row>
-              {thisComputer ? (
+              {thisComputer && !accountMode ? (
                 <ComfySearchRow enabled={health?.comfySearch !== false} onSaved={refreshHealth} />
               ) : (
                 <Row label="Restart ComfyUI" description="Loads new custom nodes and files, and frees memory.">
@@ -843,8 +832,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 </Row>
               )}
             </Group>
-            {thisComputer ? <RestartGroup confirmAction={confirmAction} onComfyBack={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
-            <OtherDevicesGroup
+            {thisComputer && !accountMode ? <RestartGroup confirmAction={confirmAction} onComfyBack={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
+            {accountMode ? null : <OtherDevicesGroup
               canChange={thisComputer}
               confirmAction={confirmAction}
               copyToClipboard={copyToClipboard}
@@ -853,7 +842,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               Row={Row}
               Status={Status}
               Switch={Switch}
-            />
+            />}
           </>
         ) : null}
 
@@ -890,65 +879,17 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
 
         {section === 'about' ? (
-          <>
-            <section className="about-hero">
-              <HeatMark className="about-mark" />
-              <p className="about-tagline">A local image and video studio for ComfyUI.</p>
-              {/* What staying local means, in numbers: everything made here stays here. */}
-              {stats ? (
-                <p className="about-value">
-                  {stats.outputs.toLocaleString()} {stats.videos ? 'images and videos' : stats.outputs === 1 ? 'image' : 'images'} made here · none uploaded · no telemetry
-                </p>
-              ) : null}
-              <div className="about-meta">
-                {appVersion ? (
-                  sinceRelease?.commits
-                    ? <span title={`${sinceRelease.commits} commit${sinceRelease.commits === 1 ? '' : 's'} since the ${sinceRelease.tag} release`}>v{appVersion} + {sinceRelease.commits}</span>
-                    : <span>v{appVersion}</span>
-                ) : null}
-                <span>MIT licensed</span>
-              </div>
-            </section>
-
-            <Group title="Stats" note={stats && stats.outputs ? <>Since {formatDay(stats.firstAt)} · {stats.activeDays} active day{stats.activeDays === 1 ? '' : 's'}{stats.busiestCount > 1 ? <> · busiest day {formatDay(stats.busiestDay)} with {stats.busiestCount}</> : null}.</> : undefined}>
-              <div className="about-stats">
-                {[
-                  { value: stats ? compact(stats.outputs) : null, label: 'Outputs', hint: stats ? `${compact(stats.images)} images · ${compact(stats.videos)} videos` : '' },
-                  { value: stats ? formatDuration(stats.renderMs) : null, label: 'Rendering', hint: stats?.upscales ? `${compact(stats.upscales)} upscaled` : 'time in ComfyUI' },
-                  { value: stats ? `${compact(stats.megapixels)} MP` : null, label: 'Pixels Made', hint: 'megapixels' },
-                  { value: stats ? `${stats.currentStreak} day${stats.currentStreak === 1 ? '' : 's'}` : null, label: 'Current Streak', hint: stats?.currentStreak ? '' : 'starts with today’s first image' },
-                  { value: stats ? `${stats.longestStreak} day${stats.longestStreak === 1 ? '' : 's'}` : null, label: 'Longest Streak', hint: '' },
-                  { value: stats ? (topWorkflowName || '—') : null, label: 'Most Used', hint: stats?.topWorkflowCount ? `${compact(stats.topWorkflowCount)} outputs` : '' }
-                ].map((tile) => (
-                  <div className="about-stat" key={tile.label}>
-                    <strong title={typeof tile.value === 'string' ? tile.value : undefined}>{tile.value ?? <Skeleton className="skeleton-text short" />}</strong>
-                    <span>{tile.label}</span>
-                    {tile.hint ? <small>{tile.hint}</small> : null}
-                  </div>
-                ))}
-              </div>
-            </Group>
-
-            <Group title="Links">
-              <div className="about-links">
-                <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={15} /><span>Source on GitHub</span><ExternalLink size={12} /></a>
-                <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer"><Scale size={15} /><span>MIT license</span><ExternalLink size={12} /></a>
-                <a href={`${githubUrl}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer"><ScrollText size={15} /><span>Changelog</span><ExternalLink size={12} /></a>
-              </div>
-            </Group>
-
-            <Group title="Credits">
-              <Row label="HEISS UI" description="Studio is a fork of HEISS UI and merges its model, workflow and studio work.">
-                <a className="btn is-ghost" href="https://github.com/tristmeister/HEISS-UI" target="_blank" rel="noreferrer"><ExternalLink size={13} /> HEISS UI</a>
-              </Row>
-              <Row label="J-AI Studio by Jasper" description="HEISS UI started as a fork of J-AI Studio. The prompt-first idea and much of the foundation are his work.">
-                <a className="btn is-ghost" href="https://github.com/jasperdevs/J-AI-Studio" target="_blank" rel="noreferrer"><ExternalLink size={13} /> J-AI Studio</a>
-              </Row>
-              <Row label="ComfyUI" description="Renders every image and video.">
-                <a className="btn is-ghost" href="https://github.com/comfyanonymous/ComfyUI" target="_blank" rel="noreferrer"><ExternalLink size={13} /> ComfyUI</a>
-              </Row>
-            </Group>
-          </>
+          <Group>
+            <Row label="Version" description={sinceRelease?.commits ? `${sinceRelease.commits} commit${sinceRelease.commits === 1 ? '' : 's'} since the ${sinceRelease.tag} release.` : 'The release running here.'}>
+              <span className="set-status">{appVersion ? `v${appVersion}` : <Skeleton className="skeleton-text short" />}</span>
+            </Row>
+            <Row label="Source" description="Studio's repository on GitHub.">
+              <a className="btn is-ghost" href={githubUrl} target="_blank" rel="noreferrer"><Github size={14} /> GitHub</a>
+            </Row>
+            <Row label="Changelog" description="What changed in each release.">
+              <a className="btn is-ghost" href={`${githubUrl}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer"><ScrollText size={14} /> Changelog</a>
+            </Row>
+          </Group>
         ) : null}
       </div>
     </Modal>
