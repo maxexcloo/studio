@@ -10,7 +10,7 @@ import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
 import { ViewerReuseAction } from './ViewerActions';
 import { shortLeft, upscaleLeftLine, upscaleTooltip, useUpscaleClock, type UpscaleNotice } from './useUpscale';
-import { useItemActionHandlers, useItemActions, type ItemAction, type ItemActionExtras } from './itemActions';
+import { useItemActionHandlers, useItemActions, type ItemAction, type ItemActionExtras, type ItemActionId } from './itemActions';
 import type { GalleryItem } from './types';
 
 /* Every surface that renders the shared item actions (itemActions.ts). */
@@ -155,9 +155,12 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
 const dockKeys: Partial<Record<ItemAction['id'], string>> = { star: 'F', delete: 'Del' };
 
 /** The desktop viewer dock's item actions, between the zoom controls and Details. */
+const dockOrder: ItemActionId[] = ['copyItem', 'download', 'star', 'upscale', 'compare', 'delete'];
+
 export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpscaleNotice }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; upscaleNotice?: UpscaleNotice; onDismissUpscaleNotice: () => void }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
-  const actions = useItemActions(item, 'dock', { compare });
+  // The dock's own order: copy and save first, then star, upscale and delete.
+  const actions = [...useItemActions(item, 'dock', { compare })].sort((a, b) => dockOrder.indexOf(a.id) - dockOrder.indexOf(b.id));
   const copy = useCopyFeedback();
   return (
     <>

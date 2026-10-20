@@ -75,7 +75,12 @@ test('swipes move through previews and generation details stay accessible', asyn
   const canvas = page.locator('.viewer-canvas');
   await expect(canvas).toBeVisible();
   for (const delta of [-200, 200, -200, 200]) {
-    await page.getByRole('button', { name: 'Fit Whole Image', exact: true }).click();
+    // Fitted: the phone's Fit button, or the desktop's percentage stepped round to it.
+    if (await ui.isPhone()) await page.getByRole('button', { name: 'Fit Whole Image', exact: true }).click();
+    else {
+      const percent = page.getByRole('button', { name: 'Image Zoom Percentage', exact: true });
+      for (let step = 0; step < 3 && await canvas.evaluate((element) => Math.abs(Number(getComputedStyle(element).getPropertyValue('--zoom')) - 1) > 0.001); step += 1) await percent.click();
+    }
     const before = await canvas.locator('img').getAttribute('src');
     await canvas.evaluate((element, delta) => {
       const rect = element.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;

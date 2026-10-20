@@ -83,7 +83,8 @@ export type ItemActionExtras = {
 
 // Where each action appears. Share is the phone's: its bar and sheet share where
 // they can, and download only where the share sheet cannot take the file to save it.
-// The desktop downloads and never shares.
+// The desktop downloads and never shares. The desktop viewer's dock keeps to
+// Copy, Download, Star, Upscale and Delete; the rest are in its menus and Details.
 const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   share: ['bar', 'sheet'],
   download: canShareFiles ? ['dock', 'tile', 'menu'] : ['bar', 'sheet', 'dock', 'tile', 'menu'],
@@ -94,10 +95,10 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   reuse: ['bar', 'sheet', 'menu'],
   copyPrompt: ['bar', 'sheet', 'tile', 'menu'],
   promptsOnly: ['sheet', 'menu'],
-  animate: ['bar', 'sheet', 'dock', 'menu'],
-  extend: ['bar', 'sheet', 'dock', 'menu'],
-  reference: ['sheet', 'dock', 'menu'],
-  move: ['bar', 'sheet', 'dock', 'tile', 'menu'],
+  animate: ['bar', 'sheet', 'menu'],
+  extend: ['bar', 'sheet', 'menu'],
+  reference: ['sheet', 'menu'],
+  move: ['bar', 'sheet', 'tile', 'menu'],
   select: ['sheet', 'menu'],
   delete: ['bar', 'sheet', 'dock', 'tile', 'menu'],
 };

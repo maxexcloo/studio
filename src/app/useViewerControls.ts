@@ -94,6 +94,28 @@ export function useViewerControls(view: any) {
     setViewerZoom(1);
     setViewerPan({ x: 0, y: 0 });
   }
+  /**
+   * The desktop's percentage button: Fit, then 1:1, then Full Size (the
+   * picture filling the whole viewer, edges cropped), and round again,
+   * skipping a step that would look the same as where it is.
+   */
+  function cycleViewerSize() {
+    const canvas = document.querySelector<HTMLElement>(active ? '.viewer-canvas' : '.zen-output');
+    const geometry = canvas ? measureViewer(canvas) : null;
+    const fill = geometry?.w && geometry.h ? Math.max((geometry.right - geometry.left) / geometry.w, (geometry.bottom - geometry.top) / geometry.h) : 1;
+    const steps: Array<['fit' | 'native' | 'fill', number]> = [['fit', 1], ['native', nativeZoomRef.current], ['fill', fill]];
+    const zoom = latestView.current.viewerZoom;
+    const near = (value: number) => Math.abs(value - zoom) < zoom * 0.01;
+    const at = steps.findIndex(([, value]) => near(value));
+    for (let offset = 1; offset <= steps.length; offset += 1) {
+      const [mode, value] = steps[(Math.max(at, -1) + offset + steps.length) % steps.length];
+      if (near(value)) continue;
+      if (mode === 'fit') fitViewer();
+      else if (mode === 'native') resetViewer('native');
+      else { sizeMode.current = 'manual'; setViewerZoom(value); setViewerPan({ x: 0, y: 0 }); }
+      return;
+    }
+  }
   const swipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swiping = useRef(false);
   const tapPointRef = useRef<Pan | null>(null);
@@ -653,5 +675,5 @@ export function useViewerControls(view: any) {
     // A pan ends where the finger left it.
     settleViewer(canvas, gesture.zoom, gesture.current, false);
   }
-  return { fitViewer, stepViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
+  return { fitViewer, cycleViewerSize, stepViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
 }

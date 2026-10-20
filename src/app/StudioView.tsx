@@ -582,7 +582,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </>
   );
 
-  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={() => resetViewer()} onFit={view.fitViewer} />;
+  // The desktop's percentage steps through Fit, 1:1 and Full Size; the phone keeps its buttons.
+  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={() => resetViewer()} onFit={view.fitViewer} onCycle={phone ? undefined : view.cycleViewerSize} />;
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">

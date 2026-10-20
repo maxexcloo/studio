@@ -32,10 +32,28 @@ for (const [width, height] of [[160, 100], [2400, 3600], [3600, 2400]]) test(`vi
   await expect(zoom.getByRole('button', { name: 'Zoom Out', exact: true })).toBeVisible();
   await zoom.getByRole('button', { name: 'Zoom In', exact: true }).click();
   await expect.poll(async () => (await drawn()).width).toBeGreaterThan(opened.width + 1);
-  await zoom.getByRole('button', { name: '1:1', exact: true }).click();
-  await expect.poll(async () => Math.abs((await drawn()).width - width)).toBeLessThan(2);
-  await zoom.getByRole('button', { name: 'Fit Whole Image', exact: true }).click();
-  await expect.poll(fitted).toBe(true);
+  // The phone has 1:1 and Fit buttons; the desktop's percentage steps through Fit, 1:1 and Full Size.
+  const percent = zoom.getByRole('button', { name: 'Image Zoom Percentage', exact: true });
+  const native = async () => Math.abs((await drawn()).width - width) < 2;
+  const reach = async (state: () => Promise<boolean>, button: string) => {
+    if (phone) await zoom.getByRole('button', { name: button, exact: true }).click();
+    else for (let step = 0; step < 3 && !await state(); step += 1) {
+      const before = await percent.textContent();
+      await percent.click();
+      await expect(percent).not.toHaveText(before!);
+    }
+    await expect.poll(state).toBe(true);
+  };
+  await reach(native, '1:1');
+  if (!phone) {
+    // Full Size fills the viewer: the picture covers the canvas both ways, edges cropped.
+    await percent.click();
+    await expect.poll(async () => {
+      const size = await drawn();
+      return size.width >= bounds!.width - 1 && size.height >= bounds!.height - 1 && Math.min(size.width - bounds!.width, size.height - bounds!.height) < 2;
+    }).toBe(true);
+  }
+  await reach(fitted, 'Fit Whole Image');
   const size = await drawn();
   if (phone) expect(Math.abs(opened.width - size.width)).toBeLessThan(2);
   expect(size.width / size.height).toBeCloseTo(width / height, 5);
