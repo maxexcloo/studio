@@ -352,7 +352,7 @@ export function loraStacks(familyKey: string, legacyWorkflowId = ''): LoraSnapsh
 
 export function saveLoraStack(familyKey: string, name: string, loras: LoraSelection[]) {
   // clientJobUuid, not crypto.randomUUID: the latter is missing over plain-HTTP LAN.
-  const snapshot: LoraSnapshot = { id: clientJobUuid(), name: name.trim() || 'Untitled stack', loras: normalizeLoras(loras) };
+  const snapshot: LoraSnapshot = { id: clientJobUuid(), name: name.trim() || 'Untitled Stack', loras: normalizeLoras(loras) };
   apply({ op: 'stack.add', key: familyKey, stack: snapshot }, 0);
   return snapshot;
 }

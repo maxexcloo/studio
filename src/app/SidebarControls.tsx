@@ -23,8 +23,8 @@ function WorkflowPreviewCard({ workflow, onOpen }: { workflow: WorkflowSummary |
     <button type="button" className="workflow-card" onClick={onOpen}>
       <div className="workflow-card-thumb"><GalleryHorizontalEnd size={18} /></div>
       <div className="workflow-card-info">
-        <strong>No model selected</strong>
-        <span>Browse models</span>
+        <strong>No Model Selected</strong>
+        <span>Browse Models</span>
       </div>
       <ChevronRight size={15} className="workflow-card-arrow" />
     </button>
@@ -115,7 +115,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           <span>Seed<small>{String(seed || "").trim() ? "The same picture every time" : "A new picture every time"}</small></span>
           <input inputMode="numeric" pattern="[0-9]*" value={seed} placeholder="Random" aria-label="Seed" onChange={(event) => setSeed(event.target.value.replace(/[^0-9]/g, ""))} />
         </label>
-        {String(seed || "").trim() ? <button type="button" className="phone-row" onClick={() => setSeed("")}><span>Back to random</span></button> : null}
+        {String(seed || "").trim() ? <button type="button" className="phone-row" onClick={() => setSeed("")}><span>Back to Random</span></button> : null}
       </div>
 
       {customSize && !aspectLocked ? (
@@ -128,15 +128,15 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
 
       {parts ? (
         <>
-          <h3 className="phone-section">Model parts</h3>
+          <h3 className="phone-section">Model Parts</h3>
           <div className="phone-group">
             {encoderSlots.length
               ? encoderSlots.map((slot: { slot: string; label: string; options: string[]; default: string }, index: number) => (
-                <PhoneSelect key={slot.slot} label={encoderSlots.length > 1 ? slot.label : "Text encoder"} value={textEncoders?.[index] || slot.default} options={slot.options} onChange={(value) => setTextEncoders((current: string[]) => { const next = [...(current || [])]; next[index] = value; return next; })} />
+                <PhoneSelect key={slot.slot} label={encoderSlots.length > 1 ? slot.label : "Text Encoder"} value={textEncoders?.[index] || slot.default} options={slot.options} onChange={(value) => setTextEncoders((current: string[]) => { const next = [...(current || [])]; next[index] = value; return next; })} />
               ))
               : currentProfile?.capabilities.textEncoder ? <PhoneSelect label="Text Encoder" value={textEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} onChange={setTextEncoder} /> : null}
             {showVae ? (
-              <PhoneSelect label="VAE" value={vae || (currentProfile.vaeBuiltIn ? "__builtin" : "")} options={[...(currentProfile.vaeBuiltIn ? [{ label: "Built into the checkpoint", value: "__builtin" }] : []), ...(profileOptions.vaes || models?.vaes || [])]} onChange={(value) => setVae(value === "__builtin" ? "" : value)} />
+              <PhoneSelect label="VAE" value={vae || (currentProfile.vaeBuiltIn ? "__builtin" : "")} options={[...(currentProfile.vaeBuiltIn ? [{ label: "Built into the Checkpoint", value: "__builtin" }] : []), ...(profileOptions.vaes || models?.vaes || [])]} onChange={(value) => setVae(value === "__builtin" ? "" : value)} />
             ) : null}
             {currentProfile?.capabilities.weightDtype ? <PhoneSelect label="Weight Type" value={weightDtype} options={profileOptions.weightDtypes || models?.weightDtypes || []} onChange={setWeightDtype} /> : null}
           </div>
@@ -168,7 +168,7 @@ export function SidebarControls({ view }: { view: any }) {
   // What the model's makers ship, one tap away once anything has moved from it.
   const backToRecommended = recommended?.differs ? (
     <button type="button" className="btn is-ghost sidebar-recommended" onClick={recommended.restore} title={`The steps, prompt strength, sampler and scheduler recommended for ${recommended.family || "this model"}`}>
-      <RotateCcw size={13} /> <span>Back to recommended</span>
+      <RotateCcw size={13} /> <span>Back to Recommended</span>
     </button>
   ) : null;
 
@@ -262,7 +262,7 @@ export function SidebarControls({ view }: { view: any }) {
               ) : null}
               {currentProfile?.encoderSlots
                 ? currentProfile.encoderSlots.filter((slot: { options: string[] }) => slot.options.length).map((slot: { slot: string; label: string; options: string[]; default: string }, index: number) => (
-                  <Field key={slot.slot} label={currentProfile.encoderSlots.length > 1 ? slot.label : "Text encoder"}>
+                  <Field key={slot.slot} label={currentProfile.encoderSlots.length > 1 ? slot.label : "Text Encoder"}>
                     <Select value={textEncoders?.[index] || slot.default} onChange={(value: string) => setTextEncoders((current: string[]) => {
                       const next = [...(current || [])];
                       next[index] = value;
@@ -271,13 +271,13 @@ export function SidebarControls({ view }: { view: any }) {
                   </Field>
                 ))
                 : currentProfile?.capabilities.textEncoder ? <Field label="Text Encoder"><Select value={textEncoder} onChange={setTextEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} /></Field> : null}
-              {currentProfile?.encoderBuiltIn ? <Field label="Text Encoder"><span className="encoder-slot-builtin">Built into the checkpoint</span></Field> : null}
+              {currentProfile?.encoderBuiltIn ? <Field label="Text Encoder"><span className="encoder-slot-builtin">Built into the Checkpoint</span></Field> : null}
               {currentProfile?.capabilities.vae && (currentProfile.vaeBuiltIn || (profileOptions.vaes || []).length) ? (
                 <Field label="VAE">
                   <Select
                     value={vae || (currentProfile.vaeBuiltIn ? "__builtin" : "")}
                     onChange={(value: string) => setVae(value === "__builtin" ? "" : value)}
-                    options={[...(currentProfile.vaeBuiltIn ? [{ label: "Built into the checkpoint", value: "__builtin" }] : []), ...(profileOptions.vaes || models?.vaes || [])]}
+                    options={[...(currentProfile.vaeBuiltIn ? [{ label: "Built into the Checkpoint", value: "__builtin" }] : []), ...(profileOptions.vaes || models?.vaes || [])]}
                   />
                 </Field>
               ) : null}

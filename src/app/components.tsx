@@ -430,7 +430,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
               </AnimatePresence>
               {note ? <p className="size-menu-note">{note}</p> : null}
             </div>
-            <div ref={listRef} className="aspect-list" role="listbox" aria-label={custom ? "Shape, at this size" : "Shape"} onPointerLeave={() => setHovered(null)} onKeyDown={(event) => {
+            <div ref={listRef} className="aspect-list" role="listbox" aria-label={custom ? "Shape, at This Size" : "Shape"} onPointerLeave={() => setHovered(null)} onKeyDown={(event) => {
               // Up and down move between shapes, previewing each on the way.
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
               event.preventDefault();
@@ -669,7 +669,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                             <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
                           </button></Tip>
                         {menu ? (
-                          <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from favorites` : `Add ${profile.displayName || profile.label} to favorites`} onClick={() => menu.toggleFavorite(profile.id)}>
+                          <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from Favourites` : `Add ${profile.displayName || profile.label} to Favourites`} onClick={() => menu.toggleFavorite(profile.id)}>
                             <Star size={13} fill={starred ? "currentColor" : "none"} />
                           </button>
                         ) : null}

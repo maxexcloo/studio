@@ -185,7 +185,7 @@ function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'e
                     <span className="prompt-history-text"><Highlighted text={row.entry.text} ranges={row.ranges} /></span>
                     <span className="prompt-history-meta">{meta(row.entry)}</span>
                   </button>
-                  <button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} title={row.entry.pinned ? 'Unstar' : 'Star to keep'} onClick={() => pin(row.entry)}>
+                  <button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar This Prompt' : 'Star This Prompt to Keep It'} title={row.entry.pinned ? 'Unstar' : 'Star to Keep'} onClick={() => pin(row.entry)}>
                     <Star size={13} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                   </button>
                   <button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove This Prompt" title="Remove" onClick={() => forget(row.entry)}>
@@ -237,7 +237,7 @@ export function PromptHistorySheet({ open, onClose, onPick, onError, kind = 'pos
                 <button type="button" className="phone-row" onClick={() => { onPick(row.entry.text); }}>
                   <span><span className="phone-history-text"><Highlighted text={row.entry.text} ranges={row.ranges} /></span><small>{meta(row.entry)}</small></span>
                 </button>
-                <button type="button" className={cn('phone-icon', row.entry.pinned && 'is-on')} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} onClick={() => { pin(row.entry); }}>
+                <button type="button" className={cn('phone-icon', row.entry.pinned && 'is-on')} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar This Prompt' : 'Star This Prompt to Keep It'} onClick={() => { pin(row.entry); }}>
                   <Star size={18} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                 </button>
                 <button type="button" className="phone-icon" aria-label="Remove This Prompt" onClick={() => forget(row.entry)}>

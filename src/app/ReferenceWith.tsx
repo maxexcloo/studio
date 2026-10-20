@@ -54,7 +54,7 @@ export function ReferenceWithButton({ profiles, onPick }: ReferenceWithChoice) {
   const close = React.useCallback(() => setOpen(false), []);
   return (
     <>
-      <Tip content="Choose a model that takes a reference image">
+      <Tip content="Choose a Model That Takes a Reference Image">
         <button type="button" data-open-trigger className={cn('ref-chip ref-add reference-with-trigger', open && 'is-open')} aria-label="Reference With" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           <ImagePlus size={15} strokeWidth={2.2} />
           <span className="ref-add-label"><span>Reference With</span></span>

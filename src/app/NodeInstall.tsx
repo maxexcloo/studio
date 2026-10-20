@@ -42,7 +42,7 @@ export function ShellCommand({ plan, showToast }: { plan: ShellPlan; showToast: 
           ))}
         </div>
       ) : null}
-      <CopyRow text={shell.command} label={`Copy the ${shell.label} command`} block showToast={showToast} />
+      <CopyRow text={shell.command} label={`Copy the ${shell.label} Command`} block showToast={showToast} />
     </>
   );
 }
@@ -100,7 +100,7 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
         <p className="upscale-fine">{state.canOverride
           ? <>You can install {pack.name} with ComfyUI’s own Python instead. It’s third-party code from {source || 'GitHub'} and runs inside ComfyUI.</>
           : <>Lower Manager’s security level if you trust {pack.name}, or install it yourself below.</>}</p>
-        {state.canOverride ? <button type="button" className="btn" onClick={() => start(true)}><Download size={14} /> Install anyway</button> : null}
+        {state.canOverride ? <button type="button" className="btn" onClick={() => start(true)}><Download size={14} /> Install Anyway</button> : null}
       </div>
     );
   }
@@ -117,7 +117,7 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
     <div className="node-quick">
       <button type="button" className="btn is-primary" onClick={() => start()} disabled={running}>
         {running ? <RotateCw size={14} className="is-spinning" /> : <Download size={14} />}
-        {running ? state.step || 'Installing…' : state?.status === 'error' ? 'Try again' : `Install ${pack.name}`}
+        {running ? state.step || 'Installing…' : state?.status === 'error' ? 'Try Again' : `Install ${pack.name}`}
         {running ? null : <BetaTag />}
       </button>
       {running ? <p className="upscale-fine">{state.route === 'manager' ? 'Installing through ComfyUI-Manager. ' : 'Installing with ComfyUI’s own Python. '}It can take a few minutes.</p> : null}
@@ -167,7 +167,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
     return (
       <div className="node-install">
         <QuickInstall pack={pack as NodePackInfo & { id: string }} showToast={showToast} onRestarted={onRestarted} afterRestart={afterRestart} onDone={(state) => { if (state?.status === 'error') setQuickError(state.error || 'The install stopped.'); if (state?.status === 'done') setInstalled(true); }} />
-        {installed ? null : <button type="button" className="comfy-restart-link node-install-manual" onClick={() => setManual(true)}>Install it yourself instead</button>}
+        {installed ? null : <button type="button" className="comfy-restart-link node-install-manual" onClick={() => setManual(true)}>Install It Yourself Instead</button>}
       </div>
     );
   }

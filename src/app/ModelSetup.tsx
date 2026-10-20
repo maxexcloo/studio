@@ -164,7 +164,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
 
   if (!missing.length && shownDone?.length) {
     return (
-      <section className={cn('model-setup', `is-${variant}`, 'is-ready')} aria-label={alsoNeedsNodes ? 'Files in place' : `${name} is ready`} role="status">
+      <section className={cn('model-setup', `is-${variant}`, 'is-ready')} aria-label={alsoNeedsNodes ? 'Files in Place' : `${name} Is Ready`} role="status">
         <header className="model-setup-head">
           <div>
             {/* Files alone do not make an imported workflow ready while its custom nodes are missing. */}
@@ -258,11 +258,11 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         </div>
         {profile.setupGuide ? (
           // A family with its own guided setup: the same parts, with the choices that come before them.
-          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!, profile.id)}>Guided setup</button>
+          <button type="button" className="btn" onClick={() => openFamilySetup(profile.setupGuide!, profile.id)}>Guided Setup</button>
         ) : null}
         {startable.length > 1 && !outdated ? (
           <button type="button" className={cn('btn', short ? 'is-ghost' : 'is-primary')} onClick={getAll}>
-            <Download size={14} /> Get all{remainingBytes ? ` · ${formatBytes(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}
+            <Download size={14} /> Get All{remainingBytes ? ` · ${formatBytes(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}
           </button>
         ) : null}
       </header>
@@ -398,7 +398,7 @@ function SetupRowHead({ item, rowState, children }: { item: MissingPart; rowStat
 function SetupRowShell({ item, rowState }: { item: MissingPart; rowState: RowState }) {
   return (
     <li className={cn('model-setup-item', `is-${rowState}`)}>
-      <SetupRowHead item={item} rowState={rowState}><span className="model-setup-meta">In place</span></SetupRowHead>
+      <SetupRowHead item={item} rowState={rowState}><span className="model-setup-meta">In Place</span></SetupRowHead>
     </li>
   );
 }
@@ -425,7 +425,7 @@ function DiscardButton({ file, receivedBytes, onDiscard }: { file: string; recei
   if (asking) {
     return <button type="button" className="btn is-danger-soft" onClick={() => { setAsking(false); onDiscard(); }}>Discard {formatBytes(receivedBytes) || 'it'}?</button>;
   }
-  return <button type="button" className="btn is-ghost is-icon" aria-label={`Discard partial download of ${file}`} title="Discard" onClick={() => setAsking(true)}><X size={14} /></button>;
+  return <button type="button" className="btn is-ghost is-icon" aria-label={`Discard Partial Download of ${file}`} title="Discard" onClick={() => setAsking(true)}><X size={14} /></button>;
 }
 
 function RowActions({ rowState, download, current, remote, run, start, pause, discard }: {
@@ -460,9 +460,9 @@ function RowActions({ rowState, download, current, remote, run, start, pause, di
     return <a className="btn" href={download.url.replace('/resolve/', '/blob/')} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Hugging Face</a>;
   }
   if (rowState === 'error') {
-    return <button type="button" className="btn" onClick={() => run(() => start(download.id))}><RotateCw size={13} /> {current?.retryable === false ? 'Try again' : 'Resume'}</button>;
+    return <button type="button" className="btn" onClick={() => run(() => start(download.id))}><RotateCw size={13} /> {current?.retryable === false ? 'Try Again' : 'Resume'}</button>;
   }
-  if (rowState === 'landed') return <span className="model-setup-meta">In place</span>;
+  if (rowState === 'landed') return <span className="model-setup-meta">In Place</span>;
   return (
     <>
       {!remote ? (

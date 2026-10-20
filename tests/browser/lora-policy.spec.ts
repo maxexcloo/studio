@@ -34,11 +34,11 @@ test('optional LoRAs show unverified variants and expose full published strength
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
-  const value = page.getByLabel('Published Slider strength value', { exact: true }).filter({ visible: true });
+  const value = page.getByLabel('Published Slider Strength Value', { exact: true }).filter({ visible: true });
   await value.fill('10');
   await value.press('Enter');
   await expect(value).toHaveValue('10.00');
-  const slider = page.getByLabel('Published Slider strength', { exact: true }).filter({ visible: true });
+  const slider = page.getByLabel('Published Slider Strength', { exact: true }).filter({ visible: true });
   await expect(slider).toHaveAttribute('min', '-3');
   await expect(slider).toHaveAttribute('max', '10');
   await value.press('ArrowUp');
@@ -88,7 +88,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await row.focus();
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-checked', 'true');
-  const strength = picker.getByLabel('Cards Two strength value', { exact: true });
+  const strength = picker.getByLabel('Cards Two Strength Value', { exact: true });
   await expect(strength).toBeVisible();
   await strength.fill('1.25');
   await strength.press('Enter');
@@ -114,7 +114,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(strength).toHaveCount(0);
   await row.click();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
-  await expect(page.getByLabel('Cards Two strength value', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
   await picker.getByRole('button', { name: /^Save Stack/ }).click();
   await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
   await picker.getByRole('button', { name: 'Save', exact: true }).click();

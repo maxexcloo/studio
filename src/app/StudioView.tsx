@@ -460,7 +460,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
             <motion.div key="simple" {...dockChip}>
               <button type="button" className="dock-chip" onClick={() => setPrefs({ fullStudioOnPhone: false })}>
                 <Smartphone size={14} />
-                <span>Simple view</span>
+                <span>Simple View</span>
               </button>
             </motion.div>
           ) : null}
@@ -544,7 +544,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           {renderedGallery.length ? <ConnectedCard at={comfyReconnectedAt} device={comfyStatus?.device} /> : null}
             {galleryLoaded && hasMoreGallery ? (
               <button className="gallery-load-more" onClick={loadMoreGalleryItems}>
-                Load more
+                Load More
               </button>
             ) : null}
     </>
@@ -683,7 +683,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <RunCard key={zenDisplayItem.run.id} run={zenDisplayItem.run} onOpen={() => showRunInGallery(zenDisplayItem.run)} />
             ) : zenDisplayItem ? (
               <button
-                aria-label={zenDisplayItem.status === "pending" ? "Generating" : "Open in the viewer"}
+                aria-label={zenDisplayItem.status === "pending" ? "Generating" : "Open in the Viewer"}
                 className={cn("zen-output", viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging", zenDisplayItem.status === "pending" && "is-pending")}
                 onClick={() => {
                   if (zenDisplayItem.status === "pending") return;
@@ -885,7 +885,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
                                       <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
                                       <i aria-hidden="true" />
-                                      <span className="detail-lora-strength" aria-label={`strength ${lora.strength}`}>{lora.strength}</span>
+                                      <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
                                     </li>
                                   ))}
                                 </ul>

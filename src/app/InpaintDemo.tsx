@@ -343,7 +343,7 @@ export function InpaintDemo() {
       <div className="inpaint-demo-prompt">
         <span className="inpaint-demo-text"><span>Prompt</span>{PROMPT}</span>
         {phase === "done" ? (
-          <button type="button" className="btn" onClick={again}><RotateCcw size={14} /> Paint again</button>
+          <button type="button" className="btn" onClick={again}><RotateCcw size={14} /> Paint Again</button>
         ) : (
           <button type="button" className={cn("btn is-primary", history.painted && phase === "paint" && "is-ready")} disabled={!history.painted || phase !== "paint"} onClick={generate}>
             {phase === "working" ? "Making it…" : "Generate"}

@@ -257,7 +257,7 @@ export function useGenerationActions(view: any) {
             const message = job.error || "Generation failed";
             galleryPatch((item: GalleryItem) => item.jobId === jobId ? { ...item, status: "error", optimistic: false, filename: message } : item);
             const failed = firstItemOf.get(jobId);
-            showToast(message, "error", failed ? { action: { label: "See why", onClick: () => setActive({ ...failed, status: "error", optimistic: false, filename: message }) } } : undefined);
+            showToast(message, "error", failed ? { action: { label: "See Why", onClick: () => setActive({ ...failed, status: "error", optimistic: false, filename: message }) } } : undefined);
             setStatus(message);
             return job;
           }
@@ -328,15 +328,15 @@ export function useGenerationActions(view: any) {
     // Its pictures are done and only Smart upscale is left: stopping keeps them.
     if (runItems.some((item) => item.progress?.upscaling)) {
       if (!await confirmAction({
-        title: "Stop the upscale?",
+        title: "Stop the Upscale?",
         description: many ? "The pictures are done and stay, at the size they were generated." : "The picture is done and stays, at the size it was generated.",
-        action: "Stop upscale"
+        action: "Stop Upscale"
       })) return;
       await stopJob(jobId, { keep: true });
       return;
     }
     if (!await confirmAction({
-      title: many ? `Stop all ${runSize} variants?` : "Stop generation?",
+      title: many ? `Stop All ${runSize} Variants?` : "Stop Generation?",
       description: many ? "They’re one run, so they stop together. Nothing is saved." : "It won’t be saved.",
       action: many ? "Stop all" : "Stop",
       destructive: true
@@ -347,7 +347,7 @@ export function useGenerationActions(view: any) {
   async function stopJob(jobId: string, { keep = false } = {}) {
     const response = await apiFetch(`/api/jobs/${jobId}/cancel`, { method: "POST" }).catch(() => null);
     if (!response?.ok) {
-      showToast("Couldn’t stop it. It may still be running in ComfyUI.", "error", { action: { label: "Try again", onClick: () => stopJob(jobId, { keep }) } });
+      showToast("Couldn’t stop it. It may still be running in ComfyUI.", "error", { action: { label: "Try Again", onClick: () => stopJob(jobId, { keep }) } });
       return;
     }
     // Kept pictures arrive with the run's next poll; the tiles stay until then.
@@ -357,7 +357,7 @@ export function useGenerationActions(view: any) {
   }
 
   async function cancelQueue() {
-    if (!await confirmAction({"title": "Stop all generations?", "description": "Running and queued generations and upscales stop.", "action": "Stop all", "destructive": true})) return;
+    if (!await confirmAction({"title": "Stop All Generations?", "description": "Running and queued generations and upscales stop.", "action": "Stop All", "destructive": true})) return;
     await stopQueue();
   }
 
@@ -366,7 +366,7 @@ export function useGenerationActions(view: any) {
     queueRevision.current += 1;
     const response = await apiFetch("/api/queue/cancel", { method: "POST" }).catch(() => null);
     if (!response?.ok) {
-      showToast("Couldn’t stop the queue. Generations may still be running in ComfyUI.", "error", { action: { label: "Try again", onClick: stopQueue } });
+      showToast("Couldn’t stop the queue. Generations may still be running in ComfyUI.", "error", { action: { label: "Try Again", onClick: stopQueue } });
       return;
     }
     // A run already upscaling keeps its pictures; they arrive with the next gallery update.
@@ -377,9 +377,9 @@ export function useGenerationActions(view: any) {
   async function clearGallery() {
     const where = outputDir ? ` in ${outputDir}` : " in ComfyUI’s output folder";
     if (!await confirmAction({
-      title: "Delete all finished images?",
+      title: "Delete All Finished Images?",
       description: `Their files${where} move to Studio’s trash there for 30 days.`,
-      action: "Delete all",
+      action: "Delete All",
       destructive: true
     })) return;
     const data = await apiJson<GalleryPayload & { files?: { deleted: number; skipped: number }; trash?: { batch: string; moved: number; days: number } }>("/api/gallery/clear", { method: "POST" }).catch(() => null);
@@ -407,7 +407,7 @@ export function useGenerationActions(view: any) {
   }
 
   async function clearFailedItems() {
-    if (!await confirmAction({"title": "Clear failed generations?", "description": "Removes failed and interrupted items from the gallery.", "action": "Clear", "destructive": true})) return;
+    if (!await confirmAction({"title": "Clear Failed Generations?", "description": "Removes failed and interrupted items from the gallery.", "action": "Clear", "destructive": true})) return;
     const data = await apiJson<GalleryPayload>("/api/gallery/errors/clear", { method: "POST" }).catch(() => null);
     if (!data) { showToast("Couldn’t clear failed generations", "error"); return; }
     setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));
@@ -415,7 +415,7 @@ export function useGenerationActions(view: any) {
   }
 
   async function resetAllSettings() {
-    if (!await confirmAction({"title": "Reset all settings?", "description": "Preferences, prompt drafts and saved LoRA stacks are deleted here and on the server. The page reloads. This can’t be undone.", "action": "Reset", "destructive": true, "irreversible": true})) return;
+    if (!await confirmAction({"title": "Reset All Settings?", "description": "Preferences, prompt drafts and saved LoRA stacks are deleted here and on the server. The page reloads. This can’t be undone.", "action": "Reset", "destructive": true, "irreversible": true})) return;
     // The signed-in account's own copies, and the unscoped single-user ones.
     for (const key of ["heiss-ui-draft", "heiss-ui-prefs"]) {
       localStorage.removeItem(key);
@@ -434,7 +434,7 @@ export function useGenerationActions(view: any) {
   }
 
   async function clearAllCache() {
-    if (!await confirmAction({"title": "Clear cache?", "description": "Clears cached previews and frees ComfyUI’s memory. The gallery isn’t affected.", "action": "Clear", "destructive": false})) return;
+    if (!await confirmAction({"title": "Clear Cache?", "description": "Clears cached previews and frees ComfyUI’s memory. The gallery isn’t affected.", "action": "Clear", "destructive": false})) return;
     await clearCaches();
   }
 
@@ -443,7 +443,7 @@ export function useGenerationActions(view: any) {
       await caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => null);
     }
     const data = await apiFetch("/api/cache/clear", { method: "POST" }).then((res) => res.ok ? res.json() : null).catch(() => null);
-    if (!data) { showToast("Couldn’t clear ComfyUI’s cache", "error", { action: { label: "Try again", onClick: clearCaches } }); return; }
+    if (!data) { showToast("Couldn’t clear ComfyUI’s cache", "error", { action: { label: "Try Again", onClick: clearCaches } }); return; }
     setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));
     showToast("Cache cleared", "removed");
     setStatus("Ready");
@@ -550,7 +550,7 @@ export function useGenerationActions(view: any) {
   async function freeMemoryAndRetry(item: GalleryItem) {
     const response = await apiFetch("/api/comfy/free", { method: "POST" }).catch(() => null);
     if (!response?.ok) {
-      showToast("Couldn’t reach ComfyUI to free its memory", "error", { action: { label: "Try again", onClick: () => freeMemoryAndRetry(item) } });
+      showToast("Couldn’t reach ComfyUI to free its memory", "error", { action: { label: "Try Again", onClick: () => freeMemoryAndRetry(item) } });
       return;
     }
     await retryFailed(item, { tiledDecode: Boolean(item.failure?.retry?.tiledDecode) });

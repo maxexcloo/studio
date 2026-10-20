@@ -261,13 +261,13 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
   return (
     // Not a <label>: a label's click would focus the field at the end of every drag.
     <div className={cn("size-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
-      <Tip content={`Drag to change the ${label.toLowerCase()}`}>
+      <Tip content={`Drag to Change the ${label}`}>
         <span className="size-field-key" {...handlers} aria-hidden="true">{axis}</span>
       </Tip>
       <input
         ref={input}
         inputMode="numeric"
-        aria-label={`${label} in pixels`}
+        aria-label={`${label} in Pixels`}
         value={draft}
         onFocus={(event) => { setEditing(true); onStart(); event.currentTarget.select(); }}
         onBlur={() => { setEditing(false); commit(); }}
@@ -415,7 +415,7 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
       <div className={cn("size-fields", linked && "is-linked", fresh && "is-fresh")}>
         <SizeField axis="W" value={size.width} limits={limits.width} onStart={begin} onChange={setWidth} />
         <Tip content={linked ? "Linked: the shape stays as you resize. Click to unlink" : "Unlinked: width and height change on their own. Click to link"}>
-          <button type="button" className="size-link" aria-pressed={linked} aria-label={linked ? "Unlink width and height" : "Link width and height"} onClick={() => { begin(); setFresh(true); setLinked((value) => !value); }} onPointerLeave={() => setFresh(false)}>
+          <button type="button" className="size-link" aria-pressed={linked} aria-label={linked ? "Unlink Width & Height" : "Link Width & Height"} onClick={() => { begin(); setFresh(true); setLinked((value) => !value); }} onPointerLeave={() => setFresh(false)}>
             {/* Keyed, so each change plays the icon's turn (37-size-menu.css). */}
             <span key={linked ? "linked" : "apart"} className="size-link-icon">{linked ? <Link2 size={14} strokeWidth={2.2} /> : <Unlink2 size={14} strokeWidth={2.2} />}</span>
           </button>
