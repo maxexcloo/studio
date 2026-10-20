@@ -391,8 +391,8 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
 
   const pick = (row: SizeRow) => {
     if (custom && onCustomRatio) { onCustomRatio(presetRatio(row.shape)); return; }
+    // The panel stays open, so a resolution and a shape can be picked in one go.
     onChange(row.value);
-    setOpen(false);
   };
 
   return (
@@ -465,7 +465,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                     saved={item}
                     active={savedMatch?.id === item.id}
                     // From Default or 2K it switches to Custom and closes, like any pick there; in Custom it stays open.
-                    onPick={() => { onPickSaved(item); if (!custom) setOpen(false); }}
+                    onPick={() => onPickSaved(item)}
                     onRename={(name) => onRenameSize?.(item.id, name)}
                     onRemove={() => { setHovered(null); onRemoveSize?.(item.id); }}
                     onPreview={(on) => setHovered((current) => on ? savedRow(item) : current?.key === savedRow(item).key ? null : current)}

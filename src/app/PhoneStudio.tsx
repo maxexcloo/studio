@@ -462,8 +462,8 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
  *
  * There is no hover on a phone, so a finger resting on a row shows its frame
  * on the stage, and the saved sizes' Rename and Remove wait behind Edit
- * rather than hiding under a pointer. Picking from Default or 2K closes the
- * sheet, as the desktop menu closes; in Custom a shape keeps the area.
+ * rather than hiding under a pointer. Picking keeps the sheet open, as the
+ * desktop panel stays open; in Custom a shape keeps the area.
  */
 function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
   const {

@@ -30,10 +30,14 @@ for (const supported of [0, 1, 2]) test(`native resolution choices follow model 
     await expect(menu.getByRole('radio', { name: '4K', exact: true })).toHaveCount(0);
     await menu.getByRole('radio', { name: '2K', exact: true }).click();
   } else {
-    await expect(menu.getByRole('radio')).toHaveCount(0);
-    await menu.getByRole('combobox', { name: 'Resolution', exact: true }).click();
-    await page.getByRole('option', { name: '4K', exact: true }).click();
+    // A segmented toggle of the native options, however many.
+    await expect(menu.getByRole('radio')).toHaveCount(3);
+    await menu.getByRole('radio', { name: '4K', exact: true }).click();
   }
+  // The panel stays open, so a shape can be picked in the same go.
+  await expect(menu).toBeVisible();
+  const shape = menu.locator('.aspect-option, .phone-size-row').filter({ hasText: /1:1|Square/ }).first();
+  if (await shape.count()) { await shape.click(); await expect(menu).toBeVisible(); }
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await ui.generate.click();

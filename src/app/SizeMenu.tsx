@@ -2,7 +2,7 @@ import React from 'react';
 import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
-import { StudioSelect, Tip } from './components';
+import { Tip } from './components';
 import { fitRatio, formatMp, MEGAPIXEL, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
 import type { AspectPreset, NativeSupport, SavedSize } from './types';
@@ -157,9 +157,8 @@ export function SizeTabs({ tiers, value, onChange }: { tiers: SizeTier[]; value:
   return <div className="size-tier-controls">
     {resolutions.length > 1 ? <div className="size-resolution">
       <span className="aspect-upscale-head">Resolution</span>
-      {resolutions.length > 2
-        ? <StudioSelect ariaLabel="Resolution" value={selected} options={resolutions.map(tier => ({ label: tierLabels[tier], value: tier }))} onChange={next => onChange(next as SizeTier)} />
-        : <div className="aspect-upscale-tabs" role="radiogroup" aria-label="Resolution" style={{ '--tab-index': index, '--tab-count': resolutions.length } as React.CSSProperties} onKeyDown={event => {
+      {/* One segmented toggle of the model's native resolutions, however many it has. */}
+      {<div className="aspect-upscale-tabs" role="radiogroup" aria-label="Resolution" style={{ '--tab-index': index, '--tab-count': resolutions.length } as React.CSSProperties} onKeyDown={event => {
           if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
           event.preventDefault();
           event.stopPropagation();
