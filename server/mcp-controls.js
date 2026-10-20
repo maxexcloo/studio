@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Which Generate arguments a profile lets MCP adjust; fixed controls are never advertised.
+import { referenceImageSize } from './generation-defaults.js';
 import { loraCompatibility, strengthRange } from './lora-policy.js';
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
@@ -225,4 +226,49 @@ export function prepareLoras(profile, infos = {}, loras = []) {
     stack.push({ name, strength: Number.isFinite(strength) ? strength : range?.default ?? 0.7 });
   }
   return stack;
+}
+
+const orientations = { landscape: 'landscape', wide: 'landscape', horizontal: 'landscape', portrait: 'portrait', tall: 'portrait', vertical: 'portrait', square: 'square' };
+const longSides = { '2k': 2048, '4k': 4096 };
+/**
+ * The width and height for an aspect ("landscape", "portrait", "square" or a ratio such as 16:9)
+ * and a size ("2k" or "4k"): the profile's own preset for the aspect, scaled to the long side the
+ * profile draws natively. Null when neither is given, so the saved size applies.
+ */
+export function mcpSize(profile, { aspect, size } = {}) {
+  if (!aspect && !size) return null;
+  const label = profile.label || profile.id;
+  const defaults = profile.defaults || {};
+  const presets = (profile.aspectPresets || []).filter(item => item.w > 0 && item.h > 0);
+  let width = Number(defaults.width) || 1024;
+  let height = Number(defaults.height) || width;
+  if (aspect) {
+    const key = String(aspect).trim().toLowerCase().slice(0, 20);
+    const orientation = orientations[key];
+    const ratio = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(key);
+    if (!orientation && !(ratio && Number(ratio[1]) > 0 && Number(ratio[2]) > 0)) throw new Error(`Choose aspect from landscape, portrait, square or a ratio such as 16:9.`);
+    const shape = (w, h) => w > h ? 'landscape' : w < h ? 'portrait' : 'square';
+    const wanted = orientation ? null : Number(ratio[1]) / Number(ratio[2]);
+    // The profile's own preset when one fits, in its own order; otherwise the ratio at its default pixel count.
+    const preset = orientation
+      ? presets.find(item => shape(item.w, item.h) === orientation)
+      : presets.find(item => Math.abs(Math.log(item.w / item.h) - Math.log(wanted)) < 0.02);
+    if (preset) ({ w: width, h: height } = preset);
+    else {
+      const [rw, rh] = orientation ? { landscape: [16, 9], portrait: [9, 16], square: [1, 1] }[orientation] : [wanted, 1];
+      const fitted = referenceImageSize(profile, { width: rw * 1000, height: rh * 1000 });
+      if (fitted) ({ width, height } = fitted);
+    }
+  }
+  if (size) {
+    if (profile.kind !== 'image' || !profile.native?.[size]) throw new Error(`${label} does not draw ${size.toUpperCase()} natively. Omit size, choose another profile, or use upscale_quality for a larger image.`);
+    const scale = longSides[size] / Math.max(width, height);
+    const snap = (value, range = {}) => {
+      const step = Number(range.step) || 16;
+      return Math.max(Number(range.min) || step, Math.min(Number(range.max) || 16384, Math.round(value / step) * step));
+    };
+    width = snap(width * scale, profile.constraints?.width);
+    height = snap(height * scale, profile.constraints?.height);
+  }
+  return { width, height };
 }

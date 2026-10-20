@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Aspect and size in chat:** Generate takes `aspect` (`landscape`, `portrait`, `square` or a ratio such as `16:9`) and `size` (`2k` or `4k`) and uses the profile's own native preset sizes instead of invented pixel sizes.
+
+### Changed
+- **Fast by default in chat:** without a tier, Generate and Reuse animation pick the fastest tier available (Fast, then Super Fast, Standard and Quality). A `profile_id` such as "flux 3" or "FLUX.3" matches its family and picks that family's fastest profile, and near misses list the fastest first. An exact ID or an explicit tier still wins.
+- **Batches in one call:** Generate's description and errors say that N different images are N prompts in one call. `count` is variations per prompt, and a `count` equal to the number of prompts is read as one each. The call waits for all its jobs against one shared deadline, and a refusal such as the outstanding-job limit names its reason.
+- **Prompting guides once per conversation:** every pick (exact, by family name or by tier) carries a compact prompting guide of at most 1,200 characters the first time a conversation uses a profile. Studio marks the guide as sent before it waits, so concurrent calls never repeat it.
+
 ## [0.29.0] - 2026-10-20
 
 > One image per chat request, AI Control restarts from chat, and a gallery that follows the viewer

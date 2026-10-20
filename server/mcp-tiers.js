@@ -3,6 +3,8 @@
 import { isLocalVideoProfile } from './comfy-backends.js';
 
 export const mcpTiers = ['quality', 'standard', 'fast', 'turbo'];
+/** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
+export const preferredTiers = ['fast', 'turbo', 'standard', 'quality'];
 const labels = { 'super fast': 'turbo', fast: 'fast', quality: 'quality', standard: 'standard' };
 
 /** A profile's tier; a label without a tier segment counts as standard. */
@@ -20,17 +22,37 @@ export function profilesForTier(profiles, tier) {
   return matching.length || tier !== 'standard' ? matching : profiles.filter(profile => tierOf(profile) === 'quality');
 }
 
+/** Profiles in preferred tier order (Fast first), keeping catalogue order within a tier. */
+export function fastestFirst(profiles) {
+  const rank = (profile) => preferredTiers.indexOf(tierOf(profile));
+  return [...profiles].sort((left, right) => rank(left) - rank(right));
+}
+
+/** The profiles of the first preferred tier that has any. */
+function fastestTier(profiles) {
+  for (const tier of preferredTiers) {
+    const matching = profiles.filter(profile => tierOf(profile) === tier);
+    if (matching.length) return matching;
+  }
+  return profiles;
+}
+
 const squash = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-/** The profile a name means: its id, then a unique id or label match ignoring case and punctuation, then a unique partial match. */
+/**
+ * The profile a name means: its id, then an id, label or family match ignoring case and punctuation,
+ * then a partial match. Several matches from one family ("flux 3" for every FLUX.3 profile) resolve
+ * to its fastest profile; matches across families find nothing.
+ */
 export function findProfile(profiles, value) {
   const exact = profiles.find(profile => profile.id === value);
   if (exact) return exact;
   const key = squash(value);
   if (!key) return null;
-  const names = (profile) => [profile.id, profile.label, profile.displayName, String(profile.label || '').split('·')[0]].map(squash).filter(Boolean);
+  const names = (profile) => [profile.id, profile.label, profile.displayName, String(profile.label || '').split('·')[0], profile.family].map(squash).filter(Boolean);
   for (const pick of [profile => names(profile).includes(key), profile => names(profile).some(name => name.includes(key))]) {
     const found = profiles.filter(pick);
     if (found.length === 1) return found[0];
+    if (found.length > 1 && found[0].family && found.every(profile => profile.family === found[0].family)) return fastestFirst(found)[0];
   }
   return null;
 }
@@ -48,10 +70,10 @@ const fits = (profile, references) => {
 };
 
 /**
- * The profile Studio uses when Generate names a kind and tier instead of a profile_id:
- * the deployment default when it fits, then its family, then unrestricted, then catalogue order.
- * `firstFrame` (animating an image) prefers first-frame profiles and, without a tier or a
- * first-frame deployment default, the fast tier. `profiles` is already limited to this
+ * The profile Studio uses when Generate names a kind and tier instead of a profile_id. Without a
+ * tier, the first preferred tier (Fast, Super Fast, Standard, Quality) that fits. Within it, the
+ * deployment default, then its family, then unrestricted, then catalogue order. `firstFrame`
+ * (animating an image) prefers first-frame profiles. `profiles` is already limited to this
  * account's ready profiles of the kind.
  */
 export function chooseProfile(profiles, { kind, tier, defaultId, references = 0, firstFrame = false }) {
@@ -62,13 +84,9 @@ export function chooseProfile(profiles, { kind, tier, defaultId, references = 0,
     const available = mcpTiers.filter(item => profilesForTier(profiles, item).length);
     throw new Error(`No ready ${kind} profile${tier ? ` in the ${tier} tier` : ''} is available to this account${references ? ` for ${references} reference${references > 1 ? 's' : ''}` : ''}. Available ${kind} tiers: ${available.join(', ')}.`);
   }
-  let pool = usable;
   const frames = firstFrame ? usable.filter(takesFirstFrame) : [];
-  if (frames.length) {
-    // A chat follow-up wants a quick animation, so Fast first-frame profiles lead unless a tier or the default says otherwise.
-    const fast = tier || frames.some(profile => profile.id === defaultId) ? [] : profilesForTier(frames, 'fast');
-    pool = fast.length ? fast : frames;
-  }
+  let pool = frames.length ? frames : usable;
+  if (!tier) pool = fastestTier(pool);
   const score = (profile) => [profile.id === defaultId, Boolean(fallback?.family) && profile.family === fallback.family, !profile.restricted].reduce((total, value) => total * 2 + Number(value), 0);
   return pool.reduce((best, profile) => score(profile) > score(best) ? profile : best);
 }

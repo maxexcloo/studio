@@ -22,6 +22,8 @@ const shortAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234
 const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
 const previewSize = 1024;
 export const maxResultWaitSeconds = 1500;
+/** Jobs one Generate call may queue: every prompt times count. */
+export const maxJobsPerCall = 4;
 const aborted = (signal) => {
   const error = new Error('The wait ended because the request was cancelled. The generation continues; collect it later with Result.');
   error.aborted = true;
@@ -91,7 +93,7 @@ export class McpMedia {
     if (!response.ok) {
       // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
       let reason = '';
-      if ([400, 403, 409, 422].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
+      if ([400, 403, 409, 422, 429].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
       throw new Error(reason ? `Studio refused the request: ${reason}` : `Studio refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
     }
     return response;
@@ -196,7 +198,10 @@ export class McpMedia {
       controls.autoUpscale = { quality: upscale_quality, faceDetail: face_detail };
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
-    if (prompts.length * runs > 4) throw new Error('Submit at most four jobs at a time.');
+    if (prompts.length * runs > maxJobsPerCall) {
+      const fix = prompts.length > 1 ? `For ${prompts.length} different images, pass the ${prompts.length} prompts without count.` : `Pass count ${maxJobsPerCall} or less.`;
+      throw new Error(`count is images per prompt, so ${prompts.length} prompt${prompts.length > 1 ? 's' : ''} × count ${runs} would queue ${prompts.length * runs} jobs; one call queues at most ${maxJobsPerCall}. ${prompts.length > maxJobsPerCall ? `Pass at most ${maxJobsPerCall} prompts.` : fix}`);
+    }
     const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.
@@ -219,7 +224,8 @@ export class McpMedia {
           queued.push({ job_id: id, ...this.handle(owner, scope, id), status: 'unknown' });
           return { status: 'partially_queued', jobs: queued, error: 'The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.' };
         }
-        if (queued.length) return { status: 'partially_queued', jobs: queued, error: 'Further submission failed; retain returned jobs before retrying.' };
+        // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
+        if (queued.length) return { status: 'partially_queued', jobs: queued, error: `Further submission failed; retain returned jobs before retrying. ${error.message}` };
         throw error;
       }
     }
@@ -506,9 +512,11 @@ export class McpMedia {
     // One unfinished job sends the whole submission to Result, so stop waiting for the rest.
     const stop = new AbortController();
     const linked = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
+    // One shared deadline: the submission's jobs render together and the whole wait never exceeds `seconds`.
+    const deadline = Date.now() + seconds * 1000;
     const jobs = await Promise.all(submission.jobs.map(async ({ job_id }) => {
       // A finer poll than Result's: every second counts while the chat waits.
-      const job = await this.job(owner, job_id, seconds, { signal: linked, interval: 1000 });
+      const job = await this.job(owner, job_id, Math.max(0, (deadline - Date.now()) / 1000), { signal: linked, interval: 1000 });
       if (!finished.has(job.status) || !job.outputs?.some(item => mcpOutputPath(item?.url))) throw new Error('Unfinished.');
       return job;
     })).catch(() => { stop.abort(); return null; });

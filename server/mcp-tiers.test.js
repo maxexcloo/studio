@@ -17,7 +17,7 @@ test('a profile is found by id, then by a unique id or label match ignoring case
   assert.equal(findProfile(profiles, 'Krea 2 Turbo')?.id, 'krea-2-turbo');
   assert.equal(findProfile(profiles, 'QWEN_image')?.id, 'qwen-image');
   assert.equal(findProfile(profiles, 'qwen')?.id, 'qwen-image', 'a unique partial match');
-  assert.equal(findProfile(profiles, 'krea'), null, 'an ambiguous partial match finds nothing');
+  assert.equal(findProfile(profiles, 'krea'), null, 'an ambiguous partial match across unknown families finds nothing');
   assert.equal(findProfile(profiles, ''), null);
 });
 
@@ -28,14 +28,16 @@ test('the chosen profile prefers the default, then its family, then unrestricted
     { id: 'kin', label: 'K · Fast', family: 'qwen', restricted: true },
     { id: 'default', label: 'D · Quality', family: 'qwen' }
   ];
-  assert.equal(chooseProfile(profiles, { kind: 'image', defaultId: 'default' }).id, 'default');
+  // Without a tier, Fast leads; the default's family wins within it.
+  assert.equal(chooseProfile(profiles, { kind: 'image', defaultId: 'default' }).id, 'kin');
+  assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'quality', defaultId: 'default' }).id, 'default');
   assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'fast', defaultId: 'default' }).id, 'kin');
   assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'fast', defaultId: 'missing' }).id, 'plain');
   assert.throws(() => chooseProfile(profiles, { kind: 'image', tier: 'turbo' }), /Available image tiers: quality, standard, fast\./);
   assert.throws(() => chooseProfile([], { kind: 'video' }), /No ready video profile/);
 });
 
-test('animating prefers a fast first-frame profile unless a tier or a first-frame default is given', () => {
+test('animating prefers a fast first-frame profile unless a tier is given', () => {
   const frame = [{ id: 'reference', kind: 'image', label: 'Optional First Frame' }];
   const reference = [{ id: 'reference', kind: 'image', label: 'Reference Image' }];
   // Shaped like the Bento H3 catalogue: Ref2VA, FL2VA and text-only profiles across tiers.
@@ -52,7 +54,7 @@ test('animating prefers a fast first-frame profile unless a tier or a first-fram
   const animate = (options) => chooseProfile(profiles, { kind: 'video', references: 1, firstFrame: true, ...options }).id;
   assert.equal(animate({ defaultId: 'text' }), 'fl-fast');
   assert.equal(animate({ defaultId: 'ref-fast' }), 'fl-fast');
-  assert.equal(animate({ defaultId: 'fl-quality' }), 'fl-quality');
+  assert.equal(animate({ defaultId: 'fl-quality' }), 'fl-fast');
   assert.equal(animate({ defaultId: 'text', tier: 'quality' }), 'fl-quality');
   // Without a first-frame profile, any profile that takes the image still animates it.
   assert.equal(chooseProfile(profiles.filter(profile => !takesFirstFrame(profile)), { kind: 'video', references: 1, firstFrame: true }).id, 'ref-fast');
@@ -69,4 +71,31 @@ test('the remote video fallback uses only cloud profiles that fit, preferring th
   assert.equal(chooseRemoteVideo([local, cloud, fast], { tier: 'fast', references: 1, firstFrame: true }).id, 'cloud');
   assert.equal(chooseRemoteVideo([local, fast], { references: 1, firstFrame: true }), null);
   assert.equal(chooseRemoteVideo([local], {}), null);
+});
+
+test('without a tier the order is Fast, Super Fast, Standard, Quality', () => {
+  const profiles = [
+    { id: 'q', label: 'Q · Quality' },
+    { id: 's', label: 'S · Standard' },
+    { id: 't', label: 'T · Super Fast' },
+    { id: 'f', label: 'F · Fast' }
+  ];
+  const pick = (list) => chooseProfile(list, { kind: 'image', defaultId: 'q' }).id;
+  assert.equal(pick(profiles), 'f');
+  assert.equal(pick(profiles.slice(0, 3)), 't');
+  assert.equal(pick(profiles.slice(0, 2)), 's');
+  assert.equal(pick(profiles.slice(0, 1)), 'q');
+  assert.equal(chooseProfile(profiles, { kind: 'image', tier: 'quality' }).id, 'q', 'an explicit tier still wins');
+});
+
+test('a family name such as "flux 3" picks its fastest profile, and an exact id still wins', () => {
+  const profiles = [
+    { id: 'custom:bento-image-flux3-klein-base-int8', label: 'FLUX.3 [klein] Base · Quality · 50 Steps', family: 'flux3_klein' },
+    { id: 'custom:bento-image-flux3-klein-distilled-int8', label: 'FLUX.3 [klein] Distilled · Fast · 16 Steps', family: 'flux3_klein' },
+    { id: 'flux-2-klein', label: 'Flux.2 Klein 9B · Fast', family: 'flux2_klein' }
+  ];
+  for (const name of ['flux 3', 'flux3', 'FLUX.3', 'FLUX.3 [klein]', 'flux3 klein']) assert.equal(findProfile(profiles, name)?.id, 'custom:bento-image-flux3-klein-distilled-int8', name);
+  assert.equal(findProfile(profiles, 'custom:bento-image-flux3-klein-base-int8')?.id, 'custom:bento-image-flux3-klein-base-int8');
+  assert.equal(findProfile(profiles, 'FLUX.3 Base')?.id, undefined, 'words out of order are not a name');
+  assert.equal(findProfile(profiles, 'klein'), null, 'matches across families stay ambiguous');
 });

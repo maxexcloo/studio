@@ -6,16 +6,16 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { hostAllowed } from './request-guard.js';
-import { closest, mcpControls, mcpGenerationCount, mcpLoras } from './mcp-controls.js';
-import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
+import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
+import { McpMedia, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
-import { findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
+import { fastestFirst, findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
 export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
 // Workflow rules only; tool descriptions and each reply carry the details, so hosts that resend these every step stay small.
-const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; pass a model the user names as profile_id and LoRAs the user names as loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the watch links and end the turn. Call Result only when the user asks to see a result. Never poll, resubmit or invent results.`;
+const instructions = `For an ordinary image or video request, call Generate once with kind, tier and a clear prompt per distinct image that keeps the user's intent ("landscape" or "16:9" after a request is aspect, "2k" is size); pass the model and LoRAs the user names as profile_id and loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the watch links and end the turn. Call Result only when the user asks to see a result. Never poll, resubmit or invent results.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const anonymousMessage = 'The gateway must forward its user identity.';
@@ -31,6 +31,17 @@ const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('A job_id or ref such as "result 3".') };
 const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
 const tier = z.enum(mcpTiers).describe('turbo is Super Fast.');
+// A prompting guide is long; chat gets its essentials once, and Models returns the full guide.
+const maxGuideCharacters = 1200;
+/** A profile guide's essentials as one capped paragraph: summary, rules and pitfalls, without sources or examples. */
+export function compactGuide(guide) {
+  if (!guide || typeof guide !== 'object') return '';
+  const parts = [];
+  const add = (value) => { for (const item of [value].flat()) if (typeof item === 'string' && item.trim()) parts.push(item.replace(/\s+/g, ' ').trim()); };
+  for (const source of [guide, guide.mode, guide.variant]) if (source && typeof source === 'object') { add(source.summary); add(source.rules); add(source.pitfalls); }
+  const textValue = parts.join(' ');
+  return textValue.length > maxGuideCharacters ? `${textValue.slice(0, maxGuideCharacters - 1)}…` : textValue;
+}
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
@@ -57,10 +68,15 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
   const inflight = new Map();
   const inflightKey = (actor, requestId) => JSON.stringify([actor.scope, actor.owner, String(requestId)]);
-  const guideKey = (owner, profileId) => JSON.stringify([owner, profileId]);
-  const review = (owner, profileId) => {
+  // A guide goes to each conversation once (each account and profile without a conversation header).
+  const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
+  /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
+  const review = (refs, profileId) => {
+    const key = guideKey(refs, profileId);
+    if (reviewedGuides.has(key)) return false;
     if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
-    reviewedGuides.set(guideKey(owner, profileId), Date.now());
+    reviewedGuides.set(key, Date.now());
+    return true;
   };
   const guard = (req, res, next) => {
     res.set('Cache-Control', 'private, no-store');
@@ -130,16 +146,16 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     });
     const resolve = (value) => media.resolve(owner, refs, value);
     /** A submission's reply: finished markdown when every job ends within the wait, otherwise watch links for the queued jobs, which end the agent's turn. */
-    const respond = async (submission, profile, waitSeconds, signal, guide = {}) => {
+    const respond = async (submission, profile, waitSeconds, signal, guide = '') => {
       const label = profile.label || profile.id;
       // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
       const note = profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${label}; tell the user. ` : '';
       // Quick jobs come back finished, so the agent needs no Result call.
       const seconds = waitSeconds ?? (profile.kind === 'video' ? 0 : imageWaitSeconds);
       const markdown = await media.settle(owner, submission, seconds, { signal });
-      const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) }, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...guide };
-      // An unread prompting guide follows the reply, so the agent applies it to later prompts.
-      const extra = guide.prompting ? [{ type: 'text', text: `Prompting guide for ${label}, not read before this submission; apply it to later prompts: ${JSON.stringify(guide.prompting)}` }] : [];
+      const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) }, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...(guide ? { prompting: guide } : {}) };
+      // The profile's guide follows its first use in a conversation, so the agent applies it to later prompts.
+      const extra = guide ? [{ type: 'text', text: `Prompting guide for ${label} (sent once; Models with profile_id has the full guide); apply it to later prompts: ${guide}` }] : [];
       if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.\n\n${markdown}` }, ...extra], structuredContent: structured };
       const watch = submission.jobs.map(({ ref, link }) => `[Watch ${ref}](${link})`).join('\n');
       const message = submission.status === 'queued'
@@ -147,12 +163,24 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         : `${submission.error} ${note}Share the watch links; never resubmit.`;
       return { content: [{ type: 'text', text: `${message}\n\n${watch}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
     };
-    /** A ready profile by id or a unique name match; otherwise the closest few, so one call corrects a guess. */
+    /** A ready profile by id or name, the fastest of one family's matches; otherwise the closest few, fastest first, so one call corrects a guess. */
     const profileNamed = (profiles, value) => {
       const found = findProfile(profiles, value);
       if (found) return found;
-      const near = closest(profiles, value, profile => [profile.id, profile.label, tierOf(profile)]);
+      const near = closest(fastestFirst(profiles), value, profile => [profile.id, profile.label, tierOf(profile)]);
       throw new Error(`No ready profile matches ${value}.${near.length ? ` Closest: ${near.map(profile => `${profile.id} (${profile.label || profile.id})`).join(', ')}.` : ' Call Models for the list.'}`);
+    };
+    /** Queues a submission, attaching the profile's guide when this conversation has not had it; marked before any wait. */
+    const submit = async (profile, args) => {
+      const fresh = review(refs, profile.id);
+      try {
+        const queued = await media.queue(owner, args, refs);
+        return { queued, guide: fresh ? compactGuide(prompting(profile, true)) : '' };
+      } catch (error) {
+        // A refused submission delivered no guide, so the next attempt carries it.
+        if (fresh) reviewedGuides.delete(guideKey(refs, profile.id));
+        throw error;
+      }
     };
     const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions: scope === 'control' ? controlInstructions : instructions });
     const toolError = server.createToolError.bind(server);
@@ -174,7 +202,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const { loras, total, more, missing } = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
           return mcpJson({ id: profile.id, loras, loras_total: total, ...(more ? { more_matches: more } : {}), ...(missing ? { missing } : {}) });
         }
-        review(owner, profile.id);
+        review(refs, profile.id);
         // Defaults only for adjustable controls: a fixed value is not something to choose.
         const defaults = Object.fromEntries(Object.entries({ ...profile.defaults, count: mcpGenerationCount }).filter(([key]) => controls[key] || ['frames', 'fps', 'duration'].includes(key)));
         const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
@@ -191,24 +219,22 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Generate one output unless the user asks for more; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. For N different images pass N prompts in ONE call (at most four jobs; count is images per prompt). Pass kind and tier; Studio picks the profile. profile_id (an id, label or family) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. One output unless the user asks for more. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
-        width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('Default 1. Set only when the user asks for more, such as 2 for "a couple" or 3 for "a few".'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
+        aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
+        width: z.number().int().positive().optional(), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('Variations per prompt, default 1.'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
-      }, async ({ kind, tier: wanted, wait_seconds, ...args }, signal) => {
-        // Without a profile_id Studio chooses, so there is no guide for the agent to have read first.
-        const chosen = args.profile_id === undefined ? await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0, loras: args.loras || [] }) : null;
-        const profileId = chosen?.id ?? profileNamed(await media.profiles('all', owner), args.profile_id).id;
-        const reviewed = reviewedGuides.get(guideKey(owner, profileId));
-        // An unread guide accompanies the submission instead of costing a refused call and another round trip.
-        const unread = !chosen && (reviewed === undefined || Date.now() - reviewed >= 3600000);
-        const submission = await media.queue(owner, { ...args, profile_id: profileId }, refs);
-        const profile = chosen || (await media.profiles('all', owner)).find(item => item.id === profileId);
-        let guide = {};
-        if (unread && profile) guide = { prompting: prompting(profile, true) };
-        if (chosen || unread) review(owner, profileId);
-        return respond(submission, profile || { id: profileId }, wait_seconds, signal, guide);
+      }, async ({ kind, tier: wanted, wait_seconds, aspect, size, ...args }, signal) => {
+        // "count: 4" beside four prompts means one image each, not sixteen.
+        if (args.count > 1 && args.count === args.prompts.length && args.count * args.prompts.length > maxJobsPerCall) args.count = 1;
+        const profile = args.profile_id === undefined
+          ? await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0, loras: args.loras || [] })
+          : profileNamed(await media.profiles(kind || 'all', owner), args.profile_id);
+        const sized = mcpSize(profile, { aspect, size });
+        if (sized && (args.width !== undefined || args.height !== undefined)) throw new Error('Pass aspect and size, or width and height, not both.');
+        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id });
+        return respond(submission.queued, profile, wait_seconds, signal, submission.guide);
       });
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
         const id = resolve(job_id);
@@ -241,8 +267,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (kind !== own && own === 'video') throw new Error('A video result can only run again as a video.');
         if (kind === own && wanted) throw new Error('tier applies only when animating an image; call Generate for another tier.');
         const { profile, args } = kind === own ? await media.rerun(owner, item, { prompt, count }) : await media.animate(owner, id, output_index, item, { tier: wanted, prompt, count });
-        review(owner, profile.id);
-        return respond(await media.queue(owner, args, refs), profile, wait_seconds, signal);
+        const submission = await submit(profile, args);
+        return respond(submission.queued, profile, wait_seconds, signal, submission.guide);
       });
     } else {
       const control = async (method, route, body) => {
