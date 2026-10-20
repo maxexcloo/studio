@@ -166,7 +166,8 @@ export function useGenerationActions(view: any) {
         width: native ? native.width : width,
         height: native ? native.height : height,
         steps,
-        cfg,
+        // A profile without CFG (distilled) runs at its own guidance; a stored CFG never reaches it.
+        ...(currentProfile?.capabilities?.cfg !== false ? { cfg } : {}),
         denoise,
         sampler,
         scheduler,
