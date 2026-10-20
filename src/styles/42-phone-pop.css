@@ -243,3 +243,74 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
   translate: none;
 }
 .phone-bar .status-pill-panel { top: calc(env(safe-area-inset-top) + var(--bar-h) + 6px); }
+
+/* -------------------------------------------------------------- Focused text (useTextFocus)
+   A focused Prompt or Negative is the only thing on screen, as tall as the room above the
+   keyboard: its actions in a row along its top with Done at the end, nothing to scroll under it. */
+.phone-sheet.phone-create.is-text-focus {
+  height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(8px, env(safe-area-inset-top)));
+  max-height: none;
+  padding-bottom: 8px;
+}
+.phone-create.is-text-focus :is(.phone-sheet-grab, .phone-sheet-foot, .create-options, .phone-ref-role) { display: none; }
+.phone-create.is-text-focus .phone-sheet-body { overflow: hidden; padding-top: 8px; }
+.phone-create.is-text-focus .create-flow { min-height: 100%; height: 100%; }
+.phone-create.is-text-focus .create-prompts { flex: 1 1 auto; min-height: 0; }
+.phone-create.is-text-focus .composer-prompt-field:not(.is-text-focused) { display: none; }
+.create-prompts .composer-prompt-field.is-text-focused { flex: 1 1 auto; flex-direction: column; min-height: 0; padding-right: 0; border-color: rgb(255 255 255 / .16); }
+.create-prompts .composer-prompt-field.is-text-focused textarea { order: 2; flex: 1 1 auto; height: auto !important; min-height: 0; max-height: none; overflow-y: auto; padding: 6px 14px 12px !important; }
+.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools {
+  position: static;
+  order: 1;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 0;
+  transform: none;
+}
+.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools .prompt-action { width: 44px; height: 44px; }
+.create-prompts .composer-prompt-field.is-text-focused .prompt-select-all { display: inline-grid; }
+.create-prompts .composer-prompt-field.is-text-focused .prompt-done {
+  order: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  margin-left: 4px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+/* A long field in Settings (the profile JSON) focused on the phone: Settings fits the visible
+   height and the field covers it, with its name and Done along the top. */
+.settings-modal:has(.text-focus-field.is-text-focused) {
+  position: fixed;
+  top: var(--vv-top, 0px);
+  left: 0;
+  right: 0;
+  width: auto;
+  height: var(--vv-height, 100dvh);
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+}
+.text-focus-field.is-text-focused {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: max(8px, env(safe-area-inset-top)) 8px 8px;
+  background: var(--glass-panel-solid);
+}
+.text-focus-bar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding-left: 8px; }
+.text-focus-bar strong { font-size: 15px; font-weight: 650; }
+.text-focus-bar .text-focus-done { min-height: 44px; padding: 0 18px; }
+.text-focus-field.is-text-focused .profile-editor-text { flex: 1 1 auto; height: auto; min-height: 0; }

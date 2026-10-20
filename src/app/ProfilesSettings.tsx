@@ -6,6 +6,8 @@ import { lineDiff } from './lineDiff';
 import { Group, Row, SaveRow, Status } from './SettingsControls';
 import type { ShowToast } from './toast';
 import { cn } from './format';
+import { usePhone } from './device';
+import { useTextFocus } from './useTextFocus';
 
 type Editable = { id: string; profileId: string; name: string; kind: 'image' | 'video'; family: string; readable: boolean; edited: { editedAt: string; by: string } | null };
 type Loaded = { id: string; text: string; hash: string; edited: Editable['edited'] };
@@ -18,6 +20,8 @@ const jsonBody = (method: string, body: unknown) => ({ method, headers: { 'conte
  * Studio's copy.
  */
 export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast; onSaved?: () => void }) {
+  // On the phone the editor takes the whole screen above the keyboard while it has the focus.
+  const focus = useTextFocus(usePhone());
   const [list, setList] = React.useState<Editable[] | null>(null);
   const [listError, setListError] = React.useState('');
   const [id, setId] = React.useState('');
@@ -98,7 +102,9 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
     </Group>
     <Group title="JSON" note={parseError ? undefined : `${lines} line${lines === 1 ? '' : 's'}`}>
       <div className="profile-editor">
-        {loaded ? <textarea className={cn('profile-editor-text', parseError && 'is-invalid')} aria-label="Profile JSON" aria-invalid={Boolean(parseError)} spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
+        {loaded ? <div {...focus.bind} className={cn('text-focus-field', focus.focused && 'is-text-focused')}>
+          {focus.focused ? <div className="text-focus-bar"><strong>Profile JSON</strong><button type="button" className="btn is-primary text-focus-done" {...focus.keepFocus} onClick={focus.done}>Done</button></div> : null}
+          <textarea className={cn('profile-editor-text', parseError && 'is-invalid')} aria-label="Profile JSON" aria-invalid={Boolean(parseError)} spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
           // Tab indents inside the editor; Escape leaves it for the keyboard.
           if (event.key !== 'Tab' || event.shiftKey) return;
           event.preventDefault();
@@ -106,7 +112,8 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
           const { selectionStart: from, selectionEnd: to } = field;
           setText(`${text.slice(0, from)}  ${text.slice(to)}`);
           requestAnimationFrame(() => { field.selectionStart = field.selectionEnd = from + 2; });
-        }} /> : <Skeleton className="profile-editor-text" />}
+        }} />
+        </div> : <Skeleton className="profile-editor-text" />}
         {parseError ? <p className="list-note is-error" role="alert">Not valid JSON: {parseError}</p> : null}
       </div>
       {dirty && !reviewing ? <div className="list-row is-static set-row set-save-row" role="group" aria-label="Unsaved Changes">

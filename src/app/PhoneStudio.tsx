@@ -320,6 +320,10 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     showToast('References cleared', 'default', { action: { label: 'Undo', onClick: () => cleared.forEach((item) => selectReferenceAsset(item.slot, item.asset)) } });
   };
 
+  // A focused Prompt or Negative shows only itself, above the keyboard (useTextFocus).
+  const [textFocus, setTextFocus] = React.useState(false);
+  React.useEffect(() => { if (!open) setTextFocus(false); }, [open]);
+
   const go = () => {
     if (comfyOffline) { retryComfyStatus(); return; }
     if (restarting) return;
@@ -334,7 +338,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       open={open}
       onClose={onClose}
       full
-      className="phone-create"
+      className={cn('phone-create', textFocus && 'is-text-focus')}
       title="Create"
       footer={
         <>
@@ -359,8 +363,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       {/* One flat column: the prompt takes the room that's left, then one row per choice. */}
       <div className="create-flow">
         <div className="create-prompts">
-          <PromptField kind="positive" fill selectAll value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
-          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
+          <PromptField kind="positive" fill selectAll focusMode onFocusModeChange={setTextFocus} value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} focusMode onFocusModeChange={setTextFocus} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
         </div>
         <div className="list-group create-options">
           <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} data-open-trigger aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={pop === 'model'} onClick={() => toggle('model')} />
