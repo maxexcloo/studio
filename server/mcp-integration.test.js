@@ -322,7 +322,8 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   assert.deepEqual(detail.controls.cfg, { min: 0, max: 20, default: 0 });
   assert.deepEqual(detail.controls.sampler.options, ['euler', 'dpmpp_2m']);
   assert.equal(detail.controls.scheduler, undefined, 'a single scheduler is fixed');
-  assert.equal(detail.defaults.count, 2);
+  assert.equal(detail.defaults.count, 1);
+  assert.equal(detail.controls.count.default, 1);
   assert.equal(detail.prompting, null);
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
   // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
@@ -398,16 +399,17 @@ test('Generate returns immediately with one saved-size image and passes explicit
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
 });
 
-test('omitted counts queue two independent image or video jobs and explicit one remains one', async t => {
+test('omitted counts queue one image or video job and an explicit count queues independent jobs', async t => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
     await call(client, 'Models', { profile_id: profile.id });
     const result = data(await call(client, 'Generate', { profile_id: profile.id, prompts: ['A landscape'] }));
-    assert.equal(result.jobs.length, 2);
+    assert.equal(result.jobs.length, 1);
+    assert.deepEqual(f.submitted.slice(-1).map(body => [body.kind, body.count]), [[profile.kind, 1]]);
+    const pair = await generate(client, { profile_id: profile.id, count: 2 });
+    assert.equal(pair.jobs.length, 2);
     assert.deepEqual(f.submitted.slice(-2).map(body => [body.kind, body.count]), [[profile.kind, 1], [profile.kind, 1]]);
-    const single = await generate(client, { profile_id: profile.id, count: 1 });
-    assert.equal(single.jobs.length, 1);
   }
 });
 

@@ -3,9 +3,9 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import { defaultGenerationCount, referenceImageSize } from './generation-defaults.js';
+import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
-import { assertAdjustable, mcpControls, prepareLoras, resolveLoraName } from './mcp-controls.js';
+import { assertAdjustable, mcpControls, mcpGenerationCount, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 
@@ -172,7 +172,7 @@ export class McpMedia {
     } catch { return {}; }
   }
   async queue(owner, args, scope = '') {
-    const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = defaultGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
+    const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = mcpGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles('all', owner)).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };

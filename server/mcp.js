@@ -5,9 +5,8 @@ import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { defaultGenerationCount } from './generation-defaults.js';
 import { hostAllowed } from './request-guard.js';
-import { closest, mcpControls, mcpLoras } from './mcp-controls.js';
+import { closest, mcpControls, mcpGenerationCount, mcpLoras } from './mcp-controls.js';
 import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 import { findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
@@ -177,7 +176,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         }
         review(owner, profile.id);
         // Defaults only for adjustable controls: a fixed value is not something to choose.
-        const defaults = Object.fromEntries(Object.entries({ ...profile.defaults, count: defaultGenerationCount }).filter(([key]) => controls[key] || ['frames', 'fps', 'duration'].includes(key)));
+        const defaults = Object.fromEntries(Object.entries({ ...profile.defaults, count: mcpGenerationCount }).filter(([key]) => controls[key] || ['frames', 'fps', 'duration'].includes(key)));
         const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
           // The same merge Generate validates against when references select this mode.
           const merged = { ...profile, ...settings };
@@ -192,10 +191,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Set count from the user\u2019s wording; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Generate one output unless the user asks for more; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
-        width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('1 for one image ("a photo"); omit for "some" or "a few" to use the saved default.'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
+        width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('Default 1. Set only when the user asks for more, such as 2 for "a couple" or 3 for "a few".'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async ({ kind, tier: wanted, wait_seconds, ...args }, signal) => {
         // Without a profile_id Studio chooses, so there is no guide for the agent to have read first.

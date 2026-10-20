@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
+
 ## [0.28.0] - 2026-10-20
 
 > Chats hand back slow jobs at once

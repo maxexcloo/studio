@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Which Generate arguments a profile lets MCP adjust; fixed controls are never advertised.
-import { defaultGenerationCount } from './generation-defaults.js';
 import { loraCompatibility, strengthRange } from './lora-policy.js';
+
+/** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
+export const mcpGenerationCount = 1;
 
 const fixedRange = (range) => Boolean(range) && Number.isFinite(range.min) && range.min === range.max;
 const rangeOf = (range, fallback, fallbackDefault) => {
@@ -19,7 +21,7 @@ export function mcpControls(profile) {
   const options = profile.options || {};
   const controls = {};
   for (const key of ['width', 'height']) if (!fixedRange(constraints[key])) controls[key] = rangeOf(constraints[key], { min: 64 }, defaults[key]);
-  controls.count = { min: 1, max: 4, default: defaultGenerationCount, note: 'Each output is a separate job.' };
+  controls.count = { min: 1, max: 4, default: mcpGenerationCount, note: 'Each output is a separate job.' };
   if (caps.seed !== false) controls.seed = { min: 0 };
   if (caps.steps !== false && !fixedRange(constraints.steps)) controls.steps = rangeOf(constraints.steps, { min: 1 }, defaults.steps);
   const cfgAdjustable = Boolean(caps.cfg) && !fixedRange(constraints.cfg);
