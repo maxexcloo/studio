@@ -8,6 +8,7 @@ import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
+import { isLocalVideoProfile } from './comfy-backends.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
 const terminal = new Set([...finished, 'failed', 'error', 'cancelled', 'canceled', 'missing']);
@@ -27,6 +28,11 @@ const maxShownResults = 8;
 export const maxResultWaitSeconds = 1500;
 /** Jobs one Generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 4;
+// A cloud provider that refused for authorisation or quota is skipped this long, so fallbacks don't queue doomed jobs.
+export const cloudPauseMilliseconds = 10 * 60 * 1000;
+export const cloudQuotaMessage = 'Cloud video unavailable (quota).';
+const cloudRefusal = /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
+const isCloudVideo = (profile) => profile?.kind === 'video' && !isLocalVideoProfile(profile);
 // Request records behind each MCP job, for Reuse tweaks and the result page; the oldest go first.
 const maxPromptRecords = 5000;
 const aborted = (signal) => {
@@ -72,6 +78,9 @@ export class McpMedia {
     if (!this.state.refs || typeof this.state.refs !== 'object' || Array.isArray(this.state.refs)) this.state.refs = {};
     if (!this.state.links || typeof this.state.links !== 'object' || Array.isArray(this.state.links)) this.state.links = {};
     if (!this.state.prompts || typeof this.state.prompts !== 'object' || Array.isArray(this.state.prompts)) this.state.prompts = {};
+    // Recent cloud video jobs by id: their owner, submission time and whether they ended.
+    this.cloudJobs = new Map();
+    this.cloudUnavailableUntil = 0;
     this.linkIds = new Map(Object.entries(this.state.links).map(([id, link]) => [link.all ? this.linkKey(link.audience, link.owner, `refs:${link.scope}`, 'all') : this.linkKey(link.audience, link.owner, link.jobId, link.index), id]));
     this.key = signingKey || this.state.signingKey;
     this.save();
@@ -179,6 +188,25 @@ export class McpMedia {
       return loras;
     } catch { return {}; }
   }
+  /** Minutes left while the cloud video provider is known to refuse, otherwise 0. */
+  cloudPause() {
+    const left = this.cloudUnavailableUntil - Date.now();
+    return left > 0 ? Math.ceil(left / 60000) : 0;
+  }
+  /** A cloud refusal for authorisation or quota pauses cloud video; returns whether this was one. */
+  noteCloudRefusal(text) {
+    if (!cloudRefusal.test(String(text || ''))) return false;
+    this.cloudUnavailableUntil = Date.now() + cloudPauseMilliseconds;
+    return true;
+  }
+  /** Reads the few most recent unfinished cloud jobs, so a refusal is known before another cloud job queues. */
+  async checkCloudJobs() {
+    if (this.cloudPause()) return;
+    const recent = [...this.cloudJobs].filter(([, entry]) => !entry.ended && Date.now() - entry.at < 30 * 60 * 1000).slice(-4);
+    await Promise.all(recent.map(async ([jobId, entry]) => {
+      try { if (terminal.has((await this.job(entry.owner, jobId)).status)) entry.ended = true; } catch { /* Unreadable now; the job itself is unaffected. */ }
+    }));
+  }
   /** The request behind an MCP job and the prompt it ran, when Studio recorded them. */
   promptRecord(jobId) {
     return Object.hasOwn(this.state.prompts, jobId) ? this.state.prompts[jobId] : null;
@@ -191,6 +219,9 @@ export class McpMedia {
     const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = mcpGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles('all', owner)).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
+    const cloud = isCloudVideo(profile);
+    if (cloud) await this.checkCloudJobs();
+    if (cloud && this.cloudPause()) throw new Error(`${cloudQuotaMessage} The cloud provider refused recent jobs, so Studio queues no cloud video for about ${this.cloudPause()} more minute${this.cloudPause() > 1 ? 's' : ''}. Tell the user video needs the local video worker until the quota returns.`);
     if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
     // Fixed controls are refused by name, with the adjustable alternatives, instead of being dropped;
     // a supplied value equal to a fixed one passes unchanged.
@@ -231,6 +262,10 @@ export class McpMedia {
         if (!result.jobId) throw new Error('Studio did not return a job ID.');
         if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('Studio returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
+        if (cloud) {
+          if (this.cloudJobs.size >= 256) this.cloudJobs.delete(this.cloudJobs.keys().next().value);
+          this.cloudJobs.set(result.jobId, { owner, at: Date.now(), ended: false });
+        }
         this.recordPrompt(result.jobId, { prompt, ...(record.request ? { request: record.request } : {}), ...(record.changes?.length ? { changes: record.changes } : {}) });
         this.save();
         queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), prompt });
@@ -239,6 +274,7 @@ export class McpMedia {
           queued.push({ job_id: id, ...this.handle(owner, scope, id), status: 'unknown', prompt });
           return { status: 'partially_queued', jobs: queued, error: 'The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.' };
         }
+        if (cloud && this.noteCloudRefusal(error.message)) error.message = `${cloudQuotaMessage} ${error.message}`;
         // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
         if (queued.length) return { status: 'partially_queued', jobs: queued, error: `Further submission failed; retain returned jobs before retrying. ${error.message}` };
         throw error;
@@ -316,6 +352,14 @@ export class McpMedia {
         // A subsequently hidden/deleted output is revoked even while its terminal job remains cached.
         const visible = await this.galleryJob(jobId, owner, { signal, credential });
         job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind, profileId: visible.profileId };
+      }
+      // A cloud job refused for authorisation or quota reads as such, and pauses further cloud video.
+      // Each failed job counts once, so reading it again later never extends the pause.
+      const cloud = this.cloudJobs.get(jobId);
+      if (cloud && ['failed', 'error'].includes(job.status)) {
+        cloud.ended = true;
+        cloud.refused ??= this.noteCloudRefusal(`${job.error || ''} ${JSON.stringify(job.failure || '')}`);
+        if (cloud.refused) job = { ...job, error: cloudQuotaMessage, cloudQuota: true };
       }
       if (terminal.has(job.status) || Date.now() >= deadline) return job;
       // A client Stop or disconnect ends only this wait; the generation itself keeps running.
@@ -517,7 +561,8 @@ export class McpMedia {
       const pending = !terminal.has(job.status);
       const message = pending
         ? `${ref ? label : 'This job'} is still ${job.status || 'running'}. Reply now with its link; do not poll. It continues in the studio and appears at the link when done.`
-        : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
+        : job.cloudQuota ? `${cloudQuotaMessage} ${ref ? label : 'This job'} did not run; video needs the local video worker until the quota returns. Do not resubmit.`
+          : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       const summary = { ...named, ...this.summary(job), message };
       // The agent needs only the sentence and result link; detail adds the status fields.
       const lean = { job_id: jobId, ...(ref ? { ref } : {}), status: job.status || 'running' };
@@ -618,7 +663,7 @@ export class McpMedia {
         return `<section>${heading}<p>Still generating${escapeHtml(progress)}.</p></section>`;
       }
       const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.shortId(claims.owner, jobId, index)] : []) : [];
-      if (!outputs.length) return `<section>${heading}<p>This generation did not produce a result.</p>${this.promptHtml(jobId)}</section>`;
+      if (!outputs.length) return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : 'This generation did not produce a result.'}</p>${this.promptHtml(jobId)}</section>`;
       return `<section>${heading}${outputs.map(token => job.kind === 'video'
         ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
         : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`).join('')}${this.promptHtml(jobId)}</section>`;
@@ -638,7 +683,8 @@ export class McpMedia {
     const media = outputs.map(token => job.kind === 'video'
       ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
       : `<figure><a href="${token}"><img src="${token}" alt="Studio result"></a><a href="${token}">View Original</a></figure>`).join('');
-    const body = (pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : '<p>This generation did not produce a result.</p>') + this.promptHtml(claims.jobId);
+    const ended = job.cloudQuota ? `<p>${cloudQuotaMessage} This generation did not run.</p>` : '<p>This generation did not produce a result.</p>';
+    const body = (pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : ended) + this.promptHtml(claims.jobId);
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
   }
   /** The full prompt a job ran, for its result pages. */

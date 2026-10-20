@@ -17,6 +17,7 @@ version opens with a `> ` summary line.
 - **Reference With:** when the selected model takes no reference image, the composer shows Reference With in the Reference button's place. It lists the ready models of that kind that take one, grouped and labelled like the model picker; picking one switches to it and opens its reference picker. On the desktop and in the phone's Create sheet.
 
 ### Fixed
+- **Cloud video quota:** when the cloud video provider refuses for authorisation or quota (such as CLIProxyAPI's HTTP 401), chat results and result pages say "Cloud video unavailable (quota)", and MCP queues no cloud video for 10 minutes instead of failing job after job.
 - **Reuse in chat:** Reuse's `job_id` says to pass the result's ref exactly as the reply header shows it ("result 1") or its job id, and never "all", which only Result takes; link ids still work. A chat model's first Reuse had passed a link id or "all".
 - **Selection and search:** "N Selected" in the gallery toolbar reads as plain text rather than a highlighted pill (the phone header says "N Selected" too), and the search's clear X is a round plain icon button. A focus ring shows only for keyboard focus.
 - **Copy Prompt on phones:** copying asks the clipboard within the tap, as iOS Safari requires, falls back to a selected text box where there is no clipboard API, and says "Prompt copied".

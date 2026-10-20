@@ -1779,3 +1779,29 @@ test('partial prompt writer settings fail at start by name', () => {
     assert.throws(() => registerMcpRoutes(express(), { dataDir, baseUrl: 'http://127.0.0.1:1', environment: { STUDIO_MCP_API_KEY: mediaKey, MCP_PUBLIC_URL: 'https://studio.example.test', STUDIO_PROMPT_WRITER_URL: 'http://fixture-writer.invalid' } }), /needs STUDIO_PROMPT_WRITER_KEY, STUDIO_PROMPT_WRITER_MODEL/);
   } finally { fs.rmSync(dataDir, { recursive: true, force: true }); }
 });
+
+test('a cloud quota refusal reads as cloud video unavailable and pauses cloud video for about ten minutes', async t => {
+  const f = await fixture(t);
+  await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
+  const client = await f.client();
+  const first = data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] }));
+  assert.equal(first.profile.remote, true);
+  Object.assign(f.jobs.get(first.jobs[0].job_id), { status: 'error', error: 'CLIProxyAPI returned HTTP 401' });
+  // The next cloud video reads the failed job first, so it queues nothing that would fail.
+  const refused = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /^Cloud video unavailable \(quota\)\. .*about 10 more minutes\. Tell the user video needs the local video worker/);
+  await failure(client, 'Reuse', { job_id: 'result 1', kind: 'video' });
+  assert.equal(f.submitted.length, 1);
+  assert.match(texts(await call(client, 'Result', { job_id: 'result 1' })), /^Cloud video unavailable \(quota\)\. Result 1 did not run/);
+  assert.match(await (await fetch(localLink(f, first.jobs[0].link))).text(), /Cloud video unavailable \(quota\)\. This generation did not run\./);
+  // Images are unaffected, and cloud video queues again once the pause has passed; rereading the old failure does not extend it.
+  data(await call(client, 'Generate', { kind: 'image', prompts: ['An egg'] }));
+  const now = Date.now();
+  t.mock.method(Date, 'now', () => now + 11 * 60 * 1000);
+  assert.match(texts(await call(client, 'Result', { job_id: 'result 1' })), /^Cloud video unavailable \(quota\)/);
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })).profile.id, 'cloud-video');
+  // Other failures are ordinary failures and do not pause cloud video.
+  Object.assign(f.jobs.get(f.submitted.at(-1).clientJobId), { status: 'error', error: 'Prompt was moderated' });
+  assert.equal(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })).status, 'queued');
+});
