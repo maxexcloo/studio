@@ -289,7 +289,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   liveView.current = view;
   const phoneRef = React.useRef(phone);
   phoneRef.current = phone;
-  const smartUpscale = prefs.smartUpscale !== false;
+  const smartUpscale = prefs.smartUpscale;
   const itemActionHandlers = React.useMemo<ItemActionHandlers>(() => {
     const live = () => liveView.current;
     // On a phone the composer is a sheet: it opens above the viewer with the change in place, so closing it returns there.
@@ -520,7 +520,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               key={`${hiddenSpace ? "hidden" : "gallery"}:${mode}`}
               cancelJob={cancelJob}
               groups={galleryGroups}
-              moments={features.moments && prefs.showMoments !== false}
+              moments={features.moments && prefs.showMoments}
               stackRuns={stackRuns}
               openRuns={openRuns}
               settleVersion={view.settleVersion}
@@ -536,7 +536,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               items={renderedGallery}
               openItem={openItem}
               scrollRef={galleryStageRef}
-              smartUpscale={prefs.smartUpscale !== false}
+              smartUpscale={prefs.smartUpscale}
               upscaleBusyIds={upscaleBusyIds}
               onUpscale={activateUpscale}
               onCancelUpscale={cancelUpscale}
@@ -602,7 +602,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               models={models}
               model={model}
               modelProfiles={modelProfiles}
-              showInpaint={prefs.inpainting !== false}
+              showInpaint={prefs.inpainting}
               profileBadges={profileBadges}
               chooseModel={pickModel}
               modelMenu={modelMenu}
@@ -822,7 +822,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <FeedbackHost />
       {advancedOpen ? <Modal open title="Advanced Settings" className="composer-advanced-modal" onOpenChange={setAdvancedOpen}><div className="composer-advanced-body">{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</div></Modal> : null}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
-      {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs !== false} onClose={() => setAnimationItems(null)} /> : null}
+      {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
       <UpscaleSetupDialog
         setup={upscaleSetup}

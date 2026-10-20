@@ -1300,7 +1300,7 @@ function App() {
   const canUseStartImage = Boolean(referenceInput);
   // A mask belongs to the image it was painted on, for a model that can inpaint.
   // Settings › Features › Inpainting can switch it off: no brush, no mask, no inpaint settings.
-  const canInpaint = Boolean(prefs.inpainting !== false && currentProfile?.capabilities.inpaint && referenceInput && (referenceAsset?.url || referenceAsset?.thumbnailUrl));
+  const canInpaint = Boolean(prefs.inpainting && currentProfile?.capabilities.inpaint && referenceInput && (referenceAsset?.url || referenceAsset?.thumbnailUrl));
   const activeInpaintMask = canInpaint && inpaintMask && inpaintMask.assetId === referenceAsset?.id ? inpaintMask : null;
   useEffect(() => {
     if (inpaintMask && !activeInpaintMask) setInpaintMask(null);
@@ -1340,14 +1340,14 @@ function App() {
     // Kept from before the first lock only: on another model the size is already the reference's.
     if (!sizeBeforeLock.current) sizeBeforeLock.current = { model, width, height, customSize: Boolean(customSize) };
     setCustomSize(false);
-    const size = referenceImageSize(currentProfile, referenceForAspect, { pixels: Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024), resize: prefs.autoResizeInputs !== false });
+    const size = referenceImageSize(currentProfile, referenceForAspect, { pixels: Number(currentProfile?.defaults.width || 1024) * Number(currentProfile?.defaults.height || 1024), resize: prefs.autoResizeInputs });
     if (size) { setWidth(size.width); setHeight(size.height); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aspectLocked, referenceForAspect?.id, referenceForAspect?.width, referenceForAspect?.height, model, prefs.autoResizeInputs]);
   const manualReference = composerReferenceAssets.find((item) => item.slot === referenceInput?.id)?.asset || null;
   useEffect(() => {
     if (aspectLocked || activeInpaintMask || referenceRoleOffered(currentProfile)) return;
-    const size = referenceImageSize(currentProfile, manualReference, { pixels: width * height, resize: prefs.autoResizeInputs !== false });
+    const size = referenceImageSize(currentProfile, manualReference, { pixels: width * height, resize: prefs.autoResizeInputs });
     if (!size) return;
     setCustomSize(!aspectOptions.some((item) => item.w === size.width && item.h === size.height));
     setWidth(size.width);
@@ -1452,7 +1452,7 @@ function App() {
     emptyModels: Boolean(models && primaryConnected && !models.profiles.some((profile) => profile.ready !== false)),
     onModelsChanged: () => { refreshModels(false); refreshWorkflows(); },
     showToast,
-    hints: prefs.modelFolderHints !== false,
+    hints: prefs.modelFolderHints,
     onStopHints: () => setPrefs({ modelFolderHints: false })
   });
   const doneGallery = useMemo(() => visibleGallery.filter((item) => item.status === "done" || item.status === "error"), [visibleGallery]);

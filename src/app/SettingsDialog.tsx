@@ -566,12 +566,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
       || stats.topWorkflow.replace(/^custom:/, '')
     : '';
 
-  const upscaleOn = prefs.smartUpscale !== false;
+  const upscaleOn = prefs.smartUpscale;
   const upscaleState = upscaleSummary(upscaleStatus, upscaleInstall);
   // Inpainting ships behind a release switch; while it's off its group stays away.
   const inpaintReleased = Boolean((models as Models | null)?.features?.inpainting);
   const inpaintModels = ((modelProfiles || []) as Profile[]).filter((profile) => profile.capabilities?.inpaint);
-  const inpaintOn = prefs.inpainting !== false;
+  const inpaintOn = prefs.inpainting;
   const effort = upscaleEfforts.find((item) => item.value === (prefs.upscaleQuality || 'balanced')) || upscaleEfforts[1];
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
   const connected = Boolean(view.comfyStatus?.backends?.primary?.connected ?? health?.ok);
@@ -677,7 +677,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </Row>
             </Group>
             <Group title="Input images">
-              <SwitchRow label="Automatically resize input images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs !== false} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
+              <SwitchRow label="Automatically resize input images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
             </Group>
             <Group title="Starting values" note="Used when a model doesn’t set its own. The current draft stays as it is.">
               <Row label="Variants"><NumberPicker label="Variants" value={Number(prefs.defaultImageCount)} onChange={(next) => setPrefs({ defaultImageCount: next })} min={1} max={16} /></Row>
@@ -760,7 +760,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             </Group> : null}
             <Group title="Gallery">
               <SwitchRow label="Follow the latest output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
-              {features.moments ? <SwitchRow label="Group by time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments !== false} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
+              {features.moments ? <SwitchRow label="Group by time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
               <SwitchRow label="Wide images take two columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <SwitchRow label={preferenceLabels.showFailedItems} description="Interrupted and failed generations stay in the gallery." checked={prefs.showFailedItems} onChange={(next) => setPrefs({ showFailedItems: next })} />
             </Group>
@@ -881,7 +881,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
               </Row>
             </Group>
             {thisComputer ? <ModelManifestGroup showToast={showToast} /> : null}
-            {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints !== false} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
+            {modelFolders ? <ModelFolderSettings folders={modelFolders} confirmAction={confirmAction} onOpen={() => { onClose(); modelFolders.openDialog(); }} hints={prefs.modelFolderHints} onHintsChange={(next) => setPrefs({ modelFolderHints: next })} /> : null}
           </>
         ) : null}
         {section === 'integrations' && thisComputer ? (

@@ -8,6 +8,7 @@ import { autoLockChoices, type HiddenState } from './useHidden';
 import type { ConfirmAction } from './useConfirmation';
 import { passwordStrength } from './HiddenSetup';
 import type { ShowToast } from './toast';
+import type { Preferences } from './types';
 
 
 function when(value?: string) {
@@ -22,7 +23,7 @@ function when(value?: string) {
  */
 export function HiddenSettings({ hidden, prefs, setPrefs, showToast, confirmAction, Group, Row, Status, Switch }: {
   hidden: HiddenState;
-  prefs: { hiddenAutoLockMinutes?: number; hiddenShareWithoutSettings?: boolean };
+  prefs: Pick<Preferences, 'hiddenAutoLockMinutes' | 'hiddenShareWithoutSettings'>;
   setPrefs: (next: { hiddenAutoLockMinutes?: number; hiddenShareWithoutSettings?: boolean }) => void;
   showToast: ShowToast;
   confirmAction: ConfirmAction;
@@ -37,7 +38,7 @@ export function HiddenSettings({ hidden, prefs, setPrefs, showToast, confirmActi
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [busy, setBusy] = React.useState("");
-  const autoLock = prefs.hiddenAutoLockMinutes ?? 15;
+  const autoLock = prefs.hiddenAutoLockMinutes;
   // The password is only ever changed at the computer Hidden lives on.
   const atComputer = useAtComputer();
 
@@ -150,7 +151,7 @@ export function HiddenSettings({ hidden, prefs, setPrefs, showToast, confirmActi
 
       <Group title="Sharing">
         <Row label="Share without settings" description="Leaves the prompt, seed and workflow out of files downloaded or shared from Hidden.">
-          <Switch label="Share without settings" checked={prefs.hiddenShareWithoutSettings !== false} onChange={(next) => setPrefs({ hiddenShareWithoutSettings: next })} />
+          <Switch label="Share without settings" checked={prefs.hiddenShareWithoutSettings} onChange={(next) => setPrefs({ hiddenShareWithoutSettings: next })} />
         </Row>
       </Group>
 

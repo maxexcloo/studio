@@ -9,7 +9,7 @@ import type { GalleryItem, Preferences } from './types';
 let current = { gallery: false, hidden: true };
 
 export function setShareSettings(prefs: Pick<Preferences, 'shareWithoutSettings' | 'hiddenShareWithoutSettings'>) {
-  current = { gallery: prefs.shareWithoutSettings === true, hidden: prefs.hiddenShareWithoutSettings !== false };
+  current = { gallery: prefs.shareWithoutSettings, hidden: prefs.hiddenShareWithoutSettings };
 }
 
 /** Whether this item's downloads and shares go out without its settings. */

@@ -316,14 +316,14 @@ export type Preferences = {
   /** Minutes untouched before Hidden locks itself; 0 leaves it to the session. */
   hiddenAutoLockMinutes: number;
   /** Point out models in folders ComfyUI doesn’t read (sidebar notice, model menu, first-run dialog). */
-  modelFolderHints?: boolean;
+  modelFolderHints: boolean;
   mobileZenDefaulted?: boolean;
   /** On a phone, show the full studio instead of the simplified phone one. */
   fullStudioOnPhone?: boolean;
   /** Downloads and shares from the gallery leave out the prompt and workflow saved in the file. */
-  shareWithoutSettings?: boolean;
+  shareWithoutSettings: boolean;
   /** The same for Hidden; on unless turned off. */
-  hiddenShareWithoutSettings?: boolean;
+  hiddenShareWithoutSettings: boolean;
 };
 
 export type UpscaleModelInfo = { key: string; file: string; label: string; detail?: string; bytes: number; present: boolean; partialBytes: number };
