@@ -18,6 +18,7 @@ import { ProfilesSettings } from './ProfilesSettings';
 import { AdapterLibraryGroup, CivitaiRow, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { AccountSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
+import { AiControlGroup, useAiControlAvailability } from './AiControlSettings';
 import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings, VideoWorkerRestart, WorkerGroups } from './DeploymentSettings';
 
 export const SETTINGS_SECTIONS = [
@@ -25,7 +26,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Accounts, access profiles, chat gateway users and model profiles.' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: generation, features, the gallery and sharing.' },
   { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, the catalogue, LoRAs and integrations.' },
-  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, status and restart.' },
+  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker and what each GPU runs: addresses, status and restarts.' },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, reset and help.' },
   { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' }
 ] as const;
@@ -175,7 +176,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       setAccountMode(status.mode === 'multi-user');
       setAccountRole(status.account?.role || '');
       if (status.mode !== 'multi-user' && ACCOUNT_SECTIONS.has(section)) onSectionChange('studio');
-      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('studio');
+      // Workers stays while AI Control can show ordinary accounts what the GPUs run (checked below).
+      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section) && section !== 'workers') onSectionChange('studio');
     }).catch(() => { if (live && !known) setAccountMode(false); });
     return () => { live = false; };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -204,7 +206,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
   const deployment = useDeploymentSettings(open && thisComputer);
   // One rule for the rail and the page: account sections need accounts, administration needs an administrator.
   const administrator = accountMode ? accountRole === 'administrator' : thisComputer;
-  const sectionShown = (id: SettingsSection) => (!ACCOUNT_SECTIONS.has(id) || accountMode) && (!ADMINISTRATION_SECTIONS.has(id) || administrator);
+  const aiControl = useAiControlAvailability(open);
+  // Everyone may read what the GPUs run; the rest of Workers is administration.
+  const sectionShown = (id: SettingsSection) => (!ACCOUNT_SECTIONS.has(id) || accountMode) && (!ADMINISTRATION_SECTIONS.has(id) || administrator || (id === 'workers' && Boolean(aiControl?.configured)));
+  React.useEffect(() => {
+    if (open && section === 'workers' && aiControl && !sectionShown('workers')) onSectionChange('studio');
+  }, [open, section, aiControl, administrator]); // eslint-disable-line react-hooks/exhaustive-deps
   const connected = Boolean(view.comfyStatus?.backends?.primary?.connected ?? health?.ok);
   const backendStatus = (backend: 'primary' | 'video') => {
     const reported = view.comfyStatus?.backends?.[backend] as { connected: boolean; device?: string; url?: string } | undefined;
@@ -260,7 +267,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
         <header className="set-page-head">
           {sub ? <button type="button" className="btn is-ghost set-back" onClick={() => setUsersPage('main')}><ArrowLeft size={14} /> Users</button> : null}
           <h3 id="settings-panel-title">{sub ? 'Profiles' : current.label}</h3>
-          <p>{sub ? 'One model profile’s JSON at a time, checked and reviewed before it is saved.' : current.description}</p>
+          <p>{sub ? 'One model profile’s JSON at a time, checked and reviewed before it is saved.' : section === 'workers' && !administrator ? 'What each GPU runs right now.' : current.description}</p>
         </header>
 
         {section === 'account' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} /> : null}
@@ -275,8 +282,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
               {phoneDevice ? null : <ShortcutsDrawer />}
             </Group>
             <Group title="Generation">
-              <Row label="Run Variants As" description={prefs.variationQueueMode === 'separate' ? 'One job per variant. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
-                <Segmented label="Variants Run As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
+              <Row label="Run Several Images As" description={prefs.variationQueueMode === 'separate' ? 'One job per image. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
+                <Segmented label="Run Several Images As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
               </Row>
               <SwitchRow label="Size in Megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
               <Row label="While Generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
@@ -293,7 +300,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                 : <Row label="Inpainting" description={inpaintOn ? 'A brush on a reference image: paint over part of it and only that part changes.' : 'Off for this Studio.'}><Status tone={inpaintOn ? 'ok' : undefined}>{inpaintOn ? 'On' : 'Off'}</Status></Row>}
             </Group>
             <Group title="Gallery">
-              <SwitchRow label="Follow the Latest Output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
               <SwitchRow label="Date Headers" description="Headings like “Today” and “This Evening” split the gallery by when you made things." checked={Boolean(prefs.dateHeaders)} onChange={(next) => setPrefs({ dateHeaders: next })} />
               <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
@@ -325,8 +331,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
           </>
         ) : null}
 
-        {section === 'workers' && sectionShown('workers') ? (
-          deployment.settings ? <WorkerGroups
+        {section === 'workers' && sectionShown('workers') ? <>
+          {!administrator ? null : deployment.settings ? <WorkerGroups
             settings={deployment.settings}
             status={backendStatus}
             showToast={showToast}
@@ -335,8 +341,9 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             restart={(backend) => backend === 'primary'
               ? <ComfyRestart compact className="is-end" onBack={() => { refreshModels(false); refreshWorkflows(); }} confirm={() => confirmAction({ title: 'Restart the Image Worker?', description: 'Running and queued generations stop. It takes a few seconds.', action: 'Restart', destructive: true })} />
               : <VideoWorkerRestart showToast={showToast} confirm={() => confirmAction({ title: 'Restart the Video Worker?', description: 'Running and queued videos stop. It takes a few seconds.', action: 'Restart', destructive: true })} />}
-          /> : deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : <Group title="Image Worker"><Row label={<Skeleton className="skeleton-text short" />} /></Group>
-        ) : null}
+          /> : deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : <Group title="Image Worker"><Row label={<Skeleton className="skeleton-text short" />} /></Group>}
+          {aiControl ? <AiControlGroup admin={administrator} phone={phoneDevice} showToast={showToast} confirmAction={confirmAction} /> : null}
+        </> : null}
 
         {section === 'maintenance' ? (
           <>
