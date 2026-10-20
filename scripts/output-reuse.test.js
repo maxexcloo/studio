@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normaliseReusedSettings, outputProfile, reuseNumber } from '../src/app/outputReuse.js';
+import { compatibleLoras, normaliseReusedSettings, outputProfile, removedLorasNote, reuseNumber } from '../src/app/outputReuse.js';
 
 test('reuse associates saved identity and provider model aliases with ready profiles', () => {
   const profiles = [
@@ -66,4 +66,22 @@ test('reuse respects numeric step origins, fractional settings and invalid numbe
   assert.equal(reuseNumber(3.78, 4, { min: 1, max: 10, step: 0.5 }), 4);
   assert.equal(reuseNumber(Infinity, 512, { min: 256, max: 1024, step: 32 }), 512);
   assert.equal(reuseNumber(5, 5, { min: 5, max: 6, step: 8 }), undefined);
+});
+
+test('reused settings drop a LoRA made for another family and count it, keeping unknown ones', () => {
+  const profile = { id: 'tesserafine', kind: 'image', family: 'krea2', capabilities: { lora: true }, defaults: { width: 1024, height: 1024, steps: 8, cfg: 1 }, options: { loras: ['zimage_style.safetensors', 'krea-style.safetensors', 'mystery.safetensors'] }, maxLoras: 8 };
+  const infos = {
+    'zimage_style.safetensors': { families: ['zimage'] },
+    'krea-style.safetensors': { families: ['krea2'] },
+    'mystery.safetensors': { families: [] }
+  };
+  const loras = [{ name: 'zimage_style.safetensors', strength: 1 }, { name: 'krea-style.safetensors', strength: 0.8 }, { name: 'mystery.safetensors', strength: 0.5 }];
+  const settings = normaliseReusedSettings(profile, { type: 'image', settings: { profileId: 'tesserafine', loras } }, { loraInfos: infos });
+  assert.deepEqual(settings.loras.map((lora) => lora.name), ['krea-style.safetensors', 'mystery.safetensors']);
+  assert.equal(settings.removedLoras, 1);
+  assert.equal(removedLorasNote(settings.removedLoras), 'Removed 1 incompatible LoRA');
+  assert.equal(removedLorasNote(2), 'Removed 2 incompatible LoRAs');
+  assert.equal(removedLorasNote(0), '');
+  // Without what the files say, nothing is guessed away.
+  assert.equal(compatibleLoras(loras, profile, {}).removed, 0);
 });

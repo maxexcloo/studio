@@ -27,6 +27,10 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await picker.getByRole('button', { name: 'All Models', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
+  // Shown under All Models, an incompatible LoRA says why and can't be added.
+  const excluded = picker.getByRole('checkbox', { name: 'Select Excluded Conditioning', exact: true });
+  await expect(excluded).toBeDisabled();
+  await expect(picker.getByText('This LoRA does not support the selected model variant.', { exact: true }).first()).toBeVisible();
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
@@ -209,12 +213,11 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
   await picker.getByRole('button', { name: 'All Models', exact: true }).click();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
+  // Another family's LoRA is listed with its reason, never added (a Z-Image LoRA on Tesserafine).
   const crossFamily = picker.getByRole('checkbox', { name: 'Select FLUX.3 Effect', exact: true });
-  await crossFamily.click();
-  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
+  await expect(crossFamily).toBeDisabled();
+  await expect(crossFamily).toHaveAttribute('aria-checked', 'false');
+  await expect(picker.getByText(/does not support the selected model variant \(made for FLUX\.3 Klein\)/).first()).toBeVisible();
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
-  await expect(crossFamily).toHaveCount(1);
-  await expect(crossFamily).toHaveAttribute('aria-checked', 'true');
-  await crossFamily.click();
   await expect(crossFamily).toHaveCount(0);
 });

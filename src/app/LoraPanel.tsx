@@ -290,7 +290,11 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const multi = !swapping;
   const isAdded = (name: string) => current.includes(name) && name !== swapping;
   const full = selected.length >= remaining;
+  // A LoRA made for another family is shown under All Models, but never added; a picked one can still come off.
+  const blocked = (name: string) => fitOf(name) === 'other' && !current.includes(name);
+  const blockedNote = (name: string) => policyNoteOf(name) || `This LoRA does not support the selected model variant${baseOf(name) ? ` (made for ${baseOf(name)})` : ''}.`;
   const choose = (name: string) => {
+    if (blocked(name)) return;
     if (libraryView && inlineSelection && !swapping) {
       const adding = !inlineSelection.items.some((item) => item.name === name);
       inlineSelection.toggle(name);
@@ -397,13 +401,13 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                         const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : index;
                         if (to !== index) { event.preventDefault(); if (to >= 0 && to < inlineSelection.items.length) reorder(index, to); }
                       }}><GripVertical size={14} /></button> : null}
-                    <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={!item && remaining <= 0} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
+                    <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
                       <span className="lora-library-check" aria-hidden="true">{item ? <Check size={12} strokeWidth={3} /> : null}</span>
                       <span className="lora-option-copy"><strong>{label}</strong><span title={row.name}>{row.name}</span></span>
                     </button>
                     <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     <LoraDetails info={info} label={label} />
-                    {policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
+                    {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: .32, ease: [.16, 1, .3, 1] }}><div className="lora-library-settings">
                       <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
@@ -420,9 +424,9 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     key={row.key}
                     role="option"
                     aria-selected={checked || added}
-                    tabIndex={added || (multi && full && !checked) ? -1 : 0}
+                    tabIndex={added || blocked(row.name) || (multi && full && !checked) ? -1 : 0}
                     onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); choose(row.name); } }}
-                    aria-disabled={added || (multi && full && !checked) || undefined}
+                    aria-disabled={added || blocked(row.name) || (multi && full && !checked) || undefined}
                     data-highlight={index === highlight}
                     className={cn('lora-option', checked && 'is-selected', added && 'is-added', index === highlight && 'is-highlight')}
                     onMouseEnter={() => setHighlight(index)}
@@ -433,7 +437,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <span className="lora-option-copy">
                       <strong>{nameOf(row.name)}</strong>
                       <span title={row.name}>{row.name}</span>
-                      {policyNoteOf(row.name) ? <span>{policyNoteOf(row.name)}</span> : null}
+                      {blocked(row.name) ? <span>{blockedNote(row.name)}</span> : policyNoteOf(row.name) ? <span>{policyNoteOf(row.name)}</span> : null}
                       {folderOf(row.name) && (query || !section.collapsible) ? <span>{folderOf(row.name)}</span> : null}
                     </span>
                     {added ? <em>Added</em> : fitOf(row.name) === 'other' && baseOf(row.name) ? <em className="lora-fit" title={`Made for ${baseOf(row.name)}`}>{baseOf(row.name)}</em> : null}
