@@ -31,15 +31,22 @@ export function studioUi(page: Page) {
     return more;
   }
 
-  /** Waits until the phone's Create sheet is gone or open and still; a closing sheet stays in the page while it slides away. */
+  /**
+   * Waits until the phone's Create sheet is gone or open and still; a closing
+   * sheet stays in the page while it slides away. Its spring advances at most
+   * one short step a frame, so a busy machine stretches it well past a second.
+   */
   async function composerSettled() {
     await expect.poll(async () => {
-      if (!await composer.count()) return true;
-      return composer.evaluate((element) => new Promise<boolean>((resolve) => {
+      if (!await composer.count()) return 'gone';
+      return composer.evaluate((element) => new Promise<string>((resolve) => {
         const top = element.getBoundingClientRect().top;
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(element.isConnected && element.getBoundingClientRect().top === top && top < innerHeight / 2)));
-      })).catch(() => false);
-    }).toBe(true);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const now = element.getBoundingClientRect().top;
+          resolve(!element.isConnected ? 'gone' : now !== top ? `moving ${top} to ${now}` : now >= innerHeight / 2 ? `low at ${now}` : 'open');
+        }));
+      })).catch((error: Error) => error.message.split('\n')[0]);
+    }, { timeout: 15000 }).toMatch(/^(gone|open)$/);
   }
 
   /** Opens the creation controls: the phone's Create sheet, or the full studio's expanded box. */
