@@ -297,6 +297,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <ReferenceSlots
           scope={`${mode}:${view.model}:${hiddenSpace}`}
           inputs={referenceInputs || []}
+          referenceWith={view.referenceWith}
+          openRequest={view.referenceOpenRequest}
           inpaint={referenceInpaint}
           role={referenceRole}
           selected={referenceAssets || []}

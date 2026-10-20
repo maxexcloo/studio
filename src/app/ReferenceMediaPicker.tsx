@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
@@ -638,8 +639,12 @@ function StackThumb({ item, number, guide }: { item: StackItem; number: number; 
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError }: {
+export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError, referenceWith = null, openRequest = 0 }: {
   scope?: string;
+  /** With no slot of its own: the models that take a reference, offered in the Reference button's place. */
+  referenceWith?: ReferenceWithChoice | null;
+  /** Bumped to open the first slot's picker (after Reference With switched models). */
+  openRequest?: number;
   inputs: MediaInput[];
   inpaint?: ReferenceInpaint | null;
   role?: ReferenceRoleControl | null;
@@ -654,6 +659,14 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   if (context.current.scope !== scope) { context.current.scope = scope; context.current.revision += 1; }
   React.useEffect(() => { context.current.active = true; return () => { context.current.active = false; }; }, []);
   React.useEffect(() => { setOpenSlot(""); setPainting(false); }, [scope]);
+  // After the scope's reset above, so a model switch that asked for the picker keeps it open.
+  const handledOpen = React.useRef(openRequest);
+  React.useEffect(() => {
+    if (!openRequest || openRequest === handledOpen.current || !inputs.length) return;
+    handledOpen.current = openRequest;
+    setPainting(false);
+    setOpenSlot(inputs.find((input) => !selected.some((item) => item.slot === input.id))?.id || inputs[0].id);
+  }, [openRequest, inputs]); // eslint-disable-line react-hooks/exhaustive-deps
   const memories = React.useRef(new Map<string, PickerMemory>());
   if (!memories.current.has(scope)) memories.current.set(scope, pickerMemory());
   const memory = memories.current.get(scope)!;
@@ -859,7 +872,12 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     };
   }, [host, inputs.length]);
 
-  if (!inputs.length) return null;
+  if (!inputs.length) {
+    if (!referenceWith?.profiles.length) return null;
+    const button = <div className="composer-reference-slots" role="group" aria-label="Reference Images"><div className="reference-slot-list"><ReferenceWithButton {...referenceWith} /></div></div>;
+    const target = host?.querySelector(".composer-reference-tools");
+    return <div className="composer-reference" ref={rootRef}>{target ? createPortal(button, target) : button}</div>;
+  }
   const visibleInputs = inputs.filter((input) => !input.follows || assetFor(input.id) || assetFor(input.follows));
   const count = inputs.filter((input) => assetFor(input.id)).length;
   const revision = context.current.revision;

@@ -684,3 +684,10 @@
 
 /* Full capacity is said in the picker itself, on the phone too. */
 .reference-popover .reference-popover-hint.is-full { display: block; color: hsl(var(--foreground)); }
+
+/* Reference With (ReferenceWith.tsx): the models that take a reference, grouped like the model picker. */
+.reference-with-body { display: grid; gap: 12px; align-content: start; }
+.reference-with-group { display: grid; gap: 4px; }
+.reference-with-group h4 { margin: 0 0 2px; color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 600; }
+.reference-with-option { width: 100%; text-align: left; }
+.reference-with .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
