@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { defaultGenerationCount } from './generation-defaults.js';
 import { hostAllowed } from './request-guard.js';
 import { closest, mcpControls, mcpLoras } from './mcp-controls.js';
-import { McpMedia, maxResultWaitSeconds, mcpJson, mcpOutputPath } from './mcp-media.js';
+import { McpMedia, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 import { findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
 
@@ -16,7 +16,7 @@ import { findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
 export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
 // Workflow rules only; tool descriptions and each reply carry the details, so hosts that resend these every step stay small.
-const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; pass a model the user names as profile_id and LoRAs the user names as loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption, and collect each queued job with one Result call. Never poll, resubmit or invent results.`;
+const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; pass a model the user names as profile_id and LoRAs the user names as loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the watch links and end the turn. Call Result only when the user asks to see a result. Never poll, resubmit or invent results.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview and get approval before Apply. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const anonymousMessage = 'The gateway must forward its user identity.';
@@ -130,7 +130,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       }
     });
     const resolve = (value) => media.resolve(owner, refs, value);
-    /** A submission's reply: finished markdown when every job ends within the wait, otherwise watch links for the queued jobs. */
+    /** A submission's reply: finished markdown when every job ends within the wait, otherwise watch links for the queued jobs, which end the agent's turn. */
     const respond = async (submission, profile, waitSeconds, signal, guide = {}) => {
       const label = profile.label || profile.id;
       // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
@@ -144,7 +144,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.\n\n${markdown}` }, ...extra], structuredContent: structured };
       const watch = submission.jobs.map(({ ref, link }) => `[Watch ${ref}](${link})`).join('\n');
       const message = submission.status === 'queued'
-        ? `Queued. ${note}Call Result once per ref with delivery=notification and wait_seconds=${maxResultWaitSeconds}, then reply with its markdown. Never poll or resubmit.`
+        ? `Queued. ${note}Share the watch links below and end your turn; do not call Result now. When the user later asks to see a result, call Result with its ref. Never poll or resubmit.`
         : `${submission.error} ${note}Share the watch links; never resubmit.`;
       return { content: [{ type: 'text', text: `${message}\n\n${watch}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
     };
@@ -192,7 +192,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Set count from the user\u2019s wording; keep the saved size unless asked. Returns markdown to reply with, or queued jobs to collect with Result. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Set count from the user\u2019s wording; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('1 for one image ("a photo"); omit for "some" or "a few" to use the saved default.'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
@@ -217,7 +217,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const ref = media.refOf(owner, refs, id);
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', `Show a finished result as markdown to reply with. To collect a queued job, call once with delivery=notification and wait_seconds=${maxResultWaitSeconds}; it returns when the job ends, with the markdown to reply with. Never poll or call it again.`, { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      tool(server, 'Result', 'Show Result', 'Show a result as markdown to reply with, only when the user asks for it ("show result 3"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its watch link: share it and stop. Never poll.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
       tool(server, 'Cancel', 'Cancel Generation', 'Cancel a job when the user asks.', job, async ({ job_id }) => {
         const id = resolve(job_id);
         media.own(owner, id);

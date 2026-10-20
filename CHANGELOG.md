@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Chats hand back slow jobs at once
+
+### Changed
+- **Slow jobs hand back at once:** when an image outlasts Generate's 60-second wait, or for any video, Generate and Reuse reply with the watch links and tell the chat to end its turn instead of waiting on a Result call. Result runs only when the user asks to see a result, such as "show result 3", with a short wait. Finished images still return inline.
+
 ## [0.27.0] - 2026-10-20
 
 > Dismiss waiting chat users, and a faster studio while the video worker is off

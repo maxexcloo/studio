@@ -292,6 +292,9 @@ test('media and administrator credentials discover only their own friendly tools
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
   assert.match(media.getInstructions(), /call Generate with kind, tier/);
+  // Slow jobs hand back at once; Result runs only on the user's request.
+  assert.match(media.getInstructions(), /share the watch links and end the turn\. Call Result only when the user asks/);
+  assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
   assert.match(admin.getInstructions(), /Preview and get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
@@ -1235,7 +1238,7 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(texts(slowResult), /^Queued\. Call Result once per ref with delivery=notification and wait_seconds=1500, then reply with its markdown\. Never poll or resubmit\.\n\n\[Watch result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
+  assert.match(texts(slowResult), /^Queued\. Share the watch links below and end your turn; do not call Result now\. When the user later asks to see a result, call Result with its ref\. Never poll or resubmit\.\n\n\[Watch result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
   once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
