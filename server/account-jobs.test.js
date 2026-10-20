@@ -30,8 +30,9 @@ test("job reservations enforce a per-account cap atomically and release once", (
   assert.equal(reservations.has("artist-a"), false);
 });
 
-test("the account job cap defaults safely and accepts only positive integers", () => {
+test("the account job cap defaults to two and refuses anything but a positive integer", () => {
   assert.equal(configuredAccountJobLimit(undefined), 2);
+  assert.equal(configuredAccountJobLimit(""), 2);
   assert.equal(configuredAccountJobLimit("4"), 4);
-  for (const value of ["0", "-1", "1.5", "many"]) assert.equal(configuredAccountJobLimit(value), 2);
+  for (const value of ["0", "-1", "1.5", "many"]) assert.throws(() => configuredAccountJobLimit(value), /STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS/);
 });

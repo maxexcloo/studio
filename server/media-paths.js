@@ -17,9 +17,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
 
 export const mediaType = "media";
-export const mediaStorageEnabled = process.env.STUDIO_OUTPUT_STORAGE
-  ? process.env.STUDIO_OUTPUT_STORAGE === "studio"
-  : process.env.STUDIO_MULTI_USER === "1";
+/** Whether outputs live in Studio media; any value other than `studio` or `comfy` is refused. */
+export function outputStorageFromEnv(env = process.env) {
+  if (!env.STUDIO_OUTPUT_STORAGE) return env.STUDIO_MULTI_USER === "1";
+  if (!["studio", "comfy"].includes(env.STUDIO_OUTPUT_STORAGE)) throw new Error('STUDIO_OUTPUT_STORAGE must be "studio" or "comfy".');
+  return env.STUDIO_OUTPUT_STORAGE === "studio";
+}
+export const mediaStorageEnabled = outputStorageFromEnv();
 export const mediaRoot = path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(dataDir, "media"));
 
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;

@@ -95,9 +95,12 @@ function requireAccountAdmin(req, res) {
 }
 
 let oidc = null;
-// Shorter tokens are refused outright, so they are never advertised either.
+/** A setup token shorter than 32 characters stops Studio instead of being ignored. */
+export function checkSetupToken(value = process.env.STUDIO_SETUP_TOKEN) {
+  if (value && String(value).length < 32) throw new Error("STUDIO_SETUP_TOKEN must be at least 32 characters.");
+}
 const setupTokenUsable = () => String(process.env.STUDIO_SETUP_TOKEN || "").length >= 32;
-if (multiUserEnabled && process.env.STUDIO_SETUP_TOKEN && !setupTokenUsable()) console.warn("[Studio] STUDIO_SETUP_TOKEN is ignored: use at least 32 characters.");
+if (multiUserEnabled) checkSetupToken();
 
 export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], oidcClient } = {}) {
   oidc = oidcClient !== undefined ? oidcClient : multiUserEnabled && oidcConfigFromEnv() ? createOidcClient(oidcConfigFromEnv()) : null;

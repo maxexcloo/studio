@@ -49,6 +49,14 @@ test("configuration needs issuer, client and HTTPS callback", () => {
   assert.equal(oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: `${issuer}/`, STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }).issuer, issuer);
 });
 
+test("a partial single sign-on configuration fails and names what is missing", () => {
+  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: "studio" }), /STUDIO_OIDC_REDIRECT_URI/);
+  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_LABEL: "Pocket ID" }), /STUDIO_OIDC_ISSUER, STUDIO_OIDC_CLIENT_ID, STUDIO_OIDC_REDIRECT_URI/);
+  const complete = { STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" };
+  assert.equal(oidcConfigFromEnv(complete).label, "Single Sign-On");
+  assert.equal(oidcConfigFromEnv({ ...complete, STUDIO_OIDC_LABEL: "Pocket ID" }).label, "Pocket ID");
+});
+
 test("a PKCE sign-in verifies the signed identity token once", async () => {
   let nonce = "";
   const { client, exchanges } = provider(() => idToken(baseClaims(nonce)));

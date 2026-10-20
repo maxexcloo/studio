@@ -15,6 +15,8 @@ version opens with a `> ` summary line.
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
 - **Matching phone switches:** the phone's More sheet names its switches as Settings does (Smart upscale, Show failed items, Confirm before removing things) and uses the same switch control.
 
+- **Studio settings fail loudly:** a partial `STUDIO_OIDC_*` set, an invalid `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS` or `STUDIO_OUTPUT_STORAGE`, or a `STUDIO_SETUP_TOKEN` under 32 characters now stops Studio at startup with the setting's name instead of quietly falling back. The sign-in button reads Single Sign-On unless `STUDIO_OIDC_LABEL` names it.
+
 ### Fixed
 - **Current wording and links:** About and the phone no longer mention in-app updates, the Hugging Face hint points at Settings › Integrations, `.env.example` names the `studio` storage default, and broken guide links point at existing sections.
 - **Studio names in downloads:** gallery and Hidden exports download as `studio-gallery-…`, `studio-hidden-…`, unnamed shared files fall back to `studio`, and accounts asking for Hidden see "Hidden is not available to accounts."

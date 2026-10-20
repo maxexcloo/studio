@@ -113,3 +113,11 @@ test("ingested runs are remembered across restarts so recovery never imports the
   const saved = JSON.parse(fs.readFileSync(path.join(temporary, "media-ingested.json"), "utf8"));
   assert.ok(saved.jobs["job-remembered"]);
 });
+
+test("output storage accepts studio or comfy and refuses anything else", () => {
+  assert.equal(paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "studio" }), true);
+  assert.equal(paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "comfy", STUDIO_MULTI_USER: "1" }), false);
+  assert.equal(paths.outputStorageFromEnv({ STUDIO_MULTI_USER: "1" }), true);
+  assert.equal(paths.outputStorageFromEnv({}), false);
+  assert.throws(() => paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "heiss" }), /STUDIO_OUTPUT_STORAGE must be "studio" or "comfy"/);
+});

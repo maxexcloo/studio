@@ -31,6 +31,8 @@ export function reserveAccountJob(ownerId, jobs, reservations, limit) {
 }
 
 export function configuredAccountJobLimit(value = process.env.STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS) {
+  if (value === undefined || value === "") return 2;
   const limit = Number(value);
-  return Number.isSafeInteger(limit) && limit > 0 ? limit : 2;
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS must be a positive whole number.");
+  return limit;
 }

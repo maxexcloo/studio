@@ -9,7 +9,7 @@ process.env.HEISS_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MULTI_USER = "1";
 process.env.STUDIO_SETUP_TOKEN = "a-deployment-setup-token-of-sufficient-length";
 process.env.COMFY_URL = "http://127.0.0.1:9";
-const { registerMultiUserAuthRoutes } = await import("./multi-user-auth.js");
+const { checkSetupToken, registerMultiUserAuthRoutes } = await import("./multi-user-auth.js");
 
 const routes = {};
 registerMultiUserAuthRoutes({
@@ -42,4 +42,10 @@ test("a deployment setup token creates the first administrator remotely, once", 
   const again = await call(routes["POST /api/accounts/bootstrap"], remote({ username: "second", password: "a secure second password", setupToken: process.env.STUDIO_SETUP_TOKEN }));
   assert.equal(again.statusCode, 409);
   assert.equal((await call(routes["GET /api/accounts/status"], remote({}))).body.setupTokenAccepted, undefined);
+});
+
+test("a setup token shorter than 32 characters is refused, not ignored", () => {
+  assert.throws(() => checkSetupToken("too-short"), /STUDIO_SETUP_TOKEN must be at least 32 characters/);
+  assert.doesNotThrow(() => checkSetupToken(undefined));
+  assert.doesNotThrow(() => checkSetupToken("x".repeat(32)));
 });

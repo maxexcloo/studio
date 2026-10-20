@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 /**
- * OpenID Connect sign-in (Pocket ID) as a PKCE client. The provider proves who
+ * OpenID Connect sign-in (such as Pocket ID) as a PKCE client. The provider proves who
  * someone is; Studio administrators decide what they may do. Nothing here
  * assigns roles or access profiles.
  */
@@ -24,7 +24,12 @@ export function oidcConfigFromEnv(env = process.env) {
   const issuer = trimSlash(env.STUDIO_OIDC_ISSUER);
   const clientId = String(env.STUDIO_OIDC_CLIENT_ID || "");
   const redirectUri = String(env.STUDIO_OIDC_REDIRECT_URI || "");
-  if (!issuer || !clientId || !redirectUri) return null;
+  const required = { STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: clientId, STUDIO_OIDC_REDIRECT_URI: redirectUri };
+  const optional = ["STUDIO_OIDC_CLIENT_SECRET", "STUDIO_OIDC_LABEL"].filter((name) => env[name]);
+  const missing = Object.keys(required).filter((name) => !required[name]);
+  if (missing.length === 3 && !optional.length) return null;
+  // A partial set would quietly turn single sign-on off.
+  if (missing.length) throw new Error(`Single sign-on is partly configured: set ${missing.join(", ")}.`);
   for (const value of [issuer, redirectUri]) {
     const url = new URL(value);
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -35,7 +40,7 @@ export function oidcConfigFromEnv(env = process.env) {
     clientId,
     clientSecret: String(env.STUDIO_OIDC_CLIENT_SECRET || ""),
     redirectUri,
-    label: String(env.STUDIO_OIDC_LABEL || "Pocket ID").slice(0, 40),
+    label: String(env.STUDIO_OIDC_LABEL || "Single Sign-On").slice(0, 40),
     scopes: "openid email profile"
   };
 }
