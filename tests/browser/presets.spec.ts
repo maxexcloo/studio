@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 test('Normal instances hide the preset library on desktop and phone', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -6,14 +7,15 @@ test('Normal instances hide the preset library on desktop and phone', async ({ p
     await route.fulfill({ json: { ...models, features: { ...models.features, presets: false } } });
   });
   await page.goto('/');
-  await expect(page.locator('.phone-create-open, .gallery-generation-mode').first()).toBeVisible();
+  await expect(studioUi(page).galleryMode).toBeVisible();
   await expect(page.getByRole('button', { name: 'Image & Model Library', exact: true })).toHaveCount(0);
 });
 
+// The phone lists the library in More; the full studio keeps it in the dock.
 async function openLibrary(page: import('@playwright/test').Page) {
-  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
-  if (await page.locator('.phone-shell').count()) await page.getByRole('button', { name: 'More', exact: true }).click();
-  else await page.getByRole('textbox', { name: 'Prompt', exact: true }).click();
+  const ui = studioUi(page);
+  if (await ui.isPhone()) await ui.openMore();
+  else await ui.prompt.click();
   await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
 }
 
@@ -25,7 +27,7 @@ const preset = {
   settings: { width: 768, height: 1024, steps: 4, cfg: 1, seed: '0', sampler: 'euler', scheduler: 'simple' }, warnings: []
 };
 
-test('import, reopen and apply image settings on desktop and phone', async ({ page, isMobile }, testInfo) => {
+test('import, reopen and apply image settings on desktop and phone', async ({ page }, testInfo) => {
   const models = await (await page.request.get('/api/models')).json();
   for (const profile of models.profiles) if (profile.kind === 'video') profile.mediaInputs = [{ id: 'start', kind: 'image', role: 'start', label: 'Start Image', required: false, min: 0, max: 1 }];
   const originalModel = models.profiles.find((profile: any) => profile.id === 'mock-flux-schnell');
@@ -68,44 +70,27 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   await expect(dialog).toHaveCount(0);
   let generated: Record<string, unknown> | null = null;
   await page.route('**/api/generate', async (route) => { generated = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { ok: false, error: 'Test request captured' } }); });
-  if (isMobile) {
-    await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
-  } else await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  const ui = studioUi(page);
+  await ui.openComposer();
+  await ui.generate.click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.prompt).toBe(preset.prompt);
   expect(String(generated!.seed)).toBe('0');
   expect(generated!.width).toBe(768);
   expect(generated!.height).toBe(1024);
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
-  if (isMobile) {
-    await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
-  } else {
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await page.locator('.model-trigger').first().click();
-  }
-  const modelMenu = page.locator(isMobile ? '.phone-sheet[aria-label="Model"]' : '.model-menu');
-  await modelMenu.locator(isMobile ? '.phone-model-option' : '.model-option').filter({ hasText: 'Alternate Test Model' }).first().click();
+  await ui.chooseModel('Alternate Test Model');
   generated = null;
-  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
-  else await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await ui.generate.click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.profileId).toBe('alternate-test-model');
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
-  if (isMobile) {
-    await expect(page.locator('.phone-create')).toHaveCount(0);
-    await page.getByRole('group', { name: 'Gallery Mode', exact: true }).getByRole('button', { name: 'Videos', exact: true }).click();
-    await page.locator('.phone-create-open').click();
-  } else {
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await page.locator('.composer-mode-select').getByRole('button', { name: 'Video', exact: true }).click();
-  }
+  await ui.openComposer();
+  await ui.composer.getByRole('group', { name: 'Generation Mode', exact: true }).getByRole('button', { name: 'Video', exact: true }).click();
   await expect(page.getByRole('button', { name: `Change reference image, currently ${preset.name}`, exact: true })).toBeVisible();
   generated = null;
-  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Animate the imported image');
-  if (isMobile) await page.locator('.phone-create').getByRole('button', { name: 'Generate', exact: true }).click();
-  else await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await ui.prompt.fill('Animate the imported image');
+  await ui.generate.click();
   await expect.poll(() => generated).not.toBeNull();
   expect(generated!.kind).toBe('video');
   expect(generated!.referenceAssets).toEqual([{ slot: 'start', assetId: 'imported-reference' }]);

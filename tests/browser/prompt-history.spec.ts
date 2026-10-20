@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 test.beforeEach(async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -10,31 +11,32 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('positive and negative histories replace only their respective fields', async ({ page, isMobile }) => {
+test('positive and negative histories replace only their respective fields', async ({ page }) => {
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
-  const negative = page.getByRole('textbox', { name: 'Negative Prompt', exact: true });
+  const ui = studioUi(page);
+  await ui.openComposer();
+  const { prompt, negativePrompt: negative } = ui;
   await prompt.fill('Keep this scene');
   await page.getByRole('button', { name: 'Recent Negative Prompts', exact: true }).click();
   const negativeHistory = page.getByRole('dialog', { name: 'Recent Negative Prompts', exact: true });
   await expect(negativeHistory).toBeVisible();
-  await negativeHistory.getByRole(isMobile ? 'button' : 'option', { name: /Avoid blur and extra fingers/ }).first().click();
+  // The phone history sheet lists buttons; the full studio's popover is a listbox.
+  await negativeHistory.getByRole('option', { name: /Avoid blur and extra fingers/ }).or(negativeHistory.getByRole('button', { name: /Avoid blur and extra fingers/ })).first().click();
   await expect(negative).toHaveValue('Avoid blur and extra fingers');
   await expect(prompt).toHaveValue('Keep this scene');
   await prompt.focus();
   await page.getByRole('button', { name: 'Recent Prompts', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Recent Prompts', exact: true }).getByRole(isMobile ? 'button' : 'option', { name: /A mountain at sunrise/ }).first().click();
+  const history = page.getByRole('dialog', { name: 'Recent Prompts', exact: true });
+  await history.getByRole('option', { name: /A mountain at sunrise/ }).or(history.getByRole('button', { name: /A mountain at sunrise/ })).first().click();
   await expect(prompt).toHaveValue('A mountain at sunrise');
   await expect(negative).toHaveValue('Avoid blur and extra fingers');
 });
 
-test('both prompt fields grow, stop at a viewport cap and scroll through long content', async ({ page, isMobile }) => {
+test('both prompt fields grow, stop at a viewport cap and scroll through long content', async ({ page }) => {
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
-  await prompt.focus();
-  const fields = [prompt, page.getByRole('textbox', { name: 'Negative Prompt', exact: true })];
+  const ui = studioUi(page);
+  await ui.openComposer();
+  const fields = [ui.prompt, ui.negativePrompt];
   for (const field of fields) {
     await field.fill('Short');
     const small = await field.evaluate((element) => element.clientHeight);
