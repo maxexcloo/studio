@@ -26,6 +26,7 @@ import os from "node:os";
 
 export const studioHeader = "x-heiss";
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+const signOutPaths = new Set(["/api/accounts/sign-out", "/api/access/sign-out"]);
 
 /** "Localhost.:8787" -> "localhost", "[::1]:8787" -> "::1". "" when it cannot be read. */
 export function hostnameOf(hostHeader = "") {
@@ -118,7 +119,10 @@ export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) 
       refuse(res, "origin", "Blocked a request from another website.");
       return;
     }
-    if (!req.headers[studioHeader] && !req.is("application/json")) {
+    // Signing out only ever ends the sender's own session, so a plain same-origin POST (a console
+    // fetch, a form) may do it; another site was already refused above.
+    const signOut = req.method === "POST" && signOutPaths.has(req.path);
+    if (!signOut && !req.headers[studioHeader] && !req.is("application/json")) {
       refuse(res, "header", "This request didn’t come from the studio. Reload the page and try again.");
       return;
     }

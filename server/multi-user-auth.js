@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { accountAccessForId, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
-import { canAdmin, clientOf } from "./access.js";
+import { canAdmin, clientOf, endDeviceSession } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
@@ -206,9 +206,11 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     }
   });
 
+  // Every session this browser holds ends: the account's, and a studio-password device session left from single-user mode.
   post("/api/accounts/sign-out", (req, res) => {
     revokeAccountSession(cookieToken(req));
     appendCookie(res, accountCookie(req, ""));
+    endDeviceSession(req, res);
     req.heissAccount = null;
     res.json({ ok: true });
   });

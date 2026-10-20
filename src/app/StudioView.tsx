@@ -48,6 +48,8 @@ import { StatusAnnouncer, StatusPill, SurfaceStatus, useStatusHost } from './Sta
 import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
+import { AccountMenu } from './AccountMenu';
+import { hasAccountStorageScope } from './api';
 import { GetModelsSheet, StarterModels } from './StarterModels';
 import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
@@ -463,6 +465,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
       {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" aria-haspopup="dialog" aria-expanded={Boolean(view.presetLibraryOpen)} onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
+      {hasAccountStorageScope() ? <AccountMenu running={runningCount} confirmAction={view.confirmAction} openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
       {prefs.zenMode ? (
         <Tip content="Exit Zen (Esc)"><button className="icon-button" aria-label="Exit Zen" onClick={() => setZenMode(false)}><Minimize2 size={16} /></button></Tip>
       ) : null}
