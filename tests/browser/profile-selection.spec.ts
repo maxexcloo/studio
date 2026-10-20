@@ -1,25 +1,22 @@
 import { expect, test } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
-test('image count keeps minus and plus across profile widths and mobile sizes', async ({ page, isMobile }) => {
+test('image count keeps minus and plus across profile widths and mobile sizes', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const base = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
   const names = ['Count Short', 'Count With A Much Longer Profile Name'];
   const profiles = names.map((name, index) => ({ ...base, id: index ? 'count-long-profile' : base.id, displayName: name, label: name, defaults: { ...base.defaults, count: 4 }, constraints: { ...base.constraints, count: { min: 1, max: 8, step: 1 } }, capabilities: { ...base.capabilities, variations: true } }));
   models.profiles = [...models.profiles.filter((profile: any) => profile.kind !== 'image'), ...profiles];
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
-  // Every project has a touch screen, so 640px would switch to the phone studio; the full one is chosen to keep it.
-  if (!isMobile) await page.addInitScript(() => { localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })); });
   await page.goto('/');
   const ui = studioUi(page);
   const phone = await ui.isPhone();
   const root = await ui.openComposer();
-  for (const width of phone ? [390, 320] : [1440, 900, 640]) {
+  for (const width of phone ? [390, 320] : [1440, 900]) {
     await page.setViewportSize({ width, height: phone ? 844 : 1000 });
     for (const name of names) {
       await ui.chooseModel(name);
       const picker = root.locator('.composer-count-picker').filter({ visible: true });
-      if (!await picker.count()) await root.getByRole('button', { name: 'More Settings', exact: true }).click();
       await expect(picker).toBeVisible();
       const decrease = picker.getByRole('button', { name: 'Decrease Images', exact: true });
       const increase = picker.getByRole('button', { name: 'Increase Images', exact: true });
@@ -35,7 +32,6 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
         expect(box!.width).toBeGreaterThanOrEqual(44);
         expect(box!.height).toBeGreaterThanOrEqual(44);
       }
-      if (await root.locator('.composer-drawer').isVisible()) await root.locator('.composer-drawer').getByRole('button', { name: 'Close Settings', exact: true }).click();
     }
   }
 });

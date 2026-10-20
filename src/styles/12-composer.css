@@ -117,112 +117,19 @@
 
 /* --- The drawer trigger and panel ---------------------------------------- */
 
-.composer-more {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 40px;
-  min-height: 40px;
-  padding: 0 11px;
-  border: 1px solid transparent;
-  border-radius: 20px;
-  background: #090909;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  transition: background var(--motion-base, 180ms) var(--motion-ease, ease), color 160ms ease, box-shadow 160ms ease;
-}
-.composer-more i {
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: hsl(var(--foreground));
-}
-@media (hover: hover) and (pointer: fine) {
-  .composer-more:hover {
-    background: #161616;
-    color: hsl(var(--foreground));
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-  }
-}
-.composer-more.active {
-  background: #1c1c1c;
-  color: hsl(var(--foreground));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
-}
-
-.composer-drawer {
-  position: absolute;
-  right: 8px;
-  bottom: calc(100% + 10px);
-  z-index: 16;
-  width: min(320px, calc(100vw - 32px));
-  display: grid;
-  gap: 2px;
-  padding: 8px;
-}
-.composer-drawer > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 4px 6px 8px;
-  color: hsl(var(--muted-foreground));
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-.composer-drawer-row {
-  /* 24px panel radius - 8px panel padding = 16px on the rows inside it. */
-  border-radius: 16px;
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 4px 0 8px;
-}
-.composer-drawer-row > span {
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-  font-weight: 500;
-}
-.composer-drawer-row > div {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  min-width: 0;
-}
 /* The row already names the control, so the control does not repeat itself. */
-.composer-drawer-row .number-picker-label,
-.composer-drawer-row .number-picker-icon { display: none; }
-.composer-drawer-row .model-picker.is-compact .model-trigger { grid-template-columns: minmax(0, 150px) 12px; }
-.composer-drawer-row .aspect-picker { width: auto; }
-.composer-drawer .model-menu,
-.composer-drawer .aspect-menu {
-  right: 0;
-  left: auto;
-  min-width: 220px;
-}
 
 /* The narrow-screen overrides in 06-responsive.css are meant for the sidebar
    picker; the composer's compact one has to stay a single 40px line. */
-.zen-prompt-actions .model-picker.is-compact .model-trigger,
-.composer-drawer .model-picker.is-compact .model-trigger {
+.zen-prompt-actions .model-picker.is-compact .model-trigger {
   min-height: 40px;
   height: 40px;
 }
-.zen-prompt-actions .model-copy strong,
-.composer-drawer .model-copy strong {
+.zen-prompt-actions .model-copy strong {
   display: block;
   white-space: nowrap;
   -webkit-line-clamp: unset;
 }
-
-.composer-more:active:not(:disabled) { scale: 0.96; }
 
 /* --- Reference media ----------------------------------------------------- */
 @keyframes reference-shimmer { to { background-position-x: -200%; } }
@@ -262,12 +169,6 @@
     min-width: 0;
     max-width: none;
   }
-  .composer-drawer {
-    left: 8px;
-    right: 8px;
-    width: auto;
-  }
-  .composer-drawer-row { min-height: 48px; }
 }
 
 /* --- Pinned seed ----------------------------------------------------------

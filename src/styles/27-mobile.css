@@ -17,7 +17,6 @@
 
 /* The composer sits under the dock (z 13). While one of its own surfaces is
    open, it rises above the dock and short-screen sidebar (15), below the viewer (20). */
-.zen-prompt:has(.composer-drawer, .model-menu, .aspect-menu, .ref-chip.is-open, .prompt-history) { z-index: 18; }
 
 /* Chips above the dock (Group runs, Stop) must not sit on an open sidebar. */
 

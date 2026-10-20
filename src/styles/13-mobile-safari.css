@@ -95,7 +95,6 @@ body {
   .zen-prompt-actions { gap: 5px; }
   .prompt-left-actions,
   .zen-inline-settings { gap: 4px; }
-  .composer-drawer { left: 0; right: 0; }
 }
 
 @media (hover: none) and (pointer: coarse) {

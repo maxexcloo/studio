@@ -1,9 +1,8 @@
-import { imageDimension } from './generationOptions';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, ChevronUp, MoreHorizontal, RefreshCw, ListRestart, SlidersHorizontal, X } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, RefreshCw, ListRestart, SlidersHorizontal } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
 import { recipesFor } from './modelRecipes';
@@ -25,9 +24,8 @@ import type { SideLimits } from './sizing';
 --------------------------------------------------------------------------- */
 
 type ControlId = "workflow" | "negative" | "aspect" | "steps" | "variants" | "lora";
-type Demotion = ControlDensity | "drawer";
 
-const LADDER: Array<[ControlId, Demotion]> = [
+const LADDER: Array<[ControlId, ControlDensity]> = [
   ["lora", "compact"],
   ["steps", "compact"],
   ["variants", "compact"],
@@ -37,25 +35,21 @@ const LADDER: Array<[ControlId, Demotion]> = [
   ["variants", "mini"],
   ["aspect", "mini"],
   ["workflow", "compact"],
-  ["steps", "drawer"],
-  ["lora", "drawer"],
-  ["variants", "drawer"],
-  ["aspect", "drawer"],
+  ["lora", "mini"],
   ["workflow", "mini"],
 ];
-/* Note: workflow never reaches the drawer - it is the top of the hierarchy,
-   and a mini workflow chip still fits a 320px screen. */
+/* Every control stays in the bar: at its narrowest each is a mini chip, which
+   still fits the narrowest window that gets the full studio. */
 
-type Plan = Record<ControlId, { density: ControlDensity; drawer: boolean }>;
+type Plan = Record<ControlId, { density: ControlDensity }>;
 
 function planForLevel(level: number): Plan {
   const plan = {} as Plan;
   (["workflow", "negative", "aspect", "steps", "variants", "lora"] as ControlId[])
-    .forEach((id) => { plan[id] = { density: "full", drawer: false }; });
+    .forEach((id) => { plan[id] = { density: "full" }; });
   for (let index = 0; index < Math.min(level, LADDER.length); index += 1) {
     const [id, to] = LADDER[index];
-    if (to === "drawer") plan[id].drawer = true;
-    else plan[id].density = to;
+    plan[id].density = to;
   }
   return plan;
 }
@@ -296,10 +290,8 @@ export function ComposerBar(props: ComposerBarProps) {
   const contentKey = [workflowName, mode, customSize ? "custom" : "preset", aspectLocked ? "locked" : "free", loraActiveCount, canUseNegativePrompt, Boolean(models), pinnedSeed.trim(), Boolean(primaryTarget)].join("|");
   const { rowRef, plan, level } = useDensityLevel(contentKey);
   useComposerHeightVar(rowRef);
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  /* Every control is a function of its density, so the drawer can render the
-     same control at full size while the bar shows a demoted copy. */
+  /* Every control is a function of its density: the ladder picks how large each shows. */
   const recipePicker = models && recipesFor(modelProfiles, model).length ? <label className="recipe-control">Recipe<select className="is-framed" aria-label="Recipe" value={model} onChange={(event) => chooseModel(event.target.value)}>{recipesFor(modelProfiles, model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null;
 
   const workflowPicker = (density: ControlDensity) => models
@@ -351,20 +343,8 @@ export function ComposerBar(props: ComposerBarProps) {
     </Tip>
   ) : null;
 
-  const CONTROLS: Array<[ControlId, string, (density: ControlDensity) => React.ReactNode]> = [
-    ["workflow", "Model", workflowPicker],
-    ["aspect", "Aspect Ratio", aspectPicker],
-    ["steps", "Steps", stepsPicker],
-    ["variants", countLabel, variantsPicker],
-    ["lora", "LoRA", loraPill]
-  ];
 
-  /** Controls the ladder has pushed out of the bar, in reading order for the drawer. */
-  const tucked = CONTROLS.filter(([id, , render]) => plan[id].drawer && render("full"));
-
-  React.useEffect(() => { if (!tucked.length) setDrawerOpen(false); }, [tucked.length]);
-
-  const inline = (id: ControlId, render: (density: ControlDensity) => React.ReactNode) => (plan[id].drawer ? null : render(plan[id].density));
+  const inline = (id: ControlId, render: (density: ControlDensity) => React.ReactNode) => render(plan[id].density);
 
   const submitActions = (
         <div className="composer-submit-actions" data-fluid-group>
@@ -390,29 +370,6 @@ export function ComposerBar(props: ComposerBarProps) {
       {primaryTarget ? createPortal(submitActions, primaryTarget) : null}
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
       <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} referenceWith={referenceWith} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
-      <AnimatePresence initial={false}>
-        {drawerOpen && tucked.length ? (
-        <motion.div
-          data-open-surface
-          className="composer-drawer"
-          initial={{ opacity: 0, y: 8, filter: "blur(3px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: 6, filter: "blur(2px)" }}
-          transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-        >
-          <header>
-            <span>Settings</span>
-            <Tip content="Close"><button type="button" className="icon-button" aria-label="Close Settings" onClick={() => setDrawerOpen(false)}><X size={14} /></button></Tip>
-          </header>
-          {tucked.map(([id, label, render]) => (
-            <div className="composer-drawer-row" key={id}>
-              <span>{label}</span>
-              <div>{render("full")}</div>
-            </div>
-          ))}
-        </motion.div>
-        ) : null}
-      </AnimatePresence>
       <div className="composer-resource-row">
         <div className="composer-resource-left"><div className="composer-reference-tools" />{loraPill("compact")}</div>
         <div className="composer-resource-model">{workflowPicker("compact")}</div>
@@ -440,21 +397,6 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
           {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
-          {tucked.length ? (
-            <Tip content="More Settings">
-              <button
-                type="button"
-                data-open-trigger
-                className={cn("composer-more", drawerOpen && "active")}
-                aria-label="More Settings"
-                aria-expanded={drawerOpen}
-                onClick={() => setDrawerOpen((value) => !value)}
-              >
-                <MoreHorizontal size={15} />
-                <i>{tucked.length}</i>
-              </button>
-            </Tip>
-          ) : null}
         </div>
         {onReset ? <Tip content="Reset Creation"><button type="button" className="icon-button composer-reset" aria-label="Reset Creation" onClick={onReset}><ListRestart size={15} /></button></Tip> : null}
         {primaryTarget ? null : submitActions}

@@ -31,12 +31,8 @@ test('composer menus stay reachable and side controls are removed', async ({ pag
   await page.locator('.zen-prompt .model-trigger').click();
   await reachable(page.locator('.model-menu .model-option').first(), true);
   await page.keyboard.press('Escape');
-  const more = page.locator('.zen-prompt').getByRole('button', { name: 'More Settings', exact: true });
-  if (await more.isVisible()) {
-    await more.click();
-    await expect(page.locator('.composer-drawer')).toBeVisible();
-    await page.locator('.composer-drawer').getByRole('button', { name: 'Close Settings', exact: true }).click();
-  }
+  // Every control stays in the bar; there is no More Settings drawer.
+  await expect(page.locator('.zen-prompt').getByRole('button', { name: 'More Settings', exact: true })).toHaveCount(0);
   await page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'LoRAs', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');

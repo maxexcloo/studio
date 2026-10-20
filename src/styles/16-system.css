@@ -23,8 +23,7 @@
 .zen-prompt,
 .model-menu,
 .aspect-menu,
-.fluid-select-content,
-.composer-drawer {
+.fluid-select-content {
   border: 1px solid var(--glass-border);
   background: var(--surface-grain), var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
@@ -42,14 +41,12 @@
    straight through. Their own glass therefore lives on a pseudo-element, which
    leaves the element itself transparent to nested blur. (-webkit- first: the
    CSS minifier keeps only the last of the pair.) */
-.zen-prompt,
-.composer-drawer {
+.zen-prompt {
   background: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-.zen-prompt::before,
-.composer-drawer::before {
+.zen-prompt::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -72,8 +69,7 @@
 .zen-prompt,
 .model-menu,
 .aspect-menu,
-.fluid-select-content,
-.composer-drawer { box-shadow: var(--glass-panel-shadow); }
+.fluid-select-content { box-shadow: var(--glass-panel-shadow); }
 .studio-dock,
 .dock-chip,
 .zen-control-button,
@@ -84,8 +80,7 @@
 .zen-prompt { border-radius: var(--r-panel); }
 .model-menu,
 .aspect-menu,
-.fluid-select-content,
-.composer-drawer { border-radius: var(--r-menu); }
+.fluid-select-content { border-radius: var(--r-menu); }
 .model-option,
 .aspect-option,
 .fluid-select-content [role="option"] { border-radius: var(--r-item); }
@@ -118,8 +113,7 @@
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot,
 .viewer-dock .icon-button,
-.viewer-dock .text-button,
-.composer-drawer .icon-button {
+.viewer-dock .text-button {
   width: var(--control-h);
   height: var(--control-h);
   min-width: var(--control-h);
@@ -134,8 +128,7 @@
 .viewer-dock .text-button { width: auto; padding: 0 12px; color: hsl(var(--foreground)); }
 .studio-dock .icon-button:hover:not(:disabled),
 .viewer-dock .icon-button:hover:not(:disabled),
-.viewer-dock .text-button:hover:not(:disabled),
-.composer-drawer .icon-button:hover {
+.viewer-dock .text-button:hover:not(:disabled) {
   background-color: var(--control-hover);
   color: #fff;
 }
@@ -147,19 +140,16 @@
    at --motion-fast; a press shrinks the icon a touch at --motion-instant. The
    keyboard ring traces the fill circle, inside the bar. */
 .studio-dock .icon-button,
-.viewer-dock .icon-button,
-.composer-drawer .icon-button {
+.viewer-dock .icon-button {
   padding: var(--icon-fill-inset);
   background-clip: content-box;
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), scale var(--motion-instant) var(--motion-ease);
 }
 .studio-dock .icon-button:active:not(:disabled),
-.viewer-dock .icon-button:active:not(:disabled),
-.composer-drawer .icon-button:active:not(:disabled) { background-color: var(--control-press); scale: .94; }
+.viewer-dock .icon-button:active:not(:disabled) { background-color: var(--control-press); scale: .94; }
 .viewer-dock .icon-button.danger-tone:active:not(:disabled) { background-color: var(--danger-ring); }
 .studio-dock .icon-button:focus-visible,
-.viewer-dock .icon-button:focus-visible,
-.composer-drawer .icon-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
+.viewer-dock .icon-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 /* The countdown widens the button; the fill stays a pill around it. */
 .viewer-dock .icon-button.has-count { padding-inline: calc(var(--icon-fill-inset) + 6px); }
 .zen-control-button:hover { background: rgb(36 36 36 / .94); transform: none; }
