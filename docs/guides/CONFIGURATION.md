@@ -88,7 +88,7 @@ Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a to
 
 ## Civitai Images & Downloads
 
-Image & Model Library is disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on the secondary instance; keep it unset or `0` on the primary instance. The server enforces this switch for preset data, thumbnails, imports, provider downloads and Civitai token settings, and the desktop and phone controls follow the server’s feature flag. Existing catalogue downloads remain available independently.
+Image & Model Library is disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer it; keep it unset or `0` everywhere else. The server enforces this switch for preset data, thumbnails, imports, provider downloads and Civitai token settings, and the desktop and phone controls follow the server’s feature flag. Existing catalogue downloads remain available independently.
 
 Open **Image & Model Library** from the desktop toolbar or phone gallery. **Images** accepts a Civitai image link and downloads the full image into this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations. Missing supported resources queue automatically through the configured downloader; filename conflicts and unavailable resources remain explicit. Existing saved presets migrate to gallery images when the library opens. Imported images use the normal viewer, settings reuse, reference selection, Hidden and deletion behaviour. Deleting an image keeps downloaded models.
 
