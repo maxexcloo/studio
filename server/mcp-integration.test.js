@@ -169,7 +169,9 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
   });
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-ai-user-id': user } : {}) });
-  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers(''), body })).status, 403);
+  // The gateway's own probes name no user: they connect, and nobody is noted as waiting for a link.
+  assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: headers(''), body })).status, 200);
+  assert.deepEqual(noted, []);
   assert.equal((await fetch(`${f.base}/mcp`, { method: 'POST', headers: { ...headers('librechat-unlinked'), 'x-ai-user-email': 'unlinked@example.test' }, body })).status, 200);
   assert.deepEqual(noted, ['librechat-unlinked']);
   assert.deepEqual(emails, [['librechat-unlinked', 'unlinked@example.test']]);
@@ -181,6 +183,13 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
   const refused = await unlinked.callTool({ name: 'Generate', arguments: { prompts: ['a lighthouse'] } });
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /isn’t linked to a Studio account yet\. Ask an administrator to link it in Settings › Accounts & MCP\./);
+  assert.equal(f.requests.length, 0);
+
+  // Nor can a request without a user do anything once connected.
+  const anonymous = await f.client('');
+  const unnamed = await anonymous.callTool({ name: 'Generate', arguments: { prompts: ['a lighthouse'] } });
+  assert.equal(unnamed.isError, true);
+  assert.match(unnamed.content[0].text, /must forward its user identity/);
   assert.equal(f.requests.length, 0);
 
   const client = await f.client('librechat-linked');

@@ -20,6 +20,7 @@ version opens with a `> ` summary line.
 - **Faster while the video worker is off:** when the video worker does not answer, Studio remembers that for 30 seconds instead of asking again on every model list and run, which took about 1.5 seconds each time a lookup or connection failed slowly. A connection check that reaches the worker, or a new video address, clears it at once. Model detection is also reused until ComfyUI is asked again.
 - **Faster gallery media:** Studio builds the thumbnails, video stills and grid previews of its stored media in the background after it starts and whenever the gallery changes, newest first and only while nothing else is being built, so a large imported gallery no longer waits on hundreds of first-view builds. A finished run's thumbnails are built as it is delivered. Browsers keep stored originals for good, and their thumbnails, stills and previews for a week before checking them again.
 - **Video thumbnails in small views:** a video's thumbnail address now gives its still, so the activity panel, the reference picker and the Animate review show a picture instead of a placeholder.
+- **Quieter chat gateway checks:** the gateway's own health checks and handshakes, which name no chat user, now connect and list the tools instead of being refused, so LiteLLM stops logging a failed MCP session for each. Tool calls without a user are still refused.
 
 ## [0.26.0] - 2026-10-19
 

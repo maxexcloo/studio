@@ -18,6 +18,7 @@ const maxGenerateWaitSeconds = 60;
 const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; call Models only when the user names a model, asks what is available or needs controls, LoRAs or references. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption, and collect queued jobs with one background Result each. Never poll, resubmit or invent results.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview and get approval before Apply. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
+const anonymousMessage = 'The gateway must forward its user identity.';
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('A job_id or ref such as "result 3".') };
@@ -72,11 +73,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     else if (equal(token, controlKey)) scope = 'control';
     else if (equal(token, mediaKey)) {
       // Gateway trust: the shared key vouches for the gateway; only a link (an administrator's, or by matching email) maps its user to an account.
-      if (!user) return res.status(403).json({ error: 'The gateway must forward its user identity.' });
+      // The gateway's own health checks and handshakes name no user: they connect and list, and every call is refused.
       const email = String(req.headers['x-ai-user-email'] || '');
       if (email.length > 256 || /[\x00-\x1f\x7f]/.test(email)) return res.status(400).json({ error: 'Invalid forwarded user email.' });
-      account = authenticateGatewayIdentity(user, email);
-      if (account) {
+      account = user ? authenticateGatewayIdentity(user, email) : null;
+      if (!user) scope = 'anonymous';
+      else if (account) {
         scope = 'media';
         media.credentials.set(account.userId, internalCredential(account.userId));
       } else {
@@ -110,6 +112,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (key) inflight.set(key, controller);
       try {
         if (scope === 'unlinked') throw new Error(unlinkedMessage);
+        if (scope === 'anonymous') throw new Error(anonymousMessage);
         return await action(args, controller.signal);
       } catch (error) {
         return { isError: true, content: [{ type: 'text', text: error?.message || 'Studio could not complete this request.' }] };
@@ -134,7 +137,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       return mcpJson({ ...submission, profile: summary, ...guide, message: `Submitted. ${note ? `${note} ` : ''}Share each link as [Watch <ref>](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then reply; otherwise reply now. Never poll or resubmit.` });
     };
     const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions: scope === 'control' ? controlInstructions : instructions });
-    if (scope === 'media' || scope === 'unlinked') {
+    if (scope === 'media' || scope === 'unlinked' || scope === 'anonymous') {
       tool(server, 'Models', 'Browse Models', 'List ready profiles (id, label, kind, tier, summary). With profile_id, return its prompting guide, defaults, adjustable controls, compatible LoRAs, reference slots and native sizes. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Narrows a long LoRA list.') }, async ({ kind, tier: wanted, profile_id, lora_query }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {
