@@ -50,7 +50,7 @@ import { derivedMediaCache, immutableMediaCache } from './media-response.js';
 import { startMediaWarmup } from './media-warmup.js';
 import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
-import { jobs, queueClearsAt, setTerminalJob } from './jobs.js';
+import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
 import { loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
@@ -179,6 +179,11 @@ const recoverRunningJobs = createJobRecovery({
   request: comfy, setGallery, visible: filterVisibleGallery, withBackend: withComfyBackend,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : [])
 });
+// Cloud runs accepted before a restart are live again before any status check or gallery cleanup.
+{
+  const waiting = new Set(filterVisibleGallery(gallery.filter((item) => !item.url && ["pending", "error"].includes(item.status))).map((item) => item.jobId));
+  cloudJobs.restore(jobs, { live: (id) => waiting.has(id) });
+}
 
 /**
  * With HEISS media storage, recovered ComfyUI outputs move into HEISS media and

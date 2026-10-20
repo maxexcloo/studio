@@ -1,3 +1,5 @@
+import { cloudJobExpired, cloudJobFailedMessage, cloudJobLostMessage } from './cloud-jobs.js';
+
 // Reattach persisted tiles to their existing prompts; never submit replacement work.
 export function createJobRecovery({ backends, finishJob, getGallery, jobs, recordsFromHistory, request, setGallery, visible, withBackend, ingest = async (records) => records }) {
   let active;
@@ -70,16 +72,21 @@ export function createJobRecovery({ backends, finishJob, getGallery, jobs, recor
               finishJob(id, { status: 'done', outputs, comfyBackend: backend, promptId: done.promptId });
             } else {
               const failed = done.entry.status?.status_str === 'error';
-              const error = failed ? 'ComfyUI could not finish this generation.' : 'ComfyUI finished without an available output file.';
+              const error = failed
+                ? current?.cloud ? cloudJobFailedMessage : 'ComfyUI could not finish this generation.'
+                : 'ComfyUI finished without an available output file.';
               setGallery(getGallery().map((item) => item.jobId === id && !item.url ? { ...item, status: 'error', error, progress: null } : item));
               finishJob(id, { status: 'error', error, comfyBackend: backend, promptId: done.promptId });
             }
           } else if (current?.recovered && current.comfyBackend) {
             const misses = (missing.get(id) || 0) + 1;
             missing.set(id, misses);
-            if (misses < 2) continue;
+            // A cloud run past the provider's own deadline cannot reappear, so one confirmed miss settles it.
+            const expired = current.cloud && cloudJobExpired(current);
+            if (misses < 2 && !expired) continue;
             const status = ['canceling', 'canceled'].includes(current.status) ? 'canceled' : 'error';
-            const error = status === 'error' ? 'ComfyUI no longer has this generation.' : undefined;
+            const lost = current.cloud ? expired ? cloudJobFailedMessage : cloudJobLostMessage : 'ComfyUI no longer has this generation.';
+            const error = status === 'error' ? lost : undefined;
             setGallery(getGallery().map((item) => item.jobId === id ? { ...item, status, error, progress: null } : item));
             finishJob(id, { status, error });
             missing.delete(id);
