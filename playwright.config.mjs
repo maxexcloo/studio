@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const port = 8790;
+// Parallel checkouts can each run the suite on their own port.
+const port = Number(process.env.STUDIO_TEST_PORT || 8790);
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   fullyParallel: true,
