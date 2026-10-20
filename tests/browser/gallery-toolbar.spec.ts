@@ -13,7 +13,7 @@ test('gallery tools expand independently and clear every active filter', async (
   await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
-  const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
   const clear = toolbar.getByRole('button', { name: 'Clear Search', exact: true });
   const filters = toolbar.getByRole('button', { name: 'Gallery Filters', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
@@ -93,7 +93,7 @@ test('empty search dismisses outside while active queries and filters stay open'
   test.skip(isMobile, 'Desktop search expansion.');
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
-  const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
   const outside = page.getByRole('group', { name: 'Gallery Mode' }).getByRole('button', { name: 'Images', exact: true });
   await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await outside.click();
@@ -164,25 +164,25 @@ test('compact studio keeps active search and every filter inside the viewport', 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).fill('picture');
+  await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('picture');
   await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
   const panel = page.getByRole('group', { name: 'Gallery Filters', exact: true });
   await panel.getByRole('button', { name: 'Filter By Model' }).click();
   await page.getByRole('option', { name: 'Flux', exact: true }).click();
   await page.waitForTimeout(400);
-  for (const control of [page.getByRole('textbox', { name: 'Search the gallery', exact: true }), page.getByRole('button', { name: 'Clear Search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
+  for (const control of [page.getByRole('textbox', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Clear Search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1440);
-  expect((await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
+  expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
   await page.setViewportSize({ width: 640, height: 900 });
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   const narrow = await panel.boundingBox();
   expect(narrow!.x).toBeGreaterThanOrEqual(0);
   expect(narrow!.x + narrow!.width).toBeLessThanOrEqual(640);
-  expect((await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
+  expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
   const gallery = await page.locator('.virtual-gallery').boundingBox();
   expect(gallery!.y).toBeGreaterThanOrEqual(narrow!.y + narrow!.height + 12);
 });
@@ -195,10 +195,12 @@ test('custom gallery filters support keyboard selection and dismiss only their o
   const trigger = page.getByRole('button', { name: 'Filter By Model', exact: true });
   await trigger.focus();
   await page.keyboard.press('ArrowDown');
-  await expect(page.getByRole('option', { name: 'Any Model', exact: true })).toBeFocused();
-  await page.keyboard.press('ArrowDown');
+  // Several can be picked: Enter toggles the focused value and the menu stays open until Escape.
+  await expect(page.getByRole('option', { name: 'Flux', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(trigger).toHaveText('Flux');
+  await expect(page.getByRole('option', { name: 'Flux', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
   await expect(page.getByRole('listbox', { name: 'Model Filter', exact: true })).toHaveCount(0);
   await trigger.click();
@@ -275,7 +277,7 @@ test('search keeps a neutral shell without a selected input highlight', async ({
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
   await opener.click();
   const tools = page.locator(phone ? '.phone-searchbar' : '.gallery-toolbar');
-  const input = tools.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  const input = tools.getByRole('textbox', { name: 'Search Gallery', exact: true });
   const search = tools.locator('.gallery-search');
   const filters = tools.locator('.gallery-filter-anchor');
   const border = node => node.evaluate(n => { const s = getComputedStyle(n); return { colour: s.borderColor, width: s.borderWidth, style: s.borderStyle }; });
@@ -314,7 +316,7 @@ test('filter options scroll independently and have a compact local search', asyn
   const list = page.getByRole('listbox', { name: 'Model Filter', exact: true });
   const search = page.getByRole('textbox', { name: 'Search Models', exact: true });
   await expect(search).toBeVisible();
-  await expect(list.getByRole('option')).toHaveCount(46);
+  await expect(list.getByRole('option')).toHaveCount(45);
   await page.waitForTimeout(250);
   const before = await menu.boundingBox();
   await list.evaluate(node => { node.scrollTop = 250; });
@@ -324,16 +326,19 @@ test('filter options scroll independently and have a compact local search', asyn
   expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
   expect(Math.abs(after!.height - before!.height)).toBeLessThan(1);
   await search.fill('model 32');
-  await expect(list.getByRole('option')).toHaveCount(2);
+  await expect(list.getByRole('option')).toHaveCount(1);
   await expect(list.getByRole('option', { name: 'Model 32', exact: true })).toBeVisible();
   await expect(search).toBeFocused();
   await search.fill('not in this list');
   await expect(menu.getByRole('status')).toHaveText('No Matches');
   await menu.getByRole('button', { name: 'Clear Option Search' }).click();
-  await expect(list.getByRole('option')).toHaveCount(46);
+  await expect(list.getByRole('option')).toHaveCount(45);
   await search.fill('model 32');
   await search.press('Enter');
   await expect(page.getByRole('button', { name: 'Filter By Model' })).toHaveText('Model 32');
+  // Picking several keeps the menu open until Escape.
+  await expect(menu).toBeVisible();
+  await search.press('Escape');
   await expect(menu).toHaveCount(0);
 });
 

@@ -749,7 +749,7 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   await page.goto('/');
   const ui = studioUi(page);
   const phone = await ui.isPhone();
-  const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
   await expect(search).toHaveCount(0);
   await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await expect(search).toBeVisible();
@@ -819,7 +819,7 @@ test('model and LoRA filters reach gallery queries and clear independently', asy
   });
   await page.goto('/');
   const ui = studioUi(page);
-  const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+  const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
   const filters = await ui.openFilters();
   // Filters open on their own; search stays closed.
   await expect(search).toHaveCount(0);

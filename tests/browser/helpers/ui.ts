@@ -170,7 +170,7 @@ export function studioUi(page: Page) {
           await settings.click();
           return;
         }
-        await more.getByRole('button', { name: /^Use the full studio/ }).click();
+        await more.getByRole('button', { name: /^Use the Full Studio/ }).click();
         await expect(page.locator('.app-shell, .zen-shell')).toHaveCount(1);
       }
       await page.getByRole('button', { name: 'Settings', exact: true }).click();

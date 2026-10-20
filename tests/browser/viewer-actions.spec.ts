@@ -53,7 +53,9 @@ test('the action bar is ordered by intent, with Star and Info in the phone’s t
   } else {
     const order = await barOrder(viewer.getByRole('toolbar', { name: 'Image Actions' }));
     expect(order).toEqual(['Copy', 'Download', '|', 'Recreate', 'Reference', 'Upscale', '|', 'Star', 'Delete', '|', 'Close']);
-    // Info sits on its own in the top right.
+    // Info sits on its own in the top right, while Details is shut.
+    const details = page.locator('.viewer-side');
+    if (await details.count()) await details.getByRole('button', { name: 'Close Details', exact: true }).click();
     const info = await viewer.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const viewport = page.viewportSize()!;
     expect(info!.y).toBeLessThan(80);

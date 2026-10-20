@@ -65,7 +65,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     expect((await toolbar.locator('.gallery-generation-mode').boundingBox())!.x).toBe(modeBefore!.x);
     await management.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
     await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Search the gallery', exact: true }).fill('Layout');
+    await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('Layout');
     await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
     await expect.poll(() => page.getByRole('group', { name: 'Gallery Filters', exact: true }).evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
     await page.getByLabel('Filter By Model', { exact: true }).scrollIntoViewIfNeeded();
@@ -83,7 +83,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
 test('phone filter tools stay on screen and yield to create and reference sheets', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Phone containment and sheets.');
   await page.goto('/');
-  await expect(page.getByRole('textbox', { name: 'Search the gallery', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Search Gallery', exact: true })).toHaveCount(0);
   for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();

@@ -12,7 +12,7 @@ test.beforeEach(async ({ page, isMobile }) => {
 
 const searchButton = (page) => page.getByRole('button', { name: 'Search Gallery', exact: true });
 const filterButton = (page) => page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
-const searchField = (page) => page.getByRole('textbox', { name: 'Search the gallery', exact: true });
+const searchField = (page) => page.getByRole('textbox', { name: 'Search Gallery', exact: true });
 const filterRow = (page) => page.getByRole('group', { name: 'Gallery Filters', exact: true });
 
 test('the search row is as tall as the Images/Videos icons and sits above the prompt', async ({ page }) => {
