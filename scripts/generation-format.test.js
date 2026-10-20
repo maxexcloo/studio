@@ -4,7 +4,9 @@ import test from 'node:test';
 import ts from 'typescript';
 
 const source = fs.readFileSync(new URL('../src/app/format.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+  // A data URL has no base for relative imports, so point format.ts's one helper import at its file.
+  .replace("from './partNames'", `from '${new URL('../src/app/partNames.js', import.meta.url)}'`);
 const { fullGenerationText, generationDetailEntries, settingsText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const item = {
   type: 'video', model: 'custom:grok-video-standard', prompt: 'A hot-air balloon', width: 1280, height: 720,
