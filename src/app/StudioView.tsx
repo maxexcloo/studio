@@ -1,12 +1,12 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
-import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
+import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
 import { LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ArrowLeft, ChevronDown, CircleStop, Columns2, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, EyeOff, FastForward, GalleryHorizontalEnd, ImagePlus, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RefreshCw, RotateCcw, Settings, SlidersHorizontal, Smartphone, Square, Star, Trash2, Video, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, EyeOff, GalleryHorizontalEnd, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
@@ -22,9 +22,8 @@ import { RunCard, runKind } from './RunStack';
 import { RunSheet } from './RunSheet';
 import { StackRunsButton } from './StackRunsButton';
 import { runTitle, type Run } from './runs';
-import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleCompare } from './UpscaleCompare';
-import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { upscaledWithRun } from './useUpscale';
 import { UpscaleSetupDialog } from './UpscaleDialogs';
 import { ModelFoldersDialog } from './ModelFoldersDialog';
 import { UpscaleNoticePopover } from './UpscaleNotice';
@@ -41,8 +40,9 @@ import { HiddenSetupDialog } from './HiddenSetup';
 import { HiddenActionsContext } from './hiddenContext';
 import { LockMark } from './LockMark';
 import { TileLongPressContext } from './GalleryTile';
-import { downloadUrl } from './share';
-import { PhoneShell, PhoneViewerBar, type PhoneItemActions } from './PhoneStudio';
+import { PhoneShell } from './PhoneStudio';
+import { PhoneViewerBar, ViewerDockActions } from './ItemActionSurfaces';
+import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { usePhone, useThisComputer } from './device';
 import { haptic } from './phoneControls';
 import { ConnectedCard } from './ConnectedCard';
@@ -133,7 +133,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, hiddenSpace, hideItems, unhideItems, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
@@ -298,23 +298,37 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   }, [active, toggleFavorite]);
   // The viewer offers Animate and Extend Video only where a first-frame video profile can run them.
   const canAnimate = animationProfiles(models?.profiles || []).length > 0;
-  const phoneItemActions: PhoneItemActions = {
-    animate: canAnimate ? (item) => setAnimationItems([item]) : undefined,
-    star: (item) => toggleFavorite([item], !item.favorite),
-    showToast,
-    smartUpscale: prefs.smartUpscale !== false,
-    upscaleBusy: (item) => Boolean(upscaleBusyIds?.has(item.id)),
-    upscale: activateUpscale,
-    cancelUpscale,
-    copyPrompt: (item) => copyToClipboard(item.prompt || ""),
-    // Reuse opens the composer above the current viewer, so closing it returns here.
-    reuse: (item) => { applyAllSettings(item); setPhoneCreate(true); },
-    promptsOnly: (item) => { applyPromptsOnly(item); setPhoneCreate(true); },
-    useAsReference: canUseStartImage ? (item) => { useOutputAsStartImage(item); setActive(null); setPhoneCreate(true); } : undefined,
-    hide: (item) => hideItems([item]),
-    unhide: (item) => unhideItems([item]),
-    remove: (item) => deleteItem(item)
-  };
+  // The item actions' handlers read the latest view, so the memoised tiles keep one stable value.
+  const liveView = React.useRef(view);
+  liveView.current = view;
+  const phoneRef = React.useRef(phone);
+  phoneRef.current = phone;
+  const smartUpscale = prefs.smartUpscale !== false;
+  const itemActionHandlers = React.useMemo<ItemActionHandlers>(() => {
+    const live = () => liveView.current;
+    // On a phone the composer is a sheet: it opens above the viewer with the change in place, so closing it returns there.
+    const compose = () => { if (phoneRef.current) setPhoneCreate(true); };
+    return {
+      showToast: (...args) => live().showToast(...args),
+      smartUpscale,
+      upscaleBusy: (item) => Boolean(live().upscaleBusyIds?.has(item.id)),
+      upscale: (item) => live().activateUpscale(item),
+      cancelUpscale: (item) => live().cancelUpscale(item),
+      copyPrompt: (item, announce) => live().copyToClipboard(item.prompt || "", announce),
+      copyItem: (item) => live().copyItemToClipboard(item),
+      reuse: (item) => { live().applyAllSettings(item); compose(); },
+      promptsOnly: (item) => { live().applyPromptsOnly(item); compose(); },
+      useAsReference: canUseStartImage ? (item) => {
+        live().useOutputAsStartImage(item);
+        if (phoneRef.current) { live().setActive(null); setPhoneCreate(true); }
+      } : undefined,
+      animate: canAnimate ? (item) => setAnimationItems([item]) : undefined,
+      hide: (item) => live().hideItems([item]),
+      unhide: (item) => live().unhideItems([item]),
+      remove: (item) => live().deleteItem(item),
+      star: (item) => live().toggleFavorite([item], !item.favorite),
+    };
+  }, [smartUpscale, canUseStartImage, canAnimate]);
   const hiddenCount = hiddenSpace ? renderedGallery.filter((item: GalleryItem) => item.status === "done").length : 0;
   const hiddenLockScreen = (
     <AnimatePresence>
@@ -527,8 +541,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onFocused={() => setFocusRun("")}
               columns={galleryColumnCount}
               spanWide={Boolean(prefs.spanWideImages) && !phone}
-              copyPromptAndToast={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")}
-              deleteItem={deleteItem}
               formatElapsed={formatElapsed}
               items={renderedGallery}
               openItem={openItem}
@@ -679,6 +691,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <GenerationPreviewMode.Provider value={prefs.generationPreviewMode}>
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
+    <ItemActionsContext.Provider value={itemActionHandlers}>
     <FavoriteContext.Provider value={toggleFavorite}>
     <GenerationProfiles.Provider value={models?.profiles || noProfiles}>
     <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
@@ -693,7 +706,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           toggleHiddenSpace={toggleHiddenSpace}
           createOpen={phoneCreate}
           setCreateOpen={setPhoneCreate}
-          itemActions={phoneItemActions}
           actionsFor={phoneActionsFor}
           setActionsFor={setPhoneActionsFor}
           selection={phoneSelection}
@@ -793,7 +805,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   {nextMode === "image" ? "Images" : "Videos"}
                 </button>
               ))}
-            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>} onDelete={view.deleteItems} onCopy={(item) => copyToClipboard(item.prompt || item.filename || "", "Prompt copied")} showToast={showToast}>{galleryBody}</GalleryManagement>
+            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>} onDelete={view.deleteItems} showToast={showToast}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
@@ -963,53 +975,21 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     {active.type === "image" && !showDetails ? <div className="viewer-phone-zoom">{imageZoomControls}</div> : null}
                     <PhoneViewerBar
                       item={active}
-                      actions={phoneItemActions}
                       showDetails={Boolean(showDetails)}
                       onToggleDetails={() => setShowDetails((value: boolean) => !value)}
-                      compareOpen={Boolean(compareOpen)}
-                      onToggleCompare={() => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer('fit'); }}
+                      compare={{ open: compareOpen, toggle: () => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer('fit'); } }}
                     />
                   </>
                 ) : (
                 <div data-open-trigger className={cn("viewer-dock", showDetails && "with-side")}>
                   {active.type === "image" ? imageZoomControls : null}
                   <span className="viewer-divider is-zoom-control" />
-                  <Tip content={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"}><button className="icon-button" aria-label={active.url ? active.type === "image" ? "Copy Image" : "Copy output link" : "Copy generation details"} onClick={() => viewerCopy.copyWith(() => copyItemToClipboard(active), "item")}><CopyIcon copied={viewerCopy.copied === "item"} size={15} /></button></Tip>
-                  {canStar(active) ? (
-                    <Tip content={active.favorite ? "Unstar (F)" : "Star (F)"}>
-                      <button className={cn("icon-button viewer-star", active.favorite && "is-on")} aria-label={active.favorite ? "Unstar" : "Star"} aria-pressed={Boolean(active.favorite)} onClick={() => toggleFavorite([active], !active.favorite)}>
-                        <Star size={15} fill={active.favorite ? "currentColor" : "none"} />
-                      </button>
-                    </Tip>
-                  ) : null}
-                  {canAnimate && canAnimatePhoto(active) ? <Tip content="Animate"><button className="icon-button" aria-label="Animate" onClick={() => setAnimationItems([active])}><Video size={15} /></button></Tip> : null}
-                  {canAnimate && canExtendVideo(active) ? <Tip content="Extend Video"><button className="icon-button" aria-label="Extend Video" onClick={() => setAnimationItems([active])}><FastForward size={15} /></button></Tip> : null}
-                  {canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? <Tip content="Use as Reference Image"><button className="icon-button" aria-label="Use as Reference Image" onClick={() => useOutputAsStartImage(active)}><ImagePlus size={15} /></button></Tip> : null}
-                  {prefs.smartUpscale !== false && canUpscaleItem(active) ? (
-                    <span className="upscale-notice-anchor">
-                    {upscaleNotices?.get(active.id) ? <UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /> : null}
-                    <ViewerUpscaleButton item={active} busy={Boolean(upscaleBusyIds?.has(active.id))} onCancel={cancelUpscale} onActivate={activateUpscale} />
-                    </span>
-                  ) : null}
-                  {active.type === "image" && active.upscale?.url && !upscaledWithRun(active) ? (
-                    <Tip content={compareOpen ? "Hide the comparison" : "Compare with the original"}>
-                      <button
-                        className={cn("icon-button", compareOpen && "active")}
-                        aria-label="Compare with the original"
-                        aria-pressed={compareOpen}
-                        onClick={() => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); }}
-                      >
-                        <Columns2 size={15} />
-                      </button>
-                    </Tip>
-                  ) : null}
-                  {active.status === "done" && active.url && !active.library ? (
-                    active.privateVault
-                      ? <Tip content="Move to Gallery"><button className="icon-button" aria-label="Move to Gallery" onClick={() => unhideItems([active])}><Eye size={15} /></button></Tip>
-                      : <Tip content="Move to Hidden"><button className="icon-button" aria-label="Move to Hidden" onClick={() => hideItems([active])}><EyeOff size={15} /></button></Tip>
-                  ) : null}
-                  {active.url ? <Tip content={active.upscaleActive && !upscaledWithRun(active) ? "Download the upscale" : "Download"}><a className="icon-button" aria-label={active.upscaleActive && !upscaledWithRun(active) ? "Download the upscale" : "Download"} href={downloadUrl(active)} download><Download size={15} /></a></Tip> : null}
-                  <Tip content="Delete (Del)"><button className="icon-button danger-tone" aria-label={active.privateVault ? "Delete from Hidden" : "Delete from gallery"} onClick={() => deleteItem(active)}><Trash2 size={15} /></button></Tip>
+                  <ViewerDockActions
+                    item={active}
+                    compare={{ open: compareOpen, toggle: () => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); } }}
+                    upscaleNotice={upscaleNotices?.get(active.id)}
+                    onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
+                  />
                   <span className="viewer-divider" />
                   <Tip content={showDetails ? "Hide Details" : "Show Details"}><button className={cn("icon-button", showDetails && "active")} aria-label="Toggle Details" aria-pressed={showDetails} onClick={() => setShowDetails((value: boolean) => !value)}><SlidersHorizontal size={15} /></button></Tip>
                   <Tip content="Close (Esc)"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>
@@ -1031,33 +1011,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </div>
     </GenerationProfiles.Provider>
     </FavoriteContext.Provider>
+    </ItemActionsContext.Provider>
     </TileLongPressContext.Provider>
     </HiddenActionsContext.Provider>
     </GenerationPreviewMode.Provider>
-  );
-}
-
-/**
- * The viewer's upscale button. Its own component, so a running upscale's
- * clock re-renders this alone each second; the tip and a small count beside
- * the icon say how long is left once the time is known.
- */
-function ViewerUpscaleButton({ item, busy, onCancel, onActivate }: { item: GalleryItem; busy: boolean; onCancel: (item: GalleryItem) => void; onActivate: (item: GalleryItem) => void }) {
-  const running = item.upscale?.status === "running";
-  const clock = useUpscaleClock(item);
-  const tip = upscaleTooltip(item, clock.leftMs);
-  return (
-    <Tip content={tip}>
-      <button
-        className={cn("icon-button", item.upscaleActive && item.upscale?.url && "active", running && clock.leftMs !== null && "has-count")}
-        aria-label={running ? tip : "Smart upscale"}
-        aria-pressed={item.upscale?.url ? Boolean(item.upscaleActive) : undefined}
-        disabled={busy}
-        onClick={() => running ? onCancel(item) : onActivate(item)}
-      >
-        {busy ? <RefreshCw size={15} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
-        {running && clock.leftMs !== null ? <span className="viewer-upscale-left" aria-hidden="true">{shortLeft(clock.leftMs)}</span> : null}
-      </button>
-    </Tip>
   );
 }

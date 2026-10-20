@@ -1,5 +1,5 @@
 import { PromptField } from './PromptField';
-import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
+import { canAnimatePhoto } from './AnimatePhotos';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
@@ -7,16 +7,13 @@ import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes'
 import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, FastForward, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, UserRound, Video, Wand2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Star, Trash2, UserRound, Video, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
-import { canShareFiles, prefetchShare, shareItem, shareItems } from './share';
+import { canShareFiles, shareItems } from './share';
 import { Sheet } from './Sheet';
-import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
-import { UpscaleArrow } from './UpscaleArrow';
+import { ItemActionSheet } from './ItemActionSurfaces';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import { ViewerReuseAction } from './ViewerActions';
-import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
 import { progressReading } from './GenerationProgress';
@@ -25,7 +22,6 @@ import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
-import type { ShowToast } from './toast';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
 import { StackRunsButton } from './StackRunsButton';
@@ -50,146 +46,9 @@ import { hasAccountStorageScope } from './api';
 --------------------------------------------------------------------------- */
 
 
-/* ------------------------------------------------------------ Item actions */
-
-export type PhoneItemActions = {
-  showToast: ShowToast;
-  smartUpscale: boolean;
-  upscaleBusy: (item: GalleryItem) => boolean;
-  upscale: (item: GalleryItem) => void;
-  cancelUpscale: (item: GalleryItem) => void;
-  copyPrompt: (item: GalleryItem) => Promise<boolean>;
-  reuse: (item: GalleryItem) => void;
-  promptsOnly: (item: GalleryItem) => void;
-  useAsReference?: (item: GalleryItem) => void;
-  /** Animates a photo or extends a video; left out when no first-frame video profile is ready. */
-  animate?: (item: GalleryItem) => void;
-  hide: (item: GalleryItem) => void;
-  unhide: (item: GalleryItem) => void;
-  remove: (item: GalleryItem) => void;
-  star: (item: GalleryItem) => void;
-};
-
-function upscaleLabel(item: GalleryItem) {
-  if (item.upscale?.status === 'running') return 'Stop upscale';
-  if (item.upscale?.url) return item.upscaleActive ? 'Show original' : 'Show upscale';
-  return 'Upscale';
-}
-
-/** The sheet's upscale row; a running upscale says how long is left under its label. Its own component, so the clock re-renders it alone. */
-function UpscaleSheetRow({ item, actions, run }: { item: GalleryItem; actions: PhoneItemActions; run: (action: () => void) => void }) {
-  const running = item.upscale?.status === 'running';
-  const clock = useUpscaleClock(item);
-  return (
-    <button type="button" className="phone-row" disabled={actions.upscaleBusy(item)} onClick={() => run(() => (running ? actions.cancelUpscale(item) : actions.upscale(item)))}>
-      {running ? <Square size={16} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={20} />}
-      <span>{upscaleLabel(item)}{running && clock.leftMs !== null ? <small>{upscaleLeftLine(item, clock.leftMs)}</small> : null}</span>
-    </button>
-  );
-}
-
-/** The viewer bar's upscale button: while running, its label is the time left (the stop square says what a tap does). */
-function UpscaleBarButton({ item, actions }: { item: GalleryItem; actions: PhoneItemActions }) {
-  const running = item.upscale?.status === 'running';
-  const clock = useUpscaleClock(item);
-  // The ring, as on a desktop tile: the learned time when there is one, else the step count, else a spinning arc.
-  const stepRatio = item.upscale?.progress?.max ? Math.min(1, Math.max(0, item.upscale.progress.value / item.upscale.progress.max)) : 0;
-  const ratio = clock.ratio ?? (clock.leftMs !== null ? 0 : stepRatio);
-  const label = running
-    ? clock.leftMs === null ? 'Stop' : clock.leftMs <= 1500 ? 'Almost' : shortLeft(clock.leftMs)
-    : item.upscale?.url ? (item.upscaleActive ? 'Original' : 'Upscale') : 'Upscale';
-  return (
-    <button type="button" className={cn(item.upscaleActive && item.upscale?.url && 'is-on')} aria-label={running ? upscaleTooltip(item, clock.leftMs) : undefined} disabled={actions.upscaleBusy(item)} onClick={() => (running ? actions.cancelUpscale(item) : actions.upscale(item))}>
-      <i className={cn('viewer-phone-upscale', running && 'is-running', running && !ratio && 'is-indeterminate', running && clock.ratio !== null && 'is-timed')}>
-        {actions.upscaleBusy(item) ? <RefreshCw size={18} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={19} />}
-        {running ? (
-          <svg className="viewer-phone-upscale-ring" viewBox="0 0 30 30" aria-hidden="true" focusable="false">
-            <circle className="is-track" cx="15" cy="15" r="14" />
-            <circle cx="15" cy="15" r="14" pathLength={100} strokeDasharray={ratio ? `${ratio * 100} 100` : '25 75'} />
-          </svg>
-        ) : null}
-      </i>
-      <span className={cn(running && clock.leftMs !== null && 'is-count')}>{label}</span>
-    </button>
-  );
-}
-
-/** A compact action sheet keeps the picture and its actions within reach. */
-export function ItemActionSheet({ item, onClose, actions, onSelect }: { item: GalleryItem | null; onClose: () => void; actions: PhoneItemActions; onSelect?: (item: GalleryItem) => void }) {
-  React.useEffect(() => { prefetchShare(item); }, [item]);
-  const done = item?.status === 'done' && Boolean(item?.url);
-  const run = (action: () => void) => { onClose(); action(); };
-  return (
-    <Sheet className="phone-item-actions" open={Boolean(item)} onClose={onClose} title={item?.prompt ? truncate(item.prompt, 60) : 'Image'}>
-      {item ? (
-        <div className="phone-group">
-          {done ? (
-            <button type="button" className="phone-row" onClick={() => run(() => shareItem(item, actions.showToast))}>
-              {canShareFiles ? <Share size={20} /> : <Download size={20} />}<span>{canShareFiles ? 'Share or Save' : 'Save'}</span>
-            </button>
-          ) : null}
-          {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleSheetRow item={item} actions={actions} run={run} /> : null}
-          {canStar(item) ? (
-            <button type="button" className={cn('phone-row', item.favorite && 'is-starred')} onClick={() => run(() => { haptic('tap'); actions.star(item); })}>
-              <Star size={20} fill={item.favorite ? 'currentColor' : 'none'} /><span>{item.favorite ? 'Unstar' : 'Star'}</span><HapticTarget />
-            </button>
-          ) : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.reuse(item))}><Wand2 size={20} /><span>Use This Prompt</span></button> : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => { void actions.copyPrompt(item); })}><CopyIcon copied={false} size={20} /><span>Copy Prompt</span></button> : null}
-          {item.prompt ? <button type="button" className="phone-row" onClick={() => run(() => actions.promptsOnly(item))}><TextQuote size={20} /><span>Prompts Only</span></button> : null}
-          {done && actions.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library ? <button type="button" className="phone-row" onClick={() => run(() => actions.useAsReference!(item))}><ImagePlus size={20} /><span>Use as Reference</span></button> : null}
-          {done && !item.library ? (
-            item.privateVault
-              ? <button type="button" className="phone-row" onClick={() => run(() => actions.unhide(item))}><Eye size={20} /><span>Move to Gallery</span></button>
-              : <button type="button" className="phone-row" onClick={() => run(() => actions.hide(item))}><EyeOff size={20} /><span>Move to Hidden</span></button>
-          ) : null}
-          {onSelect && (item.status === 'done' || item.status === 'error') ? <button type="button" className="phone-row" onClick={() => run(() => onSelect(item))}><CheckCircle2 size={20} /><span>Select Several</span><HapticTarget /></button> : null}
-          <button type="button" className="phone-row is-danger" onClick={() => run(() => { haptic('warning'); actions.remove(item); })}><Trash2 size={20} /><span>{item.library ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
-        </div>
-      ) : null}
-    </Sheet>
-  );
-}
-
-/** Direct actions below the image, with Star and Details beside the close control. */
-export function PhoneViewerBar({ item, actions, showDetails, onToggleDetails, compareOpen, onToggleCompare }: { item: GalleryItem; actions: PhoneItemActions; showDetails: boolean; onToggleDetails: () => void; compareOpen: boolean; onToggleCompare: () => void }) {
-  React.useEffect(() => { prefetchShare(item); }, [item]);
-  const done = item.status === 'done' && Boolean(item.url);
-  const promptCopy = useCopyFeedback();
-  return (
-    <nav className="viewer-phone-bar" aria-label="Image actions">
-      {done ? <button type="button" onClick={() => shareItem(item, actions.showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button> : null}
-      {actions.smartUpscale && canUpscaleItem(item) ? <UpscaleBarButton item={item} actions={actions} /> : null}
-      {item.type === "image" && item.upscale?.url && !upscaledWithRun(item) ? <button type="button" className={cn(compareOpen && 'is-on')} aria-pressed={compareOpen} onClick={() => { haptic('tap'); onToggleCompare(); }}><Columns2 size={21} /><span>Compare</span><HapticTarget /></button> : null}
-      {item.prompt ? <ViewerReuseAction compact onUseSettings={() => actions.reuse(item)} /> : null}
-      {item.prompt ? <button type="button" aria-label="Copy Prompt" onClick={() => { void promptCopy.copyWith(() => actions.copyPrompt(item)); }}><CopyIcon copied={Boolean(promptCopy.copied)} size={21} /><span>{promptCopy.copied ? 'Copied' : 'Copy Prompt'}</span></button> : null}
-      {actions.animate && canAnimatePhoto(item) ? <button type="button" onClick={() => actions.animate!(item)}><Video size={21} /><span>Animate</span></button> : null}
-      {actions.animate && canExtendVideo(item) ? <button type="button" aria-label="Extend Video" onClick={() => actions.animate!(item)}><FastForward size={21} /><span>Extend</span></button> : null}
-      {canStar(item) ? (
-        <button type="button" className={cn('viewer-phone-star', item.favorite && 'is-starred')} aria-label={item.favorite ? 'Unstar' : 'Star'} aria-pressed={Boolean(item.favorite)} onClick={() => { haptic('tap'); actions.star(item); }}>
-          <Star size={21} fill={item.favorite ? 'currentColor' : 'none'} /><HapticTarget />
-        </button>
-      ) : null}
-      {done && !item.library ? (
-        item.privateVault
-          ? <button type="button" onClick={() => actions.unhide(item)}><Eye size={21} /><span>Unhide</span></button>
-          : <button type="button" onClick={() => actions.hide(item)}><EyeOff size={21} /><span>Hide</span></button>
-      ) : null}
-      <button type="button" className="is-danger" onClick={() => { haptic('warning'); actions.remove(item); }}><Trash2 size={21} /><span>{item.library ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
-      {/* Info sits beside Close at the top right, so the bar keeps room for actions. */}
-      <button type="button" className={cn('viewer-phone-info', showDetails && 'is-on')} aria-pressed={showDetails} aria-label="Details" onClick={onToggleDetails}><Info size={20} /></button>
-    </nav>
-  );
-}
-
-function truncate(text: string, length: number) {
-  const clean = text.replace(/\s+/g, ' ').trim();
-  return clean.length > length ? `${clean.slice(0, length - 1)}…` : clean;
-}
-
 /* ------------------------------------------------------------ The shell */
 
-export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, itemActions, actionsFor, setActionsFor, selection, setSelection, onAnimate }: {
+export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, actionsFor, setActionsFor, selection, setSelection, onAnimate }: {
   view: Record<string, any>;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
@@ -198,7 +57,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   toggleHiddenSpace: () => void;
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
-  itemActions: PhoneItemActions;
   actionsFor: GalleryItem | null;
   setActionsFor: (item: GalleryItem | null) => void;
   selection: Set<string> | null;
@@ -352,7 +210,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
       <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => setSelection(new Set()) : undefined} />
-      <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} actions={itemActions} onSelect={(item) => { haptic('press'); setSelection(new Set([item.id])); }} />
+      <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} onSelect={(item) => { haptic('press'); setSelection(new Set([item.id])); }} />
     </>
   );
 }

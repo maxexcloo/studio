@@ -6,7 +6,7 @@ const images = ['A quiet lake below a mountain', 'A dog resting in a garden'].ma
 async function selectPhotos(page: import('@playwright/test').Page, isMobile: boolean) {
   if (isMobile) {
     await page.locator('[data-tile-id]').first().locator('.tile').dispatchEvent('contextmenu');
-    await page.getByRole('button', { name: 'Select Several', exact: true }).click();
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
     await page.locator('[data-tile-id]').nth(1).locator('.tile').click();
     await page.getByRole('navigation', { name: 'Selected Items' }).getByRole('button', { name: 'Animate', exact: true }).click();
   } else {

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Copy, Download, Eye, EyeOff, Loader2, MoreHorizontal, Square, Star, Trash2 } from 'lucide-react';
-import { canStar, useStar } from './favorites';
+import { Check, Loader2, MoreHorizontal, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from './format';
 import { Tip } from './components';
@@ -9,15 +8,16 @@ import { ElapsedTime } from './ElapsedTime';
 import { GenerationModel, GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
 import type { GalleryItem } from './types';
-import { canUpscaleItem, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { canUpscaleItem, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
-import { useHiddenActions } from './hiddenContext';
 import type { UpscaleNotice } from './useUpscale';
 import { useDismiss } from './useDismiss';
 import { HapticTarget } from './phoneControls';
 import { GallerySelectionContext } from './gallerySelection';
-import { downloadUrl } from './share';
+import { downloadName } from './share';
+import { useItemActions } from './itemActions';
+import { ActionIcon } from './ItemActionSurfaces';
 
 /**
  * The phone studio's tiles: no corner buttons, a long press opens the tile's
@@ -40,8 +40,6 @@ type GalleryTileProps = {
   titleFromPrompt: (value?: string) => string;
   openItem: (item: GalleryItem) => void;
   cancelJob: (jobId?: string) => void;
-  copyPromptAndToast: (item: GalleryItem) => void;
-  deleteItem: (item: GalleryItem) => void;
   smartUpscale?: boolean;
   upscaleBusy?: boolean;
   onUpscale?: (item: GalleryItem) => void;
@@ -88,14 +86,13 @@ const tileEnterTransition = {
   mass: 0.86,
 };
 
-function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, upscaleNotice, onDismissUpscaleNotice, width }: GalleryTileProps) {
+function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, upscaleNotice, onDismissUpscaleNotice, width }: GalleryTileProps) {
   const mountedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
   useEffect(() => { mountedRef.current = true; }, []);
-  const hiddenActions = useHiddenActions();
-  const canMove = item.status === "done" && Boolean(item.url) && Boolean(hiddenActions) && !item.library;
-  const star = useStar();
+  const actions = useItemActions(item, "tile");
+  const star = actions.find((action) => action.id === "star");
   // Phones get one "More" button instead of a row of circles that would not fit.
   const [menuOpen, setMenuOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -183,20 +180,25 @@ function GalleryTileComponent({ cancelJob, copyPromptAndToast, deleteItem, forma
           <>
             <button type="button" className="tile-more" aria-label="More Actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal size={16} /></button>
             <span className="tile-hover-actions">
-              {canMove ? (
-                item.privateVault
-                  ? <Tip content="Move to Gallery" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to Gallery" onClick={() => act(() => hiddenActions!.unhide([item]))}><Eye size={14} /><span className="tile-menu-label">Move to Gallery</span></button></Tip>
-                  : <Tip content="Move to Hidden" side="left"><button type="button" className="tile-icon tile-hide" aria-label="Move to Hidden" onClick={() => act(() => hiddenActions!.hide([item]))}><EyeOff size={14} /><span className="tile-menu-label">Move to Hidden</span></button></Tip>
-              ) : null}
-              {item.url ? <Tip content={item.upscaleActive && !upscaledWithRun(item) ? "Download the Upscale" : "Download"} side="left"><a className="tile-icon" aria-label="Download" href={downloadUrl(item)} download onClick={() => setMenuOpen(false)}><Download size={13} /><span className="tile-menu-label">Download</span></a></Tip> : null}
-              {item.status === "done" ? <Tip content="Copy Prompt" side="left"><button type="button" className="tile-icon" aria-label="Copy Prompt" onClick={() => act(() => copyPromptAndToast(item))}><Copy size={14} /><span className="tile-menu-label">Copy Prompt</span></button></Tip> : null}
-              <Tip content={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from Gallery" : "Delete from Gallery"} side="left"><button type="button" className="tile-delete" aria-label={item.privateVault ? "Delete from Hidden" : item.library ? "Remove from Gallery" : "Delete from Gallery"} onClick={() => act(() => deleteItem(item))}><Trash2 size={14} /><span className="tile-menu-label">{item.library ? "Remove" : "Delete"}</span></button></Tip>
+              {actions.map((action) => {
+                if (action.id === 'star') return null;
+                const name = action.tip || action.label;
+                const className = action.danger ? "tile-delete" : cn("tile-icon", action.id === "move" && "tile-hide");
+                const body = <><ActionIcon action={action} size={action.href ? 13 : 14} /><span className="tile-menu-label">{action.label}</span></>;
+                return (
+                  <Tip key={action.id} content={name} side="left">
+                    {action.href
+                      ? <a className={className} aria-label={name} href={action.href} download={downloadName(item)} onClick={() => setMenuOpen(false)}>{body}</a>
+                      : <button type="button" className={className} aria-label={name} onClick={() => act(action.run)}>{body}</button>}
+                  </Tip>
+                );
+              })}
             </span>
             {/* Its own corner: always there once starred, on hover otherwise. */}
-            {star && canStar(item) ? (
-              <Tip content={item.favorite ? "Unstar" : "Star"} side="left">
-                <button type="button" className={cn("tile-star", item.favorite && "is-on")} aria-label={item.favorite ? "Unstar" : "Star"} aria-pressed={Boolean(item.favorite)} onClick={() => act(() => star([item], !item.favorite))}>
-                  <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
+            {star ? (
+              <Tip content={star.label} side="left">
+                <button type="button" className={cn("tile-star", star.pressed && "is-on")} aria-label={star.label} aria-pressed={star.pressed} onClick={() => act(star.run)}>
+                  <ActionIcon action={star} size={14} />
                 </button>
               </Tip>
             ) : null}

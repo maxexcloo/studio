@@ -29,7 +29,8 @@ export function prefetchShare(item: GalleryItem | null, includeVideo = false) {
   if (!shareBlobs.has(url)) shareBlobs.set(url, fetch(url).then((response) => response.ok ? response.blob() : Promise.reject(new Error('fetch failed'))));
 }
 
-function fileNameFor(item: GalleryItem, type = '') {
+/** A file name from the prompt, for downloads and shared files. */
+export function downloadName(item: GalleryItem, type = '') {
   const base = String(item.outputName || item.filename || 'heiss').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'heiss';
   if (/\.\w{2,4}$/.test(base)) return base;
   return `${base}.${type.includes('webp') ? 'webp' : type.includes('jpeg') ? 'jpg' : item.type === 'video' ? 'mp4' : 'png'}`;
@@ -42,7 +43,7 @@ export async function shareItem(item: GalleryItem, showToast: ShowToast) {
     try {
       prefetchShare(item, true);
       const blob = await shareBlobs.get(url)!;
-      const file = new File([blob], fileNameFor(item, blob.type), { type: blob.type || 'image/png' });
+      const file = new File([blob], downloadName(item, blob.type), { type: blob.type || 'image/png' });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file] });
         return;
@@ -51,13 +52,18 @@ export async function shareItem(item: GalleryItem, showToast: ShowToast) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
     }
   }
+  downloadItem(item);
+  if (!canShareFiles) showToast('Saved to downloads', 'success');
+}
+
+/** Saves one file through a temporary link, named from its prompt. */
+export function downloadItem(item: GalleryItem) {
   const link = document.createElement('a');
-  link.href = url;
-  link.download = fileNameFor(item);
+  link.href = downloadUrl(item);
+  link.download = downloadName(item);
   document.body.appendChild(link);
   link.click();
   link.remove();
-  if (!canShareFiles) showToast('Saved to downloads', 'success');
 }
 
 /** Several files: one share sheet where possible, otherwise one download after another. */
@@ -70,7 +76,7 @@ export async function shareItems(items: GalleryItem[], showToast: ShowToast) {
       ready.forEach((item) => prefetchShare(item, true));
       const files = await Promise.all(ready.map(async (item) => {
         const blob = await shareBlobs.get(downloadUrl(item))!;
-        return new File([blob], fileNameFor(item, blob.type), { type: blob.type || 'image/png' });
+        return new File([blob], downloadName(item, blob.type), { type: blob.type || 'image/png' });
       }));
       if (!navigator.canShare || navigator.canShare({ files })) {
         await navigator.share({ files });
@@ -87,12 +93,7 @@ export async function downloadItems(items: GalleryItem[], showToast: ShowToast) 
   const ready = items.filter((item) => item.status === 'done' && item.url);
   if (!ready.length) return;
   for (const item of ready) {
-    const link = document.createElement('a');
-    link.href = downloadUrl(item);
-    link.download = fileNameFor(item);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    downloadItem(item);
     // Browsers drop downloads fired in one burst.
     await new Promise((resolve) => setTimeout(resolve, 450));
   }

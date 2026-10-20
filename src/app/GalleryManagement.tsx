@@ -2,17 +2,19 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
-import { CheckSquare, Copy, Download, Eye, EyeOff, Star, Trash2, Video, X } from 'lucide-react';
+import { CheckSquare, Download, Eye, EyeOff, Star, Trash2, Video, X } from 'lucide-react';
 import { canStar, useStar } from './favorites';
 import { canAnimatePhoto } from './AnimatePhotos';
 import { GallerySelectionContext } from './gallerySelection';
 import { useHiddenActions } from './hiddenContext';
 import { downloadItems } from './share';
+import { useItemActions } from './itemActions';
+import { ActionIcon } from './ItemActionSurfaces';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 import type { ShowToast } from './toast';
 
-export function GalleryManagement({ children, items, modeSelector, onAnimate, onDelete, onCopy, resetKey, search, showToast, showToolbar = true, tools }: {
+export function GalleryManagement({ children, items, modeSelector, onAnimate, onDelete, resetKey, search, showToast, showToolbar = true, tools }: {
   children: React.ReactNode;
   items: GalleryItem[];
   modeSelector: React.ReactNode;
@@ -22,7 +24,6 @@ export function GalleryManagement({ children, items, modeSelector, onAnimate, on
   tools?: React.ReactNode;
   onAnimate: (items: GalleryItem[]) => void;
   onDelete: (items: GalleryItem[]) => Promise<unknown>;
-  onCopy: (item: GalleryItem) => void;
   showToast: ShowToast;
 }) {
   const reducedMotion = useReducedMotion();
@@ -92,6 +93,10 @@ export function GalleryManagement({ children, items, modeSelector, onAnimate, on
   const starred = targets.filter(canStar);
   const allStarred = starred.length > 0 && starred.every((item) => item.favorite);
   const act = (action: () => void) => { closeMenu(); action(); };
+  const selectFromMenu = (item: GalleryItem) => { setSelection((current) => new Set([...(current || []), item.id])); anchor.current = item.id; };
+  // One item has the full list of item actions; several share the bulk ones.
+  const single = menu && targets.length === 1 ? targets[0] : null;
+  const singleActions = useItemActions(single, 'menu', { select: selectFromMenu });
   const actions = (inMenu: boolean) => <>
     <button type="button" role={inMenu ? 'menuitem' : undefined} title="Animate" disabled={!targets.some(canAnimatePhoto)} onClick={() => act(() => onAnimate(targets.filter(canAnimatePhoto)))}><Video size={16} />Animate</button>
     <button type="button" role={inMenu ? 'menuitem' : undefined} title="Download" disabled={!ready.length} onClick={() => act(() => { void downloadItems(ready, showToast); })}><Download size={16} />Download</button>
@@ -144,9 +149,12 @@ export function GalleryManagement({ children, items, modeSelector, onAnimate, on
         buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus({ preventScroll: true });
       } else if (event.key === 'Tab') closeMenu();
     }}>
-      <button type="button" role="menuitem" onClick={() => act(() => { setSelection((current) => new Set([...(current || []), menu.item.id])); anchor.current = menu.item.id; })}><CheckSquare size={16} />Select</button>
-      {targets.length === 1 && menu.item.prompt ? <button type="button" role="menuitem" onClick={() => act(() => onCopy(menu.item))}><Copy size={16} />Copy Prompt</button> : null}
-      {actions(true)}
+      {single ? singleActions.map((action) => (
+        <button key={action.id} type="button" role="menuitem" className={action.danger ? 'is-danger' : undefined} onClick={() => act(action.run)}><ActionIcon action={action} size={16} />{action.label}</button>
+      )) : <>
+        <button type="button" role="menuitem" onClick={() => act(() => selectFromMenu(menu.item))}><CheckSquare size={16} />Select</button>
+        {actions(true)}
+      </>}
     </div>, document.body) : null}
   </GallerySelectionContext.Provider>;
 }

@@ -20,8 +20,6 @@ type VirtualMasonryGalleryProps = {
   titleFromPrompt: (value?: string) => string;
   openItem: (item: GalleryItem) => void;
   cancelJob: (jobId?: string) => void;
-  copyPromptAndToast: (item: GalleryItem) => void;
-  deleteItem: (item: GalleryItem) => void;
   /** Moments and runs; null while grouping is off. */
   groups?: GalleryGroups | null;
   /** Headings for each stretch of time. */
@@ -82,8 +80,6 @@ type Flight = { runId: string; x: number; y: number; w: number; h: number; at: n
 export function VirtualMasonryGallery({
   cancelJob,
   columns,
-  copyPromptAndToast,
-  deleteItem,
   focusRun,
   formatElapsed,
   groups = null,
@@ -461,8 +457,6 @@ export function VirtualMasonryGallery({
               ) : (
                 <GalleryTile
                   cancelJob={cancelJob}
-                  copyPromptAndToast={copyPromptAndToast}
-                  deleteItem={deleteItem}
                   formatElapsed={formatElapsed}
                   height={entry.h}
                   item={freshItem(entry.item)}
