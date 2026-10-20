@@ -1,5 +1,4 @@
 import { PromptField } from './PromptField';
-import { canAnimatePhoto } from './AnimatePhotos';
 import { CatalogueFilters, emptyCatalogueFilter } from './CatalogueFilters';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import React from 'react';
@@ -7,12 +6,13 @@ import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes'
 import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Download, Eye, EyeOff, Image as ImageIcon, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Star, Trash2, UserRound, Video, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
-import { canShareFiles, shareItems } from './share';
 import { Sheet } from './Sheet';
 import { ItemActionSheet } from './ItemActionSurfaces';
+import { bulkItemActions, useItemActionHandlers } from './itemActions';
+import type { GallerySelection } from './gallerySelection';
 import { ReferenceSlots } from './ReferenceMediaPicker';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
@@ -25,7 +25,7 @@ import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneSearchBar } from './GallerySearch';
 import { StackRunsButton } from './StackRunsButton';
-import { canStar, emptySearch, searchActive, type GallerySearch } from './favorites';
+import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
@@ -48,7 +48,7 @@ import { hasAccountStorageScope } from './api';
 
 /* ------------------------------------------------------------ The shell */
 
-export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, actionsFor, setActionsFor, selection, setSelection, onAnimate }: {
+export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, actionsFor, setActionsFor, selection }: {
   view: Record<string, any>;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
@@ -59,23 +59,16 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   setCreateOpen: (open: boolean) => void;
   actionsFor: GalleryItem | null;
   setActionsFor: (item: GalleryItem | null) => void;
-  selection: Set<string> | null;
-  setSelection: (selection: Set<string> | null) => void;
-  onAnimate: (items: GalleryItem[]) => void;
+  selection: GallerySelection;
 }) {
   const {
     prompt, hiddenSpace, runningCount, comfyStatus, retryComfyStatus, mode, changeMode,
-    galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, deleteItems, hideItems, unhideItems, showToast
+    galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, showToast
   } = view;
   const gallery = (visibleGallery || []) as GalleryItem[];
-  const selecting = Boolean(selection);
-  const selectedItems = selecting ? gallery.filter((item) => selection!.has(item.id)) : [];
-  const selectable = gallery.filter((item) => item.status === 'done' || item.status === 'error');
-  const readyItems = selectedItems.filter((item) => item.status === 'done' && item.url);
-  const movableItems = readyItems.filter((item) => !item.library);
-  const starredItems = selectedItems.filter(canStar);
-  const allStarred = starredItems.length > 0 && starredItems.every((item) => item.favorite);
-  const endSelection = () => setSelection(null);
+  const { selecting, selectedItems, selectable } = selection;
+  const handlers = useItemActionHandlers();
+  const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, Boolean(hiddenSpace)) : [];
   const reducedMotion = useReducedMotion();
   const scrollToTop = () => galleryStageRef.current?.scrollTo({ left: 0, top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
   // Tapping what is generating shows that run: its own mode, its own tile.
@@ -141,10 +134,10 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     <>
       {selecting ? (
         <header className="phone-bar is-selecting">
-          <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={endSelection}><X size={22} /></button>
+          <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
           <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} selected` : 'Select Items'}</span></div>
-          <button type="button" className="phone-pill" aria-label={selectedItems.length === selectable.length && selectable.length ? "Deselect All" : "Select All Loaded"} onClick={() => { haptic('tap'); setSelection(new Set(selectedItems.length === selectable.length ? [] : selectable.map((item) => item.id))); }}>
-            {selectedItems.length === selectable.length && selectable.length ? 'None' : 'All'}
+          <button type="button" className="phone-pill" aria-label={selection.allSelected ? "Deselect All" : "Select All Loaded"} onClick={() => { haptic('tap'); selection.toggleAll(); }}>
+            {selection.allSelected ? 'None' : 'All'}
             <HapticTarget />
           </button>
         </header>
@@ -180,13 +173,11 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       {selecting ? (
         <nav className="phone-select-bar" aria-label="Selected Items">
-          <button type="button" disabled={!selectedItems.some(canAnimatePhoto)} onClick={() => onAnimate(selectedItems.filter(canAnimatePhoto))}><Video size={21} /><span>Animate</span></button>
-          <button type="button" disabled={!readyItems.length} onClick={() => shareItems(readyItems, showToast)}>{canShareFiles ? <Share size={21} /> : <Download size={21} />}<span>{canShareFiles ? 'Share' : 'Save'}</span></button>
-          <button type="button" disabled={!starredItems.length} onClick={() => view.toggleFavorite(starredItems, !allStarred)}><Star size={21} /><span>{allStarred ? 'Unstar' : 'Star'}</span></button>
-          {hiddenSpace
-            ? <button type="button" disabled={!movableItems.length} onClick={() => { unhideItems(movableItems); }}><Eye size={21} /><span>Unhide</span></button>
-            : <button type="button" disabled={!movableItems.length} onClick={() => { hideItems(movableItems); }}><EyeOff size={21} /><span>Hide</span></button>}
-          <button type="button" className="is-danger" disabled={!selectedItems.length} onClick={async () => { haptic('warning'); await deleteItems(selectedItems); }}><Trash2 size={21} /><span>{selectedItems.length > 0 && selectedItems.every((item) => item.library) ? 'Remove' : 'Delete'}</span><HapticTarget /></button>
+          {bulkActions.map((action) => (
+            <button key={action.id} type="button" className={cn(action.danger && 'is-danger')} aria-label={action.short ? action.label : undefined} disabled={action.disabled} onClick={() => { if (action.haptic) haptic(action.haptic); action.run(); }}>
+              <action.Icon size={21} /><span>{action.short || action.label}</span>{action.haptic ? <HapticTarget /> : null}
+            </button>
+          ))}
         </nav>
       ) : null}
 
@@ -209,8 +200,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
-      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => setSelection(new Set()) : undefined} />
-      <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} onSelect={(item) => { haptic('press'); setSelection(new Set([item.id])); }} />
+      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={!hiddenLocked && selectable.length ? () => selection.start() : undefined} />
+      <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} onSelect={(item) => { haptic('press'); selection.start([item.id]); }} />
     </>
   );
 }

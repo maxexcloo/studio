@@ -695,11 +695,10 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   const bar = ui.selectionBar;
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
   await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  // The phone bar uses short labels for the same actions.
-  await expect(bar.getByRole('button', { name: /^(Hide|Move To Hidden)$/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Move to Hidden', exact: true })).toBeDisabled();
   await page.locator('[data-tile-id="image-0"] .tile').click();
   await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();
-  await expect(bar.getByRole('button', { name: /^(Save|Share|Download)$/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Download', exact: true })).toBeDisabled();
   await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
   await page.locator('[data-tile-id="image-2"] .tile').click();
   await expect(page.locator('.tile.is-selected')).toHaveCount(1);

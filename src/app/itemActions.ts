@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, Columns2, Copy, Download, Eye, EyeOff, FastForward, ImagePlus, Share, Star, TextQuote, Trash2, Video, Wand2 } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
-import { canShareFiles, downloadItem, downloadUrl, shareItem } from './share';
+import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
 import { canUpscaleItem, upscaledWithRun } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import type { GalleryItem } from './types';
@@ -42,6 +42,12 @@ export type ItemActionHandlers = {
   unhide: (item: GalleryItem) => void;
   remove: (item: GalleryItem) => void;
   star: (item: GalleryItem) => void;
+  /* The same for several selected items at once. */
+  animateItems: (items: GalleryItem[]) => void;
+  starItems: (items: GalleryItem[], favorite: boolean) => void;
+  hideItems: (items: GalleryItem[]) => void;
+  unhideItems: (items: GalleryItem[]) => void;
+  removeItems: (items: GalleryItem[]) => Promise<unknown>;
 };
 
 export type ItemActionIcon = React.ComponentType<{ size?: number; fill?: string; strokeWidth?: number }>;
@@ -64,6 +70,8 @@ export type ItemAction = {
   danger?: boolean;
   /** A haptic cue on phones. */
   haptic?: 'tap' | 'warning';
+  /** Bulk actions stay in place, unavailable, when nothing selected fits them. */
+  disabled?: boolean;
 };
 
 export type ItemActionExtras = {
@@ -142,6 +150,29 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     },
   ];
   return actions.filter((action): action is ItemAction => Boolean(action) && placement[(action as ItemAction).id].includes(surface));
+}
+
+/**
+ * What can be done to several selected items, in the same order and with the
+ * same names as for one. `hiddenSpace` says which way Move goes.
+ */
+export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, hiddenSpace: boolean): ItemAction[] {
+  const ready = items.filter((item) => item.status === 'done' && item.url);
+  const movable = ready.filter((item) => !item.library);
+  const starrable = items.filter(canStar);
+  const allStarred = starrable.length > 0 && starrable.every((item) => item.favorite);
+  const photos = items.filter(canAnimatePhoto);
+  const actions: (ItemAction | false)[] = [
+    canShareFiles && { id: 'share', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
+    { id: 'download', label: 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    { id: 'star', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, haptic: 'tap', run: () => handlers.starItems(starrable, !allStarred) },
+    { id: 'animate', label: 'Animate', Icon: Video, disabled: !photos.length, run: () => handlers.animateItems(photos) },
+    hiddenSpace
+      ? { id: 'move', label: 'Move to Gallery', short: 'Unhide', Icon: Eye, disabled: !movable.length, run: () => handlers.unhideItems(movable) }
+      : { id: 'move', label: 'Move to Hidden', short: 'Hide', Icon: EyeOff, disabled: !movable.length, run: () => handlers.hideItems(movable) },
+    { id: 'delete', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', Icon: Trash2, danger: true, haptic: 'warning', disabled: !items.length, run: () => { void handlers.removeItems(items); } },
+  ];
+  return actions.filter((action): action is ItemAction => Boolean(action));
 }
 
 /** The studio's handlers, kept stable so memoised tiles only redraw for their own item. */

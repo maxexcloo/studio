@@ -25,10 +25,6 @@ import { ActionIcon } from './ItemActionSurfaces';
  */
 export type PhoneTiles = {
   onLongPress: (item: GalleryItem) => void;
-  /** Selecting several: a tap toggles the tile instead of opening it. */
-  selecting: boolean;
-  selected: Set<string>;
-  toggle: (item: GalleryItem) => void;
 };
 export const TileLongPressContext = React.createContext<PhoneTiles | null>(null);
 
@@ -102,10 +98,10 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
   const phoneTiles = React.useContext(TileLongPressContext);
   const selection = React.useContext(GallerySelectionContext);
   const selectable = item.status === "done" || item.status === "error";
-  const selecting = Boolean(phoneTiles?.selecting || selection?.selecting);
-  const isSelected = Boolean(selecting && (phoneTiles?.selected.has(item.id) || selection?.selected.has(item.id)));
+  const selecting = Boolean(selection?.selecting);
+  const isSelected = Boolean(selecting && selection?.selected.has(item.id));
   // While selecting, a long press toggles too, so a slow tap never gets lost.
-  const onLongPress = phoneTiles ? (selecting ? (selectable ? phoneTiles.toggle : null) : phoneTiles.onLongPress) : null;
+  const onLongPress = phoneTiles ? (selecting ? (selectable ? selection!.toggle : null) : phoneTiles.onLongPress) : null;
   const press = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
   const cancelPress = () => { if (press.current) window.clearTimeout(press.current.timer); };
   const longPress = onLongPress && item.status !== "pending" ? {
@@ -143,14 +139,13 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
         style={{ width: "100%", height: "100%" } as React.CSSProperties}
         {...longPress}
         onKeyDown={(event) => {
-          if (selection && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) selection.menu(item, event);
+          if (selection?.menu && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) selection.menu(item, event);
         }}
-        onContextMenu={selection ? (event) => selection.menu(item, event) : longPress?.onContextMenu}
+        onContextMenu={selection?.menu ? (event) => selection.menu!(item, event) : longPress?.onContextMenu}
         onClick={(event) => {
           // A long press already opened the actions; the lift that ends it is not a tap.
           if (press.current?.fired) { press.current = null; return; }
           if (selection?.click(item, event)) return;
-          if (selecting) { if (selectable) phoneTiles?.toggle(item); return; }
           if (item.status !== "pending") openItem(item);
         }}
         aria-pressed={selecting && selectable ? isSelected : undefined}

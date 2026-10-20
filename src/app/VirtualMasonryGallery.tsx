@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { GallerySelectionContext } from './gallerySelection';
-import { TileLongPressContext, GalleryTile } from './GalleryTile';
+import { GalleryTile } from './GalleryTile';
 import { RunShelf, RunStack, MomentHeading } from './RunStack';
 import { itemKey, layoutGallery, placementKey, type LayoutEntry, type RunStackStyle } from './galleryLayout';
 import { cn } from './format';
@@ -105,8 +105,7 @@ export function VirtualMasonryGallery({
   onDismissUpscaleNotice,
 }: VirtualMasonryGalleryProps) {
   const selection = React.useContext(GallerySelectionContext);
-  const phoneTiles = React.useContext(TileLongPressContext);
-  const stackRuns = configuredStackRuns && !selection?.selecting && !phoneTiles?.selecting;
+  const stackRuns = configuredStackRuns && !selection?.selecting;
   const reducedMotion = useReducedMotion();
   const [containerRef, containerWidth] = useElementWidth<HTMLElement>();
   // The element that scrolls, found from where the gallery actually sits. The

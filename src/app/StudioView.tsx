@@ -43,6 +43,7 @@ import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
 import { PhoneViewerBar, ViewerDockActions } from './ItemActionSurfaces';
 import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
+import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
 import { usePhone, useThisComputer } from './device';
 import { haptic } from './phoneControls';
 import { ConnectedCard } from './ConnectedCard';
@@ -251,26 +252,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [phoneCreate, setPhoneCreate] = React.useState(false);
   const [phoneActionsFor, setPhoneActionsFor] = React.useState<GalleryItem | null>(null);
   const openTileActions = React.useCallback((item: GalleryItem) => { haptic('press'); setPhoneActionsFor(item); }, []);
-  // Selecting several on the phone: null when not selecting.
   const [animationItems, setAnimationItems] = React.useState<GalleryItem[] | null>(null);
-  const [phoneSelection, setPhoneSelection] = React.useState<Set<string> | null>(null);
-  const toggleSelected = React.useCallback((item: GalleryItem) => {
-    haptic('tap');
-    setPhoneSelection((current) => {
-      const next = new Set(current || []);
-      if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
-      return next;
-    });
-  }, []);
-  useHistoryDismiss(Boolean(phone && phoneSelection), () => setPhoneSelection(null));
-  // A change of layout, privacy domain or filtered view ends a selection.
-  React.useEffect(() => { setPhoneSelection(null); }, [phone, hiddenSpace, hiddenLocked, mode, gallerySearch.q, gallerySearch.favorites, gallerySearch.model, gallerySearch.workflow, gallerySearch.lora]);
-  const phoneTiles = React.useMemo(() => phone ? {
-    onLongPress: openTileActions,
-    selecting: Boolean(phoneSelection),
-    selected: phoneSelection || new Set<string>(),
-    toggle: toggleSelected
-  } : null, [phone, openTileActions, phoneSelection, toggleSelected]);
+  // Selecting several, in either layout. A change of layout, privacy domain or filtered view ends it.
+  const selection = useGallerySelection(renderedGallery, JSON.stringify([phone, hiddenSpace, hiddenLocked, mode, gallerySearch]));
+  useHistoryDismiss(Boolean(phone && selection.selecting), selection.end);
+  const phoneTiles = React.useMemo(() => phone ? { onLongPress: openTileActions } : null, [phone, openTileActions]);
   // Zen shows one image at a time: a search there would narrow a strip with nothing to say so.
   React.useEffect(() => {
     if (!prefs.zenMode) return;
@@ -327,6 +313,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       unhide: (item) => live().unhideItems([item]),
       remove: (item) => live().deleteItem(item),
       star: (item) => live().toggleFavorite([item], !item.favorite),
+      animateItems: (items) => setAnimationItems(items),
+      starItems: (items, favorite) => live().toggleFavorite(items, favorite),
+      hideItems: (items) => live().hideItems(items),
+      unhideItems: (items) => live().unhideItems(items),
+      removeItems: (items) => live().deleteItems(items),
     };
   }, [smartUpscale, canUseStartImage, canAnimate]);
   const hiddenCount = hiddenSpace ? renderedGallery.filter((item: GalleryItem) => item.status === "done").length : 0;
@@ -692,6 +683,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <HiddenActionsContext.Provider value={hiddenActions}>
     <TileLongPressContext.Provider value={phoneTiles}>
     <ItemActionsContext.Provider value={itemActionHandlers}>
+    <GallerySelectionContext.Provider value={selection}>
     <FavoriteContext.Provider value={toggleFavorite}>
     <GenerationProfiles.Provider value={models?.profiles || noProfiles}>
     <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", hiddenSpace && "is-hidden-space", hiddenLocked && "is-hidden-locked", !hiddenLocked && (searchOpen || searchOn) && "is-searching", passageClass)} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
@@ -708,9 +700,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           setCreateOpen={setPhoneCreate}
           actionsFor={phoneActionsFor}
           setActionsFor={setPhoneActionsFor}
-          selection={phoneSelection}
-          setSelection={setPhoneSelection}
-          onAnimate={setAnimationItems}
+          selection={selection}
         />
       ) : prefs.zenMode ? (
         <>
@@ -799,13 +789,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement onAnimate={setAnimationItems} items={renderedGallery} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Gallery Mode">
+            <GalleryManagement selection={selection} modeSelector={<div className="gallery-generation-mode mode-tabs" role="group" aria-label="Gallery Mode">
               {(["image", "video"] as const).map((nextMode) => (
                 <button key={nextMode} type="button" aria-pressed={mode === nextMode} className={cn(mode === nextMode && "active")} onClick={() => view.changeMode(nextMode)}>
                   {nextMode === "image" ? "Images" : "Videos"}
                 </button>
               ))}
-            </div>} resetKey={JSON.stringify([hiddenSpace, hiddenLocked, mode, gallerySearch])} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>} onDelete={view.deleteItems} showToast={showToast}>{galleryBody}</GalleryManagement>
+            </div>} search={<GallerySearchBar onToggleHidden={toggleHiddenSpace} search={gallerySearch} setSearch={setGallerySearch} count={hiddenSpace ? renderedGallery.length : view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} hiddenSpace={Boolean(hiddenSpace)} items={renderedGallery} />} showToolbar={!hiddenLocked} tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
@@ -1011,6 +1001,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     </div>
     </GenerationProfiles.Provider>
     </FavoriteContext.Provider>
+    </GallerySelectionContext.Provider>
     </ItemActionsContext.Provider>
     </TileLongPressContext.Provider>
     </HiddenActionsContext.Provider>
