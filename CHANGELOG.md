@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **AI Control from chat:** the control tools add Restart, which restarts a running workload in place (same model, profile and GPUs) when the user asks, and Mode, which previews a preset board (image and text, image and video, or video on both GPUs) for an approved Apply. GPU changes still happen only on explicit request.
+
 ### Changed
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
 - **The library follows the viewer:** stepping or swiping to another item in the viewer scrolls its tile (or the stack holding it) into view behind the viewer, on a computer and on a phone, so closing the viewer lands where you are. The gallery only moves when the item changes and its tile is out of sight.

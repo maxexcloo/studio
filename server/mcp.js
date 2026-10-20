@@ -16,7 +16,7 @@ export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
 // Workflow rules only; tool descriptions and each reply carry the details, so hosts that resend these every step stay small.
 const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; pass a model the user names as profile_id and LoRAs the user names as loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the watch links and end the turn. Call Result only when the user asks to see a result. Never poll, resubmit or invent results.`;
-const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview and get approval before Apply. Media generation never changes allocation.';
+const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const anonymousMessage = 'The gateway must forward its user identity.';
 /** Schema refusals arrive as one issue per line ("Too big: … at wait_seconds"); one line naming each field is enough to fix the call. */
@@ -245,12 +245,25 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return respond(await media.queue(owner, args, refs), profile, wait_seconds, signal);
       });
     } else {
-      const request = async (method, route, body) => {
+      const control = async (method, route, body) => {
         try {
           const response = await fetchImpl(`${environment.CONTROL_URL.replace(/\/+$/, '')}/api/${route}`, { method, headers: { Authorization: `Bearer ${environment.CONTROL_API_KEY}`, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.timeout(15000) });
           if (![200, 202].includes(response.status)) throw new Error('refused');
-          return mcpJson(await response.json());
+          return await response.json();
         } catch { throw new Error('AI Control is unavailable or refused the request. Refresh its status and preview before retrying.'); }
+      };
+      const request = async (method, route, body) => mcpJson(await control(method, route, body));
+      /** A preset board: image with text, image with video, or video on both GPUs. Text keeps the running single-GPU model unless one is named. */
+      const modeAllocation = async (mode, textProfile) => {
+        if (mode === 'image_video') return [{ profile: 'comfyui-image', devices: ['0'] }, { profile: 'comfyui-video', devices: ['1'] }];
+        if (mode === 'video') return [{ profile: 'comfyui-video', devices: ['0', '1'] }];
+        const [status, catalogue] = await Promise.all([control('GET', 'status'), control('GET', 'catalogue')]);
+        const workloads = catalogue?.rules?.workloads || {};
+        const fits = Object.keys(workloads).filter(id => workloads[id].kind === 'text' && workloads[id].placements?.includes('0'));
+        const running = status?.runtimes?.text?.running ? status.runtimes.text.profile : '';
+        const text = textProfile || (fits.includes(running) ? running : '');
+        if (!fits.includes(text)) throw new Error(`Name text_profile, a text model that fits one GPU: ${fits.join(', ')}.`);
+        return [{ profile: text, devices: ['0'] }, { profile: 'comfyui-image', devices: ['1'] }];
       };
       tool(server, 'GPUStatus', 'GPU Status', 'Read GPU allocation and runtime health.', {}, () => request('GET', 'status'), { readOnlyHint: true });
       tool(server, 'Workloads', 'List Workloads', 'List workloads and placement rules for an explicitly requested allocation.', {}, () => request('GET', 'catalogue'), { readOnlyHint: true });
@@ -258,6 +271,15 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       tool(server, 'Apply', 'Apply Allocation', 'Apply an explicitly requested allocation only after its Preview was presented and approved, with its exact signature. Active jobs may stop; never use it for media generation.', { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) }, ({ allocation, signature, confirmed }) => {
         if (!confirmed) throw new Error('Present the preview and obtain approval before applying this allocation.');
         return request('POST', 'board', { allocation, replace: true, signature });
+      }, { destructiveHint: true });
+      tool(server, 'Mode', 'Preview GPU Mode', 'Preview a preset board only when the user asks for it: image_text (text on GPU 0, image on GPU 1), image_video (image on GPU 0, video on GPU 1) or video (video on both GPUs). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then Apply the returned allocation and signature.', { mode: z.enum(['image_text', 'image_video', 'video']), text_profile: z.string().min(1).optional() }, async ({ mode, text_profile }) => {
+        const board = await modeAllocation(mode, text_profile);
+        return mcpJson({ allocation: board, ...await control('POST', 'board/plan', { allocation: board }) });
+      }, { readOnlyHint: true });
+      tool(server, 'Restart', 'Restart Workload', 'Restart a running workload in place, only when the user asks: the same model, profile and GPUs. Its active jobs stop. runtime is a runtime name from GPUStatus, such as text, image or comfyui-video. Never starts a stopped workload or changes allocation.', { runtime: z.string().min(1) }, async ({ runtime }) => {
+        const current = (await control('GET', 'status'))?.runtimes?.[runtime];
+        if (!current?.running) throw new Error(`${runtime} is not running; only a running workload can be restarted.`);
+        return request('POST', 'restart', { runtime, profile: current.profile, devices: current.devices });
       }, { destructiveHint: true });
       tool(server, 'Operation', 'Check Operation', 'Read the job returned by Apply, without waiting.', { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) }, ({ job_id }) => request('GET', `jobs/${job_id}`), { readOnlyHint: true });
     }

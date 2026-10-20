@@ -33,7 +33,7 @@ const loraInfo = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult } = {}) {
+async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }) } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -100,7 +100,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     fetchImpl: async (url, init) => {
       if (String(url).startsWith('http://fixture-control.invalid')) {
         controlRequests.push({ url: String(url), method: init?.method || 'GET', body: init?.body ? JSON.parse(init.body) : undefined });
-        return Response.json({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' });
+        return Response.json(controlReply(new URL(url).pathname, init?.body ? JSON.parse(init.body) : undefined));
       }
       const response = await fetch(url, init);
       if (dropAck && new URL(url).pathname === '/api/generate') { dropAck = false; throw new Error('Fixture acknowledgement interrupted'); }
@@ -203,7 +203,7 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8')).jobs[id], linked.userId);
 
   const control = await f.client('administrator', controlKey);
-  assert.deepEqual((await control.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
+  assert.deepEqual((await control.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
 });
 
 test('account signed result links survive restart without persisting bearer tokens and recheck output availability', async t => {
@@ -290,14 +290,14 @@ test('media and administrator credentials discover only their own friendly tools
   assert.deepEqual(Object.fromEntries(tools.map(tool => [tool.name, tool.title])), { Cancel: 'Cancel', Generate: 'Generate', Models: 'Find Models', Result: 'Show Result', Reuse: 'Reuse Result', Status: 'Check Status', Upload: 'Upload Reference' });
   await failure(media, 'GPUStatus');
   const admin = await f.client('administrator', controlKey);
-  assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
+  assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
   assert.match(media.getInstructions(), /call Generate with kind, tier/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(media.getInstructions(), /share the watch links and end the turn\. Call Result only when the user asks/);
   assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
-  assert.match(admin.getInstructions(), /Preview and get approval before Apply/);
+  assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
   assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7500, 'media tool schemas and instructions exceed their context budget');
@@ -309,6 +309,35 @@ test('media and administrator credentials discover only their own friendly tools
   assert.equal(f.controlRequests.length, 1);
   await call(admin, 'Apply', { allocation: [], signature: 'fixture-preview', confirmed: true });
   assert.deepEqual(f.controlRequests.at(-1).body, { allocation: [], replace: true, signature: 'fixture-preview' });
+});
+
+test('control Mode previews preset boards and Restart restarts only a running workload as it is', async t => {
+  const runtimes = { text: { running: true, profile: 'radiance-mxfp4', devices: ['1'], health: 'healthy' }, image: { running: false, profile: '', devices: [], health: 'stopped' } };
+  const catalogue = { rules: { workloads: { 'comfyui-image': { kind: 'image', placements: ['0', '1'] }, 'radiance-mxfp4': { kind: 'text', placements: ['0', '1'] }, 'radiance-flashnext': { kind: 'text', placements: ['0,1'] }, 'gemma-31b': { kind: 'text', placements: ['0', '1', '0,1'] } } } };
+  const f = await fixture(t, { environment: adminEnvironment, controlReply: (route, body) => route === '/api/status' ? { runtimes } : route === '/api/catalogue' ? catalogue : route === '/api/board/plan' ? { signature: `plan:${JSON.stringify(body.allocation)}`, stop: [], start: [] } : { id: 'fixture-operation', state: 'running' } });
+  const admin = await f.client('administrator', controlKey);
+  const tools = (await admin.listTools()).tools;
+  assert.equal(tools.find(tool => tool.name === 'Restart').annotations.destructiveHint, true);
+  assert.equal(tools.find(tool => tool.name === 'Mode').annotations.readOnlyHint, true);
+  const board = async (args) => data(await call(admin, 'Mode', args));
+  // Modes only preview; applying stays a separate, approved Apply.
+  assert.deepEqual((await board({ mode: 'image_video' })).allocation, [{ profile: 'comfyui-image', devices: ['0'] }, { profile: 'comfyui-video', devices: ['1'] }]);
+  assert.deepEqual((await board({ mode: 'video' })).allocation, [{ profile: 'comfyui-video', devices: ['0', '1'] }]);
+  const imageText = await board({ mode: 'image_text' });
+  assert.deepEqual(imageText.allocation, [{ profile: 'radiance-mxfp4', devices: ['0'] }, { profile: 'comfyui-image', devices: ['1'] }], 'keeps the running text model');
+  assert.equal(imageText.signature, `plan:${JSON.stringify(imageText.allocation)}`);
+  assert.deepEqual((await board({ mode: 'image_text', text_profile: 'gemma-31b' })).allocation[0], { profile: 'gemma-31b', devices: ['0'] });
+  runtimes.text.profile = 'radiance-flashnext';
+  const ambiguous = await call(admin, 'Mode', { mode: 'image_text' });
+  assert.equal(ambiguous.isError, true);
+  assert.match(ambiguous.content[0].text, /Name text_profile.*radiance-mxfp4, gemma-31b/);
+  assert.equal(f.controlRequests.some(request => ['/api/board', '/api/restart'].includes(new URL(request.url).pathname)), false);
+  await call(admin, 'Restart', { runtime: 'text' });
+  assert.deepEqual(f.controlRequests.at(-1).body, { runtime: 'text', profile: 'radiance-flashnext', devices: ['1'] });
+  const stopped = await call(admin, 'Restart', { runtime: 'image' });
+  assert.equal(stopped.isError, true);
+  assert.match(stopped.content[0].text, /image is not running/);
+  assert.equal(new URL(f.controlRequests.at(-1).url).pathname, '/api/status');
 });
 
 test('Models uses only this studio, filters readiness and kind, and returns detailed capabilities on request', async t => {
