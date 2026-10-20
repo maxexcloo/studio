@@ -94,6 +94,7 @@ export function studioUi(page: Page) {
     more,
     openComposer,
     closeComposer,
+    composerSettled,
     openModelPicker,
     openMore,
     openSizeMenu,

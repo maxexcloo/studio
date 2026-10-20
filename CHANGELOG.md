@@ -16,6 +16,7 @@ version opens with a `> ` summary line.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed
+- **Use Prompt and Use Settings:** from the viewer, its Details, a tile or a menu, they now apply, close the viewer and open the prompt box with the reused text ready to edit: the desktop composer expanded and focused, or the phone's Create sheet.
 - **Viewer dock:** the desktop dock reads Zoom Out, a zoom percentage that steps through Fit, 1:1 and Full Size when clicked, and Zoom In, then Copy, Download, Star, Upscale and Delete, then Details. Use as Reference, Animate and Move to Hidden stay in the menus and on the phone.
 - **Share and Download:** the desktop viewer, tiles, context menu and selection bar download and no longer offer Share. On a phone the viewer bar, long-press sheet and selection bar offer Share instead of Download (iOS's share sheet has Save Image), and keep Download only where the browser can't share files.
 - **Faster viewer:** the viewer and its neighbour prefetch load a display-sized WebP (up to 2560 px, cached and warmed like thumbnails) instead of the full PNG, often a sixth of the bytes. The original loads only when zooming past the display copy's size; downloads still give the original.

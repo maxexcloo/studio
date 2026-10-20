@@ -15,14 +15,14 @@ test.beforeEach(async ({ page }) => {
 
 for (const kind of ['image', 'video'] as const) {
   for (const failed of [false, true]) {
-    test(`reusing ${failed ? 'failed' : 'completed'} ${kind} settings keeps its viewer open`, async ({ page }) => {
+    test(`reusing ${failed ? 'failed' : 'completed'} ${kind} settings closes the viewer and opens the prompt box`, async ({ page }) => {
       const item = {
         id: `reuse-${kind}`,
         url: failed ? '' : kind === 'image' ? picture : '/reuse-video.mp4',
         filename: `reuse.${kind === 'image' ? 'png' : 'mp4'}`,
         type: kind,
         status: failed ? 'error' : 'done',
-        prompt: `Keep this ${kind} open while reusing its settings`,
+        prompt: `Open the prompt box with this ${kind}'s prompt`,
         negative: 'Keep the negative prompt too',
         model: kind === 'image' ? 'flux1-schnell.safetensors' : 'wan2.1_i2v_480p.safetensors',
         createdAt: new Date().toISOString(),
@@ -38,36 +38,20 @@ for (const kind of ['image', 'video'] as const) {
       const ui = studioUi(page);
       if (kind === 'video') await ui.switchMode('video');
       const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
-      await viewer.evaluate((element) => { element.setAttribute('data-reuse-check', 'original-viewer'); });
-      const media = viewer.locator(`.viewer-canvas ${kind === 'video' ? 'video' : 'img'}`).first();
-      const source = failed ? null : await media.getAttribute('src');
       const phone = await ui.isPhone();
       // The full studio offers a failed run's reuse in its failure panel.
       const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Use Settings', exact: true }) : await ui.reuseButton();
-
-      // Reuse opens the phone's Create sheet over the viewer, which each dismissal must leave open.
-      for (const dismiss of phone ? ['button', 'escape', 'back'] : ['viewer']) {
-        await reuse.click();
-        await expect(viewer).toHaveAttribute('data-reuse-check', 'original-viewer');
-        if (phone) {
-          const composer = ui.composer;
-          await expect(composer).toBeVisible();
-          await expect(ui.prompt).toHaveValue(item.prompt);
-          await expect(ui.negativePrompt).toHaveValue(item.negative);
-          if (dismiss === 'button') await ui.closeComposer();
-          else if (dismiss === 'escape') await page.keyboard.press('Escape');
-          else await page.evaluate(() => window.history.back());
-          await expect(composer).toHaveCount(0);
-          await expect(viewer).toBeVisible();
-          await expect(viewer).toHaveAttribute('data-reuse-check', 'original-viewer');
-        }
-        if (failed) await expect(viewer.locator('.failure-panel')).toBeVisible();
-        else await expect(media).toHaveAttribute('src', source!);
-      }
-
-      await ui.closeViewer();
-      await ui.openComposer();
+      await reuse.click();
+      await expect(viewer).toHaveCount(0);
+      await expect(ui.composer).toBeVisible();
       await expect(ui.prompt).toHaveValue(item.prompt);
+      await expect(ui.negativePrompt).toHaveValue(item.negative);
+      // Ready to edit: the desktop's box is expanded with the prompt focused; the phone's sheet is open.
+      if (phone) await ui.composerSettled();
+      else {
+        await expect(ui.prompt).toBeFocused();
+        await expect(page.locator('.zen-prompt')).toHaveClass(/is-expanded/);
+      }
     });
   }
 }
@@ -101,11 +85,13 @@ for (const promptsOnly of [false, true]) {
       await ui.showDetails();
       const readouts = viewer.locator('.prompt-readout');
       await readouts.getByRole('button', { name: 'Use Prompt', exact: true }).click();
+      await expect(viewer).toHaveCount(0);
+      await ui.closeComposer();
+      await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
+      await ui.showDetails();
       await readouts.getByRole('button', { name: 'Use Negative Prompt', exact: true }).click();
     } else await (await ui.reuseButton()).click();
-    await ui.closeComposer();
-    await expect(viewer).toBeVisible();
-    await ui.closeViewer();
+    await expect(viewer).toHaveCount(0);
     await ui.openComposer();
     await expect(ui.prompt).toHaveValue(item.prompt);
     await expect(ui.negativePrompt).toHaveValue(item.negative);
@@ -152,7 +138,7 @@ for (const field of ['prompt', 'negative'] as const) {
     const reuseBox = await reuse.boundingBox();
     expect(reuseBox!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);
     await reuse.click();
-    await ui.closeViewer();
+    await expect(viewer).toHaveCount(0);
     await ui.openComposer();
     await expect(ui.prompt).toHaveValue(field === 'prompt' ? item.prompt : 'Positive draft');
     await expect(ui.negativePrompt).toHaveValue(field === 'negative' ? item.negative : 'Negative draft');

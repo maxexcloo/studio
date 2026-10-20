@@ -290,10 +290,27 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const phoneRef = React.useRef(phone);
   phoneRef.current = phone;
   const smartUpscale = prefs.smartUpscale;
+  /**
+   * After Use Prompt or Use Settings: the viewer closes and the prompt box
+   * opens with the reused text ready to edit, the phone's Create sheet or
+   * the desktop composer, expanded and focused at the end of the prompt.
+   */
+  const composeFromViewer = React.useRef(() => {});
+  composeFromViewer.current = () => {
+    liveView.current.setActive(null);
+    if (phoneRef.current) { setPhoneCreate(true); return; }
+    setComposerExpanded(true);
+    // Once the viewer has gone and handed focus back.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const field = zenPromptRef.current;
+      if (!field) return;
+      field.focus({ preventScroll: true });
+      field.setSelectionRange(field.value.length, field.value.length);
+    }));
+  };
   const itemActionHandlers = React.useMemo<ItemActionHandlers>(() => {
     const live = () => liveView.current;
-    // On a phone the composer is a sheet: it opens above the viewer with the change in place, so closing it returns there.
-    const compose = () => { if (phoneRef.current) setPhoneCreate(true); };
+    const compose = () => composeFromViewer.current();
     return {
       showToast: (...args) => live().showToast(...args),
       smartUpscale,
@@ -883,7 +900,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onClick={clickViewer}
                   onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > view.viewerNativeZoom * 1.05 ? view.viewerNativeZoom : view.viewerNativeZoom * 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
-                  {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
+                  {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => itemActionHandlers.reuse(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain" stage scale={(viewerZoom / (view.viewerNativeZoom || 1)) * (window.devicePixelRatio || 1)}>
                   {active.status === "pending" ? <GenerationProgress item={active} formatElapsed={formatElapsed} /> : null}
                   </GenerationMedia>
@@ -906,7 +923,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         <div className="readout-box">
                           <p>{active.prompt || "No prompt recorded"}</p>
                           <Tip content="Copy Prompt"><button className="readout-copy" aria-label="Copy Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.prompt || ""), "prompt")}><CopyIcon copied={viewerCopy.copied === "prompt"} size={13} /></button></Tip>
-                          <Tip content="Use Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Prompt" disabled={!active.prompt} onClick={() => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); }}><Wand2 size={13} /></button></Tip>
+                          <Tip content="Use Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Prompt" disabled={!active.prompt} onClick={() => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); composeFromViewer.current(); }}><Wand2 size={13} /></button></Tip>
                         </div>
                       </div>
                       {active.negative ? (
@@ -915,14 +932,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           <div className="readout-box">
                             <p>{active.negative}</p>
                             <Tip content="Copy Negative Prompt"><button className="readout-copy" aria-label="Copy Negative Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.negative || ""), "negative")}><CopyIcon copied={viewerCopy.copied === "negative"} size={13} /></button></Tip>
-                            <Tip content="Use Negative Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Negative Prompt" disabled={!active.negative} onClick={() => { setNegative(clampText(active.negative || "", negativeLimit)); showToast("Negative prompt applied."); }}><Wand2 size={13} /></button></Tip>
+                            <Tip content="Use Negative Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Negative Prompt" disabled={!active.negative} onClick={() => { setNegative(clampText(active.negative || "", negativeLimit)); showToast("Negative prompt applied."); composeFromViewer.current(); }}><Wand2 size={13} /></button></Tip>
                           </div>
                         </div>
                       ) : null}
                       {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
                       <ViewerActions
                         item={active}
-                        onUseSettings={() => applyAllSettings(active)}
+                        onUseSettings={() => itemActionHandlers.reuse(active)}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />

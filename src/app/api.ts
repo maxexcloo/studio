@@ -3,25 +3,41 @@ import { defaultPrefs } from './constants';
 import { fullGenerationText } from './format';
 import { sharesWithoutSettings } from './shareSettings';
 
-export async function copyText(text: string) {
+/**
+ * Copies text. iOS Safari allows it only while the tap is still being
+ * handled, so the clipboard is asked straight away, with nothing awaited
+ * first; where there is no clipboard API (plain HTTP) a hidden text box is
+ * selected and copied instead, also within the tap.
+ */
+export function copyText(text: string): Promise<boolean> {
+  if (!navigator.clipboard?.writeText) return Promise.resolve(copyWithSelection(text));
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    return navigator.clipboard.writeText(text).then(() => true, () => copyWithSelection(text));
   } catch {
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const copied = document.execCommand("copy");
-      textarea.remove();
-      return copied;
-    } catch {
-      return false;
-    }
+    return Promise.resolve(copyWithSelection(text));
+  }
+}
+
+function copyWithSelection(text: string) {
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    // 16px, or iOS zooms the page to it; off screen but rendered, so it can be selected.
+    textarea.style.cssText = "position:fixed;top:0;left:-9999px;font-size:16px;opacity:0";
+    // Inside the open dialog, so its focus trap doesn't pull focus back before the copy.
+    const host = document.activeElement?.closest('[role="dialog"]') || document.body;
+    host.appendChild(textarea);
+    const before = document.activeElement as HTMLElement | null;
+    textarea.focus({ preventScroll: true });
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    before?.focus?.({ preventScroll: true });
+    return copied;
+  } catch {
+    return false;
   }
 }
 
