@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> A thumb-first phone dock, one layer at a time, viewer actions by intent with Recreate and Reuse, Retry for failed items, and chat prompts written by Studio
+
 ### Added
 - **Retry failed items:** a failed image or video offers Retry on its tile, in the viewer and in the right-click menu, and Select Failed picks every failed item for one Retry or Delete. Each retry is a new job with the run's own model, prompts, settings and references.
 - **Selections download as one zip:** Download on several selected items fetches one archive of just those items (`/api/gallery/export?ids=`), instead of a burst of separate downloads.
