@@ -13,7 +13,7 @@ import { useReorderDrag } from './useReorderDrag';
 import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
-import { loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
+import { knownLoraInfo, loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
 import type { LoraSnapshot } from './lora-storage';
 import type { LoraSelection, Profile } from './types';
 
@@ -34,10 +34,6 @@ export type LoraLibraryApi = {
 const strengthMin = 0;
 const strengthMax = 2;
 
-function fileName(name: string) {
-  const parts = name.split(/[\\/]/);
-  return (parts[parts.length - 1] || name).replace(/\.(safetensors|ckpt|pt|bin)$/i, '');
-}
 
 function folderOf(name: string) {
   const parts = name.split(/[\\/]/).filter(Boolean);
@@ -313,7 +309,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     <div className={cn("lora-picker", libraryView && "is-library is-list")} role={libraryView ? "group" : "dialog"} aria-label={libraryView ? 'LoRA Library' : swapping ? 'Replace LoRA' : 'Add LoRAs'}>
       {!libraryView ? <div className="lora-picker-head">
         <button type="button" className="btn is-ghost lora-picker-back" onClick={onClose}><ArrowLeft size={14} /> Back</button>
-        <span>{swapping ? <>Replace <strong>{fileName(swapping)}</strong></> : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
+        <span>{swapping ? <>Replace <strong>{nameOf(swapping)}</strong></> : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
       </div> : null}
       {profile?.loraNote ? <p className="lora-picker-note">{profile.loraNote}</p> : null}
       <label className={cn("lora-picker-search", libraryView && "picker-search")}>
@@ -377,7 +373,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     </button>
                     <LoraSource info={info} label={label} />
                     <LoraDetails info={info} label={label} />
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${fileName(row.name)} from Favourites` : `Add ${fileName(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
                     {item && reviewing ? <div className="lora-library-expansion"><div className="lora-library-settings">
@@ -416,7 +412,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <button
                       type="button"
                       className={cn('lora-option-star', favorite && 'active')}
-                      aria-label={favorite ? `Remove ${fileName(row.name)} from Favourites` : `Add ${fileName(row.name)} to Favourites`}
+                      aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`}
                       onClick={(event) => { event.stopPropagation(); onToggleFavorite(row.name); }}
                     >
                       <Star size={13} fill={favorite ? 'currentColor' : 'none'} />
@@ -449,7 +445,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
 
 /** A short default name from the LoRAs themselves: "Anime Watercolor +1". */
 function suggestStackName(loras: LoraSelection[], taken: string[]) {
-  const pretty = (item: LoraSelection) => fileName(item.name)
+  const pretty = (item: LoraSelection) => loraName(item.name, knownLoraInfo()?.[item.name])
     .replace(/[-_.]+/g, ' ')
     .replace(/\b(v\d+(\.\d+)*|lora|loha|lycoris|epoch\s*\d+|e\d+|\d{3,})\b/gi, '')
     .replace(/\s+/g, ' ').trim()
@@ -522,7 +518,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
               return <NameField key={stack.id} initial={stack.name} action="Rename" onSave={(name) => { library.renameStack(stack.id, name); setNaming(null); }} onCancel={() => setNaming(null)} />;
             }
             return (
-              <Tip key={stack.id} content={<>{stack.loras.map((item) => fileName(item.name)).join(', ') || 'Empty'}<br /><span className="lora-tip-hint">Double-click to rename</span></>}>
+              <Tip key={stack.id} content={<>{stack.loras.map((item) => loraName(item.name, knownLoraInfo()?.[item.name])).join(', ') || 'Empty'}<br /><span className="lora-tip-hint">Double-click to rename</span></>}>
                 <span className={cn('lora-chip', isActive && 'is-active', isActive && modified && 'is-modified')}>
                   <button
                     type="button"
@@ -609,7 +605,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
     showToastTone(label, "removed", { action: { label: "Undo", onClick: () => setLoras(before) } });
   };
   const update = (index: number, patch: Partial<LoraSelection>) => setLoras((current) => current.map((item, i) => i === index ? { ...item, ...patch } : item));
-  const remove = (index: number) => withUndo(`Removed ${fileName(loras[index].name)}`, loras.filter((_, i) => i !== index));
+  const remove = (index: number) => withUndo(`Removed ${loraName(loras[index].name, infos[loras[index].name])}`, loras.filter((_, i) => i !== index));
   const clearAll = () => { withUndo(`Cleared ${loras.length} LoRA${loras.length === 1 ? '' : 's'}`, []); setActiveStackId(''); };
   const loadStack = (stack: LoraSnapshot) => {
     const unsaved = loras.length > 0 && !library.stacks.some((item) => sameStack(item.loras, loras));

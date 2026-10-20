@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, maxJobsPerCall, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
-import { compatibleLoras, loraCompatibility } from './lora-policy.js';
+import { compatibleLoras, loraCompatibility, loraName } from './lora-policy.js';
 import { recommendedNegative, withLoraPrompting } from './lora-prompts.js';
 import { chooseProfile, isCloudProfile, localVideoUnavailable } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
@@ -514,9 +514,10 @@ export class McpMedia {
     if (item.negative && controls.negative_prompt) args.negative_prompt = item.negative;
     const saved = controls.loras ? (settings.loras || []).filter(lora => lora?.enabled !== false && profile.options?.loras?.includes(lora.name)).map(({ name, strength }) => ({ name, strength })) : [];
     // A LoRA for another model family would be refused on submit, so a rerun leaves it out and says so.
-    const { loras, droppedNames } = saved.length ? compatibleLoras(saved, await this.loraInfos(owner), profile) : { loras: [], droppedNames: [] };
+    const infos = saved.length ? await this.loraInfos(owner) : {};
+    const { loras, droppedNames } = saved.length ? compatibleLoras(saved, infos, profile) : { loras: [], droppedNames: [] };
     if (loras.length) args.loras = loras;
-    return { profile: base, args, ...(droppedNames.length ? { droppedLoras: droppedNames } : {}) };
+    return { profile: base, args, ...(droppedNames.length ? { droppedLoras: droppedNames.map((name) => loraName(name, infos[name])) } : {}) };
   }
   /** Generate arguments that run a finished output on another profile of its kind, at its proportions and with its references. */
   retarget(item, profile, { count = 1 } = {}) {
