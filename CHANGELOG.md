@@ -14,6 +14,7 @@ version opens with a `> ` summary line.
 ### Changed
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
 - **The library follows the viewer:** stepping or swiping to another item in the viewer scrolls its tile (or the stack holding it) into view behind the viewer, on a computer and on a phone, so closing the viewer lands where you are. The gallery only moves when the item changes and its tile is out of sight.
+- **Plain tool titles:** MCP tools carry short titles such as Generate, Find Models, Check Status and Preview Allocation for chat hosts that show them.
 - **Matching phone switches:** the phone's More sheet names its switches as Settings does (Smart upscale, Show failed items, Confirm before removing things) and uses the same switch control.
 
 - **Studio settings fail loudly:** a partial `STUDIO_OIDC_*` set, an invalid `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS` or `STUDIO_OUTPUT_STORAGE`, or a `STUDIO_SETUP_TOKEN` under 32 characters now stops Studio at startup with the setting's name instead of quietly falling back. The sign-in button reads Single Sign-On unless `STUDIO_OIDC_LABEL` names it.

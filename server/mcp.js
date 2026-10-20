@@ -158,7 +158,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     const toolError = server.createToolError.bind(server);
     server.createToolError = (message) => toolError(conciseError(message));
     if (scope === 'media' || scope === 'unlinked' || scope === 'anonymous') {
-      tool(server, 'Models', 'Browse Models', 'List ready profiles as "id — label" by kind. With profile_id (an id or label), return its prompting guide, defaults, adjustable controls, reference slots and an index of compatible LoRAs; lora_query or lora_names returns full details for up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
+      tool(server, 'Models', 'Find Models', 'List ready profiles as "id — label" by kind. With profile_id (an id or label), return its prompting guide, defaults, adjustable controls, reference slots and an index of compatible LoRAs; lora_query or lora_names returns full details for up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {
           if (wanted) profiles = profilesForTier(profiles, wanted);
@@ -191,7 +191,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Generate one output unless the user asks for more; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Generate one output unless the user asks for more; keep the saved size unless asked. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('Default 1. Set only when the user asks for more, such as 2 for "a couple" or 3 for "a few".'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
@@ -210,14 +210,14 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (chosen || unread) review(owner, profileId);
         return respond(submission, profile || { id: profileId }, wait_seconds, signal, guide);
       });
-      tool(server, 'Status', 'Generation Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
+      tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
         const id = resolve(job_id);
         const status = await media.job(owner, id, capWait(wait_seconds), { signal });
         const ref = media.refOf(owner, refs, id);
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
       tool(server, 'Result', 'Show Result', 'Show a result as markdown to reply with, only when the user asks for it ("show result 3"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its watch link: share it and stop. Never poll.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
-      tool(server, 'Cancel', 'Cancel Generation', 'Cancel a job when the user asks.', job, async ({ job_id }) => {
+      tool(server, 'Cancel', 'Cancel', 'Cancel a job when the user asks.', job, async ({ job_id }) => {
         const id = resolve(job_id);
         media.own(owner, id);
         await media.job(owner, id);
@@ -253,13 +253,13 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         } catch { throw new Error('AI Control is unavailable or refused the request. Refresh its status and preview before retrying.'); }
       };
       tool(server, 'GPUStatus', 'GPU Status', 'Read GPU allocation and runtime health.', {}, () => request('GET', 'status'), { readOnlyHint: true });
-      tool(server, 'Workloads', 'GPU Workloads', 'List workloads and placement rules for an explicitly requested allocation.', {}, () => request('GET', 'catalogue'), { readOnlyHint: true });
-      tool(server, 'Preview', 'Preview GPU Allocation', 'Preview a COMPLETE GPU board without applying it; omitted workloads stop and an empty board stops all. Present the changes for approval; discard to cancel.', { allocation }, args => request('POST', 'board/plan', args), { readOnlyHint: true });
-      tool(server, 'Apply', 'Apply GPU Allocation', 'Apply an explicitly requested allocation only after its Preview was presented and approved, with its exact signature. Active jobs may stop; never use it for media generation.', { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) }, ({ allocation, signature, confirmed }) => {
+      tool(server, 'Workloads', 'List Workloads', 'List workloads and placement rules for an explicitly requested allocation.', {}, () => request('GET', 'catalogue'), { readOnlyHint: true });
+      tool(server, 'Preview', 'Preview Allocation', 'Preview a COMPLETE GPU board without applying it; omitted workloads stop and an empty board stops all. Present the changes for approval; discard to cancel.', { allocation }, args => request('POST', 'board/plan', args), { readOnlyHint: true });
+      tool(server, 'Apply', 'Apply Allocation', 'Apply an explicitly requested allocation only after its Preview was presented and approved, with its exact signature. Active jobs may stop; never use it for media generation.', { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) }, ({ allocation, signature, confirmed }) => {
         if (!confirmed) throw new Error('Present the preview and obtain approval before applying this allocation.');
         return request('POST', 'board', { allocation, replace: true, signature });
       }, { destructiveHint: true });
-      tool(server, 'Operation', 'GPU Operation', 'Read the job returned by Apply, without waiting.', { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) }, ({ job_id }) => request('GET', `jobs/${job_id}`), { readOnlyHint: true });
+      tool(server, 'Operation', 'Check Operation', 'Read the job returned by Apply, without waiting.', { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) }, ({ job_id }) => request('GET', `jobs/${job_id}`), { readOnlyHint: true });
     }
     return server;
   };

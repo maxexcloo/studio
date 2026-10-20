@@ -286,7 +286,8 @@ test('media and administrator credentials discover only their own friendly tools
   const media = await f.client();
   const tools = (await media.listTools()).tools;
   assert.deepEqual(tools.map(tool => tool.name).sort(), ['Cancel', 'Generate', 'Models', 'Result', 'Reuse', 'Status', 'Upload']);
-  for (const tool of tools) assert.ok(tool.title || tool.annotations?.title, `${tool.name} needs a readable title`);
+  // Hosts that show MCP titles name each call in plain words.
+  assert.deepEqual(Object.fromEntries(tools.map(tool => [tool.name, tool.title])), { Cancel: 'Cancel', Generate: 'Generate', Models: 'Find Models', Result: 'Show Result', Reuse: 'Reuse Result', Status: 'Check Status', Upload: 'Upload Reference' });
   await failure(media, 'GPUStatus');
   const admin = await f.client('administrator', controlKey);
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Operation', 'Preview', 'Workloads']);
