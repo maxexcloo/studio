@@ -141,15 +141,20 @@ test('the full studio viewer summary is selectable text', async ({ page, isMobil
   expect(await page.evaluate(() => window.getSelection()?.toString().length || 0)).toBeGreaterThan(0);
 });
 
-test('the phone viewer keeps Info beside Close in both orientations', async ({ page, isMobile }) => {
+test('the phone viewer keeps Star and Info beside Close and its title top left, in both orientations', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'The phone viewer bar.');
   await page.goto('/');
   await studioUi(page).openViewer(page.locator('[data-tile-id]').first());
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
-    await expect(page.locator('.viewer-profile-summary')).toBeHidden();
+    // The desktop's title, top left, clear of the corner buttons.
+    const title = await page.locator('.viewer-profile-summary').boundingBox();
+    const star = await page.getByRole('button', { name: /^(Star|Unstar)$/ }).boundingBox();
     const info = await page.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await page.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
+    expect(title!.x).toBeLessThan(viewport.width / 4);
+    expect(title!.x + title!.width).toBeLessThanOrEqual(star!.x);
+    expect(info!.x - star!.x - star!.width).toBeCloseTo(8, 0);
     expect(info!.x).toBeGreaterThan(viewport.width / 2);
     expect(close!.x - info!.x - info!.width).toBeCloseTo(8, 0);
     expect(info!.y).toBeCloseTo(close!.y, 0);

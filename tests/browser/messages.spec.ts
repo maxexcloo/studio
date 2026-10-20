@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
+const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
+const images = Array.from({ length: 6 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Image ${index}`, width: 512, height: 512 }));
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: new URL(route.request().url()).searchParams.get('type') === 'video' ? [] : images, revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+});
+
 // One message pattern (UI-PATTERNS › Messages): one pill at a time, questions inline in it, Undo inside it.
 test('several messages in a row show one pill, a question lists what it removes, and Undo follows in the same pill', async ({ page }) => {
   await page.goto('/');

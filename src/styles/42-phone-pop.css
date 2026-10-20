@@ -230,3 +230,16 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-filter-row .gallery-view-toggle:disabled { opacity: .45; }
 .phone-filter-divider { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--list-hairline); }
 .phone-menu-count { margin-left: auto; padding: 1px 8px; border-radius: var(--r-pill); background: rgb(255 120 100 / .18); font-style: normal; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* On the phone a question's panel spans the screen under the bar, whatever the pill's place. */
+.phone-bar .status-pill-panel,
+.reference-popover.is-pop .status-pill-panel,
+.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill-panel {
+  position: fixed;
+  top: calc(max(10px, env(safe-area-inset-top)) + var(--bar-h) + 6px);
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  width: auto;
+  translate: none;
+}
+.phone-bar .status-pill-panel { top: calc(env(safe-area-inset-top) + var(--bar-h) + 6px); }

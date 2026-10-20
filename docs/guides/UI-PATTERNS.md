@@ -40,15 +40,14 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
 ## Layering
 
 - Avoid modals unless they are clearly the best option. Modals are for
-  destructive confirmations and genuinely focused tasks (inpainting, a
-  first-run setup).
+  genuinely focused tasks (inpainting, a first-run setup, naming something);
+  confirmations ask inline in the status pill (see [Messages](#messages)).
 - **Phone:** at most one layer above the main screen. A new surface replaces
   the current one, or navigates within it with a back step; it never stacks on
   top. Every sheet and sheet-style picker registers with `phoneLayers.ts`:
   only the newest shows, the ones under it step aside (`is-covered`) until it
   closes, one dimmed backdrop stays behind, and a nested sheet shows Back
-  instead of Close. Two exceptions: a destructive confirmation, and **pop-up
-  lists**. A pop-up list (Create's Model, References, LoRAs, Size and Advanced
+  instead of Close. One exception: **pop-up lists**. A pop-up list (Create's Model, References, LoRAs, Size and Advanced
   Settings; the top bar's menu and what's running) opens over Create or the
   page, one at a time, anchored to the row or button that opened it, the
   screen's width less a margin, on the solid panel glass. What is under it
@@ -103,25 +102,41 @@ own colours. `--ember` is an older name for the same colour.
 
 ## Messages
 
-There are no floating toasts. A message (a confirmation, a failure, an Undo)
-shows in the **Studio status pill** (`src/app/StatusMessage.tsx`): the
-status light takes the message's tone, then the words, its one action (Undo,
-View, Try Again) and Dismiss. It times out (failures wait), pauses while
-hovered or focused, and a sideways flick dismisses it. Screen readers hear it
-through one announcer (polite, failures assertive).
+There are no floating toasts, banners or alert dialogs. Every message,
+question and failure shows in the **Studio status pill**
+(`src/app/StatusMessage.tsx`, fed by `toast.ts`), one at a time, the same on
+both devices:
 
-- **Where:** the phone's top bar, in its centre slot: it takes the place of
-  Images | Videos between "Studio" and the tools, which stay; the desktop
-  gallery's top bar, before its tools (narrowing rather than pushing them).
-  Status messages always go to the pill, never inline under a field or row.
-- **Covered:** a surface that covers the bar (a sheet, a pop-up list, a
-  dialog, the viewer) shows the pill at its own top edge while open: on its
-  title row short of Back and Close (a phone pop-up's title gives way to it),
-  or between the viewer's corner buttons.
-  Only the newest open host shows it, so a message is never on screen twice.
+| Kind | Shows | Stays |
+| --- | --- | --- |
+| Info and success ("Prompt copied", "Settings applied") | The words, short, in the neutral or success tone | About 3.5 s (longer for long words) |
+| Something undoable ("2 items deleted") | The words and **Undo** inside the pill | 6 s, then the change is final |
+| A failure that needs action | The error tone, the words and one action (Try Again, Set Up) | Until it is answered or dismissed |
+| A question (confirmations) | The question, **Cancel** and the answer ("Delete 6"); under the pill, its whole text and, for several items, a scrolling list of their thumbnails and short names | Until it is answered; Escape or Cancel answers no |
+
+- **Where:** the phone's top bar, in its centre slot (it takes the place of
+  Images | Videos, or of "n Selected" while selecting); the desktop gallery's
+  top bar, before its tools. A surface that covers the bar (a sheet, a pop-up
+  list, a dialog, the viewer) shows the pill at its own top edge while open,
+  in its title's place. Only the newest open host shows it.
+- **One at a time:** a new message replaces what is showing; nothing stacks or
+  turns up stale later. Failures and questions wait for their answer, and
+  plain news that arrives behind an Undo or a failure is dropped. A repeat of
+  the same message folds into the one on screen and restarts its time, with
+  no "×3"; only a count the words themselves say ("4 items deleted") grows.
+- **Confirmations ask inline** in the pill, never in a dialog (`useConfirmation`).
+  Cancel takes the focus first. The pill is an `alertdialog` named by the
+  question. Deleting several items lists them under the question, with the
+  count in it ("Delete 6 Items?"), and Undo follows in the same pill.
+- **Status, not messages:** status messages always go to the pill, never
+  inline under a field or row. Field validation (a JSON editor's error) and
+  empty or failed lists (`EmptyState`, with Try Again) stay where they are.
 - **Never over controls:** the pill takes the place of a title or hint, never
   floats over fields, and touching it never dismisses the surface under it.
-- Undo stays inside the pill; a surface never grows its own undo strip.
+- **Words:** Title Case for questions and actions; sentence case for news,
+  without a full stop; "Couldn’t …" for failures.
+- Screen readers hear every message through one announcer (polite, failures
+  assertive).
 
 ## Lists
 

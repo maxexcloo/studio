@@ -102,12 +102,9 @@ export function StatusPill({ message, className, children }: { message: ToastRec
             <i className="status-pill-light" aria-hidden="true" />
             {message.confirm ? (
               // A question: the words (and one line on what happens), then Cancel and the answer.
-              <span className="status-pill-text is-question" title={[messageText(message), message.confirm.detail].filter(Boolean).join(' ')}>
-                <strong>{messageText(message)}</strong>
-                {message.confirm.detail ? <small>{message.confirm.detail}</small> : null}
-              </span>
+              <span className="status-pill-text is-question" title={messageText(message)}>{messageText(message)}</span>
             ) : <span className="status-pill-text" title={messageText(message)}>{messageText(message)}</span>}
-            {message.confirm?.items?.length ? <ConfirmList items={message.confirm.items} /> : null}
+            {message.confirm ? <ConfirmPanel title={messageText(message)} confirm={message.confirm} /> : null}
             {message.confirm ? <ConfirmButtons message={message} /> : <>
               {message.actionLabel ? <button type="button" className="status-pill-action" onClick={() => runToastAction(message.id)}>{message.actionLabel}</button> : null}
               <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}><X size={13} /></button>
@@ -121,14 +118,22 @@ export function StatusPill({ message, className, children }: { message: ToastRec
   );
 }
 
-/** What a question acts on, under the pill: a thumbnail and a short name each, scrolling when there are many. */
-function ConfirmList({ items }: { items: NonNullable<NonNullable<ToastRecord['confirm']>['items']> }) {
-  return <ul className="status-pill-list" aria-label="Items">
-    {items.map((item) => <li key={item.id}>
-      {item.thumb ? <img src={item.thumb} alt="" loading="lazy" decoding="async" /> : <span className="status-pill-list-blank" aria-hidden="true" />}
-      <span>{item.name}</span>
-    </li>)}
-  </ul>;
+/**
+ * A question's whole text under the pill: the question with its count, the
+ * line on what happens, and what it acts on (a thumbnail and a short name
+ * each, scrolling when there are many).
+ */
+function ConfirmPanel({ title, confirm }: { title: string; confirm: NonNullable<ToastRecord['confirm']> }) {
+  return <div className="status-pill-panel">
+    <strong>{title}</strong>
+    {confirm.detail ? <p>{confirm.detail}</p> : null}
+    {confirm.items?.length ? <ul className="status-pill-list" aria-label="Items">
+      {confirm.items.map((item) => <li key={item.id}>
+        {item.thumb ? <img src={item.thumb} alt="" loading="lazy" decoding="async" /> : <span className="status-pill-list-blank" aria-hidden="true" />}
+        <span>{item.name}</span>
+      </li>)}
+    </ul> : null}
+  </div>;
 }
 
 /** A question's answers: Cancel takes the focus first, so Enter never removes anything by accident; Escape cancels. */
