@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 test.beforeEach(async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -9,10 +10,8 @@ test.beforeEach(async ({ page }) => {
 test('compact creation keeps a one-line prompt and send aligned through expansion', async ({ page, isMobile }) => {
   test.skip(isMobile, 'The full creation box is a desktop layout.');
   await page.goto('/');
-  const composer = page.locator('.zen-prompt');
-  const prompt = composer.getByRole('textbox', { name: 'Prompt', exact: true });
-  const send = composer.getByRole('button', { name: 'Generate', exact: true });
-  const model = composer.locator('.model-trigger');
+  const ui = studioUi(page);
+  const { composer, prompt, generate: send, modelTrigger: model } = ui;
   await expect(model).toBeHidden();
   await expect(composer).not.toHaveClass(/is-expanded/);
   await expect(composer.locator('.composer-field-tools').first()).toBeHidden();
@@ -25,9 +24,9 @@ test('compact creation keeps a one-line prompt and send aligned through expansio
   await expect(model).toBeVisible();
   await expect(composer.getByRole('button', { name: 'Clear Prompt', exact: true })).toBeVisible();
   await model.click();
-  await expect(page.locator('.model-menu').getByRole('button', { name: 'Browse Models', exact: true })).toBeVisible();
+  await expect(ui.modelPicker.getByRole('button', { name: 'Browse Models', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.locator('.stage-gallery').click({ position: { x: 150, y: 150 } });
+  await ui.gallery.click({ position: { x: 150, y: 150 } });
   await expect(composer).not.toHaveClass(/is-expanded/);
   await expect(prompt).toHaveValue('A user-written landscape prompt');
   await expect(composer.locator('.composer-prompt-row .composer-prompt-preview')).toHaveText('A user-written landscape prompt');
@@ -45,10 +44,10 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   test.skip(isMobile, 'Phone creation uses its scrollable sheet.');
   await page.setViewportSize({ width: 900, height: 700 });
   await page.goto('/');
-  const composer = page.locator('.zen-prompt');
-  await composer.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Scene detail\n'.repeat(60));
-  await composer.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('Avoid defects\n'.repeat(60));
-  await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
+  const ui = studioUi(page);
+  await ui.prompt.fill('Scene detail\n'.repeat(60));
+  await ui.negativePrompt.fill('Avoid defects\n'.repeat(60));
+  await ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
   const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
   await expect(advanced).toBeVisible();
   await expect.poll(() => advanced.evaluate((element) => {
@@ -60,10 +59,11 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
 test('phone compact prompt is one muted line with overflow ellipsis', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'Phone compact creation pill.');
   await page.goto('/');
-  await page.locator('.phone-create-open').click();
+  const ui = studioUi(page);
+  await ui.openComposer();
   const text = 'A detailed landscape with mountains and valleys beneath a softly lit sky. '.repeat(4);
-  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(text);
-  await page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }).click();
+  await ui.prompt.fill(text);
+  await ui.closeComposer();
   const preview = page.locator('.phone-create-open strong');
   await expect(preview).toHaveText(text.trim());
   await expect(preview).toHaveCSS('text-overflow', 'ellipsis');
@@ -84,9 +84,9 @@ test('phone prompt keeps a usable height when tapped with the keyboard up', asyn
   });
   await page.setViewportSize({ width: 393, height: 660 });
   await page.goto('/');
-  await page.locator('.phone-create-open').click();
-  const sheet = page.locator('.phone-create');
-  const prompt = sheet.getByRole('textbox', { name: 'Prompt', exact: true });
+  const ui = studioUi(page);
+  const sheet = await ui.openComposer();
+  const prompt = ui.prompt;
   await prompt.tap();
   await expect(prompt).toBeFocused();
   await page.evaluate(() => (window as unknown as { keyboard: (height: number) => void }).keyboard(336));
@@ -96,20 +96,19 @@ test('phone prompt keeps a usable height when tapped with the keyboard up', asyn
     const boxes = [field, field.closest('.phone-sheet-body')!, field.closest('.phone-sheet')!].map((box) => box.getBoundingClientRect());
     return Math.round(Math.min(...boxes.map((box) => box.bottom)) - Math.max(...boxes.map((box) => box.top)));
   })).toBeGreaterThanOrEqual(60);
-  const send = sheet.getByRole('button', { name: 'Generate', exact: true });
+  const send = ui.generate;
   await send.scrollIntoViewIfNeeded();
   await expect(send).toBeInViewport();
 });
 
 
-test('each expanded field owns its clear action and reset clears only the current creation', async ({ page, isMobile }) => {
+test('each expanded field owns its clear action and reset clears only the current creation', async ({ page }) => {
   let destructiveRequest = false;
   page.on('request', (request) => { if (request.method() === 'DELETE') destructiveRequest = true; });
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt');
-  const prompt = root.getByRole('textbox', { name: 'Prompt', exact: true });
-  const negative = root.getByRole('textbox', { name: 'Negative Prompt', exact: true });
+  const ui = studioUi(page);
+  const root = await ui.openComposer();
+  const { prompt, negativePrompt: negative } = ui;
   await prompt.fill('A scene to retain');
   await negative.fill('Blur and defects');
   for (const field of [prompt, negative]) {
@@ -132,7 +131,7 @@ test('each expanded field owns its clear action and reset clears only the curren
 });
 
 
-test('unsupported profiles hide negative prompt without deleting its draft', async ({ page, isMobile }) => {
+test('unsupported profiles hide negative prompt without deleting its draft', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const base = models.profiles.find((profile: any) => profile.kind === 'image');
   const supported = { ...base, id: 'negative-supported', displayName: 'Negative Supported', capabilities: { ...base.capabilities, negativePrompt: true } };
@@ -141,30 +140,25 @@ test('unsupported profiles hide negative prompt without deleting its draft', asy
   models.defaults.imageModel = supported.id;
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt');
-  await root.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Retain this scene');
-  await root.getByRole('textbox', { name: 'Negative Prompt', exact: true }).fill('Retain this negative');
-  const choose = async (name: string) => {
-    await root.locator(isMobile ? '.phone-model-browse' : '.model-trigger').click();
-    const picker = page.locator(isMobile ? '.phone-model-sheet' : '.model-menu');
-    await picker.getByRole(isMobile ? 'button' : 'option', { name: new RegExp(name) }).first().click();
-  };
-  await choose('Negative Unsupported');
-  await expect(root.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveCount(0);
-  await expect(root.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('Retain this scene');
-  await choose('Negative Supported');
-  await expect(root.getByRole('textbox', { name: 'Negative Prompt', exact: true })).toHaveValue('Retain this negative');
+  const ui = studioUi(page);
+  await ui.openComposer();
+  await ui.prompt.fill('Retain this scene');
+  await ui.negativePrompt.fill('Retain this negative');
+  await ui.chooseModel('Negative Unsupported');
+  await expect(ui.negativePrompt).toHaveCount(0);
+  await expect(ui.prompt).toHaveValue('Retain this scene');
+  await ui.chooseModel('Negative Supported');
+  await expect(ui.negativePrompt).toHaveValue('Retain this negative');
 });
 
-test('creation pickers expose their open state and ignore exiting surfaces when dismissing', async ({ page, isMobile }) => {
+test('creation pickers expose their open state and ignore exiting surfaces when dismissing', async ({ page }) => {
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt');
-  await root.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A neutral control state');
-  const loras = root.locator('.composer-resource-add');
+  const ui = studioUi(page);
+  const root = await ui.openComposer();
+  await ui.prompt.fill('A neutral control state');
+  const loras = root.getByRole('button', { name: 'LoRAs', exact: true });
   const advanced = root.getByRole('button', { name: 'Advanced Settings', exact: true, includeHidden: true });
-  const model = root.locator(isMobile ? '.phone-model-browse' : '.model-trigger');
+  const model = ui.modelTrigger;
   await loras.click();
   await expect(loras).toHaveAttribute('aria-expanded', 'true');
   await page.mouse.move(0, 0);
@@ -174,18 +168,19 @@ test('creation pickers expose their open state and ignore exiting surfaces when 
   await expect(model).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(model).toHaveAttribute('aria-expanded', 'false');
-  await root.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await ui.prompt.focus();
   await advanced.click();
   await expect(advanced).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('secondary creation controls share muted, hover and neutral open states without changing Send', async ({ page, isMobile }) => {
+test('secondary creation controls share muted, hover and neutral open states without changing Send', async ({ page }) => {
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt');
-  await root.getByRole('textbox', { name: 'Prompt', exact: true }).fill('A quiet landscape');
+  const ui = studioUi(page);
+  const root = await ui.openComposer();
+  const phone = await ui.isPhone();
+  await ui.prompt.fill('A quiet landscape');
   await page.mouse.move(0, 0);
   const colours = await root.evaluate(element => {
     const probe = document.createElement('i');
@@ -199,15 +194,16 @@ test('secondary creation controls share muted, hover and neutral open states wit
   const loras = root.getByRole('button', { name: 'LoRAs', exact: true });
   const advanced = root.getByRole('button', { name: 'Advanced Settings', exact: true, includeHidden: true });
   const reset = root.getByRole('button', { name: 'Reset Creation', exact: true });
-  const model = root.locator(isMobile ? '.phone-model-browse' : '.model-trigger');
-  const send = root.getByRole('button', { name: 'Generate', exact: true });
+  const model = ui.modelTrigger;
+  const send = ui.generate;
   const sendBefore = await send.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, colour: getComputedStyle(element).color }));
   for (const button of [loras, advanced, reset, model]) {
     await expect(button).toHaveCSS('color', colours.muted);
     await expect(button.locator('svg').first()).toHaveCSS('width', '16px');
     await expect(button.locator('svg').first()).toHaveCSS('height', '16px');
   }
-  if (!isMobile) for (const button of [advanced, reset]) await expect(button).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+  // The full studio's square buttons keep an invisible border; the phone's have none.
+  if (!phone) for (const button of [advanced, reset]) await expect(button).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
   await loras.hover();
   await expect(loras).toHaveCSS('color', colours.foreground);
   await expect(loras).toHaveCSS('background-color', colours.hover);
@@ -221,7 +217,7 @@ test('secondary creation controls share muted, hover and neutral open states wit
   await page.mouse.move(0, 0);
   await expect(model).toHaveCSS('background-color', colours.selected);
   await page.keyboard.press('Escape');
-  await root.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
+  await ui.prompt.focus();
   await advanced.click();
   await page.mouse.move(0, 0);
   await expect(advanced).toHaveCSS('background-color', colours.selected);
@@ -230,7 +226,8 @@ test('secondary creation controls share muted, hover and neutral open states wit
   await expect(advanced).toHaveCSS('color', colours.muted);
   await expect(send).toHaveCSS('background-color', sendBefore.background);
   await expect(send).toHaveCSS('color', sendBefore.colour);
-  if (!isMobile) {
+  // Only the full studio has a dock.
+  if (!phone) {
     const settings = page.locator('.studio-dock').getByRole('button', { name: 'Settings', exact: true });
     await expect(settings).toHaveCSS('color', colours.muted);
     await settings.hover();

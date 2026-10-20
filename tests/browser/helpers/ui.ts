@@ -10,7 +10,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * they actually show.
  */
 export function studioUi(page: Page) {
-  const composer = page.getByRole('dialog', { name: 'Create', exact: true }).or(page.getByRole('region', { name: 'Create', exact: true }));
+  // Hidden too: a modal opened from the composer hides it from the accessibility tree, yet it stays the composer.
+  const composer = page.getByRole('dialog', { name: 'Create', exact: true, includeHidden: true }).or(page.getByRole('region', { name: 'Create', exact: true, includeHidden: true }));
   const galleryMode = page.getByRole('group', { name: 'Gallery Mode', exact: true });
   const more = page.getByRole('dialog', { name: 'More', exact: true });
   const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
