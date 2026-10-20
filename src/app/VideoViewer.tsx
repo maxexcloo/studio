@@ -5,6 +5,7 @@ import '@videojs/react/video/skin.css';
 import { Play, Pause, Volume2, VolumeX, RotateCcw, Maximize, Minimize } from 'lucide-react';
 import { usePhone } from './device';
 import { suspendVideoPreviews } from './videoPreviewScheduler';
+import { mediaCovered, stopVideo } from './mediaCover';
 import type { Output } from './types';
 import { titleFromPrompt } from './format';
 import { mediaUrl } from './mediaUrl';
@@ -58,13 +59,14 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
     const start = () => {
       const v = video;
       if (v.readyState < 2) return;
-      if (document.hidden) return;
+      if (document.hidden || mediaCovered()) return;
       if (v.paused) v.play().catch(() => { v.muted = true; return v.play(); }).catch(() => { /* Blocked outright: the play button is there. */ });
       if (!checked) { checked = true; timer = window.setTimeout(start, 400); }
     };
     video.addEventListener('canplay', start, { once: true });
     start();
-    return () => { window.clearTimeout(timer); video.removeEventListener('canplay', start); video.pause(); };
+    // Closing the viewer or stepping to another item stops this one for good: no ghost audio.
+    return () => { window.clearTimeout(timer); video.removeEventListener('canplay', start); stopVideo(video); };
   }, [item.url, attempt]);
   const media = <Video src={mediaUrl(item.url, item as { id?: string; createdAt?: string })} autoPlay playsInline disablePictureInPicture disableRemotePlayback loop preload="auto" onLoadedMetadata={(event) => {
     const v = event.currentTarget; if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);

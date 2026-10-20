@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { coverMedia } from './mediaCover';
 
 /*
  * One layer above the main screen (docs/guides/UI-PATTERNS.md). Every phone
@@ -22,7 +23,9 @@ export function usePhoneLayer(open: boolean) {
     const own = id.current;
     stack = [...stack, own];
     emit();
-    return () => { stack = stack.filter((item) => item !== own); emit(); };
+    // A layer over the gallery or the viewer pauses what plays behind it.
+    const uncover = coverMedia();
+    return () => { stack = stack.filter((item) => item !== own); emit(); uncover(); };
   }, [open]);
   const layers = useSyncExternalStore(subscribe, snapshot, snapshot);
   const index = layers.indexOf(id.current);

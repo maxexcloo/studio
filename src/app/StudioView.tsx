@@ -42,11 +42,11 @@ import { LockMark } from './LockMark';
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
 import { MediaModeToggle } from './ComposerModeSelect';
+import { coverMedia } from './mediaCover';
 import { PhoneViewerBar, ViewerDockActions } from './ItemActionSurfaces';
 import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
 import { usePhone, useThisComputer } from './device';
-import { haptic } from './phoneControls';
 import { ConnectedCard } from './ConnectedCard';
 import { Toaster } from './Toaster';
 import { EmptyStage } from './EmptyStage';
@@ -438,6 +438,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [compareOpen, setCompareOpen] = React.useState(false);
   // The pictures either side of the open one are fetched ahead, so a swipe lands on one already there.
   useNeighborPrefetch(active || null, (view.viewerGallery || []) as GalleryItem[]);
+  // On a phone Details covers the video, so it pauses until Details closes (mediaCover.ts).
+  React.useEffect(() => (phone && showDetails && active?.type === "video" ? coverMedia() : undefined), [phone, showDetails, active?.id, active?.type]);
   // A different image has its own comparison, so never carry the mode over.
   React.useEffect(() => { setCompareOpen(false); }, [active?.id]);
   const viewerWheelRef = useWheelRef<HTMLElement>(wheelViewer);
