@@ -15,7 +15,7 @@ import { fastestFirst, findProfile, mcpTiers, profilesForTier, tierOf } from './
 export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
 // Workflow rules only; tool descriptions and each reply carry the details, so hosts that resend these every step stay small.
-const instructions = `For an ordinary image or video request, call Generate once with kind, tier and a clear prompt per distinct image that keeps the user's intent ("landscape" or "16:9" after a request is aspect, "2k" is size); pass the model and LoRAs the user names as profile_id and loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the watch links and end the turn. Call Result only when the user asks to see a result. Never poll, resubmit or invent results.`;
+const instructions = `For an ordinary image or video request, call Generate once with kind, tier and a clear prompt per distinct image that keeps the user's intent ("landscape" or "16:9" after a request is aspect, "2k" is size); pass the model and LoRAs the user names as profile_id and loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption; for queued jobs, share the result links and end the turn. Call Result only when the user asks to see results. Never poll, resubmit or invent results.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const anonymousMessage = 'The gateway must forward its user identity.';
@@ -145,7 +145,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       }
     });
     const resolve = (value) => media.resolve(owner, refs, value);
-    /** A submission's reply: finished markdown when every job ends within the wait, otherwise watch links for the queued jobs, which end the agent's turn. */
+    /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
     const respond = async (submission, profile, waitSeconds, signal, guide = '') => {
       const label = profile.label || profile.id;
       // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
@@ -156,12 +156,14 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) }, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...(guide ? { prompting: guide } : {}) };
       // The profile's guide follows its first use in a conversation, so the agent applies it to later prompts.
       const extra = guide ? [{ type: 'text', text: `Prompting guide for ${label} (sent once; Models with profile_id has the full guide); apply it to later prompts: ${guide}` }] : [];
-      if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.\n\n${markdown}` }, ...extra], structuredContent: structured };
-      const watch = submission.jobs.map(({ ref, link }) => `[Watch ${ref}](${link})`).join('\n');
+      // Several results, or any still running, also get one All Results page that fills in as they finish.
+      const all = `[All Results](${media.allUrl(owner, refs)})`;
+      if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.\n\n${markdown}${submission.jobs.length > 1 ? `\n\n${all}` : ''}` }, ...extra], structuredContent: structured };
+      const pending = [...submission.jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`), all].join(' · ');
       const message = submission.status === 'queued'
-        ? `Queued. ${note}Share the watch links below and end your turn; do not call Result now. When the user later asks to see a result, call Result with its ref. Never poll or resubmit.`
-        : `${submission.error} ${note}Share the watch links; never resubmit.`;
-      return { content: [{ type: 'text', text: `${message}\n\n${watch}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
+        ? `Queued. ${note}Share the links below and end your turn; do not call Result now. When the user later asks to see results, call Result. Never poll or resubmit.`
+        : `${submission.error} ${note}Share the links; never resubmit.`;
+      return { content: [{ type: 'text', text: `${message}\n\n${pending}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
     };
     /** A ready profile by id or name, the fastest of one family's matches; otherwise the closest few, fastest first, so one call corrects a guess. */
     const profileNamed = (profiles, value) => {
@@ -219,7 +221,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. For N different images pass N prompts in ONE call (at most four jobs; count is images per prompt). Pass kind and tier; Studio picks the profile. profile_id (an id, label or family) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. One output unless the user asks for more. Returns markdown to reply with, or watch links for queued jobs to share before ending the turn. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. For N different images pass N prompts in ONE call (at most four jobs; count is images per prompt). Pass kind and tier; Studio picks the profile. profile_id (an id, label or family) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. One output unless the user asks for more. Returns markdown to reply with, or result links for queued jobs to share before ending the turn. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
@@ -242,7 +244,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const ref = media.refOf(owner, refs, id);
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', 'Show a result as markdown to reply with, only when the user asks for it ("show result 3"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its watch link: share it and stop. Never poll.', { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      tool(server, 'Result', 'Show Result', 'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for "show them" or "show me all"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its link: share it and stop. Never poll.', { ...output, job_id: z.string().min(1).max(200), delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => /^\s*all\s*$/i.test(job_id) ? media.resultsAll(owner, refs, { signal }) : media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
       tool(server, 'Cancel', 'Cancel', 'Cancel a job when the user asks.', job, async ({ job_id }) => {
         const id = resolve(job_id);
         media.own(owner, id);
@@ -330,9 +332,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');
       const claims = media.claims(req.params.token);
-      if (claims.page) {
+      if (claims.page || claims.all) {
         // Account mode reads as the signed owner through MCP's loopback credential; the studio rechecks that account's access.
-        const html = await media.page(claims, accountMode ? internalCredential(claims.owner) : undefined);
+        const credential = accountMode ? internalCredential(claims.owner) : undefined;
+        const html = claims.all ? await media.allPage(claims, credential) : await media.page(claims, credential);
         if (!html) throw new Error('Unavailable.');
         return res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", 'Content-Type': 'text/html; charset=utf-8' }).send(html);
       }

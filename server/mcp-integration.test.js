@@ -294,7 +294,7 @@ test('media and administrator credentials discover only their own friendly tools
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
   assert.match(media.getInstructions(), /call Generate once with kind, tier and a clear prompt per distinct image/);
   // Slow jobs hand back at once; Result runs only on the user's request.
-  assert.match(media.getInstructions(), /share the watch links and end the turn\. Call Result only when the user asks/);
+  assert.match(media.getInstructions(), /share the result links and end the turn\. Call Result only when the user asks/);
   assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
   assert.match(admin.getInstructions(), /get approval before Apply/);
@@ -1254,8 +1254,8 @@ test('Generate returns quick images inline as finished markdown, so no backgroun
   assert.equal(result.content.length, 1);
   // The same markdown a background notification returns, one block per job: only the instruction and the markdown.
   // Each linked preview sits directly under its header, in one paragraph; jobs are separated by a blank line.
-  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)$/);
-  assert.ok(result.content[0].text.length < 450, `${result.content[0].text.length} characters`);
+  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
+  assert.ok(result.content[0].text.length < 520, `${result.content[0].text.length} characters`);
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
@@ -1272,7 +1272,7 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(texts(slowResult), /^Queued\. Share the watch links below and end your turn; do not call Result now\. When the user later asks to see a result, call Result with its ref\. Never poll or resubmit\.\n\n\[Watch result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
+  assert.match(texts(slowResult), /^Queued\. Share the links below and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
   once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
@@ -1596,4 +1596,41 @@ test('aspect and size pick the profile’s own preset sizes instead of invented 
   const schema = (await client.listTools()).tools.find(tool => tool.name === 'Generate').inputSchema.properties;
   assert.match(schema.aspect.description, /prefer to width\/height/);
   assert.deepEqual(schema.size.enum, ['2k', '4k']);
+});
+
+test('replies label links Result N with one All Results page, and Result "all" shows the conversation', async t => {
+  const f = await fixture(t);
+  const client = await chat(t, f, 'alice', 'plush-chat');
+  const queued = await call(client, 'Generate', { kind: 'image', prompts: ['A bear', 'A fox', 'An owl'] });
+  const text = texts(queued);
+  assert.equal(/Watch/i.test(text), false, 'no Watch wording');
+  const [, allLink] = /\[All Results\]\((https:[^)]+)\)/.exec(text);
+  assert.deepEqual([...text.matchAll(/\[(Result \d)\]/g)].map(match => match[1]), ['Result 1', 'Result 2', 'Result 3']);
+  assert.equal(text.match(/All Results/g).length, 1);
+  // The All Results page lists every result and fills in as they finish.
+  const page = localLink(f, allLink);
+  let html = await (await fetch(page)).text();
+  assert.match(html, /<meta http-equiv="refresh"/);
+  assert.equal(html.match(/Still generating/g).length, 3);
+  const [first, second] = queued.structuredContent.jobs;
+  Object.assign(f.jobs.get(first.job_id), { status: 'done', outputs: [{ url: '/comfy/view?filename=bear.png' }] });
+  html = await (await fetch(page)).text();
+  assert.match(html, /<h2>Result 1<\/h2><figure><a href="[A-Za-z0-9]{10}"><img/);
+  assert.equal(html.match(/Still generating/g).length, 2);
+  assert.equal((await fetch(`${page}.jpg`)).status, 404);
+  // "show me all": one call returns every finished result under its header, plus links for the rest.
+  Object.assign(f.jobs.get(second.job_id), { status: 'done', outputs: [{ url: '/comfy/view?filename=fox.png' }] });
+  const shown = await call(client, 'Result', { job_id: 'all' });
+  const body = texts(shown);
+  assert.match(body, /^2 results are ready, 1 still running\. Reply with the markdown below exactly/);
+  assert.match(body, /\*\*Result 1\*\*[^\n]*\n\[!\[Result 1\]/);
+  assert.match(body, /\*\*Result 2\*\*[^\n]*\n\[!\[Result 2\]/);
+  assert.match(body, /\[Result 3\]\(https:[^)]+\) · \[All Results\]\(https:[^)]+\)$/);
+  assert.equal(/Watch/i.test(body), false);
+  assert.equal(previews(shown).length, 2);
+  // Another conversation and another account see only their own results.
+  await failure(await chat(t, f, 'alice', 'other-chat'), 'Result', { job_id: 'all' });
+  assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, 'AAAAAAAAAA'))).status, 404);
+  // A pending Result names its link Result N.
+  assert.match(texts(await call(client, 'Result', { job_id: 'result 3' })), /\[Result 3\]\(https:/);
 });

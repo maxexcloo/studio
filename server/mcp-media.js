@@ -21,6 +21,9 @@ const maxReferenceScopes = 5000;
 const shortAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
 const previewSize = 1024;
+// The All Results page and an "all" Result cover a conversation's most recent results.
+const maxListedResults = 24;
+const maxShownResults = 8;
 export const maxResultWaitSeconds = 1500;
 /** Jobs one Generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 4;
@@ -66,7 +69,7 @@ export class McpMedia {
     // Result numbering is additive; files written before it simply start without references.
     if (!this.state.refs || typeof this.state.refs !== 'object' || Array.isArray(this.state.refs)) this.state.refs = {};
     if (!this.state.links || typeof this.state.links !== 'object' || Array.isArray(this.state.links)) this.state.links = {};
-    this.linkIds = new Map(Object.entries(this.state.links).map(([id, link]) => [this.linkKey(link.audience, link.owner, link.jobId, link.index), id]));
+    this.linkIds = new Map(Object.entries(this.state.links).map(([id, link]) => [link.all ? this.linkKey(link.audience, link.owner, `refs:${link.scope}`, 'all') : this.linkKey(link.audience, link.owner, link.jobId, link.index), id]));
     this.key = signingKey || this.state.signingKey;
     this.save();
   }
@@ -331,13 +334,28 @@ export class McpMedia {
   }
   /** A job's watch page: shows progress until done, then its outputs, without the chat. */
   pageUrl(owner, jobId) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId)}`; }
+  /** The All Results page of a conversation's result numbers (the account's without a conversation), reused per scope. */
+  allUrl(owner, scope) {
+    const key = scope || this.referenceScope(owner);
+    const audience = this.publicUrl;
+    const linkKey = this.linkKey(audience, owner, `refs:${key}`, 'all');
+    let id = this.linkIds.get(linkKey);
+    if (!id) {
+      do id = Array.from({ length: 10 }, () => shortAlphabet[crypto.randomInt(shortAlphabet.length)]).join(''); while (Object.hasOwn(this.state.links, id));
+      this.state.links[id] = { audience, owner, scope: key, all: true };
+      this.linkIds.set(linkKey, id);
+      this.save();
+    }
+    return `${this.publicUrl}/mcp/results/${id}`;
+  }
   /** A finished image's chat-sized JPEG preview. */
   previewUrl(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}.jpg`; }
   claims(token) {
     const short = shortPattern.exec(String(token || ''));
     if (short) {
       const link = Object.hasOwn(this.state.links, short[1]) ? this.state.links[short[1]] : null;
-      if (!link || link.audience !== this.publicUrl || (short[2] && link.page)) throw new Error('Invalid result link.');
+      if (!link || link.audience !== this.publicUrl || (short[2] && (link.page || link.all))) throw new Error('Invalid result link.');
+      if (link.all) return { owner: link.owner, scope: link.scope, all: true };
       this.own(link.owner, link.jobId);
       return { owner: link.owner, jobId: link.jobId, ...(link.page ? { page: true } : { index: link.index }), ...(short[2] ? { preview: true } : {}) };
     }
@@ -469,12 +487,12 @@ export class McpMedia {
     if (!finished.has(job.status)) {
       const pending = !terminal.has(job.status);
       const message = pending
-        ? `${ref ? label : 'This job'} is still ${job.status || 'running'}. Reply now; do not poll. It continues in the studio and appears on its watch page when done.`
+        ? `${ref ? label : 'This job'} is still ${job.status || 'running'}. Reply now with its link; do not poll. It continues in the studio and appears at the link when done.`
         : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       const summary = { ...named, ...this.summary(job), message };
-      // The agent needs only the sentence and watch link; detail adds the status fields.
+      // The agent needs only the sentence and result link; detail adds the status fields.
       const lean = { job_id: jobId, ...(ref ? { ref } : {}), status: job.status || 'running' };
-      return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), ...(detail ? [text(summary)] : [])], structuredContent: detail ? summary : lean };
+      return { content: [text(`${message} [${ref ? label : 'Result'}](${named.link})`), ...(detail ? [text(summary)] : [])], structuredContent: detail ? summary : lean };
     }
     this.available(job, index);
     // A preview shows the asked-for output; a notification carries every output of the job.
@@ -526,6 +544,57 @@ export class McpMedia {
       return this.markdown(owner, job_id, job, ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'Studio result');
     }));
     return blocks.map(block => block.markdown).join('\n\n');
+  }
+  /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
+  async scopeJobs(owner, scope, { signal, credential } = {}) {
+    const entry = this.state.refs[scope || this.referenceScope(owner)];
+    const numbers = Object.keys(entry?.jobs || {}).map(Number).sort((left, right) => left - right).slice(-maxListedResults);
+    const jobs = await Promise.all(numbers.map(async number => {
+      const jobId = entry.jobs[number];
+      try { return { number, jobId, job: await this.job(owner, jobId, 0, { signal, credential }) }; } catch (error) {
+        if (error.aborted) throw error;
+        return null;
+      }
+    }));
+    return jobs.filter(item => item && !hidden(item.job) && item.job.status !== 'missing');
+  }
+  /**
+   * Every finished result of a conversation as one reply ("show me all"): the most recent few as
+   * markdown under their Result headers, and the All Results page when there are more or some are pending.
+   */
+  async resultsAll(owner, scope, { signal } = {}) {
+    const jobs = await this.scopeJobs(owner, scope, { signal });
+    if (!jobs.length) throw new Error('There are no results in this conversation yet.');
+    const done = jobs.filter(({ job }) => finished.has(job.status) && job.outputs?.some(item => mcpOutputPath(item?.url)));
+    const pending = jobs.filter(({ job }) => !terminal.has(job.status));
+    const shown = done.slice(-maxShownResults);
+    const blocks = await Promise.all(shown.map(({ number, jobId, job }) => this.markdown(owner, jobId, job, `Result ${number}`)));
+    const all = done.length > 1 || pending.length ? `[All Results](${this.allUrl(owner, scope)})` : '';
+    const pendingLinks = pending.map(({ number, jobId }) => `[Result ${number}](${this.pageUrl(owner, jobId)})`);
+    const markdown = [...blocks.map(block => block.markdown), [...pendingLinks, all].filter(Boolean).join(' · ')].filter(Boolean).join('\n\n');
+    const message = shown.length
+      ? `${shown.length === 1 ? 'One result is' : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ''}. Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.`
+      : 'No result has finished yet. Share the links below and end your turn; do not poll.';
+    return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { status: pending.length ? 'running' : 'done', results: jobs.map(({ number, jobId, job }) => ({ ref: `result ${number}`, job_id: jobId, status: job.status })) } };
+  }
+  /** The All Results page: every recent result of a conversation, filling in as jobs finish. */
+  async allPage(claims, credential) {
+    const jobs = await this.scopeJobs(claims.owner, claims.scope, { credential });
+    if (!jobs.length) return null;
+    const pending = jobs.some(({ job }) => !terminal.has(job.status));
+    const sections = jobs.map(({ number, jobId, job }) => {
+      const heading = `<h2>Result ${number}</h2>`;
+      if (!terminal.has(job.status)) {
+        const progress = Number.isFinite(job.progress) ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%` : '';
+        return `<section>${heading}<p>Still generating${escapeHtml(progress)}.</p></section>`;
+      }
+      const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.shortId(claims.owner, jobId, index)] : []) : [];
+      if (!outputs.length) return `<section>${heading}<p>This generation did not produce a result.</p></section>`;
+      return `<section>${heading}${outputs.map(token => job.kind === 'video'
+        ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
+        : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`).join('')}</section>`;
+    }).join('');
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
   async page(claims, credential) {
