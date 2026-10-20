@@ -23,7 +23,8 @@ test('the phone Create sheet is one flat column that fits every phone width', as
       await row.scrollIntoViewIfNeeded();
       const box = (await row.boundingBox())!;
       expect(box.height).toBeLessThan(52);
-      expect(box.width).toBeGreaterThan(width - 40);
+      // LoRAs gives up its end to its Clear once something is picked (another test's stack can be on the server).
+      expect(box.width).toBeGreaterThan(width - (String(name) === String(/^LoRAs$/) ? 84 : 40));
     }
     // The prompt takes the room that's left: no gap under the fields on a tall phone.
     if (height >= 800) {

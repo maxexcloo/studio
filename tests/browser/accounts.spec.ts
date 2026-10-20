@@ -139,7 +139,11 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await newEmail.fill(' new.artist@example.com ');
   await page.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users')?.body).toMatchObject({ username: 'new.artist@example.com' });
-  await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
+  // A menu still closing takes the first outside click for itself, so go to Account until it shows.
+  await expect(async () => {
+    await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15000 });
   await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });
