@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 test('image count keeps minus and plus across profile widths and mobile sizes', async ({ page, isMobile }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -7,21 +8,16 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
   const profiles = names.map((name, index) => ({ ...base, id: index ? 'count-long-profile' : base.id, displayName: name, label: name, defaults: { ...base.defaults, count: 4 }, constraints: { ...base.constraints, count: { min: 1, max: 8, step: 1 } }, capabilities: { ...base.capabilities, variations: true } }));
   models.profiles = [...models.profiles.filter((profile: any) => profile.kind !== 'image'), ...profiles];
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  // Every project has a touch screen, so 640px would switch to the phone studio; the full one is chosen to keep it.
   if (!isMobile) await page.addInitScript(() => { localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })); });
   await page.goto('/');
-  if (isMobile) await page.locator('.phone-create-open').click();
-  const root = page.locator(isMobile ? '.phone-create' : '.zen-prompt').filter({ visible: true });
-  for (const width of isMobile ? [390, 320] : [1440, 900, 640]) {
-    await page.setViewportSize({ width, height: isMobile ? 844 : 1000 });
+  const ui = studioUi(page);
+  const phone = await ui.isPhone();
+  const root = await ui.openComposer();
+  for (const width of phone ? [390, 320] : [1440, 900, 640]) {
+    await page.setViewportSize({ width, height: phone ? 844 : 1000 });
     for (const name of names) {
-      if (isMobile) {
-        await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
-        await page.locator('.phone-model-sheet .phone-model-option').filter({ hasText: name }).first().click();
-      } else {
-        await root.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-        await root.locator('.model-trigger').click();
-        await page.getByRole('option').filter({ hasText: name }).first().click();
-      }
+      await ui.chooseModel(name);
       const picker = root.locator('.composer-count-picker').filter({ visible: true });
       if (!await picker.count()) await root.getByRole('button', { name: 'More settings', exact: true }).click();
       await expect(picker).toBeVisible();
@@ -34,17 +30,17 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
       await expect(picker.getByRole('button', { name: 'Images: 3, click to edit', exact: true })).toBeVisible();
       await decrease.click();
       await expect(picker.getByRole('button', { name: 'Images: 2, click to edit', exact: true })).toBeVisible();
-      if (isMobile) for (const button of [decrease, increase]) {
+      if (phone) for (const button of [decrease, increase]) {
         const box = await button.boundingBox();
         expect(box!.width).toBeGreaterThanOrEqual(44);
         expect(box!.height).toBeGreaterThanOrEqual(44);
       }
-      if (!isMobile && await root.locator('.composer-drawer').isVisible()) await root.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
+      if (await root.locator('.composer-drawer').isVisible()) await root.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
     }
   }
 });
 
-test('model menus show profile details without recent sections or discovery footers', async ({ page, isMobile }) => {
+test('model menus show profile details without recent sections or discovery footers', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   const base = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
   const profile = { ...base, displayName: 'Detailed Model', label: 'Studio Profile', familyName: 'Test Family', recipe: undefined, recipeProfiles: undefined, mediaInputs: [{ id: 'reference', kind: 'image', max: 3, min: 0, required: false }] };
@@ -54,15 +50,9 @@ test('model menus show profile details without recent sections or discovery foot
   await page.route('**/api/models', route => route.fulfill({ json: models }));
   await page.route('**/api/workflows', route => route.fulfill({ json: workflows }));
   await page.goto('/');
-  if (isMobile) {
-    await page.locator('.phone-create-open').click();
-    await page.locator('.phone-create').getByRole('button', { name: 'Browse Models', exact: true }).click();
-  } else {
-    await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
-    await page.locator('.zen-prompt .model-trigger').click();
-  }
-  const menu = page.locator(isMobile ? '.phone-model-sheet' : '.model-menu');
-  const option = menu.locator(isMobile ? '.phone-model-option' : '[role="option"]').filter({ hasText: 'Detailed Model' }).first();
+  const ui = studioUi(page);
+  const menu = await ui.openModelPicker();
+  const option = ui.modelOptions.filter({ hasText: 'Detailed Model' }).first();
   await expect(option).toContainText('Studio Profile');
   await expect(option).toContainText('Test Family');
   await expect(option).toContainText('Image');
@@ -70,7 +60,8 @@ test('model menus show profile details without recent sections or discovery foot
   await expect(option.locator('.model-selection-tick')).toBeVisible();
   await expect(menu.getByText('Recent', { exact: true })).toHaveCount(0);
   await expect(menu.getByRole('button', { name: /Find (More )?Models/ })).toHaveCount(0);
-  if (!isMobile) {
+  // Only the full studio's menu offers Browse Models and hover states.
+  if (!await ui.isPhone()) {
     await page.mouse.move(0, 0);
     await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(option).toHaveCSS('box-shadow', 'none');

@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="640"><rect width="512" height="640" fill="#497e7b"/></svg>');
 const items = Array.from({ length: 12 }, (_, index) => ({ id: `layout-${index}`, url: picture, filename: `layout-${index}.png`, type: 'image', status: 'done', prompt: 'Layout test', createdAt: '2026-01-01T00:00:00Z', width: 512, height: 640 }));
@@ -11,14 +12,13 @@ async function reachable(locator: Locator, hasTrailingAction = false) {
   }, hasTrailingAction)).toBe(true);
 }
 
-test.beforeEach(async ({ page, isMobile }) => {
+test.beforeEach(async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
   for (const profile of models.profiles) profile.mediaInputs = [{ id: 'reference', kind: 'image', role: 'start', label: 'Start Image', required: false, min: 0, max: 1 }];
   await page.route('**/api/models', (route) => route.fulfill({ json: models }));
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
-  if (!isMobile) await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
 });
 
 test('composer menus stay reachable and side controls are removed', async ({ page, isMobile }) => {
@@ -101,12 +101,13 @@ test('phone filter tools stay on screen and yield to create and reference sheets
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
-  await page.locator('.phone-create-open').click();
-  await reachable(page.locator('.phone-create').getByRole('textbox', { name: 'Prompt', exact: true }), true);
-  await page.locator('.phone-create .ref-add').click();
+  const ui = studioUi(page);
+  const composer = await ui.openComposer();
+  await reachable(ui.prompt, true);
+  await composer.locator('.ref-add').click();
   await reachable(page.locator('.reference-popover').getByRole('searchbox', { name: 'Search Library', exact: true }));
   await page.locator('.reference-popover').getByRole('button', { name: 'Close References', exact: true }).click();
-  await reachable(page.locator('.phone-create').getByRole('button', { name: 'Close', exact: true }));
+  await reachable(composer.getByRole('button', { name: 'Close', exact: true }));
 });
 
 test('horizontal dock and Generate keep separate lanes without changing dock orientation', async ({ page, isMobile }) => {
@@ -125,6 +126,8 @@ test('horizontal dock and Generate keep separate lanes without changing dock ori
 
 test('short desktop filter tools stay above the composer', async ({ page, isMobile }) => {
   test.skip(isMobile, 'Full studio filter and composer overlap.');
+  // A 500px-high touch screen counts as a phone held sideways; the full studio is chosen to keep it.
+  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
   await page.setViewportSize({ width: 900, height: 500 });
   await page.goto('/');
   await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
