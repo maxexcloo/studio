@@ -309,6 +309,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   .picker-clear-short { display: inline; }
   .picker-toolbar .reference-tabs button, .lora-filter .reference-tabs button { padding: 0 10px; font-size: 13px; }
 }
+/* Tab names stay on one line; at 320 px the pills give up padding first. */
+.reference-tabs button { white-space: nowrap; }
+@media (max-width: 359px) {
+  .picker-toolbar .reference-tabs button, .lora-filter .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
+}
 .reference-popover .reference-popover-hint { flex: 0 1 auto; }
 /* The picked order, the same mark in every chooser: an empty ring, then the number on white. */
 .picker-order { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1.5px solid hsl(var(--foreground) / .3); border-radius: 50%; color: #0b0b0b; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
