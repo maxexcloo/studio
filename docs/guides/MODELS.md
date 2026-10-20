@@ -218,4 +218,4 @@ The table of supported families is in the [README](../../README.md#supported-mod
 
 ## Formats
 
-**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](../gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](#bring-your-own-workflow).
+**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](../gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](../../README.md#bring-your-own-workflow).

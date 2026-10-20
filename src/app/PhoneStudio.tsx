@@ -619,7 +619,7 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
           <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Could not sign out.', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
         </div>
       </> : null}
-      <p className="phone-note">Models, folders, downloads and updates are managed on the computer running Studio.</p>
+      <p className="phone-note">Models, folders and downloads are managed on the computer running Studio.</p>
     </Sheet>
   );
 }

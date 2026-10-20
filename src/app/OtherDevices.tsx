@@ -316,7 +316,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
         <StudioPasswordRow access={access} onSaved={loadAccess} showToast={showToast} Row={Row} Status={Status} />
         <Row
           label="Trust other devices with admin"
-          description={`Lets signed-in devices update Studio, install nodes and models, change the output folder and clear the gallery.${atComputer ? '' : ' Only the computer running Studio can change this.'}`}
+          description={`Lets signed-in devices install nodes and models, change the output folder and clear the gallery.${atComputer ? '' : ' Only the computer running Studio can change this.'}`}
           disabled={!atComputer || !access}
         >
           <Switch label="Trust other devices with admin" checked={Boolean(access?.adminFromDevices)} disabled={!atComputer || !access} onChange={setAdmin} />

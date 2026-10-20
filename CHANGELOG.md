@@ -15,6 +15,9 @@ version opens with a `> ` summary line.
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
 - **Matching phone switches:** the phone's More sheet names its switches as Settings does (Smart upscale, Show failed items, Confirm before removing things) and uses the same switch control.
 
+### Fixed
+- **Current wording and links:** About and the phone no longer mention in-app updates, the Hugging Face hint points at Settings › Integrations, `.env.example` names the `studio` storage default, and broken guide links point at existing sections.
+
 ## [0.28.0] - 2026-10-20
 
 > Chats hand back slow jobs at once

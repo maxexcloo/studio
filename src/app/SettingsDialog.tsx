@@ -42,7 +42,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'privacy', label: 'Hidden', icon: LockKeyhole, description: 'Images you keep to yourself, encrypted and unlocked with a password, Touch ID or Windows Hello.' },
   { id: 'connection', label: 'Connection', icon: Plug, description: 'Reaching ComfyUI, restarting it, and opening the studio on other devices.' },
   { id: 'accounts', label: 'Accounts & MCP', icon: UsersRound, description: 'Manage account access profiles and personal MCP connections.' },
-  { id: 'about', label: 'About', icon: Info, description: 'Version, stats, updates, feedback and credits.' }
+  { id: 'about', label: 'About', icon: Info, description: 'Version, stats, feedback and credits.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
