@@ -76,7 +76,6 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   const single = menu && targets.length === 1 ? targets[0] : null;
   const singleActions = useItemActions(single, 'menu', { select: selectFromMenu });
   const bulkActions = handlers ? bulkItemActions(targets, handlers) : [];
-  const menuBulkActions = handlers ? bulkItemActions(targets, handlers, false, 'menu') : [];
   const actionButton = (action: ItemAction, inMenu: boolean, divider = false) => (
     <React.Fragment key={action.id}>
       {divider ? <span className={inMenu ? 'gallery-menu-divider' : 'gallery-selection-divider'} role={inMenu ? 'separator' : undefined} aria-hidden={inMenu ? undefined : true} /> : null}
@@ -115,7 +114,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
         buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus({ preventScroll: true });
       } else if (event.key === 'Tab') closeMenu();
     }}>
-      {(single ? singleActions : menuBulkActions).map((action, index, list) => actionButton(action, true, startsGroup(list, index)))}
+      {(single ? singleActions : bulkActions).map((action, index, list) => actionButton(action, true, startsGroup(list, index)))}
     </div>, document.body) : null}
   </GallerySelectionContext.Provider>;
 }
