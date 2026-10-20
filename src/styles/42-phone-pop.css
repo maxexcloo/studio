@@ -180,9 +180,14 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
   .phone-bar .phone-gallery-mode.media-mode-toggle { position: static; translate: none; margin-left: 2px; }
   .phone-bar .phone-gallery-mode button { width: 40px; min-width: 40px; }
 }
-.create-footer-tune .create-tune { gap: 0; }
-.create-footer-tune .create-tune .number-picker-btn { width: 38px; min-width: 38px; }
-.create-footer-tune .create-tune input, .create-footer-tune .create-tune .number-picker-value { min-width: 24px; width: 28px; }
+.create-footer-tune .create-tune { gap: 0; padding-left: 12px; }
+/* 44 px targets like every phone control; the value between them stays narrow. */
+.create-footer-tune .create-tune .number-picker-btn { width: 44px; min-width: 44px; height: 44px; }
+.create-footer-tune .create-tune input, .create-footer-tune .create-tune .number-picker-value { min-width: 22px; width: 26px; }
+/* Too narrow for Steps and the count side by side at that size: one above the other. */
+@media (max-width: 379px) {
+  .create-footer-tune { flex-direction: column; align-items: stretch; gap: 6px; }
+}
 
 /* -------------------------------------------------------------- Phone viewer & Details */
 
