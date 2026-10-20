@@ -958,7 +958,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   translate: none;
 }
 /* The phone viewer's title keeps to two short lines: the name, then the settings, each cut short. */
-.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary :is(strong, span) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary :is(strong, span) { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
 @media (max-width: 359px) {
   .viewer-phone-bar button { font-size: 10.5px; }
 }
