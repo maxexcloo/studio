@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> MCP face detail only beside a requested upscale, and exact prompts that refuse only clear instructions
+
 ### Changed
 - **MCP face detail:** Generate turns face detail on by itself for a full-body or wide-shot person only when the request already chooses `upscale_quality`; it no longer adds a fast upscale. Without an upscale nothing changes, and an explicit `face_detail: true` works as before.
 - **MCP exact prompts:** `exact_prompt` refuses only clear instructions ("variations", "of this scene", "generate 4 photos", "five variations"), so finished prompts such as "Create two cats on a sofa" run as written.
