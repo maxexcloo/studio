@@ -220,7 +220,7 @@ function App() {
       next.delete(run.id);
       return next;
     });
-    showToast("Unstacked", "default", { description: runTitle(run), action: { label: "Undo", onClick: () => { unstack(run, false); setOpenRuns((current) => new Set([...current, run.id])); } } });
+    showToast(`Unstacked ${runTitle(run)}`, "default", { action: { label: "Undo", onClick: () => { unstack(run, false); setOpenRuns((current) => new Set([...current, run.id])); } } });
   }, [unstack]); // eslint-disable-line react-hooks/exhaustive-deps
   // The viewer steps through the gallery as it is laid out: a stacked run's
   // takes one after another where the stack stands, not wherever they fell in time.
@@ -685,8 +685,7 @@ function App() {
     try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { /* told this session at most */ }
     const when = new Date(exit.lastSeen || exit.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
     const details = [`Studio stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
-    showToast("Studio stopped unexpectedly last time", "warning", {
-      description: `${exit.reason.replace(/\.?$/, ".")} Last seen running ${when}.`,
+    showToast(`Studio stopped unexpectedly last time: ${exit.reason.replace(/\.?$/, "")}, last seen running ${when}`, "warning", {
       duration: 20_000,
       action: { label: "Copy Details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
     });
@@ -792,7 +791,7 @@ function App() {
       setWidth(fitted.width);
       setHeight(fitted.height);
       if (fitted.width !== width || fitted.height !== height) {
-        showToast(`Custom size fitted to ${profile.displayName || profile.label || "this model"}: ${fitted.width} × ${fitted.height}`, "default", { description: `${width} × ${height} is past what it takes.` });
+        showToast(`Custom size fitted to ${profile.displayName || profile.label || "this model"}: ${fitted.width} × ${fitted.height}`, "default");
       }
     } else {
       const size = profileImageSize(profile);
@@ -966,7 +965,7 @@ function App() {
         // Another device's sizes come in with the answer, unless this page changed again meanwhile.
         if (savedSizesRef.current === next) { savedSizesRef.current = data.sizes; setSavedSizesState(data.sizes); }
       })
-      .catch(() => showToast("Couldn’t save your sizes", "error", { description: "They’re kept on this page until it reloads." }));
+      .catch(() => showToast("Couldn’t save your sizes. They’re kept on this page until it reloads.", "error"));
   }
   useEffect(() => {
     let alive = true;
@@ -1030,7 +1029,7 @@ function App() {
     const fitted = sameRatio(snapped, saved) ? snapped : fitRatio(saved.width / saved.height, saved.width * saved.height, customLimits.width, customLimits.height, 16);
     setCustomDimensions(fitted);
     if (fitted.width !== saved.width || fitted.height !== saved.height) {
-      showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default", { description: `It’s saved as ${saved.width} × ${saved.height}, past what ${currentProfile?.displayName || currentProfile?.label || "this model"} takes.` });
+      showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default");
     }
   }
   function setCustomDimensions(next: { width: number; height: number }) {

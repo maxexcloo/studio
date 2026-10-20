@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { runTitle, type GalleryGroups, type Run } from './runs';
+import { type GalleryGroups, type Run } from './runs';
 import type { ShowToast } from './toast';
 
 /** A run folds into a stack once it has had nothing new for this long. */
@@ -75,7 +75,6 @@ export function useRunSettling(groups: GalleryGroups, { enabled, showToast }: { 
     setSettled(next);
     if (!folded.length) return;
     showToast(folded.length === 1 ? "Stacked similar images" : `Stacked ${folded.length} groups of similar images`, "default", {
-      description: folded.length === 1 ? runTitle(folded[0]) : folded.map(runTitle).slice(0, 3).join(" · "),
       action: {
         label: "Undo",
         onClick: () => {

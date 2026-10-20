@@ -498,31 +498,8 @@
   to { transform: scale(1); opacity: 1; }
 }
 
-/* ComfyUI came back with images on screen: the plug in a connected toast. */
-.connected-glyph { width: 50px; height: 20px; overflow: visible; }
-.connected-glyph rect { fill: rgb(255 255 255 / .42); }
-.connected-plug { animation: connected-plug 520ms cubic-bezier(.3, .7, .2, 1) 160ms both; }
-.connected-socket { animation: connected-socket 520ms cubic-bezier(.3, .7, .2, 1) 160ms both; }
-.connected-plug rect, .connected-socket rect { animation: connected-warm 900ms ease-out 520ms both; }
-.connected-flash { fill: rgb(255 190 120); opacity: 0; transform-origin: 12px 4.5px; animation: connected-flash 520ms ease-out 560ms both; }
-/* The prongs (x 7–8) meet the socket's holes (x 13–14): plug +4, socket −2. */
-@keyframes connected-plug { from { transform: translateX(0); } to { transform: translateX(4px); } }
-@keyframes connected-socket { from { transform: translateX(0); } to { transform: translateX(-2px); } }
-@keyframes connected-warm {
-  0% { fill: rgb(255 255 255 / .42); }
-  25% { fill: rgb(255 214 160); }
-  100% { fill: rgb(255 150 80 / .85); }
-}
-@keyframes connected-flash {
-  0% { opacity: 0; transform: scale(0.2); }
-  30% { opacity: .75; }
-  100% { opacity: 0; transform: scale(1.6); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .stage-copy, .stage-connected span, .connected-plug, .connected-socket, .connected-flash { animation: none; }
-  .connected-plug { transform: translateX(4px); }
-  .connected-socket { transform: translateX(-2px); }
-  .connected-plug rect, .connected-socket rect { animation: none; fill: rgb(255 150 80 / .85); }
+  .stage-copy, .stage-connected span { animation: none; }
 }
 .reconnect-btn {
   margin-top: 6px;

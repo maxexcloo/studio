@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
-
 /**
- * Toasts: short notes that float in under the top pills, in the same glass.
+ * Messages for the status pill (StatusMessage.tsx, UI-PATTERNS › Messages):
+ * the pill shows the front one where the status lives, never as a floating
+ * toast. The names stay "toast" for the callers.
  *
  * Five tones, one shape. Repeats never pile up: a toast with the same `group`
  * (or, without one, the same tone and words) that is still on screen takes the
@@ -24,7 +24,6 @@ import type { ReactNode } from 'react';
  */
 
 export type ToastTone = 'neutral' | 'success' | 'warning' | 'error' | 'removed';
-export type ToastGlyph = 'info' | 'check' | 'bang' | 'cross' | 'trash' | 'lock';
 export type ToastAction = { label: string; onClick: () => void };
 
 export type ToastOptions = {
@@ -36,12 +35,9 @@ export type ToastOptions = {
   count?: number;
   /** The title once the count is over one, e.g. `(n) => `${n} items deleted``. The number in it rolls. */
   plural?: (count: number) => string;
-  description?: ReactNode;
   /** Milliseconds on screen. Hovering pauses it. `Infinity` waits for a dismiss. */
   duration?: number;
   action?: ToastAction;
-  /** One of the cell glyphs, or any node (drawn without the round well). Defaults to the tone's glyph. */
-  glyph?: ToastGlyph | ReactNode;
   /** Runs when the toast leaves any way other than its action: time, swipe, close. */
   onClose?: () => void;
 };
@@ -53,9 +49,7 @@ export type ToastRecord = {
   title: string;
   count: number;
   plural?: (count: number) => string;
-  description?: ReactNode;
   duration: number;
-  glyph?: ToastGlyph | ReactNode;
   actionLabel?: string;
   /** Bumped on every merge: restarts the timer and plays the bump. */
   version: number;
@@ -140,9 +134,7 @@ function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
       title,
       count: merging ? live.count + count : count,
       plural: options.plural ?? (merging ? live.plural : undefined),
-      description: options.description ?? (merging ? live.description : undefined),
       duration,
-      glyph: options.glyph ?? (merging ? live.glyph : undefined),
       actionLabel: options.action?.label ?? (merging ? live.actionLabel : undefined),
       version: live.version + 1,
       updatedAt: Date.now()
@@ -165,9 +157,7 @@ function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
     title,
     count,
     plural: options.plural,
-    description: options.description,
     duration,
-    glyph: options.glyph,
     actionLabel: options.action?.label,
     version: 0,
     createdAt: Date.now(),
