@@ -90,6 +90,21 @@ own colours. `--ember` is an older name for the same colour.
 
 ## Composer
 
+- **References:** a model with several reference slots shows one References
+  button (the picked thumbnails overlapping, "References" and n/max), never a
+  control per slot. It opens the chooser, which picks several at once up to
+  the model's limit (a picked image shows its order number; tapping it takes
+  it off) and has a **Selected n/max** tab to review, reorder and remove. A
+  single-slot model keeps its one thumbnail chip. Edit | Reference and the
+  inpaint brush sit beside the button.
+- **LoRAs** use the same pattern: This Model | All Models | Selected n/max in
+  the library, one tap to add or remove, no row animations.
+- **Number steppers:** one `NumberPicker` (minus, value, plus) everywhere; on
+  touch screens each part is a 44 px target. Names read "Decrease Images",
+  "Increase Steps".
+- **Phone Create sheet order:** Prompt · Negative · Image/Video with Model ·
+  References with LoRAs · Size, count, Advanced and Generate.
+
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers.
 - **Advanced** expands inline below the composer's controls with a height
@@ -105,10 +120,10 @@ own colours. `--ember` is an older name for the same colour.
   until hovered, with an accessible name and a tooltip naming the action.
 - Icon bars group related actions with a divider between groups; the same
   action has the same icon everywhere.
-- **Image/Video switches are icon pairs everywhere:** the gallery's
-  Images/Videos switch and the composer's Image/Video mode use the same image
-  and video icons as a segmented toggle, with accessible names ("Images",
-  "Videos"; "Image", "Video") and tooltips.
+- **Image/Video switches:** the composer's Image/Video mode and the phone
+  dock's Images/Videos switch are icon pairs (the same image and video icons,
+  with accessible names and tooltips). The desktop gallery's top switch has
+  the room for words and reads "Images" | "Videos".
 - Segmented toggles (`role="group"` with `aria-pressed` buttons) choose one of
   a few native options, such as Image/Video or a resolution (1K | 2K | 4K).
 
@@ -137,7 +152,9 @@ own colours. `--ember` is an older name for the same colour.
   **Reuse** loads both prompts only; a prompt's own **Use** loads just that
   prompt. After any of them the viewer closes and the prompt box opens.
 - **Viewer, desktop:** Copy · Download | Animate · Recreate · Reference ·
-  Upscale | Star · Delete | Info, then Close.
+  Upscale | Star · Delete, then Close. Info sits alone in the top right (beside
+  the corner Close on tablets); it opens Details, and the open Details panel
+  has its own Close in its header, as Info's corner is under it.
 - **Viewer, phone:** Star top left; Info top right beside Close; the bottom
   bar Copy · Share | Animate · Recreate · Reference · Upscale | Delete.
   Download replaces Share only where the browser can't share files. Info
@@ -151,7 +168,10 @@ own colours. `--ember` is an older name for the same colour.
 - **Selecting:** a long press on a phone tile starts selecting with that item
   (there is no long-press action sheet). The select bar offers Select All,
   Select Failed, then Download (a zip when several) or Share on a phone,
-  Retry for failed items, Star and Delete.
+  Animate for the photos among them, Retry for failed items, Star and Delete.
+  The desktop's right-click menu offers the same for several, under an
+  "n Selected" heading, and the full list for one; its rows are full width
+  with a muted icon, split by hairlines between the intent groups.
 - **Copying on phones:** call the clipboard synchronously inside the tap
   (iOS Safari requires it), fall back to a selected text box where there is
   no clipboard API, and confirm with the button's own "Copied" and a toast.
@@ -194,6 +214,10 @@ Safari's bottom bar (safe-area insets). The top keeps only a thin status strip
 (status, title, what is running), so a tap on the iOS status bar still scrolls
 the document to the top.
 
+The **status** is the small Studio pill top left: its light says whether
+generation can run and a tap checks again. **More** reads Select · Library ·
+Settings · Account.
+
 The **dock** at the bottom holds, from the top down: the shared Search/Filter
 row when open, the create pill (prompt preview and Generate), then the
 Images/Videos icon pair, Search, Filter and More. Prefer tall, vertically
@@ -216,8 +240,10 @@ LoRAs | Size | Aspect Ratio**, then one Clear. On the phone they are one
 horizontal row of compact triggers that scrolls sideways (momentum, no
 wrapping). Active filters are highlighted the same way on both. Each trigger
 opens its options in the one-layer style: a popover on the desktop, the
-filter row's own panel on the phone. Filters combine with AND over the
-server's paginated results and never show misleading zero counts.
+filter row's own panel on the phone. Each filter takes several values (a
+tick per value, a count on its trigger when more than one, its own Clear);
+values within a filter combine with OR, filters with AND, over the server's
+paginated results, and never show misleading zero counts.
 
 ### Keyboard & visual viewport
 
@@ -228,7 +254,8 @@ padding, and the page returns to where it rested once the keyboard closes.
 
 ## Labels
 
-- Title Case for headings, labels and actions, with `&` instead of "And";
+- Title Case for headings, labels, actions, menu items, tooltips and
+  accessible names, with `&` instead of "And";
   sentence case for explanations. Australian English ("Favourite",
   "Catalogue", "Colour").
 - Standard words: Images/Videos (gallery modes), Image/Video (generation),
