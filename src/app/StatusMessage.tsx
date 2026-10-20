@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef, useState, useSyncExternalStore } from '
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from './format';
+import { SafeImg } from './SafeImg';
 import { dismissToast, runToastAction, subscribeToasts, toastSnapshot, type ToastRecord } from './toast';
 import { usePageHidden, usePausableTimeout } from '@/hooks/use-pausable-timeout';
 
@@ -129,7 +130,7 @@ function ConfirmPanel({ title, confirm }: { title: string; confirm: NonNullable<
     {confirm.detail ? <p>{confirm.detail}</p> : null}
     {confirm.items?.length ? <ul className="status-pill-list" aria-label="Items">
       {confirm.items.map((item) => <li key={item.id}>
-        {item.thumb ? <img src={item.thumb} alt="" loading="lazy" decoding="async" /> : <span className="status-pill-list-blank" aria-hidden="true" />}
+        <SafeImg src={item.thumb} alt="" loading="lazy" decoding="async" fallback={<span className="status-pill-list-blank" aria-hidden="true" />} />
         <span>{item.name}</span>
       </li>)}
     </ul> : null}
