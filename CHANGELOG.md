@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Dismiss waiting chat users, and a faster studio while the video worker is off
+
+### Added
+- **Dismiss waiting chat users:** each waiting ID under Settings › Accounts & MCP › Chat Gateway Users has Dismiss next to Link, which removes it from the list after a confirmation. An ID the gateway sends again returns to the list.
+
+### Fixed
+- **Faster while the video worker is off:** when the video worker does not answer, Studio remembers that for 30 seconds instead of asking again on every model list and run, which took about 1.5 seconds each time a lookup or connection failed slowly. A connection check that reaches the worker, or a new video address, clears it at once. Model detection is also reused until ComfyUI is asked again.
+
 ## [0.26.0] - 2026-10-19
 
 > Email sign-in, Animate and Extend Video in the viewer, and a steadier phone prompt
