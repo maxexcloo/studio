@@ -35,27 +35,11 @@
 .composer-advanced-body { display: grid; gap: 12px; max-height: min(65dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
 .composer-loras .model-loras { padding: 0; }
 .composer-loras .model-loras > h3 { display: none; }
-.phone-create .phone-compose { display: grid; gap: 12px; }
-.phone-create .composer-prompt-field textarea { box-sizing: border-box; width: 100%; min-height: 68px; padding: 10px 72px 10px 10px; border: 0; border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); font: inherit; font-size: 16px; line-height: 1.4; resize: none; }
-.phone-create .composer-field-tools { top: 7px; right: 7px; }
-.phone-create .phone-sheet-foot { display: grid; gap: 8px; }
-.phone-creation-toolbar, .phone-creation-submit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.phone-creation-toolbar .phone-model-browse { flex: 1; min-width: 80px; max-width: 180px; }
 .phone-model-browse span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.phone-creation-toolbar > button[aria-label="LoRAs"] span { display: none; }
-.phone-creation-submit-row .composer-reference-tools { flex: 1; max-width: none; padding: 0; }
-.phone-creation-submit-row .composer-reference-slots { align-items: flex-start; }
-.phone-creation-submit-row .reference-slot-list { justify-content: flex-start; gap: 8px; }
-.phone-creation-submit-row .ref-add { width: auto; height: 44px; padding: 6px 10px; flex-direction: row; gap: 6px; border-style: solid; border-radius: var(--r-pill); }
-.phone-creation-submit-row .ref-add-label { font-size: 12px; }
-.phone-creation-submit-row .ref-selected { width: 44px; height: 44px; }
-.phone-creation-submit-row .reference-count { display: none; }
-.phone-creation-submit-row .phone-generate { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: var(--r-pill); }
 .phone-create-open strong { color: hsl(var(--muted-foreground) / .72); font-weight: 400; }
 @media (min-width: 761px) { .zen-prompt { width: min(920px, calc(100vw - 176px)); min-width: 0; } }
 /* Resources form the third row; shared generation controls stay below. */
 .composer-field-tools { top: 50%; transform: translateY(-50%); }
-.phone-create .composer-field-tools { top: 50%; }
 .composer-resource-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }
 .composer-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
 .composer-resource-left .composer-reference-tools { flex: 0 1 auto; min-width: 0; }
@@ -63,20 +47,9 @@
 .composer-resource-model { flex: none; max-width: 220px; margin-left: auto; }
 .composer-resource-model .model-copy strong { max-width: 160px; }
 .zen-prompt:not(.is-expanded) .composer-resource-row { display: none; }
-.phone-creation-resources { display: flex; align-items: center; gap: 8px; }
-.phone-creation-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: 6px; }
-.phone-creation-resource-left .composer-reference-tools { flex: 1; min-width: 0; max-width: none; padding: 0; }
-.phone-creation-resource-left .reference-slot-list { justify-content: flex-start; gap: 8px; }
-.phone-creation-resource-left .reference-count { display: none; }
-.phone-creation-resource-left .ref-add { width: 44px; height: 44px; padding: 0; border-radius: var(--r-pill); border-style: solid; }
-.phone-creation-resource-left .ref-add-label { display: none; }
-.phone-creation-resource-left .ref-selected { width: 44px; height: 44px; }
 /* Phone creation buttons: one 44px pill in a dark well. */
-.phone-creation-toolbar > button, .phone-creation-reset, .phone-creation-resources > button, .phone-creation-resource-left > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
-.phone-creation-kind-row .phone-model-browse { flex: 1; min-width: 0; max-width: none; justify-content: flex-start; }
-.phone-creation-submit-row .composer-submit-actions { margin-left: auto; }
 .composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
-.composer-resource-left .composer-resource-add, .phone-creation-resource-left > .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
+.composer-resource-left .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
 .composer-resource-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .composer-resource-add svg { flex: none; }
 .composer-resource-model .model-menu { width: min(460px, calc(100vw - 32px)); }
@@ -101,7 +74,6 @@
 .composer-advanced .phone-control-hint, .phone-advanced .phone-control-hint { font-size: 11px; }
 .composer-advanced .phone-seed-field input, .phone-advanced .phone-seed-field input { min-height: 40px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--well); }
 
-.phone-creation-resource-left > .composer-resource-add { height: 44px; min-height: 44px; }
 .composer-advanced .phone-slider::-webkit-slider-runnable-track { height: 4px; }
 .composer-advanced .phone-slider::-moz-range-track { height: 4px; }
 .composer-advanced .phone-slider::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
@@ -151,14 +123,14 @@
 .composer-loras .lora-picker:not(.is-list) .lora-option { display: flex; min-height: 52px; }
 
 /* Creation and dock icons share the same quiet, hover and open states. */
-:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn),
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .prompt-action, .number-picker-btn),
 .studio-dock .icon-button { color: hsl(var(--muted-foreground)); }
-:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn):hover:not(:disabled),
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .prompt-action, .number-picker-btn):hover:not(:disabled),
 .studio-dock .icon-button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn)[aria-expanded="true"],
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-more, .prompt-action, .number-picker-btn)[aria-expanded="true"],
 .studio-dock .icon-button[aria-expanded="true"] { background-color: var(--selected); color: hsl(var(--foreground)); }
 .zen-prompt :is(.composer-advanced-trigger, .composer-reset, .composer-more) { border-color: transparent; }
-:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn) > svg,
+:is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .prompt-action, .number-picker-btn) > svg,
 :is(.zen-prompt, .phone-create) :is(.number-picker-icon, .number-picker-btn) svg,
 .studio-dock .icon-button > svg { flex-shrink: 0; width: 16px; height: 16px; }
 

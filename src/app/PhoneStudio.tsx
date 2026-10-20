@@ -24,12 +24,13 @@ import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
+import { ListButton, ListItem } from './SheetList';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
 import { StackRunsButton } from './StackRunsButton';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
-import { signOutAccount } from './accounts';
+import { signOutChecked } from './accounts';
 import { hasAccountStorageScope } from './api';
 import { StatusPill, useStatusHost } from './StatusMessage';
 import { EmptyState } from './EmptyState';
@@ -296,8 +297,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
-    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, setSeed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers
+    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
+    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
   const many = (referenceAssets || []).length > 1;
@@ -309,13 +310,19 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const restarting = Boolean(comfyStatus?.restarting);
   const variations = mode === 'video' || currentProfile?.capabilities?.variations !== false;
   const maxCount = Math.max(1, Number(countMeta?.max || 8));
-  const { min: stepMin, max: stepMax, recommended: stepDefault } = practicalStepRange(currentProfile, stepsMeta, steps);
+  const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
   // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes, targetArea: sizeArea || 0, offerTwoK: Boolean(sizeTiers?.includes('2k')) });
+  const sizeText = `${ratioName(size.shown.width, size.shown.height)} · ${size.shown.width}×${size.shown.height}`;
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
+  const hasReferences = Boolean((referenceInputs || []).length || view.referenceWith?.profiles?.length);
+  const lorasOffered = mode !== 'video' || currentProfile?.capabilities?.lora;
+  const fixedSeed = String(seed || '').trim();
+  const advancedText = [currentProfile?.family !== 'grok' && steps ? `${steps} Steps` : '', sampler ? String(sampler) : '', fixedSeed ? `Seed ${fixedSeed}` : ''].filter(Boolean).join(' · ');
+  const blocked = restarting || (!comfyOffline && (!prompt.trim() || generateDisabled));
 
   const go = () => {
     if (comfyOffline) { retryComfyStatus(); return; }
@@ -333,33 +340,63 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       full
       className="phone-create"
       title="Create"
+      headerAction={<ComposerModeSelect mode={mode} onChange={view.changeMode} tips={false} />}
       footer={
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
-          {/* Top down, in the order of making something: Image/Video and Model, then
-              References and LoRAs, then Size, Advanced and Generate. */}
-          <div className="phone-creation-toolbar phone-creation-kind-row">
-            <ComposerModeSelect mode={mode} onChange={view.changeMode} />
-            <button type="button" className="phone-model-browse" aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')}><SlidersHorizontal size={16} /><span>{currentProfile?.recipe?.modelLabel || currentProfile?.displayName || currentProfile?.label || 'Model'}</span></button>
-          </div>
-          <div className="phone-creation-resources">
-            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}>{view.loraSummary ? <><Layers size={16} /><span className="lora-pill-summary">{view.loraSummary}</span></> : <><Plus size={16} /><span>LoRAs</span></>}</button></div>
-          </div>
-          <div className="phone-creation-toolbar phone-creation-submit-row">
-            {!aspectLocked ? <button type="button" aria-label="Aspect Ratio" aria-haspopup="dialog" aria-expanded={sheet === 'size'} onClick={() => setSheet('size')}><span className="aspect-shape phone-aspect" style={aspectIconStyle({ label: "", value: "", w: size.shown.width, h: size.shown.height })} /></button> : null}
-            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
-            <button type="button" aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={sheet === 'advanced'} onClick={() => setSheet('advanced')}><MoreHorizontal size={18} /></button>
-            <button type="button" className="phone-creation-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={18} /></button>
-            <div className="composer-submit-actions">
-              <button type="button" className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={restarting || (!comfyOffline && (!prompt.trim() || generateDisabled)) || undefined} onClick={go}>
-                {restarting || comfyOffline ? <RefreshCw size={20} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={20} strokeWidth={2.4} />}
-              </button>
-            </div>
+          {/* Always in view: how many, start again, and Generate. */}
+          <div className="create-footer">
+            {variations && maxCount > 1 ? <NumberPicker className="create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
+            <button type="button" className="phone-icon create-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={19} /></button>
+            <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={blocked || undefined} onClick={go}>
+              {restarting || comfyOffline ? <RefreshCw size={18} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={18} strokeWidth={2.4} />}
+              <span>{restarting ? 'Restarting' : comfyOffline ? 'Check Again' : 'Generate'}</span>
+            </button>
           </div>
         </>
       }
     >
-      <div className="phone-compose">
+      {/* One flat column: the prompt takes the room that's left, then one row per choice. */}
+      <div className="create-flow">
+        <div className="create-prompts">
+          <PromptField kind="positive" fill value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={1} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
+        </div>
+        <div className="list-group create-options">
+          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')} />
+          {hasReferences ? (
+            // The chooser's button lands here (ReferenceSlots portals into the tools), as wide as the row.
+            <div className="list-row is-static create-references">
+              <span className="list-row-label">References</span>
+              <div className="composer-reference-tools" />
+            </div>
+          ) : null}
+          {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
+          <AnimatePresence initial={false}>
+            {referenceRole ? (
+              <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+                <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What This Image Is">
+                  <i aria-hidden="true" />
+                  {(['edit', 'reference'] as const).map((value) => (
+                    // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
+                    <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { return; } referenceRole.onChange(value); }}>
+                      {value === 'edit' ? 'Edit' : 'Reference'}
+                    </button>
+                  ))}
+                </div>
+                <small key={`${referenceRole.value}:${many}:${Boolean(referenceRole.locked)}`}>{referenceRole.locked ? 'The painted part changes this picture. Clear the paint to use it as a reference'
+                  : referenceRole.value === 'edit'
+                  ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
+                  : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+          {lorasOffered ? <ListButton label="LoRAs" value={view.loraSummary || 'None'} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()} /> : null}
+          {!aspectLocked ? (
+            <ListButton label="Size" value={sizeText} aria-label={`Size: ${sizeText}`} aria-haspopup="dialog" aria-expanded={sheet === 'size'} onClick={() => setSheet('size')} />
+          ) : <ListItem label="Size"><span className="list-row-value">Follows the image · {size.shown.width}×{size.shown.height}</span></ListItem>}
+          <ListButton label="Advanced" value={advancedText} aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={sheet === 'advanced'} onClick={() => setSheet('advanced')} />
+        </div>
         <ReferenceSlots
           scope={`${mode}:${view.model}`}
           inputs={referenceInputs || []}
@@ -373,28 +410,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
-        <PromptField kind="positive" value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
-        {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
-        {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
-        <AnimatePresence initial={false}>
-          {referenceRole ? (
-            <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What This Image Is">
-                <i aria-hidden="true" />
-                {(['edit', 'reference'] as const).map((value) => (
-                  // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
-                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { return; } referenceRole.onChange(value); }}>
-                    {value === 'edit' ? 'Edit' : 'Reference'}
-                  </button>
-                ))}
-              </div>
-              <small key={`${referenceRole.value}:${many}:${Boolean(referenceRole.locked)}`}>{referenceRole.locked ? 'The painted part changes this picture. Clear the paint to use it as a reference'
-                : referenceRole.value === 'edit'
-                ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
-                : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
       </div>
       <PromptHistorySheet
         kind={historyKind}
@@ -407,15 +422,10 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
       <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
       <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced Settings" full className="phone-advanced">
-        {currentProfile?.family !== 'grok' ? <div className="phone-control"><NumberPicker label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /></div> : null}
-      {String(seed || '').trim() ? (
-        <button type="button" className="phone-row phone-seed" onClick={() => setSeed('')}>
-          <Dices size={20} /><span>Seed {String(seed).trim()} is fixed<small>Tap for a random seed</small></span>
-        </button>
-      ) : null}
-
-      {grokMediaControls}
-      {phoneVideoDurationControls}
+        {/* Steps lives here on the phone; the desktop has it in the composer. Every other setting is the shared list. */}
+        {currentProfile?.family !== 'grok' ? <div className="list-group"><ListItem label="Steps"><NumberPicker label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" density="compact" /></ListItem></div> : null}
+        {grokMediaControls}
+        {phoneVideoDurationControls}
         {phoneAdvancedControls}
       </Sheet>
     </Sheet>
@@ -645,7 +655,14 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
   );
   return (
     <Sheet open={open} onClose={onClose} title="More">
-      {/* Select · Library · Settings · Account; the Studio mark top left is the status. */}
+      {/* Account · Select · Library · Settings; the Studio mark top left is the status. Sign Out is first, in plain sight. */}
+      {hasAccountStorageScope() ? <>
+        <h3 className="phone-section">Account</h3>
+        <div className="phone-group">
+          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('account'); }}><UserRound size={20} /><span>Account<small>Your MCP token and session</small></span></button>
+          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutChecked(view.runningCount || 0, view.confirmAction).then((done) => { if (!done) setSigningOut(false); }).catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
+        </div>
+      </> : null}
       <h3 className="phone-section">Select</h3>
       <div className="phone-group">
         {onSelect ? <button type="button" className="phone-row" aria-label="Select Items" onClick={() => { onClose(); onSelect(); }}><CheckSquare size={20} /><span>Select Items<small>Download, animate, star or delete several</small></span></button> : null}
@@ -670,13 +687,6 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
         </button>
         <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('studio'); }}><Settings size={20} /><span>All Settings</span></button>
       </div>
-      {hasAccountStorageScope() ? <>
-        <h3 className="phone-section">Account</h3>
-        <div className="phone-group">
-          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('account'); }}><UserRound size={20} /><span>Account<small>Your MCP token and session</small></span></button>
-          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
-        </div>
-      </> : null}
       <p className="phone-note">Models, folders and downloads are managed on the computer running Studio.</p>
     </Sheet>
   );

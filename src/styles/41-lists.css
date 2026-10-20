@@ -1,0 +1,235 @@
+/* ---------------------------------------------------------------------------
+   Flat lists (UI-PATTERNS › Lists): SheetList.tsx. Full-width one-line rows
+   split by hairlines, no cards: the label left, the value muted on the right,
+   then a chevron (opens a step) or a check (the selected option).
+--------------------------------------------------------------------------- */
+
+:root { --list-hairline: rgb(255 255 255 / .08); --list-row-h: 48px; }
+@media (max-height: 700px) { :root { --list-row-h: 44px; } }
+
+.list-section { margin-top: 16px; }
+.list-section:first-child { margin-top: 2px; }
+.list-section-title {
+  margin: 0 0 2px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.list-group { display: flex; flex-direction: column; min-width: 0; }
+.list-group > :not(:first-child) { border-top: 1px solid var(--list-hairline); }
+.list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--list-row-h);
+  margin: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 15px;
+  font-weight: 450;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.list-row.is-static { cursor: default; }
+button.list-row:hover { background: transparent; }
+@media (hover: hover) { button.list-row:hover .list-row-value, button.list-row:hover .list-row-end { color: hsl(var(--foreground)); } }
+button.list-row:active { background: rgb(255 255 255 / .04); }
+button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: -2px; border-radius: 8px; }
+.list-row:disabled { opacity: .45; cursor: default; }
+.list-row-lead { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; color: hsl(var(--muted-foreground)); }
+.list-row-label { flex: none; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.list-row-value, .list-row-gap { flex: 1; min-width: 0; }
+.list-row-value {
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+.list-row-end { flex: none; margin-left: -4px; color: hsl(var(--muted-foreground) / .7); transition: color var(--motion-fast) var(--motion-ease); }
+.list-row-check.is-off { visibility: hidden; }
+.list-row.is-selected .list-row-check { color: var(--accent-amber); }
+.list-row-control { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.list-row-control .number-picker-label { display: none; }
+.list-row-control .number-picker { flex: none; }
+/* A native select laid over the row's value, so the tap opens the phone's own picker. */
+.list-row-control select.list-select {
+  max-width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 26px 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--control-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.list-row-control input.list-field {
+  width: 100%;
+  max-width: 150px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--control-fill);
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.list-row-control input.list-field::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+.list-note { margin: 4px 2px 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; line-height: 1.4; }
+
+/* -------------------------------------------------------------- Create (phone) */
+
+/* The prompt takes the height the rows and the footer leave. With the keyboard
+   up there is little of it, so the body scrolls instead of the field shrinking away. */
+.phone-create > .phone-sheet-body { display: flex; flex-direction: column; padding: 0 16px 6px; overflow-y: auto; }
+.create-flow { display: flex; flex-direction: column; flex: 1 0 auto; min-height: 100%; }
+.create-prompts { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 172px; }
+.create-prompts .composer-prompt-field {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--control-fill);
+  transition: border-color var(--motion-fast) var(--motion-ease);
+}
+.create-prompts .composer-prompt-field:focus-within { border-color: rgb(255 255 255 / .16); }
+/* The prompt: its text above, its actions in a small toolbar along the bottom edge, never over the text. */
+.create-prompts .composer-prompt-field.is-fill { flex: 1 1 0; flex-direction: column; min-height: 118px; }
+.create-prompts textarea {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+}
+.create-prompts textarea::placeholder { color: hsl(var(--muted-foreground)); }
+.create-prompts .is-fill textarea { height: auto; min-height: 0; padding-bottom: 0; }
+.create-prompts .is-negative textarea { padding: 11px 4px 11px 14px !important; font-size: 15px; }
+.create-prompts .composer-field-tools { position: static; flex: none; align-self: flex-end; transform: none; gap: 0; padding: 2px 4px 4px; }
+.create-prompts .is-negative .composer-field-tools { align-self: center; padding: 0 4px 0 0; }
+.create-prompts .composer-field-tools .prompt-action { width: 40px; height: 40px; border-radius: 12px; }
+.create-prompts .composer-field-tools .prompt-action > svg { width: 17px; height: 17px; }
+
+.create-options { flex: none; margin-top: 8px; }
+.phone-create .list-row.phone-model-browse,
+.phone-create .list-row.phone-model-browse[aria-expanded="true"] { background: transparent; color: hsl(var(--foreground)); }
+.create-options .list-row-lead .aspect-shape { max-width: 20px; max-height: 16px; border-width: 1.5px; border-radius: 3px; }
+.create-options .phone-ref-role { padding: 6px 0 8px; }
+
+/* References: the chooser's button is the whole row; the label underneath shows through. */
+.create-references .composer-reference-tools { flex: 1; min-width: 0; display: flex; justify-content: flex-end; max-width: none; padding: 0; }
+.create-references .composer-reference-slots, .create-references .reference-slot-list { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.create-references .reference-count { display: none; }
+.phone-create .create-references .ref-chip.ref-add {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 26px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 15px;
+}
+.phone-create .create-references .ref-chip.ref-add::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  width: 17px;
+  height: 17px;
+  background: currentColor;
+  opacity: .7;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.phone-create .create-references .ref-chip.ref-add:not(.has-items) > svg,
+.phone-create .create-references .ref-group-label,
+.phone-create .create-references .ref-add-label { display: none; }
+.phone-create .create-references .ref-chip.ref-add:not(.has-items)::before { content: "Add"; }
+.phone-create .create-references .ref-group-thumbs img { width: 28px; height: 28px; }
+.phone-create .create-references .ref-group-count { color: hsl(var(--muted-foreground)); font-size: 15px; }
+.phone-create .create-references .ref-selected { width: 36px; height: 36px; margin-right: 0; }
+
+.phone-create .phone-sheet-head .composer-mode-select { margin-right: 2px; }
+
+.create-footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.create-footer .create-count { flex: none; }
+.create-footer .create-count .number-picker-icon { display: none; }
+.create-footer .create-reset { flex: none; }
+.phone-create .create-footer .create-generate { flex: 1; width: auto; min-width: 0; min-height: 48px; border-radius: 999px; font-size: 16px; }
+
+/* -------------------------------------------------------------- Account menu (desktop dock) */
+
+.account-menu { position: relative; display: inline-flex; }
+.account-menu-list {
+  position: absolute;
+  right: -6px;
+  bottom: calc(100% + 14px);
+  z-index: var(--z-popover, 50);
+  display: grid;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
+  transform-origin: bottom right;
+}
+.account-menu-list[data-settling] { background: var(--glass-panel-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.account-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu-list button > svg { color: hsl(var(--muted-foreground)); }
+.account-menu-list button:hover { background-color: var(--control-hover); }
+.account-menu-list button.is-danger, .account-menu-list button.is-danger > svg { color: var(--danger-ink); }

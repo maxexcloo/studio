@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type Ref } from 'react';
 
 /** Size to text and available viewport space, then allow scrolling inside the field. */
-export function useAutosizeTextarea(value: string, forwardedRef?: Ref<HTMLTextAreaElement>, maximum = 240, minimumRows?: number) {
+export function useAutosizeTextarea(value: string, forwardedRef?: Ref<HTMLTextAreaElement>, maximum = 240, minimumRows?: number, enabled = true) {
   const minimums = useRef(new WeakMap<HTMLTextAreaElement, number>());
   const [field, setField] = useState<HTMLTextAreaElement | null>(null);
   const ref = useCallback((node: HTMLTextAreaElement | null) => {
@@ -12,6 +12,8 @@ export function useAutosizeTextarea(value: string, forwardedRef?: Ref<HTMLTextAr
 
   useLayoutEffect(() => {
     if (!field) return;
+    // Off: the field fills the space its layout gives it (the phone's Create sheet).
+    if (!enabled) { for (const property of ['height', 'minHeight', 'maxHeight', 'overflowY'] as const) field.style[property] = ''; return; }
     let width = -1;
     if (!minimums.current.has(field)) minimums.current.set(field, parseFloat(getComputedStyle(field).minHeight) || 44);
     const measure = () => {
@@ -45,6 +47,6 @@ export function useAutosizeTextarea(value: string, forwardedRef?: Ref<HTMLTextAr
       window.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('resize', measure);
     };
-  }, [field, maximum, minimumRows, value]);
+  }, [field, maximum, minimumRows, value, enabled]);
   return ref;
 }

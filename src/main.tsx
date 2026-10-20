@@ -1730,7 +1730,7 @@ function App() {
     locked: Boolean(activeInpaintMask),
     onChange: (value: ReferenceRole) => { if (!activeInpaintMask) setPrefs({ referenceRole: value }); }
   } : null;
-  const view = { ...baseView, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  const view = { ...baseView, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />

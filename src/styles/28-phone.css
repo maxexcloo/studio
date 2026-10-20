@@ -493,36 +493,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 
 /* -------------------------------------------------------------- Create */
 
-/* An on-screen keyboard leaves the sheet little height. The prompt keeps its
-   own height and the whole sheet scrolls, rather than the body shrinking to a
-   sliver above the fixed footer until a scroll moves the keyboard inset. */
-.phone-create { overflow-y: auto; overscroll-behavior: contain; }
-.phone-create > .phone-sheet-body { flex: 1 0 auto; overflow: visible; }
-
-.phone-compose {
-  position: relative;
-  display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px;
-  border-radius: 20px;
-  background: #1f1f1f;
-}
-.phone-compose textarea {
-  width: 100%;
-  min-height: 118px;
-  max-height: 40dvh;
-  padding: 4px 4px 2px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: hsl(var(--foreground));
-  font-size: 17px;
-  line-height: 1.45;
-  resize: none;
-  outline: none;
-}
-.phone-compose textarea::placeholder { color: rgb(255 255 255 / .45); }
 /* Edit or Ref sits under the chips (below), so the chip's menu leaves it out,
    with the line that would set the brush apart from it; with no brush either,
    there is no menu to open. */
