@@ -64,18 +64,29 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await expect(ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true })).toBeFocused();
 });
 
-test('the phone Create button marks a prompt waiting in Create', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'The phone Create button.');
+test('the phone prompt bar shows the prompt, marks it waiting and opens Create', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone prompt bar.');
   await page.goto('/');
   const ui = studioUi(page);
-  const create = page.locator('.phone-fab');
+  const bar = page.locator('.phone-prompt-bar');
+  const create = bar.locator('.phone-create-open');
   await expect(create).toHaveAccessibleName('Create');
-  await expect(create).not.toHaveClass(/has-draft/);
+  await expect(create).toContainText('Describe an image…');
+  await expect(bar).not.toHaveClass(/has-draft/);
+  await expect(bar.getByRole('button', { name: 'Generate', exact: true })).toBeDisabled();
+  // A slim bar on the shared bar height, at the bottom edge, and the gallery clears it.
+  const box = (await bar.boundingBox())!;
+  expect(box.y + box.height).toBeCloseTo(page.viewportSize()!.height, 0);
+  expect(box.height).toBeLessThan(80);
   await ui.openComposer();
   await ui.prompt.fill('A detailed landscape with mountains');
   await ui.closeComposer();
-  await expect(create).toHaveClass(/has-draft/);
+  await expect(bar).toHaveClass(/has-draft/);
+  await expect(create).toContainText('A detailed landscape with mountains');
   await expect(create).toHaveAccessibleName('Create: A detailed landscape with mountains');
+  await expect(bar.getByRole('button', { name: 'Generate', exact: true })).toBeEnabled();
+  const padding = await page.locator('.phone-gallery').evaluate((element) => parseFloat(getComputedStyle(element).paddingBottom));
+  expect(padding).toBeGreaterThanOrEqual(box.height);
 });
 
 test('phone prompt keeps a usable height when tapped with the keyboard up', async ({ page, isMobile }) => {

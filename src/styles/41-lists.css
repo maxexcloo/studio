@@ -367,28 +367,58 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .phone-bar .phone-tools-inner { padding: 2px 0 8px; }
 @media (max-width: 340px) { .phone-bar .phone-gallery-mode button { padding: 0 5px; font-size: 16.5px; } .phone-bar .phone-icon { width: 40px; } }
 
-.phone-fab {
+.phone-prompt-bar {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) - var(--pwa-drop, 0px) + var(--pwa-gap, 0px));
-  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(0px - var(--pwa-drop, 0px) + var(--pwa-gap, 0px));
+  z-index: var(--z-phone-bar);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: calc(var(--bar-h) + 12px + env(safe-area-inset-bottom));
+  padding: 6px max(10px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  border-top: 1px solid var(--glass-border);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+}
+.phone-prompt-open {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  height: var(--bar-pill-h);
+  padding: 0 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / .06);
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+.phone-prompt-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A prompt waiting in Create reads bright, with the accent dot. */
+.phone-prompt-bar.has-draft .phone-prompt-open { padding-right: 26px; color: hsl(var(--foreground)); }
+.phone-prompt-bar.has-draft .phone-prompt-open::after { content: ""; position: absolute; top: 50%; right: 12px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-amber); translate: 0 -50%; }
+.phone-prompt-go {
   display: grid;
+  flex: none;
   place-items: center;
-  width: 58px;
-  height: 58px;
-  min-height: 58px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: #f2f2f2;
-  box-shadow: 0 8px 24px rgb(0 0 0 / .45), 0 0 0 1px rgb(0 0 0 / .2);
   color: #0b0b0b;
-  transition: scale var(--motion-instant) var(--motion-ease);
+  transition: scale var(--motion-instant) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease);
 }
-.phone-fab:active { scale: .94; }
-/* A prompt waiting in Create: a small accent dot on the button. */
-.phone-fab.has-draft::after { content: ""; position: absolute; top: 9px; right: 9px; width: 9px; height: 9px; border: 2px solid #f2f2f2; border-radius: 50%; background: var(--accent-amber); }
-.phone-gallery { padding-bottom: calc(max(16px, env(safe-area-inset-bottom)) + 84px); }
+.phone-prompt-go:active:not(:disabled) { scale: .94; }
+.phone-prompt-go:disabled { opacity: .4; }
+.phone-gallery { padding-bottom: calc(var(--bar-h) + 28px + env(safe-area-inset-bottom)); }
 
 /* -------------------------------------------------------------- Settings, flat and dense */
 
