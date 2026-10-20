@@ -192,9 +192,9 @@ for (const selection of ['empty', 'previous', 'manual']) {
     }
     await ui.openViewer(page.locator(`[data-tile-id="${images[0].id}"]`));
     await (await ui.reuseButton()).click();
-    // Reuse opens the phone's Create sheet over the viewer; both close before the next step.
+    // Reuse closes the viewer and opens the prompt box; the phone's Create sheet closes before the next step.
+    await expect(ui.viewer).toHaveCount(0);
     await ui.closeComposer();
-    await ui.closeViewer();
     if (existingReference) {
       await ui.switchMode('video');
       await ui.openComposer();
