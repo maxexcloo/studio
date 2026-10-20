@@ -1,38 +1,24 @@
-node_modules
-dist
+/.claude/
+/artifacts/
+data/
+dist/
+node_modules/
+outputs/
+/playwright-report/
+# Internal docs, design notes and anything else not meant for the public repo.
+/private/
+/product-screenshots/
+release/
+/test-results/
+*.log
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
+docs/screenshots/size-picker*
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-outputs
-data
-*.log
-*.tsbuildinfo
-# Internal docs, design notes and anything else not meant for the public repo.
-/private/
-# Local tooling config (launch configs with machine paths).
-/.claude/
-.DS_Store
-
-# Never publish product screenshots or design working files.
-/product-screenshots/
-/artifacts/
-
 # PP Neue Bit is a commercial font; the app doesn't use it, keep any local copy out of the repo.
 /public/fonts/PPNeueBit*
-
-# Size-picker demo recordings (local only)
-docs/screenshots/size-picker*
-
-# Browser regression traces and results.
-/playwright-report/
-/test-results/
-
-# Python bytecode from the companion ComfyUI node
-__pycache__/
-
-# Old local desktop archives from before the fork became container-only
-release
+yarn-debug.log*
+yarn-error.log*

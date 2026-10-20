@@ -6,8 +6,13 @@ _.path = ["node_modules/.bin"]
 run = "npm run build"
 
 [tasks.check]
-depends = ["check:actions", "check:mise", "check:updates"]
-run = [{ task = "check:typescript" }, { task = "test" }]
+depends = [
+  "check:actions",
+  "check:mise",
+  "check:typescript",
+  "check:updates",
+  "test",
+]
 
 [tasks.dev]
 run = "npm run dev"
