@@ -16,12 +16,12 @@ export function fullBodyPerson(prompt) {
 }
 
 // "Generate five … of this scene: <prompt>" is an instruction to Studio, not a prompt for the model.
+// Only clear meta-instructions count, so a finished prompt such as "Create two cats on a sofa" runs as written.
 const instructionPatterns = [
-  new RegExp(`^\\W*(?:please\\s+)?(?:generate|make|create|produce|render|give\\s+me)\\s+(?:me\\s+)?${number}\\b`, 'i'),
-  new RegExp(`\\b(?:generate|make|create|produce|render)\\s+(?:me\\s+)?${number}\\s+(?:[\\w-]+\\s+){0,4}?(?:variations?|versions?|variants?|images?|photos?|pictures?|shots?)\\b`, 'i'),
-  new RegExp(`\\b${number}\\s+(?:[\\w-]+\\s+){0,3}?(?:variations|variants)\\b`, 'i'),
-  /\bvariations?\s+(?:of|on)\s+(?:this|the|that)\s+(?:scene|image|prompt|photo|picture)\b/i,
-  /\bof\s+this\s+(?:scene|image|prompt|photo|picture)\s*:/i
+  new RegExp(`\\b(?:generate|make|create)\\s+(?:me\\s+)?${number}\\s+(?:[\\w-]+\\s+){0,3}?(?:images?|pictures?|photos?|versions?)\\b`, 'i'),
+  new RegExp(`\\b${number}\\s+(?:[\\w-]+\\s+){0,3}?variations\\b`, 'i'),
+  /\bvariations\b/i,
+  /\bof\s+this\s+scene\b/i
 ];
 /**
  * The refusal for an exact prompt that holds generation instructions, or '' when it reads as a finished prompt.

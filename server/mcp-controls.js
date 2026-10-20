@@ -43,7 +43,7 @@ export function mcpControls(profile) {
   if (slots.length && profile.aspectPolicy === 'reference' && String(profile.workflow || '').startsWith('family:')) controls.reference_role = { options: ['edit', 'reference'], note: 'Requires reference_asset_ids.' };
   if (profile.kind === 'image') {
     controls.upscale_quality = { options: ['fast', 'balanced', 'high'] };
-    controls.face_detail = { note: 'Requires upscale_quality.' };
+    controls.face_detail = { note: 'Requires upscale_quality. With upscale_quality set, it turns on by itself for a full-body person.' };
   }
   return controls;
 }

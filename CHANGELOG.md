@@ -11,6 +11,10 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **MCP face detail:** Generate turns face detail on by itself for a full-body or wide-shot person only when the request already chooses `upscale_quality`; it no longer adds a fast upscale. Without an upscale nothing changes, and an explicit `face_detail: true` works as before.
+- **MCP exact prompts:** `exact_prompt` refuses only clear instructions ("variations", "of this scene", "generate 4 photos", "five variations"), so finished prompts such as "Create two cats on a sofa" run as written.
+
 ## [0.34.0] - 2026-10-20
 
 > A flat phone Create sheet with a sticky Generate, one phone top bar with a floating Create, flat lists for every step and for Settings, one chooser for References, LoRAs and Models with drag to reorder, a Sign Out that works, and the gallery staying put when the viewer closes

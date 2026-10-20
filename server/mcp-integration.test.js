@@ -311,8 +311,8 @@ test('media and administrator credentials discover only their own friendly tools
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
-  // (7800 since Generate says to batch several images into one call and to pass a named model as profile_id.)
-  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7800, 'media tool schemas and instructions exceed their context budget');
+  // (7900 since Generate says to batch several images into one call, to pass a named model as profile_id and when face detail turns on.)
+  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7900, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
   await call(admin, 'GPUStatus');
@@ -445,24 +445,26 @@ test('Generate returns immediately with one saved-size image and passes explicit
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
 });
 
-test('a full-body person turns face detail on unless the caller chose, and the reply says so', async t => {
+test('a full-body person turns face detail on only beside a requested upscale, and the reply says so', async t => {
   const f = await fixture(t);
   const client = await f.client();
   const person = 'Full body photo of a woman on a city street';
-  const auto = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person] });
-  assert.match(texts(auto), /Face detail on for the full-body person, with fast smart upscale\. /);
-  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'fast', faceDetail: true });
-  // A chosen upscale quality stays, with face detail added.
+  // Without an upscale nothing changes: face detail never brings one.
+  const plain = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person] });
+  assert.doesNotMatch(texts(plain), /Face detail/);
+  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  // A requested upscale keeps its quality, with face detail added.
   const chosen = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person], upscale_quality: 'high' });
-  assert.match(texts(chosen), /Face detail on for the full-body person\. /);
+  assert.match(texts(chosen), /^Queued on [^.]+\. Face detail on for the full-body person\. /);
+  assert.match((await client.listTools()).tools.find(item => item.name === 'Generate').description, /Face detail turns on for full-body people only with a chosen upscale_quality\./);
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'high', faceDetail: true });
   // An explicit false wins, and other prompts are unchanged.
-  const off = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person], face_detail: false });
+  const off = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person], upscale_quality: 'fast', face_detail: false });
   assert.doesNotMatch(texts(off), /Face detail/);
-  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
-  const portrait = await call(client, 'Generate', { profile_id: imageProfile.id, request: 'Close-up portrait of a woman', exact_prompt: true });
+  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'fast', faceDetail: false });
+  const portrait = await call(client, 'Generate', { profile_id: imageProfile.id, request: 'Close-up portrait of a woman', exact_prompt: true, upscale_quality: 'fast' });
   assert.doesNotMatch(texts(portrait), /Face detail/);
-  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'fast', faceDetail: false });
   // Video has no face detail.
   const video = await call(client, 'Generate', { profile_id: videoProfile.id, prompts: [person] });
   assert.doesNotMatch(texts(video), /Face detail/);
@@ -474,11 +476,14 @@ test('an exact prompt holding generation instructions is refused with the count 
   const client = await f.client();
   const refused = await call(client, 'Generate', { kind: 'image', request: 'Generate five distinct amateur-snapshot variations of this scene: a woman reading in a café', exact_prompt: true });
   assert.equal(refused.isError, true);
-  assert.match(texts(refused), /^exact_prompt is for a finished prompt only, and this request holds instructions \("Generate five"\)\. Call Generate again with count: 5 \(1–10 per call\) and request set to just the plain prompt/);
+  assert.match(texts(refused), /^exact_prompt is for a finished prompt only, and this request holds instructions \("five distinct amateur-snapshot variations"\)\. Call Generate again with count: 5 \(1–10 per call\) and request set to just the plain prompt/);
   assert.equal(f.submitted.length, 0);
   // The same words without exact_prompt are a request, not a refusal.
   assert.equal(data(await call(client, 'Generate', { kind: 'image', request: 'Generate five variations of a red fox' })).status, 'queued');
   assert.match((await client.listTools()).tools.find(item => item.name === 'Generate').description, /exact_prompt \(a finished prompt only; for variations use count\)/);
+  // A finished prompt that starts with a verb and a number runs as written.
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', request: 'Create two cats on a sofa', exact_prompt: true })).status, 'queued');
+  assert.equal(f.submitted.at(-1).prompt, 'Create two cats on a sofa');
 });
 
 test('omitted counts queue one image or video job and an explicit count queues independent jobs', async t => {

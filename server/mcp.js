@@ -277,7 +277,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
         profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
@@ -309,12 +309,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const written = exact_prompt ? { prompts: [request], source: 'exact' } : await write(profile, { request, count, references, role: references ? args.reference_role || 'reference' : '', fallback: [request], signal });
           source = usePrompts(args, written, count);
         }
-        // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose;
-        // face detail runs within smart upscale, so it brings the fast upscale when none was chosen.
+        // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.
+        // Face detail runs within smart upscale, so it joins only an upscale the caller asked for and never adds one.
         let faceNote = '';
-        if (args.face_detail === undefined && !references && mcpControls(profile).face_detail && args.prompts.some(fullBodyPerson)) {
-          faceNote = `Face detail on for the full-body person${args.upscale_quality ? '' : ', with fast smart upscale'}. `;
-          Object.assign(args, { face_detail: true, upscale_quality: args.upscale_quality || 'fast' });
+        if (args.face_detail === undefined && args.upscale_quality && !references && mcpControls(profile).face_detail && args.prompts.some(fullBodyPerson)) {
+          faceNote = 'Face detail on for the full-body person. ';
+          args.face_detail = true;
         }
         const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request } : {});
         return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
