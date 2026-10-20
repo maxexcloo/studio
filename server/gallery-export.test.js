@@ -12,7 +12,7 @@ process.env.COMFY_OUTPUT_DIR = output;
 process.env.STUDIO_MULTI_USER = '1';
 const { setGallery } = await import('./gallery-store.js');
 const { accountOutputSubfolder } = await import('./account-ownership.js');
-const { sendGalleryExport } = await import('./gallery-export.js');
+const { exportFilename, sendGalleryExport } = await import('./gallery-export.js');
 const ownerA = { heissAccount: { userId: 'account-a' } };
 const ownerB = { heissAccount: { userId: 'account-b' } };
 for (const [owner, name] of [['account-a', 'account-a.png'], ['account-b', 'account-b.png']]) {
@@ -45,4 +45,10 @@ test('gallery exports include only the signed-in account outputs in account mode
   assert.doesNotMatch(b, /gallery\/account-a\.png/);
   const anonymous = await archive(null);
   assert.doesNotMatch(anonymous, /account-[ab]\.png/);
+});
+
+test('downloads are named for Studio with the date', () => {
+  const date = new Date('2026-10-20T12:00:00Z');
+  assert.equal(exportFilename('gallery', 'zip', date), 'studio-gallery-2026-10-20.zip');
+  assert.equal(exportFilename('hidden', 'backup', date), 'studio-hidden-2026-10-20.backup');
 });

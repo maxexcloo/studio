@@ -52,7 +52,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
 
   async function dispatchGenerate(req, res) {
     const accountUser = req.heissAccount?.role === "user";
-    if (accountUser && req.body?.privateVault) return res.status(403).json({ ok: false, error: "Private Vault is not available until account storage is separated." });
+    if (accountUser && req.body?.privateVault) return res.status(403).json({ ok: false, error: "Hidden is not available to accounts." });
     if (!accountUser && configuredBackends().length === 1) return generateOnBackend(req, res);
     try {
       const available = await mediaModels();

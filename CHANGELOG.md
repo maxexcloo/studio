@@ -17,6 +17,7 @@ version opens with a `> ` summary line.
 
 ### Fixed
 - **Current wording and links:** About and the phone no longer mention in-app updates, the Hugging Face hint points at Settings › Integrations, `.env.example` names the `studio` storage default, and broken guide links point at existing sections.
+- **Studio names in downloads:** gallery and Hidden exports download as `studio-gallery-…`, `studio-hidden-…`, unnamed shared files fall back to `studio`, and accounts asking for Hidden see "Hidden is not available to accounts."
 
 ## [0.28.0] - 2026-10-20
 

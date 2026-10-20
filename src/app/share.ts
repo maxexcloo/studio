@@ -31,7 +31,7 @@ export function prefetchShare(item: GalleryItem | null, includeVideo = false) {
 
 /** A file name from the prompt, for downloads and shared files. */
 export function downloadName(item: GalleryItem, type = '') {
-  const base = String(item.outputName || item.filename || 'heiss').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'heiss';
+  const base = String(item.outputName || item.filename || 'studio').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'studio';
   if (/\.\w{2,4}$/.test(base)) return base;
   return `${base}.${type.includes('webp') ? 'webp' : type.includes('jpeg') ? 'jpg' : item.type === 'video' ? 'mp4' : 'png'}`;
 }

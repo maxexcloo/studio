@@ -121,6 +121,9 @@ async function measure(file) {
  * browser takes it. The header comes first and needs the CRC, so a file too
  * big to hold is read twice, the second time usually from the system's cache.
  */
+/** The attachment name of a download, such as `studio-gallery-2026-10-20.zip`. */
+export const exportFilename = (kind, extension, date = new Date()) => `studio-${kind}-${date.toISOString().slice(0, 10)}.${extension}`;
+
 export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true, req = null } = {}) {
   let closed = false;
   res.on("close", () => { closed = true; });

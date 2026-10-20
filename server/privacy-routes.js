@@ -15,7 +15,7 @@ import { addDevicePasskey, addPasskey, changePassword, issueChallenge, unlockWit
 import { compactVaultBundles, dissolveVaultBundle, eraseVault, retireVault, exportVaultBackup, hideItems, patchVaultItem, readVaultAsset, setVaultBundleCover, unhideItems, vaultAssetsForExport, vaultBundlePendingSummary, vaultConfigured, vaultItems, vaultRevision } from './vault.js';
 import { forgetComfyRun } from './hidden-traces.js';
 import { adoptHiddenRuns, forgetHiddenRunKeys } from './hidden-runs.js';
-import { sendGalleryExport } from './gallery-export.js';
+import { exportFilename, sendGalleryExport } from './gallery-export.js';
 import { autoDetectOutputDir } from './output-folder.js';
 import { requireHiddenKey, requireLocal, requireThisComputer } from "./route-access.js";
 
@@ -273,9 +273,8 @@ export function registerPrivacyRoutes(app) {
   app.get("/api/hidden/export", (req, res) => {
     const key = requireHiddenKey(req, res);
     if (!key) return;
-    const date = new Date().toISOString().slice(0, 10);
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-hidden-${date}.zip"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${exportFilename("hidden", "zip")}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     sendGalleryExport(res, vaultAssetsForExport(key), { gallery: false });
   });
@@ -382,7 +381,7 @@ export function registerVaultMediaRoutes(app) {
       return;
     }
     res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-hidden-${new Date().toISOString().slice(0, 10)}.backup"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${exportFilename("hidden", "backup")}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     res.send(backup);
   });

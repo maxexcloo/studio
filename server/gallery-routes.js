@@ -6,7 +6,7 @@ import { jobs } from './jobs.js';
 import { applyBundles, createBundles, DEFAULT_COOLDOWN_MINUTES, dissolveBundle, listBundles, pendingSummary, setBundleCover } from './gallery-bundles.js';
 import { encryptionKeyFromRequest, revealGalleryItemsForRequest } from './privacy.js';
 import { deleteVaultItems, vaultConfigured } from './vault.js';
-import { sendGalleryExport } from './gallery-export.js';
+import { exportFilename, sendGalleryExport } from './gallery-export.js';
 import { ownerIdForRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { mayUseFeature } from './account-policy.js';
 import { requireAdmin, requireLocal } from "./route-access.js";
@@ -161,9 +161,8 @@ export function registerGalleryReadRoutes(app) {
 export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory }) {
   app.get("/api/gallery/export", (req, res) => {
     if (!requireGalleryAccess(req, res)) return res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' });
-    const date = new Date().toISOString().slice(0, 10);
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="heiss-ui-gallery-${date}.zip"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${exportFilename("gallery", "zip")}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     sendGalleryExport(res, [], { req });
   });
