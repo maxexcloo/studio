@@ -205,3 +205,36 @@ export function familyMatches(profiles, value) {
     return words.some(word => own.has(word) || (word.length > 3 && joined.includes(word)));
   });
 }
+
+// Label and family words too common to name a model on their own.
+const notAliases = new Set([...genericWords, ...Object.keys(speedWords), 'base', 'edit', 'raw', 'max', 'ref', 'sft', 'distilled', 'lite', 'cloud', 'text', 'only', 'optional', 'reference', 'single', 'uncensored']);
+/** Words that name a profile's model: its family id's words and its label's first word, with and without a version digit ("krea2", "krea"). */
+function aliases(profile) {
+  const words = [...nameWords(String(profile.family || '').replace(/_/g, ' ')), nameWords(String(profile.label || '').split('·')[0])[0]].filter(Boolean);
+  return new Set(words.flatMap(word => [word, word.replace(/\d+$/, '')]).filter(word => word.length > 2 && !/^\d/.test(word) && !notAliases.has(word)));
+}
+/**
+ * The profile a request names when Generate has no profile_id ("six baby ducks, fast moss"): a model
+ * or family alias of exactly one family, resolved within it by the request's model and speed words,
+ * then moved to `tier` within the family. Null when no family, or several, are named.
+ */
+export function profileFromRequest(profiles, request, tier) {
+  const words = nameWords(request);
+  // Adjacent words joined too, so "Z-Image" finds zimage.
+  const terms = new Set([...words, ...words.slice(1).map((word, index) => `${words[index]}${word}`)]);
+  const named = new Map();
+  for (const profile of profiles) {
+    const hits = [...aliases(profile)].filter(alias => terms.has(alias));
+    if (hits.length) named.set(profile.family || profile.id, [...(named.get(profile.family || profile.id) || []), { profile, hits }]);
+  }
+  if (named.size !== 1) return null;
+  const [entries] = named.values();
+  const family = entries.map(entry => entry.profile);
+  // The request's words that also name something in the family ("radiance", "tesserafine"), plus its speed words.
+  const familyWords = new Set(family.flatMap(profile => profileNames(profile).flatMap(nameWords)));
+  const query = [...new Set([...entries.flatMap(entry => entry.hits), ...[...terms].filter(word => familyWords.has(word) && !notAliases.has(word))]), ...words.filter(word => speedWords[word])].join(' ');
+  // Within the family, a profile's own name ("tesserafine") narrows further; otherwise its speed words choose.
+  const found = findProfile(family, query) || searchProfiles(family, query)[0] || fastestFirst(family)[0];
+  const moved = withinFamily(profiles, found, tier);
+  return { ...moved, note: `Used ${moved.profile.label || moved.profile.id}, the model the request names. ${moved.note}` };
+}

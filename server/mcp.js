@@ -9,7 +9,7 @@ import { hostAllowed } from './request-guard.js';
 import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
-import { familyMatches, fastestFirst, findProfile, mcpTiers, nameWords, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
+import { familyMatches, fastestFirst, findProfile, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
@@ -178,10 +178,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       const extra = guide ? [{ type: 'text', text: `Prompting guide for ${label} (sent once; Models with profile_id has the full guide); apply it to later prompts: ${guide}` }] : [];
       // Several results, or any still running, also get one All Results page that fills in as they finish.
       const all = `[All Results](${media.allUrl(owner, refs)})`;
-      if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.\n\n${markdown}${submission.jobs.length > 1 ? `\n\n${all}` : ''}${prompts}` }, ...extra], structuredContent: structured };
+      if (markdown) return { content: [{ type: 'text', text: `Done on ${label}. ${note}Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.\n\n${markdown}${submission.jobs.length > 1 ? `\n\n${all}` : ''}${prompts}` }, ...extra], structuredContent: structured };
       const pending = [...submission.jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`), all].join(' · ');
       const message = submission.status === 'queued'
-        ? `Queued. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now. When the user later asks to see results, call Result. Never poll or resubmit.`
+        ? `Queued on ${label}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now. When the user later asks to see results, call Result. Never poll or resubmit.`
         : `${submission.error} ${note}Share the links; never resubmit.`;
       return { content: [{ type: 'text', text: `${message}\n\n${pending}${prompts}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
     };
@@ -276,9 +276,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images, use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. profile_id (id, label or family) and loras choose the model. prompts (one per different image), or exact_prompt, use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt, use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
-        profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
+        profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
         width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
@@ -289,8 +289,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (args.count > 1 && args.count === args.prompts?.length && args.count * args.prompts.length > maxJobsPerCall) args.count = 1;
         // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
         assertJobCount(args.prompts?.length || 1, args.count ?? 1);
+        const references = args.reference_asset_ids?.length || 0;
+        // A model the request names ("fast moss") counts as its profile_id when the chat left it out.
+        const fromRequest = args.profile_id === undefined && request && !args.loras?.length ? profileFromRequest(await media.profiles(kind || 'image', owner), request, wanted) : null;
+        const fits = fromRequest && (fromRequest.profile.mediaInputs || []).length >= references;
         const { profile, note: tierNote } = args.profile_id === undefined
-          ? { profile: await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0, loras: args.loras || [] }), note: '' }
+          ? (fits ? fromRequest : { profile: await media.choose(owner, { kind, tier: wanted, references, loras: args.loras || [] }), note: '' })
           : namedInTier(await media.profiles(kind || 'all', owner), args.profile_id, wanted);
         const sized = mcpSize(profile, { aspect, size });
         if (sized && (args.width !== undefined || args.height !== undefined)) throw new Error('Pass aspect and size, or width and height, not both.');

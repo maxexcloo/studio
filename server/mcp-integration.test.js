@@ -311,8 +311,8 @@ test('media and administrator credentials discover only their own friendly tools
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
   // Chat hosts resend every schema and the instructions on each model step; keep them within a small budget.
-  // (7600 since Generate says to batch several images into one call instead of repeating it.)
-  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7600, 'media tool schemas and instructions exceed their context budget');
+  // (7800 since Generate says to batch several images into one call and to pass a named model as profile_id.)
+  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 7800, 'media tool schemas and instructions exceed their context budget');
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
   await call(admin, 'GPUStatus');
@@ -1275,7 +1275,7 @@ test('Generate returns quick images inline as finished markdown, so no backgroun
   assert.equal(result.content.length, 1);
   // The same markdown a background notification returns, one block per job: only the instruction and the markdown.
   // Each linked preview sits directly under its header, in one paragraph; jobs are separated by a blank line.
-  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
+  assert.match(result.content[0].text, /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
   assert.ok(result.content[0].text.length < 540, `${result.content[0].text.length} characters`);
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
@@ -1293,7 +1293,7 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(texts(slowResult), /^Queued\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
+  assert.match(texts(slowResult), /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
   once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
@@ -1374,7 +1374,7 @@ test('Reuse runs a result again with its profile and settings, a new seed and an
   f.completeOnSubmit();
   const quick = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', wait_seconds: 5 });
   assert.equal(quick.structuredContent?.status, 'done', JSON.stringify(quick.content));
-  assert.match(quick.content[0].text, /^Done\. .+\n\n\*\*Result 5\*\* · Fixture Image\n\[!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]/);
+  assert.match(quick.content[0].text, /^Done on Fixture Image\. .+\n\n\*\*Result 5\*\* · Fixture Image\n\[!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]/);
   // Without kind, Reuse still returns a reference asset for Generate, and a rerun keeps a result's references.
   const { asset } = data(await call(client, 'Reuse', { job_id: 'result 1' }));
   assert.match(asset.id, /^fixture-asset-/);
@@ -1562,7 +1562,13 @@ test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it w
   const unknown = await call(client, 'Generate', { profile_id: 'sdxl turbo', prompts: ['A heron'] });
   assert.equal(texts(unknown), "No ready profile matches sdxl turbo; that model isn't available to this account. Tell the user instead of using another model.");
   assert.match(client.getInstructions(), /If a named model is unavailable, say so; don't substitute\./);
-  assert.deepEqual(f.submitted.map(body => body.profileId), ['custom:bento-image-moss-base-dmd8', 'custom:bento-image-moss-sft']);
+  // The chat left the model out of profile_id; the request still names it.
+  const fromRequest = await call(client, 'Generate', { kind: 'image', tier: 'fast', request: 'six baby ducks, fast moss', count: 6 });
+  assert.equal(data(fromRequest).profile.id, 'custom:bento-image-moss-base-dmd8');
+  assert.equal(data(fromRequest).jobs.length, 6);
+  assert.match(texts(fromRequest), /^Queued on MOSS Image Base · Fast .*\. Used MOSS Image Base · Fast .*, the model the request names\./);
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', tier: 'fast', request: 'six baby ducks', count: 1 })).profile.id, 'custom:bento-image-boogu-turbo', 'no model named: the default');
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['custom:bento-image-moss-base-dmd8', 'custom:bento-image-moss-sft', ...Array(6).fill('custom:bento-image-moss-base-dmd8'), 'custom:bento-image-boogu-turbo']);
 });
 
 test('a family name such as "flux 3" picks its Fast profile, and near misses list the fastest first', async t => {
@@ -1593,7 +1599,7 @@ test('one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(texts(excess), 'count is images per prompt, so 2 prompts × count 6 would queue 12 jobs; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.');
   const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
-  assert.match(generate.description, /For several different images, use one call with count \(1–10\) or prompts; don't make repeated calls\. .*prompts \(one per different image\)/);
+  assert.match(generate.description, /For several different images \("six photos" is count 6; if unsure, separate images\), use one call with count \(1–10\) or prompts; don't make repeated calls\. When the user names a model or family \(MOSS, FLUX\.3, Krea, Qwen, Boogu\), pass it in profile_id; plain names are fine\. .*prompts \(one per different image\)/);
   assert.equal(generate.inputSchema.properties.count.description, '1–10 per prompt; default 1.');
   assert.equal(generate.inputSchema.properties.prompts.description, '1–10.');
   assert.equal(f.submitted.length, 4);
@@ -1637,7 +1643,7 @@ test('each conversation gets a profile guide once, compact, for tier, fuzzy and 
   const guided = replies.filter(reply => reply.structuredContent.prompting);
   assert.equal(guided.length, 1, 'concurrent calls attach the guide once');
   assert.ok(guided[0].structuredContent.prompting.length <= 1200);
-  assert.ok(texts(guided[0]).length < 1700, `${texts(guided[0]).length} characters`);
+  assert.ok(texts(guided[0]).length < 1750, `${texts(guided[0]).length} characters`);
   assert.equal(texts(guided[0]).includes('example.test/guide'), false);
   for (const reply of replies.filter(reply => !reply.structuredContent.prompting)) assert.ok(texts(reply).length < 450, `${texts(reply).length} characters`);
   // A tier pick of another profile carries that profile's guide, once.
@@ -1799,7 +1805,7 @@ test('six individual photos are one Generate call: six jobs, each with its own w
   await f.profiles(guidedCatalogue());
   const client = await f.client();
   const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
-  assert.match(generate.description, /For several different images, use one call with count \(1–10, a distinct prompt each\) or prompts; don't make repeated calls\./);
+  assert.match(generate.description, /use one call with count \(1–10, a distinct prompt each\) or prompts; don't make repeated calls\./);
   const result = data(await call(client, 'Generate', { kind: 'image', request: 'six individual photos of a plush, unique colours', count: 6 }));
   assert.equal(result.jobs.length, 6);
   assert.equal(f.writerRequests.length, 1, 'one writer call for all six');

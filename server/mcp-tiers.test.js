@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, chooseRemoteVideo, familyMatches, findProfile, nameWords, withinFamily, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo, familyMatches, findProfile, nameWords, profileFromRequest, withinFamily, profilesForTier, profilesNearTier, searchProfiles, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -182,4 +182,17 @@ test('the family decides and speed words only choose within it: "moss turbo" is 
   // A miss lists the family the name points at, not unrelated models.
   assert.deepEqual(familyMatches(bento, 'moss xl turbo').map(profile => profile.id), ['custom:bento-image-moss-base-dmd8', 'custom:bento-image-moss-sft']);
   assert.deepEqual(familyMatches(bento, 'sdxl turbo'), []);
+});
+
+test('a model named only in the request ("six baby ducks, fast moss") is used when profile_id is missing', () => {
+  const pick = (request, tier) => profileFromRequest(bento, request, tier)?.profile.id;
+  assert.equal(pick('six individual photos of baby ducks, fast moss'), 'custom:bento-image-moss-base-dmd8');
+  assert.equal(pick('baby ducks with MOSS', 'quality'), 'custom:bento-image-moss-sft');
+  assert.equal(pick('a cat, tesserafine'), 'custom:bento-image-tesserafine-turbo-int8-convrot', "a model's own name narrows within its family");
+  assert.equal(pick('a fox, turbo radiance flux 3'), 'custom:bento-image-radiance-flux3-klein');
+  assert.equal(pick('a cat on Z-Image'), 'custom:bento-image-z-image-turbo-int8-convrot');
+  assert.equal(pick('a fast red car at night'), undefined, 'no model named');
+  assert.equal(pick('flux portrait'), undefined, 'FLUX.2 and FLUX.3 are both flux');
+  assert.equal(pick('moss or qwen, a pond'), undefined, 'two families named');
+  assert.match(profileFromRequest(bento, 'ducks, moss', 'turbo').note, /^Used MOSS Image Base · Fast .*, the model the request names\. MOSS Image Base has no Super Fast profile/);
 });
