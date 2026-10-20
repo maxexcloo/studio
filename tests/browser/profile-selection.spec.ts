@@ -50,10 +50,13 @@ test('model menus show profile details without recent sections or discovery foot
   const menu = await ui.openModelPicker();
   const option = ui.modelOptions.filter({ hasText: 'Detailed Model' }).first();
   await expect(option).toContainText('Studio Profile');
-  await expect(option).toContainText('Test Family');
+  // The row names Studio's own family for the model (catalogueNames.js), not the profile's familyName.
+  await expect(option).toContainText('FLUX');
   await expect(option).toContainText('Image');
   await expect(option).toContainText('3 Reference Images');
-  await expect(option.locator('.model-selection-tick')).toBeVisible();
+  // The picked row: a tick in the desktop menu; on the phone the reserved tick column shows it and the row is current.
+  if (await ui.isPhone()) await expect(option).toHaveAttribute('aria-current', 'true');
+  else await expect(option.locator('.model-selection-tick')).toBeVisible();
   await expect(menu.getByText('Recent', { exact: true })).toHaveCount(0);
   await expect(menu.getByRole('button', { name: /Find (More )?Models/ })).toHaveCount(0);
   // The full studio's menu has hover states, and no Browse Models: the chooser is the only way to pick.

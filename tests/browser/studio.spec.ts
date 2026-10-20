@@ -502,11 +502,18 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   const rows = ui.modelOptions;
   await expect(rows).toHaveCount(28);
   const selectedRow = rows.filter({ hasText: 'Model 01' }).first();
-  await expect(selectedRow.locator('.model-selection-tick')).toHaveCount(1);
-  expect(await selectedRow.evaluate((row) => row.firstElementChild?.classList.contains('model-selection-tick'))).toBe(true);
-  const tick = await selectedRow.locator('.model-selection-tick').boundingBox();
-  const text = await selectedRow.locator('.model-copy, :scope > span').first().boundingBox();
-  expect(tick!.x + tick!.width).toBeLessThan(text!.x);
+  if (phone) {
+    // The phone list keeps a check column at each row's end (UI-PATTERNS › Lists); only the picked row's shows.
+    await expect(selectedRow).toHaveAttribute('aria-current', 'true');
+    await expect(selectedRow.locator('.list-row-check:not(.is-off)')).toHaveCount(1);
+    await expect(rows.filter({ hasText: 'Model 02' }).first().locator('.list-row-check.is-off')).toHaveCount(1);
+  } else {
+    await expect(selectedRow.locator('.model-selection-tick')).toHaveCount(1);
+    expect(await selectedRow.evaluate((row) => row.firstElementChild?.classList.contains('model-selection-tick'))).toBe(true);
+    const tick = await selectedRow.locator('.model-selection-tick').boundingBox();
+    const text = await selectedRow.locator('.model-copy, :scope > span').first().boundingBox();
+    expect(tick!.x + tick!.width).toBeLessThan(text!.x);
+  }
   await rows.filter({ hasText: 'Model 02' }).click();
   await ui.openModelPicker();
   await expect(rows).toHaveCount(28);
@@ -519,7 +526,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   const search = menu.getByLabel('Search Models', { exact: true });
   await expect(search).toBeVisible();
   if (phone) {
-    await menu.locator('.phone-sheet-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await menu.locator('.phone-model-pop-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(search).toBeInViewport();
     await expect(menu.getByRole('button', { name: 'Fast', exact: true })).toBeInViewport();
   } else {
