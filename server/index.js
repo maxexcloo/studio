@@ -1,5 +1,7 @@
 // First: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
+// Then, once: Hidden's data backed up and its readable records back in the gallery.
+import "./hidden-migration.js";
 import { createJobRecovery } from "./job-recovery.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
