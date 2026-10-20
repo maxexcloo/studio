@@ -20,11 +20,19 @@ export function profilesForTier(profiles, tier) {
   return matching.length || tier !== 'standard' ? matching : profiles.filter(profile => tierOf(profile) === 'quality');
 }
 
-/** The first sentence of a profile's description, for compact lists. */
-export function summaryOf(profile, length = 120) {
-  const text = String(profile?.description || '').replace(/\s+/g, ' ').trim();
-  const sentence = /^.*?[.!?](?=\s|$)/.exec(text)?.[0] || text;
-  return sentence.length > length ? `${sentence.slice(0, length - 1)}…` : sentence;
+const squash = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+/** The profile a name means: its id, then a unique id or label match ignoring case and punctuation, then a unique partial match. */
+export function findProfile(profiles, value) {
+  const exact = profiles.find(profile => profile.id === value);
+  if (exact) return exact;
+  const key = squash(value);
+  if (!key) return null;
+  const names = (profile) => [profile.id, profile.label, profile.displayName, String(profile.label || '').split('·')[0]].map(squash).filter(Boolean);
+  for (const pick of [profile => names(profile).includes(key), profile => names(profile).some(name => name.includes(key))]) {
+    const found = profiles.filter(pick);
+    if (found.length === 1) return found[0];
+  }
+  return null;
 }
 
 /** A profile whose first image slot starts the video, so an image can be animated from its first frame. */

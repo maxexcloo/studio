@@ -32,7 +32,7 @@ export function mcpControls(profile) {
     const list = options[`${key}s`];
     if (caps[key] && Array.isArray(list) && list.length > 1) controls[key] = { options: list, ...(defaults[key] ? { default: defaults[key] } : {}) };
   }
-  if (caps.lora !== false && Array.isArray(options.loras) && options.loras.length) controls.loras = { max: profile.maxLoras || 8, note: 'Choose names from this profile’s loras list.' };
+  if (caps.lora !== false && Array.isArray(options.loras) && options.loras.length) controls.loras = { max: profile.maxLoras || 8 };
   const slots = profile.mediaInputs || [];
   if (slots.length) controls.reference_asset_ids = { max: slots.length, slots: slots.map(slot => slot.id) };
   if (slots.length && profile.aspectPolicy === 'reference' && String(profile.workflow || '').startsWith('family:')) controls.reference_role = { options: ['edit', 'reference'], note: 'Requires reference_asset_ids.' };
@@ -85,34 +85,142 @@ const clip = (value, length) => {
   const textValue = String(value || '').replace(/\s+/g, ' ').trim();
   return textValue.length > length ? `${textValue.slice(0, length - 1)}…` : textValue;
 };
+// CamelCase file names split into their words too.
+const words = (value) => String(value || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const squash = (value) => words(value).join('');
+// Words a title shares with most LoRA names, so they never justify a hint on their own.
+const filler = new Set(['lora', 'loras', 'style', 'model', 'by', 'the', 'and', 'for', 'with', 'of', 'a', 'an', 'in', 'v1', 'v2', 'v3', 'v4', 'v5']);
+/** A LoRA file name without its folder or extension. */
+const stem = (name) => String(name).split(/[\\/]/).pop().replace(/\.(?:safetensors|ckpt|pt|pth|bin)$/i, '');
+const maxDetails = 5;
 
-/** Profile-compatible optional LoRAs, described from the same metadata as the studio's LoRA picker. */
-export function mcpLoras(profile, infos = {}, { query = '', limit = 40 } = {}) {
-  if (profile.capabilities?.lora === false) return { loras: [], total: 0 };
-  const needle = String(query || '').trim().toLowerCase();
+/** Profile-compatible optional LoRAs, verified fits first, then by name; the studio picker ranks the same way. */
+function loraCandidates(profile, infos) {
+  if (profile.capabilities?.lora === false) return [];
   const entries = [];
   for (const name of profile.options?.loras || []) {
     const info = infos[name];
     // Infrastructure weights cannot enter the optional stack, and other architectures never fit.
     if (['acceleration', 'supporting'].includes(info?.role)) continue;
     const fit = loraCompatibility(info, profile);
-    if (fit === 'other') continue;
-    const range = strengthRange(info);
-    const entry = {
-      name,
-      ...(info?.title ? { title: clip(info.title, 120) } : {}),
-      ...(info?.description ? { description: clip(info.description, 280) } : {}),
-      ...(info?.triggers?.length ? { trigger_words: info.triggers.slice(0, 12) } : {}),
-      strength: range ? { recommended: range.default ?? 0.7, min: range.min, max: range.max } : { recommended: 0.7 },
-      ...(info?.base ? { trained_for: info.base } : {}),
-      ...(info?.sourceUrl ? { source_url: info.sourceUrl } : {}),
-      ...(info?.note ? { note: clip(info.note, 200) } : {}),
-      ...(fit === 'unknown' ? { compatibility: 'unverified' } : {})
-    };
-    if (needle && ![name, entry.title, entry.description, ...(entry.trigger_words || [])].some(value => String(value || '').toLowerCase().includes(needle))) continue;
-    entries.push(entry);
+    if (fit !== 'other') entries.push({ name, info, fit });
   }
-  // Verified fits first, then by name; the studio picker ranks the same way.
-  entries.sort((left, right) => Number(Boolean(left.compatibility)) - Number(Boolean(right.compatibility)) || left.name.localeCompare(right.name));
-  return { loras: entries.slice(0, limit), total: entries.length };
+  return entries.sort((left, right) => Number(left.fit === 'unknown') - Number(right.fit === 'unknown') || left.name.localeCompare(right.name));
+}
+
+/** Each LoRA's shortest name that Generate still resolves: its stem when no other file shares it. */
+function shortNames(profile) {
+  const counts = new Map();
+  for (const name of profile.options?.loras || []) counts.set(squash(stem(name)), (counts.get(squash(stem(name))) || 0) + 1);
+  return (name) => counts.get(squash(stem(name))) === 1 ? stem(name) : name.replace(/\.(?:safetensors|ckpt|pt|pth|bin)$/i, '');
+}
+
+/**
+ * One index line: the name, then only what it does not already say: for a name that does not
+ * describe the LoRA, the title's other words as a hint, and its first trigger word to prompt with.
+ */
+function indexLine({ info, fit }, short) {
+  const known = new Set(words(short));
+  const novel = (value) => words(value).some(word => !known.has(word) && !filler.has(word) && !/^\d+$/.test(word));
+  // A name of two or more descriptive words already says what the LoRA does.
+  const descriptive = [...known].filter(word => word.length > 2 && /^[a-z]+$/.test(word) && !filler.has(word)).length;
+  const hint = descriptive < 2 ? clip(String(info?.title || '').split(/\s+/).filter(novel).join(' '), 40) : '';
+  const trigger = clip((info?.triggers || []).find(novel), 24);
+  return `${short}${hint ? ` — ${hint}` : ''}${trigger ? ` [${trigger}]` : ''}${fit === 'unknown' ? ' (unverified)' : ''}`;
+}
+
+/** Everything the studio picker knows about one LoRA, for an explicit lookup. */
+function loraDetail({ name, info, fit }, short) {
+  const range = strengthRange(info);
+  return {
+    name: short,
+    ...(info?.title ? { title: clip(info.title, 120) } : {}),
+    ...(info?.description ? { description: clip(info.description, 280) } : {}),
+    ...(info?.triggers?.length ? { trigger_words: info.triggers.slice(0, 12) } : {}),
+    strength: range ? { recommended: range.default ?? 0.7, min: range.min, max: range.max } : { recommended: 0.7 },
+    ...(info?.base ? { trained_for: info.base } : {}),
+    ...(info?.sourceUrl ? { source_url: info.sourceUrl } : {}),
+    ...(info?.note ? { note: clip(info.note, 200) } : {}),
+    ...(fit === 'unknown' ? { compatibility: 'unverified' } : {})
+  };
+}
+
+/** Word overlap between a request and a candidate's names, for ranking near misses. */
+const closeness = (value, ...names) => {
+  const wanted = words(value);
+  const have = names.flatMap(words);
+  return wanted.filter(word => have.some(item => item === word)).length * 2 + wanted.filter(word => have.some(item => item !== word && (item.includes(word) || word.includes(item)))).length;
+};
+/** The few candidates closest to a name that matched none, best first. */
+export function closest(candidates, value, label, count = 3) {
+  return candidates.map(candidate => ({ candidate, score: closeness(value, ...label(candidate)) })).filter(item => item.score > 0)
+    .sort((left, right) => right.score - left.score).slice(0, count).map(item => item.candidate);
+}
+
+/** The profile LoRA a name means: exact, then case-insensitive, then a unique stem or folder-less match. */
+export function resolveLoraName(profile, value) {
+  const names = profile.options?.loras || [];
+  if (names.includes(value)) return value;
+  const key = squash(value);
+  for (const pick of [name => squash(name) === key, name => squash(stem(name)) === key || squash(stem(name)) === squash(stem(value))]) {
+    const found = names.filter(pick);
+    if (found.length === 1) return found[0];
+  }
+  return null;
+}
+
+/**
+ * Compatible LoRAs for Models. Without a lookup, a compact index of every compatible LoRA;
+ * with lora_query or lora_names, full details for the first few matches.
+ */
+export function mcpLoras(profile, infos = {}, { query = '', names = [] } = {}) {
+  const candidates = loraCandidates(profile, infos);
+  const short = shortNames(profile);
+  const needle = String(query || '').trim().toLowerCase();
+  if (!needle && !names.length) return { loras: candidates.map(entry => indexLine(entry, short(entry.name))), total: candidates.length };
+  let matches;
+  const missing = [];
+  if (names.length) {
+    matches = [];
+    for (const value of names) {
+      const name = resolveLoraName(profile, value);
+      const entry = candidates.find(item => item.name === name);
+      if (entry && !matches.includes(entry)) matches.push(entry); else if (!entry) missing.push(value);
+    }
+  } else {
+    // Name matches lead, then titles, then trigger words and descriptions.
+    const rank = ({ name, info }) => [stem(name), info?.title, [...(info?.triggers || []), info?.description].join(' ')].findIndex(value => String(value || '').toLowerCase().includes(needle));
+    matches = candidates.map(entry => ({ entry, rank: rank(entry) })).filter(item => item.rank >= 0).sort((left, right) => left.rank - right.rank).map(item => item.entry);
+  }
+  return {
+    loras: matches.slice(0, maxDetails).map(entry => loraDetail(entry, short(entry.name))),
+    total: candidates.length,
+    ...(matches.length > maxDetails ? { more: matches.slice(maxDetails).map(entry => indexLine(entry, short(entry.name))) } : {}),
+    ...(missing.length ? { missing: missing.map(value => ({ name: value, closest: closest(candidates, value, item => [stem(item.name), item.info?.title]).map(item => short(item.name)) })) } : {})
+  };
+}
+
+/**
+ * Generate's LoRA stack for a profile: each name resolved to its file, refused with the closest
+ * matches when unknown or unusable, and given its recommended strength when none is supplied.
+ */
+export function prepareLoras(profile, infos = {}, loras = []) {
+  const candidates = loraCandidates(profile, infos);
+  const short = shortNames(profile);
+  const label = profile.label || profile.id;
+  const stack = [];
+  for (const { name: value, strength } of loras) {
+    const name = resolveLoraName(profile, value);
+    const entry = candidates.find(item => item.name === name);
+    if (!entry) {
+      if (name && ['acceleration', 'supporting'].includes(infos[name]?.role)) throw new Error(`${value} is applied by Studio itself; leave it out of loras.`);
+      if (name) throw new Error(`${value} is for ${infos[name]?.base || 'another model family'}, not ${label}; choose a LoRA from Models for this profile.`);
+      const near = closest(candidates, value, item => [stem(item.name), item.info?.title]).map(item => short(item.name));
+      throw new Error(`No LoRA named ${value} for ${label}.${near.length ? ` Closest: ${near.join(', ')}.` : ''} Call Models with lora_query to look one up.`);
+    }
+    if (stack.some(item => item.name === name)) continue;
+    const range = strengthRange(entry.info);
+    stack.push({ name, strength: Number.isFinite(strength) ? strength : range?.default ?? 0.7 });
+  }
+  return stack;
 }

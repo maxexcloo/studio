@@ -10,7 +10,8 @@ import express from 'express';
 import sharp from 'sharp';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { registerMcpRoutes } from './mcp.js';
+import { generateWaitSeconds, registerMcpRoutes } from './mcp.js';
+import { McpMedia } from './mcp-media.js';
 
 const mediaKey = 'fixture-media-credential';
 const controlKey = 'fixture-control-credential';
@@ -150,8 +151,8 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
   assert.equal(saved.jobs[id], 'stable-account-a');
   Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=account-result.png' }] });
   const preview = await call(client, 'Result', { job_id: id });
-  assert.ok(preview.content.some(item => item.type === 'image'));
-  assert.ok(f.downloads.includes('/comfy/view?filename=account-result.png'));
+  assert.equal(links(preview).length, 1);
+  assert.equal(previews(preview).length, 1);
   const rejected = await fetch(`${f.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   assert.equal(rejected.status, 401);
 });
@@ -247,10 +248,27 @@ async function generate(client, args = {}) {
   return data(await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'], count: 1, ...args }));
 }
 function jobId(result) { assert.ok(result.jobs?.length); return result.jobs[0].job_id; }
-function links(result) { return (result.content || []).filter(item => item.type === 'resource_link').map(item => item.uri); }
+const texts = (result) => (result.content || []).filter(item => item.type === 'text').map(item => item.text).join('\n');
+/** Original output links: the target of each linked preview image, or a View Video link. */
+function links(result) { return [...texts(result).matchAll(/(?:\)\]|\[View Video\])\((https?:\/\/[^)]+)\)/g)].map(match => match[1]); }
+function previews(result) { return [...texts(result).matchAll(/\[!\[[^\]]*\]\((https?:\/\/[^)]+)\)\]/g)].map(match => match[1]); }
+/** Runs a change once the fixture reaches a state, such as every job of a submission existing. */
+const once = (ready, change) => { const timer = setInterval(() => { if (ready()) { clearInterval(timer); change(); } }, 10); };
 function localLink(f, publicLink) { const url = new URL(publicLink); assert.equal(url.origin, 'https://studio.example.test'); assert.match(url.pathname, /^\/mcp\/results\//); return f.base + url.pathname; }
 
 const adminEnvironment = { CONTROL_API_KEY: 'fixture-private-control', CONTROL_MCP_API_KEY: controlKey, CONTROL_URL: 'http://fixture-control.invalid' };
+
+test('tool lists, schemas and instructions are identical for every caller and call, so prompt prefixes cache', async t => {
+  const f = await fixture(t);
+  const snapshot = async (client) => JSON.stringify([client.getInstructions(), (await client.listTools()).tools]);
+  const first = await snapshot(await f.client('alice'));
+  await call(await f.client('alice'), 'Generate', { kind: 'image', prompts: ['An egg'], count: 1 });
+  await f.profiles([structuredClone(videoProfile)]);
+  for (const user of ['alice', 'bob', '']) assert.equal(await snapshot(await f.client(user)), first, user || 'native');
+  assert.doesNotMatch(first, /\d{4}-\d{2}-\d{2}|fixture-(?:image|video)|Fixture/, 'no dates or catalogue entries in the prefix');
+  // Images wait long enough for a cold model load, so they usually return inline.
+  assert.equal(generateWaitSeconds, 60);
+});
 
 test('native MCP is absent without credentials and refuses missing or incorrect authentication', async t => {
   const disabled = await fixture(t, { enabled: false });
@@ -293,10 +311,8 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   const f = await fixture(t);
   const client = await f.client('previously-unknown-user');
   const compact = data(await call(client, 'Models', { kind: 'image' }));
-  assert.deepEqual(compact.profiles.map(profile => profile.id), [imageProfile.id]);
-  assert.equal(compact.profiles[0].options, undefined);
-  assert.equal(compact.profiles[0].loras, undefined);
-  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  assert.deepEqual(compact, { image: [`${imageProfile.id} — ${imageProfile.label}`] });
+  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id }));
   // Only adjustable controls are advertised; raw capability and constraint tables are not.
   assert.equal(detail.capabilities, undefined);
   assert.equal(detail.constraints, undefined);
@@ -306,6 +322,12 @@ test('Models uses only this studio, filters readiness and kind, and returns deta
   assert.equal(detail.defaults.count, 2);
   assert.equal(detail.prompting, null);
   await failure(client, 'Models', { profile_id: 'another-studio-profile' });
+  // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
+  assert.equal(data(await call(client, 'Models', { profile_id: 'Fixture Image' })).id, imageProfile.id);
+  assert.equal(data(await call(client, 'Models', { profile_id: 'fixture_IMAGE' })).id, imageProfile.id);
+  const missed = await call(client, 'Models', { profile_id: 'fixture-turbo-image' });
+  assert.equal(missed.isError, true);
+  assert.equal(missed.content[0].text, `No ready profile matches fixture-turbo-image. Closest: ${imageProfile.id} (${imageProfile.label}), ${videoProfile.id} (${videoProfile.label}).`);
 });
 
 test('Generate shows the full guide unless this account read the selected profile, not discovery or another profile', async t => {
@@ -318,7 +340,6 @@ test('Generate shows the full guide unless this account read the selected profil
   const first = data(await call(alice, 'Generate', args));
   assert.equal(first.status, 'queued');
   assert.deepEqual(first.prompting.rules, ['Describe the subject first'], 'an unread guide accompanies the submission');
-  assert.ok(first.guide_note);
   const second = data(await call(alice, 'Generate', args));
   assert.equal(second.prompting, undefined, 'the guide is shown once per account');
   const bob = await f.client('bob');
@@ -339,11 +360,11 @@ test('Models caches each owner’s catalogue for the TTL instead of rescanning p
   data(await call(alice, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], count: 1 }));
   assert.equal(scans(), 1, 'Generate reuses the cached catalogue');
   const bob = await f.client('bob');
-  assert.deepEqual(data(await call(bob, 'Models', { kind: 'video' })).profiles.map(profile => profile.id), [videoProfile.id]);
+  assert.deepEqual(data(await call(bob, 'Models', { kind: 'video' })), { video: [`${videoProfile.id} — ${videoProfile.label}`] });
   assert.equal(scans(), 2, 'each owner has its own cache entry');
   await f.profiles([structuredClone(videoProfile)]);
   const rescans = scans();
-  assert.deepEqual(data(await call(alice, 'Models', {})).profiles.map(profile => profile.id), [videoProfile.id], 'a studio rescan invalidates cached catalogues');
+  assert.deepEqual(data(await call(alice, 'Models', {})), { video: [`${videoProfile.id} — ${videoProfile.label}`] }, 'a studio rescan invalidates cached catalogues');
   assert.equal(scans(), rescans + 1);
 });
 
@@ -352,9 +373,9 @@ test('foreground Status and Result waits are capped; background notification wai
   const client = await f.client();
   const id = jobId(await generate(client));
   let started = performance.now();
-  const pending = data(await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 1800 }));
-  assert.equal(pending.status, 'running');
-  assert.match(pending.message, /do not poll/);
+  const pending = await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 1800 });
+  assert.equal(data(pending).status, 'running');
+  assert.match(texts(pending), /do not poll/);
   assert.equal(data(await call(client, 'Status', { job_id: id, wait_seconds: 20 })).status, 'running');
   assert.ok(performance.now() - started < 1500, 'foreground waits return at once under a zero cap');
   setTimeout(() => Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=later.png' }] }), 25);
@@ -455,7 +476,7 @@ test('uploaded references belong to their uploader and map to declared profile s
   assert.deepEqual(f.submitted[0].loras, [{ name: 'fixture-effect.safetensors', strength: -0.5, enabled: true }]);
 });
 
-test('image Result attaches a preview and a signed private download of the unchanged original', async t => {
+test('image Result returns one short linked preview that opens the unchanged original', async t => {
   const f = await fixture(t);
   const client = await f.client();
   const id = jobId(await generate(client));
@@ -463,18 +484,25 @@ test('image Result attaches a preview and a signed private download of the uncha
   const before = f.requests.length;
   const result = await call(client, 'Result', { job_id: id });
   assert.notEqual(result.isError, true);
-  assert.deepEqual(f.requests.slice(before).map(request => request.path), [`/jobs/${id}`, `/gallery/jobs/${id}`]);
-  assert.ok(result.content.some(item => item.type === 'image'));
+  assert.ok(f.requests.slice(before).every(request => !request.path.startsWith('/generate')));
+  // Only the instruction and the markdown: no image bytes, JSON echo or resource link enter the chat.
+  assert.deepEqual(result.content.map(item => item.type), ['text']);
   const [link] = links(result);
-  assert.ok(link);
+  const [preview] = previews(result);
+  assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}$/);
+  assert.equal(preview, `${link}.jpg`);
+  assert.match(result.content[0].text, /\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\([^)]+\.jpg\)\]\([^)]+\)$/);
+  assert.doesNotMatch(result.content[0].text, /View Original|\[Download/);
   const response = await fetch(localLink(f, link));
   assert.equal(response.status, 200);
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
   assert.equal(response.headers.get('content-disposition'), 'inline');
-  assert.ok(result.content.some(item => item.type === 'text' && item.text.startsWith('[View Original]')));
-  assert.equal(JSON.stringify(result.content).includes('[Download'), false);
+  const small = await fetch(localLink(f, preview));
+  assert.equal(small.status, 200);
+  assert.equal(small.headers.get('content-type'), 'image/jpeg');
+  assert.equal((await sharp(Buffer.from(await small.arrayBuffer())).metadata()).format, 'jpeg');
   const tampered = localLink(f, link).replace(/.$/, value => value === 'a' ? 'b' : 'a');
   assert.equal((await fetch(tampered)).status, 404);
   const status = data(await call(client, 'Status', { job_id: id }));
@@ -490,7 +518,7 @@ test('video results return signed links without eagerly downloading video bytes'
   const result = await call(client, 'Result', { job_id: id });
   assert.notEqual(result.isError, true);
   assert.equal(links(result).length, 1);
-  assert.equal(result.content.some(item => item.type === 'image'), false);
+  assert.equal(previews(result).length, 0);
   assert.equal(f.downloads.length, 0);
 });
 
@@ -536,6 +564,7 @@ test('hiding a completed output revokes existing signed links and prevents resul
   f.jobs.get(id).gallery = [];
   const before = f.downloads.length;
   assert.equal((await fetch(localLink(f, link))).status, 404);
+  assert.equal((await fetch(localLink(f, previews(result)[0]))).status, 404);
   await failure(client, 'Result', { job_id: id });
   await failure(client, 'Reuse', { job_id: id });
   assert.equal(f.downloads.length, before);
@@ -550,7 +579,6 @@ test('owned completed results remain available after the transient job expires',
   const result = await call(client, 'Result', { job_id: id });
   assert.notEqual(result.isError, true);
   assert.deepEqual(f.requests.slice(before).map(request => request.path), [`/jobs/${id}`, `/gallery/jobs/${id}`]);
-  assert.ok(result.content.some(item => item.type === 'image'));
   assert.equal(links(result).length, 1);
   const reused = data(await call(client, 'Reuse', { job_id: id }));
   assert.ok(reused.asset?.id || reused.id || reused.asset_id);
@@ -578,6 +606,10 @@ test('invalid generation controls, references and excessive batches fail before 
     { loras: [{ name: 'unavailable-effect.safetensors', strength: 1 }] }
   ]) await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], ...arguments_ });
   assert.equal(f.submitted.length, 0);
+  // Every refusal is one line that names what to fix.
+  const invalid = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], wait_seconds: 61, count: 0 });
+  assert.equal(invalid.isError, true);
+  assert.match(invalid.content[0].text, /^Fix the Generate arguments: count: [^\n]+; wait_seconds: [^\n]+\.$/);
   await f.profiles([{ ...imageProfile, capabilities: {} }]);
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
   await failure(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], cfg: 1 });
@@ -609,10 +641,9 @@ test('deployment prompting packs retain compact discovery, profile modes and rev
   }));
   const f = await fixture(t, { dataDir: dir, environment: { MCP_PROMPTING_PATH: file } });
   const client = await f.client();
-  // Guides stay in the detail; the compact list carries only identity, tier and a one-line summary.
-  const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0];
-  assert.deepEqual(compact, { id: imageProfile.id, label: imageProfile.label, kind: 'image', tier: 'standard', summary: imageProfile.description });
-  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].prompting;
+  // Guides stay in the detail; the compact list carries only each profile's id and label.
+  assert.deepEqual(data(await call(client, 'Models', { kind: 'image' })), { image: [`${imageProfile.id} — ${imageProfile.label}`] });
+  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).prompting;
   assert.equal(detail.mode.id, 'reference');
   assert.deepEqual(detail.mode.rules, ['Preserve the subject']);
   assert.equal(detail.variant.id, 'quick');
@@ -665,15 +696,14 @@ test('background Result collects a later completion without another submission',
   assert.equal(f.downloads.length, 0);
   // Self-sufficient: the woken agent renders this markdown without another Result call.
   const [message] = result.content;
-  assert.match(message.text, /\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)$/);
-  assert.match(message.text, /Do not call Result again/);
-  const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(message.text);
-  const original = await fetch(localLink(f, imageUrl));
+  assert.match(message.text, /\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
+  assert.match(message.text, /Do not call Studio again/);
+  const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
   assert.equal(data(result).ref, 'result 1');
   const preview = await call(client, 'Result', { job_id: id, delivery: 'preview', wait_seconds: 0 });
-  assert.ok(preview.content.some(item => item.type === 'image'));
+  assert.deepEqual(links(preview), links(result), 'the same output keeps its short link');
   assert.equal(f.submitted.length, 1);
 });
 
@@ -708,6 +738,12 @@ test('signed links do not expire, preserve the configured public path and cannot
   // Still valid much later; hiding or deleting the output is what ends a link.
   const clock = t.mock.method(Date, 'now', () => now + 90 * 24 * 60 * 60 * 1000);
   try { assert.equal((await fetch(local)).status, 200); } finally { clock.mock.restore(); }
+  // Sealed links issued before short links keep opening the same output.
+  const ownership = JSON.parse(fs.readFileSync(path.join(dir, 'mcp-ownership.json'), 'utf8'));
+  const sealed = new McpMedia({ dataDir: fs.mkdtempSync(path.join(dir, 'sealed-')), baseUrl: f.base, publicUrl: 'https://studio.example.test/nested/studio', signingKey: ownership.signingKey });
+  const legacy = `${f.base}/mcp/results/${sealed.token(ownership.jobs[id], id, 0)}`;
+  assert.match(legacy, /\/mcp\/results\/v2\./);
+  assert.equal((await fetch(legacy)).status, 200);
 });
 
 test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded identities', async t => {
@@ -737,12 +773,12 @@ test('reference-mode capabilities override text controls without losing the prof
     reference: { capabilities: imageProfile.capabilities, defaults: imageProfile.defaults }
   } }]);
   const client = await f.client();
-  const details = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  const details = data(await call(client, 'Models', { profile_id: imageProfile.id }));
   assert.equal(details.controls.negative_prompt, undefined);
   assert.equal(details.controls.denoise, undefined);
   assert.deepEqual(details.imageModes.reference.controls.negative_prompt, {});
   assert.ok(details.imageModes.reference.controls.denoise);
-  assert.ok(details.loras.some(lora => lora.name === 'fixture-effect.safetensors'));
+  assert.ok(details.loras.some(line => line.startsWith('fixture-effect ')));
   const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /negative_prompt cannot be adjusted.*Adjustable controls: .*cfg/);
@@ -795,10 +831,11 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   const base = started.url.replace('localhost', '127.0.0.1');
   await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': 'real-server-fixture' } } }));
   assert.equal((await client.listTools()).tools.length, 7);
-  const profiles = data(await call(client, 'Models', { kind: 'image' })).profiles;
-  assert.ok(profiles.length);
-  await call(client, 'Models', { profile_id: profiles[0].id });
-  const queued = data(await call(client, 'Generate', { profile_id: profiles[0].id, prompts: ['A simple demo landscape'], count: 1, wait_seconds: 0 }));
+  const [first] = data(await call(client, 'Models', { kind: 'image' })).image;
+  assert.ok(first);
+  const profileId = first.split(' — ')[0];
+  await call(client, 'Models', { profile_id: profileId });
+  const queued = data(await call(client, 'Generate', { profile_id: profileId, prompts: ['A simple demo landscape'], count: 1, wait_seconds: 0 }));
   assert.equal(queued.status, 'queued');
   assert.equal(queued.jobs.length, 1);
   const id = jobId(queued);
@@ -814,10 +851,10 @@ test('Models consumes self-contained profile guidance without a runtime promptin
   const referenceGuide = { ...shared, mode: { id: 'reference', example: 'Keep the tree and change its background' } };
   await f.profiles([{ ...imageProfile, prompting: shared, imageModes: { generate: { prompting: generateGuide }, reference: { prompting: referenceGuide } } }]);
   const client = await f.client();
-  const compact = data(await call(client, 'Models', { kind: 'image' })).profiles[0];
-  assert.deepEqual(Object.keys(compact), ['id', 'label', 'kind', 'tier', 'summary']);
+  const compact = data(await call(client, 'Models', { kind: 'image' }));
+  assert.deepEqual(Object.keys(compact), ['image']);
   assert.equal(JSON.stringify(compact).includes('Subject first'), false);
-  const detailed = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  const detailed = data(await call(client, 'Models', { profile_id: imageProfile.id }));
   assert.deepEqual(detailed.prompting, generateGuide);
   assert.deepEqual(detailed.imageModes.reference.prompting, referenceGuide);
   assert.equal(detailed.prompting.modes, undefined);
@@ -832,7 +869,7 @@ test('profile-owned prompting overrides a stale compatibility inventory', async 
   const owned = { id: 'profile-guide', summary: 'Reviewed profile guidance', rules: ['Use the reviewed profile'], sources: ['https://example.test/reviewed'], reviewed_on: '2026-10-16' };
   await f.profiles([{ ...imageProfile, prompting: owned }]);
   const client = await f.client();
-  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].prompting, owned);
+  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id })).prompting, owned);
 });
 
 test('maintained profile guidance reaches the real model API and native MCP without a pack file', { timeout: 15000 }, async t => {
@@ -876,7 +913,7 @@ test('maintained profile guidance reaches the real model API and native MCP with
   const models = await (await fetch(new URL('/api/models', base))).json();
   assert.deepEqual(models.profiles.find(profile => profile.id === 'custom:owned-api-guide')?.prompting, guide);
   await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { Authorization: `Bearer ${mediaKey}` } } }));
-  const profile = data(await call(client, 'Models', { profile_id: 'custom:owned-api-guide' })).profiles[0];
+  const profile = data(await call(client, 'Models', { profile_id: 'custom:owned-api-guide' }));
   assert.deepEqual(profile.prompting, guide);
   const cachedReads = catalogueReads;
   await call(client, 'Models', { profile_id: 'custom:owned-api-guide' });
@@ -891,7 +928,7 @@ test('MCP advertises native sizing and submits tiled 2K with an explicit referen
   const client = await f.client('native-sizing');
   const profile = { ...imageProfile, aspectPolicy: 'reference', family: 'flux3', native: { '2k': 'yes' }, workflow: 'family:flux3' };
   await f.profiles([profile]);
-  const detail = data(await call(client, 'Models', { profile_id: profile.id })).profiles[0];
+  const detail = data(await call(client, 'Models', { profile_id: profile.id }));
   assert.deepEqual(detail.native, { '2k': 'yes' });
   const uploaded = data(await call(client, 'Upload', { content_base64: png.toString('base64'), filename: 'reference.png' }));
   const assetId = uploaded.asset?.id || uploaded.id;
@@ -920,7 +957,7 @@ test('Generate returns per-conversation refs with signed watch pages that tools 
   const first = await conversation('alice', 'conversation-a');
   const queued = await generate(first, { count: 2 });
   assert.deepEqual(queued.jobs.map(job => job.ref), ['result 1', 'result 2']);
-  for (const job of queued.jobs) assert.match(job.link, /^https:\/\/studio\.example\.test\/mcp\/results\/p2\./);
+  for (const job of queued.jobs) assert.match(job.link, /^https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}$/);
   assert.deepEqual((await generate(first)).jobs.map(job => job.ref), ['result 3']);
   // Another conversation numbers from one again; the same account without a conversation has its own sequence.
   const second = await conversation('alice', 'conversation-b');
@@ -947,15 +984,14 @@ test('Generate returns per-conversation refs with signed watch pages that tools 
   assert.match(await pending.text(), /Still generating/);
   Object.assign(f.jobs.get(secondJob.job_id), { status: 'done', outputs: [{ url: '/comfy/view?filename=watched.png' }] });
   const html = await (await fetch(page)).text();
-  const [, output] = /<img src="(v2\.[^"]+)"/.exec(html);
+  const [, output] = /<img src="([A-Za-z0-9]{10})"/.exec(html);
   assert.match(html, /View Original/);
   const image = await fetch(new URL(output, page));
   assert.equal(image.status, 200);
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
-  // A page link is not an output link, and the reverse: prefixes cannot be swapped.
-  const sealed = new URL(page).pathname.split('/').pop();
-  assert.equal((await fetch(page.replace(sealed, sealed.replace(/^p2\./, 'v2.')))).status, 404);
-  assert.equal((await fetch(page.replace(sealed, output.replace(/^v2\./, 'p2.')))).status, 404);
+  // A watch page has no preview, and an unknown id opens nothing.
+  assert.equal((await fetch(`${page}.jpg`)).status, 404);
+  assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, 'AAAAAAAAAA'))).status, 404);
   f.jobs.get(secondJob.job_id).gallery = [];
   assert.equal((await fetch(page)).status, 404, 'hiding the output ends the watch page');
 });
@@ -972,8 +1008,8 @@ test('the Result wait ends promptly when the client cancels or disconnects, with
   const id = jobId(await generate(client));
   const controller = new AbortController();
   const waiting = client.callTool({ name: 'Result', arguments: { job_id: id, delivery: 'notification', wait_seconds: 1500 } }, undefined, { signal: controller.signal, timeout: 60000 });
-  await new Promise(resolve => setTimeout(resolve, 300));
-  assert.ok(lookups() >= 1);
+  // Abort once the wait has started polling, however long submission took.
+  await new Promise(resolve => once(() => lookups() >= 1, resolve));
   controller.abort();
   await assert.rejects(waiting);
   assert.equal(await settled(), 0, 'a cancelled wait stops polling');
@@ -988,18 +1024,21 @@ test('the Result wait ends promptly when the client cancels or disconnects, with
   assert.equal(f.requests.some(request => request.path.endsWith('/cancel')), false);
 });
 
-test('Models lists compatible LoRAs with picker metadata and fixed controls are refused by name', async t => {
+test('Models indexes every compatible LoRA compactly and details only the LoRAs looked up', async t => {
   const f = await fixture(t);
   const client = await f.client();
-  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
-  assert.deepEqual(detail.loras.map(lora => lora.name), ['fixture-effect.safetensors', 'fixture-unknown.safetensors']);
-  assert.deepEqual(detail.loras[0], { name: 'fixture-effect.safetensors', title: 'Glow Effect', description: 'Adds a soft neon glow.', trigger_words: ['glowfx'], strength: { recommended: 0.8, min: 0.2, max: 1.2 }, trained_for: 'FLUX.1', source_url: 'https://civitai.example.test/models/1' });
-  assert.equal(detail.loras[1].compatibility, 'unverified');
+  const detail = data(await call(client, 'Models', { profile_id: imageProfile.id }));
+  // Short names, the trigger word to prompt with, and no infrastructure or other-architecture LoRAs.
+  assert.deepEqual(detail.loras, ['fixture-effect [glowfx]', 'fixture-unknown (unverified)']);
   assert.equal(detail.loras_total, 2);
-  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id, lora_query: 'glowfx' })).profiles[0].loras.map(lora => lora.name), ['fixture-effect.safetensors']);
+  const full = { name: 'fixture-effect', title: 'Glow Effect', description: 'Adds a soft neon glow.', trigger_words: ['glowfx'], strength: { recommended: 0.8, min: 0.2, max: 1.2 }, trained_for: 'FLUX.1', source_url: 'https://civitai.example.test/models/1' };
+  // A lookup answers only the LoRA question, with full details.
+  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id, lora_query: 'glowfx' })), { id: imageProfile.id, loras: [full], loras_total: 2 });
+  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id, lora_names: ['Fixture Effect', 'fixture-unknown.safetensors'] })).loras.map(lora => [lora.name, lora.compatibility]), [['fixture-effect', undefined], ['fixture-unknown', 'unverified']]);
+  assert.deepEqual(data(await call(client, 'Models', { profile_id: imageProfile.id, lora_names: ['fixture-glow'] })).missing, [{ name: 'fixture-glow', closest: ['fixture-effect', 'fixture-unknown'] }]);
 
   await f.profiles([{ ...imageProfile, capabilities: { ...imageProfile.capabilities, negativePrompt: false }, constraints: { ...imageProfile.constraints, steps: { min: 4, max: 4 }, cfg: { min: 1, max: 1 } }, defaults: { ...imageProfile.defaults, steps: 4, cfg: 1 } }]);
-  const fixed = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0];
+  const fixed = data(await call(client, 'Models', { profile_id: imageProfile.id }));
   for (const key of ['steps', 'cfg', 'negative_prompt']) assert.equal(fixed.controls[key], undefined, key);
   for (const key of ['steps', 'cfg']) assert.equal(fixed.defaults[key], undefined, key);
   for (const [field, value, pattern] of [['steps', 20, /steps cannot be adjusted.*fixed at 4.*Adjustable controls: width, height, count, seed/], ['cfg', 3, /cfg cannot be adjusted.*fixed at 1/], ['negative_prompt', 'Blur', /negative_prompt cannot be adjusted.*no negative prompt input/]]) {
@@ -1014,12 +1053,36 @@ test('Models lists compatible LoRAs with picker metadata and fixed controls are 
   assert.match(refused.content[0].text, /Studio refused the request: Fixture LoRA supports strength 0\.2 to 1\.2\./);
 });
 
+test('Generate takes LoRA names alone, fills the recommended strength and refuses unusable names in one line', async t => {
+  const f = await fixture(t);
+  await f.profiles([structuredClone(imageProfile), { ...structuredClone(imageProfile), id: 'fixture-sdxl', family: 'sdxl', label: 'Fixture SDXL' }, structuredClone(videoProfile)], { defaults: { image: imageProfile.id, video: videoProfile.id } });
+  const client = await f.client();
+  await generate(client, { loras: [{ name: 'Fixture Effect' }, { name: 'fixture-unknown', strength: 0.4 }] });
+  assert.deepEqual(f.submitted.at(-1).loras, [{ name: 'fixture-effect.safetensors', strength: 0.8, enabled: true }, { name: 'fixture-unknown.safetensors', strength: 0.4, enabled: true }]);
+  for (const [name, message] of [
+    ['fixture-other', 'fixture-other is for SDXL, not Fixture Image; choose a LoRA from Models for this profile.'],
+    ['fixture-turbo', 'fixture-turbo is applied by Studio itself; leave it out of loras.'],
+    ['glow-effect', 'No LoRA named glow-effect for Fixture Image. Closest: fixture-effect. Call Models with lora_query to look one up.']
+  ]) {
+    const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], loras: [{ name }] });
+    assert.equal(refused.isError, true);
+    assert.equal(refused.content[0].text, message);
+  }
+  // Without a profile_id, a named LoRA picks a profile that can use it.
+  const chosen = data(await call(client, 'Generate', { kind: 'image', prompts: ['A tree'], count: 1, loras: [{ name: 'fixture-other' }] }));
+  assert.equal(chosen.profile.id, 'fixture-sdxl');
+  assert.deepEqual(f.submitted.at(-1).loras, [{ name: 'fixture-other.safetensors', strength: 0.7, enabled: true }]);
+  const nowhere = await call(client, 'Generate', { kind: 'image', prompts: ['A tree'], loras: [{ name: 'unheard-of' }] });
+  assert.equal(nowhere.content[0].text, 'No ready image profile can use unheard-of. Call Models with lora_query to look it up.');
+  assert.equal(f.submitted.length, 2);
+});
+
 test('negative prompts reach the submission only where they take effect', async t => {
   const f = await fixture(t);
   const client = await f.client();
   const cfgOne = { ...imageProfile, defaults: { ...imageProfile.defaults, cfg: 1 } };
   await f.profiles([cfgOne]);
-  const advertised = data(await call(client, 'Models', { profile_id: imageProfile.id })).profiles[0].controls.negative_prompt;
+  const advertised = data(await call(client, 'Models', { profile_id: imageProfile.id })).controls.negative_prompt;
   assert.match(advertised.note, /cfg 1/);
   const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A tree'], negative_prompt: 'Blur' });
   assert.match(refused.content[0].text, /negative_prompt has no effect at cfg 1.*Set cfg above 1/);
@@ -1056,19 +1119,18 @@ const tieredCatalogue = () => [
   { ...structuredClone(videoProfile), label: 'Video · Quality · 20 Steps' }
 ];
 
-test('Models filters by tier and lists only id, label, kind, tier and a one-line summary', async t => {
+test('Models filters by tier and lists only each profile’s id and label by kind', async t => {
   const f = await fixture(t);
   await f.profiles(tieredCatalogue(), { defaults: { image: 'qwen-quality', video: videoProfile.id } });
   const client = await f.client();
-  const turbo = data(await call(client, 'Models', { kind: 'image', tier: 'turbo' }));
-  assert.deepEqual(turbo.profiles.map(profile => profile.id), ['krea-turbo', 'edit-turbo']);
-  assert.deepEqual(turbo.profiles[0], { id: 'krea-turbo', label: 'Krea 2 Turbo · Super Fast · 2 Steps', kind: 'image', tier: 'turbo', summary: imageProfile.description });
-  assert.deepEqual(data(await call(client, 'Models', { kind: 'image', tier: 'fast' })).profiles.map(profile => profile.id), ['qwen-fast', 'krea-fast']);
+  const ids = (result) => Object.fromEntries(Object.entries(data(result)).map(([kind, lines]) => [kind, lines.map(line => line.split(' — ')[0])]));
+  assert.deepEqual(data(await call(client, 'Models', { kind: 'image', tier: 'turbo' })), { image: ['krea-turbo — Krea 2 Turbo · Super Fast · 2 Steps', 'edit-turbo — Edit · Super Fast · 4 Steps'] });
+  assert.deepEqual(ids(await call(client, 'Models', { kind: 'image', tier: 'fast' })), { image: ['qwen-fast', 'krea-fast'] });
   // No profile is labelled Standard here, so standard falls back to Quality.
-  assert.deepEqual(data(await call(client, 'Models', { kind: 'all', tier: 'standard' })).profiles.map(profile => profile.id), ['qwen-quality', videoProfile.id]);
+  assert.deepEqual(ids(await call(client, 'Models', { kind: 'all', tier: 'standard' })), { image: ['qwen-quality'], video: [videoProfile.id] });
   const all = await call(client, 'Models', { kind: 'image' });
   assert.equal(all.content[0].text.includes('A long rule'), false);
-  assert.equal(data(await call(client, 'Models', { profile_id: 'krea-turbo' })).profiles[0].tier, 'turbo');
+  assert.equal(data(await call(client, 'Models', { profile_id: 'krea-turbo' })).tier, 'turbo');
 });
 
 test('Generate with kind and tier needs no Models call, picks the default profile for the tier and stays lean', async t => {
@@ -1105,7 +1167,7 @@ test('tier-based Generate chooses only profiles the account may use', async t =>
   const limited = await f.client('', Object.keys(tokens)[0]);
   // The deployment default is not visible to this account, so another permitted profile is chosen.
   assert.equal(data(await call(limited, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1 })).profile.id, 'qwen-fast');
-  assert.deepEqual(data(await call(limited, 'Models', { kind: 'image', tier: 'turbo' })).profiles, []);
+  assert.deepEqual(data(await call(limited, 'Models', { kind: 'image', tier: 'turbo' })), {});
   const refused = await call(limited, 'Generate', { kind: 'image', tier: 'turbo', prompts: ['An egg'] });
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /Available image tiers: fast\./);
@@ -1125,7 +1187,7 @@ test('a background notification returns only its markdown unless detail is asked
   Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=lean.png' }] });
   const lean = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0 });
   assert.equal(lean.content.length, 1);
-  assert.match(lean.content[0].text, /^Result 1 is ready\. .+\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 1\]\([^)]+\)$/);
+  assert.match(lean.content[0].text, /^Result 1 is ready\. .+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\([^)]+\.jpg\)\]\([^)]+\)$/);
   assert.deepEqual(lean.structuredContent, { job_id: id, ref: 'result 1', status: 'done' });
   const detailed = await call(client, 'Result', { job_id: id, delivery: 'notification', wait_seconds: 0, detail: true });
   assert.equal(detailed.content.length, 2);
@@ -1139,7 +1201,7 @@ test('a finished video notification names its result and profile beside View Vid
   const id = jobId(data(await call(client, 'Generate', { kind: 'video', prompts: ['A wave'] })));
   Object.assign(f.jobs.get(id), { status: 'done', outputs: [{ url: '/comfy/view?filename=wave.mp4' }] });
   const result = await call(client, 'Result', { job_id: 'result 1', delivery: 'notification', wait_seconds: 0 });
-  assert.match(result.content[0].text, /\n\n\*\*Result 1\*\* · Fixture Video · \[View Video\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)$/);
+  assert.match(result.content[0].text, /\n\n\*\*Result 1\*\* · Fixture Video · \[View Video\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
 });
 
 test('Generate returns quick images inline as finished markdown, so no background Result is needed', async t => {
@@ -1147,17 +1209,17 @@ test('Generate returns quick images inline as finished markdown, so no backgroun
   const client = await f.client();
   const started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 2 });
-  setTimeout(() => { for (const job of f.jobs.values()) Object.assign(job, { status: 'done', outputs: [{ url: `/comfy/view?filename=${job.id}.png` }] }); }, 50);
+  once(() => f.jobs.size === 2, () => { for (const job of f.jobs.values()) Object.assign(job, { status: 'done', outputs: [{ url: `/comfy/view?filename=${job.id}.png` }] }); });
   const result = await pending;
   assert.notEqual(result.isError, true);
   assert.ok(performance.now() - started < 5000, 'returns once the jobs finish, not at the deadline');
-  assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}` })) });
+  assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}`, link: result.structuredContent.jobs[index].link })) });
   assert.equal(result.content.length, 1);
-  // The same markdown a background notification returns, one block per job.
-  // Each image sits directly under its header, in one paragraph; jobs are separated by a blank line.
-  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly.+\n\n\*\*Result 1\*\* · Fixture Image · \[View Original\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\.[^)]+\)\n!\[Result 1\]\([^)]+\)\n\n\*\*Result 2\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 2\]\([^)]+\)$/);
-  const [, imageUrl] = /!\[[^\]]*\]\(([^)]+)\)/.exec(result.content[0].text);
-  const original = await fetch(localLink(f, imageUrl));
+  // The same markdown a background notification returns, one block per job: only the instruction and the markdown.
+  // Each linked preview sits directly under its header, in one paragraph; jobs are separated by a blank line.
+  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)$/);
+  assert.ok(result.content[0].text.length < 450, `${result.content[0].text.length} characters`);
+  const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
   assert.equal(f.downloads.length, 1, 'only the link fetch downloads the output');
@@ -1167,15 +1229,16 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   const f = await fixture(t, { imageWaitSeconds: 30 });
   const client = await f.client();
   let started = performance.now();
-  const slow = data(await call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1, wait_seconds: 1 }));
+  const slowResult = await call(client, 'Generate', { kind: 'image', prompts: ['An egg'], count: 1, wait_seconds: 1 });
+  const slow = data(slowResult);
   const elapsed = performance.now() - started;
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(slow.message, /background|run_in_background/);
+  assert.match(texts(slowResult), /^Queued\. Call Result once per ref with delivery=notification and wait_seconds=1500, then reply with its markdown\. Never poll or resubmit\.\n\n\[Watch result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
-  setTimeout(() => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; }, 50);
+  once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
   const mixed = data(await pending);
   assert.equal(mixed.status, 'queued');
   assert.equal(mixed.jobs.length, 2);
@@ -1188,8 +1251,8 @@ test('the Generate wait ends promptly when the client cancels, without cancellin
   const client = await f.client();
   const controller = new AbortController();
   const waiting = client.callTool({ name: 'Generate', arguments: { kind: 'image', prompts: ['An egg'], count: 1 } }, undefined, { signal: controller.signal, timeout: 60000 });
-  await new Promise(resolve => setTimeout(resolve, 300));
-  assert.ok(lookups() >= 1);
+  // Abort once the wait has started polling, however long submission took.
+  await new Promise(resolve => once(() => lookups() >= 1, resolve));
   controller.abort();
   await assert.rejects(waiting);
   const before = lookups();
@@ -1236,7 +1299,7 @@ test('Reuse runs a result again with its profile and settings, a new seed and an
   f.completeOnSubmit();
   const quick = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', wait_seconds: 5 });
   assert.equal(quick.structuredContent?.status, 'done', JSON.stringify(quick.content));
-  assert.match(quick.content[0].text, /^Done\. .+\n\n\*\*Result 5\*\* · Fixture Image · \[View Original\]\([^)]+\)\n!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/v2\./);
+  assert.match(quick.content[0].text, /^Done\. .+\n\n\*\*Result 5\*\* · Fixture Image\n\[!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]/);
   // Without kind, Reuse still returns a reference asset for Generate, and a rerun keeps a result's references.
   const { asset } = data(await call(client, 'Reuse', { job_id: 'result 1' }));
   assert.match(asset.id, /^fixture-asset-/);
@@ -1316,7 +1379,7 @@ test('video goes to a cloud profile for the tier while the local video worker is
   const plain = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
   const result = data(plain);
   assert.deepEqual(result.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
-  assert.match(result.message, /local video worker is unavailable, so this video runs on the cloud profile Cloud Video 1\.5 · Cloud/);
+  assert.match(texts(plain), /local video worker is unavailable, so this video runs on the cloud profile Cloud Video 1\.5 · Cloud/);
   assert.equal(f.submitted.at(-1).profileId, 'cloud-video');
   assert.equal(f.submitted.at(-1).referenceAssets.length, 0, 'plain video is text only');
   // A matching cloud tier wins; otherwise Standard.
@@ -1334,9 +1397,10 @@ test('Reuse animates an image on a cloud profile while the local video worker is
   const client = await f.client();
   data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
   finish(f);
-  const animated = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' }));
+  const animation = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
+  const animated = data(animation);
   assert.deepEqual(animated.profile, { id: 'cloud-video', label: 'Cloud Video 1.5 · Cloud', tier: 'standard', remote: true });
-  assert.match(animated.message, /cloud profile Cloud Video 1\.5 · Cloud/);
+  assert.match(texts(animation), /cloud profile Cloud Video 1\.5 · Cloud/);
   const body = f.submitted.at(-1);
   assert.equal(body.profileId, 'cloud-video');
   assert.equal(body.referenceAssets.length, 1);
@@ -1351,9 +1415,9 @@ test('video stays local while the worker is up, and without cloud access keeps t
   const visibleTo = (authorization, profile) => !String(authorization).includes('restricted') || profile.family !== 'grok';
   await f.profiles(videoCatalogue(), { defaults: { image: imageProfile.id, video: videoProfile.id }, visibleTo, videoAvailable: true });
   const full = await f.client('', Object.keys(tokens)[1]);
-  const local = data(await call(full, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 }));
-  assert.deepEqual(local.profile, { id: videoProfile.id, label: 'Video · Quality · 20 Steps', tier: 'quality' });
-  assert.doesNotMatch(local.message, /cloud/);
+  const localResult = await call(full, 'Generate', { kind: 'video', tier: 'quality', prompts: ['A wave'], count: 1 });
+  assert.deepEqual(data(localResult).profile, { id: videoProfile.id, label: 'Video · Quality · 20 Steps', tier: 'quality' });
+  assert.doesNotMatch(texts(localResult), /cloud/);
   const missing = await call(full, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'] });
   assert.match(missing.content[0].text, /No ready video profile in the turbo tier/, 'an up worker never falls back');
   data(await call(full, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));

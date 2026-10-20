@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseProfile, chooseRemoteVideo, profilesForTier, summaryOf, takesFirstFrame, tierOf } from './mcp-tiers.js';
+import { chooseProfile, chooseRemoteVideo, findProfile, profilesForTier, takesFirstFrame, tierOf } from './mcp-tiers.js';
 
 test('tiers come from the label segment, and untiered labels are standard', () => {
   assert.equal(tierOf({ label: 'Krea 2 Turbo · Super Fast · 2 Steps' }), 'turbo');
@@ -11,9 +11,14 @@ test('tiers come from the label segment, and untiered labels are standard', () =
   assert.deepEqual(profilesForTier([{ id: 'a', label: 'A · Quality' }, { id: 'b', label: 'B · Fast' }], 'standard').map(profile => profile.id), ['a']);
 });
 
-test('summaries keep the first sentence within a line', () => {
-  assert.equal(summaryOf({ description: 'Generate draft previews from text. Small faces lose detail.' }), 'Generate draft previews from text.');
-  assert.equal(summaryOf({ description: 'x'.repeat(200) }).length, 120);
+test('a profile is found by id, then by a unique id or label match ignoring case and punctuation', () => {
+  const profiles = [{ id: 'krea-2-turbo', label: 'Krea 2 Turbo · Super Fast · 2 Steps' }, { id: 'krea-2', label: 'Krea 2 · Quality · 30 Steps' }, { id: 'qwen-image', label: 'Qwen-Image · Fast' }];
+  assert.equal(findProfile(profiles, 'krea-2')?.id, 'krea-2');
+  assert.equal(findProfile(profiles, 'Krea 2 Turbo')?.id, 'krea-2-turbo');
+  assert.equal(findProfile(profiles, 'QWEN_image')?.id, 'qwen-image');
+  assert.equal(findProfile(profiles, 'qwen')?.id, 'qwen-image', 'a unique partial match');
+  assert.equal(findProfile(profiles, 'krea'), null, 'an ambiguous partial match finds nothing');
+  assert.equal(findProfile(profiles, ''), null);
 });
 
 test('the chosen profile prefers the default, then its family, then unrestricted profiles', () => {

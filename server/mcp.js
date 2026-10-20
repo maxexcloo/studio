@@ -7,18 +7,26 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { defaultGenerationCount } from './generation-defaults.js';
 import { hostAllowed } from './request-guard.js';
-import { mcpControls, mcpLoras } from './mcp-controls.js';
+import { closest, mcpControls, mcpLoras } from './mcp-controls.js';
 import { McpMedia, maxResultWaitSeconds, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
-import { mcpTiers, profilesForTier, summaryOf, tierOf } from './mcp-tiers.js';
+import { findProfile, mcpTiers, profilesForTier, tierOf } from './mcp-tiers.js';
 
-const generateWaitSeconds = 30;
+// Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
+export const generateWaitSeconds = 60;
 const maxGenerateWaitSeconds = 60;
 // Workflow rules only; tool descriptions and each reply carry the details, so hosts that resend these every step stay small.
-const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; call Models only when the user names a model, asks what is available or needs controls, LoRAs or references. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption, and collect queued jobs with one background Result each. Never poll, resubmit or invent results.`;
+const instructions = `Studio makes the images and videos users ask for. For an ordinary request, call Generate with kind, tier and one clear prompt that keeps the user's intent; pass a model the user names as profile_id and LoRAs the user names as loras; call Models only when the user asks what is available or needs controls, references or a LoRA lookup. For a follow-up on a result ("again", "more like that", "animate it"), call Reuse with its ref. Follow each reply's instructions: reproduce finished markdown exactly with at most a short caption, and collect each queued job with one Result call. Never poll, resubmit or invent results.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview and get approval before Apply. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
 const anonymousMessage = 'The gateway must forward its user identity.';
+/** Schema refusals arrive as one issue per line ("Too big: … at wait_seconds"); one line naming each field is enough to fix the call. */
+const conciseError = (message) => {
+  const match = /Invalid arguments for tool (\w+): ([\s\S]+)$/.exec(String(message));
+  if (!match) return message;
+  const issues = match[2].split('\n').filter(Boolean).map(line => /^(.+) at (\S+)$/.exec(line)?.slice(1).reverse().join(': ') || line);
+  return `Fix the ${match[1]} arguments: ${issues.join('; ')}.`;
+};
 const equal = (left, right) => Boolean(left && right && Buffer.byteLength(left) === Buffer.byteLength(right) && crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)));
 const wait = (max) => z.number().int().min(0).max(max).default(0);
 const job = { job_id: z.string().min(1).max(200).describe('A job_id or ref such as "result 3".') };
@@ -36,9 +44,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const parsedPublic = new URL(publicUrl);
   if (!['http:', 'https:'].includes(parsedPublic.protocol) || parsedPublic.username || parsedPublic.password || parsedPublic.search || parsedPublic.hash) throw new Error('MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.');
   const media = mediaKey || accountMode ? new McpMedia({ dataDir, baseUrl, publicUrl: environment.MCP_PUBLIC_URL ? publicUrl : () => typeof baseUrl === 'function' ? baseUrl() : baseUrl, signingKey: environment.MCP_SIGNING_KEY, fetchImpl, resolveSignedResult }) : null;
-  // A chat model waiting in the foreground can block its chat; only background notifications wait longer.
+  // A chat model waiting on Status or a preview can block its chat; only notification deliveries wait longer.
   const foregroundWait = foregroundWaitSeconds;
-  // Only a background notification may hold a request open for long; a foreground wait blocks the chat.
+  // Only a notification delivery, which collects a queued job, may hold a request open for long.
   const capWait = (seconds, delivery) => delivery === 'notification' ? seconds : Math.min(seconds, foregroundWait);
   const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
@@ -122,34 +130,52 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       }
     });
     const resolve = (value) => media.resolve(owner, refs, value);
-    /** A submission's reply: finished markdown when every job ends within the wait, otherwise the queued jobs. */
+    /** A submission's reply: finished markdown when every job ends within the wait, otherwise watch links for the queued jobs. */
     const respond = async (submission, profile, waitSeconds, signal, guide = {}) => {
-      const summary = { id: profile.id, label: profile.label || profile.id, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) };
+      const label = profile.label || profile.id;
       // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
-      const note = profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${summary.label}. Tell the user it went to ${summary.label}.` : '';
-      // Quick jobs come back finished, so the agent needs no background Result and no second turn.
+      const note = profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${label}; tell the user. ` : '';
+      // Quick jobs come back finished, so the agent needs no Result call.
       const seconds = waitSeconds ?? (profile.kind === 'video' ? 0 : imageWaitSeconds);
       const markdown = await media.settle(owner, submission, seconds, { signal });
-      if (markdown) {
-        const done = { status: 'done', profile: summary, jobs: submission.jobs.map(({ job_id, ref }) => ({ job_id, ref })), ...(note ? { note } : {}), ...guide };
-        return { content: [{ type: 'text', text: `Done. ${note ? `${note} ` : ''}Reply with the markdown below exactly, plus at most one short sentence. Do not call Result, poll or generate again.\n\n${markdown}` }, ...(guide.prompting ? [{ type: 'text', text: JSON.stringify(guide) }] : [])], structuredContent: done };
-      }
-      return mcpJson({ ...submission, profile: summary, ...guide, message: `Submitted. ${note ? `${note} ` : ''}Share each link as [Watch <ref>](link). If Result supports run_in_background, start one Result per job with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then reply; otherwise reply now. Never poll or resubmit.` });
+      const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) }, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...guide };
+      // An unread prompting guide follows the reply, so the agent applies it to later prompts.
+      const extra = guide.prompting ? [{ type: 'text', text: `Prompting guide for ${label}, not read before this submission; apply it to later prompts: ${JSON.stringify(guide.prompting)}` }] : [];
+      if (markdown) return { content: [{ type: 'text', text: `Done. ${note}Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.\n\n${markdown}` }, ...extra], structuredContent: structured };
+      const watch = submission.jobs.map(({ ref, link }) => `[Watch ${ref}](${link})`).join('\n');
+      const message = submission.status === 'queued'
+        ? `Queued. ${note}Call Result once per ref with delivery=notification and wait_seconds=${maxResultWaitSeconds}, then reply with its markdown. Never poll or resubmit.`
+        : `${submission.error} ${note}Share the watch links; never resubmit.`;
+      return { content: [{ type: 'text', text: `${message}\n\n${watch}` }, ...extra], structuredContent: { ...structured, ...(submission.error ? { error: submission.error } : {}) } };
+    };
+    /** A ready profile by id or a unique name match; otherwise the closest few, so one call corrects a guess. */
+    const profileNamed = (profiles, value) => {
+      const found = findProfile(profiles, value);
+      if (found) return found;
+      const near = closest(profiles, value, profile => [profile.id, profile.label, tierOf(profile)]);
+      throw new Error(`No ready profile matches ${value}.${near.length ? ` Closest: ${near.map(profile => `${profile.id} (${profile.label || profile.id})`).join(', ')}.` : ' Call Models for the list.'}`);
     };
     const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions: scope === 'control' ? controlInstructions : instructions });
+    const toolError = server.createToolError.bind(server);
+    server.createToolError = (message) => toolError(conciseError(message));
     if (scope === 'media' || scope === 'unlinked' || scope === 'anonymous') {
-      tool(server, 'Models', 'Browse Models', 'List ready profiles (id, label, kind, tier, summary). With profile_id, return its prompting guide, defaults, adjustable controls, compatible LoRAs, reference slots and native sizes. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Narrows a long LoRA list.') }, async ({ kind, tier: wanted, profile_id, lora_query }) => {
+      tool(server, 'Models', 'Browse Models', 'List ready profiles as "id — label" by kind. With profile_id (an id or label), return its prompting guide, defaults, adjustable controls, reference slots and an index of compatible LoRAs; lora_query or lora_names returns full details for up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {
           if (wanted) profiles = profilesForTier(profiles, wanted);
-          return mcpJson({ profiles: profiles.map(profile => ({ id: profile.id, label: profile.label, kind: profile.kind, tier: tierOf(profile), summary: summaryOf(profile) })) });
+          const list = {};
+          for (const profile of profiles) (list[profile.kind] ||= []).push(profile.label && profile.label !== profile.id ? `${profile.id} — ${profile.label}` : profile.id);
+          return mcpJson(list);
         }
-        profiles = profiles.filter(profile => profile.id === profile_id);
-        if (!profiles.length) throw new Error('Choose a ready profile from Models.');
-        review(owner, profile_id);
-        const [profile] = profiles;
+        const profile = profileNamed(profiles, profile_id);
         const infos = profile.options?.loras?.length && profile.capabilities?.lora !== false ? await media.loraInfos(owner) : {};
         const controls = mcpControls(profile);
+        // A LoRA lookup answers only that question; the profile's guide and controls come without one.
+        if (controls.loras && (lora_query || lora_names.length)) {
+          const { loras, total, more, missing } = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
+          return mcpJson({ id: profile.id, loras, loras_total: total, ...(more ? { more_matches: more } : {}), ...(missing ? { missing } : {}) });
+        }
+        review(owner, profile.id);
         // Defaults only for adjustable controls: a fixed value is not something to choose.
         const defaults = Object.fromEntries(Object.entries({ ...profile.defaults, count: defaultGenerationCount }).filter(([key]) => controls[key] || ['frames', 'fps', 'duration'].includes(key)));
         const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
@@ -157,31 +183,31 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const merged = { ...profile, ...settings };
           return [mode, { controls: mcpControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
         }));
-        const { loras, total } = mcpLoras(profile, infos, { query: lora_query });
+        const { loras, total } = mcpLoras(profile, infos);
         const detail = {
           ...Object.fromEntries(['id', 'label', 'kind', 'family', 'description', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native'].filter(key => key in profile).map(key => [key, profile[key]])),
           tier: tierOf(profile), defaults, controls, ...(modes ? { imageModes: modes, imageModes_note: 'A mode applies when its media is supplied, such as reference with references.' } : {}),
-          ...(controls.loras ? { loras, loras_total: total, ...(total > loras.length ? { loras_note: `Showing ${loras.length} of ${total}; narrow with lora_query.` } : {}) } : {}),
+          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Put the trigger word in the prompt.' } : {}),
           prompting: prompting(profile, true)
         };
-        return mcpJson({ profiles: [detail] });
+        return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier: Studio picks this account\u2019s default ready profile and its defaults; omit tier for the deployment default. A profile_id from Models overrides both; pass only the adjustable controls Models lists for it. Keep saved count and size unless asked. Waits briefly, then returns status done with markdown to reply with, or queued jobs to collect with Result. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate Media', `Queue images or videos, at most four jobs per call. Pass kind and tier; Studio picks this account\u2019s default profile and its defaults (omit tier for the deployment default). profile_id (an id or label) overrides both; pass only controls Models lists for it. loras takes LoRA names (strength optional) and picks a profile that can use them. Set count from the user\u2019s wording; keep the saved size unless asked. Returns markdown to reply with, or queued jobs to collect with Result. Never switches GPUs.`, {
         profile_id: z.string().min(1).optional(), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(4),
-        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
-        width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional(), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
+        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
+        width: z.number().int().positive().optional().describe('With height, requests native generation; 2K is a 2048-pixel long side.'), height: z.number().int().positive().optional(), count: z.number().int().min(1).max(4).optional().describe('1 for one image ("a photo"); omit for "some" or "a few" to use the saved default.'), steps: z.number().int().positive().optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
       }, async ({ kind, tier: wanted, wait_seconds, ...args }, signal) => {
         // Without a profile_id Studio chooses, so there is no guide for the agent to have read first.
-        const chosen = args.profile_id === undefined ? await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0 }) : null;
-        const profileId = chosen?.id ?? args.profile_id;
+        const chosen = args.profile_id === undefined ? await media.choose(owner, { kind, tier: wanted, references: args.reference_asset_ids?.length || 0, loras: args.loras || [] }) : null;
+        const profileId = chosen?.id ?? profileNamed(await media.profiles('all', owner), args.profile_id).id;
         const reviewed = reviewedGuides.get(guideKey(owner, profileId));
         // An unread guide accompanies the submission instead of costing a refused call and another round trip.
         const unread = !chosen && (reviewed === undefined || Date.now() - reviewed >= 3600000);
         const submission = await media.queue(owner, { ...args, profile_id: profileId }, refs);
         const profile = chosen || (await media.profiles('all', owner)).find(item => item.id === profileId);
         let guide = {};
-        if (unread && profile) guide = { prompting: prompting(profile, true), guide_note: 'This profile\u2019s prompting guide was not read before submission; apply it to later prompts.' };
+        if (unread && profile) guide = { prompting: prompting(profile, true) };
         if (chosen || unread) review(owner, profileId);
         return respond(submission, profile || { id: profileId }, wait_seconds, signal, guide);
       });
@@ -191,7 +217,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const ref = media.refOf(owner, refs, id);
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
-      tool(server, 'Result', 'Show Result', `Show a result: an image preview or video link. To collect a queued job, call once in the background with delivery=notification, wait_seconds=${maxResultWaitSeconds} and run_in_background=true, then wait for the host\u2019s notification; it carries the finished markdown, so reply with it and do not call Result again. Never poll.`, { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      tool(server, 'Result', 'Show Result', `Show a finished result as markdown to reply with. To collect a queued job, call once with delivery=notification and wait_seconds=${maxResultWaitSeconds}; it returns when the job ends, with the markdown to reply with. Never poll or call it again.`, { ...output, delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
       tool(server, 'Cancel', 'Cancel Generation', 'Cancel a job when the user asks.', job, async ({ job_id }) => {
         const id = resolve(job_id);
         media.own(owner, id);
@@ -263,9 +289,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (!html) throw new Error('Unavailable.');
         return res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", 'Content-Type': 'text/html; charset=utf-8' }).send(html);
       }
-      const result = accountMode
+      const original = accountMode
         ? await media.signedResult(claims.owner, claims.jobId, claims.index)
         : await media.download(claims.owner, claims.jobId, claims.index);
+      const result = claims.preview ? await media.previewOf(original) : original;
       res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline', 'Content-Type': result.mime }).send(result.content);
     } catch { res.status(404).json({ error: 'The result link is invalid, unavailable or expired.' }); }
   });

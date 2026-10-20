@@ -5,7 +5,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { defaultGenerationCount, referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
-import { assertAdjustable, mcpControls } from './mcp-controls.js';
+import { assertAdjustable, mcpControls, prepareLoras, resolveLoraName } from './mcp-controls.js';
+import { loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 
 const finished = new Set(['done', 'completed', 'succeeded']);
@@ -16,6 +17,10 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, character => ({ 
 /** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
 const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
 const maxReferenceScopes = 5000;
+// Short result links: ten random base62 characters (about 59 bits), mapped server-side to an owner and output.
+const shortAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
+const previewSize = 1024;
 export const maxResultWaitSeconds = 1500;
 const aborted = (signal) => {
   const error = new Error('The wait ended because the request was cancelled. The generation continues; collect it later with Result.');
@@ -58,6 +63,8 @@ export class McpMedia {
     if (this.state.version !== 1 || !this.state.jobs || !this.state.assets || !this.state.signingKey) throw new Error('Invalid MCP ownership data.');
     // Result numbering is additive; files written before it simply start without references.
     if (!this.state.refs || typeof this.state.refs !== 'object' || Array.isArray(this.state.refs)) this.state.refs = {};
+    if (!this.state.links || typeof this.state.links !== 'object' || Array.isArray(this.state.links)) this.state.links = {};
+    this.linkIds = new Map(Object.entries(this.state.links).map(([id, link]) => [this.linkKey(link.audience, link.owner, link.jobId, link.index), id]));
     this.key = signingKey || this.state.signingKey;
     this.save();
   }
@@ -111,9 +118,19 @@ export class McpMedia {
    * While the studio reports its local video worker unavailable, video goes to a ready remote (cloud) profile,
    * marked `remote` so the reply can say so.
    */
-  async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false } = {}) {
+  async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false, loras = [] } = {}) {
     const models = await this.catalogue(owner);
-    const profiles = await this.profiles(kind, owner);
+    let profiles = await this.profiles(kind, owner);
+    if (loras.length) {
+      // Named LoRAs narrow the choice to profiles that can use every one of them.
+      const infos = await this.loraInfos(owner);
+      const usable = (profile) => profile.capabilities?.lora !== false && loras.every(({ name }) => {
+        const file = resolveLoraName(profile, name);
+        return file && !['acceleration', 'supporting'].includes(infos[file]?.role) && loraCompatibility(infos[file], profile) !== 'other';
+      });
+      profiles = profiles.filter(usable);
+      if (!profiles.length) throw new Error(`No ready ${kind} profile can use ${loras.map(({ name }) => name).join(', ')}. Call Models with lora_query to look it up.`);
+    }
     const defaultId = models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'];
     const remote = kind === 'video' && models.backends?.video?.available === false ? chooseRemoteVideo(profiles, { tier, defaultId, references, firstFrame }) : null;
     return remote ? { ...remote, remote: true } : chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
@@ -165,7 +182,8 @@ export class McpMedia {
     const controls = {};
     if (negative_prompt !== undefined && adjustable.negative_prompt) controls.negative = negative_prompt;
     for (const [key, value] of Object.entries({ cfg, denoise, sampler, scheduler })) if (value !== undefined) controls[key] = value;
-    for (const adapter of loras) if (!profile.options?.loras?.includes(adapter.name)) throw new Error(`${adapter.name} is not a LoRA this profile can use. Choose names from Models loras for this profile_id.`);
+    // Names resolve to the profile's files and take their recommended strength unless one is given.
+    const stack = loras.length ? prepareLoras(profile, await this.loraInfos(owner), loras) : [];
     const slots = profile.mediaInputs || [];
     if (reference_asset_ids.length > slots.length || slots.some((slot, index) => slot.required && !reference_asset_ids[index])) throw new Error('Supply the references required by this profile.');
     for (const id of reference_asset_ids) this.own(owner, id, 'assets');
@@ -179,7 +197,7 @@ export class McpMedia {
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
     if (prompts.length * runs > 4) throw new Error('Submit at most four jobs at a time.');
-    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: loras.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
+    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;
@@ -288,9 +306,35 @@ export class McpMedia {
     const sealed = Buffer.concat([cipher.update(JSON.stringify(claims)), cipher.final()]);
     return `${prefix}.${iv.toString('base64url')}.${sealed.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}`;
   }
+  linkKey(audience, owner, jobId, index) { return JSON.stringify([audience, owner, jobId, index ?? 'page']); }
+  /**
+   * A short opaque link id for an output (or a job's watch page), reused for the same output.
+   * Like a sealed link it is bound to this public URL, and each request rechecks ownership and availability.
+   */
+  shortId(owner, jobId, index) {
+    const audience = this.publicUrl;
+    const key = this.linkKey(audience, owner, jobId, index);
+    const existing = this.linkIds.get(key);
+    if (existing) return existing;
+    let id;
+    do id = Array.from({ length: 10 }, () => shortAlphabet[crypto.randomInt(shortAlphabet.length)]).join(''); while (Object.hasOwn(this.state.links, id));
+    this.state.links[id] = { audience, owner, jobId, ...(index === undefined ? { page: true } : { index }) };
+    this.linkIds.set(key, id);
+    this.save();
+    return id;
+  }
   /** A job's watch page: shows progress until done, then its outputs, without the chat. */
-  pageUrl(owner, jobId) { return `${this.publicUrl}/mcp/results/${this.seal('p2', { audience: this.publicUrl, owner, jobId, page: true })}`; }
+  pageUrl(owner, jobId) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId)}`; }
+  /** A finished image's chat-sized JPEG preview. */
+  previewUrl(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}.jpg`; }
   claims(token) {
+    const short = shortPattern.exec(String(token || ''));
+    if (short) {
+      const link = Object.hasOwn(this.state.links, short[1]) ? this.state.links[short[1]] : null;
+      if (!link || link.audience !== this.publicUrl || (short[2] && link.page)) throw new Error('Invalid result link.');
+      this.own(link.owner, link.jobId);
+      return { owner: link.owner, jobId: link.jobId, ...(link.page ? { page: true } : { index: link.index }), ...(short[2] ? { preview: true } : {}) };
+    }
     const parts = String(token || '').split('.');
     let claims;
     if (parts[0] === 'v2' || parts[0] === 'p2') {
@@ -320,7 +364,7 @@ export class McpMedia {
     this.own(claims.owner, claims.jobId);
     return claims;
   }
-  url(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.token(owner, jobId, index)}`; }
+  url(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}`; }
   available(job, index) {
     if (!finished.has(job.status) || hidden(job) || !Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
     return job.outputs[index];
@@ -378,6 +422,12 @@ export class McpMedia {
     if (!result?.content || !result?.mime) throw new Error('The signed result is unavailable.');
     return result;
   }
+  /** A chat-sized JPEG of an image output; other media pass through unchanged. */
+  async previewOf(result) {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(result.mime)) return result;
+    const content = await sharp(result.content, { limitInputPixels: 80000000 }).rotate().resize({ width: previewSize, height: previewSize, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 85 }).toBuffer();
+    return { content, mime: 'image/jpeg' };
+  }
   async readOutput(output, owner = "") {
     const response = await this.response('GET', output.url, undefined, owner);
     const chunks = [];
@@ -408,55 +458,42 @@ export class McpMedia {
     const wait = Math.min(seconds, maxResultWaitSeconds);
     const job = await this.job(owner, jobId, wait, { signal });
     const ref = this.refOf(owner, scope, jobId);
+    const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'Studio result';
     const named = { job_id: jobId, ...(ref ? { ref } : {}), link: this.pageUrl(owner, jobId) };
     if (!finished.has(job.status)) {
       const pending = !terminal.has(job.status);
       const message = pending
-        ? `${ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'This job'} is still ${job.status || 'running'}. Reply now; do not poll. It continues in the studio and appears on its watch page when done; a background Result with delivery=notification reports completion.`
-        : `${ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
+        ? `${ref ? label : 'This job'} is still ${job.status || 'running'}. Reply now; do not poll. It continues in the studio and appears on its watch page when done.`
+        : `${ref ? label : 'This job'} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       const summary = { ...named, ...this.summary(job), message };
-      if (delivery !== 'notification') return mcpJson(summary);
-      // The woken agent needs only the sentence and watch link; detail adds the status fields.
+      // The agent needs only the sentence and watch link; detail adds the status fields.
       const lean = { job_id: jobId, ...(ref ? { ref } : {}), status: job.status || 'running' };
       return { content: [text(`${message} [Watch ${ref || 'result'}](${named.link})`), ...(detail ? [text(summary)] : [])], structuredContent: detail ? summary : lean };
     }
-    const available = this.available(job, index);
-    if (delivery === 'notification') return await this.notification(owner, jobId, job, named, detail);
-    const url = this.url(owner, jobId, index);
-    const link = { type: 'resource_link', uri: url, name: `${jobId}-${index}` };
-    if (job.kind === 'video') return { content: [text(`[View Video](${url})`), link] };
-    const output = await this.readOutput(available, owner);
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) return { content: [text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
-    const preview = await sharp(output.content, { limitInputPixels: 80000000 }).rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 80 }).toBuffer();
-    return { content: [{ type: 'image', data: preview.toString('base64'), mimeType: 'image/jpeg' }, text({ ...named, output_index: index, status: 'done', message: 'Generation complete. Show the attached image inline. Its original opens in the browser; call it View Original, not Download. Reply briefly; do not generate or poll again unless requested.' }), text(`[View Original](${url})`), { ...link, mimeType: output.mime }] };
-  }
-  /**
-   * A self-contained, text-only completion: the woken agent can render it directly
-   * (signed image markdown with its header) without calling Result again.
-   */
-  async notification(owner, jobId, job, named, detail = false) {
-    const label = named.ref ? `${named.ref[0].toUpperCase()}${named.ref.slice(1)}` : 'Studio result';
-    const { outputs, markdown } = await this.markdown(owner, jobId, job, label);
-    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Result again, poll or generate again.`;
+    this.available(job, index);
+    // A preview shows the asked-for output; a notification carries every output of the job.
+    const shown = delivery === 'notification' ? job : { ...job, outputs: job.outputs.map((item, position) => position === index ? item : {}) };
+    const { outputs, markdown } = await this.markdown(owner, jobId, shown, label);
+    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Do not call Studio again.`;
     // Only the markdown re-enters the chat by default; detail restores the full record.
-    if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(named.ref ? { ref: named.ref } : {}), status: 'done' } };
+    if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(ref ? { ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
     return { content: [text(`${message}\n\n${markdown}`), text(structured)], structuredContent: structured };
   }
   /**
-   * A finished job's markdown: per output, a visible header naming its ref and profile with a
-   * View Original link, directly above its signed image (a View Video link for videos). The
-   * header and image share one paragraph so renderers add no gap; outputs are blank-line separated.
+   * A finished job's markdown: per output, a header naming its ref and profile, then its image
+   * as a preview that links to the original (a View Video link for videos). The header and image
+   * share one paragraph so renderers add no gap; outputs are blank-line separated.
    */
   async markdown(owner, jobId, job, label) {
     const outputs = (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : []);
     const profile = job.profileId ? (await this.profiles('all', owner).catch(() => [])).find(item => item.id === job.profileId) : undefined;
     // The profile's short name, as its label reads before the first ' · '.
     const name = String(profile?.displayName || profile?.label || '').split(/\s*·\s*/)[0].trim();
-    const markdown = outputs.map(({ url }, position) => {
+    const markdown = outputs.map(({ output_index, url }, position) => {
       const caption = outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
-      const header = [`**${caption}**`, name, job.kind === 'video' ? `[View Video](${url})` : `[View Original](${url})`].filter(Boolean).join(' · ');
-      return job.kind === 'video' ? header : `${header}\n![${caption}](${url})`;
+      if (job.kind === 'video') return [`**${caption}**`, name, `[View Video](${url})`].filter(Boolean).join(' · ');
+      return `${[`**${caption}**`, name].filter(Boolean).join(' · ')}\n[![${caption}](${this.previewUrl(owner, jobId, output_index)})](${url})`;
     }).join('\n\n');
     return { outputs, markdown };
   }
@@ -466,7 +503,7 @@ export class McpMedia {
    */
   async settle(owner, submission, seconds, { signal } = {}) {
     if (!seconds || submission.status !== 'queued') return null;
-    // One unfinished job sends the whole submission to background Result, so stop waiting for the rest.
+    // One unfinished job sends the whole submission to Result, so stop waiting for the rest.
     const stop = new AbortController();
     const linked = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
     const jobs = await Promise.all(submission.jobs.map(async ({ job_id }) => {
@@ -487,7 +524,7 @@ export class McpMedia {
     let job;
     try { job = await this.job(claims.owner, claims.jobId, 0, { credential }); } catch { return null; }
     if (hidden(job)) return null;
-    const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.token(claims.owner, claims.jobId, index)] : []) : [];
+    const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.shortId(claims.owner, claims.jobId, index)] : []) : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);
     const title = pending ? 'Generating…' : outputs.length ? 'Studio Result' : `Generation ${escapeHtml(job.status)}`;

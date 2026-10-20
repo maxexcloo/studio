@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertAdjustable, cfgIgnoresNegative, mcpControls, mcpLoras } from './mcp-controls.js';
+import { assertAdjustable, cfgIgnoresNegative, mcpControls, mcpLoras, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { familyGraph } from './family-graph.js';
 import { McpMedia, maxResultWaitSeconds } from './mcp-media.js';
 
@@ -44,17 +44,38 @@ test('an accepted MCP negative prompt reaches the built-in graph’s negative en
   assert.ok(sampler.inputs.cfg > 1, 'the negative takes effect only above cfg 1');
 });
 
-test('LoRA discovery keeps compatible optional effects and bounds long descriptions', () => {
+test('LoRA discovery indexes compatible optional effects compactly and bounds looked-up details', () => {
   const infos = {
-    'style.safetensors': { families: ['sdxl'], base: 'SDXL', triggers: ['inkstyle'], description: 'x'.repeat(1000), sourceUrl: 'https://example.test/style' },
+    'styles/ink.safetensors': { families: ['sdxl'], base: 'SDXL', title: 'Ink Wash Painting', triggers: ['inkstyle', 'wash'], description: 'x'.repeat(1000), sourceUrl: 'https://example.test/style' },
+    'lora_1234_v2.safetensors': { families: ['sdxl'], title: 'Brutalist Concrete Architecture Photography LoRA by someone', triggers: ['lora'], strengthRange: { min: 0, max: 1.5, step: 0.1, default: 1.1 } },
+    'PixelArtRedmond.safetensors': { families: ['sdxl'], title: 'Pixel Art Redmond', triggers: ['pixel art'] },
     'speed.safetensors': { families: ['sdxl'], role: 'acceleration' },
     'flux.safetensors': { families: ['flux'] }
   };
-  const { loras, total } = mcpLoras({ ...profile, options: { loras: ['style.safetensors', 'speed.safetensors', 'flux.safetensors'] } }, infos);
-  assert.equal(total, 1);
-  assert.equal(loras[0].description.length, 280);
-  assert.deepEqual(loras[0].strength, { recommended: 0.7 });
+  const subject = { ...profile, options: { loras: Object.keys(infos) } };
+  const { loras, total } = mcpLoras(subject, infos);
+  assert.equal(total, 3);
+  // A descriptive name needs no hint; a cryptic one gets the title's other words, at most 40 characters.
+  // A trigger the name already spells out is left out too.
+  assert.deepEqual(loras, ['lora_1234_v2 — Brutalist Concrete Architecture Photogr…', 'PixelArtRedmond', 'ink — Wash Painting [inkstyle]']);
+  const detailed = mcpLoras(subject, infos, { query: 'ink' });
+  assert.equal(detailed.loras[0].description.length, 280);
+  assert.deepEqual(detailed.loras[0].strength, { recommended: 0.7 });
+  assert.deepEqual(mcpLoras(subject, infos, { names: ['LORA_1234_V2'] }).loras[0].strength, { recommended: 1.1, min: 0, max: 1.5 });
   assert.deepEqual(mcpLoras({ ...profile, capabilities: { lora: false } }, infos), { loras: [], total: 0 });
+  // Lookups return at most five full entries; further matches stay in the compact form.
+  const many = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`glow-${index}.safetensors`, { families: ['sdxl'], title: `Glow ${index}` }]));
+  const capped = mcpLoras({ ...profile, options: { loras: Object.keys(many) } }, many, { query: 'glow' });
+  assert.equal(capped.loras.length, 5);
+  assert.deepEqual(capped.more, ['glow-5', 'glow-6', 'glow-7']);
+});
+
+test('Generate LoRA names resolve without folder, extension or case and take the recommended strength', () => {
+  const infos = { 'styles/Ink-Wash.safetensors': { families: ['sdxl'], strengthRange: { min: 0, max: 1.5, step: 0.1, default: 1.1 } } };
+  const subject = { ...profile, options: { loras: Object.keys(infos) } };
+  for (const name of ['styles/Ink-Wash.safetensors', 'ink-wash', 'Ink Wash', 'styles/ink_wash']) assert.equal(resolveLoraName(subject, name), 'styles/Ink-Wash.safetensors', name);
+  assert.deepEqual(prepareLoras(subject, infos, [{ name: 'ink wash' }, { name: 'Ink-Wash', strength: 0.5 }]), [{ name: 'styles/Ink-Wash.safetensors', strength: 1.1 }]);
+  assert.throws(() => prepareLoras(subject, infos, [{ name: 'oil paint' }]), /^Error: No LoRA named oil paint for SDXL\. Call Models with lora_query to look one up\.$/);
 });
 
 test('Result waits are capped below LibreChat’s 1800-second background deadline', async (t) => {
