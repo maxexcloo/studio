@@ -149,13 +149,14 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   };
   // The strip's and dock's heights, for the gallery to clear and toasts to sit under the strip.
   const barRef = React.useRef<HTMLElement>(null);
-  const dockRef = React.useRef<HTMLElement>(null);
+  const dockRef = React.useRef<HTMLElement | null>(null);
   React.useLayoutEffect(() => {
     // On the root: toasts are portalled outside the shell.
     const root = document.documentElement;
     const measure = () => {
       // Hidden behind the selection header it measures 0; that header is as tall, so the last height stands.
-      const bar = barRef.current?.getBoundingClientRect().height || 0;
+      // To the bottom of the bar's own row: the search or filter row under it overlays the gallery rather than pushing it down.
+      const bar = barRef.current?.querySelector('.phone-bar-row')?.getBoundingClientRect().bottom || 0;
       if (bar) root.style.setProperty('--phone-bar-h', `${Math.round(bar)}px`);
       if (dockRef.current) root.style.setProperty('--phone-dock-h', `${Math.round(dockRef.current.getBoundingClientRect().height)}px`);
     };
@@ -183,25 +184,27 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={15} aria-hidden="true" />{selection.allSelected ? 'None' : 'All'}</button>
         </header>
       ) : null}
-      {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
+      {/* One slim top bar: iOS's status bar sits over it, and a tap there scrolls the page to the top.
+          Left, one element: the status light and the gallery's Images | Videos. Right, Search, Filter and More. */}
       <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
         <div className="phone-bar-row">
-          {/* The Studio mark is the status: its light says whether generation can run, a tap checks again. */}
-          {/* A message takes the pill over for a moment (UI-PATTERNS › Messages); the title steps aside. */}
+          {/* A message takes the element over for a moment (UI-PATTERNS › Messages); the tools stay where they are. */}
           {message ? <StatusPill message={message} className="is-bar" /> : (
-            <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
-              <span /><strong>Studio</strong>
-            </button>
+            <div className={cn('phone-heading', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')}>
+              <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>
+              <MediaModeToggle kind="gallery" labelled className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />
+            </div>
           )}
-          <div className={cn('phone-title', message && 'is-yielding')}>
-            <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
-              <span>Gallery</span>
-            </button>
-            {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
-              <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
-            </button> : null}
-          </div>
+          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
+            <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
+          </button> : null}
+          <span className="phone-bar-gap" />
+          <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
+          <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
+          <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
         </div>
+        {/* Search or the filters, full width under the bar, one at a time. */}
+        <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />
       </header>
 
       <main className="phone-gallery" onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
@@ -222,33 +225,10 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       {!selecting ? (
-        // Bottom-up: what a thumb reaches for most sits in one dock above the home indicator.
-        <nav ref={dockRef} className="phone-dock" aria-label="Gallery Controls">
-          <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />
-          {(
-            <div className="phone-create-pill">
-              <button type="button" className="phone-create-open" onClick={() => setCreateOpen(true)}>
-                <strong className={cn(!prompt.trim() && 'is-placeholder')}>{prompt.trim() || 'Prompt...'}</strong>
-              </button>
-              <button
-                type="button"
-                className={cn('phone-go', pending.length > 0 && 'is-working')}
-                style={{ '--progress': progress } as React.CSSProperties}
-                aria-label={quickGo ? 'Generate' : 'Open the Composer'}
-                onClick={() => { if (quickGo) generate(); else setCreateOpen(true); }}
-              >
-                {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
-              </button>
-            </div>
-          )}
-          <div className="phone-dock-row">
-            <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false}  />
-            <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
-            <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
-            <span className="phone-dock-gap" />
-            <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
-          </div>
-        </nav>
+        // Create floats bottom right, in thumb reach; nothing else sits at the bottom.
+        <button ref={dockRef as unknown as React.RefObject<HTMLButtonElement>} type="button" className={cn('phone-create-open phone-fab', pending.length > 0 && 'is-working', prompt.trim() && 'has-draft')} style={{ '--progress': progress } as React.CSSProperties} aria-label={prompt.trim() ? `Create: ${prompt.trim().slice(0, 80)}` : 'Create'} onClick={() => setCreateOpen(true)}>
+          <Plus size={26} strokeWidth={2.2} aria-hidden="true" />
+        </button>
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />

@@ -64,20 +64,18 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await expect(ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true })).toBeFocused();
 });
 
-test('phone compact prompt is one muted line with overflow ellipsis', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'Phone compact creation pill.');
+test('the phone Create button marks a prompt waiting in Create', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone Create button.');
   await page.goto('/');
   const ui = studioUi(page);
+  const create = page.locator('.phone-fab');
+  await expect(create).toHaveAccessibleName('Create');
+  await expect(create).not.toHaveClass(/has-draft/);
   await ui.openComposer();
-  const text = 'A detailed landscape with mountains and valleys beneath a softly lit sky. '.repeat(4);
-  await ui.prompt.fill(text);
+  await ui.prompt.fill('A detailed landscape with mountains');
   await ui.closeComposer();
-  const preview = page.locator('.phone-create-open strong');
-  await expect(preview).toHaveText(text.trim());
-  await expect(preview).toHaveCSS('text-overflow', 'ellipsis');
-  await expect(page.locator('.phone-create-open small')).toHaveCount(0);
-  const [prompt, send] = await Promise.all([page.locator('.phone-create-open').boundingBox(), page.locator('.phone-go').boundingBox()]);
-  expect(prompt!.height).toBe(send!.height);
+  await expect(create).toHaveClass(/has-draft/);
+  await expect(create).toHaveAccessibleName('Create: A detailed landscape with mountains');
 });
 
 test('phone prompt keeps a usable height when tapped with the keyboard up', async ({ page, isMobile }) => {

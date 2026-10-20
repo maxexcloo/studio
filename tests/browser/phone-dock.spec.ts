@@ -15,20 +15,18 @@ const filterButton = (page) => page.getByRole('button', { name: 'Open Gallery Fi
 const searchField = (page) => page.getByRole('textbox', { name: 'Search Gallery', exact: true });
 const filterRow = (page) => page.getByRole('group', { name: 'Gallery Filters', exact: true });
 
-test('the search row is as tall as the Images/Videos icons and sits above the prompt', async ({ page }) => {
+test('the search row opens under the top bar, as tall as its icons and full width', async ({ page }) => {
   await page.goto('/');
   await searchButton(page).click();
   const field = page.locator('.phone-tools-field');
   await expect(field).toBeVisible();
   await page.waitForTimeout(300);
-  const mode = await studioUi(page).galleryMode.getByRole('button').first().boundingBox();
-  const row = await field.boundingBox();
-  const prompt = await page.locator('.phone-create-pill').boundingBox();
-  expect(Math.abs(row!.height - mode!.height)).toBeLessThan(1);
-  expect(row!.y + row!.height).toBeLessThanOrEqual(prompt!.y);
-  // Full width of the dock, less its close button.
-  const dock = await page.locator('.phone-dock').boundingBox();
-  expect(row!.width).toBeGreaterThan(dock!.width - 80);
+  const icon = (await searchButton(page).boundingBox())!;
+  const row = (await field.boundingBox())!;
+  expect(Math.abs(row.height - icon.height)).toBeLessThan(1);
+  expect(row.y).toBeGreaterThanOrEqual(icon.y + icon.height - 1);
+  // Full width, less its close button.
+  expect(row.width).toBeGreaterThan(page.viewportSize()!.width - 80);
 });
 
 test('search and filters share one row: opening one collapses the other to its icon', async ({ page }) => {

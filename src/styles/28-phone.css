@@ -44,13 +44,8 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-bar.is-selecting .phone-icon,
 .phone-bar.is-selecting .phone-pill { height: 40px; min-height: 40px; }
 .phone-bar-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: 40px; }
-.phone-bar-row .phone-status { height: 40px; }
 .phone-bar-row .phone-title { font-size: 16px; }
 .phone-bar-row .phone-scroll-top { min-height: 40px; }
-/* The Images/Videos pair is as tall as the icons beside it, and as the search row above them. */
-.phone-dock .phone-gallery-mode { margin: 0 2px; padding: 0; border-radius: var(--r-pill); background: rgb(255 255 255 / .06); }
-.phone-dock .phone-gallery-mode button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); }
-.phone-dock .phone-gallery-mode button[aria-pressed="true"] { background: rgb(255 255 255 / .14); color: hsl(var(--foreground)); }
 /* Search and Filter: tinted with a count while something is applied, filled while their row is open. */
 .phone-tool.is-active { color: var(--accent-amber); }
 .phone-tool.is-open { background: rgb(255 255 255 / .1); }
@@ -165,34 +160,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   background: var(--accent-amber);
 }
 
-/* The Studio mark, top left: a small glass pill whose light is the status. */
-.phone-status {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 12px 0 11px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-pill);
-  background: var(--glass-bar-bg);
-  -webkit-backdrop-filter: var(--glass-bar-blur);
-  backdrop-filter: var(--glass-bar-blur);
-  box-shadow: var(--glass-bar-shadow);
-  color: hsl(var(--foreground));
-}
-.phone-status strong { font-size: 13px; font-weight: 600; letter-spacing: -0.005em; }
-.phone-status span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: hsl(45 90% 58%);
-}
-.phone-status.is-connected span { background: hsl(145 70% 48%); box-shadow: 0 0 0 4px hsl(145 70% 48% / .14); }
-.phone-status.is-offline span { background: hsl(0 74% 58%); box-shadow: 0 0 0 4px hsl(0 74% 58% / .14); }
-.phone-status.is-restarting span,
-.phone-status.is-checking span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
-
 .phone-pill {
   flex: none;
   display: inline-flex;
@@ -236,98 +203,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .tile-overlay.is-phone .tile-more,
 .tile-overlay.is-phone .tile-hover-actions { display: none; }
 .tile-overlay.is-phone .tile-upscale:not(.is-active, .is-running) { display: none; }
-
-/* --------------------------------------------------------- Create pill */
-
-/* The dock: Search/Filter expanding upwards, the create pill, then Images/Videos, Search, Filter and More. */
-.phone-dock {
-  position: fixed;
-  left: max(10px, env(safe-area-inset-left));
-  right: max(10px, env(safe-area-inset-right));
-  bottom: calc(max(10px, env(safe-area-inset-bottom)) - var(--pwa-drop, 0px) + var(--pwa-gap, 0px));
-  z-index: 20;
-  padding: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: 30px;
-  background: var(--glass-bar-bg);
-  -webkit-backdrop-filter: var(--glass-bar-blur);
-  backdrop-filter: var(--glass-bar-blur);
-  box-shadow: var(--glass-bar-shadow);
-}
-.phone-dock-row { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
-.phone-dock-gap { flex: 1; }
-.phone-create-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 56px;
-  padding: 6px;
-  border-radius: 24px;
-  background: rgb(255 255 255 / .06);
-}
-.phone-create-pill.is-hidden { box-shadow: inset 0 0 0 1px rgb(255 140 90 / .28); }
-.phone-mode-select {
-  flex: none;
-  display: flex;
-  padding: 2px;
-  border-radius: 24px;
-  background: rgb(255 255 255 / .06);
-}
-.phone-mode-select button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 22px;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-}
-.phone-mode-select button[aria-pressed="true"] { background: rgb(255 255 255 / .14); color: hsl(var(--foreground)); }
-.phone-mode-select button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-.phone-create-open {
-  flex: 1;
-  min-width: 0;
-  min-height: 48px;
-  display: grid;
-  align-content: center;
-  gap: 2px;
-  padding: 0 8px 0 12px;
-  border: 0;
-  background: transparent;
-  color: hsl(var(--foreground));
-  text-align: left;
-}
-.phone-create-open strong {
-  overflow: hidden;
-  font-size: 16px;
-  font-weight: 500;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.phone-create-open strong.is-placeholder { color: rgb(255 255 255 / .5); }
-.phone-create-open small {
-  overflow: hidden;
-  color: hsl(var(--muted-foreground));
-  font-size: 12.5px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.phone-go {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: #f2f2f2;
-  color: #0b0b0b;
-}
-.phone-go:active { scale: .94; }
 
 /* -------------------------------------------------------------- Sheets */
 
@@ -960,7 +835,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* ------------------------------------------------ Progress while browsing */
 
 /* A ring around Generate fills as the running images move through their steps. */
-.phone-go.is-working {
+.phone-fab.is-working {
   background:
     radial-gradient(closest-side, #f2f2f2 calc(100% - 4px), transparent calc(100% - 3px)),
     conic-gradient(hsl(38 92% 60%) calc(var(--progress, 0) * 360deg), rgb(255 255 255 / .18) 0);

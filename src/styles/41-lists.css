@@ -139,7 +139,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .create-references .composer-reference-tools { flex: 1; min-width: 0; display: flex; justify-content: flex-end; max-width: none; padding: 0; }
 .create-references .composer-reference-slots, .create-references .reference-slot-list { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .create-references .reference-count { display: none; }
-.phone-create .create-references .ref-chip.ref-add {
+.phone-create .create-references .ref-chip.ref-add:only-child {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -158,7 +158,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   color: hsl(var(--muted-foreground));
   font-size: 15px;
 }
-.phone-create .create-references .ref-chip.ref-add::after {
+.phone-create .create-references .ref-chip.ref-add:only-child::after {
   content: "";
   position: absolute;
   right: 0;
@@ -169,10 +169,12 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.phone-create .create-references .ref-chip.ref-add:not(.has-items) > svg,
-.phone-create .create-references .ref-group-label,
-.phone-create .create-references .ref-add-label { display: none; }
-.phone-create .create-references .ref-chip.ref-add:not(.has-items)::before { content: "Add"; }
+.phone-create .create-references .ref-chip.ref-add:only-child:not(.has-items) > svg,
+.phone-create .create-references .ref-chip:only-child .ref-group-label,
+.phone-create .create-references .ref-chip:only-child .ref-add-label { display: none; }
+.phone-create .create-references .ref-chip.ref-add:only-child:not(.has-items)::before { content: "Add"; }
+/* Several separate slots (a video's start and end frames): compact chips side by side, each with its name. */
+.phone-create .create-references .ref-chip.ref-add:not(:only-child) { height: 36px; padding: 0 10px; border-radius: 999px; font-size: 13px; }
 .phone-create .create-references .ref-group-thumbs img { width: 28px; height: 28px; }
 .phone-create .create-references .ref-group-count { color: hsl(var(--muted-foreground)); font-size: 15px; }
 .phone-create .create-references .ref-selected { width: 36px; height: 36px; margin-right: 0; }
@@ -337,3 +339,48 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .phone-model-sheet .phone-model-tools .model-filters { padding: 4px 0 6px; }
 .phone-model-sheet .phone-model-option { gap: 10px; }
 .phone-model-sheet .phone-model-option .model-selection-tick { color: var(--accent-amber); }
+
+/* -------------------------------------------------------------- Phone header & Create button */
+
+/* One slim bar: the status light with Images | Videos as one element on the left, then the
+   running count, and Search, Filter and More on the right. No boxes inside it. */
+.phone-bar-row { gap: 0; height: 48px; }
+.phone-bar-gap { flex: 1; min-width: 4px; }
+.phone-heading { display: flex; align-items: center; min-width: 0; }
+.phone-heading-light { display: grid; place-items: center; flex: none; width: 32px; height: 44px; margin-left: -4px; padding: 0; border: 0; background: transparent; }
+.phone-heading-light span { width: 9px; height: 9px; border-radius: 50%; background: hsl(45 90% 58%); }
+.phone-heading.is-connected .phone-heading-light span { background: hsl(145 70% 48%); box-shadow: 0 0 0 4px hsl(145 70% 48% / .14); }
+.phone-heading.is-offline .phone-heading-light span { background: hsl(0 74% 58%); box-shadow: 0 0 0 4px hsl(0 74% 58% / .14); }
+.phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
+.phone-bar .phone-gallery-mode.media-mode-toggle { display: flex; gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.phone-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
+.phone-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: 10px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.phone-bar .phone-gallery-mode button.active, .phone-bar .phone-gallery-mode button[aria-pressed="true"] { background: transparent; box-shadow: none; color: hsl(var(--foreground)); font-weight: 650; }
+.phone-bar .phone-gallery-mode button:active { background: rgb(255 255 255 / .06); }
+.phone-bar .phone-running-inline { margin-left: 2px; }
+.phone-bar .phone-tools-row { margin: 0 calc(-1 * max(8px, env(safe-area-inset-right))) 0 calc(-1 * max(8px, env(safe-area-inset-left))); padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
+.phone-bar .phone-tools-inner { padding: 2px 0 8px; }
+@media (max-width: 340px) { .phone-bar .phone-gallery-mode button { padding: 0 5px; font-size: 16.5px; } .phone-bar .phone-icon { width: 40px; } }
+
+.phone-fab {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) - var(--pwa-drop, 0px) + var(--pwa-gap, 0px));
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f2f2;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .45), 0 0 0 1px rgb(0 0 0 / .2);
+  color: #0b0b0b;
+  transition: scale var(--motion-instant) var(--motion-ease);
+}
+.phone-fab:active { scale: .94; }
+/* A prompt waiting in Create: a small accent dot on the button. */
+.phone-fab.has-draft::after { content: ""; position: absolute; top: 9px; right: 9px; width: 9px; height: 9px; border: 2px solid #f2f2f2; border-radius: 50%; background: var(--accent-amber); }
+.phone-gallery { padding-bottom: calc(max(16px, env(safe-area-inset-bottom)) + 84px); }

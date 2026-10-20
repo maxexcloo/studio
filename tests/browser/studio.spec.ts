@@ -64,33 +64,34 @@ test('the phone gallery scrolls the document so a tap on the status bar reaches 
   await expect(page.locator('[data-tile-id="image-0"]')).toBeInViewport();
 });
 
-test('the phone dock keeps Images/Videos, the prompt and large targets in thumb reach at every phone size', async ({ page, isMobile }, testInfo) => {
-  test.skip(!isMobile, 'The phone dock and creation pill.');
+test('the phone top bar holds Images/Videos and the tools, with Create floating in thumb reach at every phone size', async ({ page, isMobile }, testInfo) => {
+  test.skip(!isMobile, 'The phone top bar and Create button.');
   await page.goto('/');
   const mode = studioUi(page).galleryMode;
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   await expect(page.locator('.phone-gallery .phone-generation-mode')).toHaveCount(0);
   await expect(mode.locator('select')).toHaveCount(0);
   await expect(mode.getByRole('button')).toHaveCount(2);
+  // No bottom bar: Create is the only thing at the bottom.
+  await expect(page.locator('.phone-dock, .phone-create-pill')).toHaveCount(0);
   for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
-    const selector = await mode.boundingBox();
-    const prompt = await page.locator('.phone-create-open').boundingBox();
-    const pill = await page.locator('.phone-create-pill').boundingBox();
-    for (const button of await mode.getByRole('button').all()) {
-      const box = await button.boundingBox();
-      expect(box!.width).toBeGreaterThanOrEqual(44);
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+    const bar = (await page.locator('.phone-bar').first().boundingBox())!;
+    const create = (await page.getByRole('button', { name: 'Create', exact: true }).boundingBox())!;
+    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'More', exact: true })]) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(40);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      // All in the one slim bar, on screen.
+      expect(box.y).toBeGreaterThanOrEqual(bar.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(bar.y + bar.height + 1);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
     }
-    expect(selector!.height).toBeGreaterThanOrEqual(44);
-    expect(selector!.x).toBeGreaterThanOrEqual(0);
-    expect(selector!.x + selector!.width).toBeLessThanOrEqual(viewport.width);
-    // Bottom-up: the pair sits in the dock under the prompt, and the top keeps only a thin strip.
-    expect(selector!.y).toBeGreaterThan(prompt!.y);
-    expect(prompt!.y).toBeGreaterThan(viewport.height / 2);
-    expect((await page.locator('.phone-bar').first().boundingBox())!.height).toBeLessThanOrEqual(48);
-    expect(prompt!.width).toBeGreaterThan(100);
-    expect(pill!.x + pill!.width).toBeLessThanOrEqual(viewport.width);
+    expect(bar.height).toBeLessThanOrEqual(52);
+    // Create floats bottom right, within thumb reach.
+    expect(create.width).toBeGreaterThanOrEqual(56);
+    expect(create.y).toBeGreaterThan(viewport.height / 2);
+    expect(create.x + create.width).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
   }
   await page.setViewportSize({ width: 390, height: 844 });
@@ -570,8 +571,9 @@ test('each prompt keeps its own Clear and history actions without changing the o
     const container = composer.locator(clear === 'Clear Prompt' ? '.composer-prompt-field:not(.is-negative)' : '.composer-prompt-field.is-negative');
     await expect(container.getByRole('button', { name: clear, exact: true })).toBeVisible();
     await expect(container.getByRole('button', { name: history, exact: true })).toBeVisible();
+    // Inside its own field (the phone's sit in a toolbar along the prompt's lower edge).
     await expect.poll(() => container.evaluate(element => {
-      const field = element.querySelector('textarea')!.getBoundingClientRect();
+      const field = element.getBoundingClientRect();
       return [...element.querySelectorAll('button')].every(button => {
         const bounds = button.getBoundingClientRect();
         return bounds.x >= field.x - 1 && bounds.right <= field.right + 1 && bounds.y >= field.y - 1 && bounds.bottom <= field.bottom + 1;
@@ -872,10 +874,10 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
   if (await ui.isPhone()) {
     // The phone names a running generation beside its title; tapping it scrolls back to it.
-    const indicator = page.locator('.phone-title .phone-running-inline');
+    const indicator = page.locator('.phone-bar .phone-running-inline');
     await expect(indicator).toBeVisible();
     await expect(page.locator('.phone-running')).toHaveCount(0);
-    const galleryTitle = await page.getByRole('button', { name: 'Scroll To Top', exact: true }).boundingBox();
+    const galleryTitle = await ui.galleryMode.boundingBox();
     const badge = await indicator.boundingBox();
     expect(Math.abs(badge!.y - galleryTitle!.y)).toBeLessThan(3);
     await indicator.click();
