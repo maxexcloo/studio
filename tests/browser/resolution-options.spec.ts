@@ -18,25 +18,28 @@ for (const supported of [0, 1, 2]) test(`native resolution choices follow model 
   await ui.openComposer();
   await ui.prompt.fill('A mountain');
   const menu = await ui.openSizeMenu();
-  await expect(menu.getByRole('button', { name: 'Custom Size', exact: true })).toBeVisible();
+  // Width and Height are always there, with no Custom Size toggle.
+  await expect(menu.getByRole('textbox', { name: 'Width in Pixels', exact: true })).toBeVisible();
+  await expect(menu.getByRole('button', { name: 'Custom Size', exact: true })).toHaveCount(0);
+  const resolution = menu.getByRole('radiogroup', { name: 'Resolution', exact: true });
   if (!supported) {
     await expect(menu.getByText('Resolution', { exact: true })).toHaveCount(0);
-    await expect(menu.getByRole('radio')).toHaveCount(0);
+    await expect(resolution).toHaveCount(0);
     return;
   }
   if (supported === 1) {
-    await expect(menu.getByRole('radiogroup', { name: 'Resolution', exact: true })).toBeVisible();
-    await expect(menu.getByRole('radio')).toHaveCount(2);
-    await expect(menu.getByRole('radio', { name: '4K', exact: true })).toHaveCount(0);
-    await menu.getByRole('radio', { name: '2K', exact: true }).click();
+    await expect(resolution).toBeVisible();
+    await expect(resolution.getByRole('radio')).toHaveCount(2);
+    await expect(resolution.getByRole('radio', { name: '4K', exact: true })).toHaveCount(0);
+    await resolution.getByRole('radio', { name: '2K', exact: true }).click();
   } else {
     // A segmented toggle of the native options, however many.
-    await expect(menu.getByRole('radio')).toHaveCount(3);
-    await menu.getByRole('radio', { name: '4K', exact: true }).click();
+    await expect(resolution.getByRole('radio')).toHaveCount(3);
+    await resolution.getByRole('radio', { name: '4K', exact: true }).click();
   }
   // The panel stays open, so a shape can be picked in the same go.
   await expect(menu).toBeVisible();
-  const shape = menu.locator('.aspect-option, .phone-size-row').filter({ hasText: /1:1|Square/ }).first();
+  const shape = menu.locator('.aspect-option, .size-shape').filter({ hasText: /1:1|Square/ }).first();
   if (await shape.count()) { await shape.click(); await expect(menu).toBeVisible(); }
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
