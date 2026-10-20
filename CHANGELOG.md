@@ -18,6 +18,7 @@ version opens with a `> ` summary line.
 - **Studio settings fail loudly:** a partial `STUDIO_OIDC_*` set, an invalid `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS` or `STUDIO_OUTPUT_STORAGE`, or a `STUDIO_SETUP_TOKEN` under 32 characters now stops Studio at startup with the setting's name instead of quietly falling back. The sign-in button reads Single Sign-On unless `STUDIO_OIDC_LABEL` names it.
 
 ### Fixed
+- **Reduced motion everywhere:** animated panels, sheets and the viewer follow the system's reduce-motion setting, as the CSS animations already did.
 - **Current wording and links:** About and the phone no longer mention in-app updates, the Hugging Face hint points at Settings › Integrations, `.env.example` names the `studio` storage default, and broken guide links point at existing sections.
 - **Studio names in downloads:** gallery and Hidden exports download as `studio-gallery-…`, `studio-hidden-…`, unnamed shared files fall back to `studio`, and accounts asking for Hidden see "Hidden is not available to accounts."
 

@@ -1,6 +1,7 @@
 import "./app/domGuard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MotionConfig } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import { showToastTone as showToast, toast } from "./app/toast";
 import "./styles.css";
@@ -1817,4 +1818,5 @@ function App() {
 // Other devices sign in before the studio loads (DeviceGate.tsx).
 // A render error anywhere shows the crash screen (with Reload and Report) instead of a blank page.
 // One tooltip provider for the whole app holds the shared hover delay and lets neighbours open at once.
-createRoot(document.getElementById("root")!).render(<TooltipProvider><CrashBoundary><DeviceGate><App /></DeviceGate></CrashBoundary></TooltipProvider>);
+// Framer Motion follows the system reduced-motion setting, as the CSS animations do.
+createRoot(document.getElementById("root")!).render(<MotionConfig reducedMotion="user"><TooltipProvider><CrashBoundary><DeviceGate><App /></DeviceGate></CrashBoundary></TooltipProvider></MotionConfig>);
