@@ -101,12 +101,6 @@ export function rubber(value: number, min: number, max: number, reach = 140) {
   return value;
 }
 
-export function rubberPan(geometry: ViewerGeometry | null, zoom: number, pan: Pan): Pan {
-  if (!geometry || zoom < MIN_ZOOM) return pan;
-  const { minX, maxX, minY, maxY } = panBounds(geometry, zoom);
-  return { x: rubber(pan.x, minX, maxX), y: rubber(pan.y, minY, maxY) };
-}
-
 /** Pinching past 100% or 600% gives way less and less, in proportion. */
 export function rubberZoom(raw: number) {
   if (raw < MIN_ZOOM) return MIN_ZOOM * Math.pow(raw / MIN_ZOOM, 0.4);

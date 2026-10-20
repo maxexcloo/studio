@@ -4,14 +4,6 @@ import type { GalleryItem } from './types';
 import { NARROW_QUERY } from './device';
 export { galleryTime, sortGalleryItems } from '../../server/gallery-order.js';
 
-export type GalleryPhoto = {
-  src: string;
-  width: number;
-  height: number;
-  key: string;
-  item: GalleryItem;
-};
-
 export function dedupeGalleryItems(items: GalleryItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -41,18 +33,6 @@ export function useGalleryColumnCount() {
     return () => window.removeEventListener("resize", update);
   }, []);
   return count;
-}
-
-export function galleryPhoto(item: GalleryItem): GalleryPhoto {
-  const width = Math.max(1, Number(item.width || 1));
-  const height = Math.max(1, Number(item.height || 1));
-  return {
-    src: item.url || item.preview || "/heiss-mark-white.svg",
-    width,
-    height,
-    key: item.id,
-    item
-  };
 }
 
 export function touchDistance(touches: React.TouchList) {

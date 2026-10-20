@@ -68,7 +68,3 @@ export function useFavorites({ patchGalleryItems, removeGalleryItems, setActive,
 
 /** Starring from any tile, without threading props through the masonry. */
 export const FavoriteContext = React.createContext<((items: GalleryItem[], favorite: boolean) => void) | null>(null);
-
-export function useStar() {
-  return React.useContext(FavoriteContext);
-}

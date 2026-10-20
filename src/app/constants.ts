@@ -38,9 +38,6 @@ export const features = {
   moments: false
 } as const;
 
-export const galleryInitialBatch = 72;
-export const galleryBatchSize = 48;
-
 export const fallbackAspectPresets: Record<Mode, AspectPreset[]> = {
   image: [
     { label: "1:1", value: "1024x1024", w: 1024, h: 1024 },

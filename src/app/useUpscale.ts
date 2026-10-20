@@ -85,12 +85,6 @@ export const upscaleEfforts = [
   { value: "high", label: "High", scale: "3×", model: "SeedVR2 7B fp16", detail: "3× with the 7B fp16 model. Slowest, and uses the most graphics memory.", downloadBytes: 16_980_659_238 }
 ] as const;
 
-/** The size menu's preset tabs; Custom is the size menu's own (customSize). */
-export const autoUpscaleTiers: { value: AutoUpscale; label: string }[] = [
-  { value: "none", label: "Default" },
-  { value: "2k", label: "2K" }
-];
-
 /** The native size from a saved pick, including legacy tier suffixes. */
 export function upscaleSize(tier: AutoUpscale | undefined): "none" | "2k" | "4k" {
   return tier?.startsWith("4k") ? "4k" : tier && tier !== "none" ? "2k" : "none";

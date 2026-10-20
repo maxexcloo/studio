@@ -314,12 +314,6 @@ export function startLoraSync() {
   };
 }
 
-/** Try the queue now, e.g. right after unlocking on another device. */
-export function retryLoraSync() {
-  failures = 0;
-  void flush();
-}
-
 /* ------------------------------------------------------------ Strengths */
 
 export function rememberedLoraStrength(workflowId: string, name: string, fallback: number) {

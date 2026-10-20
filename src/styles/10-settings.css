@@ -1,36 +1,5 @@
-/* Shared form bits that outlived the old settings sheet: the
-   info "i" and disclosures. Settings itself lives in 19-settings.css. */
-
-/* ------------------------------------------------------------------- Info i */
-
-.info-tip {
-  position: relative;
-  flex: 0 0 auto;
-  width: 17px;
-  height: 17px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.09);
-  color: hsl(var(--muted-foreground));
-  cursor: help;
-  transition-property: background-color, color, scale;
-  transition-duration: var(--motion-base);
-  transition-timing-function: var(--motion-ease);
-}
-/* Keeps the visual dot small while the pointer target stays comfortable. */
-.info-tip::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 34px;
-  height: 34px;
-  translate: -50% -50%;
-}
-.info-tip:hover { background: rgb(255 255 255 / 0.18); color: hsl(var(--foreground)); }
+/* Shared form bits that outlived the old settings sheet: disclosures.
+   Settings itself lives in 19-settings.css. */
 
 /* -------------------------------------------------------------- Disclosures */
 

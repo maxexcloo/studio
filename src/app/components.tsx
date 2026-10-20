@@ -5,7 +5,7 @@ import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState }
 import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
-import { Brush, Check, ChevronDown, ImagePlus, Info, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { Brush, Check, ChevronDown, ImagePlus, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -128,17 +128,6 @@ export function Tip({ content, side = "bottom", forceOpen, children }: { content
 export function BetaTag({ className }: { className?: string }) {
   // The hidden comma keeps a screen reader from reading "VideoBeta" as one word.
   return <span className={cn("beta-tag", className)}><span className="sr-only">, </span>Beta</span>;
-}
-
-/** Small "i" affordance for the one explanation a control genuinely needs. */
-export function InfoTip({ content, side = "top" }: { content: React.ReactNode; side?: "top" | "right" | "bottom" | "left" }) {
-  return (
-    <Tip content={content} side={side}>
-      <button type="button" className="info-tip" aria-label="More Information">
-        <Info size={12} strokeWidth={2.6} />
-      </button>
-    </Tip>
-  );
 }
 
 export function NumberPicker({
