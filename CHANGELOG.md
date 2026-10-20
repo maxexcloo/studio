@@ -11,6 +11,18 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Lighter icon-button hovers with tooltips that stay clear of the zoom, an outline Upscale arrow, plain centred empty states, picks that keep their place, and a steady CI
+
+### Changed
+- **Icon-button states:** the viewer bar's and docks' hover and press fill is a 32 px circle inset evenly in the bar, with a keyboard ring that traces it; tile corner buttons share one hover, press and focus treatment; the phone viewer bar's press fill sits inside its cell.
+- **Viewer zoom in the corner:** the zoom pill sits at the bottom right, level with the action bar, so the bar's tooltips never cover it.
+- **Upscale arrow:** an outline like the other action icons.
+- **Empty states:** every picker, tab and list with nothing to show uses plain muted words centred in the space, without a box or icon; the LoRA picker says "This Model Doesn’t Support LoRAs".
+- **Picks keep their place:** in the References and LoRA choosers a picked item stays where it is and shows its number; the Selected tab lists picks in order. Clear All is now **Clear Selection**.
+
+### Fixed
+- **CI:** the completion-notice test measures the island once its height settles instead of mid-animation.
+
 ## [0.33.0] - 2026-10-20
 
 > Messages move into the Studio pill, every reference stack gets one References button, Advanced Settings become a popover, Settings regroup, chat queues ten images per call, and motion and start-up get quicker
