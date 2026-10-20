@@ -84,14 +84,23 @@ test('Info opens Details, which closes with its own Close (or Info on a phone)',
   await expect(info).toBeVisible();
 });
 
-test('zoom is a small − % + pill, bottom middle, whose percentage cycles the fit', async ({ page }) => {
+test('zoom is a small − % + pill, clear of the action bar, whose percentage cycles the fit', async ({ page }) => {
   await page.goto('/');
   const { viewer, phone } = await open(page);
   if (await page.locator('.viewer-side').count()) await page.locator('.viewer-side').getByRole('button', { name: 'Close Details', exact: true }).click();
   const zoom = viewer.getByRole('group', { name: 'Image Zoom' });
   const viewport = page.viewportSize()!;
-  // Centred once Details has gone and the pill has slid back.
-  await expect.poll(async () => { const b = await zoom.boundingBox(); return Math.abs(b!.x + b!.width / 2 - viewport.width / 2); }).toBeLessThan(4);
+  if (phone) {
+    // Centred above the phone bar.
+    await expect.poll(async () => { const b = await zoom.boundingBox(); return Math.abs(b!.x + b!.width / 2 - viewport.width / 2); }).toBeLessThan(4);
+  } else {
+    // Bottom right, level with the action bar, so the bar's tooltips (above it) never cover it.
+    const bar = viewer.getByRole('toolbar', { name: 'Image Actions' });
+    await expect.poll(async () => { const b = await zoom.boundingBox(); return viewport.width - (b!.x + b!.width); }).toBeLessThan(32);
+    const [pill, dock] = [await zoom.boundingBox(), await bar.boundingBox()];
+    expect(Math.abs((pill!.y + pill!.height / 2) - (dock!.y + dock!.height / 2))).toBeLessThan(2);
+    expect(pill!.x).toBeGreaterThan(dock!.x + dock!.width);
+  }
   const box = await zoom.boundingBox();
   expect(box!.height).toBeLessThanOrEqual(phone ? 44 : 34);
   expect(box!.width).toBeLessThanOrEqual(phone ? 140 : 120);
