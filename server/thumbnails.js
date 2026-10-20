@@ -10,8 +10,17 @@ import { loadSharp } from "./sharp-loader.js";
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
 // only has to pull a full-resolution image when it actually opens the viewer.
 const thumbnailDir = path.join(dataDir, ".thumbnails");
-const longestEdge = 768;
-const quality = 72;
+/*
+ * The grid's thumbnail, and the viewer's display copy: a WebP of the whole
+ * picture up to a size no screen needs more of at fit or 1:1, a fraction of
+ * the original PNG's bytes. The viewer asks for the original only past it.
+ */
+export const RENDITIONS = {
+  thumb: { longestEdge: 768, quality: 72 },
+  display: { longestEdge: 2560, quality: 90 }
+};
+const { longestEdge, quality } = RENDITIONS.thumb;
+const renditionOf = (size) => RENDITIONS[size] || RENDITIONS.thumb;
 const pending = new Map();
 
 /**
@@ -149,8 +158,9 @@ setTimeout(maybeSweep, 60_000).unref?.();
 
 // Folding the resize settings into the key means changing longestEdge/quality
 // naturally starts a fresh cache generation instead of serving stale-sized files.
-function cacheKey(filename, subfolder, type) {
-  return crypto.createHash("sha1").update(`${type}:${subfolder}:${filename}:${longestEdge}:${quality}`).digest("hex");
+function cacheKey(filename, subfolder, type, size = "thumb") {
+  const rendition = renditionOf(size);
+  return crypto.createHash("sha1").update(`${type}:${subfolder}:${filename}:${rendition.longestEdge}:${rendition.quality}`).digest("hex");
 }
 
 function cachePath(key, sourceHash) {
@@ -254,8 +264,8 @@ async function localSource(filename, subfolder, type) {
   }
 }
 
-async function build(filename, subfolder, type) {
-  const key = cacheKey(filename, subfolder, type);
+async function build(filename, subfolder, type, size) {
+  const key = cacheKey(filename, subfolder, type, size);
   const local = await localSource(filename, subfolder, type);
   if (local) {
     const file = cachePath(key, local.sourceHash);
@@ -264,7 +274,7 @@ async function build(filename, subfolder, type) {
       if (fs.existsSync(file)) return { file, etag: `\"${local.sourceHash}\"` };
       // sharp reads the file itself, off the main thread, instead of it being
       // read here into a buffer first. Unreadable: try ComfyUI below.
-      try { return await writeThumbnail(key, local.sourceHash, local.file); } catch { return null; }
+      try { return await writeThumbnail(key, local.sourceHash, local.file, size); } catch { return null; }
     });
     if (made) return made;
   }
@@ -279,14 +289,15 @@ async function build(filename, subfolder, type) {
     const sourceHash = crypto.createHash("sha256").update(source).digest("hex");
     const file = cachePath(key, sourceHash);
     if (fs.existsSync(file)) return { file, etag: `\"${sourceHash}\"` };
-    return writeThumbnail(key, sourceHash, source);
+    return writeThumbnail(key, sourceHash, source, size);
   });
 }
 
-async function writeThumbnail(key, sourceHash, source) {
+async function writeThumbnail(key, sourceHash, source, size = "thumb") {
   const file = cachePath(key, sourceHash);
   const sharp = await loadSharp();
   if (!sharp) return { original: true };
+  const { longestEdge, quality } = renditionOf(size);
   // .rotate() turns a phone photo (a library image) upright by its EXIF
   // orientation, which WebP doesn't carry; outputs have none and are unchanged.
   const resized = await sharp(source)
@@ -320,22 +331,24 @@ async function writeThumbnail(key, sourceHash, source) {
 // Concurrent requests for the same not-yet-cached image share one build instead of
 // each downloading and resizing the source independently. Without sharp there is
 // nothing to build: an earlier thumbnail, else `{ original: true }` (serve the full image).
-export async function getThumbnail(filename, subfolder, type) {
-  const result = await findOrBuild(filename, subfolder, type);
+// `size` is a rendition: "thumb" for the grid, "display" for the viewer.
+export async function getThumbnail(filename, subfolder, type, size = "thumb") {
+  const result = await findOrBuild(filename, subfolder, type, size);
   if (result?.file) noteUsed(result.file);
   return result;
 }
 
 /** Builds an output's thumbnail ahead of its first view (media-warmup.js); unlike a request, not a use. */
-export function warmThumbnail(filename, subfolder = "", type = "output") {
-  return findOrBuild(filename, subfolder, type);
+export function warmThumbnail(filename, subfolder = "", type = "output", size = "thumb") {
+  return findOrBuild(filename, subfolder, type, size);
 }
 
-async function findOrBuild(filename, subfolder, type) {
-  if (!(await loadSharp())) return cachedThumbnail(cacheKey(filename, subfolder, type)) || { original: true };
-  const dedupeKey = `${type}:${subfolder}:${filename}`;
+async function findOrBuild(filename, subfolder, type, size = "thumb") {
+  if (!RENDITIONS[size]) size = "thumb";
+  if (!(await loadSharp())) return cachedThumbnail(cacheKey(filename, subfolder, type, size)) || { original: true };
+  const dedupeKey = `${size}:${type}:${subfolder}:${filename}`;
   if (pending.has(dedupeKey)) return pending.get(dedupeKey);
-  const promise = build(filename, subfolder, type).finally(() => pending.delete(dedupeKey));
+  const promise = build(filename, subfolder, type, size).finally(() => pending.delete(dedupeKey));
   pending.set(dedupeKey, promise);
   return promise;
 }
@@ -384,12 +397,13 @@ export function viewParams(url = "") {
  */
 export function forgetThumbnail(filename, subfolder = "", type = "output") {
   if (!filename) return 0;
-  const key = cacheKey(filename, subfolder, type);
+  // Every rendition: the viewer's display copy is as much a copy as the thumbnail.
+  const keys = Object.keys(RENDITIONS).map((size) => cacheKey(filename, subfolder, type, size));
   let removed = 0;
   let names = [];
   try { names = fs.readdirSync(thumbnailDir); } catch { return 0; }
   for (const name of names) {
-    if (!name.startsWith(`${key}-`)) continue;
+    if (!keys.some((key) => name.startsWith(`${key}-`))) continue;
     try {
       fs.rmSync(path.join(thumbnailDir, name), { force: true });
       indexRemove(name);
@@ -440,7 +454,7 @@ export async function forgetItemThumbnails(item) {
   for (const url of [item?.url, item?.thumbnailUrl, item?.upscale?.url, item?.upscale?.thumbnailUrl]) {
     const params = viewParams(url);
     if (!params) continue;
-    await pending.get(`${params.type}:${params.subfolder}:${params.filename}`)?.catch(() => null);
+    for (const size of Object.keys(RENDITIONS)) await pending.get(`${size}:${params.type}:${params.subfolder}:${params.filename}`)?.catch(() => null);
     removed += forgetThumbnail(params.filename, params.subfolder, params.type);
   }
   return removed;

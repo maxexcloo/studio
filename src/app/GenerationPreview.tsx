@@ -6,6 +6,7 @@ import { generationGridCount, webglMosaicAllowed } from './generationEffect';
 import { upscaleDisplayThumbnail, upscaleDisplayUrl } from './useUpscale';
 import { SafeImg } from './SafeImg';
 import { mediaUrl } from './mediaUrl';
+import { needsOriginal, viewerMediaSize, viewerSources } from './viewerMedia';
 
 export function generationIdentity(item: GalleryItem) {
   return !item.run && item.jobId && Number.isInteger(item.index)
@@ -23,11 +24,16 @@ function inpaintPreviewOf(item: GalleryItem): InpaintPreview | null {
   return value as InpaintPreview;
 }
 
-export function GenerationMedia({ item, muted = false, fit = 'cover', children }: React.PropsWithChildren<{ item: GalleryItem; muted?: boolean; fit?: 'cover' | 'contain' }>) {
-  return <GenerationMediaInstance key={generationIdentity(item)} item={item} muted={muted} fit={fit}>{children}</GenerationMediaInstance>;
+/**
+ * `stage` is the viewer: a finished image there shows its thumbnail at once,
+ * in the rectangle the picture will fill, and fades to the display copy, or
+ * to the original once `scale` (screen pixels per original pixel) needs it.
+ */
+export function GenerationMedia({ item, muted = false, fit = 'cover', stage = false, scale = 1, children }: React.PropsWithChildren<{ item: GalleryItem; muted?: boolean; fit?: 'cover' | 'contain'; stage?: boolean; scale?: number }>) {
+  return <GenerationMediaInstance key={generationIdentity(item)} item={item} muted={muted} fit={fit} stage={stage} scale={scale}>{children}</GenerationMediaInstance>;
 }
 
-function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWithChildren<{ item: GalleryItem; muted: boolean; fit: 'cover' | 'contain' }>) {
+function GenerationMediaInstance({ item, muted, fit, stage, scale, children }: React.PropsWithChildren<{ item: GalleryItem; muted: boolean; fit: 'cover' | 'contain'; stage: boolean; scale: number }>) {
   const mode = useContext(GenerationPreviewMode);
   const reducedMotion = useReducedMotion();
   const beganPending = useRef(item.status === 'pending');
@@ -52,9 +58,14 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
   // Unique to this item, so a reused file name never brings back an older picture (mediaUrl.ts).
   const source = mediaUrl(isThumbnail ? displayThumbnail! : displayUrl, item);
   const previewItem = pending ? item : lastPending.current;
+  const size = item.type === 'image' ? viewerMediaSize(item) : null;
+  const staged = stage && item.status === 'done' && item.type === 'image' && !resolving && !inpaint && Boolean(source) && failedSource !== source;
   return (
-    <div className={`generation-surface${pending ? ' is-pending' : ''}${resolving ? ' is-resolving' : ''}`}>
-      {item.status === 'done' && item.type === 'image' && source && failedSource !== source ? (
+    // The picture's own size, so the viewer knows the rectangle it fills before any pixels arrive (viewerGesture.ts).
+    <div className={`generation-surface${pending ? ' is-pending' : ''}${resolving ? ' is-resolving' : ''}`} data-media-width={size?.width} data-media-height={size?.height}>
+      {staged ? (
+        <StagedImage item={item} scale={scale} reducedMotion={Boolean(reducedMotion)} onFailed={() => { setFailedSource(source); setResolved(true); }} />
+      ) : item.status === 'done' && item.type === 'image' && source && failedSource !== source ? (
         <img src={source} alt={muted ? "" : item.prompt ? `Generated from: ${item.prompt.slice(0, 160)}` : "Generated image"} draggable={false} className="generation-result" decoding="async"
           onLoad={() => setLoadedSource(source)}
           onError={() => {
@@ -80,6 +91,44 @@ function GenerationMediaInstance({ item, muted, fit, children }: React.PropsWith
         onResolved={() => setResolved(true)} /> : null}
       {pending ? children : null}
     </div>
+  );
+}
+
+/**
+ * The viewer's picture. Every layer is the same object-fit: contain box over
+ * the same picture, so each draws in the same rectangle: the last layer that
+ * loaded stays underneath while the next fades in over it, never resizing.
+ */
+function StagedImage({ item, scale, reducedMotion, onFailed }: { item: GalleryItem; scale: number; reducedMotion: boolean; onFailed: () => void }) {
+  const sources = viewerSources(item);
+  const [failed, setFailed] = useState<string[]>([]);
+  // Once the original is asked for it stays, so zooming back out never steps down a copy.
+  const [wantOriginal, setWantOriginal] = useState(false);
+  const deep = needsOriginal(item, scale);
+  useEffect(() => { if (deep) setWantOriginal(true); }, [deep]);
+  const target = wantOriginal || failed.includes(sources.display) ? sources.original : sources.display;
+  const [loaded, setLoaded] = useState('');
+  const [under, setUnder] = useState(sources.placeholder);
+  useEffect(() => {
+    if (!loaded || loaded === under) return;
+    // Hands over once the fade is done; the layer beneath goes then, not before.
+    const timer = window.setTimeout(() => setUnder(loaded), reducedMotion ? 0 : 220);
+    return () => window.clearTimeout(timer);
+  }, [loaded, under, reducedMotion]);
+  const alt = item.prompt ? `Generated from: ${item.prompt.slice(0, 160)}` : 'Generated image';
+  return (
+    <>
+      <img key={target} src={target} alt={alt} draggable={false} className={`generation-result${loaded === target ? '' : ' is-loading'}`} decoding="async"
+        onLoad={() => setLoaded(target)}
+        onError={() => {
+          if (target === sources.original) onFailed();
+          else setFailed((list) => [...list, target]);
+        }} />
+      {under && under !== target && !failed.includes(under) ? (
+        <img src={under} alt="" aria-hidden="true" draggable={false} className="generation-placeholder" decoding="async"
+          onError={() => setFailed((list) => [...list, under])} />
+      ) : null}
+    </>
   );
 }
 

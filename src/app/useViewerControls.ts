@@ -12,7 +12,7 @@ import { flushSync } from 'react-dom';
 import { toast } from './toast';
 import { wheelPixels } from './wheel';
 import type { GalleryItem, Profile, TouchGesture } from './types';
-import { MAX_ZOOM, MIN_ZOOM, Velocity, anchoredPan as anchorPan, clampPan, liveTransform, measureViewer, paint, rubber, rubberZoom, type Pan } from './viewerGesture';
+import { MAX_ZOOM, MIN_ZOOM, Velocity, anchoredPan as anchorPan, clampPan, liveTransform, measureViewer, mediaSize, paint, rubber, rubberZoom, type Pan } from './viewerGesture';
 
 const VIEWER_CONTROLS = 'button, a, input, select, textarea, [role="slider"], .heiss-video-error';
 function viewerControl(event: React.SyntheticEvent) {
@@ -23,8 +23,7 @@ function viewerControl(event: React.SyntheticEvent) {
 /** Where an object-fit: contain image actually draws inside its box. */
 function containedRect(media: HTMLImageElement | HTMLVideoElement) {
   const box = media.getBoundingClientRect();
-  const naturalW = media instanceof HTMLImageElement ? media.naturalWidth : media.videoWidth;
-  const naturalH = media instanceof HTMLImageElement ? media.naturalHeight : media.videoHeight;
+  const { width: naturalW, height: naturalH } = mediaSize(media);
   if (!naturalW || !naturalH || !box.width || !box.height) return box;
   const scale = Math.min(box.width / naturalW, box.height / naturalH);
   const w = naturalW * scale;
@@ -63,12 +62,15 @@ export function useViewerControls(view: any) {
     if (!canvas) return;
     sizeMode.current = openingMode();
     let first = true;
+    // From the record's size when it has one, so the picture opens at its
+    // final size before a pixel of it loads, and never resizes as it does.
     const measure = () => {
-      const image = canvas.querySelector<HTMLImageElement>('img.generation-result');
-      if (!image?.naturalWidth) return;
+      const surface = canvas.querySelector<HTMLElement>('.generation-surface');
+      const width = surface ? mediaSize(surface).width : 0;
+      if (!width) return;
       const geometry = measureViewer(canvas);
       if (!geometry?.w) return;
-      const factor = image.naturalWidth / geometry.w;
+      const factor = width / geometry.w;
       if (!first && Math.abs(factor - nativeZoomRef.current) < 0.0001) return;
       const previous = nativeZoomRef.current;
       nativeZoomRef.current = factor;

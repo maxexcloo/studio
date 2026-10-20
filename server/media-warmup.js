@@ -14,6 +14,8 @@ import { encoderIdle, getComfyVideoPoster, getComfyVideoPreview, maxCacheBytes }
 const videoPattern = /\.(mp4|webm|mov|mkv|m4v)$/i;
 const imagePattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?)$/i;
 const thumbnailBudget = Math.floor(cacheLimitBytes / 2 / (64 * 1024));
+// The viewer's display copies are larger: only the newest get one ahead of time.
+const displayBudget = Math.floor(cacheLimitBytes / 4 / (1024 * 1024));
 const posterBudget = Math.floor(maxCacheBytes / 4 / (32 * 1024));
 const previewBudget = Math.floor(maxCacheBytes / 4 / (512 * 1024));
 const settled = new Set();
@@ -58,6 +60,7 @@ async function quietly(key, media, build) {
 /** One pass over the gallery as it is now. Resolves to how many files it looked at. */
 export async function warmGallery({ items = gallery } = {}) {
   let images = 0;
+  let displays = 0;
   let videos = 0;
   const previews = [];
   for (const item of [...items]) {
@@ -72,6 +75,10 @@ export async function warmGallery({ items = gallery } = {}) {
       } else if (images < thumbnailBudget) {
         images += 1;
         await quietly(`thumb:${key}`, media, () => warmThumbnail(filename, subfolder, type));
+        if (displays < displayBudget) {
+          displays += 1;
+          await quietly(`display:${key}`, media, () => warmThumbnail(filename, subfolder, type, 'display'));
+        }
       }
     }
   }
@@ -113,7 +120,7 @@ export function warmNewOutputs(outputs = []) {
     if (!params) continue;
     const { filename, subfolder, type } = params;
     const build = videoPattern.test(filename) ? getComfyVideoPoster(filename, subfolder, type)
-      : imagePattern.test(filename) ? warmThumbnail(filename, subfolder, type) : null;
+      : imagePattern.test(filename) ? warmThumbnail(filename, subfolder, type).then(() => warmThumbnail(filename, subfolder, type, 'display')) : null;
     build?.catch(() => {});
   }
 }

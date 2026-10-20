@@ -43,6 +43,24 @@ export function liveTransform(canvas: HTMLElement, fallback: { zoom: number; pan
 }
 
 /**
+ * The picture's pixel size: the one its record gives (data-media-width/height
+ * on the generation surface), known before anything loads and the same for
+ * its thumbnail, display copy and original; else what the media reports.
+ */
+export function mediaSize(element: Element) {
+  const surface = element.closest<HTMLElement>(".generation-surface") || element.querySelector<HTMLElement>(".generation-surface");
+  const width = Number(surface?.dataset.mediaWidth) || 0;
+  const height = Number(surface?.dataset.mediaHeight) || 0;
+  const media = (element.matches("img, video") ? element : element.querySelector("img, video")) as HTMLImageElement | HTMLVideoElement | null;
+  // A record whose size is wrong (a rotated library photo) gives way to the loaded picture.
+  const loaded = media instanceof HTMLImageElement && media.naturalWidth && media.naturalHeight;
+  if (width && height && (!loaded || Math.abs(media.naturalWidth / media.naturalHeight - width / height) < 0.01 * (width / height))) return { width, height };
+  if (media instanceof HTMLImageElement) return { width: media.naturalWidth, height: media.naturalHeight };
+  if (media instanceof HTMLVideoElement) return { width: media.videoWidth, height: media.videoHeight };
+  return { width: 0, height: 0 };
+}
+
+/**
  * Measured from what is drawn. The canvas pads more below (the dock) than
  * above, so the picture's centre is not the canvas's: zooming about the
  * canvas's centre is what made a pinch drift. Scaling about its own centre
@@ -58,9 +76,7 @@ export function measureViewer(canvas: HTMLElement): ViewerGeometry | null {
   const cy = box.top + box.height / 2 - matrix.f;
   const boxW = element.offsetWidth || box.width;
   const boxH = element.offsetHeight || box.height;
-  const media = (element.matches("img, video") ? element : element.querySelector("img, video")) as HTMLImageElement | HTMLVideoElement | null;
-  const naturalW = media instanceof HTMLImageElement ? media.naturalWidth : media instanceof HTMLVideoElement ? media.videoWidth : 0;
-  const naturalH = media instanceof HTMLImageElement ? media.naturalHeight : media instanceof HTMLVideoElement ? media.videoHeight : 0;
+  const { width: naturalW, height: naturalH } = mediaSize(element);
   const fit = naturalW && naturalH ? Math.min(boxW / naturalW, boxH / naturalH) : 0;
   const frame = canvas.getBoundingClientRect();
   return {

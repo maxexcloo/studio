@@ -36,9 +36,9 @@ const { warmGallery, warmNewOutputs } = await import('./media-warmup.js');
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 const files = (folder, pattern) => { try { return fs.readdirSync(path.join(dataDir, folder)).filter((name) => pattern.test(name)); } catch { return []; } };
 
-test('a pass builds the gallery’s thumbnails, posters and previews, and none for Hidden items', async () => {
+test('a pass builds the gallery’s thumbnails, display copies, posters and previews, and none for Hidden items', async () => {
   await warmGallery();
-  assert.equal(files('.thumbnails', /\.webp$/).length, 1, 'the visible image only');
+  assert.equal(files('.thumbnails', /\.webp$/).length, 2, 'the visible image’s thumbnail and display copy only');
   if (canEncode) {
     assert.equal(files('.video-previews', /\.jpg$/).length, 1, 'the video’s poster');
     assert.equal(files('.video-previews', /\.mp4$/).length, 1, 'the video’s grid preview');
@@ -51,8 +51,8 @@ test('a pass builds the gallery’s thumbnails, posters and previews, and none f
   assert.equal(fs.readdirSync(path.join(dataDir, '.thumbnails')).length, before);
 });
 
-test('a delivered output’s thumbnail is built straight away, before any browser asks', async () => {
+test('a delivered output’s thumbnail and display copy are built straight away, before any browser asks', async () => {
   warmNewOutputs([urls('c-new-output.png')]);
-  for (let tries = 0; files('.thumbnails', /\.webp$/).length < 2 && tries < 100; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(files('.thumbnails', /\.webp$/).length, 2);
+  for (let tries = 0; files('.thumbnails', /\.webp$/).length < 4 && tries < 100; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(files('.thumbnails', /\.webp$/).length, 4);
 });

@@ -883,7 +883,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > view.viewerNativeZoom * 1.05 ? view.viewerNativeZoom : view.viewerNativeZoom * 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
                   {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => applyAllSettings(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
-                  <GenerationMedia item={active} fit="contain">
+                  <GenerationMedia item={active} fit="contain" stage scale={(viewerZoom / (view.viewerNativeZoom || 1)) * (window.devicePixelRatio || 1)}>
                   {active.status === "pending" ? <GenerationProgress item={active} formatElapsed={formatElapsed} /> : null}
                   </GenerationMedia>
                   )}

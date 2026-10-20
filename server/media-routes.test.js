@@ -69,6 +69,18 @@ test('a Studio media thumbnail is kept a week, then revalidated by its ETag', as
   assert.equal(await revalidate(address('thumb', 'still.png', '&v=abc'), response.headers.get('etag')), 304);
 });
 
+test('the viewer’s display copy is a WebP of the whole picture, cached like a thumbnail', async () => {
+  const response = await fetch(address('thumb', 'still.png', '&size=display&v=abc'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/webp');
+  assert.equal(response.headers.get('cache-control'), 'private, max-age=604800, stale-while-revalidate=2592000');
+  const display = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
+  const thumbnail = await sharp(Buffer.from(await (await fetch(address('thumb', 'still.png', '&v=abc'))).arrayBuffer())).metadata();
+  assert.deepEqual([display.width, display.height], [900, 900], 'under its cap, the original’s own size');
+  assert.deepEqual([thumbnail.width, thumbnail.height], [768, 768]);
+  assert.equal(await revalidate(address('thumb', 'still.png', '&size=display&v=abc'), response.headers.get('etag')), 304);
+});
+
 test('a video’s thumbnail address gives its poster, so small views show a picture', { skip: !canEncode }, async () => {
   const response = await fetch(address('thumb', 'clip.mp4', '&v=abc'));
   assert.equal(response.status, 200);

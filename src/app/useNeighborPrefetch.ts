@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { mediaUrl } from './mediaUrl';
 import type { GalleryItem } from './types';
-import { upscaleDisplayUrl } from './useUpscale';
+import { viewerSources } from './viewerMedia';
 
 /** How far either side of the open picture is fetched ahead. */
 const REACH = 2;
 
 /**
- * Fetches and decodes the full pictures either side of the open one, nearest
- * first, the same URL the viewer will ask for (GenerationMedia), so a swipe
+ * Fetches and decodes the display copies either side of the open one, nearest
+ * first, the same URL the viewer will ask for (viewerMedia.ts), so a swipe
  * lands on a picture that is already there instead of a blank that fills in.
  */
 export function useNeighborPrefetch(active: GalleryItem | null, items: GalleryItem[]) {
@@ -20,7 +19,7 @@ export function useNeighborPrefetch(active: GalleryItem | null, items: GalleryIt
       for (const offset of [step, -step]) {
         const item = items[(index + offset + items.length) % items.length];
         if (!item || item.id === active?.id || item.status !== "done" || item.type !== "image" || item.vaultLocked) continue;
-        const url = mediaUrl(upscaleDisplayUrl(item), item);
+        const url = viewerSources(item).display;
         if (url && !urls.includes(url)) urls.push(url);
       }
     }

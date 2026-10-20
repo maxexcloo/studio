@@ -1772,7 +1772,8 @@ app.get("/comfy/thumb", async (req, res) => {
       await sendVideoPoster(req, res, await getComfyVideoPoster(filename, subfolder, type), thumbnailCacheControl(req));
       return;
     }
-    const thumbnail = await getThumbnail(filename, subfolder, type);
+    // ?size=display is the viewer's larger copy (thumbnails.js RENDITIONS).
+    const thumbnail = await getThumbnail(filename, subfolder, type, req.query.size === "display" ? "display" : "thumb");
     if (!thumbnail) { res.status(404).json({ error: "Source image is unavailable." }); return; }
     // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
     if (thumbnail.original) { res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`); return; }

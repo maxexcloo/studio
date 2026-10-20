@@ -479,3 +479,18 @@
 .viewer-zoom-percent { min-width: 42px; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 .viewer-phone-zoom { position: absolute; z-index: 12; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); left: 50%; transform: translateX(-50%); padding: 4px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-float); }
 .viewer-phone-zoom button { min-width: 44px; min-height: 44px; }
+
+/* The viewer's picture loads in layers (GenerationPreview.tsx StagedImage):
+   the thumbnail, then the display copy or original fading in over it. Both
+   are contained in the same box, so they cover the same rectangle. */
+.viewer-canvas .generation-surface img.generation-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.viewer-canvas .generation-surface img.generation-result.is-loading { opacity: 0; }
+.viewer-canvas .generation-surface img.generation-result:not(.is-loading) { transition: opacity 200ms var(--ease-soft); }
+@media (prefers-reduced-motion: reduce) {
+  .viewer-canvas .generation-surface img.generation-result:not(.is-loading) { transition: none; }
+}
