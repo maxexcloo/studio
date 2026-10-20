@@ -6,7 +6,7 @@ import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
-import { surfaceMotion, useComposerSurfaceBox } from "./composerSurface";
+import { surfaceMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
@@ -245,6 +245,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   React.useEffect(() => {
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
+  const settling = useSettling();
   if (!box) return null;
   // In the phone studio the prompt sits at the top of a full-height sheet, so the
   // picker comes up from the bottom edge as a sheet of its own.
@@ -262,6 +263,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       tabIndex={-1}
       data-open-surface
       {...surfaceMotion}
+      {...settling}
     >
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">

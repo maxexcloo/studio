@@ -6,6 +6,7 @@ import { cn } from './format';
 import { useFocusTrap } from './useFocusTrap';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { usePhoneLayer } from './phoneLayers';
+import { useSettling } from './composerSurface';
 import { StatusPill, useStatusHost } from './StatusMessage';
 
 /**
@@ -30,6 +31,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   const reduced = useReducedMotion();
   const { covered, nested } = usePhoneLayer(open);
   const message = useStatusHost(open && !covered);
+  const settling = useSettling();
   useFocusTrap(panelRef, open);
   useHistoryDismiss(open, onClose);
   React.useEffect(() => {
@@ -75,6 +77,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             aria-labelledby={titleId}
             tabIndex={-1}
             className={cn('phone-sheet', full && 'is-full', nested && 'is-nested', covered && 'is-covered', className)}
+            {...settling}
             aria-hidden={covered || undefined}
             initial={reduced ? { opacity: 0 } : nested ? { opacity: 0, y: 24 } : { y: '100%' }}
             animate={reduced ? { opacity: 1 } : nested ? { opacity: 1, y: 0 } : { y: 0 }}

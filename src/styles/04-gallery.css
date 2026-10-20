@@ -539,11 +539,12 @@
   border-color: hsl(var(--border-strong));
 }
 
+/* The viewer's backdrop is near-solid, without a blur: fading in a full-screen
+   blur re-blurred the whole gallery on every frame, and the picture covers
+   most of it anyway. */
 .scrim {
   position: fixed; inset: 0;
-  background: hsl(var(--background) / 0.55);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
+  background: hsl(var(--background) / 0.9);
   z-index: 20;
   overflow: hidden;
   overscroll-behavior: contain;

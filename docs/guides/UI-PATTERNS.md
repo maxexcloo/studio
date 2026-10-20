@@ -78,6 +78,13 @@ two levels:
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
 ad-hoc alpha, blur or shadow values.
 
+**Glass never blurs while it moves.** A popover or sheet spreads
+`useSettling()` (`composerSurface.ts`) onto its moving element: during its
+entry and exit it shows `--glass-panel-solid` without a blur, and the glass
+returns when it settles. A dialog's scrim adds its blur when its fade ends.
+The viewer's backdrop is near-solid with no blur. Animate only `transform`
+and `opacity`; never `top`, `left`, `width`, `height`, margins or padding.
+
 ### Accent
 
 One accent, warm amber like the lock mark's glow: `--accent-amber`,
