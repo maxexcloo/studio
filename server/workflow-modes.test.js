@@ -136,3 +136,14 @@ test('runtime profiles expose owned prompting and select explicit image-mode gui
   assert.deepEqual(inherited.prompting, prompting);
   assert.equal(inherited.imageModes.generate.prompting, undefined);
 });
+
+test('a profile without a CFG control (distilled) takes no CFG and records none', async () => {
+  const profile = inferModels(info).profiles.find((item) => item.id === 'custom:mode-test');
+  assert.equal(profile.capabilities.cfg, false);
+  assert.equal(profile.imageModes.generate.capabilities.cfg, false);
+  // CFG 3 on a distilled profile made photo-negative images: a stored one never reaches it.
+  const body = sanitizeGenerateBody({ kind: 'image', workflow: 'custom:mode-test', model: 'custom:mode-test', prompt: 'A scene', cfg: 3 }, info);
+  assert.equal(body.cfg, undefined);
+  const generated = await customWorkflowGraph(body);
+  assert.equal(generated[2].inputs.cfg, undefined);
+});

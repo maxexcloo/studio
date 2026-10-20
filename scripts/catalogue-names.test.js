@@ -40,7 +40,10 @@ test('model names show the title as it is, with tier, steps and tags on the seco
 
 test('LoRA names prefer metadata, preserve useful version information and leave identity untouched', () => {
   const filename = 'styles/watercolour_portrait-v2.safetensors';
-  assert.equal(loraName(filename), 'watercolour portrait v2');
+  assert.equal(loraName(filename), 'Watercolour Portrait V2');
+  // Unknown files read as a cleaned, Title Case stem; capitals and digits stay as they are.
+  assert.equal(loraName('loras/pawg_krea2.safetensors'), 'Pawg Krea2');
+  assert.equal(loraName('FLUX-detail_LoRA.pt'), 'FLUX Detail LoRA');
   assert.equal(loraName(filename, { title: '  Watercolour Portrait  ' }), 'Watercolour Portrait');
   assert.equal(filename, 'styles/watercolour_portrait-v2.safetensors');
 });

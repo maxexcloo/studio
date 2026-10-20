@@ -78,6 +78,7 @@ export function assertAdjustable(profile, args) {
     const fixed = fixedValue(profile, field);
     if (fixed !== undefined && fixed === value) continue;
     let reason = fixed !== undefined ? ` It is fixed at ${fixed}.` : '';
+    if (field === 'cfg' && profile.capabilities?.cfg === false) reason = ' This profile is guidance-distilled and runs at its own CFG; leave cfg out.';
     if (field === 'negative_prompt') reason = profile.capabilities?.negativePrompt
       ? ' This profile runs at cfg 1 (guidance-distilled), where a negative prompt has no effect. Describe what you want positively in the prompt instead.'
       : ' This profile has no negative prompt input (guidance-distilled). Describe what you want positively in the prompt instead.';

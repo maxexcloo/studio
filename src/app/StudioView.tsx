@@ -33,7 +33,7 @@ import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
 import { itemProfile, itemProfileName } from './itemProfile';
 import { loraName, modelName } from './catalogueNames';
-import { knownLoraInfo } from './useLoraInfo';
+import { fetchLoraInfo, knownLoraInfo } from './useLoraInfo';
 import { partName } from './partNames';
 
 import { TileLongPressContext } from './GalleryTile';
@@ -347,6 +347,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   });
   const [islandsHeight, setIslandsHeight] = React.useState(0);
   const viewerCopy = useCopyFeedback();
+  // The catalogue's LoRA titles, asked for once an output with LoRAs opens, so Details names them (UI-PATTERNS › Lists).
+  const [loraInfos, setLoraInfos] = React.useState(() => knownLoraInfo());
+  const activeHasLoras = Boolean(active?.settings?.loras?.length);
+  React.useEffect(() => {
+    if (!activeHasLoras || loraInfos) return;
+    let live = true;
+    fetchLoraInfo().then((infos) => { if (live) setLoraInfos(infos); }).catch(() => null);
+    return () => { live = false; };
+  }, [activeHasLoras, loraInfos]);
   const [compareOpen, setCompareOpen] = React.useState(false);
   // The pictures either side of the open one are fetched ahead, so a swipe lands on one already there.
   useNeighborPrefetch(active || null, (view.viewerGallery || []) as GalleryItem[]);
@@ -641,7 +650,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         const activeProfile = itemProfile(active, models?.profiles || []);
         const activeProfileName = itemProfileName(active, models?.profiles || []);
         const profileTitle = (activeProfile ? modelName(activeProfile).name : activeProfileName) || (active.settings?.modelName ? partName(String(active.settings.modelName)) : "") || "Generation";
-        const detailNames = { profile: activeProfileName, lora: (file: string) => loraName(file, knownLoraInfo()?.[file]) };
+        const detailNames = { profile: activeProfileName, lora: (file: string) => loraName(file, (loraInfos || knownLoraInfo())?.[file]) };
         const detailEntries = generationDetailEntries(active, detailNames);
         const profileDetail = [
           active.width && active.height ? `${active.width} × ${active.height}` : "",
@@ -721,7 +730,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                                 <ul className="detail-loras" aria-label="LoRAs">
                                   {section.loras.map((lora, index) => (
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
-                                      <span className="detail-lora-name" title={lora.name}>{lora.name}</span>
+                                      <span className="detail-lora-name" title={lora.file}>{lora.name}</span>
                                       <i aria-hidden="true" />
                                       <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
                                     </li>

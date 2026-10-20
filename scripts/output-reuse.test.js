@@ -85,3 +85,11 @@ test('reused settings drop a LoRA made for another family and count it, keeping 
   // Without what the files say, nothing is guessed away.
   assert.equal(compatibleLoras(loras, profile, {}).removed, 0);
 });
+
+test('Edit and Rerun keep a distilled profile at its own CFG, never the recorded one', () => {
+  const profile = { id: 'tesserafine-fast', kind: 'image', capabilities: { cfg: false }, defaults: { cfg: 1, steps: 8, width: 1024, height: 1024 } };
+  const settings = normaliseReusedSettings(profile, { type: 'image', width: 1024, height: 1024, settings: { cfg: 3, steps: 8 } });
+  assert.equal(settings.cfg, 1);
+  const open = normaliseReusedSettings({ ...profile, capabilities: { cfg: true } }, { type: 'image', width: 1024, height: 1024, settings: { cfg: 3, steps: 8 } });
+  assert.equal(open.cfg, 3);
+});

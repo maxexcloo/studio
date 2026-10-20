@@ -1420,7 +1420,7 @@ test('Reuse leaves out a saved LoRA made for another model family and says so', 
   finish(f);
   const again = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image' });
   assert.equal(again.isError, undefined);
-  assert.match(texts(again), /Left out a LoRA made for another model \(fixture-other\.safetensors\); tell the user\./);
+  assert.match(texts(again), /Left out a LoRA made for another model \(Fixture Other\); tell the user\./);
   assert.deepEqual(f.submitted[1].loras, [{ name: 'fixture-effect.safetensors', strength: 0.6, enabled: true }]);
   // Generate itself still refuses one by name.
   const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A heron'], loras: [{ name: 'fixture-other' }] });

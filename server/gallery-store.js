@@ -951,7 +951,8 @@ export function generationSettings(body) {
     ...(body.resolution ? { resolution: String(body.resolution) } : {}),
     ...(!grok ? {
       steps: Number(body.steps || 0),
-      cfg: Number(body.cfg || 0),
+      // A distilled profile takes no CFG (server/validation.js), so none is recorded for it.
+      ...(body.cfg !== undefined && body.cfg !== null ? { cfg: Number(body.cfg || 0) } : {}),
       sampler: body.sampler || "",
       scheduler: body.scheduler || ""
     } : {}),

@@ -75,17 +75,13 @@ export function modelGroups(profiles) {
 }
 
 /** Metadata titles take precedence; the exact file name remains the identity. */
-export function loraName(name, info) {
-  const title = typeof info?.title === 'string' ? info.title.trim() : '';
-  return title || String(name).split(/[\\/]/).pop().replace(/\.(safetensors|ckpt|pt|bin)$/i, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 /** Keep files without compatibility metadata visible while excluding known mismatches. */
 export function modelLoras(options, fitOf, all = false) {
   return all ? options : options.filter((name) => fitOf(name) !== 'other');
 }
 
-export { loraCompatibility } from '../../server/lora-policy.js';
+export { loraCompatibility, loraName } from '../../server/lora-policy.js';
 
 /** Prefer model variant metadata; imported recipes can identify acceleration by name or step count. */
 export function workflowSpeed(workflow, profile) {

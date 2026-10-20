@@ -272,7 +272,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     width: snapInteger(input.width, widthRange.default, widthRange),
     height: snapInteger(input.height, heightRange.default, heightRange),
     steps: snapInteger(input.steps, stepsRange.default, stepsRange),
-    cfg: snapNumber(input.cfg, cfgRange.default, cfgRange),
+    // A profile without CFG (distilled; capabilities.cfg false) keeps its graph's own guidance, so none is taken or recorded.
+    cfg: profile.capabilities?.cfg === false ? undefined : snapNumber(input.cfg, cfgRange.default, cfgRange),
     denoise: snapNumber(input.denoise, denoiseRange.default, denoiseRange),
     sampler: String(input.sampler || ""),
     scheduler: String(input.scheduler || ""),
