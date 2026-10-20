@@ -15,3 +15,8 @@ test("a reference that only guided is kept with the run, so a retry runs it the 
   assert.equal(generationSettings({ kind: "image", referenceAssets: references, referenceRole: "edit" }).referenceRole, undefined);
   assert.equal(generationSettings({ kind: "image", referenceAssets: [], referenceRole: "reference" }).referenceRole, undefined, "no reference, nothing to say");
 });
+
+test("an output keeps its profile's name from when it ran", () => {
+  assert.equal(generationSettings({ kind: "image", profileId: "custom:image-moss-base", profileName: "MOSS Image Base · Fast · 8 Steps" }).profileName, "MOSS Image Base · Fast · 8 Steps");
+  assert.equal(generationSettings({ kind: "image", profileId: "custom:image-moss-base" }).profileName, undefined);
+});

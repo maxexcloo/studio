@@ -9,13 +9,18 @@ test('Normal instances hide the preset library on desktop and phone', async ({ p
   await page.goto('/');
   await expect(studioUi(page).galleryMode).toBeVisible();
   await expect(page.getByRole('button', { name: 'Image & Model Library', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Library', exact: true })).toHaveCount(0);
 });
 
-// The phone lists the library in More; the full studio keeps it in the dock.
+// The phone lists the library in the top bar's Menu; the desktop keeps it in the dock.
 async function openLibrary(page: import('@playwright/test').Page) {
   const ui = studioUi(page);
-  if (await ui.isPhone()) await ui.openMore();
-  else await ui.prompt.click();
+  if (await ui.isPhone()) {
+    await ui.openMore();
+    await page.getByRole('menuitem', { name: 'Library', exact: true }).click();
+    return;
+  }
+  await ui.prompt.click();
   await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
 }
 

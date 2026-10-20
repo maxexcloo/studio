@@ -34,6 +34,10 @@ import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
+import { itemProfile, itemProfileName } from './itemProfile';
+import { loraName, modelName } from './catalogueNames';
+import { knownLoraInfo } from './useLoraInfo';
+import { partName } from './partNames';
 
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
@@ -771,8 +775,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         const hasNeighbors = ((view.viewerGallery || []) as GalleryItem[]).length > 1;
         // What made this output, at the top of its preview: the profile it ran
         // through, then the settings worth seeing without opening Details.
-        const activeProfile = (models?.profiles || []).find((profile: { id: string }) => profile.id === active.settings?.profileId) || null;
-        const profileTitle = activeProfile?.displayName || activeProfile?.label || active.settings?.modelName || active.model || "Generation";
+        // Its profile's friendly name, also for an output from a profile renamed since (itemProfile.ts).
+        const activeProfile = itemProfile(active, models?.profiles || []);
+        const activeProfileName = itemProfileName(active, models?.profiles || []);
+        const profileTitle = (activeProfile ? modelName(activeProfile).name : activeProfileName) || (active.settings?.modelName ? partName(String(active.settings.modelName)) : "") || "Generation";
+        const detailNames = { profile: activeProfileName, lora: (file: string) => loraName(file, knownLoraInfo()?.[file]) };
+        const detailEntries = generationDetailEntries(active, detailNames);
         const profileDetail = [
           active.width && active.height ? `${active.width} × ${active.height}` : "",
           active.type === "video" && active.settings?.duration ? `${active.settings.duration} s` : "",
@@ -832,10 +840,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     <div className="viewer-side-body">
                       <PromptReadout label="Prompt" text={active.prompt || ""} onCopy={() => copyToClipboard(active.prompt || "", phone ? "Prompt copied" : "")} />
                       {active.negative ? <PromptReadout label="Negative" text={active.negative} onCopy={() => copyToClipboard(active.negative || "", phone ? "Negative prompt copied" : "")} /> : null}
-                      {generationDetailEntries(active).length ? (
+                      {detailEntries.length ? (
                         <section className="detail-settings" aria-labelledby="viewer-generation-settings">
                           <h3 id="viewer-generation-settings" className="detail-settings-title">Settings</h3>
-                          {generationDetailEntries(active).map((section: GenerationDetailSection) => (
+                          {detailEntries.map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
                               {section.rows.length ? (
@@ -865,7 +873,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     </div>
                     <DetailsFooter
                       onCopyPrompts={active.prompt ? () => copyToClipboard([active.prompt, active.negative ? `Negative: ${active.negative}` : ""].filter(Boolean).join("\n\n"), "Prompts copied") : undefined}
-                      onCopySettings={generationDetailEntries(active).length ? () => copyToClipboard(settingsText(generationDetailEntries(active)), "Settings copied") : undefined}
+                      onCopySettings={detailEntries.length ? () => copyToClipboard(settingsText(detailEntries), "Settings copied") : undefined}
                       onEdit={active.prompt ? () => itemActionHandlers.promptsOnly(active) : undefined}
                       onRerun={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
                     />

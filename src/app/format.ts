@@ -1,3 +1,4 @@
+import { partName } from './partNames';
 import type React from 'react';
 import type { AspectPreset, GalleryItem, LoraSelection } from './types';
 
@@ -137,7 +138,7 @@ export type GenerationDetailSection = { title: string; rows: Array<[string, stri
  * (model, LoRAs as cards of their own), then how it was sampled, then the
  * size, then file metadata.
  */
-export function generationDetailEntries(item: GalleryItem): GenerationDetailSection[] {
+export function generationDetailEntries(item: GalleryItem, names: { profile?: string; lora?: (file: string) => string } = {}): GenerationDetailSection[] {
   const settings = item.settings || {};
   const grok = String(settings.modelName || "").startsWith("grok-imagine-");
   const sections: GenerationDetailSection[] = [];
@@ -150,11 +151,12 @@ export function generationDetailEntries(item: GalleryItem): GenerationDetailSect
     if (rows.length) sections.push({ title, rows });
   };
   const model = settings.modelName || (String(item.model || "").startsWith("custom:") ? "" : item.model);
+  // Names, not files: the profile it ran through, then its weights' friendly name (UI-PATTERNS › Lists).
   section("Model", (add) => {
-    add("Model", model ? fileStem(model) : "");
-    add("Workflow", settings.workflow);
+    add("Profile", names.profile || "");
+    add("Weights", model ? partName(String(model)) : "");
   });
-  const loras = activeLoras(settings.loras).map((lora) => ({ name: fileStem(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
+  const loras = activeLoras(settings.loras).map((lora) => ({ name: names.lora ? names.lora(lora.name) : fileStem(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
   if (loras.length) {
     const modelSection = sections.find((item) => item.title === "Model");
     if (modelSection) modelSection.loras = loras;

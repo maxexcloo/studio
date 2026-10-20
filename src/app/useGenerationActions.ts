@@ -154,6 +154,8 @@ export function useGenerationActions(view: any) {
         prompt,
         ...(currentProfile?.capabilities?.negativePrompt !== false ? { negative } : {}),
         profileId: currentProfile?.id || model,
+        // Kept with the output, so its Details still read well once the profile is renamed or gone.
+        ...(currentProfile ? { profileName: currentProfile.displayName || currentProfile.label } : {}),
         model: currentProfile?.model || model,
         workflow: currentProfile?.workflow || "",
         textEncoder,

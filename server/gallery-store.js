@@ -944,6 +944,8 @@ export function generationSettings(body) {
     comfyBackend: body.comfyBackend || "primary",
     workflow: body.workflow || "",
     profileId: body.profileId || "",
+    // The profile's name when it ran, for Details once the profile is renamed or removed.
+    ...(body.profileName ? { profileName: String(body.profileName).slice(0, 200) } : {}),
     ...(body.variationCount ? { variationCount: Number(body.variationCount) } : {}),
     ...(body.duration ? { duration: Number(body.duration) } : {}),
     ...(body.resolution ? { resolution: String(body.resolution) } : {}),
