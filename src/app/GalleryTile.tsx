@@ -10,8 +10,6 @@ import { FailureTile } from './GenerationFailure';
 import type { GalleryItem } from './types';
 import { canUpscaleItem, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
-import { UpscaleNoticePopover } from './UpscaleNotice';
-import type { UpscaleNotice } from './useUpscale';
 import { useDismiss } from './useDismiss';
 import { GallerySelectionContext } from './gallerySelection';
 import { downloadName } from './share';
@@ -39,11 +37,9 @@ type GalleryTileProps = {
   upscaleBusy?: boolean;
   onUpscale?: (item: GalleryItem) => void;
   onCancelUpscale?: (item: GalleryItem) => void;
-  upscaleNotice?: UpscaleNotice;
-  onDismissUpscaleNotice?: (id: string) => void;
 };
 
-function UpscaleButton({ item, busy, onUpscale, onCancelUpscale, held = false }: { item: GalleryItem; busy: boolean; onUpscale: (item: GalleryItem) => void; onCancelUpscale: (item: GalleryItem) => void; held?: boolean }) {
+function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: GalleryItem; busy: boolean; onUpscale: (item: GalleryItem) => void; onCancelUpscale: (item: GalleryItem) => void }) {
   const state = item.upscale;
   const running = state?.status === "running";
   // The ring follows the learned time when there is one; SeedVR2's own count jumps in a few big steps.
@@ -56,7 +52,7 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale, held = false }:
     <Tip content={tooltip}>
       <button
         type="button"
-        className={cn("tile-upscale", active && "is-active", running && "is-running", running && !ratio && "is-indeterminate", running && clock.ratio !== null && "is-timed", busy && "is-busy", held && "is-held")}
+        className={cn("tile-upscale", active && "is-active", running && "is-running", running && !ratio && "is-indeterminate", running && clock.ratio !== null && "is-timed", busy && "is-busy")}
         aria-label={tooltip}
         aria-pressed={state?.url ? active : undefined}
         aria-disabled={busy}
@@ -81,7 +77,7 @@ const tileEnterTransition = {
   mass: 0.86,
 };
 
-function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, upscaleNotice, onDismissUpscaleNotice, width }: GalleryTileProps) {
+function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, width }: GalleryTileProps) {
   const mountedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
@@ -165,9 +161,8 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
           inside a button is invalid and unreachable by keyboard. */}
       <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
-        {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} held={Boolean(upscaleNotice)} /> : null}
-        {upscaleNotice && onDismissUpscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="tile" onDismiss={() => onDismissUpscaleNotice(item.id)} /> : null}
-        {/* Beside Stop, in the overlay, so it holds still while the tile lifts on hover. */}
+        {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} /> : null}
+                {/* Beside Stop, in the overlay, so it holds still while the tile lifts on hover. */}
         {item.status === "pending" ? <GenerationModel item={item} className="tile-action" /> : null}
         {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
         {item.status !== "pending" ? (
@@ -207,7 +202,6 @@ export const GalleryTile = React.memo(GalleryTileComponent, (previous, next) => 
   if (previous.item !== next.item) return false;
   if (previous.smartUpscale !== next.smartUpscale) return false;
   if (previous.upscaleBusy !== next.upscaleBusy) return false;
-  if (previous.upscaleNotice !== next.upscaleNotice) return false;
   if (previous.width !== next.width || previous.height !== next.height) return false;
   return true;
 });

@@ -912,20 +912,6 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .viewer-phone-bar .viewer-phone-star {
   right: calc(max(10px, env(safe-area-inset-right)) + 2 * (var(--dock-h) + 8px));
 }
-.viewer-phone-notice {
-  position: absolute;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: calc(96px + env(safe-area-inset-bottom));
-  z-index: 8;
-}
-.viewer-phone-notice .upscale-notice {
-  position: relative;
-  inset: auto;
-  translate: none;
-  width: 100%;
-  max-width: none;
-}
 .scrim .viewer-stage:has(.viewer-phone-bar) .upscale-compare-line::before {
   content: "";
   position: absolute;

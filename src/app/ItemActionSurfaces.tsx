@@ -5,8 +5,7 @@ import { Tip } from './components';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { downloadName, prefetchShare } from './share';
 import { UpscaleArrow } from './UpscaleArrow';
-import { UpscaleNoticePopover } from './UpscaleNotice';
-import { shortLeft, upscaleLeftLine, upscaleTooltip, useUpscaleClock, type UpscaleNotice } from './useUpscale';
+import { shortLeft, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { useItemActionHandlers, useItemActions, type ItemAction, type ItemActionExtras } from './itemActions';
 import { canStar } from './favorites';
 import type { GalleryItem } from './types';
@@ -117,7 +116,7 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
 const dockKeys: Partial<Record<ItemAction['id'], string>> = { star: 'F', delete: 'Del' };
 
 
-export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpscaleNotice, details = false }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; upscaleNotice?: UpscaleNotice; onDismissUpscaleNotice: () => void; /** Details is open: its footer has Rerun, so the dock leaves it out. */ details?: boolean }) {
+export function ViewerDockActions({ item, compare, details = false }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; /** Details is open: its footer has Rerun, so the dock leaves it out. */ details?: boolean }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
   // By intent: Copy · Download | Animate · Rerun · Reference · Upscale | Star · Delete.
   const actions = useItemActions(item, 'dock', { compare }).filter((action) => !(details && action.id === 'reuse'));
@@ -126,10 +125,7 @@ export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpsca
     <>
       {actions.map((action, index) => <React.Fragment key={action.id}>{startsGroup(actions, index) ? <span className="viewer-divider" /> : null}{(() => {
         if (action.id === 'upscale') return (
-          <span key={action.id} className="upscale-notice-anchor">
-            {upscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="viewer" onDismiss={onDismissUpscaleNotice} /> : null}
-            <ViewerUpscaleButton item={item} action={action} />
-          </span>
+          <ViewerUpscaleButton key={action.id} item={item} action={action} />
         );
         const name = action.tip || action.label;
         const tip = dockKeys[action.id] ? `${name} (${dockKeys[action.id]})` : name;

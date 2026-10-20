@@ -200,15 +200,10 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
   const [status, setStatus] = useState<UpscaleStatus | null>(null);
   const [install, setInstall] = useState<UpscaleInstall>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
-  const [notices, setNotices] = useState<Map<string, UpscaleNotice>>(() => new Map());
+  // Why an upscale couldn't run goes to the status pill like every other failure (UI-PATTERNS › Messages), one per image.
   const setNotice = useCallback((id: string, notice: UpscaleNotice | null) => {
-    setNotices((current) => {
-      if (!notice && !current.has(id)) return current;
-      const next = new Map(current);
-      if (notice) next.set(id, notice); else next.delete(id);
-      return next;
-    });
-  }, []);
+    if (notice) showToast(`${notice.title}: ${notice.message.replace(/\.$/, "")}`, "error", { group: `upscale:${id}` });
+  }, [showToast]);
   // An upscale that started and then failed in ComfyUI says why on its image,
   // the way one that could not start does. Only failures seen happening count,
   // so old ones don't pop up again on every load.
@@ -510,8 +505,6 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     upscaleUnavailableReason: reason,
     upscaleInstall: install,
     upscaleBusyIds: busyIds,
-    upscaleNotices: notices,
-    dismissUpscaleNotice: (id: string) => setNotice(id, null),
     upscaleSetup: {
       open: setupOpen,
       stage,

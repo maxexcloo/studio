@@ -7,7 +7,6 @@ import { itemKey, layoutGallery, placementKey, type LayoutEntry, type RunStackSt
 import { cn } from './format';
 import { scrollEvents, scrollerTop } from './scroller';
 import type { MasonrySlot } from './masonry';
-import type { UpscaleNotice } from './useUpscale';
 import type { GalleryGroups, Run } from './runs';
 import type { GalleryItem } from './types';
 
@@ -46,8 +45,6 @@ type VirtualMasonryGalleryProps = {
   upscaleBusyIds?: Set<string>;
   onUpscale?: (item: GalleryItem) => void;
   onCancelUpscale?: (item: GalleryItem) => void;
-  upscaleNotices?: Map<string, UpscaleNotice>;
-  onDismissUpscaleNotice?: (id: string) => void;
 };
 
 /** The nearest ancestor that scrolls vertically: the gallery's stage in every layout. */
@@ -108,8 +105,6 @@ export function VirtualMasonryGallery({
   upscaleBusyIds,
   onUpscale,
   onCancelUpscale,
-  upscaleNotices,
-  onDismissUpscaleNotice,
 }: VirtualMasonryGalleryProps) {
   const selection = React.useContext(GallerySelectionContext);
   const stackRuns = configuredStackRuns && !selection?.selecting;
@@ -498,8 +493,6 @@ export function VirtualMasonryGallery({
                   upscaleBusy={Boolean(upscaleBusyIds?.has(entry.item.id))}
                   onUpscale={onUpscale}
                   onCancelUpscale={onCancelUpscale}
-                  upscaleNotice={upscaleNotices?.get(entry.item.id)}
-                  onDismissUpscaleNotice={onDismissUpscaleNotice}
                   titleFromPrompt={titleFromPrompt}
                   width={entry.w}
                 />

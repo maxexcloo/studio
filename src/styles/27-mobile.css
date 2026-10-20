@@ -178,10 +178,7 @@
     overflow: visible;
   }
   .viewer-stage.with-side .viewer-dock { left: max(8px, env(safe-area-inset-left)); }
-  .viewer-dock .icon-button,
-  .viewer-dock .upscale-notice-anchor { flex: 1 1 0; min-width: 0; width: auto; max-width: 48px; }
-  .viewer-dock .upscale-notice-anchor { display: flex; }
-  .viewer-dock .upscale-notice-anchor .icon-button { width: 100%; max-width: none; }
+  .viewer-dock .icon-button { flex: 1 1 0; min-width: 0; width: auto; max-width: 48px; }
   .viewer-canvas { padding-inline: 8px; }
   .viewer-side {
     left: max(8px, env(safe-area-inset-left));
@@ -250,8 +247,8 @@
    :where() position is zero-specificity: it only applies to buttons that are
    not already positioned, so absolutely placed ones stay where they are. */
 @media (pointer: coarse) {
-  :where(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .upscale-notice-close, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch) { position: relative; }
-  :is(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .upscale-notice-close, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch)::after {
+  :where(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch) { position: relative; }
+  :is(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch)::after {
     content: "";
     position: absolute;
     top: 50%;

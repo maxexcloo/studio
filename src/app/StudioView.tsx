@@ -24,7 +24,6 @@ import { UpscaleCompare } from './UpscaleCompare';
 import { upscaledWithRun } from './useUpscale';
 import { UpscaleSetupDialog } from './UpscaleDialogs';
 import { ModelFoldersDialog } from './ModelFoldersDialog';
-import { UpscaleNoticePopover } from './UpscaleNotice';
 import { useUpscaleDownloadActivity } from './UpscaleDownloadActivity';
 import { FailurePanel } from './GenerationFailure';
 import { useModelDownloadActivity } from './ModelDownloadActivity';
@@ -102,7 +101,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, showDetails, settings, showNegativePrompt, showToast, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, promptRef, dragViewer, endViewerTouch, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, showDetails, settings, showNegativePrompt, showToast, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, promptRef, dragViewer, endViewerTouch, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
@@ -444,8 +443,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               upscaleBusyIds={upscaleBusyIds}
               onUpscale={activateUpscale}
               onCancelUpscale={cancelUpscale}
-              upscaleNotices={upscaleNotices}
-              onDismissUpscaleNotice={dismissUpscaleNotice}
               titleFromPrompt={titleFromPrompt}
             />
           ) : searchOn ? (
@@ -746,9 +743,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 ) : null}
                 {phone ? (
                   <>
-                    {upscaleNotices?.get(active.id) ? (
-                      <div className="viewer-phone-notice"><UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /></div>
-                    ) : null}
                     {active.type === "image" && !showDetails ? <div data-open-trigger className="viewer-zoom-pill is-phone">{imageZoomControls}</div> : null}
                     <PhoneViewerBar
                       item={active}
@@ -764,8 +758,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <ViewerDockActions
                     item={active}
                     compare={{ open: compareOpen, toggle: () => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); } }}
-                    upscaleNotice={upscaleNotices?.get(active.id)}
-                    onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
                     details={Boolean(showDetails)}
                   />
                   <span className="viewer-divider" />
