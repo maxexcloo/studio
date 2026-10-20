@@ -680,7 +680,6 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
               {!flat.length ? <EmptyState title="No Matching Models" compact>{noMatchText}</EmptyState> : null}
             </div>
           ) : null}
-          {onBrowseModels ? <button type="button" className="model-option model-menu-browse" aria-label="Browse Models" onClick={() => { close(); onBrowseModels(); }}><span className="model-copy"><strong>Browse Models</strong><em>View Models & Workflows</em></span><SlidersHorizontal size={15} /></button> : null}
 
         </div>
       ) : null}

@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
-import { ArrowDown, ArrowUp, Brush, Check, Image as ImageIcon, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Brush, Check, GripVertical, Image as ImageIcon, ImagePlus, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
@@ -15,6 +15,8 @@ import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
 import { SurfaceStatus } from './StatusMessage';
+import { ClearSelection } from './SheetList';
+import { useReorderDrag } from './useReorderDrag';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
@@ -79,6 +81,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
 }) {
   const present = useIsPresent();
   const [tab, setTab] = React.useState<PickerTab>(() => memory.tab || "generation");
+  const selectedListRef = React.useRef<HTMLOListElement>(null);
+  const reorder = useReorderDrag(selected.map((asset) => asset.id), onMove, selectedListRef);
   // The source shown under Selected's review, and the one a search runs in.
   const source: SourceTab = tab === "selected" ? memory.tab || "generation" : tab;
   const [pages, setPages] = React.useState<Record<SourceTab, PageState>>(() => memory.pages);
@@ -267,14 +271,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       {...surfaceMotion}
       {...settling}
     >
+      {/* The chooser pattern (UI-PATTERNS › Pickers): a title bar, then the tabs with Clear Selection, then search. */}
       <header className="reference-popover-head">
-        <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
-          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
-          <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
-          {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
-        </div>
-        {/* Clear Selection sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
-        {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear Selection</button> : null}
+        <strong className="picker-title"><ImagePlus size={16} aria-hidden="true" />{multiple ? "References" : input.label || "Reference Image"}</strong>
         <SurfaceStatus active={Boolean(asSheet && present)} />
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
@@ -284,6 +283,15 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={15} /></button></Tip>
       </header>
+      <div className="picker-toolbar">
+        <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
+          <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
+          <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
+          {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
+        </div>
+        {/* Clear Selection sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
+        {multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+      </div>
 
       {tab !== "selected" ? <div className="reference-search picker-search">
         <Search size={15} aria-hidden="true" />
@@ -294,9 +302,10 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         {tab === "selected" && !selected.length ? (
           <EmptyState title="Nothing Selected">Pick images from Library or Uploads.</EmptyState>
         ) : tab === "selected" ? (
-          <ol className="reference-selected-list" aria-label="Selected References">
+          <ol ref={selectedListRef} className="reference-selected-list" aria-label="Selected References">
             {selected.map((asset, index) => (
-              <li key={asset.id} className="reference-selected-row">
+              <li key={asset.id} data-reorder-key={asset.id} className={cn("reference-selected-row", reorder.rowState(asset.id).dragging && "is-dragging", reorder.rowState(asset.id).over && "is-drop-target")}>
+                {selected.length > 1 ? <button type="button" className="picker-grip" aria-label={`Drag ${referenceName(asset.name)} to Reorder`} {...reorder.grip(asset.id)}><GripVertical size={14} /></button> : null}
                 <span className="reference-selected-number" aria-hidden="true">{index + 1}</span>
                 <span className="reference-selected-thumb"><SafeImg src={assetImage(asset)} draggable={false} fallback={<ImageIcon size={16} />} /></span>
                 <span className="reference-selected-name" title={asset.name}>{referenceName(asset.name)}</span>
@@ -921,12 +930,13 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             max={pickerInputs.length}
             atCapacity={pickerInputs.every(input => assetFor(input.id))}
             onMove={(from, to) => {
+              // Moves one picture to a new place; the ones between shift along, as in the LoRA stack.
               const filled = pickerInputs.filter((input) => assetFor(input.id));
-              const [a, b] = [filled[from], filled[to]];
-              const [first, second] = [a && assetFor(a.id), b && assetFor(b.id)];
-              if (!a || !b || !first || !second) return;
-              onSelect(a.id, second);
-              onSelect(b.id, first);
+              const assets = filled.map((input) => assetFor(input.id)!);
+              const [moved] = assets.splice(from, 1);
+              if (!moved) return;
+              assets.splice(to, 0, moved);
+              filled.forEach((input, index) => { if (assetFor(input.id)?.id !== assets[index].id) onSelect(input.id, assets[index]); });
             }}
             onClearAll={() => {
               const cleared = selected.filter(item => pickerInputs.some(input => input.id === item.slot));

@@ -239,3 +239,26 @@ test('Clear Selection beside the chooser tabs empties every reference and Undo b
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expectPicked(page, 2, 3);
 });
+
+test('picked references reorder by dragging in the Selected tab', async ({ page }) => {
+  await prepare(page, 3);
+  await page.route('**/api/reference-assets?*', route => route.fulfill({ json: { items: [image('first'), image('second'), image('third')], nextCursor: '' } }));
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
+  for (const name of ['first.png', 'second.png', 'third.png']) await picker.getByRole('button', { name, exact: true }).click();
+  await picker.getByRole('tab', { name: 'Selected 3 of 3', exact: true }).click();
+  const names = () => picker.locator('.reference-selected-name').allTextContents();
+  await expect.poll(names).toEqual(['first', 'second', 'third']);
+  // Drag the last one's grip onto the first row: it moves there and the others shift down.
+  const grip = picker.getByRole('button', { name: 'Drag third to Reorder', exact: true });
+  const target = picker.locator('.reference-selected-row').first();
+  const [from, to] = [(await grip.boundingBox())!, (await target.boundingBox())!];
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(names).toEqual(['third', 'first', 'second']);
+  // The keyboard moves it too: ArrowDown on its grip.
+  await picker.getByRole('button', { name: 'Drag third to Reorder', exact: true }).press('ArrowDown');
+  await expect.poll(names).toEqual(['first', 'third', 'second']);
+});

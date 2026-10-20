@@ -327,7 +327,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           {reason ? <p className="phone-reason">{reason}</p> : null}
           {/* Always in view: how many, start again, and Generate. */}
           <div className="create-footer">
-            {variations && maxCount > 1 ? <NumberPicker className="create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
+            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
             <button type="button" className="phone-icon create-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={19} /></button>
             <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={blocked || undefined} onClick={go}>
               {restarting || comfyOffline ? <RefreshCw size={18} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={18} strokeWidth={2.4} />}
@@ -344,7 +344,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={1} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
         </div>
         <div className="list-group create-options">
-          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')} />
+          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')} />
           {hasReferences ? (
             // The chooser's button lands here (ReferenceSlots portals into the tools), as wide as the row.
             <div className="list-row is-static create-references">

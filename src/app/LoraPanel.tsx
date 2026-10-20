@@ -3,12 +3,14 @@ import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, GripVertical, Info, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink, GripVertical, Info, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLoras, type FitOf } from './loras';
 import { Switch } from './SettingsControls';
 import { Tip } from './components';
 import { EmptyState } from './EmptyState';
+import { useReorderDrag } from './useReorderDrag';
+import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
 import { loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
@@ -131,9 +133,15 @@ function TriggerWords({ words }: { words: string[] }) {
   );
 }
 
+/** Where a LoRA came from (its Civitai or Hugging Face page), as a link icon beside its info. */
+function LoraSource({ info, label }: { info?: LoraInfo; label: string }) {
+  const source = info?.sourceUrl && /^https?:\/\//i.test(info.sourceUrl) ? info.sourceUrl : '';
+  if (!source) return null;
+  return <Tip content="View Source"><a className="lora-source" href={source} target="_blank" rel="noopener noreferrer" aria-label={`View Source of ${label}`}><ExternalLink size={14} /></a></Tip>;
+}
+
 function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
   const description = info?.description || info?.about;
-  const source = info?.sourceUrl && /^https?:\/\//i.test(info.sourceUrl) ? info.sourceUrl : '';
   return <details className="lora-details">
     <summary aria-label={`Information About ${label}`} title="Info"><Info size={14} /></summary>
     <div>
@@ -141,7 +149,6 @@ function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
       {info?.note ? <p>{info.note}</p> : null}
       {info?.guidance ? <p className="lora-guidance">{info.guidance}</p> : null}
       {info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
-      {source ? <a href={source} target="_blank" rel="noopener noreferrer">View Source</a> : null}
     </div>
   </details>;
 }
@@ -241,14 +248,13 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const [selected, setSelected] = useState<string[]>([]);
   const [highlight, setHighlight] = useState(0);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const dragged = useRef<string | null>(null);
-  const [dragTarget, setDragTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
   // Rows keep their places: a pick shows as its tick and number, never by moving
   // the row. The Selected tab lists the picks in stack order.
-  const reorder = (from: number, to: number) => { inlineSelection?.move(from, to); };
+  const move = (from: number, to: number) => { inlineSelection?.move(from, to); };
+  const reorder = useReorderDrag((inlineSelection?.items || []).map((item) => item.name), move, listRef);
 
   const filteredOptions = useMemo(() => [...new Set([...modelLoras(options, fitOf, showAll), ...(libraryView ? current : [])])], [options, fitOf, showAll, libraryView, current]);
   const available = useMemo(() => new Set(filteredOptions), [filteredOptions]);
@@ -339,7 +345,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
           <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All Models</button>
           {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
-        {libraryView && current.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear Selection</button> : null}
+        {libraryView && current.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
       </div>
       <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi}>
         {hasRows ? sections.map((section) => {
@@ -361,54 +367,23 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                   const item = inlineSelection.items.find(item => item.name === row.name);
                   const label = nameOf(row.name);
                   const info = inlineSelection.infoOf(row.name);
-                  return <div key={row.key} data-lora-name={row.name} className={cn('lora-library-row', item && 'is-selected', dragged.current === row.name && 'is-dragging', dragTarget === row.name && dragged.current !== row.name && 'is-drop-target')}>
-                    {item && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`}
-                      onPointerDown={event => {
-                        if (event.button !== 0) return;
-                        event.preventDefault();
-                        dragged.current = row.name;
-                        setDragTarget(row.name);
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                      }}
-                      onPointerMove={event => {
-                        if (!dragged.current) return;
-                        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-lora-name]')?.dataset.loraName;
-                        setDragTarget(target || null);
-                        const list = listRef.current;
-                        if (list) {
-                          const box = list.getBoundingClientRect();
-                          if (event.clientY < box.top + 24) list.scrollTop -= 12;
-                          else if (event.clientY > box.bottom - 24) list.scrollTop += 12;
-                        }
-                      }}
-                      onPointerUp={event => {
-                        const from = inlineSelection.items.findIndex(entry => entry.name === dragged.current);
-                        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-lora-name]')?.dataset.loraName;
-                        const to = inlineSelection.items.findIndex(entry => entry.name === target);
-                        dragged.current = null;
-                        setDragTarget(null);
-                        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-                        if (from >= 0 && to >= 0 && from !== to) reorder(from, to);
-                      }}
-                      onLostPointerCapture={() => { dragged.current = null; setDragTarget(null); }}
-                      onKeyDown={event => {
-                        const index = inlineSelection.items.indexOf(item);
-                        const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : index;
-                        if (to !== index) { event.preventDefault(); if (to >= 0 && to < inlineSelection.items.length) reorder(index, to); }
-                      }}><GripVertical size={14} /></button> : null}
+                  return <div key={row.key} data-lora-name={row.name} data-reorder-key={reviewing ? row.name : undefined} className={cn('lora-library-row', item && 'is-selected', reorder.rowState(row.name).dragging && 'is-dragging', reorder.rowState(row.name).over && 'is-drop-target')}>
+                    {item && reviewing && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`} {...reorder.grip(row.name)}><GripVertical size={14} /></button> : null}
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
-                      <span className="lora-library-check" aria-hidden="true">{item ? <Check size={12} strokeWidth={3} /> : null}</span>
+                      {/* Picked: its place in the stack, as a picked reference shows its number. */}
+                      <span className={cn('picker-order', item && 'is-on')} aria-hidden="true">{item ? inlineSelection.items.indexOf(item) + 1 : null}</span>
                       <span className="lora-option-copy"><strong>{label}</strong><span title={row.name}>{row.name}</span></span>
                     </button>
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    <LoraSource info={info} label={label} />
                     <LoraDetails info={info} label={label} />
+                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: .32, ease: [.16, 1, .3, 1] }}><div className="lora-library-settings">
                       <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
-                      {inlineSelection.items.length > 1 ? <span className="lora-library-order">
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); reorder(index, index - 1); }}><ChevronUp size={14} /></button>
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); reorder(index, index + 1); }}><ChevronDown size={14} /></button>
+                      {reviewing && inlineSelection.items.length > 1 ? <span className="lora-library-order">
+                        <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index - 1); }}><ChevronUp size={14} /></button>
+                        <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index + 1); }}><ChevronDown size={14} /></button>
                       </span> : null}
                       {item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
                     </div></motion.div> : null}</AnimatePresence>

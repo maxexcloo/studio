@@ -60,24 +60,11 @@ test('model menus show profile details without recent sections or discovery foot
   await expect(option.locator('.model-selection-tick')).toBeVisible();
   await expect(menu.getByText('Recent', { exact: true })).toHaveCount(0);
   await expect(menu.getByRole('button', { name: /Find (More )?Models/ })).toHaveCount(0);
-  // Only the full studio's menu offers Browse Models and hover states.
+  // The full studio's menu has hover states, and no Browse Models: the chooser is the only way to pick.
   if (!await ui.isPhone()) {
     await page.mouse.move(0, 0);
     await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(option).toHaveCSS('box-shadow', 'none');
-    const browse = menu.getByRole('button', { name: 'Browse Models', exact: true });
-    await expect(browse).toHaveClass(/model-option/);
-    await expect.poll(() => menu.evaluate(element => {
-      const selected = element.querySelector('[role="option"][aria-selected="true"]')!;
-      const browse = element.querySelector('.model-menu-browse')!;
-      const row = selected.getBoundingClientRect();
-      const footer = browse.getBoundingClientRect();
-      const selectedText = selected.querySelector('.model-copy')!.getBoundingClientRect();
-      const footerText = browse.querySelector('.model-copy')!.getBoundingClientRect();
-      return Math.abs(row.left - footer.left) <= 1 && Math.abs(row.right - footer.right) <= 1 && Math.abs(selectedText.left - footerText.left) <= 1;
-    })).toBe(true);
-    await browse.click();
-    await expect(page.locator('.workflow-gallery')).toBeVisible();
-    await expect(page.locator('.workflow-gallery').getByText('Recent', { exact: true })).toHaveCount(0);
   }
+  await expect(menu.getByRole('button', { name: 'Browse Models', exact: true })).toHaveCount(0);
 });

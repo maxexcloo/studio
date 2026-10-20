@@ -24,7 +24,9 @@ test('compact creation keeps a one-line prompt and send aligned through expansio
   await expect(model).toBeVisible();
   await expect(composer.getByRole('button', { name: 'Clear Prompt', exact: true })).toBeVisible();
   await model.click();
-  await expect(ui.modelPicker.getByRole('button', { name: 'Browse Models', exact: true })).toBeVisible();
+  // Models choose from the one chooser: search, families and tiers, with no modal behind it.
+  await expect(ui.modelPicker.getByRole('combobox', { name: 'Search Models', exact: true })).toBeVisible();
+  await expect(ui.modelPicker.getByRole('button', { name: 'Browse Models', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await ui.gallery.click({ position: { x: 150, y: 150 } });
   await expect(composer).not.toHaveClass(/is-expanded/);
@@ -152,9 +154,12 @@ test('each expanded field owns its clear action and reset clears only the curren
   const { prompt, negativePrompt: negative } = ui;
   await prompt.fill('A scene to retain');
   await negative.fill('Blur and defects');
+  // The full studio's fields start at two lines; the phone's prompt fills the sheet and its negative starts at one.
+  const phone = await ui.isPhone();
   for (const field of [prompt, negative]) {
-    await expect(field).toHaveAttribute('rows', '2');
-    expect(await field.evaluate((element) => element.clientHeight >= parseFloat(getComputedStyle(element).lineHeight) * 2)).toBe(true);
+    if (!phone) await expect(field).toHaveAttribute('rows', '2');
+    const lines = phone && field === negative ? 1 : 2;
+    expect(await field.evaluate((element, lines) => element.clientHeight >= parseFloat(getComputedStyle(element).lineHeight) * lines, lines)).toBe(true);
   }
   await root.getByRole('button', { name: 'Clear Prompt', exact: true }).click();
   await expect(prompt).toHaveValue('');
@@ -216,7 +221,8 @@ test('creation pickers expose their open state and ignore exiting surfaces when 
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('secondary creation controls share muted, hover and neutral open states without changing Send', async ({ page }) => {
+test('secondary creation controls share muted, hover and neutral open states without changing Send', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The phone’s Create sheet shows these as list rows (phone-create.spec.ts).');
   await page.goto('/');
   const ui = studioUi(page);
   const root = await ui.openComposer();

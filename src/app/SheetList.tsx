@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronRight, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from './format';
 import { StudioSelect } from './components';
 
@@ -78,4 +78,9 @@ export function ListSelect({ label, value, options, onChange, native }: { label:
     );
   }
   return <StudioSelect ariaLabel={label} value={value} options={all.map((option) => ({ value: option.value, label: option.label }))} onChange={onChange} />;
+}
+
+/** The chooser's Clear Selection, beside its tabs (UI-PATTERNS › Pickers); a phone shows "Clear", as the tabs need the room. */
+export function ClearSelection({ onClick }: { onClick: () => void }) {
+  return <button type="button" className="picker-clear-all" aria-label="Clear Selection" onClick={onClick}><X size={13} aria-hidden="true" /><span className="picker-clear-long">Clear Selection</span><span className="picker-clear-short" aria-hidden="true">Clear</span></button>;
 }

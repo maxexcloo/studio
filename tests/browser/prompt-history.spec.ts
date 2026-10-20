@@ -37,11 +37,14 @@ test('both prompt fields grow, stop at a viewport cap and scroll through long co
   const ui = studioUi(page);
   await ui.openComposer();
   const fields = [ui.prompt, ui.negativePrompt];
+  const phone = await ui.isPhone();
   for (const field of fields) {
+    // The phone's prompt fills the Create sheet from the start, so it scrolls rather than grows.
+    const fills = phone && field === ui.prompt;
     await field.fill('Short');
     const small = await field.evaluate((element) => element.clientHeight);
     await field.fill('A longer line of prompt detail\n'.repeat(6));
-    await expect.poll(() => field.evaluate((element) => element.clientHeight)).toBeGreaterThan(small);
+    if (!fills) await expect.poll(() => field.evaluate((element) => element.clientHeight)).toBeGreaterThan(small);
     await field.fill('A longer line of prompt detail\n'.repeat(60));
     const geometry = await field.evaluate((element) => {
       const field = element as HTMLTextAreaElement;
@@ -49,7 +52,7 @@ test('both prompt fields grow, stop at a viewport cap and scroll through long co
       const parent = field.closest('.negative-drawer, .phone-negative, .composer-prompt-field')!;
       return { height: field.clientHeight, scroll: field.scrollHeight, top: field.scrollTop, bottom: field.getBoundingClientRect().bottom, parentBottom: parent.getBoundingClientRect().bottom, viewport: innerHeight };
     });
-    expect(geometry.height).toBeLessThanOrEqual(geometry.viewport * 0.28 + 1);
+    if (!fills) expect(geometry.height).toBeLessThanOrEqual(geometry.viewport * 0.28 + 1);
     expect(geometry.scroll).toBeGreaterThan(geometry.height);
     expect(geometry.top).toBeGreaterThan(0);
     expect(geometry.bottom).toBeLessThanOrEqual(geometry.parentBottom + 1);

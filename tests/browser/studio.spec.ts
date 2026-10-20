@@ -400,14 +400,9 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
   await page.locator('.settings-modal').getByRole('button', { name: 'Close', exact: true }).click();
-  // Browse Models is the full studio's way into the workflow gallery; Settings brought the phone there.
+  // Models are picked in the chooser alone: no Browse Models into a workflow modal.
   const menu = await ui.openModelPicker();
-  await menu.getByRole('button', { name: 'Browse Models', exact: true }).click();
-  const workflows = page.locator('.workflow-gallery');
-  await expect(workflows).toBeVisible();
-  await workflows.locator('.wf-card').filter({ hasText: 'In Use' }).dblclick();
-  await expect(workflows).toBeVisible();
-  if (page.viewportSize()!.height >= 1000) expect((await workflows.boundingBox())!.height).toBeGreaterThan(650);
+  await expect(menu.getByRole('button', { name: 'Browse Models', exact: true })).toHaveCount(0);
 });
 
 test('Fast and Quality filters retain all reference variants and All clears them', async ({ page }) => {

@@ -137,8 +137,10 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
   await expect(picker.getByRole('link', { name: 'View Source' })).toHaveAttribute('href', 'https://example.com/cards');
   await expect(other).toHaveAttribute('aria-checked', 'true');
-  // Rows never move: the stack order shows in the Move buttons and the Selected tab.
+  // Rows never move: the stack order shows in the Selected tab, where they reorder by drag, grip keys or Move.
   const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');
+  await expect(picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true })).toHaveCount(0);
+  await picker.getByRole('button', { name: /^Selected 2 of / }).click();
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).press('ArrowUp');
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Move Cards One Down', exact: true }).click();
@@ -146,9 +148,9 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).dragTo(picker.getByRole('checkbox', { name: 'Select Cards Two', exact: true }));
   await expect(picker.getByRole('button', { name: 'Move Cards Two Up', exact: true })).toBeDisabled();
-  await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', firstRow!);
   await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
+  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
   await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', firstRow!);
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
