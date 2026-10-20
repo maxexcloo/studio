@@ -22,7 +22,7 @@ const mediaInstructions = (writing) => `Studio makes images and videos. For a ne
   ? "Studio writes the prompt; don't expand the request."
   : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all" for all). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
-const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Accounts & MCP.';
+const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.';
 const anonymousMessage = 'The gateway must forward its user identity.';
 /** Schema refusals arrive as one issue per line ("Too big: … at wait_seconds"); one line naming each field is enough to fix the call. */
 const conciseError = (message) => {

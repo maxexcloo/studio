@@ -190,7 +190,7 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
   assert.ok((await unlinked.listTools()).tools.some(tool => tool.name === 'Generate'));
   const refused = await unlinked.callTool({ name: 'Generate', arguments: { prompts: ['a lighthouse'] } });
   assert.equal(refused.isError, true);
-  assert.match(refused.content[0].text, /isn’t linked to a Studio account yet\. Ask an administrator to link it in Settings › Accounts & MCP\./);
+  assert.match(refused.content[0].text, /isn’t linked to a Studio account yet\. Ask an administrator to link it in Settings › Users\./);
   assert.equal(f.requests.length, 0);
 
   // Nor can a request without a user do anything once connected.

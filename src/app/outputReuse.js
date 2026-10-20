@@ -1,4 +1,4 @@
-import { loraCompatibility } from '../../server/lora-policy.js';
+import { compatibleLoras as sharedCompatibleLoras } from '../../server/lora-policy.js';
 
 const key = (value) => typeof value === 'string' ? value.trim().replaceAll('\\', '/').toLowerCase() : '';
 const aliases = (profile) => [profile.id, profile.model, profile.baseModel, profile.defaults?.model, profile.defaults?.modelName].map(key).filter(Boolean);
@@ -81,8 +81,9 @@ export function normaliseReusedSettings(profile, item, { available = {}, fallbac
 
 /** The LoRAs a profile can take: those whose files say another family ("other") are left out and counted. */
 export function compatibleLoras(loras = [], profile, loraInfos = {}) {
-  const kept = loras.filter((lora) => loraCompatibility(loraInfos[lora?.name], profile) !== 'other');
-  return { loras: kept, removed: loras.length - kept.length };
+  // The server refuses the same LoRAs on submit (server/lora-policy.js).
+  const { loras: kept, dropped } = sharedCompatibleLoras(loras, loraInfos, profile);
+  return { loras: kept, removed: dropped };
 }
 
 /** "Removed 1 incompatible LoRA", or nothing. */
