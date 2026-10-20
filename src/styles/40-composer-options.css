@@ -73,7 +73,7 @@
 .phone-creation-resource-left .ref-selected { width: 44px; height: 44px; }
 /* Phone creation buttons: one 44px pill in a dark well. */
 .phone-creation-toolbar > button, .phone-creation-reset, .phone-creation-resources > button, .phone-creation-resource-left > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
-.phone-creation-resources .phone-model-browse { flex: none; max-width: 160px; margin-left: auto; }
+.phone-creation-kind-row .phone-model-browse { flex: 1; min-width: 0; max-width: none; justify-content: flex-start; }
 .phone-creation-submit-row .composer-submit-actions { margin-left: auto; }
 .composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
 .composer-resource-left .composer-resource-add, .phone-creation-resource-left > .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }

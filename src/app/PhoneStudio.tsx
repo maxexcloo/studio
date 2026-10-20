@@ -7,7 +7,7 @@ import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X } from 'lucide-react';
+import { ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -329,14 +329,18 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       footer={
         <>
           {reason ? <p className="phone-reason">{reason}</p> : null}
-          <div className="phone-creation-resources">
-            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}>{view.loraSummary ? <><Layers size={16} /><span className="lora-pill-summary">{view.loraSummary}</span></> : <><Plus size={16} /><span>LoRAs</span></>}</button></div>
+          {/* Top down, in the order of making something: Image/Video and Model, then
+              References and LoRAs, then Size, Advanced and Generate. */}
+          <div className="phone-creation-toolbar phone-creation-kind-row">
+            <ComposerModeSelect mode={mode} onChange={view.changeMode} />
             <button type="button" className="phone-model-browse" aria-label="Browse Models" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')}><SlidersHorizontal size={16} /><span>{currentProfile?.recipe?.modelLabel || currentProfile?.displayName || currentProfile?.label || 'Model'}</span></button>
           </div>
+          <div className="phone-creation-resources">
+            <div className="phone-creation-resource-left"><div className="composer-reference-tools" /><button type="button" className="composer-resource-add" data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()}>{view.loraSummary ? <><Layers size={16} /><span className="lora-pill-summary">{view.loraSummary}</span></> : <><Plus size={16} /><span>LoRAs</span></>}</button></div>
+          </div>
           <div className="phone-creation-toolbar phone-creation-submit-row">
-            <ComposerModeSelect mode={mode} onChange={view.changeMode} />
             {!aspectLocked ? <button type="button" aria-label="Aspect Ratio" aria-haspopup="dialog" aria-expanded={sheet === 'size'} onClick={() => setSheet('size')}><span className="aspect-shape phone-aspect" style={aspectIconStyle({ label: "", value: "", w: size.shown.width, h: size.shown.height })} /></button> : null}
-            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" /> : null}
+            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
             <button type="button" aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={sheet === 'advanced'} onClick={() => setSheet('advanced')}><MoreHorizontal size={18} /></button>
             <button type="button" className="phone-creation-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={18} /></button>
             <div className="composer-submit-actions">
@@ -362,6 +366,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
+        <PromptField kind="positive" value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+        {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
         {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
         <AnimatePresence initial={false}>
           {referenceRole ? (
@@ -382,8 +388,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <PromptField kind="positive" value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
-        {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
       </div>
       <PromptHistorySheet
         kind={historyKind}
