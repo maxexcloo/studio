@@ -7,7 +7,7 @@
 :root { --list-hairline: rgb(255 255 255 / .08); --list-row-h: 48px; }
 @media (max-height: 700px) { :root { --list-row-h: 44px; } }
 
-.list-section { margin-top: 16px; }
+.list-section { margin-top: 22px; }
 .list-section:first-child { margin-top: 2px; }
 .list-section-title {
   margin: 0 0 2px;
@@ -62,21 +62,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .list-row-control .number-picker-label { display: none; }
 .list-row-control .number-picker { flex: none; }
 /* A native select laid over the row's value, so the tap opens the phone's own picker. */
-.list-row-control select.list-select {
-  max-width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 26px 0 10px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--control-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
-  color: hsl(var(--foreground));
-  font: inherit;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  -webkit-appearance: none;
-  appearance: none;
-}
+.list-select { position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; color: hsl(var(--muted-foreground)); }
+.list-select-value { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.list-select > svg { flex: none; opacity: .7; }
+.list-select select { position: absolute; inset: -8px; width: calc(100% + 16px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.list-select:focus-within { color: hsl(var(--foreground)); }
 .list-row-control input.list-field {
   width: 100%;
   max-width: 150px;
@@ -233,3 +223,71 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .account-menu-list button > svg { color: hsl(var(--muted-foreground)); }
 .account-menu-list button:hover { background-color: var(--control-hover); }
 .account-menu-list button.is-danger, .account-menu-list button.is-danger > svg { color: var(--danger-ink); }
+
+/* -------------------------------------------------------------- List controls */
+
+.list-toggle, .list-segments button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--control-fill);
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.list-toggle:hover, .list-segments button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.list-toggle.is-on, .list-segments button[aria-pressed="true"] { background-color: var(--accent-amber-subtle); color: var(--accent-amber); }
+.list-segments { display: inline-flex; gap: 4px; }
+.list-row-unit { min-width: 38px; color: hsl(var(--muted-foreground)); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.list-row-control .number-picker.is-sm { height: 34px; }
+.list-row-control input.list-field { max-width: 120px; height: 32px; }
+
+/* Advanced Settings: the phone sheet and the desktop popover show the same list. */
+.advanced-list { display: flex; flex-direction: column; }
+.advanced-list > .list-section:first-of-type { margin-top: 0; }
+.phone-advanced .phone-sheet-body { padding-top: 0; }
+/* The desktop is denser: 36px rows, 13px type, two columns where the popover is wide. */
+.composer-advanced .list-row { --list-row-h: 38px; padding: 2px 0; font-size: 13px; }
+.composer-advanced .list-section { margin-top: 10px; }
+.composer-advanced .list-section-title { font-size: 11.5px; }
+.composer-advanced .list-row-control .fluid-select-trigger { height: 30px; min-height: 30px; max-width: 220px; font-size: 13px; }
+.composer-advanced .list-row-control .number-picker.is-sm { height: 30px; }
+.composer-advanced .list-toggle, .composer-advanced .list-segments button { height: 28px; font-size: 12px; }
+@media (min-width: 900px) {
+  .composer-advanced .advanced-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; align-items: start; }
+  .composer-advanced .advanced-list > :not(.list-section) { grid-column: 1 / -1; }
+  .composer-advanced .advanced-list > .list-section { margin-top: 0; }
+}
+
+/* -------------------------------------------------------------- Size (phone) */
+
+.phone-size .list-row .aspect-upscale-head { display: none; }
+.phone-size .list-row .size-tier-controls, .phone-size .list-row .size-resolution { display: flex; margin: 0; padding: 0; }
+.phone-size .list-row .aspect-upscale-tabs { min-width: 150px; }
+/* Every shape sits in one 28px lead, so the labels line up whatever the ratio. */
+.phone-size .list-row-lead { width: 28px; }
+.phone-size .list-row-lead .aspect-shape { box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 3px; background: transparent; }
+.phone-size .list-row.is-selected .list-row-lead { color: var(--accent-amber); }
+.phone-size .list-row-value { font-variant-numeric: tabular-nums; }
+.phone-size .phone-size-fields { overflow: hidden; }
+.phone-size .phone-size-fields .size-custom-fields, .phone-size .phone-size-fields > * { padding: 4px 0 10px; }
+.phone-size-saved-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
+
+/* -------------------------------------------------------------- Older phone groups, flat too */
+
+/* The More sheet, the model step and the other phone sheets still use .phone-group and .phone-row:
+   they follow the same flat pattern, so no sheet shows a card inside a card. */
+.phone-sheet .phone-group { gap: 0; margin-bottom: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.phone-sheet .phone-group > :not(:first-child) { border-top: 1px solid var(--list-hairline); }
+.phone-sheet .phone-row { min-height: var(--list-row-h); padding: 6px 2px; border-radius: 0; font-size: 15px; font-weight: 450; }
+.phone-sheet .phone-row small { font-size: 12.5px; }
+.phone-sheet .phone-section { margin: 22px 0 2px; font-size: 12.5px; }
+.phone-sheet .phone-sheet-body > .phone-section:first-child { margin-top: 2px; }

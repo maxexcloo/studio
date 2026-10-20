@@ -3,9 +3,9 @@ import { cn } from './format';
 
 /** Preference switches shown both in Settings and on the phone's More sheet, under one name. */
 export const preferenceLabels = {
-  confirmActions: 'Confirm before removing things',
-  showFailedItems: 'Show failed items',
-  smartUpscale: 'Smart upscale',
+  confirmActions: 'Confirm Before Removing Things',
+  showFailedItems: 'Show Failed Items',
+  smartUpscale: 'Smart Upscale',
 } as const;
 
 export function Switch({ checked, onChange, disabled, label, size = 'md' }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; label: string; size?: 'sm' | 'md' }) {

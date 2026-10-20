@@ -150,7 +150,7 @@ export function SizePreview({ size, label, sub, accent = false, shown = true, in
   );
 }
 
-export function SizeTabs({ tiers, value, onChange }: { tiers: SizeTier[]; value: SizeTier; onChange: (tier: SizeTier) => void }) {
+export function SizeTabs({ tiers, value, onChange, customButton = true }: { tiers: SizeTier[]; value: SizeTier; onChange: (tier: SizeTier) => void; /** The phone's list has Custom Size as its own row. */ customButton?: boolean }) {
   const resolutions = tiers.filter((tier) => tier !== 'custom');
   const selected = value === 'custom' ? 'none' : value;
   const index = Math.max(0, resolutions.indexOf(selected));
@@ -171,7 +171,7 @@ export function SizeTabs({ tiers, value, onChange }: { tiers: SizeTier[]; value:
           {resolutions.map(tier => <button key={tier} type="button" role="radio" data-tier={tier} tabIndex={tier === selected ? 0 : -1} aria-checked={tier === selected && value !== 'custom'} className={cn(tier === selected && value !== 'custom' && 'is-active')} onClick={() => onChange(tier)}>{tierLabels[tier]}</button>)}
         </div>}
     </div> : null}
-    <button type="button" className={cn('size-custom-action', value === 'custom' && 'is-active')} aria-pressed={value === 'custom'} onClick={() => onChange(value === 'custom' ? 'none' : 'custom')}>Custom Size</button>
+    {customButton ? <button type="button" className={cn('size-custom-action', value === 'custom' && 'is-active')} aria-pressed={value === 'custom'} onClick={() => onChange(value === 'custom' ? 'none' : 'custom')}>Custom Size</button> : null}
   </div>;
 }
 

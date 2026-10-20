@@ -5,7 +5,7 @@ import React from 'react';
 import { recipesFor } from './modelRecipes';
 import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
-import { GridAutoplayButton } from './GridAutoplayButton';
+import { gridAutoplayEnabled, subscribeGridAutoplay, toggleGridAutoplay } from './videoPreviewScheduler';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
@@ -24,10 +24,9 @@ import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
-import { ListButton, ListItem } from './SheetList';
+import { ListButton, ListItem, ListSection } from './SheetList';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
-import { StackRunsButton } from './StackRunsButton';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutChecked } from './accounts';
@@ -275,23 +274,6 @@ function ToolButton({ label, Icon, count, open, onClick }: { label: string; Icon
 
 /* ------------------------------------------------------------ Create */
 
-/**
- * A slider range worth having. A workflow's own limit is usually ComfyUI's
- * technical maximum (10000), which makes the slider useless; the range here
- * is built around the workflow's default instead: a turbo model at 4 steps
- * gets 1-24, one at 20 gets 1-60. It still reaches whatever is set now, and
- * never goes past the workflow's real limit.
- */
-function practicalStepRange(profile: Profile | null | undefined, meta: { min?: number; max?: number; default?: number } | undefined, current: number) {
-  const hardMin = Math.max(1, Number(meta?.min || 1));
-  const hardMax = Math.max(hardMin, Number(meta?.max || 10000));
-  const recommended = Number(profile?.defaults?.steps || meta?.default || 0);
-  const base = recommended || 20;
-  const practical = Math.min(100, Math.max(12, base * 3, base + 20));
-  const max = Math.min(hardMax, Math.max(practical, Number(current) || 0));
-  return { min: hardMin, max, recommended: recommended && recommended >= hardMin && recommended <= hardMax ? recommended : 0 };
-}
-
 function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }: { view: Record<string, any>; open: boolean; onClose: () => void; canUseNegativePrompt: boolean; comfyOffline: boolean }) {
   const {
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
@@ -310,7 +292,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const restarting = Boolean(comfyStatus?.restarting);
   const variations = mode === 'video' || currentProfile?.capabilities?.variations !== false;
   const maxCount = Math.max(1, Number(countMeta?.max || 8));
-  const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
   // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes, targetArea: sizeArea || 0, offerTwoK: Boolean(sizeTiers?.includes('2k')) });
@@ -422,8 +403,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
       <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
       <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced Settings" full className="phone-advanced">
-        {/* Steps lives here on the phone; the desktop has it in the composer. Every other setting is the shared list. */}
-        {currentProfile?.family !== 'grok' ? <div className="list-group"><ListItem label="Steps"><NumberPicker label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" density="compact" /></ListItem></div> : null}
         {grokMediaControls}
         {phoneVideoDurationControls}
         {phoneAdvancedControls}
@@ -479,6 +458,9 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
  * rather than hiding under a pointer. Picking keeps the sheet open, as the
  * desktop panel stays open; in Custom a shape keeps the area.
  */
+/** A shape's outline fitted to the list's 24 × 18 lead, so every ratio reads true and the labels line up. */
+const shapeIn = (w: number, h: number) => { const scale = Math.min(24 / (w || 1), 18 / (h || 1)); return { width: Math.max(6, Math.round(w * scale)), height: Math.max(6, Math.round(h * scale)) }; };
+
 function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
   const {
     aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
@@ -520,41 +502,42 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
     pickSavedSize(item);
   };
 
-  const stage = pressed ? pressed.size : shown;
+  const resolutions = tiers.filter((item) => item !== 'custom');
   return (
     <Sheet open={open} onClose={onClose} title="Size" className="phone-size">
-      <div className="phone-size-stage">
-        <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && (tier !== 'none' || sizeArea > 0)} inset={18} />
-      </div>
-      <div className="phone-size-top">
-        <SizeTabs tiers={tiers} value={tier} onChange={(next) => { chooseSizeTier(next); }} />
+      {/* One flat list (UI-PATTERNS › Lists): the resolution, Custom Size as a row that opens its fields in place, then the shapes with a check on the one in use. */}
+      <div className="list-group">
+        {resolutions.length > 1 ? <ListItem label="Resolution"><SizeTabs tiers={resolutions} customButton={false} value={tier} onChange={(next) => { chooseSizeTier(next); }} /></ListItem> : null}
+        {tiers.includes('custom') ? <ListButton className="phone-size-custom" label="Custom Size" value={custom ? `${picked.width}×${picked.height}` : ''} end="check" selected={custom} aria-pressed={custom} onClick={() => chooseSizeTier(custom ? 'none' : 'custom')} /> : null}
         <AnimatePresence initial={false}>
           {custom && customLimits ? (
-            <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+            <motion.div key="custom" className="size-custom phone-size-fields" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
               <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
             </motion.div>
           ) : null}
         </AnimatePresence>
-        {note ? <p className="phone-control-note">{note}</p> : null}
       </div>
-      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at This Size' : 'Shape'}>
-        {rows.map((row) => (
-          <button key={row.key} type="button" role="option" aria-selected={isActive(row)} className={cn('phone-row phone-size-row', isActive(row) && 'is-current')} {...pressHandlers(row)} onClick={() => pick(row)}>
-            <span className="phone-size-shape"><span className="aspect-shape" style={aspectIconStyle(row.shape)} /></span>
-            <span>{row.label}{row.small ? <small>{row.small}</small> : null}</span>
-            <em>{row.size.width}×{row.size.height}</em>
-          </button>
-        ))}
-      </div>
+      {note ? <p className="list-note">{note}</p> : null}
+      <ListSection title={custom ? 'Shape, at This Size' : 'Shape'}>
+        <div className="list-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at This Size' : 'Shape'}>
+          {rows.map((row) => (
+            <ListButton key={row.key} role="option" aria-selected={isActive(row)} className="phone-size-row" end="check" selected={isActive(row)}
+              lead={<span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} />}
+              label={row.small || row.label} value={`${row.size.width}×${row.size.height}`}
+              aria-label={`${row.small ? `${row.label}, ${row.small}` : row.label}, ${row.size.width} × ${row.size.height}`}
+              onClick={() => pick(row)} />
+          ))}
+        </div>
+      </ListSection>
       {/* Under the shapes, as on the desktop: how big they're all drawn. */}
       {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
       {saved.length ? (
         <>
           <div className="phone-size-saved-head">
-            <h3 className="phone-section">Saved</h3>
+            <h3 className="list-section-title">Saved</h3>
             <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}</button>
           </div>
-          <div className={cn('phone-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved Sizes">
+          <div className={cn('list-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved Sizes">
             <AnimatePresence initial={false}>
               {saved.map((item) => (
                 <PhoneSavedSize
@@ -644,6 +627,11 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
 
 /* ------------------------------------------------------------ More */
 
+function GridAutoplayRow({ toggle }: { toggle: (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => React.ReactNode }) {
+  const enabled = React.useSyncExternalStore(subscribeGridAutoplay, gridAutoplayEnabled);
+  return <>{toggle('Play Grid Previews', 'Videos play silently in the gallery', enabled, () => toggleGridAutoplay())}</>;
+}
+
 function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void; statusText: string }) {
   const { prefs, setPrefs, retryComfyStatus, comfyRetrying } = view;
   const [signingOut, setSigningOut] = React.useState(false);
@@ -673,8 +661,9 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
       </div>
       <h3 className="phone-section">Library</h3>
       <div className="phone-group phone-gallery-options">
-        <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchActive(view.gallerySearch || emptySearch)} onToggle={() => { setPrefs({ stackRuns: !prefs.stackRuns }); }} />
-        {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}
+        {/* Toggles as rows with a switch, like every other setting here. */}
+        {toggle('Auto-Grouping', searchActive(view.gallerySearch || emptySearch) ? 'Paused while searching' : 'Groups the images of one run into a stack', Boolean(prefs.stackRuns), (next) => setPrefs({ stackRuns: next }))}
+        {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayRow toggle={toggle} /> : null}
         {view.models?.features?.presets === true ? <button type="button" className="phone-row" aria-label="Image & Model Library" onClick={() => { onClose(); view.setPresetLibraryOpen(true); }}><Library size={20} /><span>Image & Model Library</span></button> : null}
       </div>
       <h3 className="phone-section">Settings</h3>

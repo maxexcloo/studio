@@ -1,6 +1,7 @@
 import React from 'react';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import { cn } from './format';
+import { StudioSelect } from './components';
 
 /*
  * The flat settings list every phone sheet uses (UI-PATTERNS › Lists): full
@@ -51,4 +52,30 @@ export function ListItem({ label, lead, children, className, htmlFor }: { label:
       <span className="list-row-control">{children}</span>
     </Tag>
   );
+}
+
+type SelectOption = { value: string; label: string; detail?: string };
+
+/**
+ * A row's select: the phone's own picker (a native select, its options with
+ * their file names), the studio's select on the desktop. The row shows the
+ * friendly name; a value no longer offered still shows as itself.
+ */
+export function ListSelect({ label, value, options, onChange, native }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void; native: boolean }) {
+  const known = options.some((option) => option.value === value);
+  const all = known || !value ? options : [{ value, label: value }, ...options];
+  if (native) {
+    // The friendly name shows; the native select lies over it, invisible, so a tap opens the phone's picker.
+    const current = all.find((option) => option.value === value);
+    return (
+      <span className="list-select">
+        <span className="list-select-value">{current?.label || 'Not Set'}</span>
+        <ChevronsUpDown size={14} aria-hidden="true" />
+        <select value={value} aria-label={label} onChange={(event) => onChange(event.target.value)}>
+          {all.map((option) => <option key={option.value} value={option.value}>{option.detail ? `${option.label} · ${option.detail}` : option.label}</option>)}
+        </select>
+      </span>
+    );
+  }
+  return <StudioSelect ariaLabel={label} value={value} options={all.map((option) => ({ value: option.value, label: option.label }))} onChange={onChange} />;
 }

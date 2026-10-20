@@ -848,7 +848,10 @@ test('creation options expand in the bottom box without a side panel', async ({ 
   await expect(composer).toHaveClass(/is-expanded/);
   await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
   const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
-  await expect(advanced.getByRole('textbox', { name: 'Seed', exact: true })).toBeVisible();
+  // Seed is Random until one is kept; then its number shows to edit.
+  await expect(advanced.getByRole('textbox', { name: 'Seed', exact: true })).toHaveCount(0);
+  await advanced.getByRole('button', { name: 'Random Seed', exact: true }).click();
+  await expect(advanced.getByRole('textbox', { name: 'Seed', exact: true })).toHaveValue(/^\d+$/);
   // Its own button closes the popover again; a click outside would too.
   await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
   await expect(advanced).toHaveCount(0);
