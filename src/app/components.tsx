@@ -11,10 +11,10 @@ import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { EmptyState } from './EmptyState';
 import { AnimatedNumber } from './AnimatedNumber';
 import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
-import { MEGAPIXEL, presetRatio, type SideLimits } from './sizing';
+import { MEGAPIXEL, type SideLimits } from './sizing';
 import { LinkedSizeFields, MegapixelField, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type MegapixelControl, type SizeRow, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
 import { wheelPixels } from './wheel';
 import { formatDownload, modelFits, useHardware } from './hardware';
@@ -389,11 +389,8 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
     wasOpen.current = open;
   }, [open]);
 
-  const pick = (row: SizeRow) => {
-    if (custom && onCustomRatio) { onCustomRatio(presetRatio(row.shape)); return; }
-    // The panel stays open, so a resolution and a shape can be picked in one go.
-    onChange(row.value);
-  };
+  // A shape is always its preset (out of a custom size too); the panel stays open, so a resolution and a shape can be picked in one go.
+  const pick = (row: SizeRow) => onChange(row.value);
 
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
@@ -419,18 +416,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
         >
           <SizePreview size={previewSize} label={previewLabel} sub={`${previewSize.width} × ${previewSize.height}`} accent={!previewRow && (tier !== "none" || targetArea > 0)} shown={peek} />
           <div className="size-menu-side">
-            <div className="aspect-upscale">
-              {onTierChange ? <SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /> : null}
-              {/* Its space above is its own padding, so it folds with it and closing ends without a jump. */}
-              <AnimatePresence initial={false}>
-                {custom && limits && onCustomSize ? (
-                  <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-                    <LinkedSizeFields size={picked} limits={limits} onChange={onCustomSize} onSave={ownSize || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} />
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-              {note ? <p className="size-menu-note">{note}</p> : null}
-            </div>
+            {onTierChange && tiers.filter((item) => item !== "custom").length > 1 ? <div className="aspect-upscale"><SizeTabs tiers={tiers} value={tier} onChange={onTierChange} /></div> : null}
             <div ref={listRef} className="aspect-list" role="listbox" aria-label={custom ? "Shape, at This Size" : "Shape"} onPointerLeave={() => setHovered(null)} onKeyDown={(event) => {
               // Up and down move between shapes, previewing each on the way.
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -475,6 +461,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
             </div>
             {/* Under every shape: how big they're all drawn. */}
             {megapixel ? <MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixel} custom={custom} /> : null}
+            {/* Width and height, always in view at the bottom: typing a side makes it a custom size (UI-PATTERNS › Composer). */}
+            {limits && onCustomSize ? <div className="size-custom"><LinkedSizeFields size={custom ? picked : shown} limits={limits} onChange={onCustomSize} onSave={ownSize || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} /></div> : null}
+            {note ? <p className="size-menu-note">{note}</p> : null}
           </div>
         </div>
       ) : null}

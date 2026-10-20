@@ -3,7 +3,7 @@ import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
-import { fitRatio, formatMp, MEGAPIXEL, megapixels, parseSize, presetRatio, ratioName, sameRatio, snapSide, type SideLimits, type Size } from './sizing';
+import { formatMp, MEGAPIXEL, megapixels, parseSize, ratioName, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
 import type { AspectPreset, NativeSupport, SavedSize } from './types';
 
@@ -13,7 +13,7 @@ import type { AspectPreset, NativeSupport, SavedSize } from './types';
    - SizePreview: a window of its own beside the menu, there from the first
      hover until the menu closes, with the frame the picture will fill gliding between shapes:
      the size chosen, or the row under the pointer while one is.
-   - SizeTabs: Default · 2K · Custom, one sliding thumb.
+   - SizeTabs: Default · 2K · 4K (the model's native ones), one sliding thumb.
    - LinkedSizeFields: Custom's width and height. Linked they read as one
      field and keep the shape; the link in the middle splits them. Each takes
      typing, arrow keys, or a drag on its W/H label, like a design tool.
@@ -29,8 +29,8 @@ export type SizeRow = { key: string; value: string; label: string; small?: strin
  * one is chosen, and how the choice reads (label, tag, caption, note).
  *
  * Default and 2K use the model's preset shapes, 2K drawn with the long side
- * at 2048. Custom is any width and height; a shape row there keeps the area
- * and changes the shape.
+ * at 2048. Custom is any width and height, typed in the fields under the
+ * shapes; a shape row always goes back to its preset.
  */
 export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native: modelNative, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
   value: string;
@@ -59,11 +59,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   const defaultOption = options.find((item) => item.value === defaultSize);
   const listed = defaultOption ? options.filter((item) => item !== defaultOption) : options;
   const defaultShape = parseSize(defaultSize);
-  const area = picked.width * picked.height;
-  // What each row makes on this tab: the preset, the preset at 2K, or its shape at Custom's area.
-  const rowSize = (shape: AspectPreset) => custom && limits
-    ? fitRatio(presetRatio(shape), area, limits.width, limits.height, 16)
-    : (tier === "2k" || tier === "4k") ? sizePlan(tier, shape.w, shape.h, native, sizeMax).final
+  // What each row makes on this tab: the preset, or the preset at 2K. A row is always its preset, out of a custom size too.
+  const rowSize = (shape: AspectPreset) => (tier === "2k" || tier === "4k") ? sizePlan(tier, shape.w, shape.h, native, sizeMax).final
     : targetArea > 0 ? sizePlan("none", shape.w, shape.h, native, sizeMax, targetArea, limits?.width.step).final : { width: shape.w, height: shape.h };
   const defaultPreset: AspectPreset = defaultOption || { label: ratioName(defaultShape.width, defaultShape.height), value: defaultSize, w: defaultShape.width, h: defaultShape.height };
   const rows: SizeRow[] = [
@@ -72,7 +69,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   ];
   // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
   const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
-  const isActive = (row: SizeRow) => custom ? !savedMatch && sameRatio(row.size, shown) : row.value === value;
+  // A custom size is in the width and height fields: no shape claims it.
+  const isActive = (row: SizeRow) => !custom && row.value === value;
   // "Save size" is for a size of your own: any shape at any size, except one Default or 2K already
   // gives (a preset row at either tier, within a snap step a side), which is a click away as it is.
   const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, ...(offerTwoK ? [sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final] : [])]) : [];
@@ -150,13 +148,14 @@ export function SizePreview({ size, label, sub, accent = false, shown = true, in
   );
 }
 
-export function SizeTabs({ tiers, value, onChange, customButton = true }: { tiers: SizeTier[]; value: SizeTier; onChange: (tier: SizeTier) => void; /** The phone's list has Custom Size as its own row. */ customButton?: boolean }) {
+/** The model's native resolutions as one segmented toggle. A custom size is typed in the fields, so there is no Custom tab. */
+export function SizeTabs({ tiers, value, onChange, labelled = true }: { tiers: SizeTier[]; value: SizeTier; onChange: (tier: SizeTier) => void; /** The phone's pop-up shows the toggle full width, without its heading. */ labelled?: boolean; customButton?: boolean }) {
   const resolutions = tiers.filter((tier) => tier !== 'custom');
   const selected = value === 'custom' ? 'none' : value;
   const index = Math.max(0, resolutions.indexOf(selected));
   return <div className="size-tier-controls">
     {resolutions.length > 1 ? <div className="size-resolution">
-      <span className="aspect-upscale-head">Resolution</span>
+      {labelled ? <span className="aspect-upscale-head">Resolution</span> : null}
       {/* One segmented toggle of the model's native resolutions, however many it has. */}
       {<div className="aspect-upscale-tabs" role="radiogroup" aria-label="Resolution" style={{ '--tab-index': index, '--tab-count': resolutions.length } as React.CSSProperties} onKeyDown={event => {
           if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -171,7 +170,6 @@ export function SizeTabs({ tiers, value, onChange, customButton = true }: { tier
           {resolutions.map(tier => <button key={tier} type="button" role="radio" data-tier={tier} tabIndex={tier === selected ? 0 : -1} aria-checked={tier === selected && value !== 'custom'} className={cn(tier === selected && value !== 'custom' && 'is-active')} onClick={() => onChange(tier)}>{tierLabels[tier]}</button>)}
         </div>}
     </div> : null}
-    {customButton ? <button type="button" className={cn('size-custom-action', value === 'custom' && 'is-active')} aria-pressed={value === 'custom'} onClick={() => onChange(value === 'custom' ? 'none' : 'custom')}>Custom Size</button> : null}
   </div>;
 }
 
