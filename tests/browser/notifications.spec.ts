@@ -18,12 +18,12 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   // The full studio shows progress in its activity island; the phone shows a running badge.
   if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
   complete = true;
-  const notification = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  // Both say it in the status pill (UI-PATTERNS › Messages).
+  const notification = page.locator('.status-message').filter({ hasText: 'Image Ready' });
   await expect(notification).toBeVisible();
   await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
-  // The island shrinks from the running height (72 px) on a spring, so measure it once it settles.
   await expect.poll(async () => (await notification.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(56);
-  const drag = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  const drag = notification;
   const origin = await drag.boundingBox();
   await page.mouse.move(origin!.x + origin!.width / 2, origin!.y + origin!.height / 2);
   await page.mouse.down();

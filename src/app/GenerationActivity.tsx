@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from './toast';
 import { AnimatedNumber } from './AnimatedNumber';
 import { formatLeft, progressLine, progressReading, useRunClock } from './GenerationProgress';
 import { cn, titleFromPrompt } from './format';
 import { SafeImg } from './SafeImg';
-import { mediaUrl } from './mediaUrl';
 import type { Activity } from './Activities';
 import type { GalleryItem } from './types';
 import { useCellGap } from './cells';
@@ -19,10 +19,6 @@ import { useCellGap } from './cells';
  * are left to their own toast, which offers See why.
  */
 
-const DONE_HOLD_MS = 6500;
-const RESULT_FAN = 3;
-
-type Landed = { key: string; items: GalleryItem[] };
 
 export function useGenerationActivity({ items, enabled, watching, reveal, onJump, onView }: {
   /** The gallery as shown: its pending items are the work, its finished ones the results. */
@@ -42,7 +38,8 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
   const reading = progressReading(current?.progress);
   const clock = useRunClock(current?.progress);
   const [putAway, setPutAway] = useState<Set<string>>(() => new Set());
-  const [landed, setLanded] = useState<Landed | null>(null);
+  const onViewRef = useRef(onView);
+  onViewRef.current = onView;
 
   const jobsOf = (list: GalleryItem[]) => [...new Set(list.map((item) => item.jobId || item.id))];
   const pendingJobs = jobsOf(pending);
@@ -69,14 +66,18 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
     }
     const done = results.current;
     results.current = [];
-    if (done.length && wasStandingIn.current && enabled) setLanded({ key: done.map((item) => item.id).join('|'), items: done });
+    // What landed says so in the status pill, as on the phone (UI-PATTERNS › Messages), with View.
+    if (done.length && wasStandingIn.current && enabled) {
+      const first = done[0];
+      const kind = first.type === 'video' ? 'Video' : 'Image';
+      toast.success(done.length === 1 ? `${kind} Ready` : `${done.length} ${kind}s Ready`, { group: 'generation-ready', action: { label: 'View', onClick: () => onViewRef.current(first) } });
+    }
     wasStandingIn.current = false;
   }, [pendingKey, standingIn, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A new run starts clean: nothing put away, no old note in the way.
+  // A new run starts clean: nothing put away.
   useEffect(() => {
     if (!pendingJobs.length) return;
-    setLanded(null);
     setPutAway((current) => {
       const kept = new Set([...current].filter((job) => pendingJobs.includes(job)));
       return kept.size === current.size ? current : kept;
@@ -109,23 +110,6 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
     };
   }
 
-  if (landed && enabled) {
-    const first = landed.items[0];
-    const count = landed.items.length;
-    const kind = first.type === 'video' ? 'video' : 'image';
-    const shown = landed.items.filter(reveal);
-    return {
-      id: 'generation',
-      phase: `landed:${landed.key}`,
-      state: 'done',
-      compact: true,
-      glyph: <ResultFan items={shown.slice(0, RESULT_FAN)} />,
-      title: count === 1 ? `${kind === 'video' ? 'Video' : 'Image'} Ready` : `${count} ${kind === 'video' ? 'Videos' : 'Images'} Ready`,
-      action: { label: 'View', run: () => { setLanded(null); onView(first); } },
-      dismiss: { label: 'Dismiss', run: () => setLanded(null) },
-      expire: { after: DONE_HOLD_MS, run: () => setLanded(null) }
-    };
-  }
   return null;
 }
 
@@ -148,20 +132,6 @@ function HeatCells() {
         <rect key={`${x}-${y}`} x={x + gap} y={y + gap} width={1 - gap * 2} height={1 - gap * 2} rx={gap * 1.4} style={{ animationDelay: `${-(((x * 7 + y * 13) % 11) / 11) * 1.8}s` }} />
       ))}
     </svg>
-  );
-}
-
-/** The results, fanned like prints on a table: one, or the first few of a batch. */
-function ResultFan({ items }: { items: GalleryItem[] }) {
-  if (!items.length) return <span className="activity-frame is-done" aria-hidden="true"><HeatCells /></span>;
-  return (
-    <span className={cn('activity-fan', `has-${items.length}`)} aria-hidden="true">
-      {items.map((item, index) => (
-        <span key={item.id} className="activity-frame is-done" style={{ '--fan': index } as React.CSSProperties}>
-          <SafeImg src={mediaUrl(item.thumbnailUrl || item.url, item)} draggable={false} fallback={<HeatCells />} />
-        </span>
-      ))}
-    </span>
   );
 }
 

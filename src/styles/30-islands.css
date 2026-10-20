@@ -76,8 +76,7 @@ button.activity-main { cursor: pointer; }
 .activity.is-compact { width: min(300px, calc(100vw - 24px)); touch-action: pan-y; }
 .activity.is-compact .activity-main { min-height: 44px; gap: 9px; padding: 6px 10px; }
 .activity.is-compact .activity-glyph { min-width: 26px; }
-.activity.is-compact .activity-frame,
-.activity.is-compact .activity-fan { width: 26px; height: 26px; }
+.activity.is-compact .activity-frame { width: 26px; height: 26px; }
 /* Positioned, so the words leaving on a new phase lie over the ones arriving. */
 .activity-text { position: relative; display: grid; flex: 1; min-width: 0; }
 .activity-copy { display: grid; gap: 5px; min-width: 0; }
@@ -194,17 +193,6 @@ button.activity-main { cursor: pointer; }
 .activity-frame.is-done .activity-heat rect { fill: #f4f4f4; opacity: .6; animation: none; }
 
 /* The results, dealt like prints: one, or the first few of a batch, newest on top. */
-.activity-fan { --mid: 0; position: relative; display: block; width: 38px; height: 38px; }
-.activity-fan.has-2 { --mid: .5; }
-.activity-fan.has-3 { --mid: 1; }
-.activity-fan .activity-frame {
-  position: absolute;
-  inset: 0;
-  z-index: calc(10 - var(--fan));
-  box-shadow: 0 2px 8px rgb(0 0 0 / .4);
-  transform: translateX(calc((var(--fan) - var(--mid)) * 4px)) rotate(calc((var(--fan) - var(--mid)) * 9deg));
-  animation: activity-deal 560ms var(--ease-out) calc(var(--fan) * 70ms) backwards;
-}
 @keyframes activity-deal { from { opacity: 0; transform: translateY(6px) scale(.8); } }
 
 /* One quiet capsule, the only bright thing on an island. */
@@ -344,8 +332,7 @@ button.activity-main { cursor: pointer; }
   .model-setup-item.is-revealed,
   .starter-card.is-revealed { animation: none; box-shadow: 0 0 0 1.5px rgb(255 154 82 / .85); }
   .activity-frame.is-working::after,
-  .activity-heat rect,
-  .activity-fan .activity-frame { animation: none; }
+  .activity-heat rect { animation: none; }
 }
 
 @media (forced-colors: active) {
