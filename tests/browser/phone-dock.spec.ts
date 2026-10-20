@@ -89,21 +89,29 @@ test('closing the shared row clears the query and every filter', async ({ page }
   await expect(searchButton(page)).not.toHaveClass(/is-active/);
 });
 
-test('a picker opened from Create replaces it with a back step, one layer at a time', async ({ page }) => {
+test('a picker opened from Create pops up over it, one at a time, with Create in view behind', async ({ page }) => {
   await page.goto('/');
   const ui = studioUi(page);
   await ui.openComposer();
   const create = page.locator('.phone-sheet.phone-create');
   await page.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
-  const advanced = page.locator('.phone-sheet.phone-advanced');
-  await expect(advanced).toBeVisible();
-  // Create steps aside rather than staying under it.
-  await expect(create).toHaveAttribute('aria-hidden', 'true');
-  await expect(create).toHaveCSS('opacity', '0');
+  const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
+  await expect(advanced).toHaveClass(/is-pop/);
+  // Create stays in view behind it, dimmed and not touchable (UI-PATTERNS › Layering).
+  await expect(create).toHaveClass(/is-overlaid/);
+  await expect(create).toHaveCSS('pointer-events', 'none');
+  await expect(create).toBeVisible();
   // One dimmed page behind, however deep.
   await expect.poll(() => page.locator('.phone-sheet-backdrop:not(.is-nested)').count()).toBe(1);
-  await advanced.getByRole('button', { name: 'Back', exact: true }).click();
+  // Only one pop-up at a time.
+  await expect(page.locator('.reference-popover.is-pop')).toHaveCount(1);
+  // Close sits on the right of the pop-up's head.
+  const close = advanced.getByRole('button', { name: 'Close Advanced Settings', exact: true });
+  const head = (await advanced.locator('.reference-popover-head').boundingBox())!;
+  const closeBox = (await close.boundingBox())!;
+  expect(closeBox.x + closeBox.width).toBeGreaterThan(head.x + head.width - 16);
+  await close.click();
   await expect(advanced).toHaveCount(0);
-  await expect(create).toBeVisible();
+  await expect(create).not.toHaveClass(/is-overlaid/);
   await expect(page.getByRole('button', { name: 'Close', exact: true }).first()).toBeVisible();
 });
