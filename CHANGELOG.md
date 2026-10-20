@@ -11,6 +11,26 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> A flat phone Create sheet with a sticky Generate, one phone top bar with a floating Create, flat lists for every step and for Settings, one chooser for References, LoRAs and Models with drag to reorder, a Sign Out that works, and the gallery staying put when the viewer closes
+
+### Added
+- **Sign Out in plain sight:** an Account menu in the desktop dock and an Account group at the top of the phone's More, each with Sign Out; it asks first only while something is generating.
+- **Drag to reorder:** picked references and LoRAs reorder by dragging their grip in the Selected tab, with a mouse, pen or finger, or with the arrow keys.
+- **Date headers as a setting:** Settings › Studio › Gallery › Date Headers, off by default.
+- **MCP:** Generate turns face detail on by itself when the prompt shows a person full-body or in a wide shot (an explicit `face_detail: false` wins) and says so in its reply; an `exact_prompt` request that holds generation instructions ("Generate five variations of this scene: …") is refused with a message to pass `count` and the plain prompt.
+
+### Changed
+- **Phone Create sheet:** one flat column. The prompt fills the room that's left, with History and Clear in a small toolbar along its edge; Model, References, LoRAs, Size and Advanced are full-width rows; a sticky footer keeps the count, Reset and Generate in view. Image/Video sits beside Close. Nothing overflows at 320–430 px.
+- **Phone top bar:** the status light and Images | Videos are one element on the left; Search, Filter and More sit on the right; search and filters open under the bar. The bottom dock is gone and Create is a floating button, with a dot while a prompt waits.
+- **Flat lists:** Advanced Settings, Size, Model, More and Settings use one flat list of one-line rows with hairlines. Advanced Settings show steppers, friendly model-part names (the file name stays in the picker) and Seed as a field with a Random toggle, in two dense columns on the desktop. Size marks the shape in use with a check and makes Custom Size a normal row.
+- **One chooser:** References, LoRAs and Models share a title bar, the tab pills with Clear Selection, and search. LoRAs show their order like references, with View Source as a link icon beside Info. Models no longer offer Browse Models: the chooser is the one way to pick.
+- **Settings cleanup:** the Discord and feedback-board links, Report Bug buttons, About's stats and credits, and rows for a local install (output folders, finding ComfyUI on its own, the studio password for other devices, the second Restart) are gone or hidden in account mode. About shows the version, the repository and the changelog. Toggle labels are Title Case.
+
+### Fixed
+- **Sign Out:** a plain same-origin POST to `/api/accounts/sign-out` (a console fetch, a form) is no longer refused for missing the studio header, and signing out also ends a leftover device session.
+- **Gallery jump after the viewer:** opening a tile that was partly under the top bar no longer scrolls the gallery behind the viewer, so closing it lands exactly where you were.
+- **Reference chooser on phones:** its tabs, Clear Selection, Upload and Close no longer run off the right edge.
+
 ## [0.33.1] - 2026-10-20
 
 > Lighter icon-button hovers with tooltips that stay clear of the zoom, an outline Upscale arrow, plain centred empty states, picks that keep their place, and a steady CI
