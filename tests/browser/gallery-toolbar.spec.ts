@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 test.use({ launchOptions: { ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), ignoreDefaultArgs: ['--hide-scrollbars'] } });
 
@@ -29,7 +30,7 @@ test('gallery tools expand independently and clear every active filter', async (
   await expect(filterTools.getByRole('button', { name: 'Show Hidden', exact: true })).toBeVisible();
   await expect.poll(() => filterTools.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   await page.getByRole('button', { name: 'Filter By Model' }).scrollIntoViewIfNeeded();
-  expect(await page.locator('.stage-gallery').evaluate(n => n.scrollLeft)).toBe(0);
+  expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
   await expect(toolbar.getByRole('button', { name: 'Search Gallery', exact: true })).toBeInViewport();
   await page.getByRole('button', { name: 'Filter By Model' }).click();
   await page.getByRole('option', { name: 'Flux', exact: true }).click();
@@ -182,8 +183,10 @@ test('empty search dismisses outside while active queries and filters stay open'
 });
 
 
-test('search closes smoothly while retaining its input until the animation ends', async ({ page, isMobile }) => {
+test('search closes smoothly while retaining its input until the animation ends', async ({ page }) => {
   await page.goto('/');
+  // The phone's search overlay fades from its close button; the full studio's field narrows into its trigger.
+  const phone = await studioUi(page).isPhone();
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
   await opener.click();
   const field = page.locator('.gallery-search input');
@@ -200,9 +203,9 @@ test('search closes smoothly while retaining its input until the animation ends'
     const start = performance.now();
     await new Promise<void>(resolve => { function frame() { values.push(sample()); if (performance.now() - start < 450) requestAnimationFrame(frame); else resolve(); } requestAnimationFrame(frame); });
     return values;
-  }, isMobile);
+  }, phone);
   expect(frames.slice(1).some(n => n.retained && n.disabled)).toBe(true);
-  if (isMobile) {
+  if (phone) {
     expect(frames.some(n => n.opacity > 0 && n.opacity < 1)).toBe(true);
     await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   } else {
@@ -227,7 +230,7 @@ test('compact studio keeps active search and every filter inside the viewport', 
   await page.waitForTimeout(400);
   for (const control of [page.getByRole('textbox', { name: 'Search the gallery', exact: true }), page.getByRole('button', { name: 'Clear search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  expect(await page.locator('.stage-gallery').evaluate(n => n.scrollLeft)).toBe(0);
+  expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1440);
@@ -246,10 +249,7 @@ test('compact studio keeps active search and every filter inside the viewport', 
 test('custom gallery filters support keyboard selection and dismiss only their own menu', async ({ page }) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
-  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
-  const headerFilters = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
-  if (await headerFilters.count()) await headerFilters.click();
-  else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await studioUi(page).openFilters();
   const trigger = page.getByRole('button', { name: 'Filter By Model', exact: true });
   await trigger.focus();
   await page.keyboard.press('ArrowDown');
@@ -386,24 +386,26 @@ test('phone search and filters retain inset neutral actions without changing hea
 });
 
 
-test('search keeps a neutral shell without a selected input highlight', async ({ page, isMobile }, testInfo) => {
+test('search keeps a neutral shell without a selected input highlight', async ({ page }, testInfo) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
+  // The phone searches in an overlay; the full studio searches in its toolbar beside the filters and Select.
+  const phone = await studioUi(page).isPhone();
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
   await opener.click();
-  const tools = page.locator(isMobile ? '.phone-searchbar' : '.gallery-toolbar');
+  const tools = page.locator(phone ? '.phone-searchbar' : '.gallery-toolbar');
   const input = tools.getByRole('textbox', { name: 'Search the gallery', exact: true });
   const search = tools.locator('.gallery-search');
   const filters = tools.locator('.gallery-filter-anchor');
   const border = node => node.evaluate(n => { const s = getComputedStyle(n); return { colour: s.borderColor, width: s.borderWidth, style: s.borderStyle }; });
   await expect(input).toBeFocused();
-  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
+  if (!phone) expect(await border(search)).toEqual(await border(filters));
   expect(await input.evaluate(n => getComputedStyle(n).outlineStyle)).toBe('none');
   await expect(input).toHaveAttribute('placeholder', 'Search');
   await input.fill('picture');
   await search.hover();
-  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
-  if (!isMobile) {
+  if (!phone) expect(await border(search)).toEqual(await border(filters));
+  if (!phone) {
     await tools.getByRole('button', { name: 'Select', exact: true }).click();
     expect(await border(search)).toEqual(await border(tools.locator('.gallery-management')));
   }
@@ -411,10 +413,10 @@ test('search keeps a neutral shell without a selected input highlight', async ({
   await tools.screenshot({ path: testInfo.outputPath('search-focus-border.png') });
   await tools.getByRole('button', { name: 'Clear search', exact: true }).click();
   await expect(input).toHaveCount(0);
-  if (isMobile) await expect(page.locator('.phone-searchbar')).toHaveCount(0);
+  if (phone) await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   await opener.click();
   await expect(input).toBeFocused();
-  if (!isMobile) expect(await border(search)).toEqual(await border(filters));
+  if (!phone) expect(await border(search)).toEqual(await border(filters));
   await page.keyboard.press('Escape');
   await expect(input).toHaveCount(0);
 });
@@ -424,10 +426,7 @@ test('filter options scroll independently and have a compact local search', asyn
   const many = Array.from({ length: 45 }, (_, index) => ({ ...items[0], id: `filter-${index}`, model: `Model ${String(index).padStart(2, '0')}` }));
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: many, revision: 1, hasMore: false } }));
   await page.goto('/');
-  await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
-  const phoneFilters = page.getByRole('button', { name: 'Open Gallery Filters', exact: true });
-  if (await phoneFilters.count()) await phoneFilters.click();
-  else await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+  await studioUi(page).openFilters();
   await expect(page.getByRole('button', { name: 'Filter By Workflow', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Filter By Model', exact: true }).click();
   const menu = page.locator('.gallery-filter-menu');
