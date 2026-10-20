@@ -12,6 +12,8 @@ version opens with a `> ` summary line.
 ## [Unreleased]
 
 ### Added
+- **Prompt writing for chat:** with `STUDIO_PROMPT_WRITER_URL`, `_KEY` and `_MODEL` set, MCP Generate takes the user's `request` and Studio writes the final prompts itself, one per image, from the target profile's full prompting guide in one fresh call to a fast chat model, falling back to the request when that fails. `exact_prompt` or explicit `prompts` skip it. Replies show each prompt used (up to 200 characters) and result pages the full prompt. Reuse tweaks ("warmer") and model changes rewrite the original request plus the changes for the target model, so no guides pile up in the chat.
+- **Any MCP client:** Studio's server instructions and tool descriptions now carry every workflow rule, so LibreChat, Claude Desktop, Grok and others behave the same; the README explains connecting through LiteLLM or with a personal token.
 - **Reference With:** when the selected model takes no reference image, the composer shows Reference With in the Reference button's place. It lists the ready models of that kind that take one, grouped and labelled like the model picker; picking one switches to it and opens its reference picker. On the desktop and in the phone's Create sheet.
 
 ### Fixed

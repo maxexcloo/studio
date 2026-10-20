@@ -33,12 +33,13 @@ const loraInfo = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }) } = {}) {
+async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
   const requests = [];
   const controlRequests = [];
+  const writerRequests = [];
   const jobs = new Map();
   const assets = new Map();
   const submitted = [];
@@ -98,6 +99,11 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     ...(internalCredential ? { internalCredential } : {}),
     resolveSignedResult,
     fetchImpl: async (url, init) => {
+      if (String(url).startsWith('http://fixture-writer.invalid')) {
+        const body = JSON.parse(init.body);
+        writerRequests.push({ url: String(url), authorization: init.headers.Authorization, body });
+        return writerReply(body, writerRequests.length);
+      }
       if (String(url).startsWith('http://fixture-control.invalid')) {
         controlRequests.push({ url: String(url), method: init?.method || 'GET', body: init?.body ? JSON.parse(init.body) : undefined });
         return Response.json(controlReply(new URL(url).pathname, init?.body ? JSON.parse(init.body) : undefined));
@@ -121,7 +127,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     if (!existingDir) fs.rmSync(dataDir, { recursive: true, force: true });
   });
   return {
-    assets, base, controlRequests, dataDir, downloads, environment, jobs, requests, submitted,
+    assets, base, controlRequests, writerRequests, dataDir, downloads, environment, jobs, requests, submitted,
     failAfter: count => { failAfter = count; },
     dropAck: () => { dropAck = true; },
     completeOnSubmit: () => { completeOnSubmit = true; },
@@ -292,7 +298,7 @@ test('media and administrator credentials discover only their own friendly tools
   const admin = await f.client('administrator', controlKey);
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
-  assert.match(media.getInstructions(), /call Generate once with kind, tier and a clear prompt per distinct image/);
+  assert.match(media.getInstructions(), /call Generate once with request \(the user's words, with anything they refer back to\), kind and tier/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(media.getInstructions(), /share the result links and end the turn\. Call Result only when the user asks/);
   assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
@@ -1254,12 +1260,12 @@ test('Generate returns quick images inline as finished markdown, so no backgroun
   const result = await pending;
   assert.notEqual(result.isError, true);
   assert.ok(performance.now() - started < 5000, 'returns once the jobs finish, not at the deadline');
-  assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}`, link: result.structuredContent.jobs[index].link })) });
+  assert.deepEqual(result.structuredContent, { status: 'done', profile: { id: imageProfile.id, label: imageProfile.label, tier: 'standard' }, prompt_source: 'exact', jobs: [...f.jobs.keys()].map((job_id, index) => ({ job_id, ref: `result ${index + 1}`, link: result.structuredContent.jobs[index].link })) });
   assert.equal(result.content.length, 1);
   // The same markdown a background notification returns, one block per job: only the instruction and the markdown.
   // Each linked preview sits directly under its header, in one paragraph; jobs are separated by a blank line.
-  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
-  assert.ok(result.content[0].text.length < 520, `${result.content[0].text.length} characters`);
+  assert.match(result.content[0].text, /^Done\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
+  assert.ok(result.content[0].text.length < 540, `${result.content[0].text.length} characters`);
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
@@ -1276,7 +1282,7 @@ test('Generate falls back to the queued response when a job outlasts the wait or
   assert.ok(elapsed >= 900 && elapsed < 4000, `waited ${Math.round(elapsed)} ms`);
   assert.equal(slow.status, 'queued');
   assert.deepEqual(Object.keys(slow.jobs[0]), ['job_id', 'ref', 'link']);
-  assert.match(texts(slowResult), /^Queued\. Share the links below and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/);
+  assert.match(texts(slowResult), /^Queued\. Share the links below and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/);
   started = performance.now();
   const pending = call(client, 'Generate', { kind: 'image', prompts: ['An egg', 'A nest'], count: 1 });
   once(() => f.jobs.size === 3, () => { const [, failed] = [...f.jobs.values()].slice(-2); failed.status = 'failed'; });
@@ -1378,10 +1384,12 @@ test('Reuse animates an image from its first frame with the default first-frame 
   data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'quality' }));
   assert.equal(f.submitted.at(-1).profileId, 'fl-quality');
   assert.equal(f.submitted.at(-1).prompt, 'A heron', 'the image prompt by default');
-  // A video cannot become an image, tiers are only for animation, and tier or prompt need a kind.
+  // A video cannot become an image, another tier needs a profile in it, and tier or prompt need a kind.
   finish(f, 'mp4');
   await failure(client, 'Reuse', { job_id: 'result 2', kind: 'image' });
-  await failure(client, 'Reuse', { job_id: 'result 1', kind: 'image', tier: 'fast' });
+  const otherTier = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', tier: 'fast' });
+  assert.equal(otherTier.isError, true);
+  assert.match(texts(otherTier), /No ready image profile in the fast tier/);
   await failure(client, 'Reuse', { job_id: 'result 1', prompt: 'A heron at dusk' });
 });
 
@@ -1516,7 +1524,7 @@ test('one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(texts(excess), 'count is images per prompt, so 2 prompts × count 3 would queue 6 jobs; one call queues at most 4. For 2 different images, pass the 2 prompts without count.');
   const description = (await client.listTools()).tools.find(tool => tool.name === 'Generate').description;
-  assert.match(description, /For N different images pass N prompts in ONE call \(at most four jobs; count is images per prompt\)/);
+  assert.match(description, /count: images, at most four per call\. .*prompts \(one per different image\)/);
   assert.equal(f.submitted.length, 4);
 });
 
@@ -1642,4 +1650,132 @@ test('replies label links Result N with one All Results page, and Result "all" s
   await failure(await chat(t, f, 'bob', 'plush-chat'), 'Status', { job_id: linkId });
   // A pending Result names its link Result N.
   assert.match(texts(await call(client, 'Result', { job_id: 'result 3' })), /\[Result 3\]\(https:/);
+});
+
+const writerEnvironment = { STUDIO_PROMPT_WRITER_URL: 'http://fixture-writer.invalid:4000', STUDIO_PROMPT_WRITER_KEY: 'fixture-writer-key', STUDIO_PROMPT_WRITER_MODEL: 'ai/text-quick' };
+const guidedCatalogue = () => [
+  { ...structuredClone(imageProfile), prompting: { id: 'fixture-guide', summary: 'Lead with the light.', rules: ['Name the light source.'], sources: ['https://guide.example.test'], reviewed_on: '2026-10-01' } },
+  { ...structuredClone(imageProfile), id: 'fixture-other', label: 'Other Image', prompting: { id: 'other-guide', summary: 'Tags, comma separated.' } },
+  structuredClone(videoProfile),
+  { ...structuredClone(localFirstFrame), prompting: { id: 'motion-guide', summary: 'Describe the motion.' } }
+];
+/** A mocked writer: each prompt numbers itself and repeats the request and changes it was given. */
+const writes = (body) => {
+  const count = Number(/exactly (\d+)/.exec(body.messages[0].content)[1]);
+  const user = body.messages[1].content.replace(/\n/g, ' | ');
+  const prompt = (index) => `${/long/.test(user) ? 'very '.repeat(80) : ''}Written ${index + 1}: ${user}`;
+  return Response.json({ choices: [{ message: { content: `\`\`\`json\n${JSON.stringify({ prompts: Array.from({ length: count }, (_, index) => prompt(index)) })}\n\`\`\`` } }] });
+};
+
+test('Studio writes every prompt of a Generate call in one writer call from the request and the full guide', async t => {
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  assert.match(client.getInstructions(), /Studio writes the prompt; don't expand the request\./);
+  const reply = await call(client, 'Generate', { kind: 'image', request: 'a cosy cabin in snow', count: 2 });
+  const result = data(reply);
+  assert.equal(result.prompt_source, 'studio');
+  assert.equal(result.prompting, undefined, 'no guide reaches the chat');
+  assert.equal(reply.content.length, 1);
+  assert.equal(f.writerRequests.length, 1, 'one call writes every prompt');
+  const [{ url, authorization, body }] = f.writerRequests;
+  assert.equal(url, 'http://fixture-writer.invalid:4000/v1/chat/completions');
+  assert.equal(authorization, 'Bearer fixture-writer-key');
+  assert.equal(body.model, 'ai/text-quick');
+  assert.match(body.messages[0].content, /Fixture Image[\s\S]*exactly 2 complete[\s\S]*Lead with the light\.[\s\S]*Name the light source\./);
+  assert.doesNotMatch(body.messages[0].content, /guide\.example\.test|2026-10-01/, 'no sources or review dates');
+  assert.equal(body.messages[1].content, 'Request: a cosy cabin in snow');
+  assert.deepEqual(f.submitted.map(item => [item.prompt, item.profileId]), [['Written 1: Request: a cosy cabin in snow', imageProfile.id], ['Written 2: Request: a cosy cabin in snow', imageProfile.id]]);
+  assert.match(texts(reply), /\n\nResult 1 prompt: Written 1: Request: a cosy cabin in snow\nResult 2 prompt: Written 2: Request: a cosy cabin in snow$/);
+  // The chat shows at most 200 characters of a long prompt; its result page shows all of it.
+  const long = await call(client, 'Generate', { kind: 'image', request: 'a long cabin' });
+  const line = /Prompt: (.+)$/.exec(texts(long))[1];
+  assert.equal(line.length, 200);
+  assert.ok(line.endsWith('…'));
+  const page = await (await fetch(localLink(f, data(long).jobs[0].link))).text();
+  assert.ok(page.includes(`${'very '.repeat(80)}Written 1: Request: a long cabin`), 'the full prompt on its page');
+  // An exact prompt, or prompts, pass through unwritten.
+  const exact = data(await call(client, 'Generate', { kind: 'image', request: 'An egg, exactly', exact_prompt: true }));
+  const prompts = data(await call(client, 'Generate', { kind: 'image', prompts: ['A nest'] }));
+  assert.deepEqual([exact.prompt_source, prompts.prompt_source], ['exact', 'exact']);
+  assert.deepEqual(f.submitted.slice(-2).map(item => item.prompt), ['An egg, exactly', 'A nest']);
+  assert.equal(f.writerRequests.length, 2);
+  await failure(client, 'Generate', { kind: 'image' });
+  await failure(client, 'Generate', { kind: 'image', request: 'An egg', prompts: ['An egg'] });
+});
+
+test('tweaks and model changes re-expand the original request for the target profile', async t => {
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  data(await call(client, 'Generate', { kind: 'image', request: 'a cosy cabin in snow', tier: 'standard' }));
+  finish(f);
+  const warmer = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', request: 'make it warmer' });
+  assert.equal(data(warmer).prompt_source, 'studio');
+  assert.equal(f.writerRequests.at(-1).body.messages[1].content, 'Request: a cosy cabin in snow\nChange: make it warmer', 'the original request, not the written prompt');
+  assert.equal(f.submitted.at(-1).prompt, 'Written 1: Request: a cosy cabin in snow | Change: make it warmer');
+  assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
+  assert.doesNotMatch(texts(warmer), /Lead with the light/, 'no guide in the chat');
+  finish(f);
+  // Changes accumulate across follow-ups.
+  data(await call(client, 'Reuse', { job_id: 'result 2', kind: 'image', request: 'add a dog' }));
+  assert.equal(f.writerRequests.at(-1).body.messages[1].content, 'Request: a cosy cabin in snow\nChange: make it warmer\nChange: add a dog');
+  // "Again" reruns the same prompt without writing.
+  const writes0 = f.writerRequests.length;
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image' }));
+  assert.equal(f.writerRequests.length, writes0);
+  assert.equal(f.submitted.at(-1).prompt, f.submitted[0].prompt);
+  // Another model gets a prompt written from its own guide, at the result's proportions.
+  const moved = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', profile_id: 'Other Image' }));
+  assert.equal(moved.profile.id, 'fixture-other');
+  assert.match(f.writerRequests.at(-1).body.messages[0].content, /Other Image[\s\S]*Tags, comma separated\./);
+  assert.equal(f.writerRequests.at(-1).body.messages[1].content, 'Request: a cosy cabin in snow');
+  assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [768, 512]);
+  // Animating writes a motion prompt for the video profile from the first frame.
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', request: 'snow starts falling' }));
+  const animation = f.writerRequests.at(-1).body.messages;
+  assert.match(animation[0].content, /video model H3 FL[\s\S]*first frame[\s\S]*Describe the motion\./);
+  assert.equal(animation[1].content, 'Request: a cosy cabin in snow\nChange: snow starts falling');
+  assert.equal(f.submitted.at(-1).profileId, 'fl-fast');
+  // An exact prompt replaces it unwritten.
+  const writes1 = f.writerRequests.length;
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', prompt: 'A red cabin' }));
+  assert.equal(f.writerRequests.length, writes1);
+  assert.equal(f.submitted.at(-1).prompt, 'A red cabin');
+});
+
+test('prompt writing falls back to the request when the writer fails, and stays off without settings', async t => {
+  let answer = () => new Response('busy', { status: 503 });
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: () => answer() });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  const unavailable = data(await call(client, 'Generate', { kind: 'image', request: 'a cosy cabin in snow', count: 2 }));
+  assert.equal(unavailable.prompt_source, 'request');
+  assert.deepEqual(f.submitted.map(item => item.prompt), ['a cosy cabin in snow', 'a cosy cabin in snow'], 'each image keeps its own seed');
+  answer = () => Response.json({ choices: [{ message: { content: '' } }] });
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', request: 'an egg' })).prompt_source, 'request');
+  answer = () => { throw new TypeError('fetch failed'); };
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', request: 'a nest' })).prompt_source, 'request');
+  assert.equal(f.submitted.at(-1).prompt, 'a nest');
+  finish(f);
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', request: 'warmer' }));
+  assert.equal(f.submitted.at(-1).prompt, 'a cosy cabin in snow, warmer');
+
+  // Without settings the request is the prompt, the chat writes it, and the guide still goes to the chat once.
+  const off = await fixture(t);
+  await off.profiles(guidedCatalogue());
+  const plain = await off.client();
+  assert.match(plain.getInstructions(), /Write request as one clear prompt/);
+  const first = await call(plain, 'Generate', { kind: 'image', request: 'A cabin in warm light' });
+  assert.equal(data(first).prompt_source, 'request');
+  assert.match(texts(first), /Prompting guide for Fixture Image/);
+  assert.equal(off.submitted.at(-1).prompt, 'A cabin in warm light');
+  assert.equal(off.writerRequests.length, 0);
+});
+
+test('partial prompt writer settings fail at start by name', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
+  try {
+    assert.throws(() => registerMcpRoutes(express(), { dataDir, baseUrl: 'http://127.0.0.1:1', environment: { STUDIO_MCP_API_KEY: mediaKey, MCP_PUBLIC_URL: 'https://studio.example.test', STUDIO_PROMPT_WRITER_URL: 'http://fixture-writer.invalid' } }), /needs STUDIO_PROMPT_WRITER_KEY, STUDIO_PROMPT_WRITER_MODEL/);
+  } finally { fs.rmSync(dataDir, { recursive: true, force: true }); }
 });

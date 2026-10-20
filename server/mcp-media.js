@@ -5,7 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
-import { assertAdjustable, mcpControls, mcpGenerationCount, prepareLoras, resolveLoraName } from './mcp-controls.js';
+import { assertAdjustable, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 
@@ -27,6 +27,8 @@ const maxShownResults = 8;
 export const maxResultWaitSeconds = 1500;
 /** Jobs one Generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 4;
+// Request records behind each MCP job, for Reuse tweaks and the result page; the oldest go first.
+const maxPromptRecords = 5000;
 const aborted = (signal) => {
   const error = new Error('The wait ended because the request was cancelled. The generation continues; collect it later with Result.');
   error.aborted = true;
@@ -69,6 +71,7 @@ export class McpMedia {
     // Result numbering is additive; files written before it simply start without references.
     if (!this.state.refs || typeof this.state.refs !== 'object' || Array.isArray(this.state.refs)) this.state.refs = {};
     if (!this.state.links || typeof this.state.links !== 'object' || Array.isArray(this.state.links)) this.state.links = {};
+    if (!this.state.prompts || typeof this.state.prompts !== 'object' || Array.isArray(this.state.prompts)) this.state.prompts = {};
     this.linkIds = new Map(Object.entries(this.state.links).map(([id, link]) => [link.all ? this.linkKey(link.audience, link.owner, `refs:${link.scope}`, 'all') : this.linkKey(link.audience, link.owner, link.jobId, link.index), id]));
     this.key = signingKey || this.state.signingKey;
     this.save();
@@ -176,7 +179,15 @@ export class McpMedia {
       return loras;
     } catch { return {}; }
   }
-  async queue(owner, args, scope = '') {
+  /** The request behind an MCP job and the prompt it ran, when Studio recorded them. */
+  promptRecord(jobId) {
+    return Object.hasOwn(this.state.prompts, jobId) ? this.state.prompts[jobId] : null;
+  }
+  /**
+   * Queues one job per prompt and count. `record` keeps the user's request and changes beside each job,
+   * so a later tweak re-expands the original request instead of the written prompt.
+   */
+  async queue(owner, args, scope = '', record = {}) {
     const { profile_id, prompts, loras = [], reference_asset_ids = [], reference_role, count = mcpGenerationCount, seed, negative_prompt, cfg, denoise, sampler, scheduler, upscale_quality, face_detail = false } = args;
     let profile = (await this.profiles('all', owner)).find(item => item.id === profile_id);
     if (!profile) throw new Error('Choose a ready profile from Models.');
@@ -220,11 +231,12 @@ export class McpMedia {
         if (!result.jobId) throw new Error('Studio did not return a job ID.');
         if (Object.hasOwn(this.state.jobs, result.jobId) && this.state.jobs[result.jobId] !== owner) throw new Error('Studio returned a job owned by another account.');
         this.state.jobs[result.jobId] = owner;
+        this.recordPrompt(result.jobId, { prompt, ...(record.request ? { request: record.request } : {}), ...(record.changes?.length ? { changes: record.changes } : {}) });
         this.save();
-        queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId) });
+        queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), prompt });
       } catch (error) {
         if (error.submissionUncertain) {
-          queued.push({ job_id: id, ...this.handle(owner, scope, id), status: 'unknown' });
+          queued.push({ job_id: id, ...this.handle(owner, scope, id), status: 'unknown', prompt });
           return { status: 'partially_queued', jobs: queued, error: 'The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.' };
         }
         // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
@@ -233,6 +245,11 @@ export class McpMedia {
       }
     }
     return { status: 'queued', jobs: queued };
+  }
+  recordPrompt(jobId, record) {
+    const keys = Object.keys(this.state.prompts);
+    if (keys.length >= maxPromptRecords) delete this.state.prompts[keys[0]];
+    this.state.prompts[jobId] = record;
   }
   async galleryJob(jobId, owner = "", options = {}) {
     // Settings name the profile for the result's header.
@@ -428,6 +445,14 @@ export class McpMedia {
     if (loras.length) args.loras = loras;
     return { profile: base, args };
   }
+  /** Generate arguments that run a finished output on another profile of its kind, at its proportions and with its references. */
+  retarget(item, profile, { count = 1 } = {}) {
+    const references = (item.settings?.referenceAssets || []).map(asset => asset?.assetId).filter(Boolean);
+    const args = { profile_id: profile.id, prompts: [item.prompt], count, ...(references.length ? { reference_asset_ids: references } : {}) };
+    const controls = mcpControls(references.length ? { ...profile, ...profile.imageModes?.reference } : profile);
+    if (controls.width && controls.height && item.width > 0 && item.height > 0) Object.assign(args, mcpSize(profile, { aspect: `${item.width}:${item.height}` }));
+    return { profile, args };
+  }
   /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
   async animate(owner, jobId, index, item, { tier, prompt, count = 1 } = {}) {
     const output = await this.download(owner, jobId, index);
@@ -593,12 +618,12 @@ export class McpMedia {
         return `<section>${heading}<p>Still generating${escapeHtml(progress)}.</p></section>`;
       }
       const outputs = finished.has(job.status) ? (job.outputs || []).flatMap((item, index) => mcpOutputPath(item?.url) ? [this.shortId(claims.owner, jobId, index)] : []) : [];
-      if (!outputs.length) return `<section>${heading}<p>This generation did not produce a result.</p></section>`;
+      if (!outputs.length) return `<section>${heading}<p>This generation did not produce a result.</p>${this.promptHtml(jobId)}</section>`;
       return `<section>${heading}${outputs.map(token => job.kind === 'video'
         ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
-        : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`).join('')}</section>`;
+        : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`).join('')}${this.promptHtml(jobId)}</section>`;
     }).join('');
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
   async page(claims, credential) {
@@ -613,8 +638,13 @@ export class McpMedia {
     const media = outputs.map(token => job.kind === 'video'
       ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
       : `<figure><a href="${token}"><img src="${token}" alt="Studio result"></a><a href="${token}">View Original</a></figure>`).join('');
-    const body = pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : '<p>This generation did not produce a result.</p>';
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}</style></head><body><h1>${title}</h1>${body}</body></html>`;
+    const body = (pending ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>` : outputs.length ? media : '<p>This generation did not produce a result.</p>') + this.promptHtml(claims.jobId);
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ''}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
+  }
+  /** The full prompt a job ran, for its result pages. */
+  promptHtml(jobId) {
+    const prompt = this.promptRecord(jobId)?.prompt;
+    return prompt ? `<p class="prompt">${escapeHtml(prompt)}</p>` : '';
   }
   summary(job) { return Object.fromEntries(['status', 'kind', 'progress', 'error', 'failure'].filter(key => key in job).map(key => [key, job[key]])); }
 }
