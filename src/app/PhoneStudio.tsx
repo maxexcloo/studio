@@ -235,7 +235,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
                 onClick={() => { if (quickGo) generate(); else setCreateOpen(true); }}
               >
                 {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
-                
               </button>
             </div>
           ) : null}

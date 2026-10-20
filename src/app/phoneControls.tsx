@@ -47,4 +47,3 @@ export function PhoneSlider({ label, value, min, max, step = 1, onChange, format
     </div>
   );
 }
-
