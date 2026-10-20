@@ -262,7 +262,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       star: (item) => live().toggleFavorite([item], !item.favorite),
       starItems: (items, favorite) => live().toggleFavorite(items, favorite),
       removeItems: (items) => live().deleteItems(items),
-      animateItems: (items) => setAnimationItems(items),
       retry: (item) => { void live().failureFixes?.retry(item); },
       // One at a time, each its own new job with its own settings.
       retryItems: (items) => { void (async () => { for (const item of items) await live().failureFixes?.retry(item); })(); },
