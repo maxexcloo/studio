@@ -494,8 +494,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
           <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
             {role ? <span className="ref-menu-divider" aria-hidden="true" /> : null}
-            <Tip content={paint.masked ? "Change the painted part" : "Paint over a part to change only that"}>
-              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the painted part" : "Paint the part to change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
+            <Tip content={paint.masked ? "Change the Painted Part" : "Paint Over a Part to Change Only That"}>
+              <button type="button" className={cn("ref-menu-paint", paint.masked && "is-masked", paint.open && "is-active")} aria-label={paint.masked ? "Edit the Painted Part" : "Paint the Part to Change"} aria-pressed={paint.open} tabIndex={paint.hidden ? -1 : undefined} onClick={paint.onOpen}>
                 <Brush size={17} />
                 <span className="ref-menu-paint-label"><span>{coarsePointer() ? "Tap" : "Click"} to inpaint</span></span>
               </button>
@@ -679,7 +679,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   // Every slot is laid out either way; what Edit leaves out folds away (Fold), so the switch glides.
   const chains: MediaInput[][] = [];
   for (const input of inputs) {
-    const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
+    // Start and end frames mean different things: only slots of one role share a References button.
+    const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows) && items[0].role === input.role) : null;
     if (chain) chain.push(input); else chains.push([input]);
   }
   // A phone, or a screen without hover, shows Edit | Reference in the row: there's nothing to hover open.
