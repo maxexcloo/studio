@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Fast profiles by default in chat, several images in one call, prompting guides once per conversation and Result links with an All Results page
+
 ### Added
 - **Aspect and size in chat:** Generate takes `aspect` (`landscape`, `portrait`, `square` or a ratio such as `16:9`) and `size` (`2k` or `4k`) and uses the profile's own native preset sizes instead of invented pixel sizes.
 - **All Results:** replies with several results, or any still running, add one All Results link to a page that lists every result of the conversation and fills in as they finish. Result with `job_id: "all"` answers "show them" with every recent finished result in one reply.
