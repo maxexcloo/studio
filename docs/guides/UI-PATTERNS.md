@@ -10,7 +10,7 @@ the pattern occurs in the same piece of work.
 - **Durations:** `--motion-instant` (90 ms) for presses, `--motion-fast`
   (140 ms) for hover, focus and small state changes, `--motion-base` (200 ms)
   for surfaces entering or leaving, `--motion-slow` (320 ms) for height
-  changes such as Advanced settings expanding.
+  changes such as a row's details expanding.
 - **Easing:** `--motion-ease` for interactive state changes; `--ease-soft` for
   staged sequences and sheets; framer-motion springs (`stiffness: 420,
   damping: 40`) only for sheets that follow a finger.
@@ -55,11 +55,12 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
 
 Pick the lightest surface that fits:
 
-1. **Inline expansion** for more of the same thing (Advanced settings, a row's
-   details). It pushes content down with a smooth height transition.
-2. **Anchored popover** on the desktop for choosing something (model, LoRAs,
-   references, size, filters). It opens at its trigger and closes on outside
-   click or Escape. On the phone the same content is a bottom sheet.
+1. **Inline expansion** for more of the same thing (a row's details). It
+   pushes content down with a smooth height transition.
+2. **Anchored popover** on the desktop for choosing or tuning something
+   (model, LoRAs, references, Advanced Settings, size, filters). It opens at
+   its trigger and closes on outside click or Escape. On the phone the same
+   content is a bottom sheet.
 3. **Side panel or sheet** for a task with several steps or a long list
    (Settings, the Details panel, Create on the phone). Sheets have a handle,
    swipe down to close, a backdrop, and scroll inside themselves.
@@ -135,9 +136,11 @@ through one announcer (polite, failures assertive).
 
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers.
-- **Advanced** expands inline below the composer's controls with a height
-  transition, remembered per account; Escape folds it. The phone shows the
-  same controls as a tall panel within the Create flow, with Back.
+- **Advanced Settings** open in the composer popover, like LoRAs and
+  References: anchored above the composer at its width, the same glass,
+  motion and dismissal (outside click, Escape, its button again; focus returns
+  to the button). The phone shows the same controls as a sheet that replaces
+  the Create sheet, with Back (one layer).
 - **Size** stays open while choosing: the resolution is a segmented toggle of
   the model's native options (Default · 2K · 4K), beside the shapes, so both
   can be picked in one go.

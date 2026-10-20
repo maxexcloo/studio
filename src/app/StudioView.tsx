@@ -2,13 +2,12 @@ import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { PromptField } from './PromptField';
-import { LoraPopover } from './LoraPopover';
+import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, GalleryHorizontalEnd, Info, Library, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { scopedStorageKey } from './api';
 import { cn, nearTextLimit, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { useHorizontalWheel, useWheelRef } from './wheel';
@@ -148,28 +147,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [composerExpanded, setComposerExpanded] = React.useState(false);
   const [composerPrimaryTarget, setComposerPrimaryTarget] = React.useState<HTMLDivElement | null>(null);
   const [lorasOpen, setLorasOpen] = React.useState(false);
-  // Advanced settings expand inline below the composer's controls, remembered per account.
-  const advancedKey = scopedStorageKey('heiss-ui:advanced-open');
-  const [advancedOpen, setAdvancedOpenState] = React.useState(() => { try { return localStorage.getItem(advancedKey) === '1'; } catch { return false; } });
-  const setAdvancedOpen = React.useCallback((next: boolean | ((open: boolean) => boolean)) => setAdvancedOpenState((current) => {
-    const value = typeof next === 'function' ? next(current) : next;
-    try { localStorage.setItem(advancedKey, value ? '1' : '0'); } catch { /* Kept for this session. */ }
-    return value;
-  }), [advancedKey]);
-  // Escape folds it from its button or from inside it, as it closes the other composer surfaces.
-  React.useEffect(() => {
-    if (!advancedOpen || phone) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target?.closest('.composer-advanced-inline, .composer-advanced-trigger')) return;
-      event.preventDefault();
-      setAdvancedOpen(false);
-      document.querySelector<HTMLElement>('.composer-advanced-trigger')?.focus({ preventScroll: true });
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [advancedOpen, phone, setAdvancedOpen]);
+  // Advanced Settings open in a popover above the composer, like LoRAs (UI-PATTERNS › Composer).
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
   React.useEffect(() => {
     if (!composerExpanded || phone) return;
     const outside = (event: PointerEvent) => {
@@ -645,14 +624,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               generationEstimate={view.generationEstimate}
               generateKey={view.generateKey}
             />
-            <AnimatePresence initial={false}>
-              {advancedOpen && composerExpanded ? (
-                <motion.section key="advanced" className="composer-advanced-inline" role="region" aria-label="Advanced Settings" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
->
-                  <div className="composer-advanced-body">{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</div>
-                </motion.section>
-              ) : null}
-            </AnimatePresence>
             {historyPopover}
           </ExpandingComposer>
   );
@@ -780,6 +751,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FeedbackHost />
+      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</AdvancedPopover>}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}

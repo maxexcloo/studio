@@ -48,14 +48,18 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await ui.prompt.fill('Scene detail\n'.repeat(60));
   await ui.negativePrompt.fill('Avoid defects\n'.repeat(60));
   await ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
-  // Inline below the composer's controls, not a dialog.
-  const advanced = page.getByRole('region', { name: 'Advanced Settings', exact: true });
+  // A popover above the composer, as wide as it, like LoRAs and References.
+  const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
   await expect(advanced).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Advanced Settings', exact: true })).toHaveCount(0);
-  await expect.poll(() => advanced.evaluate((element) => {
-    const bounds = element.getBoundingClientRect();
-    return bounds.top >= 0 && bounds.bottom <= innerHeight;
-  })).toBe(true);
+  await expect.poll(async () => {
+    const bounds = (await advanced.boundingBox())!;
+    const composer = (await ui.composer.boundingBox())!;
+    return bounds.y >= 0 && bounds.y + bounds.height <= composer.y + 1 && Math.abs(bounds.x - composer.x) < 1 && Math.abs(bounds.width - composer.width) < 1;
+  }).toBe(true);
+  // Escape closes it and gives focus back to its button.
+  await page.keyboard.press('Escape');
+  await expect(advanced).toHaveCount(0);
+  await expect(ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true })).toBeFocused();
 });
 
 test('phone compact prompt is one muted line with overflow ellipsis', async ({ page, isMobile }) => {
