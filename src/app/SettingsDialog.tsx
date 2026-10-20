@@ -6,7 +6,7 @@ import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { useAtComputer, usePhone, useThisComputer } from './device';
 import type { ConfirmAction } from './useConfirmation';
 import { Check, RotateCw, Download, ExternalLink, FolderOpen, FolderSearch, ScanSearch, Boxes, Github, Info, LifeBuoy, Plug, RefreshCw, Scale, ScrollText, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
-import { discordUrl, features, githubUrl } from './constants';
+import { discordUrl, githubUrl } from './constants';
 import { DiscordIcon } from './DiscordIcon';
 import { cn } from './format';
 import { BetaTag, NumberPicker, Skeleton, StudioSelect, Tip } from './components';
@@ -724,7 +724,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <h4 className="set-subhead">Gallery</h4>
             <Group title="Display">
               <SwitchRow label="Follow the Latest Output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
-              {features.moments ? <SwitchRow label="Group by Time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
+              <SwitchRow label="Date Headers" description="Headings like “Today” and “This Evening” split the gallery by when you made things." checked={Boolean(prefs.dateHeaders)} onChange={(next) => setPrefs({ dateHeaders: next })} />
               <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <SwitchRow label={preferenceLabels.showFailedItems} description="Interrupted and failed generations stay in the gallery." checked={prefs.showFailedItems} onChange={(next) => setPrefs({ showFailedItems: next })} />
             </Group>

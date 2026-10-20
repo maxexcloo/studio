@@ -291,7 +291,8 @@ export type Preferences = {
   spanWideImages: boolean;
   showFailedItems: boolean;
   /** Headings for each stretch of time in the gallery ("This evening"). */
-  showMoments: boolean;
+  /** Date headings in the gallery ("Today", "This Evening"), from Settings › Studio › Gallery. */
+  dateHeaders: boolean;
   /** Runs of one idea fold into stacks (runs.js). */
   stackRuns: boolean;
   /** A folded run: a photo with edges under it, or a cover flow inside one card. */

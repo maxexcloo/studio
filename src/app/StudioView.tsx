@@ -17,7 +17,6 @@ import { GenerationProfiles, GenerationProgress } from './GenerationProgress';
 import { ComposerBar } from './ComposerBar';
 import { ExpandingComposer } from './ExpandingComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
-import { features } from './constants';
 import { RunCard, runKind } from './RunStack';
 import { RunSheet } from './RunSheet';
 import { StackRunsButton } from './StackRunsButton';
@@ -479,7 +478,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               key={mode}
               cancelJob={cancelJob}
               groups={galleryGroups}
-              moments={features.moments && prefs.showMoments}
+              moments={Boolean(prefs.dateHeaders)}
               stackRuns={stackRuns}
               openRuns={openRuns}
               settleVersion={view.settleVersion}

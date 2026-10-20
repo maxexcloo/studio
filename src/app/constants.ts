@@ -18,7 +18,8 @@ export const defaultPrefs: Preferences = {
   followLatest: true,
   spanWideImages: false,
   showFailedItems: true,
-  showMoments: true,
+  // Off until chosen: a new key, so preferences saved under the old hidden showMoments don't switch it on.
+  dateHeaders: false,
   stackRuns: false,
   runStackStyle: "burst",
   smartUpscale: true,
@@ -29,12 +30,6 @@ export const defaultPrefs: Preferences = {
   modelFolderHints: true,
   shareWithoutSettings: false
 };
-
-/** Built but kept out of sight for now. */
-export const features = {
-  /** Time headings in the gallery ("This evening"). */
-  moments: false
-} as const;
 
 export const fallbackAspectPresets: Record<Mode, AspectPreset[]> = {
   image: [
