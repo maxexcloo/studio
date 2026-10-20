@@ -16,7 +16,7 @@ export type DeploymentSettings = {
   connections: Connection[];
   defaults: { image: DefaultProfile; video: DefaultProfile; profiles: { id: string; label: string; kind: string; ready: boolean }[] };
   catalogue: CatalogueFlag[];
-  integrations: { civitai: { browsing: boolean; token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
+  integrations: { civitai: { token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
   storage: Source & { outputs: 'studio' | 'comfy'; workerToken: boolean; multiUser: boolean };
 };
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
@@ -176,12 +176,11 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
 }
 
 /** Third-party services and storage at a glance: what is on, configured and available. */
-export function IntegrationsOverview({ settings, children }: React.PropsWithChildren<{ settings: DeploymentSettings }>) {
+export function IntegrationsOverview({ settings }: { settings: DeploymentSettings }) {
   const { civitai } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <Group title="Integrations">
-    <Row label="Civitai" description={`Browsing ${civitai.browsing ? 'on' : 'off'} · token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}`}>{state(civitai.browsing || civitai.presets, ['On', 'Off'])}</Row>
-    {children}
+    <Row label="Civitai" description={`Token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}. New PNGs always carry their settings in the form Civitai reads.`}>{state(civitai.token.set || civitai.presets, ['On', 'Off'])}</Row>
     <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
   </Group>;
 }

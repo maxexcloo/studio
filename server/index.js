@@ -50,7 +50,6 @@ import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libr
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
 import { derivedMediaCache, immutableMediaCache } from './media-response.js';
 import { startMediaWarmup } from './media-warmup.js';
-import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
 import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
@@ -1037,15 +1036,6 @@ app.post("/api/prompts/clear", (req, res) => {
   res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind, ownerIdForRequest(req)) });
 });
 
-app.get("/api/civitai", (_req, res) => {
-  res.json(civitaiPrefs());
-});
-
-app.post("/api/civitai", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true, ...saveCivitaiPrefs({ enabled: req.body?.enabled === true }) });
-});
-
 // Adding folders of earlier images happens at the computer: it reads that computer's disks.
 app.get("/api/library/folders", (req, res) => {
   if (!requireThisComputer(req, res)) return;
@@ -1293,7 +1283,7 @@ app.get("/api/settings/deployment", async (req, res) => {
     },
     catalogue: catalogueFlags.map(describeFlag),
     integrations: {
-      civitai: { browsing: civitaiPrefs().enabled === true, token: civitaiTokenStatus(), presets: presetsEnabled() },
+      civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
       huggingFace: { token: hfTokenStatus() }
     },
     storage: { outputs: mediaStorageEnabled ? "studio" : "comfy", ...settingSource("STUDIO_OUTPUT_STORAGE"), workerToken: Boolean(process.env.STUDIO_WORKER_TOKEN), multiUser: multiUserEnabled }

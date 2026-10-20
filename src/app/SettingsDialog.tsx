@@ -15,7 +15,7 @@ import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { knownAccountStatus } from './accounts';
 import { ProfilesSettings } from './ProfilesSettings';
-import { AdapterLibraryGroup, CivitaiRow, PromptHistoryRow } from './LibrarySettings';
+import { AdapterLibraryGroup, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { AccountSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
 import { AiControlGroup, useAiControlAvailability } from './AiControlSettings';
@@ -325,9 +325,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
             <AdapterLibraryGroup />
-            {deployment.settings ? <IntegrationsOverview settings={deployment.settings}>
-              <CivitaiRow showToast={showToast} canChange={thisComputer} />
-            </IntegrationsOverview> : null}
+            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} /> : null}
           </>
         ) : null}
 

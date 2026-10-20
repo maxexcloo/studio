@@ -50,7 +50,7 @@ The node graph is for building workflows. Studio is for the everyday loop of pro
 - **Inpainting (beta).** Paint over part of a picture, say what it becomes, and only that part changes. No extra nodes, and it works with 18 image families.
 - **Auto-grouping.** Ten takes of one idea become one tile, so a gallery of hundreds stays easy to scan.
 - **On your phone and every device.** A phone layout made for one thumb, and the full studio on any laptop or tablet on your network. Your PC renders, and every device shares the same models and gallery. [Set it up ↓](#on-your-phone)
-- **Civitai-ready images (beta).** New PNGs carry their prompt and settings in a form Civitai fills in for you on upload. Turn it on in Settings › Models › Civitai.
+- **Civitai-ready images.** New PNGs always carry their prompt and settings in a form Civitai fills in for you on upload.
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links. The library is off by default; set `STUDIO_ENABLE_PRESETS=1` on the instances that should offer it (see [Configuration](docs/guides/CONFIGURATION.md#civitai-images--downloads)).
 - **Zen mode.** Just the prompt and the picture, fullscreen.
 

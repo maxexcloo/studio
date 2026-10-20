@@ -9,7 +9,7 @@ import sharp from "sharp";
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
-const { civitaiPrefs, parametersText, saveCivitaiPrefs, writeCivitaiParameters } = await import("./civitai.js");
+const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
 const { parseA1111Parameters, readPngInfo } = await import("./png-text.js");
 
 const body = {
@@ -40,17 +40,13 @@ test("the text reads the way AUTOMATIC1111 writes it", () => {
   assert.equal(parsed.model, "juggernautXL_v9");
 });
 
-test("off by default; on, a finished PNG in the output folder carries it", async () => {
+test("a finished PNG in the output folder always carries it", async () => {
   fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
   const file = path.join(outputDir, "heiss-ui", "image_00001_.png");
   fs.writeFileSync(file, await sharp({ create: { width: 8, height: 6, channels: 3, background: "#123" } }).png().toBuffer());
   const outputs = [{ url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" })}`, filename: "image_00001_.png", type: "image" }];
 
-  assert.equal(civitaiPrefs().enabled, false);
-  assert.equal(writeCivitaiParameters(outputs, body), 0);
   assert.equal(readPngInfo(file).text.parameters, undefined);
-
-  saveCivitaiPrefs({ enabled: true });
   assert.equal(writeCivitaiParameters(outputs, body), 1);
   const info = readPngInfo(file);
   assert.match(info.text.parameters, /Size: 8x6/, "the file's own size, not the one asked for");

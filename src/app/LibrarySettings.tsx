@@ -3,49 +3,16 @@ import { loraName } from './catalogueNames';
 import { loraRoleLabel } from './modelRecipes';
 import type { LoraInfo } from './useLoraInfo';
 import { apiJson } from './api';
-import { BetaTag } from './components';
 import { Group, Row, SwitchRow } from './SettingsControls';
 import { clearPrompts, setPromptHistoryEnabled, usePromptHistory } from './recentPrompts';
 import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
 /* ---------------------------------------------------------------------------
-   Settings rows about what Studio keeps: Civitai-ready PNGs (beta), recent
-   prompts, and the LoRA and supporting-file inventory.
+   Settings rows about what Studio keeps: recent prompts, and the LoRA and supporting-file inventory.
 --------------------------------------------------------------------------- */
 
 const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
-
-/** Civitai-ready PNGs: off unless switched on. A row of Models › Civitai. */
-export function CivitaiRow({ showToast, canChange }: { showToast: ShowToast; canChange: boolean }) {
-  const [enabled, setEnabled] = React.useState<boolean | null>(null);
-  React.useEffect(() => {
-    let live = true;
-    apiJson<{ enabled: boolean }>('/api/civitai').then((data) => { if (live) setEnabled(Boolean(data.enabled)); }).catch(() => { if (live) setEnabled(false); });
-    return () => { live = false; };
-  }, []);
-  const change = async (next: boolean) => {
-    const before = enabled;
-    setEnabled(next);
-    try {
-      const data = await apiJson<{ enabled: boolean }>('/api/civitai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: next }) });
-      setEnabled(Boolean(data.enabled));
-    } catch (error) {
-      setEnabled(before);
-      showToast(error instanceof Error ? error.message : 'Couldn’t save the setting', 'error');
-    }
-  };
-  return (
-    <SwitchRow
-      label="Civitai-Ready Images"
-      tag={<BetaTag />}
-      description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG in the form Civitai reads, so it fills them in on upload. ComfyUI’s workflow stays in the file."
-      checked={Boolean(enabled)}
-      onChange={change}
-      disabled={enabled === null || !canChange}
-    />
-  );
-}
 
 /** Recent prompts: whether to keep them, what the list holds, and the way to empty it. */
 export function PromptHistoryRow({ showToast, confirmAction }: { showToast: ShowToast; confirmAction: ConfirmAction }) {

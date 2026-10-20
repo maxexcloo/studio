@@ -7,41 +7,23 @@ import { readJsonFile, renameWithRetry, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 
 /**
- * Civitai-ready PNGs (beta, off unless switched on in Settings › Library).
+ * Civitai-ready PNGs, always on.
  *
- * ComfyUI saves its graph in every PNG, which Civitai does not read. With
- * this on, each new PNG from the gallery also gets the "parameters" text
+ * ComfyUI saves its graph in every PNG, which Civitai does not read. Each new
+ * PNG from the gallery also gets the "parameters" text
  * AUTOMATIC1111 writes: the prompt with its LoRAs as <lora:name:weight>, the
  * negative prompt, then steps, sampler, CFG, seed, size and model. Civitai
  * reads that to fill in an upload and link the model and LoRAs by hash.
  *
- * It is written into the file in ComfyUI's output folder right after a run,
- * so the file you download, share or pick up from the folder all carry it.
+ * It is written into the stored file (Studio media, or ComfyUI's output folder
+ * when Studio doesn't store media) right after a run, so the file you
+ * download or share carries it.
  */
 
-const prefsPath = path.join(dataDir, "civitai.json");
 const hashesPath = path.join(dataDir, "model-hashes.json");
 
-let prefs = loadPrefs();
-
-function loadPrefs() {
-  try {
-    const value = readJsonFile(prefsPath);
-    return { enabled: value?.enabled === true };
-  } catch {
-    return { enabled: false };
-  }
-}
-
-export function civitaiPrefs() {
-  return { ...prefs };
-}
-
-export function saveCivitaiPrefs(next = {}) {
-  prefs = { enabled: next.enabled === true };
-  writeJsonFile(prefsPath, prefs);
-  return civitaiPrefs();
-}
+// The old on/off switch is gone: a saved choice, "off" included, is dropped quietly.
+try { fs.rmSync(path.join(dataDir, "civitai.json"), { force: true }); } catch { /* read-only data: nothing to forget */ }
 
 const appVersion = (() => {
   try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
@@ -214,7 +196,6 @@ function outputFile(output) {
  * left as it is. Never throws: a run's images matter more than their tags.
  */
 export function writeCivitaiParameters(outputs, body) {
-  if (!prefs.enabled) return 0;
   let written = 0;
   const hashes = hashesFor(body);
   for (const output of outputs || []) {
