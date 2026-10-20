@@ -162,10 +162,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     });
     const resolve = (value) => media.resolve(owner, refs, value);
     /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
-    const respond = async (submission, profile, waitSeconds, signal, guide = '', promptSource = 'exact') => {
+    const respond = async (submission, profile, waitSeconds, signal, guide = '', promptSource = 'exact', notice = '') => {
       const label = profile.label || profile.id;
       // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
-      const note = profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${label}; tell the user. ` : '';
+      const note = `${profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${label}; tell the user. ` : ''}${notice}`;
       // Quick jobs come back finished, so the agent needs no Result call.
       const seconds = waitSeconds ?? (profile.kind === 'video' ? 0 : imageWaitSeconds);
       const markdown = await media.settle(owner, submission, seconds, { signal });
@@ -346,7 +346,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           source = usePrompts(plan.args, await write(plan.profile, { request: base, changes, count, references, role: kind !== own ? 'first-frame' : references ? item.settings?.referenceRole || 'reference' : '', fallback, signal }), count);
         }
         const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes });
-        return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source);
+        const dropped = plan.droppedLoras?.length ? `Left out ${plan.droppedLoras.length === 1 ? 'a LoRA' : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(', ')}); tell the user. ` : '';
+        return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source, dropped);
       });
     } else {
       const control = async (method, route, body) => {

@@ -109,6 +109,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
     if (context) {
       try {
+        // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
+        // refuses one trained for another model instead of applying it.
+        const requested = (Array.isArray(req.body?.loras) ? req.body.loras : []).filter((item) => item && item.enabled !== false && typeof item.name === "string" && item.name).map((item) => item.name);
+        if (requested.length) await loraInfos(requested.slice(0, 32)).catch(() => null);
         body = sanitizeGenerateBody(req.body, context.info, context.stats);
         const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
         if (enabledLoras.length) {

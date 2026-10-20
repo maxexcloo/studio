@@ -1333,6 +1333,23 @@ test('Generate does not wait for videos by default', async t => {
 
 const finish = (f, extension = 'png') => { for (const job of f.jobs.values()) if (job.status !== 'done') Object.assign(job, { status: 'done', outputs: [{ url: `/comfy/view?filename=${job.id}.${extension}` }] }); };
 
+test('Reuse leaves out a saved LoRA made for another model family and says so', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1, loras: [{ name: 'fixture-effect.safetensors', strength: 0.6 }] }));
+  // A result made before Studio refused other-family LoRAs can carry one in its saved settings.
+  f.submitted[0].loras.push({ name: 'fixture-other.safetensors', strength: 0.5, enabled: true });
+  finish(f);
+  const again = await call(client, 'Reuse', { job_id: 'result 1', kind: 'image' });
+  assert.equal(again.isError, undefined);
+  assert.match(texts(again), /Left out a LoRA made for another model \(fixture-other\.safetensors\); tell the user\./);
+  assert.deepEqual(f.submitted[1].loras, [{ name: 'fixture-effect.safetensors', strength: 0.6, enabled: true }]);
+  // Generate itself still refuses one by name.
+  const refused = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['A heron'], loras: [{ name: 'fixture-other' }] });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /fixture-other is for SDXL, not Fixture Image/);
+});
+
 test('Reuse runs a result again with its profile and settings, a new seed and an optional prompt, without Models', async t => {
   const f = await fixture(t);
   const client = await f.client();

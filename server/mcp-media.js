@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, maxJobsPerCall, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
-import { loraCompatibility } from './lora-policy.js';
+import { compatibleLoras, loraCompatibility } from './lora-policy.js';
 import { chooseProfile, chooseRemoteVideo } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
 
@@ -493,9 +493,11 @@ export class McpMedia {
     const recorded = { width: item.width, height: item.height, steps: settings.steps, cfg: settings.cfg, denoise: settings.denoise, sampler: settings.sampler, scheduler: settings.scheduler };
     for (const [key, value] of Object.entries(recorded)) if (controls[key] && value !== undefined && value !== '' && value !== 0 && value !== profile.defaults?.[key]) args[key] = value;
     if (item.negative && controls.negative_prompt) args.negative_prompt = item.negative;
-    const loras = controls.loras ? (settings.loras || []).filter(lora => profile.options?.loras?.includes(lora.name)).map(({ name, strength }) => ({ name, strength })) : [];
+    const saved = controls.loras ? (settings.loras || []).filter(lora => lora?.enabled !== false && profile.options?.loras?.includes(lora.name)).map(({ name, strength }) => ({ name, strength })) : [];
+    // A LoRA for another model family would be refused on submit, so a rerun leaves it out and says so.
+    const { loras, droppedNames } = saved.length ? compatibleLoras(saved, await this.loraInfos(owner), profile) : { loras: [], droppedNames: [] };
     if (loras.length) args.loras = loras;
-    return { profile: base, args };
+    return { profile: base, args, ...(droppedNames.length ? { droppedLoras: droppedNames } : {}) };
   }
   /** Generate arguments that run a finished output on another profile of its kind, at its proportions and with its references. */
   retarget(item, profile, { count = 1 } = {}) {

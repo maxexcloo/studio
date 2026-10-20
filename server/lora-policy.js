@@ -31,6 +31,24 @@ export function loraCompatibility(info, profile) {
   return unknown ? 'unknown' : 'fits';
 }
 
+/**
+ * A LoRA stack without the entries that cannot run on this profile ('other': trained for another
+ * family, or a variant its publisher excludes). Unverified ('unknown') entries stay. `infos` maps a
+ * LoRA name to its info, or is a function from name to info. Entries keep their shape and order.
+ * For reused settings: the server refuses 'other' LoRAs on submit, so drop them first and say how many.
+ */
+export function compatibleLoras(loras, infos, profile) {
+  const infoOf = typeof infos === 'function' ? infos : (name) => (infos && Object.hasOwn(infos, name) ? infos[name] : undefined);
+  const kept = [];
+  const droppedNames = [];
+  for (const item of Array.isArray(loras) ? loras : []) {
+    const name = typeof item === 'string' ? item : item?.name;
+    if (name && loraCompatibility(infoOf(name), profile) === 'other') droppedNames.push(name);
+    else kept.push(item);
+  }
+  return { loras: kept, dropped: droppedNames.length, droppedNames };
+}
+
 /** Only explicit full publisher bounds replace existing controls; recommendations stay prose. */
 export function strengthRange(info) {
   const range = info?.strengthRange;
