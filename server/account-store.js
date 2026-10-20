@@ -222,6 +222,82 @@ export async function setAccountPassword(accountId, password) {
   return { id: account.id };
 }
 
+/** What an account may see and change about itself. Provider accounts have no password here. */
+export function ownAccount(accountId) {
+  const account = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  if (!account) return null;
+  const provider = account.identity?.provider === "pocket-id";
+  return {
+    id: account.id,
+    username: account.username,
+    displayName: account.displayName || account.username,
+    role: account.role,
+    signInLinked: Boolean(account.oidc),
+    provider: provider ? "pocket-id" : "local",
+    canChangePassword: !provider && Boolean(account.password),
+    canChangeEmail: !provider,
+    createdAt: account.createdAt || ""
+  };
+}
+
+async function passwordMatches(account, password) {
+  const saved = account?.password;
+  const salt = saved?.salt ? Buffer.from(saved.salt, "base64url") : crypto.randomBytes(16);
+  const hash = await scryptAsync(String(password || ""), salt);
+  if (!saved) return false;
+  const expected = Buffer.from(saved.hash, "base64url");
+  return expected.length === hash.length && crypto.timingSafeEqual(expected, hash);
+}
+
+export const wrongCurrentPassword = "Your current password is incorrect.";
+
+/** Everything about a change to one's own account that can be checked without the current password. */
+export function validateOwnAccountChange(accountId, { displayName, username, newPassword } = {}) {
+  const found = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  if (!found) throw new Error("That account was not found.");
+  const provider = found.identity?.provider === "pocket-id";
+  const nextName = typeof displayName === "string" ? displayName.trim().slice(0, 80) : undefined;
+  const nextUsername = typeof username === "string" ? username.trim().normalize("NFKC") : undefined;
+  const nextPassword = typeof newPassword === "string" && newPassword ? newPassword : undefined;
+  if (nextName !== undefined && !nextName) throw new Error("Enter a display name.");
+  const emailChanges = nextUsername !== undefined && usernameKey(nextUsername) !== usernameKey(found.username);
+  const needsPassword = emailChanges || nextPassword !== undefined;
+  if (needsPassword && provider) throw new Error("This account signs in through single sign-on, so its email and password are managed there.");
+  if (emailChanges && (!validUsername(nextUsername) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextUsername))) throw new Error("Enter an email address of up to 128 characters.");
+  if (emailChanges && readStore().accounts.some((item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername))) throw new Error("An account with that email already exists.");
+  if (nextPassword !== undefined && nextPassword.length < 8) throw new Error("Use a new password of at least 8 characters.");
+  return { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword };
+}
+
+/**
+ * Changes an account's own display name, email (its sign-in name) or password.
+ * The email and password need the current password; a new password ends every
+ * other browser session but keeps the one making the change.
+ */
+export async function updateOwnAccount(accountId, changes = {}, { keepSessionToken = "" } = {}) {
+  const { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword } = validateOwnAccountChange(accountId, changes);
+  if (needsPassword && !await passwordMatches(found, changes.currentPassword)) throw new Error(wrongCurrentPassword);
+  let hashed = null;
+  if (nextPassword !== undefined) {
+    const salt = crypto.randomBytes(16);
+    hashed = { kdf, salt: salt.toString("base64url"), hash: (await scryptAsync(nextPassword, salt)).toString("base64url") };
+  }
+  // Recheck after the asynchronous KDF.
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId && item.disabled !== true);
+  if (!account) throw new Error("That account was not found.");
+  if (emailChanges && store.accounts.some((item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername))) throw new Error("An account with that email already exists.");
+  if (nextName !== undefined) account.displayName = nextName;
+  if (emailChanges) account.username = nextUsername;
+  if (hashed) {
+    account.password = hashed;
+    const keep = keepSessionToken ? tokenHash(keepSessionToken) : "";
+    store.sessions = store.sessions.filter((item) => item.accountId !== accountId || (keep && item.tokenHash === keep));
+  }
+  saveStore({ scrubBackup: Boolean(hashed) });
+  return ownAccount(accountId);
+}
+
 export function setAccountDisabled(accountId, disabled) {
   const account = readStore().accounts.find((item) => item.id === accountId);
   if (!account) throw new Error("That account was not found.");
