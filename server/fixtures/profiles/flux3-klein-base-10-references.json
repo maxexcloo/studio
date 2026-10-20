@@ -1,0 +1,794 @@
+{
+  "graph": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "flux3-image-klein-base-int8-convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+        "device": "default",
+        "type": "flux3"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    "4": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": [
+          "2",
+          0
+        ]
+      }
+    },
+    "5": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "batch_size": 2,
+        "height": 1024,
+        "width": 1024
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": [
+          "2",
+          0
+        ]
+      }
+    },
+    "7": {
+      "class_type": "KSampler",
+      "inputs": {
+        "cfg": 3.5,
+        "denoise": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "seed": 23001,
+        "steps": 50,
+        "latent_image": [
+          "5",
+          0
+        ],
+        "model": [
+          "91",
+          0
+        ],
+        "negative": [
+          "81",
+          1
+        ],
+        "positive": [
+          "81",
+          0
+        ]
+      }
+    },
+    "8": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "80": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "81": {
+      "class_type": "ReferenceMultiLatent",
+      "inputs": {
+        "resolution": "resize",
+        "resolution.megapixels": 1,
+        "images.image0": [
+          "80",
+          0
+        ],
+        "images.image1": [
+          "82",
+          0
+        ],
+        "images.image2": [
+          "83",
+          0
+        ],
+        "images.image3": [
+          "84",
+          0
+        ],
+        "images.image4": [
+          "85",
+          0
+        ],
+        "images.image5": [
+          "86",
+          0
+        ],
+        "images.image6": [
+          "87",
+          0
+        ],
+        "images.image7": [
+          "88",
+          0
+        ],
+        "images.image8": [
+          "89",
+          0
+        ],
+        "images.image9": [
+          "90",
+          0
+        ],
+        "negative": [
+          "6",
+          0
+        ],
+        "positive": [
+          "4",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "82": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "83": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "84": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "85": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "86": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "87": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "88": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "89": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "90": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": ""
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "bento/bento-image-flux3-klein-distilled-int8",
+        "images": [
+          "8",
+          0
+        ]
+      }
+    },
+    "91": {
+      "class_type": "Power Lora Loader (rgthree)",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ]
+      }
+    }
+  },
+  "heissUi": {
+    "aspectPolicy": "manual",
+    "description": "Generate from a full scene caption, or attach up to ten reference images to edit or combine them; expand short requests with an LLM first. Undistilled FLUX.3 [klein] Base (INT8 ConvRot) with the Qwen3-VL 4B INT8 ConvRot encoder and the FLUX.2 VAE. Euler/simple, 50 steps and CFG 3.5. Timing has not been benchmarked.",
+    "family": "flux3_klein",
+    "id": "bento-image-flux3-klein-base-int8",
+    "kind": "image",
+    "name": "FLUX.3 [klein] Base · Quality · 50 Steps · Optional 10 References · INT8 ConvRot",
+    "aspectRatios": [
+      [
+        "1:1",
+        1,
+        1
+      ],
+      [
+        "16:9",
+        16,
+        9
+      ],
+      [
+        "9:16",
+        9,
+        16
+      ],
+      [
+        "4:3",
+        4,
+        3
+      ],
+      [
+        "3:4",
+        3,
+        4
+      ]
+    ],
+    "capabilities": {
+      "cfg": true,
+      "imageToImage": true,
+      "lora": true,
+      "negativePrompt": false,
+      "sampler": false,
+      "scheduler": false,
+      "startImage": true,
+      "startImageRequired": false,
+      "steps": false,
+      "variations": true
+    },
+    "controls": {
+      "count": {
+        "input": "batch_size",
+        "node": "5"
+      },
+      "height": {
+        "input": "height",
+        "node": "5"
+      },
+      "prompt": {
+        "input": "text",
+        "node": "4"
+      },
+      "seed": {
+        "input": "seed",
+        "node": "7"
+      },
+      "startImage": {
+        "input": "image",
+        "node": "80"
+      },
+      "width": {
+        "input": "width",
+        "node": "5"
+      }
+    },
+    "defaults": {
+      "cfg": 3.5,
+      "clipType": "flux3",
+      "count": 2,
+      "height": 1024,
+      "model": "flux3-image-klein-base-int8-convrot.safetensors",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 50,
+      "textEncoder": "qwen3vl_4b_int8_convrot.safetensors",
+      "vae": "flux2-vae.safetensors",
+      "weightDtype": "default",
+      "width": 1024
+    },
+    "imageModes": {
+      "generate": {
+        "capabilities": {
+          "cfg": true,
+          "imageToImage": false,
+          "lora": true,
+          "negativePrompt": false,
+          "sampler": false,
+          "scheduler": false,
+          "startImage": false,
+          "startImageRequired": false,
+          "steps": false,
+          "variations": true
+        },
+        "controls": {
+          "count": {
+            "input": "batch_size",
+            "node": "5"
+          },
+          "height": {
+            "input": "height",
+            "node": "5"
+          },
+          "prompt": {
+            "input": "text",
+            "node": "4"
+          },
+          "seed": {
+            "input": "seed",
+            "node": "7"
+          },
+          "width": {
+            "input": "width",
+            "node": "5"
+          }
+        },
+        "defaults": {
+          "cfg": 3.5,
+          "clipType": "flux3",
+          "count": 2,
+          "height": 1024,
+          "model": "flux3-image-klein-base-int8-convrot.safetensors",
+          "sampler": "euler",
+          "scheduler": "simple",
+          "steps": 50,
+          "textEncoder": "qwen3vl_4b_int8_convrot.safetensors",
+          "vae": "flux2-vae.safetensors",
+          "weightDtype": "default",
+          "width": 1024
+        },
+        "graph": {
+          "1": {
+            "class_type": "UNETLoader",
+            "inputs": {
+              "unet_name": "flux3-image-klein-base-int8-convrot.safetensors",
+              "weight_dtype": "default"
+            }
+          },
+          "2": {
+            "class_type": "CLIPLoader",
+            "inputs": {
+              "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+              "device": "default",
+              "type": "flux3"
+            }
+          },
+          "3": {
+            "class_type": "VAELoader",
+            "inputs": {
+              "vae_name": "flux2-vae.safetensors"
+            }
+          },
+          "4": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {
+              "text": "",
+              "clip": [
+                "2",
+                0
+              ]
+            }
+          },
+          "5": {
+            "class_type": "EmptyFlux2LatentImage",
+            "inputs": {
+              "batch_size": 2,
+              "height": 1024,
+              "width": 1024
+            }
+          },
+          "6": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {
+              "text": "",
+              "clip": [
+                "2",
+                0
+              ]
+            }
+          },
+          "7": {
+            "class_type": "KSampler",
+            "inputs": {
+              "cfg": 3.5,
+              "denoise": 1,
+              "sampler_name": "euler",
+              "scheduler": "simple",
+              "seed": 23001,
+              "steps": 50,
+              "latent_image": [
+                "5",
+                0
+              ],
+              "model": [
+                "91",
+                0
+              ],
+              "negative": [
+                "6",
+                0
+              ],
+              "positive": [
+                "4",
+                0
+              ]
+            }
+          },
+          "8": {
+            "class_type": "VAEDecode",
+            "inputs": {
+              "samples": [
+                "7",
+                0
+              ],
+              "vae": [
+                "3",
+                0
+              ]
+            }
+          },
+          "9": {
+            "class_type": "SaveImage",
+            "inputs": {
+              "filename_prefix": "bento/bento-image-flux3-klein-distilled-int8",
+              "images": [
+                "8",
+                0
+              ]
+            }
+          },
+          "91": {
+            "class_type": "Power Lora Loader (rgthree)",
+            "inputs": {
+              "model": [
+                "1",
+                0
+              ]
+            }
+          }
+        },
+        "loraStack": {
+          "adapter": "rgthree-power-v1",
+          "max": 8,
+          "node": "91"
+        },
+        "mediaInputs": []
+      },
+      "reference": {
+        "capabilities": {
+          "cfg": true,
+          "imageToImage": true,
+          "lora": true,
+          "negativePrompt": false,
+          "sampler": false,
+          "scheduler": false,
+          "startImage": true,
+          "startImageRequired": false,
+          "steps": false,
+          "variations": true
+        },
+        "controls": {
+          "count": {
+            "input": "batch_size",
+            "node": "5"
+          },
+          "height": {
+            "input": "height",
+            "node": "5"
+          },
+          "prompt": {
+            "input": "text",
+            "node": "4"
+          },
+          "seed": {
+            "input": "seed",
+            "node": "7"
+          },
+          "startImage": {
+            "input": "image",
+            "node": "80"
+          },
+          "width": {
+            "input": "width",
+            "node": "5"
+          }
+        },
+        "defaults": {
+          "cfg": 3.5,
+          "clipType": "flux3",
+          "count": 2,
+          "height": 1024,
+          "model": "flux3-image-klein-base-int8-convrot.safetensors",
+          "sampler": "euler",
+          "scheduler": "simple",
+          "steps": 50,
+          "textEncoder": "qwen3vl_4b_int8_convrot.safetensors",
+          "vae": "flux2-vae.safetensors",
+          "weightDtype": "default",
+          "width": 1024
+        },
+        "loraStack": {
+          "adapter": "rgthree-power-v1",
+          "max": 8,
+          "node": "91"
+        },
+        "mediaInputs": [
+          {
+            "id": "reference",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "80"
+            }
+          },
+          {
+            "id": "reference-2",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "82"
+            }
+          },
+          {
+            "id": "reference-3",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "83"
+            }
+          },
+          {
+            "id": "reference-4",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "84"
+            }
+          },
+          {
+            "id": "reference-5",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "85"
+            }
+          },
+          {
+            "id": "reference-6",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "86"
+            }
+          },
+          {
+            "id": "reference-7",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "87"
+            }
+          },
+          {
+            "id": "reference-8",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "88"
+            }
+          },
+          {
+            "id": "reference-9",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "89"
+            }
+          },
+          {
+            "id": "reference-10",
+            "kind": "image",
+            "label": "Reference Image",
+            "max": 1,
+            "min": 0,
+            "required": false,
+            "control": {
+              "input": "image",
+              "node": "90"
+            }
+          }
+        ]
+      }
+    },
+    "loraStack": {
+      "adapter": "rgthree-power-v1",
+      "max": 8,
+      "node": "91"
+    },
+    "mediaInputs": [
+      {
+        "id": "reference",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "80"
+        }
+      },
+      {
+        "id": "reference-2",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "82"
+        }
+      },
+      {
+        "id": "reference-3",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "83"
+        }
+      },
+      {
+        "id": "reference-4",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "84"
+        }
+      },
+      {
+        "id": "reference-5",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "85"
+        }
+      },
+      {
+        "id": "reference-6",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "86"
+        }
+      },
+      {
+        "id": "reference-7",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "87"
+        }
+      },
+      {
+        "id": "reference-8",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "88"
+        }
+      },
+      {
+        "id": "reference-9",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "89"
+        }
+      },
+      {
+        "id": "reference-10",
+        "kind": "image",
+        "label": "Reference Image",
+        "max": 1,
+        "min": 0,
+        "required": false,
+        "control": {
+          "input": "image",
+          "node": "90"
+        }
+      }
+    ]
+  }
+}

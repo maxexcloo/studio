@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { dataDir } from './gallery-store.js';
+import { chainReferenceSlots } from "./reference-chains.js";
 import { root } from './comfy.js';
 import { workflowIds } from './workflow-registry.js';
 import { writeJsonFile } from './json-store.js';
@@ -55,8 +56,11 @@ function mediaInputsConfig(meta = {}, controls = {}) {
     max: Math.max(1, Math.min(8, Number(item?.max || 1))),
     control: item?.control?.node && item?.control?.input
       ? { node: String(item.control.node), input: String(item.control.input) }
-      : null
+      : null,
+    ...(["start", "end", "reference"].includes(item?.role) ? { role: item.role } : {}),
+    ...(item?.follows ? { follows: safeId(item.follows) } : {})
   })).filter((item) => item.control);
+  chainReferenceSlots(normalized);
   if (!normalized.length && controls.startImage?.node && controls.startImage?.input) {
     normalized.push({
       id: "reference",

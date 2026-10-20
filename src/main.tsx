@@ -1,4 +1,5 @@
 import "./app/domGuard";
+import { withReferenceChains } from "../server/reference-chains.js";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "framer-motion";
@@ -728,7 +729,9 @@ function App() {
 
   function refreshModels(notify = true) {
     const request = apiJson<Models>("/api/models")
-      .then((data: Models) => {
+      .then((loaded: Models) => {
+        // However a profile declares its reference stack, it reaches the composer chained (one References button).
+        const data = { ...loaded, profiles: loaded.profiles.map(withReferenceChains) };
         setModels(data);
         const profileId = selectedModelRef.current || "";
         if (!profileId && !notify) {
