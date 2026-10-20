@@ -1,4 +1,4 @@
-import { matchesGalleryFilters } from './gallery-filters.js';
+import { hasGalleryFilters, matchesGalleryFilters } from './gallery-filters.js';
 import { mediaFile, mediaParams, mediaPath } from './media-paths.js';
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -307,7 +307,7 @@ export function gallerySearchText(item) {
  */
 export function galleryFilter({ q = "", favorites = false, lora = "", model = "", workflow = "", size = "", aspect = "" } = {}) {
   const terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean).slice(0, 12);
-  if (!terms.length && !favorites && !lora && !model && !workflow && !size && !aspect) return null;
+  if (!terms.length && !favorites && !hasGalleryFilters({ lora, model, workflow, size, aspect })) return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;

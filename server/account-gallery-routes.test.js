@@ -79,3 +79,18 @@ test("finished outputs keep the pending tiles' owner and never replace another o
   assert.deepEqual(remaining.map((record) => record.ownerId).sort(), ["account-a", "account-b"]);
   assert.equal(remaining.find((record) => record.ownerId === "account-b").status, "pending");
 });
+
+test("repeated gallery filters match any of their values and combine across filters", () => {
+  const made = (jobId, model, width, height) => ({ ...item("account-a", jobId), model, width, height });
+  galleryStore.setGallery([made("job-flux", "flux.safetensors", 1024, 1024), made("job-sdxl", "sdxl.safetensors", 1344, 768), made("job-wan", "wan.safetensors", 1024, 1024)]);
+  const request = (query) => ({ heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query });
+  const ids = (query) => call(routes["/api/gallery"], request({ limit: "50", ...query })).items.map((record) => record.jobId).sort();
+  assert.deepEqual(ids({ model: ["flux", "sdxl"] }), ["job-flux", "job-sdxl"]);
+  assert.deepEqual(ids({ model: "wan" }), ["job-wan"]);
+  assert.deepEqual(ids({ model: ["flux", "sdxl"], aspect: ["1:1", "9:16"] }), ["job-flux"]);
+  assert.deepEqual(ids({ model: ["", ""] }), ["job-flux", "job-sdxl", "job-wan"], "blank values are no filter");
+  const since = galleryStore.galleryRevisionValue();
+  galleryStore.setGallery([...galleryStore.gallery, made("job-flux2", "flux.safetensors", 2048, 2048), made("job-wan2", "wan.safetensors", 2048, 2048)]);
+  const delta = call(routes["/api/gallery/delta"], request({ since: String(since), model: ["flux", "sdxl"] }));
+  assert.deepEqual(delta.upserts.map((record) => record.jobId), ["job-flux2"]);
+});

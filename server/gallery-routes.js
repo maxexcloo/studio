@@ -73,9 +73,20 @@ export function registerGalleryBundleActions(app) {
 }
 
 export function registerGalleryReadRoutes(app) {
-  /** A gallery search from the query string (q, favorites=1), or null. Search results are never stacked. */
+  /**
+   * A gallery search from the query string, or null. Search results are never
+   * stacked. `lora`, `model`, `size` and `aspect` may repeat (any of them
+   * matches); `q` and `workflow` are single values.
+   */
   function searchFilter(req) {
-    return galleryFilter({ q: String(req.query.q || "").slice(0, 200), favorites: req.query.favorites === "1", ...Object.fromEntries(["lora", "model", "workflow", "size", "aspect"].map((key) => [key, String(req.query[key] || "").slice(0, 200)])) });
+    const many = (value) => (Array.isArray(value) ? value : [value]).map((item) => String(item ?? "").slice(0, 200)).filter(Boolean).slice(0, 50);
+    const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
+    return galleryFilter({
+      q: one(req.query.q),
+      favorites: req.query.favorites === "1",
+      workflow: one(req.query.workflow),
+      ...Object.fromEntries(["lora", "model", "size", "aspect"].map((key) => [key, many(req.query[key])]))
+    });
   }
 
   /** The gallery with its runs collapsed; a run can straddle a page, so it collapses first. */

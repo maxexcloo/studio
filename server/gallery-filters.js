@@ -1,4 +1,8 @@
-/** Structured filters shared by paginated galleries and the in-memory Hidden view. */
+/**
+ * Structured gallery filters. `lora`, `model`, `size` and `aspect` each take
+ * one value or several: any of a filter's values matches, and every filter
+ * that is on must match. `workflow` is a single value.
+ */
 
 /** Long-edge size bands, without overlap: each upper bound is inclusive, the next band starts one pixel above. */
 export const gallerySizeBands = [
@@ -36,6 +40,16 @@ export function aspectOf(item) {
   return Math.abs(ratio / nearest.ratio - 1) <= 0.04 ? nearest.id : otherAspect;
 }
 
+/** A filter's values as a list: a string, an array of them, or nothing; blanks dropped. */
+export function filterValues(value) {
+  return (Array.isArray(value) ? value : [value]).map((item) => String(item ?? '').trim()).filter(Boolean);
+}
+
+/** Whether any structured filter is on. */
+export function hasGalleryFilters(filters = {}) {
+  return ['lora', 'model', 'workflow', 'size', 'aspect'].some((key) => filterValues(filters[key]).length);
+}
+
 export function matchesGalleryFilters(item, filters = {}) {
   // Pending jobs always show; they have no final size yet.
   if (item.status === 'pending') return true;
@@ -46,12 +60,14 @@ export function matchesGalleryFilters(item, filters = {}) {
     workflow: [settings.workflow, settings.profileId],
   };
   const textMatches = Object.entries(fields).every(([key, values]) => {
-    const term = String(filters[key] || '').trim().toLowerCase();
-    return !term || values.some((value) => typeof value === 'string' && value.toLowerCase().includes(term));
+    const terms = filterValues(filters[key]).map((term) => term.toLowerCase());
+    return !terms.length || terms.some((term) => values.some((value) => typeof value === 'string' && value.toLowerCase().includes(term)));
   });
   if (!textMatches) return false;
   // Unknown dimensions only drop out while a size or aspect filter is on.
-  if (filters.size && sizeBandOf(item) !== filters.size) return false;
-  if (filters.aspect && aspectOf(item) !== filters.aspect) return false;
+  const sizes = filterValues(filters.size);
+  if (sizes.length && !sizes.includes(sizeBandOf(item))) return false;
+  const aspects = filterValues(filters.aspect);
+  if (aspects.length && !aspects.includes(aspectOf(item))) return false;
   return true;
 }
