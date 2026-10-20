@@ -51,7 +51,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
       if (error instanceof ApiError && error.status === 403) {
         setState(error.reason === 'host'
           ? { kind: 'refused', title: 'Open Studio by Its Address', text: error.message }
-          : { kind: 'refused', title: 'Not Open to Other Devices', text: 'On the computer running Studio, turn on “Open on other devices” in Settings › Connection, then reload this page.' });
+          : { kind: 'refused', title: 'Not Open to Other Devices', text: 'On the computer running Studio, turn on “Open on other devices” in Settings › Workers, then reload this page.' });
         return;
       }
       // Not reachable at all: the studio has its own offline screens.
@@ -72,7 +72,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} oidcLabel={state.oidcLabel} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
   if (!studioPassword.set) {
-    return <GateMessage title="Set a Studio Password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Connection, then reload this page." />;
+    return <GateMessage title="Set a Studio Password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Workers, then reload this page." />;
   }
   return <SignIn onSignedIn={() => { window.location.reload(); }} />;
 }

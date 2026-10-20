@@ -804,9 +804,12 @@ function App() {
     const request = apiJson<ComfyStatus>("/api/comfy/status")
       .then((data) => {
         const availability = JSON.stringify(data.backends || {});
+        // A change in which backends answer refreshes the models; the first answer only records
+        // it (the models are already loading from the start, a second fetch would race them).
         if (availability !== backendAvailabilityRef.current) {
+          const known = backendAvailabilityRef.current;
           backendAvailabilityRef.current = availability;
-          refreshModels();
+          if (known) refreshModels();
         }
         // Not at the saved address, but on ComfyUI Desktop's port (or the other way round): now saved.
         if (data.found) {
@@ -1219,7 +1222,7 @@ function App() {
     return profiles.length ? { profiles, onPick: (profileId: string) => { pickModelRef.current(profileId); setReferenceOpenRequest((count) => count + 1); } } : null;
   }, [referenceInputs.length, modelProfiles]);
   // A mask belongs to the image it was painted on, for a model that can inpaint.
-  // Settings › Features › Inpainting can switch it off: no brush, no mask, no inpaint settings.
+  // Settings › Studio › Inpainting can switch it off: no brush, no mask, no inpaint settings.
   const canInpaint = Boolean(prefs.inpainting && currentProfile?.capabilities.inpaint && referenceInput && (referenceAsset?.url || referenceAsset?.thumbnailUrl));
   const activeInpaintMask = canInpaint && inpaintMask && inpaintMask.assetId === referenceAsset?.id ? inpaintMask : null;
   useEffect(() => {
@@ -1300,7 +1303,7 @@ function App() {
   const promptRemaining = promptLimit ? Math.max(0, promptLimit - textLength(prompt)) : undefined;
   const profileOptions = currentProfile?.options || {};
   const aspectValue = `${width}x${height}`;
-  /* Megapixels (Settings › Generation) takes 2K's place, for images: Default draws every shape
+  /* Megapixels (Settings › Studio) takes 2K's place, for images: Default draws every shape
      at that many pixels (the presets stay what's picked, as with 2K), and the menu's field in
      Custom rescales the size you have, keeping its shape. Unset, each model keeps its own size. */
   const megapixelMode = mode === "image" && Boolean(prefs.megapixelSizing);
@@ -1415,7 +1418,8 @@ function App() {
     if (!hasMoreGallery) return;
     const target = event.currentTarget;
     const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
-    if (remaining < 900) loadMoreGalleryItems();
+    // The next page is asked for with two and a half screens still to go, so a fast scroll never reaches the end first.
+    if (remaining < Math.max(1600, target.clientHeight * 2.5)) loadMoreGalleryItems();
   }
 
   function chooseModel(profileId: string) {

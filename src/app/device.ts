@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
  *   thisComputer  the page may look after the computer HEISS UI runs on
  *                 (folders, downloads, installs, restarts, updates): it is
  *                 open on that computer, or on a signed-in device its owner
- *                 trusts with that (Settings › Connection). Elsewhere the
+ *                 trusts with that (Settings › Workers). Elsewhere the
  *                 server refuses those, and the app hides them.
  *   atComputer    the page is open on that computer itself. Only there can
  *                 the passwords, the admin switch and sign-ins be changed.

@@ -338,7 +338,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   onRenameSize?: (id: string, name: string) => void;
   onRemoveSize?: (id: string) => void;
   onPickSaved?: (saved: SavedSize) => void;
-  /** Megapixels in 2K's place (Settings › Generation): Default draws every shape at this area. */
+  /** Megapixels in 2K's place (Settings › Studio): Default draws every shape at this area. */
   targetArea?: number;
   megapixel?: MegapixelControl | null;
 }) {

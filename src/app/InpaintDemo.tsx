@@ -6,7 +6,7 @@ import { SafeImg } from "./SafeImg";
 import { SizeSlider, drawStroke, sizes, type Stroke } from "./InpaintStudio";
 
 /**
- * Settings › Features › Inpainting: the inpaint studio in miniature, built
+ * Settings › Studio › Inpainting: the inpaint studio in miniature, built
  * from its own pieces (stroke drawing, size slider, tool pill and their CSS)
  * so it looks and paints exactly like the real one. Paint over part of a
  * small scene, press Generate, and only the painted part turns to night.

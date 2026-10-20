@@ -372,7 +372,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   .size-menu .size-saved-row .aspect-option { grid-template-columns: 30px minmax(0, 1fr) auto; }
 }
 
-/* Megapixels (Settings › Generation), under the shapes: what it is on the left, the count on
+/* Megapixels (Settings › Studio), under the shapes: what it is on the left, the count on
    the right as one pill whose MP is the drag handle, so it reads "2.5 MP". */
 .size-mp {
   display: flex;

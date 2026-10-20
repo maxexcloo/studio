@@ -292,7 +292,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
               ) : null}
             </AnimatePresence>
             {rowState === 'error' ? <p className="model-setup-error">{current?.error || 'The download stopped.'}</p> : null}
-            {rowState === 'error' && current?.needsBrowser ? <p className="model-setup-detail">Or add a Hugging Face token in Settings › Integrations, then try again here.</p> : null}
+            {rowState === 'error' && current?.needsBrowser ? <p className="model-setup-detail">Or add a Hugging Face token in Settings › Models, then try again here.</p> : null}
             {download && download.id !== item.downloads[0]?.id && downloadFor(state, item.downloads[0].file)?.status === 'error' && (rowState === 'downloading' || rowState === 'queued')
               ? <p className="model-setup-detail">{item.downloads[0].file} wasn’t available, so this version is downloading instead.</p>
               : null}

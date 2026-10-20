@@ -99,7 +99,26 @@ export const signedOutEvent = "heiss:signed-out";
  * websites cannot send it (server/request-guard.js), so they cannot make it
  * delete, install or change anything. A signed-out device hears about it here.
  */
+type BootRequest = { at: number; response: Promise<Response> };
+
+/**
+ * An answer index.html asked for while the code downloaded: taken once, for a
+ * plain GET within a few seconds of loading, and only when it succeeded (a
+ * refusal or an error asks again, so sign-in and errors behave as usual).
+ */
+async function takeBoot(url: string, options: RequestInit) {
+  const boot = (window as { __studioBoot?: Record<string, BootRequest> }).__studioBoot;
+  const entry = boot?.[url];
+  if (!entry || (options.method && options.method !== 'GET') || options.body || options.signal) return null;
+  delete boot![url];
+  if (Date.now() - entry.at > 10000) return null;
+  const response = await entry.response.catch(() => null);
+  return response?.ok ? response : null;
+}
+
 export async function apiFetch(url: string, options: RequestInit = {}) {
+  const early = await takeBoot(url, options);
+  if (early) return early;
   const headers = new Headers(options.headers);
   headers.set("X-HEISS", "1");
   const response = await fetch(url, { ...options, headers });

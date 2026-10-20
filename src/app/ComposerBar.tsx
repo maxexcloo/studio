@@ -212,7 +212,7 @@ export type ComposerBarProps = {
   applyAspect: (value: string) => void;
   /** The size menu's tab (Default · 2K · Custom), and what Custom may be. */
   sizeTier?: SizeTier;
-  /** The tabs on offer: 2K, or Megapixels in its place (Settings › Generation). */
+  /** The tabs on offer: 2K, or Megapixels in its place (Settings › Studio). */
   sizeTiers?: SizeTier[];
   sizeArea?: number;
   megapixelControl?: MegapixelControl | null;

@@ -190,7 +190,7 @@ function AddressRow({ url, detail, open, onToggle, copyToClipboard, Row }: { url
 }
 
 /**
- * Settings › Connection › Other devices. One switch restarts HEISS UI into
+ * Settings › Workers › Other devices. One switch restarts HEISS UI into
  * (or out of) LAN mode; then the addresses to open, the studio password other
  * devices sign in with, whether they may look after the computer, and who is
  * signed in. Passwords, the admin switch and signing everyone out only change

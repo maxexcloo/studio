@@ -312,7 +312,7 @@
   .set-row .segmented button { flex: 1; }
   }
 
-/* A row that opens a drawer of rows below it (Settings › General › Keyboard).
+/* A row that opens a drawer of rows below it (Settings › Studio › Keyboard).
    Title and hint share one thin line; the hint gives way first. */
 .set-drawer-toggle.set-row {
   width: 100%;

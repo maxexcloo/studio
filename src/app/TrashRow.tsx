@@ -12,7 +12,7 @@ function day(value: string) {
 }
 
 /**
- * Settings › Library: what "Delete all" moved to the trash, until it empties
+ * Settings › Maintenance: what "Delete all" moved to the trash, until it empties
  * itself. Restore puts the newest clear back; Empty deletes it all for good.
  */
 export function TrashRow({ confirmAction, showToast, Row }: {

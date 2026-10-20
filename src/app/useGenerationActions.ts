@@ -399,7 +399,7 @@ export function useGenerationActions(view: any) {
   async function restoreCleared(batch: string) {
     const data = await apiJson<GalleryPayload & { restored: number; missing: number }>("/api/gallery/trash/restore", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ batch }) }).catch(() => null);
     if (!data) {
-      showToast("Couldn’t restore them. They’re still in the trash. Try again from Settings › Library.", "error");
+      showToast("Couldn’t restore them. They’re still in the trash. Try again from Settings › Maintenance.", "error");
       return;
     }
     setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));

@@ -185,7 +185,7 @@ export function UpscaleSetupDialog({
     ) : !status?.canDownload ? (
       <div className="upscale-callout">
         <strong>The models folder isn’t set yet.</strong>
-        <span>Set ComfyUI’s output folder in Settings › Library, and the models folder next to it is found automatically.</span>
+        <span>Set ComfyUI’s output folder in Settings › Models, and the models folder next to it is found automatically.</span>
       </div>
     ) : (
       <>

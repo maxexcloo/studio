@@ -293,7 +293,7 @@ function SizeField({ axis, value, limits, onStart, onChange }: {
   );
 }
 
-/** Megapixels in the size menu (Settings › Generation): the target, its limit, and how to change or clear it. */
+/** Megapixels in the size menu (Settings › Studio): the target, its limit, and how to change or clear it. */
 export type MegapixelControl = {
   /** The count Default draws every shape at; null leaves each model at its own size. */
   target: number | null;
