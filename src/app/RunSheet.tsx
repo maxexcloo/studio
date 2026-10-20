@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Rows3 } from 'lucide-react';
-import { Sheet } from './PhoneStudio';
+import { Sheet } from './Sheet';
 import { Media } from './components';
 import { Still, modelName, runKind, timeSpan } from './RunStack';
 import { haptic } from './phoneControls';

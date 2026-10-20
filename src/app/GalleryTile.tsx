@@ -9,7 +9,7 @@ import { ElapsedTime } from './ElapsedTime';
 import { GenerationModel, GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
 import type { GalleryItem } from './types';
-import { canUpscaleItem, upscaleDisplayUrl, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { canUpscaleItem, upscaledWithRun, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
 import { useHiddenActions } from './hiddenContext';
@@ -17,7 +17,7 @@ import type { UpscaleNotice } from './useUpscale';
 import { useDismiss } from './useDismiss';
 import { HapticTarget } from './phoneControls';
 import { GallerySelectionContext } from './gallerySelection';
-import { sharesWithoutSettings } from './shareSettings';
+import { downloadUrl } from './share';
 
 /**
  * The phone studio's tiles: no corner buttons, a long press opens the tile's
@@ -49,17 +49,6 @@ type GalleryTileProps = {
   upscaleNotice?: UpscaleNotice;
   onDismissUpscaleNotice?: (id: string) => void;
 };
-
-/**
- * Hidden files are served inline; asking for an attachment gets them a real
- * file name. "Share without settings" asks the server for the file without
- * the prompt and workflow inside it.
- */
-export function downloadUrl(item: GalleryItem) {
-  const url = upscaleDisplayUrl(item) || "";
-  const params = [item.privateVault ? "download=1" : "", url && sharesWithoutSettings(item) ? "clean=1" : ""].filter(Boolean).join("&");
-  return params ? `${url}${url.includes("?") ? "&" : "?"}${params}` : url;
-}
 
 function UpscaleButton({ item, busy, onUpscale, onCancelUpscale, held = false }: { item: GalleryItem; busy: boolean; onUpscale: (item: GalleryItem) => void; onCancelUpscale: (item: GalleryItem) => void; held?: boolean }) {
   const state = item.upscale;

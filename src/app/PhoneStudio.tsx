@@ -6,12 +6,12 @@ import React from 'react';
 import { modelRecipeOptions, recipeModelMenu, recipesFor } from './modelRecipes';
 import { compareModelNames, modelGroups, modelName, profileMatchesFilters } from './catalogueNames';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowUp, Check, CheckSquare, CheckCircle2, ChevronRight, Columns2, CircleStop, Dices, Download, Eye, EyeOff, FastForward, Image as ImageIcon, ImagePlus, Info, Layers, Library, LockKeyhole, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, Share, SlidersHorizontal, Square, Star, TextQuote, Trash2, UserRound, Video, Wand2, X } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { familyLabel, modelDetails, NumberPicker, setupNote } from './components';
-import { downloadUrl } from './GalleryTile';
+import { canShareFiles, prefetchShare, shareItem, shareItems } from './share';
+import { Sheet } from './Sheet';
 import { canUpscaleItem, shortLeft, upscaledWithRun, upscaleLeftLine, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { ReferenceSlots } from './ReferenceMediaPicker';
@@ -19,8 +19,6 @@ import { ViewerReuseAction } from './ViewerActions';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
-import { useFocusTrap } from './useFocusTrap';
-import { useHistoryDismiss } from './useHistoryDismiss';
 import { progressReading } from './GenerationProgress';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
@@ -51,185 +49,6 @@ import { hasAccountStorageScope } from './api';
    and keeps the shared overlays (viewer, dialogs, toasts).
 --------------------------------------------------------------------------- */
 
-
-/* ------------------------------------------------------------------ Sheet */
-
-/**
- * A bottom sheet: grab handle, swipe down (or Back, or Escape, or a tap on the
- * dimmed page) to close, focus kept inside while open.
- */
-export function Sheet({ open, onClose, title, children, footer, full = false, className, headerAction }: {
-  open: boolean;
-  onClose: () => void;
-  title: React.ReactNode;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  full?: boolean;
-  className?: string;
-  headerAction?: React.ReactNode;
-}) {
-  const panelRef = React.useRef<HTMLDivElement | null>(null);
-  const drag = useDragControls();
-  const reduced = useReducedMotion();
-  useFocusTrap(panelRef, open);
-  useHistoryDismiss(open, onClose);
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      // A sheet opened on top of this one closes first.
-      const sheets = document.querySelectorAll('.phone-sheet');
-      if (sheets[sheets.length - 1] !== panelRef.current) return;
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <React.Fragment key="sheet">
-          <motion.button
-            type="button"
-            className="phone-sheet-backdrop"
-            aria-label="Close"
-            tabIndex={-1}
-            onClick={onClose}
-            // The colour fades, not opacity: Safari runs framer's opacity fades as
-            // hardware animations and shows the wrong end state for a frame when
-            // one finishes, so the whole page behind would flash.
-            initial={{ backgroundColor: 'rgba(0, 0, 0, 0)' }}
-            animate={{ backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
-            exit={{ backgroundColor: 'rgba(0, 0, 0, 0)' }}
-            transition={{ duration: 0.2 }}
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={typeof title === 'string' ? title : undefined}
-            tabIndex={-1}
-            className={cn('phone-sheet', full && 'is-full', className)}
-            initial={reduced ? { opacity: 0 } : { y: '100%' }}
-            animate={reduced ? { opacity: 1 } : { y: 0 }}
-            exit={reduced ? { opacity: 0 } : { y: '100%' }}
-            transition={{ type: 'spring', stiffness: 420, damping: 40 }}
-            drag={reduced ? false : 'y'}
-            dragControls={drag}
-            dragListener={false}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.6 }}
-            onDragEnd={(_event, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}
-          >
-            <div className="phone-sheet-grab" onPointerDown={(event) => {
-              // Header actions must keep their tap, even when a finger moves slightly.
-              if (reduced || !event.isPrimary || event.button !== 0 || (event.target as Element).closest('button, a, input, select, textarea, [role="button"]')) return;
-              drag.start(event);
-            }}>
-              <div className="phone-sheet-handle" aria-hidden="true" />
-              <header className="phone-sheet-head">
-                <h2>{title}</h2>
-                {headerAction}
-                <button type="button" className="phone-icon" aria-label="Close" onClick={onClose}><X size={20} /></button>
-              </header>
-            </div>
-            <div className="phone-sheet-body">{children}</div>
-            {footer ? <div className="phone-sheet-foot">{footer}</div> : null}
-          </motion.div>
-        </React.Fragment>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
-/* ------------------------------------------------------------------ Share */
-
-// The file is fetched when the actions open, so the share itself runs inside the
-// tap: iOS only allows the share sheet straight from a user gesture.
-const shareBlobs = new Map<string, Promise<Blob>>();
-
-/** Web Share with files needs a secure page; over plain http on the LAN it is not there. */
-export const canShareFiles = typeof navigator !== 'undefined' && typeof window !== 'undefined' && window.isSecureContext && 'share' in navigator;
-
-export function prefetchShare(item: GalleryItem | null, includeVideo = false) {
-  if (!item?.url || !canShareFiles) return;
-  // Opening a video must not also fetch a second full copy into a share Blob.
-  if (item.type === 'video' && !includeVideo) return;
-  const url = downloadUrl(item);
-  if (!shareBlobs.has(url)) shareBlobs.set(url, fetch(url).then((response) => response.ok ? response.blob() : Promise.reject(new Error('fetch failed'))));
-}
-
-function fileNameFor(item: GalleryItem, type = '') {
-  const base = String(item.outputName || item.filename || 'heiss').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'heiss';
-  if (/\.\w{2,4}$/.test(base)) return base;
-  return `${base}.${type.includes('webp') ? 'webp' : type.includes('jpeg') ? 'jpg' : item.type === 'video' ? 'mp4' : 'png'}`;
-}
-
-/** Share where the phone can (Photos, Messages, AirDrop…), otherwise save the file. */
-export async function shareItem(item: GalleryItem, showToast: ShowToast) {
-  const url = downloadUrl(item);
-  if (canShareFiles) {
-    try {
-      prefetchShare(item, true);
-      const blob = await shareBlobs.get(url)!;
-      const file = new File([blob], fileNameFor(item, blob.type), { type: blob.type || 'image/png' });
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        return;
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-    }
-  }
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileNameFor(item);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  if (!canShareFiles) showToast('Saved to downloads', 'success');
-}
-
-/** Several files: one share sheet where possible, otherwise one download after another. */
-export async function shareItems(items: GalleryItem[], showToast: ShowToast) {
-  const ready = items.filter((item) => item.status === 'done' && item.url);
-  if (!ready.length) return;
-  if (ready.length === 1) return shareItem(ready[0], showToast);
-  if (canShareFiles) {
-    try {
-      ready.forEach((item) => prefetchShare(item, true));
-      const files = await Promise.all(ready.map(async (item) => {
-        const blob = await shareBlobs.get(downloadUrl(item))!;
-        return new File([blob], fileNameFor(item, blob.type), { type: blob.type || 'image/png' });
-      }));
-      if (!navigator.canShare || navigator.canShare({ files })) {
-        await navigator.share({ files });
-        return;
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-    }
-  }
-  await downloadItems(ready, showToast);
-}
-
-export async function downloadItems(items: GalleryItem[], showToast: ShowToast) {
-  const ready = items.filter((item) => item.status === 'done' && item.url);
-  if (!ready.length) return;
-  for (const item of ready) {
-    const link = document.createElement('a');
-    link.href = downloadUrl(item);
-    link.download = fileNameFor(item);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    // Browsers drop downloads fired in one burst.
-    await new Promise((resolve) => setTimeout(resolve, 450));
-  }
-  showToast(`Saved ${ready.length} items to downloads`, 'success');
-}
 
 /* ------------------------------------------------------------ Item actions */
 

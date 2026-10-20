@@ -2,7 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
-import { Sheet } from './PhoneStudio';
+import { Sheet } from './Sheet';
 import { haptic } from './phoneControls';
 import { forgetPrompt, matchPrompt, pinPrompt, usePromptHistory, whenUsed, type PromptEntry, type PromptKind } from './recentPrompts';
 

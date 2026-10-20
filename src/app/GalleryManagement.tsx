@@ -7,7 +7,7 @@ import { canStar, useStar } from './favorites';
 import { canAnimatePhoto } from './AnimatePhotos';
 import { GallerySelectionContext } from './gallerySelection';
 import { useHiddenActions } from './hiddenContext';
-import { downloadItems } from './PhoneStudio';
+import { downloadItems } from './share';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 import type { ShowToast } from './toast';
