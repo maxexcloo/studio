@@ -34,6 +34,9 @@ test('optional LoRAs show unverified variants and expose full published strength
   await picker.getByRole('button', { name: 'This Model', exact: true }).click();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
+  // A pick gains its number in place; its strength is tuned in the Selected tab.
+  await expect(page.getByLabel('Published Slider Strength Value', { exact: true })).toHaveCount(0);
+  await picker.getByRole('button', { name: /^Selected 1 of/ }).click();
   const value = page.getByLabel('Published Slider Strength Value', { exact: true }).filter({ visible: true });
   await value.fill('10');
   await value.press('Enter');
@@ -71,8 +74,8 @@ test('LoRA library offers direct list selection with inline strengths and access
   const phone = await ui.isPhone();
   await composer.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true }).click();
   const surface = page.getByRole('dialog', { name: 'LoRAs', exact: true });
-  // A sheet on the phone, a popover over the full studio's composer.
-  await expect(surface).toHaveClass(phone ? /is-sheet/ : /composer-loras/);
+  // A pop-up over Create on the phone, a popover over the desktop composer.
+  await expect(surface).toHaveClass(phone ? /is-pop/ : /composer-loras/);
   await expect.poll(() => surface.evaluate(element => {
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
@@ -88,7 +91,11 @@ test('LoRA library offers direct list selection with inline strengths and access
   await row.focus();
   await row.press('Space');
   await expect(row).toHaveAttribute('aria-checked', 'true');
+  // Picking doesn't open anything under the row: nothing in the list moves.
   const strength = picker.getByLabel('Cards Two Strength Value', { exact: true });
+  await expect(strength).toHaveCount(0);
+  const selectedTab = picker.getByRole('button', { name: /^Selected 1 of/ });
+  await selectedTab.click();
   await expect(strength).toBeVisible();
   await strength.fill('1.25');
   await strength.press('Enter');
@@ -110,10 +117,11 @@ test('LoRA library offers direct list selection with inline strengths and access
     }
   }
   await row.click();
-  await expect(row).toHaveAttribute('aria-checked', 'false');
   await expect(strength).toHaveCount(0);
+  await expect(row).toHaveAttribute('aria-checked', 'false');
   await row.click();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
+  await selectedTab.click();
   await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
   await picker.getByRole('button', { name: /^Save Stack/ }).click();
   await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');

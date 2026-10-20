@@ -270,7 +270,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     const fav = favorites.filter((name) => available.has(name));
     const rec = recents.filter((name) => available.has(name) && !fav.includes(name)).slice(0, 5);
     const suggested = recommendedLoras(filteredOptions, profile, '', fitOf).filter((name) => !fav.includes(name) && !rec.includes(name)).slice(0, 6);
-    if (fav.length) out.push({ id: 'favorites', label: 'Favorites', rows: fav.map((name) => ({ key: `f:${name}`, name })) });
+    if (fav.length) out.push({ id: 'favorites', label: 'Favourites', rows: fav.map((name) => ({ key: `f:${name}`, name })) });
     if (rec.length) out.push({ id: 'recents', label: 'Recent', rows: rec.map((name) => ({ key: `r:${name}`, name })) });
     if (suggested.length) out.push({ id: 'suggested', label: modelFamilyLabel(profile) ? `Suggested for ${modelFamilyLabel(profile)}` : 'Suggested', rows: suggested.map((name) => ({ key: `s:${name}`, name })) });
     for (const group of loraGroups(filteredOptions, profile, '', fitOf)) {
@@ -376,9 +376,10 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     </button>
                     <LoraSource info={info} label={label} />
                     <LoraDetails info={info} label={label} />
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${fileName(row.name)} from Favourites` : `Add ${fileName(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
-                    <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: .32, ease: [.16, 1, .3, 1] }}><div className="lora-library-settings">
+                    {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
+                    {item && reviewing ? <div className="lora-library-expansion"><div className="lora-library-settings">
                       <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
                       {reviewing && inlineSelection.items.length > 1 ? <span className="lora-library-order">
@@ -386,7 +387,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                         <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index + 1); }}><ChevronDown size={14} /></button>
                       </span> : null}
                       {item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
-                    </div></motion.div> : null}</AnimatePresence>
+                    </div></div> : null}
                   </div>;
                 }
                 return (
@@ -414,7 +415,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <button
                       type="button"
                       className={cn('lora-option-star', favorite && 'active')}
-                      aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`}
+                      aria-label={favorite ? `Remove ${fileName(row.name)} from Favourites` : `Add ${fileName(row.name)} to Favourites`}
                       onClick={(event) => { event.stopPropagation(); onToggleFavorite(row.name); }}
                     >
                       <Star size={13} fill={favorite ? 'currentColor' : 'none'} />
