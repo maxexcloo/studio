@@ -96,7 +96,7 @@ function ComfySearchRow({ enabled, onSaved }: { enabled: boolean; onSaved: () =>
   };
   return (
     <SwitchRow
-      label="Find ComfyUI on its own"
+      label="Find ComfyUI on Its Own"
       description={note || 'When nothing answers at this address, try ports 8188 and 8000 and switch to the ComfyUI there. Turn off to stay on this address, e.g. with a second ComfyUI just for Studio.'}
       checked={checked}
       onChange={change}
@@ -112,7 +112,7 @@ function ModelFolderSettings({ folders, confirmAction, onOpen, hints, onHintsCha
   // Settings is where people come to check: look again, quietly, each time it opens.
   React.useEffect(() => { folders.scan({ quiet: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Group title="Model folders" note={report?.configLabel ? <>Stored in <code>{report.configLabel}</code>.</> : undefined}>
+    <Group title="Model Folders" note={report?.configLabel ? <>Stored in <code>{report.configLabel}</code>.</> : undefined}>
       {linked.map((item) => (
         <Row key={item.path} label={<span className="set-folder-path" title={item.path}>{item.label}</span>} description={item.read ? 'Added here · ComfyUI reads it' : 'Added here · ComfyUI reads it after a restart'}>
           <button className="btn is-ghost" onClick={async () => {
@@ -128,7 +128,7 @@ function ModelFolderSettings({ folders, confirmAction, onOpen, hints, onHintsCha
         <button className={cn('btn', stray > 0 && 'is-primary')} onClick={onOpen}><FolderSearch size={14} /> {stray ? 'Add' : 'Search'}</button>
       </Row>
       <SwitchRow
-        label="Notify about unread model folders"
+        label="Notify About Unread Model Folders"
         description="Shows a note in the sidebar and model menu when models are in a folder ComfyUI doesn’t read."
         checked={hints}
         onChange={onHintsChange}
@@ -146,7 +146,7 @@ function Status({ tone, children }: React.PropsWithChildren<{ tone?: 'ok' | 'bad
 /** Every shortcut, folded away until asked for: the list is long and rarely needed here. */
 function ShortcutsDrawer() {
   return (
-    <SettingsDrawer id="set-shortcuts" title="Keyboard shortcuts" description={<>{shortcuts.length} · <kbd className="set-kbd">?</kbd> shows them anywhere</>}>
+    <SettingsDrawer id="set-shortcuts" title="Keyboard Shortcuts" description={<>{shortcuts.length} · <kbd className="set-kbd">?</kbd> shows them anywhere</>}>
       <dl className="set-keys">
         {shortcuts.map(([keys, what]) => (
           <React.Fragment key={keys}>
@@ -276,9 +276,9 @@ function InpaintSuggestions({ onGetModels }: { onGetModels?: () => void }) {
   const { plan } = useStarterPlan();
   const families = plan?.families || [];
   return (
-    <Row label="Models that can inpaint" description={onGetModels ? 'Each downloads in the studio with its text encoder and VAE.' : 'Get one on the computer running Studio.'} stacked>
+    <Row label="Models That Can Inpaint" description={onGetModels ? 'Each downloads in the studio with its text encoder and VAE.' : 'Get one on the computer running Studio.'} stacked>
       <div className="set-suggest">
-        <ul className="set-chips" aria-label="Suggested models">
+        <ul className="set-chips" aria-label="Suggested Models">
           {families.length ? families.map((family) => (
             <li key={family.family} className="set-chip is-suggest" title={family.blurb || undefined}><span>{family.title}</span></li>
           )) : <li><Skeleton className="skeleton-text short" /></li>}
@@ -309,7 +309,7 @@ function HelpGroup({ copyToClipboard }: { copyToClipboard: (text: string) => Pro
       <Row label="Troubleshooting" description="Common errors and how to fix them.">
         <a className="btn is-ghost" href={troubleshootingUrl()} target="_blank" rel="noreferrer"><LifeBuoy size={13} /> Open</a>
       </Row>
-      <Row label="Copy diagnostics" description="Studio, ComfyUI and Node.js versions, system and GPU, for a bug report. Prompts, images and file names aren’t included.">
+      <Row label="Copy Diagnostics" description="Studio, ComfyUI and Node.js versions, system and GPU, for a bug report. Prompts, images and file names aren’t included.">
         <button className="btn" onClick={() => copy.copyWith(copyDiagnostics)}><CopyIcon copied={Boolean(copy.copied)} /> {copy.copied ? 'Copied' : 'Copy'}</button>
       </Row>
     </Group>
@@ -425,7 +425,7 @@ function OutputFolderRow({ savedDir, galleryNote, onSave, onOpen, onCopy, showTo
         <div className="set-folder-field">
           <input
             className="modal-input set-path-input"
-            aria-label="Output folder"
+            aria-label="Output Folder"
             value={draft}
             placeholder={canBrowse ? 'Paste a path, or browse' : 'Paste the full folder path'}
             spellCheck={false}
@@ -435,8 +435,8 @@ function OutputFolderRow({ savedDir, galleryNote, onSave, onOpen, onCopy, showTo
           />
           {!dirty && hasSaved ? (
             <span className="set-folder-tools">
-              <Tip content="Open in the file manager"><button type="button" className="set-folder-tool" aria-label="Open the output folder" onClick={onOpen}><FolderOpen size={14} /></button></Tip>
-              <Tip content={pathCopy.copied ? 'Copied' : 'Copy path'}><button type="button" className="set-folder-tool" aria-label="Copy the path" onClick={() => pathCopy.copyWith(() => onCopy(report?.path || savedDir))}><CopyIcon copied={Boolean(pathCopy.copied)} /></button></Tip>
+              <Tip content="Open in the File Manager"><button type="button" className="set-folder-tool" aria-label="Open the Output Folder" onClick={onOpen}><FolderOpen size={14} /></button></Tip>
+              <Tip content={pathCopy.copied ? 'Copied' : 'Copy path'}><button type="button" className="set-folder-tool" aria-label="Copy the Path" onClick={() => pathCopy.copyWith(() => onCopy(report?.path || savedDir))}><CopyIcon copied={Boolean(pathCopy.copied)} /></button></Tip>
             </span>
           ) : null}
         </div>
@@ -445,7 +445,7 @@ function OutputFolderRow({ savedDir, galleryNote, onSave, onOpen, onCopy, showTo
           : canBrowse ? <button className="btn" type="button" onClick={browse} disabled={Boolean(busy)}><FolderSearch size={14} /> {busy === 'browse' ? 'Waiting…' : 'Browse…'}</button> : null}
       </form>
       {candidates ? (
-        <div className="set-folder-picks" role="list" aria-label="Folders found">
+        <div className="set-folder-picks" role="list" aria-label="Folders Found">
           {candidates.map((item) => (
             <button key={item.path} type="button" role="listitem" className="set-folder-pick" onClick={() => save(item.path)} disabled={busy === 'save'}>
               <code className="set-path">{item.path}</code>
@@ -601,7 +601,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
 
   return (
     <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" className="settings-modal" bodyClassName="set-layout" title="Settings">
-      <nav className="set-nav" aria-label="Settings sections">
+      <nav className="set-nav" aria-label="Settings Sections">
         {SETTINGS_SECTIONS.filter((item) => (thisComputer || !['models', 'integrations'].includes(item.id)) && (item.id !== 'accounts' || accountMode)
           && !(accountMode && accountRole !== 'administrator' && ADMINISTRATION_SECTIONS.has(item.id))).map((item) => {
           const Icon = item.icon;
@@ -632,7 +632,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
         {section === 'general' ? (
           <>
             {phoneDevice || prefs.fullStudioOnPhone ? <Group title="Layout">
-              <SwitchRow label="Simple phone studio" description="A simpler layout for making, browsing and sharing. Everything else stays on the computer." checked={!prefs.fullStudioOnPhone} onChange={(next) => setPrefs({ fullStudioOnPhone: !next })} />
+              <SwitchRow label="Simple Phone Studio" description="A simpler layout for making, browsing and sharing. Everything else stays on the computer." checked={!prefs.fullStudioOnPhone} onChange={(next) => setPrefs({ fullStudioOnPhone: !next })} />
             </Group> : null}
             <Group title="Keyboard" note="Shortcuts pause while you type in a field, except the ones that send the prompt.">
               <ShortcutsDrawer />
@@ -643,15 +643,15 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             <Group title="Reset" tone="danger">
               {thisComputer ? (
                 <>
-                  <Row label="Delete all finished images" description="Moves their files to the trash for 30 days, then deletes them.">
+                  <Row label="Delete All Finished Images" description="Moves their files to the trash for 30 days, then deletes them.">
                     <button className="btn is-danger-soft" onClick={clearGallery}>Delete all</button>
                   </Row>
-                  <Row label="Clear all cache" description="Clears the browser cache, stale queue state and ComfyUI’s memory.">
+                  <Row label="Clear All Cache" description="Clears the browser cache, stale queue state and ComfyUI’s memory.">
                     <button className="btn is-danger-soft" onClick={clearAllCache}>Clear cache</button>
                   </Row>
                 </>
               ) : null}
-              <Row label="Reset all settings" description="Resets prompts, layout, model choices, LoRA stacks and every preference here.">
+              <Row label="Reset All Settings" description="Resets prompts, layout, model choices, LoRA stacks and every preference here.">
                 <button className="btn is-danger-soft" onClick={resetAllSettings}>Reset</button>
               </Row>
             </Group>
@@ -661,26 +661,26 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
         {section === 'generation' ? (
           <>
             <Group title="Composer">
-              <SwitchRow label="Enter to generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
-              <Row label="Run variants as" description={prefs.variationQueueMode === 'separate' ? 'One job per variant. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
-                <Segmented label="Run variants as" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One batch' }, { value: 'separate', label: 'Separate jobs' }]} />
+              <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
+              <Row label="Run Variants As" description={prefs.variationQueueMode === 'separate' ? 'One job per variant. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
+                <Segmented label="Run Variants As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One batch' }, { value: 'separate', label: 'Separate jobs' }]} />
               </Row>
               <PromptHistoryRow Row={Row} Switch={Switch} showToast={showToast} confirmAction={confirmAction} />
-              <SwitchRow label="Size in megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
+              <SwitchRow label="Size in Megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
             </Group>
             <Group title="Previews">
-              <Row label="While generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
-                <Segmented label="Generation previews" value={prefs.generationPreviewMode === 'simple' ? 'simple' : 'advanced'} onChange={(next) => setPrefs({ generationPreviewMode: next })} options={[{ value: 'advanced', label: 'Mosaic' }, { value: 'simple', label: 'Simple' }]} />
+              <Row label="While Generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
+                <Segmented label="Generation Previews" value={prefs.generationPreviewMode === 'simple' ? 'simple' : 'advanced'} onChange={(next) => setPrefs({ generationPreviewMode: next })} options={[{ value: 'advanced', label: 'Mosaic' }, { value: 'simple', label: 'Simple' }]} />
               </Row>
             </Group>
-            <Group title="Input images">
-              <SwitchRow label="Automatically resize input images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
+            <Group title="Input Images">
+              <SwitchRow label="Automatically Resize Input Images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
             </Group>
-            <Group title="Starting values" note="Used when a model doesn’t set its own. The current draft stays as it is.">
+            <Group title="Starting Values" note="Used when a model doesn’t set its own. The current draft stays as it is.">
               <Row label="Variants"><NumberPicker label="Variants" value={Number(prefs.defaultImageCount)} onChange={(next) => setPrefs({ defaultImageCount: next })} min={1} max={16} /></Row>
-              <Row label="Image steps"><NumberPicker label="Steps" value={Number(prefs.defaultImageSteps)} onChange={(next) => setPrefs({ defaultImageSteps: next })} min={1} max={150} /></Row>
-              <Row label="Video steps"><NumberPicker label="Steps" value={Number(prefs.defaultVideoSteps)} onChange={(next) => setPrefs({ defaultVideoSteps: next })} min={1} max={150} /></Row>
-              <Row label="Video frames"><NumberPicker label="Frames" value={Number(prefs.defaultVideoFrames)} onChange={(next) => setPrefs({ defaultVideoFrames: next })} min={1} max={1000} step={4} /></Row>
+              <Row label="Image Steps"><NumberPicker label="Steps" value={Number(prefs.defaultImageSteps)} onChange={(next) => setPrefs({ defaultImageSteps: next })} min={1} max={150} /></Row>
+              <Row label="Video Steps"><NumberPicker label="Steps" value={Number(prefs.defaultVideoSteps)} onChange={(next) => setPrefs({ defaultVideoSteps: next })} min={1} max={150} /></Row>
+              <Row label="Video Frames"><NumberPicker label="Frames" value={Number(prefs.defaultVideoFrames)} onChange={(next) => setPrefs({ defaultVideoFrames: next })} min={1} max={1000} step={4} /></Row>
               <Row label="Video FPS"><NumberPicker label="FPS" value={Number(prefs.defaultFps)} onChange={(next) => setPrefs({ defaultFps: next })} min={1} max={60} /></Row>
             </Group>
           </>
@@ -689,15 +689,15 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
         {section === 'features' ? (
           <>
           <Group>
-            <SettingsDrawer id="set-feature-upscale" title="Smart upscale" description={upscaleOn ? `On · ${upscaleState.label}` : 'Off'}>
+            <SettingsDrawer id="set-feature-upscale" title="Smart Upscale" description={upscaleOn ? `On · ${upscaleState.label}` : 'Off'}>
               <SwitchRow label={preferenceLabels.smartUpscale} description="Shows an upscale arrow on finished images. The larger, sharper copy is saved next to the original." checked={upscaleOn} onChange={(next) => setPrefs({ smartUpscale: next })} />
               {upscaleOn ? (
                 <>
                   <Row label="Effort" description={effort.detail}>
-                    <Segmented label="Upscale effort" value={effort.value} onChange={(next) => setPrefs({ upscaleQuality: next })} options={upscaleEfforts.map(({ value, label, scale }) => ({ value, label: `${label} ${scale}` }))} />
+                    <Segmented label="Upscale Effort" value={effort.value} onChange={(next) => setPrefs({ upscaleQuality: next })} options={upscaleEfforts.map(({ value, label, scale }) => ({ value, label: `${label} ${scale}` }))} />
                   </Row>
                   <SwitchRow
-                    label="Face detail pass"
+                    label="Face Detail Pass"
                     tag={<BetaTag />}
                     description={faceDetailReady
                       ? 'Redraws small faces before the upscale. Close-ups are left as they are.'
@@ -724,13 +724,13 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 {inpaintOn ? (
                   <>
                     {inpaintModels.length ? (
-                      <Row label="Your models that can inpaint" stacked>
+                      <Row label="Your Models That Can Inpaint" stacked>
                         <ModelChips profiles={inpaintModels} />
                       </Row>
                     ) : (
                       <InpaintSuggestions onGetModels={onGetModels} />
                     )}
-                    <Row label="Strength and edge softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Basics, under the image'}. Strength is there for models that take a start image.`} />
+                    <Row label="Strength & Edge Softness" description={`While a painted image is in the prompt bar, both are in ${phoneDevice ? 'the Advanced sheet' : 'the sidebar’s Basics, under the image'}. Strength is there for models that take a start image.`} />
                     <InpaintDemo />
                   </>
                 ) : null}
@@ -751,22 +751,22 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
                 onCopy={(dir) => copyToClipboard(dir)}
                 showToast={showToast}
               />
-              <Row label="Workflows folder" description={paths.workflowsDir ? <code className="set-path is-oneline" title={paths.workflowsDir}><bdi>{paths.workflowsDir}</bdi></code> : <Skeleton className="skeleton-text path" />}>
+              <Row label="Workflows Folder" description={paths.workflowsDir ? <code className="set-path is-oneline" title={paths.workflowsDir}><bdi>{paths.workflowsDir}</bdi></code> : <Skeleton className="skeleton-text path" />}>
                 <button className="btn is-ghost" onClick={() => { refreshModels(); refreshWorkflows(); }}><RefreshCw size={14} /> Rescan</button>
               </Row>
             </Group> : null}
             <Group title="Gallery">
-              <SwitchRow label="Follow the latest output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
-              {features.moments ? <SwitchRow label="Group by time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
-              <SwitchRow label="Wide images take two columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
+              <SwitchRow label="Follow the Latest Output" description="Shows each new image as it finishes." checked={prefs.followLatest} onChange={(next) => setPrefs({ followLatest: next })} />
+              {features.moments ? <SwitchRow label="Group by Time" description="Headings like “This evening” split the gallery by when you made things." checked={prefs.showMoments} onChange={(next) => setPrefs({ showMoments: next })} /> : null}
+              <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <SwitchRow label={preferenceLabels.showFailedItems} description="Interrupted and failed generations stay in the gallery." checked={prefs.showFailedItems} onChange={(next) => setPrefs({ showFailedItems: next })} />
             </Group>
             <Group title="Auto-grouping" note="Similar generations group themselves into a stack, found by prompt, model and time. The button next to search switches this too.">
               <SwitchRow label="Auto-grouping" description="Pictures from similar prompts fold into one tile that opens to show all of them." checked={Boolean(prefs.stackRuns)} onChange={(next) => setPrefs({ stackRuns: next })} />
               {prefs.stackRuns ? (
-                <Row label="Stacks look like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
+                <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
                   <Segmented
-                    label="Stacks look like"
+                    label="Stacks Look Like"
                     value={prefs.runStackStyle === 'flow' ? 'flow' : 'burst'}
                     onChange={(next) => setPrefs({ runStackStyle: next })}
                     options={[
@@ -780,13 +780,13 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
             {atComputer ? <EarlierImagesGroup Group={Group} Row={Row} showToast={showToast} confirmAction={confirmAction} outputDir={paths.outputDir || ''} /> : null}
             <AdapterLibraryGroup Group={Group} Row={Row} />
             <Group title="Sharing">
-              <SwitchRow label="Share without settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
-              <Row label="Export gallery" description="Every finished image in one ZIP file.">
+              <SwitchRow label="Share Without Settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
+              <Row label="Export Gallery" description="Every finished image in one ZIP file.">
                 <a className="btn" href="/api/gallery/export" download><Download size={14} /> Export</a>
               </Row>
             </Group>
-            <Group title="Clean up">
-              <Row label="Clear failed items" description="Removes failed and interrupted cards.">
+            <Group title="Clean Up">
+              <Row label="Clear Failed Items" description="Removes failed and interrupted cards.">
                 <button className="btn" onClick={clearFailedItems}>Clear</button>
               </Row>
               {thisComputer ? <TrashRow confirmAction={confirmAction} showToast={showToast} Row={Row} /> : null}
@@ -844,7 +844,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
           <>
             {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {typedModels.length ? (
-              <Group title="Model types" note="Set the type for models that weren’t recognized or were detected wrong.">
+              <Group title="Model Types" note="Set the type for models that weren’t recognized or were detected wrong.">
                 {typedModels.map((file) => {
                   const key = `${file.source}:${file.name}`;
                   const folder = file.source === 'checkpoint' ? 'Checkpoint' : 'Diffusion model';

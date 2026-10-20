@@ -463,7 +463,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           ) : null}
           {runningCount ? (
             <motion.div key="cancel" {...dockChip}>
-              <Tip content="Stop everything running and queued" side="left">
+              <Tip content="Stop Everything Running & Queued" side="left">
                 <button type="button" className="dock-chip is-cancel" onClick={cancelQueue}>
                   <CircleStop size={14} />
                   <span>Stop</span>
@@ -732,7 +732,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           {zenGallery.length && zenGalleryOpen ? (
             <div data-open-surface className="zen-gallery-wrap">
               <Tip content="Hide Gallery"><button className="zen-gallery-toggle" aria-label="Hide Gallery" onClick={() => setZenGalleryOpen(false)}><ChevronUp size={16} /></button></Tip>
-              {zenGallery[0]?.id !== zenItem?.id ? <Tip content="Jump to latest output"><button className="zen-latest" onClick={goLatestZen}>Latest</button></Tip> : null}
+              {zenGallery[0]?.id !== zenItem?.id ? <Tip content="Jump to Latest Output"><button className="zen-latest" onClick={goLatestZen}>Latest</button></Tip> : null}
               <ZenStrip
                 items={zenGallery}
                 activeId={zenItem?.id}

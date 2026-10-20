@@ -118,7 +118,7 @@ export function SizeSlider({ index, onChange, onPreview }: { index: number; onCh
       className={cn("inpaint-size", dragging && "is-dragging")}
       role="slider"
       tabIndex={0}
-      aria-label="Brush size"
+      aria-label="Brush Size"
       aria-orientation="vertical"
       aria-valuemin={1}
       aria-valuemax={sizes.length}
@@ -545,7 +545,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
       className={cn("inpaint-studio", asSheet && "is-sheet")}
       style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom, height }}
       role="dialog"
-      aria-label="Paint the part to change"
+      aria-label="Paint the Part to Change"
       data-open-surface
       initial={{ opacity: 0, y: 10, scale: 0.97, filter: "blur(4px)" }}
       animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
@@ -574,7 +574,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
         <p className={cn("inpaint-hint", (history.painted || !size) && "is-hidden")} aria-hidden={history.painted}>Paint over what should change</p>
       </div>
 
-      <div className="inpaint-pill" role="toolbar" aria-label="Painting tools">
+      <div className="inpaint-pill" role="toolbar" aria-label="Painting Tools">
         {tools.map((item) => (
           <Tip key={item.id} content={<>{item.label} <kbd>{item.key}</kbd></>}>
             <button type="button" className={cn("inpaint-tool", activeTool === item.id && "is-active")} aria-label={item.label} aria-pressed={activeTool === item.id} onClick={() => setTool(item.id)}>
@@ -608,13 +608,13 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
         </AnimatePresence>
         <span className="inpaint-divider" aria-hidden="true" />
         <Tip content={<>Clear the painting <kbd>Del</kbd></>}>
-          <button type="button" className="inpaint-tool" aria-label="Clear the painting" disabled={!history.painted} onClick={clear}><BrushCleaning size={16} /></button>
+          <button type="button" className="inpaint-tool" aria-label="Clear the Painting" disabled={!history.painted} onClick={clear}><BrushCleaning size={16} /></button>
         </Tip>
       </div>
 
       {/* Done sits apart, top right, so clearing and closing are never one slip apart. */}
       <Tip content={<>Done <kbd>Esc</kbd></>}>
-        <button type="button" className="inpaint-close" aria-label="Done painting" onClick={onClose}><X size={16} /></button>
+        <button type="button" className="inpaint-close" aria-label="Done Painting" onClick={onClose}><X size={16} /></button>
       </Tip>
 
       <SizeSlider index={sizeIndex} onChange={setSizeIndex} onPreview={setPreviewing} />

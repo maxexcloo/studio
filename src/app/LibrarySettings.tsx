@@ -66,7 +66,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
   const post = (url: string, body?: unknown) => apiJson<ImportResult>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
 
   return (
-    <Group title="Earlier images" note="Images stay where they are and aren’t copied. Prompts saved in the files by ComfyUI or AUTOMATIC1111 can be searched.">
+    <Group title="Earlier Images" note="Images stay where they are and aren’t copied. Prompts saved in the files by ComfyUI or AUTOMATIC1111 can be searched.">
       {(folders || []).map((folder) => (
         <Row
           key={folder.id}
@@ -88,13 +88,13 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
           }}>Remove</button>
         </Row>
       ))}
-      <Row label="Add a folder" description="Older ComfyUI outputs, or an AUTOMATIC1111 or Forge folder. Subfolders are included.">
+      <Row label="Add a Folder" description="Older ComfyUI outputs, or an AUTOMATIC1111 or Forge folder. Subfolders are included.">
         <button className="btn" disabled={Boolean(busy)} onClick={() => run('add', () => post('/api/library/folders', { start: outputDir || '' }), 'from that folder')}>
           <FolderPlus size={14} /> {busy === 'add' ? 'Looking…' : 'Choose…'}
         </button>
       </Row>
       {outputDir ? (
-        <Row label="Everything in the output folder" description="Adds images ComfyUI saved that aren’t in the gallery, such as runs made in ComfyUI or older than its history.">
+        <Row label="Everything in the Output Folder" description="Adds images ComfyUI saved that aren’t in the gallery, such as runs made in ComfyUI or older than its history.">
           <button className="btn" disabled={Boolean(busy)} onClick={() => run('output', () => post('/api/library/output'), 'from the output folder')}>
             <RefreshCw size={14} className={busy === 'output' ? 'spin' : undefined} /> {busy === 'output' ? 'Scanning…' : 'Scan'}
           </button>
@@ -129,7 +129,7 @@ export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'G
       description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG the way AUTOMATIC1111 does, so Civitai fills them in on upload. ComfyUI’s workflow stays in the file."
       disabled={enabled === null || !canChange}
     >
-      <Switch label="Civitai-ready images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
+      <Switch label="Civitai-ready Images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
     </Row>
   );
 }
@@ -147,13 +147,13 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
   return (
     <>
       <Row
-        label="Keep recent prompts"
+        label="Keep Recent Prompts"
         description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one. Shared with other devices.${enabled && prompts.length ? ` ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}.` : ''}`}
       >
-        <Switch label="Keep recent prompts" checked={enabled} onChange={toggle} />
+        <Switch label="Keep Recent Prompts" checked={enabled} onChange={toggle} />
       </Row>
       {enabled && recent ? (
-        <Row label="Forget recent prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
+        <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
           <button className="btn" onClick={async () => {
             if (!await confirmAction({ title: 'Forget recent prompts?', description: starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.', action: 'Forget' })) return;
             clearPrompts().catch(fail);

@@ -14,7 +14,7 @@ test('gallery tools expand independently and clear every active filter', async (
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
   const search = page.getByRole('textbox', { name: 'Search the gallery', exact: true });
-  const clear = toolbar.getByRole('button', { name: 'Clear search', exact: true });
+  const clear = toolbar.getByRole('button', { name: 'Clear Search', exact: true });
   const filters = toolbar.getByRole('button', { name: 'Gallery Filters', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
   const grouping = toolbar.getByRole('button', { name: 'Auto-grouping', exact: true });
@@ -113,7 +113,7 @@ test('empty search dismisses outside while active queries and filters stay open'
   const controls = await panel.locator('button, select').evaluateAll(nodes => nodes.map(n => { const b = n.getBoundingClientRect(); return { width: b.width, height: b.height }; }));
   expect(controls.every(n => n.width >= 40 && n.height === 40), JSON.stringify(controls)).toBe(true);
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear Search', exact: true }).click();
   await outside.click();
   await expect(search).toHaveCount(0);
   await expect(panel).toBeVisible();
@@ -170,7 +170,7 @@ test('compact studio keeps active search and every filter inside the viewport', 
   await panel.getByRole('button', { name: 'Filter By Model' }).click();
   await page.getByRole('option', { name: 'Flux', exact: true }).click();
   await page.waitForTimeout(400);
-  for (const control of [page.getByRole('textbox', { name: 'Search the gallery', exact: true }), page.getByRole('button', { name: 'Clear search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
+  for (const control of [page.getByRole('textbox', { name: 'Search the gallery', exact: true }), page.getByRole('button', { name: 'Clear Search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
   await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
   expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
   const bounds = await panel.boundingBox();
@@ -258,7 +258,7 @@ test('the search’s clear X is a round plain icon button', async ({ page, isMob
   await page.goto('/');
   await page.locator('.gallery-search-trigger').click();
   await page.keyboard.type('abc');
-  const close = page.getByRole('button', { name: 'Clear search', exact: true });
+  const close = page.getByRole('button', { name: 'Clear Search', exact: true });
   await close.hover();
   const box = await close.boundingBox();
   expect(Math.abs(box!.width - box!.height)).toBeLessThan(1);
@@ -292,7 +292,7 @@ test('search keeps a neutral shell without a selected input highlight', async ({
   }
   await input.focus();
   await tools.screenshot({ path: testInfo.outputPath('search-focus-border.png') });
-  await tools.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await tools.getByRole('button', { name: 'Clear Search', exact: true }).click();
   await expect(input).toHaveCount(0);
   if (phone) await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   await opener.click();

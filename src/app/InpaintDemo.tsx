@@ -280,7 +280,7 @@ export function InpaintDemo() {
 
   return (
     <div className="inpaint-demo-wrap" ref={rootRef}>
-      <div className={cn("inpaint-demo", `is-${phase}`, comparing && "is-comparing")} role="group" aria-label="Try inpainting">
+      <div className={cn("inpaint-demo", `is-${phase}`, comparing && "is-comparing")} role="group" aria-label="Try Inpainting">
         <div
           ref={viewportRef}
           className={cn("inpaint-viewport", phase === "paint" ? `is-${tool}` : "is-idle")}
@@ -316,7 +316,7 @@ export function InpaintDemo() {
           ) : null}
         </div>
 
-        <div className={cn("inpaint-pill", phase !== "paint" && "is-resting")} role="toolbar" aria-label="Painting tools">
+        <div className={cn("inpaint-pill", phase !== "paint" && "is-resting")} role="toolbar" aria-label="Painting Tools">
           {tools.map((item) => (
             <Tip key={item.id} content={item.label}>
               <button type="button" className={cn("inpaint-tool", tool === item.id && "is-active")} aria-label={item.label} aria-pressed={tool === item.id} disabled={phase !== "paint"} onClick={() => { touched.current = true; setTool(item.id); }}>
@@ -332,8 +332,8 @@ export function InpaintDemo() {
             <button type="button" className="inpaint-tool" aria-label="Redo" disabled={!history.redo || phase !== "paint"} onClick={redoStroke}><Redo2 size={16} /></button>
           </Tip>
           <span className="inpaint-divider" aria-hidden="true" />
-          <Tip content="Clear the painting">
-            <button type="button" className="inpaint-tool" aria-label="Clear the painting" disabled={!history.painted || phase !== "paint"} onClick={clear}><BrushCleaning size={16} /></button>
+          <Tip content="Clear the Painting">
+            <button type="button" className="inpaint-tool" aria-label="Clear the Painting" disabled={!history.painted || phase !== "paint"} onClick={clear}><BrushCleaning size={16} /></button>
           </Tip>
         </div>
 

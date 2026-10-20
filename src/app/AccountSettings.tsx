@@ -173,7 +173,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
         {token?.enabled ? <button className="btn is-ghost" disabled={busy} onClick={() => void revokeToken()}><X size={14} /> Revoke</button> : null}
       </Row>
       {issuedToken ? <Row stacked label="New Token" description="Shown once. Store it in your MCP client as a bearer credential, separate from the endpoint URL.">
-        <input className="modal-input set-path-input" aria-label="New MCP token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
+        <input className="modal-input set-path-input" aria-label="New MCP Token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
         <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
       </Row> : null}
     </Group>
@@ -182,7 +182,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       {admin?.accessProfiles.map((profile) => <Row key={profile.id} label={profile.name} description={`${profile.generationProfiles.length} generation profile${profile.generationProfiles.length === 1 ? '' : 's'} · ${profile.id}`}>
         <button className="btn is-ghost" disabled={busy} aria-label={`Edit ${profile.name}`} onClick={() => editProfile(profile)}><Pencil size={14} /> Edit</button>
       </Row>)}
-      <Row label={editingId ? 'Profile Name' : 'New Profile Name'}><input className="modal-input account-field" aria-label="Profile name" value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
+      <Row label={editingId ? 'Profile Name' : 'New Profile Name'}><input className="modal-input account-field" aria-label="Profile Name" value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Studio Artists" /></Row>
       {editingId ? <Row label="Profile ID" description={editingId} /> : <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen."><input className="modal-input account-field" aria-label="Profile ID" value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="studio-artists" /></Row>}
       <fieldset className="account-profile-list"><legend>Generation Profiles</legend>
         {grantable.map((id) => <label key={id}><span>{profileLabel(id)}{unavailable.has(id) ? ' (Unavailable)' : ''}</span><Switch size="sm" label={profileLabel(id)} checked={selectedProfiles.includes(id)} onChange={(next) => setSelectedProfiles((current) => next ? [...current, id] : current.filter((item) => item !== id))} /></label>)}
@@ -204,8 +204,8 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
         </> : null}
       </Row>)}
       <Row label="Email" description={username.trim() && !looksLikeEmail(username) ? 'Enter an email address. It is the account’s sign-in name.' : undefined}><input className="modal-input account-field" aria-label="Email" autoComplete="off" {...emailFieldProps} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="artist@example.com" /></Row>
-      <Row label="Display Name"><input className="modal-input account-field" aria-label="Display name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
-      <Row label="Temporary Password" description="Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
+      <Row label="Display Name"><input className="modal-input account-field" aria-label="Display Name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
+      <Row label="Temporary Password" description="Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary Password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
       <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access profile for the new account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !looksLikeEmail(username) || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
@@ -227,7 +227,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
 
     {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
       <Row label="Account"><div className="set-type-picker"><StudioSelect ariaLabel="Account to reset" value={resetAccount || NONE} options={[...choose('Choose an Account', resetAccount), ...accountOptions(localAccounts)]} onChange={(value) => setResetAccount(value === NONE ? '' : value)} /></div></Row>
-      <Row label="New Password"><input className="modal-input account-field" aria-label="New password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} /></Row>
+      <Row label="New Password"><input className="modal-input account-field" aria-label="New Password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} /></Row>
       <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || !resetPassword} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
     </Group> : null}
 

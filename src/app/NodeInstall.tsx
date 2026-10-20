@@ -183,7 +183,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
   return (
     <div className="node-install">
       {quickError && !manual ? <p className="upscale-fine is-warn">The install stopped. {quickError} Install it yourself below.</p> : null}
-      <div className="upscale-routes" role="tablist" aria-label="How to install">
+      <div className="upscale-routes" role="tablist" aria-label="How to Install">
         {(['manager', 'terminal'] as const).map((value) => (
           <button key={value} type="button" role="tab" aria-selected={route === value} className={cn(route === value && 'is-active')} onClick={() => setRoute(value)}>
             {value === 'manager' ? 'ComfyUI-Manager' : 'Terminal'}
@@ -213,7 +213,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
               <span className="upscale-step-n">2</span>
               <div>
                 Paste the {pack.name} repository:
-                <CopyRow text={pack.repository} label="Copy the repository URL" showToast={showToast} />
+                <CopyRow text={pack.repository} label="Copy the Repository URL" showToast={showToast} />
               </div>
             </li>
           )}

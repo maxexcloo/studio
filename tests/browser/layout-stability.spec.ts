@@ -31,11 +31,11 @@ test('composer menus stay reachable and side controls are removed', async ({ pag
   await page.locator('.zen-prompt .model-trigger').click();
   await reachable(page.locator('.model-menu .model-option').first(), true);
   await page.keyboard.press('Escape');
-  const more = page.locator('.zen-prompt').getByRole('button', { name: 'More settings', exact: true });
+  const more = page.locator('.zen-prompt').getByRole('button', { name: 'More Settings', exact: true });
   if (await more.isVisible()) {
     await more.click();
     await expect(page.locator('.composer-drawer')).toBeVisible();
-    await page.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
+    await page.locator('.composer-drawer').getByRole('button', { name: 'Close Settings', exact: true }).click();
   }
   await page.locator('.zen-prompt').getByRole('button', { name: 'LoRAs', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'LoRAs', exact: true })).toBeVisible();
@@ -74,7 +74,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     await expect(page.getByRole('button', { name: 'Search Gallery', exact: true })).toBeInViewport();
     expect((await toolbar.boundingBox())!.height).toBe(before!.height);
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear Search', exact: true }).click();
     await reachable(page.getByRole('button', { name: 'Auto-grouping', exact: true }));
     await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   }

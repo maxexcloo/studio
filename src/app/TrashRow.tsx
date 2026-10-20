@@ -63,7 +63,7 @@ export function TrashRow({ confirmAction, showToast, Row }: {
       {empty ? null : (
         <>
           <button className="btn" disabled={busy} onClick={restore}><RotateCcw size={14} /> Restore{trash.batches > 1 ? ' latest' : ''}</button>
-          <button className="btn is-ghost" disabled={busy} aria-label="Empty trash" onClick={emptyNow}><Trash2 size={14} /></button>
+          <button className="btn is-ghost" disabled={busy} aria-label="Empty Trash" onClick={emptyNow}><Trash2 size={14} /></button>
         </>
       )}
     </Row>

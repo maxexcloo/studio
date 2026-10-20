@@ -72,7 +72,7 @@ const STEPS: Array<{ id: Step; label: string }> = [
 function SetupSteps({ step }: { step: Step }) {
   const current = STEPS.findIndex((item) => item.id === step);
   return (
-    <ol className="upscale-stepper" aria-label="Setup steps">
+    <ol className="upscale-stepper" aria-label="Setup Steps">
       {STEPS.map((item, index) => {
         const state = step === 'ready' || index < current ? 'done' : index === current ? 'active' : 'todo';
         return (

@@ -79,7 +79,7 @@ function ImportFit({ item }: { item: ImportDraft }) {
   else notes.push("No LoRA picker. It needs an rgthree Power Lora Loader or Lora Loader Stack in the workflow.");
 
   return (
-    <section className="wf-fit" aria-label="Connected controls">
+    <section className="wf-fit" aria-label="Connected Controls">
       <div className="wf-fit-cols">
         <div>
           <h5>Follows the studio</h5>

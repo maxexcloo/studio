@@ -19,7 +19,7 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
     for (const name of names) {
       await ui.chooseModel(name);
       const picker = root.locator('.composer-count-picker').filter({ visible: true });
-      if (!await picker.count()) await root.getByRole('button', { name: 'More settings', exact: true }).click();
+      if (!await picker.count()) await root.getByRole('button', { name: 'More Settings', exact: true }).click();
       await expect(picker).toBeVisible();
       const decrease = picker.getByRole('button', { name: 'Decrease Images', exact: true });
       const increase = picker.getByRole('button', { name: 'Increase Images', exact: true });
@@ -35,7 +35,7 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
         expect(box!.width).toBeGreaterThanOrEqual(44);
         expect(box!.height).toBeGreaterThanOrEqual(44);
       }
-      if (await root.locator('.composer-drawer').isVisible()) await root.locator('.composer-drawer').getByRole('button', { name: 'Close settings', exact: true }).click();
+      if (await root.locator('.composer-drawer').isVisible()) await root.locator('.composer-drawer').getByRole('button', { name: 'Close Settings', exact: true }).click();
     }
   }
 });

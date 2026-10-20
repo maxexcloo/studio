@@ -283,7 +283,7 @@ export function RunShelf({ run, y, width, height, folding, arriving, onClose, on
             <span>Stack</span>
           </button>
           {onUnstack ? (
-            <Tip content="Keep these as separate images">
+            <Tip content="Keep These as Separate Images">
               <button type="button" className="run-shelf-action" aria-label={`Unstack ${title}`} onClick={onUnstack}>
                 <Ungroup size={13} strokeWidth={2} />
                 <span>Unstack</span>

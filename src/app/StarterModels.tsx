@@ -161,7 +161,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                     onClick={() => setChosen((current) => ({ ...current, [family.family]: item.id }))}
                   >
                     <span className="starter-version-name">
-                      <strong>{item.label}{item.id === family.best ? <i className="starter-best-dot" aria-label="Best on this computer" /> : null}</strong>
+                      <strong>{item.label}{item.id === family.best ? <i className="starter-best-dot" aria-label="Best on This Computer" /> : null}</strong>
                       <small>{item.detail}</small>
                     </span>
                     <span className="starter-version-memory">
@@ -224,7 +224,7 @@ export function GetModelsSheet({ open, onOpenChange, showToast, onStarted, onUse
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Get a model"
+      title="Get a Model"
       description="Each downloads with everything it needs and is selected when it’s done."
       className="starter-sheet"
       footer={onFindModels ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onFindModels(); }}>Find models on this computer</button> : undefined}

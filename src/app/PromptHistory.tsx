@@ -188,7 +188,7 @@ function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'e
                   <button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} title={row.entry.pinned ? 'Unstar' : 'Star to keep'} onClick={() => pin(row.entry)}>
                     <Star size={13} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                   </button>
-                  <button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove this prompt" title="Remove" onClick={() => forget(row.entry)}>
+                  <button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove This Prompt" title="Remove" onClick={() => forget(row.entry)}>
                     <X size={13} />
                   </button>
                 </div>
@@ -240,7 +240,7 @@ export function PromptHistorySheet({ open, onClose, onPick, onError, kind = 'pos
                 <button type="button" className={cn('phone-icon', row.entry.pinned && 'is-on')} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} onClick={() => { pin(row.entry); }}>
                   <Star size={18} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                 </button>
-                <button type="button" className="phone-icon" aria-label="Remove this prompt" onClick={() => forget(row.entry)}>
+                <button type="button" className="phone-icon" aria-label="Remove This Prompt" onClick={() => forget(row.entry)}>
                   <X size={18} />
                 </button>
               </div>

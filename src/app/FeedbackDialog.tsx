@@ -129,7 +129,7 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
       }
     >
       <form className="feedback-form" onSubmit={(event) => { event.preventDefault(); void send(); }}>
-        <Segmented label="Kind of post" value={kind} options={KINDS} onChange={setKind} />
+        <Segmented label="Kind of Post" value={kind} options={KINDS} onChange={setKind} />
 
         <label className="field">
           <span>Title</span>
@@ -148,7 +148,7 @@ function FeedbackDialog({ draft, onClose }: { draft: FeedbackDraft | null; onClo
                 <strong>Include setup</strong>
                 <span>Studio, ComfyUI and Node.js versions, system and GPU.</span>
               </div>
-              <Switch label="Include setup" checked={withSetup} onChange={setWithSetup} size="sm" />
+              <Switch label="Include Setup" checked={withSetup} onChange={setWithSetup} size="sm" />
             </div>
             {withSetup ? (
               <>

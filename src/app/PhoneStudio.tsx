@@ -373,7 +373,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <AnimatePresence initial={false}>
           {referenceRole ? (
             <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What this image is">
+              <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What This Image Is">
                 <i aria-hidden="true" />
                 {(['edit', 'reference'] as const).map((value) => (
                   // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
@@ -538,7 +538,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
             <h3 className="phone-section">Saved</h3>
             <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}</button>
           </div>
-          <div className={cn('phone-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved sizes">
+          <div className={cn('phone-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved Sizes">
             <AnimatePresence initial={false}>
               {saved.map((item) => (
                 <PhoneSavedSize

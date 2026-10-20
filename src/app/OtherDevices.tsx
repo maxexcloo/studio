@@ -69,8 +69,8 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
       <Row label={label} description={description} stacked={editing}>
         {editing ? (
           <form className="set-inline-form is-password" onSubmit={(event) => { event.preventDefault(); if (cert.trim() && key.trim() && !busy) save(); }}>
-            <input className="modal-input set-path-input" aria-label="Certificate file" placeholder="Certificate file (.crt or .pem)" value={cert} onChange={(event) => setCert(event.target.value)} spellCheck={false} autoComplete="off" autoFocus />
-            <input className="modal-input set-path-input" aria-label="Key file" placeholder="Key file (.key)" value={key} onChange={(event) => setKey(event.target.value)} spellCheck={false} autoComplete="off" />
+            <input className="modal-input set-path-input" aria-label="Certificate File" placeholder="Certificate file (.crt or .pem)" value={cert} onChange={(event) => setCert(event.target.value)} spellCheck={false} autoComplete="off" autoFocus />
+            <input className="modal-input set-path-input" aria-label="Key File" placeholder="Key file (.key)" value={key} onChange={(event) => setKey(event.target.value)} spellCheck={false} autoComplete="off" />
             <p className="set-inline-hint" aria-live="polite">{problem || 'Paths on this computer. With Tailscale, run tailscale cert with this computer’s name and paste the two files it creates.'}</p>
             <button type="button" className="btn is-ghost" onClick={() => { setEditing(false); setProblem(''); }}>Cancel</button>
             <button type="submit" className="btn is-primary" disabled={!cert.trim() || !key.trim() || busy}>{busy ? 'Checking…' : 'Save'}</button>
@@ -83,7 +83,7 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
         ) : null}
       </Row>
       {pending ? (
-        <Row label="Waiting for a restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when Studio restarts.` : 'HTTPS turns off when Studio restarts.'} />
+        <Row label="Waiting for a Restart" description={next.configured ? `HTTPS${next.ok ? ` for ${next.names.join(', ')}` : ''} starts when Studio restarts.` : 'HTTPS turns off when Studio restarts.'} />
       ) : null}
     </>
   );
@@ -157,8 +157,8 @@ function StudioPasswordRow({ access, onSaved, showToast, Row, Status }: { access
     <Row label={label} description={description} stacked={editing}>
       {editing ? (
         <form className="set-inline-form is-password" onSubmit={(event) => { event.preventDefault(); if (canSave) save(); }}>
-          <input className="modal-input" type="password" autoComplete="new-password" aria-label="Studio password" placeholder="Studio password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
-          <input className="modal-input" type="password" autoComplete="new-password" aria-label="Studio password again" placeholder="Again" value={again} onChange={(event) => setAgain(event.target.value)} />
+          <input className="modal-input" type="password" autoComplete="new-password" aria-label="Studio Password" placeholder="Studio password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
+          <input className="modal-input" type="password" autoComplete="new-password" aria-label="Studio Password Again" placeholder="Again" value={again} onChange={(event) => setAgain(event.target.value)} />
           <p className="set-inline-hint" aria-live="polite">{hint}</p>
           <button type="button" className="btn is-ghost" onClick={close}>Cancel</button>
           <button type="submit" className="btn is-primary" disabled={!canSave}>{busy ? 'Saving…' : 'Save'}</button>
@@ -282,10 +282,10 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
 
   return (
     <>
-      <Group title="Other devices" note="Only on a network you trust.">
+      <Group title="Other Devices" note="Only on a network you trust.">
         {lan ? (
-          <Row label="Open on other devices" description={description} disabled={busy}>
-            <Switch label="Open on other devices" checked={forced ? on : lan.saved} disabled={!canChange || forced || busy} onChange={toggle} />
+          <Row label="Open on Other Devices" description={description} disabled={busy}>
+            <Switch label="Open on Other Devices" checked={forced ? on : lan.saved} disabled={!canChange || forced || busy} onChange={toggle} />
           </Row>
         ) : !network ? <Row label={<Skeleton className="skeleton-text short" />} /> : null}
         {(on || lan?.saved) && noPassword ? (
@@ -302,7 +302,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
             Row={Row}
           />
         )) : null}
-        {on && network && !entries.length && !(tls?.configured && !tls.ok) ? <Row label="No network address" description="This computer isn’t on a local network right now." /> : null}
+        {on && network && !entries.length && !(tls?.configured && !tls.ok) ? <Row label="No Network Address" description="This computer isn’t on a local network right now." /> : null}
         {/* HTTPS only matters for other devices, so it lives with them, folded away. */}
         {tls && (on || lan?.saved || tls.configured) ? (
           <SettingsDrawer
@@ -316,30 +316,30 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
         ) : null}
       </Group>
 
-      <Group title="Signing in">
+      <Group title="Signing In">
         <StudioPasswordRow access={access} onSaved={loadAccess} showToast={showToast} Row={Row} Status={Status} />
         <Row
-          label="Trust other devices with admin"
+          label="Trust Other Devices with Admin"
           description={`Lets signed-in devices install nodes and models, change the output folder and clear the gallery.${atComputer ? '' : ' Only the computer running Studio can change this.'}`}
           disabled={!atComputer || !access}
         >
-          <Switch label="Trust other devices with admin" checked={Boolean(access?.adminFromDevices)} disabled={!atComputer || !access} onChange={setAdmin} />
+          <Switch label="Trust Other Devices with Admin" checked={Boolean(access?.adminFromDevices)} disabled={!atComputer || !access} onChange={setAdmin} />
         </Row>
         {!atComputer ? (
-          <Row label="Sign out this device" description="The studio password is needed again next time.">
+          <Row label="Sign Out This Device" description="The studio password is needed again next time.">
             <button className="btn" onClick={() => apiJson('/api/access/sign-out', { method: 'POST' }).catch(() => null).then(() => window.location.reload())}><LogOut size={14} /> Sign out</button>
           </Row>
         ) : null}
       </Group>
 
       {canChange && (devices.length || (atComputer && on)) ? (
-        <Group title="Signed-in devices" note={devices.length ? 'Devices stay signed in for a week.' : undefined}>
+        <Group title="Signed-in Devices" note={devices.length ? 'Devices stay signed in for a week.' : undefined}>
           {devices.map((device) => (
             <Row key={device.id} label={device.current ? `${device.label} · this device` : device.label} description={`Signed in ${ago(device.createdAt)} · last seen ${ago(device.lastSeenAt)}`} />
           ))}
-          {!devices.length ? <Row label="No devices signed in" description="Devices appear here after they sign in." /> : null}
+          {!devices.length ? <Row label="No Devices Signed In" description="Devices appear here after they sign in." /> : null}
           {atComputer && devices.length ? (
-            <Row label="Sign out all devices" description="They need the studio password to sign in again.">
+            <Row label="Sign Out All Devices" description="They need the studio password to sign in again.">
               <button className="btn is-danger-soft" onClick={signOutAll}><LogOut size={14} /> Sign out all</button>
             </Row>
           ) : null}

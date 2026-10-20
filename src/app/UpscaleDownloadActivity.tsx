@@ -147,7 +147,7 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
       : mode === 'verifying' ? 'Almost ready'
       : mode === 'ready' ? (finished ? 'Upscaling the image' : 'Use the upscale arrow on any image')
       : 'Click to resume',
-    aside: waitingThumb ? <SafeImg className="activity-thumb is-waiting" src={waitingThumb} draggable={false} title="Upscales when the download is done" />
+    aside: waitingThumb ? <SafeImg className="activity-thumb is-waiting" src={waitingThumb} draggable={false} title="Upscales When the Download Is Done" />
       : readyThumb ? <SafeImg className="activity-thumb" src={readyThumb} draggable={false} />
       : null,
     open: { label: `${title}. Open smart upscale setup`, run: () => setup.openSetup() },

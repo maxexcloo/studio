@@ -25,7 +25,7 @@ const STEPS = [
 function SetupSteps({ stage }: { stage: UpscaleSetupStage }) {
   const current = stage === "ready" ? STEPS.length : STEPS.findIndex((step) => (step.stages as readonly string[]).includes(stage));
   return (
-    <ol className="upscale-stepper" aria-label="Setup steps">
+    <ol className="upscale-stepper" aria-label="Setup Steps">
       {STEPS.map((step, index) => {
         const state = index < current ? "done" : index === current ? "active" : "todo";
         return (
@@ -189,7 +189,7 @@ export function UpscaleSetupDialog({
       </div>
     ) : (
       <>
-        <div className="upscale-efforts" role="radiogroup" aria-label="Upscale effort">
+        <div className="upscale-efforts" role="radiogroup" aria-label="Upscale Effort">
           {upscaleEfforts.map((effort) => (
             <button
               key={effort.value}

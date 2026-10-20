@@ -72,7 +72,7 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
   if (state.kind === 'account-sign-in') return <AccountSignIn recovery={state.recovery} setupToken={state.setupToken} oidcLabel={state.oidcLabel} onSignedIn={() => { window.location.reload(); }} />;
   const { studioPassword } = state.status;
   if (!studioPassword.set) {
-    return <GateMessage title="Set a studio password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Connection, then reload this page." />;
+    return <GateMessage title="Set a Studio Password" text="Other devices sign in with a studio password. Set one on the computer running Studio in Settings › Connection, then reload this page." />;
   }
   return <SignIn onSignedIn={() => { window.location.reload(); }} />;
 }
@@ -227,7 +227,7 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
                     type="password"
                     name="password"
                     autoComplete="current-password"
-                    aria-label="Studio password"
+                    aria-label="Studio Password"
                     placeholder="Studio password"
                     value={password}
                     disabled={working}

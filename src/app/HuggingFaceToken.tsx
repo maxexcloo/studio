@@ -44,7 +44,7 @@ export function HuggingFaceTokenSettings({ showToast }: { showToast: ShowToast }
       : 'For gated models on Hugging Face. Create a read token there under Settings › Access Tokens; it’s only sent to huggingface.co.');
   return (
     <Group title="Downloads" note={status.mirror ? `Downloads come from ${status.mirror} (HF_ENDPOINT).` : undefined}>
-      <Row label="Hugging Face token" description={description}>
+      <Row label="Hugging Face Token" description={description}>
         {status.editable ? (
           <form className="set-address" onSubmit={(event) => { event.preventDefault(); if (value.trim()) save(value.trim()); }}>
             <input
@@ -53,7 +53,7 @@ export function HuggingFaceTokenSettings({ showToast }: { showToast: ShowToast }
               value={value}
               onChange={(event) => setValue(event.target.value)}
               placeholder={status.set ? 'New token' : 'hf_…'}
-              aria-label="Hugging Face token"
+              aria-label="Hugging Face Token"
               spellCheck={false}
               autoComplete="off"
             />

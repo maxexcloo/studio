@@ -47,7 +47,7 @@ const STEPS = [
 function Steps({ stage }: { stage: ModelFolderStage }) {
   const current = stage === 'done' ? STEPS.length : Math.max(0, STEPS.findIndex((step) => (step.stages as readonly string[]).includes(stage)));
   return (
-    <ol className="upscale-stepper" aria-label="Setup steps">
+    <ol className="upscale-stepper" aria-label="Setup Steps">
       {STEPS.map((step, index) => {
         const state = index < current ? 'done' : index === current && stage !== 'error' ? 'active' : 'todo';
         return (

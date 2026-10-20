@@ -368,7 +368,7 @@ export function MegapixelField({ current, control, custom }: {
             }
           }}
         />
-        <Tip content="Drag to change the megapixels">
+        <Tip content="Drag to Change the Megapixels">
           <span className="size-field-key" {...handlers} aria-hidden="true">MP</span>
         </Tip>
       </div>
@@ -477,7 +477,7 @@ export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPrev
               autoFocus
               value={draft}
               maxLength={32}
-              aria-label="Name of this size"
+              aria-label="Name of This Size"
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={() => finish(true)}

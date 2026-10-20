@@ -562,7 +562,7 @@ function ReferenceGroupButton({ chain, assets, max, open, busy, progress, requir
 /** Edit | Reference: one thumb slides between the two, like the size menu's tabs. */
 export function RoleSwitch({ role, many, className }: { role: ReferenceRoleControl; many: boolean; className?: string }) {
   return (
-    <div className={cn("ref-menu-role", role.value === "reference" && "is-ref", role.locked && "is-locked", className)} role="radiogroup" aria-label="What this image is">
+    <div className={cn("ref-menu-role", role.value === "reference" && "is-ref", role.locked && "is-locked", className)} role="radiogroup" aria-label="What This Image Is">
       <i aria-hidden="true" />
       <Tip content={many ? "Change the first picture, at its size and framing. The others are what it can draw from" : "Change this picture: the result keeps its size and framing"}>
         <button type="button" role="radio" aria-checked={role.value === "edit"} className={cn(role.value === "edit" && "is-active")} onClick={() => role.onChange("edit")}>Edit</button>

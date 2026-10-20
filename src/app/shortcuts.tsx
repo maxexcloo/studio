@@ -28,7 +28,7 @@ export function generateShortcut(enterToGenerate: boolean) {
 
 export function ShortcutsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Keyboard shortcuts" description="They pause while you type in a field, except the ones that send the prompt." className="shortcuts-sheet">
+    <Modal open={open} onOpenChange={onOpenChange} title="Keyboard Shortcuts" description="They pause while you type in a field, except the ones that send the prompt." className="shortcuts-sheet">
       <dl className="shortcuts-list">
         {shortcuts.map(([keys, what]) => (
           <div key={keys} className="shortcuts-row">

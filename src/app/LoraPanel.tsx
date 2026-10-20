@@ -329,7 +329,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (query) setQuery(''); else onClose(); }
           }}
         />
-        {query ? <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
+        {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
       </label>
       <div className="lora-filter">
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
@@ -490,7 +490,7 @@ function NameField({ initial, action, onSave, onCancel }: { initial: string; act
       <input
         autoFocus
         className="is-framed"
-        aria-label="Stack name"
+        aria-label="Stack Name"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onFocus={(event) => event.target.select()}
@@ -706,7 +706,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
             <Tip content={allOff ? 'Turn all LoRAs back on' : 'Turn all LoRAs off'}>
               <button type="button" className="lora-head-action" onClick={() => setLoras((current) => current.map((item) => ({ ...item, enabled: allOff })))}>{allOff ? 'All on' : 'All off'}</button>
             </Tip>
-            <Tip content="Remove all LoRAs">
+            <Tip content="Remove All LoRAs">
               <button type="button" className="lora-head-action" onClick={clearAll}>Clear</button>
             </Tip>
           </>

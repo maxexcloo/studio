@@ -112,7 +112,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Cards Two strength value', { exact: true })).toBeVisible();
   await picker.getByRole('button', { name: /^Save Stack/ }).click();
-  await picker.getByRole('textbox', { name: 'Stack name', exact: true }).fill('Inline Stack');
+  await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
   await picker.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'Disable All', exact: true }).click();

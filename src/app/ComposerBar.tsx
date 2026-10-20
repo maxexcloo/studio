@@ -402,7 +402,7 @@ export function ComposerBar(props: ComposerBarProps) {
         >
           <header>
             <span>Settings</span>
-            <Tip content="Close"><button type="button" className="icon-button" aria-label="Close settings" onClick={() => setDrawerOpen(false)}><X size={14} /></button></Tip>
+            <Tip content="Close"><button type="button" className="icon-button" aria-label="Close Settings" onClick={() => setDrawerOpen(false)}><X size={14} /></button></Tip>
           </header>
           {tucked.map(([id, label, render]) => (
             <div className="composer-drawer-row" key={id}>
@@ -441,12 +441,12 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("variants", variantsPicker)}
           {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" aria-label="Advanced Settings" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
           {tucked.length ? (
-            <Tip content="More settings">
+            <Tip content="More Settings">
               <button
                 type="button"
                 data-open-trigger
                 className={cn("composer-more", drawerOpen && "active")}
-                aria-label="More settings"
+                aria-label="More Settings"
                 aria-expanded={drawerOpen}
                 onClick={() => setDrawerOpen((value) => !value)}
               >

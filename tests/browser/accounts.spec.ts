@@ -86,7 +86,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
 
   await page.getByRole('button', { name: 'Edit Artists', exact: true }).click();
-  await expect(page.getByLabel('Profile name')).toHaveValue('Artists');
+  await expect(page.getByLabel('Profile Name')).toHaveValue('Artists');
   await expect(page.getByRole('switch', { name: 'image-fast' })).toBeChecked();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
@@ -104,14 +104,14 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByRole('button', { name: 'Create Token', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Copy Token', exact: true })).toBeVisible();
   // The one-time token stays readable if the clipboard is unavailable.
-  await expect(page.getByLabel('New MCP token')).toHaveValue('new-one-time-secret');
+  await expect(page.getByLabel('New MCP Token')).toHaveValue('new-one-time-secret');
   await expect(page.getByText('https://studio.example.test/mcp')).toBeVisible();
   const newEmail = page.getByLabel('Email', { exact: true });
   await expect(newEmail).toHaveAttribute('type', 'email');
   await expect(newEmail).toHaveAttribute('autocapitalize', 'none');
   await newEmail.fill('new.artist');
-  await page.getByLabel('Display name', { exact: true }).fill('New Artist');
-  await page.getByLabel('Temporary password', { exact: true }).fill('a secure temporary password');
+  await page.getByLabel('Display Name', { exact: true }).fill('New Artist');
+  await page.getByLabel('Temporary Password', { exact: true }).fill('a secure temporary password');
   // The username is the account's email, so a new one must look like one.
   await expect(page.getByRole('button', { name: 'Create User', exact: true })).toBeDisabled();
   await expect(page.getByText('Enter an email address.', { exact: false })).toBeVisible();
@@ -133,7 +133,7 @@ test('ordinary accounts open their own studio without administration sections', 
   await page.goto('/');
   await expect(page.getByText('Your private studio is being prepared')).toHaveCount(0);
   await studioUi(page).openSettings();
-  const sections = page.getByRole('navigation', { name: 'Settings sections' });
+  const sections = page.getByRole('navigation', { name: 'Settings Sections' });
   await expect(sections.getByRole('button', { name: 'Accounts & MCP', exact: true })).toBeVisible();
   for (const name of ['Models', 'Library', 'Connection']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
   await sections.getByRole('button', { name: 'Accounts & MCP', exact: true }).click();

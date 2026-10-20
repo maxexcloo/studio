@@ -139,12 +139,12 @@ test('the image editor fills a usable workspace with reachable mobile tools', as
   await page.getByRole('button', { name: 'library-image.png', exact: true }).click();
   await expect(page.locator('.reference-popover')).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Paint the part to change', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: 'Paint the part to change' });
+  await page.getByRole('button', { name: 'Paint the Part to Change', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Paint the Part to Change' });
   await expect(editor).toBeVisible();
   await expect.poll(() => editor.locator('.inpaint-stage img').evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(phone ? 300 : 500);
   const tools = await editor.getByRole('toolbar').boundingBox();
-  const close = await editor.getByRole('button', { name: 'Done painting' }).boundingBox();
+  const close = await editor.getByRole('button', { name: 'Done Painting' }).boundingBox();
   const viewport = page.viewportSize()!;
   expect(tools!.y).toBeGreaterThanOrEqual(0);
   expect(close!.y).toBeGreaterThanOrEqual(0);
@@ -154,7 +154,7 @@ test('the image editor fills a usable workspace with reachable mobile tools', as
   expect(tools!.y + tools!.height).toBeLessThanOrEqual(viewport.height);
   // The phone puts the tools below Done; the full studio may share a row.
   if (phone) expect(tools!.y).toBeGreaterThan(close!.y + close!.height);
-  await editor.getByRole('button', { name: 'Done painting' }).click();
+  await editor.getByRole('button', { name: 'Done Painting' }).click();
   await expect(editor).toHaveCount(0);
 });
 

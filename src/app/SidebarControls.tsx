@@ -32,7 +32,7 @@ function WorkflowPreviewCard({ workflow, onOpen }: { workflow: WorkflowSummary |
 
   const status = workflowState(workflow.validation, comfyRestarting);
   return (
-    <Tip content="Change model">
+    <Tip content="Change Model">
       <button type="button" className={cn("workflow-card", status.state !== "ready" && "has-issues")} onClick={onOpen}>
         <div className="workflow-card-thumb">
           <SafeImg src={workflow.thumbnail} fallback={<Wand2 size={18} />} />
@@ -99,14 +99,14 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
         <PhoneSelect label="Sampler" value={sampler} options={samplers} onChange={setSampler} />
         <PhoneSelect label="Scheduler" value={scheduler} options={schedulers} onChange={setScheduler} />
       </div>
-      <PhoneSlider label="Prompt strength (CFG)" value={cfg} min={cfgMeta.min ?? 0} max={Math.min(cfgMeta.max ?? 30, 20)} step={cfgMeta.step || 0.5} onChange={setCfg} format={(value) => value.toFixed(1)} hint={<><span>Looser</span><span>Follows the prompt closely</span></>} />
+      <PhoneSlider label="Prompt Strength (CFG)" value={cfg} min={cfgMeta.min ?? 0} max={Math.min(cfgMeta.max ?? 30, 20)} step={cfgMeta.step || 0.5} onChange={setCfg} format={(value) => value.toFixed(1)} hint={<><span>Looser</span><span>Follows the prompt closely</span></>} />
       {inpaintActive ? (
         <>
-          {currentProfile?.capabilities.denoise ? <PhoneSlider label="Inpaint strength" value={inpaintStrength} min={0.05} max={1} step={0.05} onChange={setInpaintStrength} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Touch it up</span><span>Paint it anew</span></>} /> : null}
-          <PhoneSlider label="Edge softness" value={inpaintFeather} min={0} max={1} step={0.05} onChange={setInpaintFeather} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Crisp</span><span>Soft</span></>} />
+          {currentProfile?.capabilities.denoise ? <PhoneSlider label="Inpaint Strength" value={inpaintStrength} min={0.05} max={1} step={0.05} onChange={setInpaintStrength} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Touch it up</span><span>Paint it anew</span></>} /> : null}
+          <PhoneSlider label="Edge Softness" value={inpaintFeather} min={0} max={1} step={0.05} onChange={setInpaintFeather} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Crisp</span><span>Soft</span></>} />
         </>
       ) : canUseStartImage && currentProfile?.capabilities.denoise ? (
-        <PhoneSlider label="Change from the reference" value={denoise} min={denoiseMeta.min ?? 0} max={denoiseMeta.max ?? 1} step={denoiseMeta.step || 0.05} onChange={setDenoise} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Keep it close</span><span>Change a lot</span></>} />
+        <PhoneSlider label="Change from the Reference" value={denoise} min={denoiseMeta.min ?? 0} max={denoiseMeta.max ?? 1} step={denoiseMeta.step || 0.05} onChange={setDenoise} format={(value) => `${Math.round(value * 100)}%`} hint={<><span>Keep it close</span><span>Change a lot</span></>} />
       ) : null}
 
       <h3 className="phone-section">Seed</h3>
@@ -134,11 +134,11 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
               ? encoderSlots.map((slot: { slot: string; label: string; options: string[]; default: string }, index: number) => (
                 <PhoneSelect key={slot.slot} label={encoderSlots.length > 1 ? slot.label : "Text encoder"} value={textEncoders?.[index] || slot.default} options={slot.options} onChange={(value) => setTextEncoders((current: string[]) => { const next = [...(current || [])]; next[index] = value; return next; })} />
               ))
-              : currentProfile?.capabilities.textEncoder ? <PhoneSelect label="Text encoder" value={textEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} onChange={setTextEncoder} /> : null}
+              : currentProfile?.capabilities.textEncoder ? <PhoneSelect label="Text Encoder" value={textEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} onChange={setTextEncoder} /> : null}
             {showVae ? (
               <PhoneSelect label="VAE" value={vae || (currentProfile.vaeBuiltIn ? "__builtin" : "")} options={[...(currentProfile.vaeBuiltIn ? [{ label: "Built into the checkpoint", value: "__builtin" }] : []), ...(profileOptions.vaes || models?.vaes || [])]} onChange={(value) => setVae(value === "__builtin" ? "" : value)} />
             ) : null}
-            {currentProfile?.capabilities.weightDtype ? <PhoneSelect label="Weight type" value={weightDtype} options={profileOptions.weightDtypes || models?.weightDtypes || []} onChange={setWeightDtype} /> : null}
+            {currentProfile?.capabilities.weightDtype ? <PhoneSelect label="Weight Type" value={weightDtype} options={profileOptions.weightDtypes || models?.weightDtypes || []} onChange={setWeightDtype} /> : null}
           </div>
         </>
       ) : null}
@@ -187,7 +187,7 @@ export function SidebarControls({ view }: { view: any }) {
         <ModelSetup key={currentProfile.id} profile={currentProfile} showToast={showToast} onInstalled={() => { refreshModels(false); refreshWorkflows(); }} />
       ) : null}
 
-      <div className="sidebar-subtabs" role="tablist" aria-label="Sidebar sections">
+      <div className="sidebar-subtabs" role="tablist" aria-label="Sidebar Sections">
         {(["basics", "advanced"] as SidebarTab[]).map((id) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={cn("sidebar-subtab", tab === id && "active")} onClick={() => setTab(id)}>
             <span>{id === "basics" ? "Basics" : "Advanced"}</span>
@@ -215,16 +215,16 @@ export function SidebarControls({ view }: { view: any }) {
                     {/* Edit models edit the crop whole, so only image-to-image models have a strength here. */}
                     {currentProfile?.capabilities.denoise ? (
                       <>
-                        <NumberPicker label="Inpaint strength" value={inpaintStrength} onChange={setInpaintStrength} min={0.05} max={1} step={0.05} precision={2} fill />
+                        <NumberPicker label="Inpaint Strength" value={inpaintStrength} onChange={setInpaintStrength} min={0.05} max={1} step={0.05} precision={2} fill />
                         <div className="sidebar-scale-hint" aria-hidden="true"><span>Touch it up</span><span>Paint it anew</span></div>
                       </>
                     ) : null}
-                    <NumberPicker label="Edge softness" value={inpaintFeather} onChange={setInpaintFeather} min={0} max={1} step={0.05} precision={2} fill />
+                    <NumberPicker label="Edge Softness" value={inpaintFeather} onChange={setInpaintFeather} min={0} max={1} step={0.05} precision={2} fill />
                     <div className="sidebar-scale-hint" aria-hidden="true"><span>Crisp</span><span>Soft</span></div>
                   </>
                 ) : canUseStartImage && currentProfile?.capabilities.denoise ? (
                   <>
-                    <NumberPicker label="Change from the reference" value={denoise} onChange={setDenoise} min={denoiseMeta.min ?? 0} max={denoiseMeta.max ?? 1} step={denoiseMeta.step || 0.05} precision={2} fill />
+                    <NumberPicker label="Change from the Reference" value={denoise} onChange={setDenoise} min={denoiseMeta.min ?? 0} max={denoiseMeta.max ?? 1} step={denoiseMeta.step || 0.05} precision={2} fill />
                     <div className="sidebar-scale-hint" aria-hidden="true"><span>Keep it close</span><span>Change a lot</span></div>
                   </>
                 ) : null}
@@ -270,8 +270,8 @@ export function SidebarControls({ view }: { view: any }) {
                     })} options={slot.options} />
                   </Field>
                 ))
-                : currentProfile?.capabilities.textEncoder ? <Field label="Text encoder"><Select value={textEncoder} onChange={setTextEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} /></Field> : null}
-              {currentProfile?.encoderBuiltIn ? <Field label="Text encoder"><span className="encoder-slot-builtin">Built into the checkpoint</span></Field> : null}
+                : currentProfile?.capabilities.textEncoder ? <Field label="Text Encoder"><Select value={textEncoder} onChange={setTextEncoder} options={profileOptions.textEncoders || models?.textEncoders || []} /></Field> : null}
+              {currentProfile?.encoderBuiltIn ? <Field label="Text Encoder"><span className="encoder-slot-builtin">Built into the checkpoint</span></Field> : null}
               {currentProfile?.capabilities.vae && (currentProfile.vaeBuiltIn || (profileOptions.vaes || []).length) ? (
                 <Field label="VAE">
                   <Select
@@ -281,9 +281,9 @@ export function SidebarControls({ view }: { view: any }) {
                   />
                 </Field>
               ) : null}
-              {currentProfile?.capabilities.weightDtype ? <Field label="Weight type"><Select value={weightDtype} onChange={setWeightDtype} options={profileOptions.weightDtypes || models?.weightDtypes || []} /></Field> : null}
+              {currentProfile?.capabilities.weightDtype ? <Field label="Weight Type"><Select value={weightDtype} onChange={setWeightDtype} options={profileOptions.weightDtypes || models?.weightDtypes || []} /></Field> : null}
             </div>
-            <NumberPicker label="Prompt strength (CFG)" value={cfg} onChange={setCfg} min={cfgMeta.min ?? 0} max={cfgMeta.max ?? 30} step={cfgMeta.step || 0.5} precision={1} fill />
+            <NumberPicker label="Prompt Strength (CFG)" value={cfg} onChange={setCfg} min={cfgMeta.min ?? 0} max={cfgMeta.max ?? 30} step={cfgMeta.step || 0.5} precision={1} fill />
             <div className="sidebar-scale-hint" aria-hidden="true"><span>Looser</span><span>Follows the prompt closely</span></div>
             {currentProfile?.capabilities.sampler !== false ? (
               <div className="advanced-grid">

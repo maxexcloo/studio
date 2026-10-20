@@ -832,7 +832,7 @@ test('model and LoRA filters reach gallery queries and clear independently', asy
   if (!await search.count()) await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await search.fill('snow');
   await expect.poll(() => queries.some((query) => query.get('q') === 'snow' && !query.has('model') && !query.has('workflow') && !query.has('lora'))).toBe(true);
-  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear Search', exact: true }).click();
   await expect(search).not.toBeVisible();
   await expect.poll(() => queries.some(query => !query.has('q') && !query.has('model') && !query.has('workflow') && !query.has('lora'))).toBe(true);
 });

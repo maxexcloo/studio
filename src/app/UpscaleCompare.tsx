@@ -126,7 +126,7 @@ export function UpscaleCompare({ item, zoomed }: { item: GalleryItem; zoomed: bo
       onKeyDown={onKeyDown}
       tabIndex={0}
       role="slider"
-      aria-label="Split between the original and the upscale"
+      aria-label="Split Between the Original & the Upscale"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={valueNow}

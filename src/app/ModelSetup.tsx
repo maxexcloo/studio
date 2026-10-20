@@ -250,7 +250,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const rowFor = new Map(rows.map((row) => [partKey(row.item), row]));
 
   return (
-    <section className={cn('model-setup', `is-${variant}`)} aria-label="Files this model needs">
+    <section className={cn('model-setup', `is-${variant}`)} aria-label="Files This Model Needs">
       <header className="model-setup-head">
         <div>
           <strong>{title}</strong>
