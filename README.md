@@ -52,7 +52,6 @@ The node graph is for building workflows. Studio is for the everyday loop of pro
 - **On your phone and every device.** A phone layout made for one thumb, and the full studio on any laptop or tablet on your network. Your PC renders, and every device shares the same models and gallery. [Set it up ↓](#on-your-phone)
 - **Civitai-ready images.** New PNGs always carry their prompt and settings in a form Civitai fills in for you on upload.
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links. The library is off by default; set `STUDIO_ENABLE_PRESETS=1` on the instances that should offer it (see [Configuration](docs/guides/CONFIGURATION.md#civitai-images--downloads)).
-- **Zen mode.** Just the prompt and the picture, fullscreen.
 
 Open **LoRAs** in the composer to select effects and adjust their strengths. Drag the selected effects by their grips to change the applied order, or use the Up/Down buttons or arrow keys on a grip. **Info** shows available descriptions, trigger words and source links without fetching extra metadata.
 
@@ -187,7 +186,7 @@ Any Streamable HTTP MCP client (Claude Desktop, Grok, LibreChat or others) can c
 
 **Video (7, beta):** MiniMax H3, HunyuanVideo 1.5, Wan 2.2 (5B and 14B) and Wan 2.1, with text and image to video where the model has both.
 
-Missing parts get a Download button. An unrecognized file can be given a type under **Settings › Models › Model Types**. GGUF files work; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
+Missing parts get a Download button. GGUF files work; Nunchaku, NF4 and other formats that need their own loader nodes don't ([formats](./docs/guides/MODELS.md#formats)). Anything else runs as [your own workflow](#bring-your-own-workflow).
 
 ## Bring your own workflow
 
@@ -260,7 +259,7 @@ Bigger, sharper pictures with [SeedVR2](https://github.com/numz/ComfyUI-SeedVR2_
 <details>
 <summary><b>Effort and faces</b></summary>
 
-**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. The effort is set under **Settings › Studio › Smart Upscale**, where it can also be turned off. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes.
+**Fast**, **Balanced** (2K) and **High** (4K) trade speed for quality; High is the slowest and uses the most graphics memory. Each generation picks its effort and face detail in **Advanced Settings**, starting from **Settings › Studio**, where Smart Upscale can also be turned off. Face detail runs only with an upscale. The optional **face detail pass** (beta) redraws small faces and needs the Impact Pack and Impact Subpack nodes.
 
 </details>
 
@@ -273,41 +272,20 @@ Making ten takes of one idea fills a gallery fast. With auto-grouping on, pictur
 - **It follows your prompts.** Similar prompts group together, and coming back to a prompt the next day starts a new stack.
 - **Your files stay put.** Grouping changes no files. Switch it off and the gallery is as it was.
 
-Turn it on with the stack button next to gallery search, or under **Settings › Studio › Auto-Grouping**, where you also pick the photo or cover-flow look.
+Turn it on with **Auto-Grouping** in the gallery toolbar (at the end of the filter row on a phone), beside **Grid Autoplay** and **Failed**. **Settings › Studio › Gallery** picks the photo or cover-flow look.
 
 ## On your phone
 
 On a phone the studio switches to its own layout. Prompt, browse, share and upscale while your PC renders.
 
-Set up [LAN access](#connect-over-lan) first, then scan the QR code shown in **Settings › Workers** with your phone and sign in. Both devices need to be on the same trusted network.
+Open the studio's address on the phone and sign in with your account.
 
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge, and one **Describe…** pill opens the prompt, reference images (with Edit or Reference in plain sight), workflow, size (Default, 2K, Custom and your saved sizes) and number of images, with Advanced one link away. The brush on a reference opens the inpaint studio for your finger. Long press a tile to Share, Upscale, Star, Use these settings, Hide or Delete. In the viewer, pictures open fitted to the screen; pinch or double tap to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen. A ring around Generate shows progress while you browse.
-
-**Use the full studio** under More switches a phone to the complete layout.
+The gallery runs edge to edge under one slim top bar: the status light and "Studio", Images | Videos, Search, Filter and the menu. The round Create button opens the prompt with one row each for Model, References, LoRAs, Size and Advanced; each opens as a small pop-up over Create. Long press a tile to select; the selection's actions sit in a bar at the bottom. In the viewer, pictures open fitted to the screen; pinch or double tap to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen.
 
 </details>
-
-## Connect over LAN
-
-Use a laptop, tablet, phone or another desktop on the same local network to prompt, browse the gallery and upscale. Studio and ComfyUI keep running on your PC with its models and outputs; the other device needs only a browser.
-
-1. On the PC running Studio, open **Settings › Workers** and turn on **Open on other devices**.
-2. In the same settings, set a **studio password** under **Signing in**.
-3. On your other device, open the **network address** shown in Connection (for example, `http://192.168.1.20:8787`) and sign in with that password. Use your PC’s listed address, not `localhost`.
-
-Laptops and desktops get the full studio and phones get the phone layout. Only enable access on a network you trust. Admin controls stay at the PC unless you allow them for signed-in devices.
-
-<details>
-<summary><b>More on setup</b></summary>
-
-**Open on other devices** takes effect the next time Studio starts. For a single session, start it with `npm start -- --lan` instead. The container listens on all addresses (`HOST=0.0.0.0`), so publish its port only where other devices should reach it.
-
-</details>
-
-Signing in, admin rights, HTTPS and proxies are covered in [SECURITY.md](./docs/guides/SECURITY.md#other-devices-signing-in-admin-https-and-proxies).
 
 ## Updating
 
@@ -331,14 +309,14 @@ Everything else (the output folder, other devices, HTTPS, the Hugging Face token
 
 [TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md) covers the common problems. A failed generation links straight to its section.
 
-- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. After adding files, use **Settings › Models › Rescan**.
+- **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. New files show once the model library sync reaches the worker and ComfyUI lists them.
 - **Asking for help?** **Settings › Maintenance › Copy Diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
 
 ## Feedback and community
 
 Found a bug in Studio or want a feature? Open a [GitHub issue](https://github.com/maxexcloo/studio/issues).
 
-The in-app **Idea or bug?** and **Report bug** links post to upstream's [HEISS UI feedback board](https://heiss-ui.vercel.app/board/), for problems that also affect upstream HEISS UI. Upstream also has a [Discord](https://discord.gg/Hf7ysvDeGa).
+For problems that also affect upstream HEISS UI, upstream has a [feedback board](https://heiss-ui.vercel.app/board/) and a [Discord](https://discord.gg/Hf7ysvDeGa).
 
 ## FAQ
 
