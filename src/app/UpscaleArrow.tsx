@@ -1,13 +1,9 @@
-
 /**
- * The solid arrow from the setup hero, reused for every upscale affordance so
- * the tile, the viewer and the dialogs all speak with one mark. Drawn filled
- * with a round-joined stroke of its own colour so the corners stay soft at
- * small sizes, where a hairline icon reads as washed out.
- *
- * The path is placed so the arrow's visual mass (head plus shaft), not its
- * bounding box, sits on the centre of the 24 unit box. A bounding-box-centred
- * arrow looks low: the solid shaft outweighs the pointed tip.
+ * The upscale mark: a broad arrow pointing up, drawn as an outline at the same
+ * weight as the other action icons (lucide's 2 unit stroke, round joins), so
+ * it sits in a bar of outline icons without reading as the odd one out. Used
+ * for every upscale affordance, so the tile, the viewer and the dialogs all
+ * speak with one mark.
  */
 export function UpscaleArrow({ size = 15 }: { size?: number }) {
   return (
@@ -16,14 +12,15 @@ export function UpscaleArrow({ size = 15 }: { size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
       stroke="currentColor"
-      strokeWidth="1.2"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M12 3.04 20.6 11.84H15.8V19.84H8.2V11.84H3.4Z" />
+      <path d="M9 20v-7.5H4.5L12 4.5l7.5 8H15V20Z" />
     </svg>
   );
 }

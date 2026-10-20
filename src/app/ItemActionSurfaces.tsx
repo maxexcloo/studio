@@ -97,7 +97,7 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
   const busy = Boolean(useItemActionHandlers()?.upscaleBusy(item));
   const tip = upscaleTooltip(item, clock.leftMs);
   return (
-    <Tip content={tip}>
+    <Tip content={tip} side="top">
       <button
         className={cn('icon-button', item.upscaleActive && item.upscale?.url && 'active', running && clock.leftMs !== null && 'has-count')}
         aria-label={running ? tip : action.label}
@@ -133,9 +133,9 @@ export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpsca
         const name = action.tip || action.label;
         const tip = dockKeys[action.id] ? `${name} (${dockKeys[action.id]})` : name;
         const className = cn('icon-button', action.id === 'star' && 'viewer-star', action.id === 'star' && action.pressed && 'is-on', action.id === 'compare' && action.pressed && 'active', action.danger && 'danger-tone');
-        if (action.href) return <Tip key={action.id} content={tip}><a className={className} aria-label={action.label} href={action.href} download={downloadName(item)}><ActionIcon action={action} size={16} /></a></Tip>;
-        if (action.copy) return <Tip key={action.id} content={tip}><button className={className} aria-label={action.label} onClick={() => { void copy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(copy.copied)} size={16} /></button></Tip>;
-        return <Tip key={action.id} content={tip}><button className={className} aria-label={action.label} aria-pressed={action.pressed} onClick={action.run}><ActionIcon action={action} size={16} /></button></Tip>;
+        if (action.href) return <Tip key={action.id} content={tip} side="top"><a className={className} aria-label={action.label} href={action.href} download={downloadName(item)}><ActionIcon action={action} size={16} /></a></Tip>;
+        if (action.copy) return <Tip key={action.id} content={tip} side="top"><button className={className} aria-label={action.label} onClick={() => { void copy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(copy.copied)} size={16} /></button></Tip>;
+        return <Tip key={action.id} content={tip} side="top"><button className={className} aria-label={action.label} aria-pressed={action.pressed} onClick={action.run}><ActionIcon action={action} size={16} /></button></Tip>;
       })()}</React.Fragment>)}
     </>
   );

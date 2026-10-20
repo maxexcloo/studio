@@ -154,9 +154,9 @@
 :is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn),
 .studio-dock .icon-button { color: hsl(var(--muted-foreground)); }
 :is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn):hover:not(:disabled),
-.studio-dock .icon-button:hover:not(:disabled) { background: var(--control-hover); color: hsl(var(--foreground)); }
+.studio-dock .icon-button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
 :is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn)[aria-expanded="true"],
-.studio-dock .icon-button[aria-expanded="true"] { background: var(--selected); color: hsl(var(--foreground)); }
+.studio-dock .icon-button[aria-expanded="true"] { background-color: var(--selected); color: hsl(var(--foreground)); }
 .zen-prompt :is(.composer-advanced-trigger, .composer-reset, .composer-more) { border-color: transparent; }
 :is(.zen-prompt, .phone-create) :is(.composer-resource-add, .model-trigger, .phone-model-browse, .aspect-trigger, .ref-add, .composer-advanced-trigger, .composer-reset, .composer-more, .phone-creation-toolbar > button, .prompt-action, .number-picker-btn) > svg,
 :is(.zen-prompt, .phone-create) :is(.number-picker-icon, .number-picker-btn) svg,

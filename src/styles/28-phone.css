@@ -867,9 +867,24 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .viewer-phone-bar button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Dividers between intents: keep it | make more | organise (itemActions.ts). */
 .viewer-phone-divider { flex: none; align-self: center; width: 1px; height: 28px; margin: 0 2px; background: var(--glass-border); }
-.viewer-phone-bar button:active { background: rgb(255 255 255 / .08); }
+/* The press fill is a rounded shape inset evenly inside the cell, so it never
+   meets a divider, a neighbour or the bar's edge (the desktop bar's inset fill). */
+.viewer-phone-bar button:not(.viewer-phone-star, .viewer-phone-info) { position: relative; isolation: isolate; }
+.viewer-phone-bar button:not(.viewer-phone-star, .viewer-phone-info)::before {
+  content: "";
+  position: absolute;
+  inset: 3px 2px;
+  z-index: -1;
+  border-radius: 14px;
+  background: transparent;
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.viewer-phone-bar button:not(.viewer-phone-star, .viewer-phone-info):active:not(:disabled)::before { background: var(--control-press); transition-duration: var(--motion-instant); }
+.viewer-phone-bar button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -3px; }
 .viewer-phone-bar button:disabled { opacity: .45; }
-.viewer-phone-bar button.is-on { color: #0b0b0b; background: #f2f2f2; }
+.viewer-phone-bar button.is-on { color: #0b0b0b; }
+.viewer-phone-bar button.is-on:not(.viewer-phone-star, .viewer-phone-info)::before { background: #f2f2f2; }
+.viewer-phone-bar button.is-on:is(.viewer-phone-star, .viewer-phone-info) { background: #f2f2f2; }
 @media (max-width: 339px) {
   .viewer-phone-bar:has(.viewer-reuse) { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
   .viewer-phone-bar .viewer-reuse { grid-column: span 1; }

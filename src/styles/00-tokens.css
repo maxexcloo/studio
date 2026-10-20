@@ -36,6 +36,13 @@
   --well: #090909;
   --control-hover: rgb(255 255 255 / .09);
   --control-fill: rgb(255 255 255 / .07);
+  /* Glass icon buttons (docks, the viewer bar): a 40px target whose hover and
+     press fill is a smaller circle, inset evenly so it never crowds the bar's
+     edge. The keyboard ring sits inside the target too. */
+  --icon-fill: 32px;
+  --icon-fill-inset: calc((var(--control-h) - var(--icon-fill)) / 2);
+  --control-press: rgb(255 255 255 / .14);
+  --icon-ring: rgb(255 255 255 / .55);
   --selected: #303030;
   --action: #f4f4f4;
   --action-ink: #0a0a0a;

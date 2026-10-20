@@ -897,7 +897,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
                   />
                   <span className="viewer-divider" />
-                  <Tip content="Close (Esc)"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>
+                  <Tip content="Close (Esc)" side="top"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>
                 </div>
                 {/* Info opens Details from the top right; the open panel has its own Close. */}
                 {!showDetails ? <Tip content="Show Details (I)"><button type="button" data-open-trigger className="viewer-info" aria-label="Info" aria-pressed={false} onClick={() => setShowDetails(true)}><Info size={17} /></button></Tip> : null}

@@ -67,8 +67,8 @@
   color: hsl(var(--foreground));
   transition: left 260ms var(--ease-out);
 }
-.zen-zoom-dock .icon-button:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); border: 0; }
-.zen-zoom-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; }
+.zen-zoom-dock .icon-button:hover { background-color: hsl(var(--accent)); color: hsl(var(--foreground)); border: 0; }
+.zen-zoom-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
 .zen-zoom-dock .viewer-zoom {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   font-size: 12px; font-weight: 500;

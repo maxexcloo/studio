@@ -177,8 +177,25 @@ destructive actions live in Maintenance, never beside everyday switches.
   until hovered, with an accessible name and a tooltip naming the action.
   A tooltip starts with the action's name and fits on one line ("Recreate
   With the Same Seed"), so it never covers a neighbouring control.
+- **Glass icon buttons** in a 48 px bar (the docks, the viewer bar) keep the
+  40 px target, but their hover and press fill is a smaller circle
+  (`--icon-fill`, 32 px), inset evenly by `--icon-fill-inset` so 8 px of glass
+  shows around it on every side. Hover is `--control-hover`, press
+  `--control-press` with a slight shrink, the keyboard ring (`--icon-ring`)
+  traces the fill circle inside the bar. Hover and focus change at
+  `--motion-fast`, presses at `--motion-instant`. Change only
+  `background-color` on these buttons: the `background` shorthand resets the
+  clip and the fill grows to the full target again.
+- Tile corner buttons are their own glass circles: hover darkens them, a press
+  shrinks them, and the keyboard ring sits just outside the circle. The phone
+  viewer bar's press fill is a rounded shape inset inside its cell, never
+  touching a divider or the bar's edge.
+- A bar's tooltips open on the side away from the screen edge and nothing else
+  floats on that side: the viewer's zoom pill sits in the bottom right corner,
+  level with the bar, not above it.
 - Icon bars group related actions with a divider between groups; the same
-  action has the same icon everywhere.
+  action has the same icon everywhere. Action icons are outlines at one stroke
+  weight, including Upscale's arrow.
 - **Image/Video switches:** the composer's Image/Video mode and the phone
   dock's Images/Videos switch are icon pairs (the same image and video icons,
   with accessible names and tooltips). The desktop gallery's top switch has

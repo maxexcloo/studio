@@ -30,11 +30,11 @@
 }
 .viewer-stage.with-side .viewer-dock { left: calc(50% - 190px); }
 .viewer-dock .icon-button:hover,
-.viewer-dock .text-button:hover { background: hsl(var(--accent)); border-color: transparent; color: hsl(var(--foreground)); }
-.viewer-dock .icon-button.active { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
-.viewer-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; color: hsl(var(--muted-foreground)); }
-.viewer-dock .icon-button:disabled:hover { background: transparent; color: hsl(var(--muted-foreground)); }
-.viewer-dock .danger-tone:hover { background: hsl(var(--destructive) / 0.22); color: hsl(var(--destructive-foreground)); }
+.viewer-dock .text-button:hover { background-color: hsl(var(--accent)); border-color: transparent; color: hsl(var(--foreground)); }
+.viewer-dock .icon-button.active { background-color: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.viewer-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; color: hsl(var(--muted-foreground)); }
+.viewer-dock .icon-button:disabled:hover { background-color: transparent; color: hsl(var(--muted-foreground)); }
+.viewer-dock .danger-tone:hover { background-color: hsl(var(--destructive) / 0.22); color: hsl(var(--destructive-foreground)); }
 .viewer-dock .viewer-zoom { color: hsl(var(--foreground)); padding: 0 8px; min-width: 52px; }
 
 .viewer-stage {
@@ -475,13 +475,14 @@
 .viewer-profile-summary span { color: rgb(255 255 255 / .85); overflow-wrap: anywhere; }
 
 .viewer-zoom-controls { display: flex; align-items: center; gap: 0; }
-/* The zoom: a small − 100% + pill, bottom middle above the action bar, fading with the other controls. */
+/* The zoom: a small − 100% + pill in the bottom right corner of the picture's
+   column, level with the action bar, fading with the other controls. Never
+   above the bar: the bar's tooltips open there. */
 .viewer-zoom-pill {
   position: absolute;
-  left: 50%;
-  bottom: calc(18px + var(--dock-h) + 10px);
+  right: 18px;
+  bottom: calc(18px + (var(--dock-h) - 34px) / 2);
   z-index: 6;
-  translate: -50% 0;
   padding: 2px;
   border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
@@ -489,16 +490,31 @@
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
   opacity: .72;
-  transition: opacity var(--motion-fast) var(--motion-ease), left 260ms var(--ease-out);
+  transition: opacity var(--motion-fast) var(--motion-ease), right 260ms var(--ease-out);
 }
 .viewer-zoom-pill:hover,
 .viewer-zoom-pill:focus-within { opacity: 1; }
-.viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { left: calc(50% - 190px); }
+.viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: calc(380px + 18px); }
+/* Too narrow beside an open Details column for the bar and the pill side by
+   side: the top right corner of the picture's column instead. */
+@media (min-width: 1025px) and (max-width: 1120px) {
+  .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { top: 18px; bottom: auto; }
+}
+@media (max-width: 1024px) {
+  .viewer-zoom-pill:not(.is-phone),
+  .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: max(12px, env(safe-area-inset-right)); }
+  .viewer-zoom-pill:not(.is-phone) { bottom: calc(14px + env(safe-area-inset-bottom) + (var(--dock-h) - 34px) / 2); }
+}
+/* A narrow window: the bar spans the width, leaving the pill no room beside
+   it; zoom by pinch, wheel or double click there, as the dock's own zoom does. */
+@media (max-width: 620px) {
+  .viewer-zoom-pill:not(.is-phone) { display: none; }
+}
 .viewer-zoom-step { display: grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
 .viewer-zoom-step:hover:not(:disabled) { background: var(--control-hover); }
 .viewer-zoom-step:disabled { opacity: .35; }
 .viewer-zoom-pill .viewer-zoom-percent { height: 28px; border: 0; border-radius: var(--r-pill); background: transparent; cursor: pointer; }
-.viewer-zoom-pill.is-phone { bottom: calc(var(--viewer-bar-h, 84px) + 10px); }
+.viewer-zoom-pill.is-phone { right: auto; left: 50%; bottom: calc(var(--viewer-bar-h, 84px) + 10px); translate: -50% 0; }
 .viewer-zoom-pill.is-phone .viewer-zoom-step { width: 36px; height: 36px; }
 .viewer-zoom-pill.is-phone .viewer-zoom-percent { height: 36px; min-width: 48px; }
 .viewer-zoom-percent { min-width: 42px; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
