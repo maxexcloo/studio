@@ -444,9 +444,9 @@ scroll (`history.scrollRestoration = 'manual'`).
 
 ### Top bar and Create
 
-One slim top bar and nothing else fixed but Create; a tap on the iOS status
-bar still scrolls the document to the top. No bottom bar and no boxes in the
-bar.
+One slim top bar and, at the bottom, the collapsed prompt bar; a tap on the
+iOS status bar still scrolls the document to the top. No bottom navigation
+and no boxes in the bars.
 
 - **Left:** the status light (its colour says whether generation can run; a
   tap checks again) and "Studio", then what is running (a spinner and count;
@@ -459,8 +459,13 @@ bar.
 - **One bar height:** the top bar, the select bar, the viewer's top icons and
   the status pill share `--bar-h` and `--bar-pill-h`, so nothing jumps when one
   replaces another.
-- **Create** is a round floating button bottom right, in thumb reach, with a
-  dot while a prompt waits in Create. It opens the Create sheet.
+- **The prompt bar** is a slim glass bar at the bottom, on the shared bar
+  height with safe-area padding: the prompt on one line (cut short, or "Describe
+  an image…"), which opens the Create sheet, and Generate, which runs it as is
+  (a ring fills while runs are going). A prompt waiting in Create reads bright
+  with an accent dot. The gallery's bottom padding clears it; it hides while
+  selecting, when the select bar takes the bottom edge. Only this bar lives at
+  the bottom: navigation never does.
 - Selecting swaps the top bar's contents; the select bar shows at the bottom
   only while selecting.
 

@@ -283,7 +283,7 @@ Open the studio's address on the phone and sign in with your account.
 <details>
 <summary><b>The phone layout</b></summary>
 
-The gallery runs edge to edge under one slim top bar: the status light and "Studio", Images | Videos, Search, Filter and the menu. The round Create button opens the prompt with one row each for Model, References, LoRAs, Size and Advanced; each opens as a small pop-up over Create. Long press a tile to select; the selection's actions sit in a bar at the bottom. In the viewer, pictures open fitted to the screen; pinch or double tap to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen.
+The gallery runs edge to edge under one slim top bar: the status light and "Studio", Images | Videos, Search, Filter and the menu. The prompt bar at the bottom shows your prompt and Generate; a tap on the prompt opens Create, with one row each for Model, References, LoRAs, Size and Advanced; each opens as a small pop-up over Create. Long press a tile to select; the selection's actions sit in a bar at the bottom. In the viewer, pictures open fitted to the screen; pinch or double tap to zoom and swipe or flick to the next picture. Share opens the phone's share sheet. Added to the home screen, it opens full screen.
 
 </details>
 

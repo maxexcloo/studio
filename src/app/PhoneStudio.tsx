@@ -8,21 +8,17 @@ import { useDismiss } from './useDismiss';
 import { recipesFor } from './modelRecipes';
 import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
-import { gridAutoplayEnabled, subscribeGridAutoplay, toggleGridAutoplay } from './videoPreviewScheduler';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Film, Images } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, ListRestart, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
-import { preferenceLabels, Switch } from './SettingsControls';
 import { startsGroup } from './ItemActionSurfaces';
 import { bulkItemActions, useItemActionHandlers } from './itemActions';
 import type { GallerySelection } from './gallerySelection';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import { Media } from './components';
 import { progressReading } from './GenerationProgress';
 import { generatingLabel } from './itemWording';
-import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
 import { LinkedSizeFields, MegapixelField, SizeTabs, sizeMenuModel, type SizeTier } from './SizeMenu';
@@ -244,10 +240,15 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       {!selecting ? (
-        // Create floats bottom right, in thumb reach; nothing else sits at the bottom.
-        <button ref={dockRef as unknown as React.RefObject<HTMLButtonElement>} type="button" className={cn('phone-create-open phone-fab', pending.length > 0 && 'is-working', prompt.trim() && 'has-draft')} style={{ '--progress': progress } as React.CSSProperties} aria-label={prompt.trim() ? `Create: ${prompt.trim().slice(0, 80)}` : 'Create'} onClick={() => setCreateOpen(true)}>
-          <Plus size={26} strokeWidth={2.2} aria-hidden="true" />
-        </button>
+        // The collapsed prompt bar (UI-PATTERNS › Phone): the prompt on one line, which opens Create, and Generate.
+        <div ref={dockRef as unknown as React.RefObject<HTMLDivElement>} className={cn('phone-prompt-bar', prompt.trim() && 'has-draft', pending.length > 0 && 'is-working')}>
+          <button type="button" className="phone-create-open phone-prompt-open" aria-label={prompt.trim() ? `Create: ${prompt.trim().slice(0, 80)}` : 'Create'} onClick={() => setCreateOpen(true)}>
+            <span className="phone-prompt-text">{prompt.trim() || (mode === 'video' ? 'Describe a video…' : 'Describe an image…')}</span>
+          </button>
+          <button type="button" className={cn('phone-prompt-go', pending.length > 0 && 'is-working')} style={{ '--progress': progress } as React.CSSProperties} aria-label="Generate" title={quickGo ? 'Generate' : prompt.trim() ? 'Can’t generate yet' : 'Write a prompt first'} disabled={!quickGo} onClick={() => generate()}>
+            <ArrowUp size={20} strokeWidth={2.4} aria-hidden="true" />
+          </button>
+        </div>
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
