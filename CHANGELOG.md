@@ -18,6 +18,7 @@ version opens with a `> ` summary line.
 
 ### Fixed
 - **Cloud video quota:** when the cloud video provider refuses for authorisation or quota (such as CLIProxyAPI's HTTP 401), chat results and result pages say "Cloud video unavailable (quota)", and MCP queues no cloud video for 10 minutes instead of failing job after job.
+- **Phone keyboard:** the Create sheet, the reference, LoRA and Reference With sheets, and phone dialogs size and place themselves in the visible part of the page while the on-screen keyboard is up, so iOS panning to the prompt no longer pushes a sheet's top off screen; they return when it closes. The page uses `100dvh` rather than `100vh`, so it has nothing to scroll.
 - **Reuse in chat:** Reuse's `job_id` says to pass the result's ref exactly as the reply header shows it ("result 1") or its job id, and never "all", which only Result takes; link ids still work. A chat model's first Reuse had passed a link id or "all".
 - **Selection and search:** "N Selected" in the gallery toolbar reads as plain text rather than a highlighted pill (the phone header says "N Selected" too), and the search's clear X is a round plain icon button. A focus ring shows only for keyboard focus.
 - **Copy Prompt on phones:** copying asks the clipboard within the tap, as iOS Safari requires, falls back to a selected text box where there is no clipboard API, and says "Prompt copied".

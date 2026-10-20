@@ -2,7 +2,11 @@ import { useEffect } from 'react';
 
 /**
  * Publishes how much of the layout viewport the on-screen keyboard covers as
- * --kb-inset on <html>, and toggles .kb-open while it is up.
+ * --kb-inset on <html>, and toggles .kb-open while it is up. While it is up,
+ * --vv-height and --vv-top give the visible part of the page (the visual
+ * viewport), which is what sheets size and place themselves in: iOS also
+ * pans the page up to the focused field, so the layout height less the inset
+ * would leave a sheet's top above the screen.
  *
  * Android Chrome resizes the layout viewport itself (interactive-widget=
  * resizes-content in index.html), so the inset stays 0 there. iOS Safari only
@@ -29,6 +33,15 @@ export function useKeyboardInset() {
         const open = inset > 120;
         root.style.setProperty('--kb-inset', `${open ? inset : 0}px`);
         root.classList.toggle('kb-open', open);
+        if (open) {
+          root.style.setProperty('--vv-height', `${Math.round(viewport.height)}px`);
+          root.style.setProperty('--vv-top', `${Math.max(0, Math.round(viewport.offsetTop))}px`);
+        } else {
+          // Closed: the layout comes back to 100dvh, and any pan iOS left behind goes with it.
+          root.style.removeProperty('--vv-height');
+          root.style.removeProperty('--vv-top');
+          if (viewport.offsetTop > 0 && window.scrollY > 0) window.scrollTo(0, 0);
+        }
         // A Home Screen app drawn under the status bar (black-translucent) gets a
         // window one status bar shorter than the screen, so whatever is pinned to
         // the bottom ends that far up over a black strip. --pwa-gap is that strip,
@@ -47,6 +60,8 @@ export function useKeyboardInset() {
       viewport.removeEventListener('resize', update);
       viewport.removeEventListener('scroll', update);
       root.style.removeProperty('--kb-inset');
+      root.style.removeProperty('--vv-height');
+      root.style.removeProperty('--vv-top');
       root.style.removeProperty('--pwa-gap');
       root.style.removeProperty('--pwa-drop');
       root.classList.remove('kb-open');

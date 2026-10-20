@@ -400,7 +400,7 @@
 
 .empty {
   grid-column: 1 / -1;
-  min-height: calc(100vh - 260px);
+  min-height: calc(100dvh - 260px);
   width: 100%;
   display: grid;
   place-items: center;
@@ -433,7 +433,7 @@
 .stage-empty,
 .stage-empty.empty {
   width: 100%;
-  min-height: calc(100vh - 260px);
+  min-height: calc(100dvh - 260px);
   padding: 36px 20px;
   gap: 0;
   border: 0;

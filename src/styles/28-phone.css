@@ -260,7 +260,9 @@
   z-index: 61;
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh + var(--pwa-drop, 0px) - max(20px, env(safe-area-inset-top)) - var(--kb-inset, 0px));
+  /* With the keyboard up, the visible part of the page (use-keyboard-inset.ts): iOS pans the
+     page to the field, so the layout height less the keyboard would put the top off screen. */
+  max-height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(20px, env(safe-area-inset-top)));
   padding-bottom: max(10px, env(safe-area-inset-bottom));
   border-radius: 24px 24px 0 0;
   background: #151515;
@@ -268,7 +270,9 @@
   color: hsl(var(--foreground));
   outline: none;
 }
-.phone-sheet.is-full { height: calc(100dvh + var(--pwa-drop, 0px) - max(12px, env(safe-area-inset-top)) - var(--kb-inset, 0px)); }
+.phone-sheet.is-full { height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(12px, env(safe-area-inset-top))); }
+/* The keyboard's own safe area is the keyboard: no home-indicator padding above it. */
+.kb-open .phone-sheet { padding-bottom: 10px; }
 .phone-sheet-grab { flex: none; touch-action: none; }
 .phone-sheet-handle {
   width: 40px;
@@ -543,18 +547,20 @@
 .phone-generate.is-restarting { background: rgb(255 190 110 / .12); color: rgb(255 214 160); opacity: 1; }
 .phone-generate.is-offline { background: rgb(255 120 100 / .14); color: #ffc4b9; }
 
-/* The reference picker, as a sheet from the bottom edge. */
+/* The reference picker (and LoRAs, Reference With), as a sheet from the bottom edge.
+   With the keyboard up for its search, it sits on the keyboard inside the visible viewport. */
 .reference-popover.is-sheet {
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--kb-inset, 0px);
   z-index: 70;
   width: auto;
-  height: min(600px, 82dvh);
+  height: min(600px, 82dvh, calc(var(--vv-height, 100dvh) - max(20px, env(safe-area-inset-top))));
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: 24px 24px 0 0;
   transform-origin: 50% 100%;
 }
+.kb-open .reference-popover.is-sheet { padding-bottom: 0; }
 .reference-popover.is-sheet .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 
 /* ---------------------------------------------------------------- Size */
@@ -919,7 +925,7 @@ body:has(.phone-shell) .modal-scrim:has(.modal:not(.modal-sheet, .modal-wide)) {
 }
 body:has(.phone-shell) .modal:not(.modal-sheet, .modal-wide) {
   width: 100%;
-  max-height: calc(100dvh - max(20px, env(safe-area-inset-top)) - var(--kb-inset, 0px));
+  max-height: calc(var(--vv-height, 100dvh - var(--kb-inset, 0px)) - max(20px, env(safe-area-inset-top)));
   margin-bottom: var(--kb-inset, 0px);
   padding-bottom: env(safe-area-inset-bottom);
   border-width: 1px 0 0;

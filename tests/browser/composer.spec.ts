@@ -102,6 +102,41 @@ test('phone prompt keeps a usable height when tapped with the keyboard up', asyn
 });
 
 
+test('the phone Create sheet stays in the visible viewport while the keyboard is up, and comes back after', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Phone creation sheet.');
+  // iOS Safari: the keyboard shrinks the visual viewport and pans it down to the focused field (offsetTop).
+  await page.addInitScript(() => {
+    const viewport = new EventTarget();
+    const state = { height: innerHeight, top: 0 };
+    for (const [key, read] of Object.entries({ height: () => state.height, offsetLeft: () => 0, offsetTop: () => state.top, scale: () => 1, width: () => innerWidth })) Object.defineProperty(viewport, key, { get: read });
+    Object.defineProperty(window, 'visualViewport', { get: () => viewport });
+    Object.assign(window, { keyboard: (height: number, pan: number) => { state.height = innerHeight - height - pan; state.top = pan; viewport.dispatchEvent(new Event('resize')); viewport.dispatchEvent(new Event('scroll')); } });
+  });
+  await page.goto('/');
+  await page.locator('.phone-create-open').click();
+  const sheet = page.locator('.phone-create');
+  const prompt = sheet.getByRole('textbox', { name: 'Prompt', exact: true });
+  const send = sheet.getByRole('button', { name: 'Generate', exact: true });
+  await prompt.tap();
+  await expect(prompt).toBeFocused();
+  const closedTop = (await sheet.boundingBox())!.y;
+  // A 336 px keyboard, with the page panned 120 px up to the field.
+  const visible = { top: 120, bottom: 0 };
+  visible.bottom = await page.evaluate(() => { (window as unknown as { keyboard: (height: number, pan: number) => void }).keyboard(336, 120); return innerHeight - 336; });
+  await expect(page.locator('html')).toHaveClass(/kb-open/);
+  // The sheet's top, the focused field and Generate are all within what is visible.
+  await expect.poll(async () => (await sheet.boundingBox())!.y).toBeGreaterThanOrEqual(visible.top);
+  await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeLessThanOrEqual(visible.bottom + 1);
+  const inside = async (box: { y: number; height: number } | null) => box!.y >= visible.top - 1 && box!.y + box!.height <= visible.bottom + 1;
+  await expect.poll(async () => inside(await prompt.boundingBox())).toBe(true);
+  await send.scrollIntoViewIfNeeded();
+  await expect.poll(async () => inside(await send.boundingBox())).toBe(true);
+  // Keyboard down: the sheet goes back where it was.
+  await page.evaluate(() => (window as unknown as { keyboard: (height: number, pan: number) => void }).keyboard(0, 0));
+  await expect(page.locator('html')).not.toHaveClass(/kb-open/);
+  await expect.poll(async () => Math.round((await sheet.boundingBox())!.y)).toBe(Math.round(closedTop));
+});
+
 test('each expanded field owns its clear action and reset clears only the current creation', async ({ page }) => {
   let destructiveRequest = false;
   page.on('request', (request) => { if (request.method() === 'DELETE') destructiveRequest = true; });
