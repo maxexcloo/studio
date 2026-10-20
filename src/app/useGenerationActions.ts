@@ -511,6 +511,12 @@ export function useGenerationActions(view: any) {
     });
   }
 
+  /** A short name for a confirmation's list: the prompt's start, else the file name. */
+  function shortName(item: GalleryItem) {
+    const text = String(item.prompt || item.filename || (item.type === "video" ? "Video" : "Image")).replace(/\s+/g, " ").trim();
+    return text.length > 48 ? `${text.slice(0, 47).trimEnd()}…` : text;
+  }
+
   /** Several at once: one question, one undo for all of them. */
   async function deleteItems(items: GalleryItem[]) {
     const targets = items.filter(Boolean);
@@ -524,7 +530,9 @@ export function useGenerationActions(view: any) {
           : includesLibrary ? "Generated files are deleted from disk. Files linked from library folders stay in their folders."
             : "Their files are deleted from disk.",
       action: `${libraryOnly ? "Remove" : "Delete"} ${targets.length}`,
-      destructive: !libraryOnly
+      destructive: !libraryOnly,
+      // What goes, as a list under the question: each one's picture and a short name.
+      items: targets.map((item) => ({ id: item.id, thumb: item.type === "video" ? item.thumbnailUrl : item.thumbnailUrl || item.url, name: shortName(item) }))
     })) return;
     if (active && targets.some((item) => item.id === active.id)) setActive(null);
     galleryRemove(targets.flatMap((item) => [item.id, item.url]).filter(Boolean));

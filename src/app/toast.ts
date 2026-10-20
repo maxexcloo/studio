@@ -25,6 +25,7 @@
 
 export type ToastTone = 'neutral' | 'success' | 'warning' | 'error' | 'removed';
 export type ToastAction = { label: string; onClick: () => void };
+export type ToastConfirm = { detail?: string; destructive?: boolean; items?: Array<{ id: string; name: string; thumb?: string }> };
 
 export type ToastOptions = {
   /** Replaces the live toast with this id instead of adding one. */
@@ -38,6 +39,8 @@ export type ToastOptions = {
   /** Milliseconds on screen. Hovering pauses it. `Infinity` waits for a dismiss. */
   duration?: number;
   action?: ToastAction;
+  /** A question in the pill (useConfirmation): `action` answers yes, Cancel or a dismiss answers no; it waits for one. */
+  confirm?: ToastConfirm;
   /** Runs when the toast leaves any way other than its action: time, swipe, close. */
   onClose?: () => void;
 };
@@ -51,6 +54,7 @@ export type ToastRecord = {
   plural?: (count: number) => string;
   duration: number;
   actionLabel?: string;
+  confirm?: ToastConfirm;
   /** Bumped on every merge: restarts the timer and plays the bump. */
   version: number;
   createdAt: number;
@@ -61,15 +65,16 @@ export type ToastRecord = {
 type Callbacks = { actions: Array<() => void>; closers: Array<() => void> };
 
 const MAX_TOASTS = 5;
-const BASE_DURATION: Record<ToastTone, number> = { neutral: 4000, success: 3200, removed: 5000, warning: 6500, error: 6500 };
+const BASE_DURATION: Record<ToastTone, number> = { neutral: 3500, success: 3500, removed: 6000, warning: 6500, error: 6500 };
 
 let toasts: ToastRecord[] = [];
 const callbacks = new Map<string, Callbacks>();
 const listeners = new Set<() => void>();
 let nextId = 0;
 
-/** How far forward a toast belongs: errors, then actions and warnings, then the rest. */
+/** How far forward a toast belongs: a question, errors, then actions and warnings, then the rest. */
 function weight(toast: ToastRecord) {
+  if (toast.confirm) return 4;
   if (toast.tone === 'error') return 3;
   return toast.tone === 'warning' || toast.actionLabel ? 2 : 1;
 }
@@ -99,7 +104,7 @@ export function toastSnapshot() {
  */
 function durationFor(tone: ToastTone, title: string, options: ToastOptions) {
   if (options.duration !== undefined) return options.duration;
-  if (tone === 'error') return Infinity;
+  if (tone === 'error' || options.confirm) return Infinity;
   const reading = BASE_DURATION[tone] + Math.max(0, title.length - 48) * 45;
   return Math.min(12000, options.action ? Math.max(6000, reading) : reading);
 }
@@ -149,6 +154,13 @@ function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
     return live.id;
   }
 
+  // One message at a time: a new one replaces what is showing, so nothing stacks or turns up stale
+  // later. Errors and questions wait for their answer; a replaced message's onClose still runs.
+  // A message with an action (Undo) also stays until its time is up; plain news behind it is dropped rather than shown stale.
+  const plain = tone !== 'error' && tone !== 'warning' && !options.action && !options.confirm;
+  if (plain && toasts.some((toast) => weight(toast) > 1)) return '';
+  toasts.filter((toast) => weight(toast) === 1).forEach((old) => close(old.id, 'close'));
+
   const id = options.id || `toast-${++nextId}`;
   const record: ToastRecord = {
     id,
@@ -159,6 +171,7 @@ function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
     plural: options.plural,
     duration,
     actionLabel: options.action?.label,
+    confirm: options.confirm,
     version: 0,
     createdAt: Date.now(),
     updatedAt: Date.now()

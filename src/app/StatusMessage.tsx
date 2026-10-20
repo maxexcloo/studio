@@ -51,9 +51,9 @@ export function StatusAnnouncer() {
   );
 }
 
+/** A repeat of the same message folds into the one on screen: its words only change when it counts something (`plural`). */
 function messageText(message: ToastRecord) {
-  const title = message.count > 1 && message.plural ? message.plural(message.count) : message.title;
-  return message.count > 1 && !message.plural ? `${title} ×${message.count}` : title;
+  return message.count > 1 && message.plural ? message.plural(message.count) : message.title;
 }
 
 /**
@@ -79,11 +79,14 @@ export function StatusPill({ message, className, children }: { message: ToastRec
     <motion.div
       className={cn('status-pill', message && 'status-message', message && `is-${message.tone}`, className)}
       data-status-message={message ? '' : undefined}
+      role={message?.confirm ? 'alertdialog' : undefined}
+      aria-label={message?.confirm ? message.title : undefined}
+      aria-description={message?.confirm?.detail || undefined}
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: { duration: 0.12 } }}
       transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
-      drag={message ? 'x' : false}
+      drag={message && !message.confirm ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.5}
       dragSnapToOrigin
@@ -97,9 +100,18 @@ export function StatusPill({ message, className, children }: { message: ToastRec
         {message ? (
           <motion.span key={`m:${message.id}:${message.title}`} className="status-pill-body" {...fade}>
             <i className="status-pill-light" aria-hidden="true" />
-            <span className="status-pill-text" title={messageText(message)}>{messageText(message)}</span>
-            {message.actionLabel ? <button type="button" className="status-pill-action" onClick={() => runToastAction(message.id)}>{message.actionLabel}</button> : null}
-            <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}><X size={13} /></button>
+            {message.confirm ? (
+              // A question: the words (and one line on what happens), then Cancel and the answer.
+              <span className="status-pill-text is-question" title={[messageText(message), message.confirm.detail].filter(Boolean).join(' ')}>
+                <strong>{messageText(message)}</strong>
+                {message.confirm.detail ? <small>{message.confirm.detail}</small> : null}
+              </span>
+            ) : <span className="status-pill-text" title={messageText(message)}>{messageText(message)}</span>}
+            {message.confirm?.items?.length ? <ConfirmList items={message.confirm.items} /> : null}
+            {message.confirm ? <ConfirmButtons message={message} /> : <>
+              {message.actionLabel ? <button type="button" className="status-pill-action" onClick={() => runToastAction(message.id)}>{message.actionLabel}</button> : null}
+              <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}><X size={13} /></button>
+            </>}
           </motion.span>
         ) : (
           <motion.span key="rest" className="status-pill-body" {...fade}>{children}</motion.span>
@@ -107,6 +119,31 @@ export function StatusPill({ message, className, children }: { message: ToastRec
       </AnimatePresence>
     </motion.div>
   );
+}
+
+/** What a question acts on, under the pill: a thumbnail and a short name each, scrolling when there are many. */
+function ConfirmList({ items }: { items: NonNullable<NonNullable<ToastRecord['confirm']>['items']> }) {
+  return <ul className="status-pill-list" aria-label="Items">
+    {items.map((item) => <li key={item.id}>
+      {item.thumb ? <img src={item.thumb} alt="" loading="lazy" decoding="async" /> : <span className="status-pill-list-blank" aria-hidden="true" />}
+      <span>{item.name}</span>
+    </li>)}
+  </ul>;
+}
+
+/** A question's answers: Cancel takes the focus first, so Enter never removes anything by accident; Escape cancels. */
+function ConfirmButtons({ message }: { message: ToastRecord }) {
+  const cancel = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => { cancel.current?.focus({ preventScroll: true }); }, [message.id]);
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); dismissToast(message.id); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [message.id]);
+  return <>
+    <button ref={cancel} type="button" className="status-pill-action is-cancel" onClick={() => dismissToast(message.id)}>Cancel</button>
+    <button type="button" className={cn('status-pill-action', message.confirm?.destructive ? 'is-danger' : 'is-primary')} onClick={() => runToastAction(message.id)}>{message.actionLabel}</button>
+  </>;
 }
 
 /** A surface's own copy of the pill, at its top edge, while it covers the top bar. */

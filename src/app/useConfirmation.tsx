@@ -1,37 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Modal } from './Modal';
+import { dismissToast, toast } from './toast';
 
-/** `irreversible` confirms even when the "Confirm before removing things" setting is off. */
-export type ConfirmationOptions = { title: string; description: string; action: string; destructive?: boolean; irreversible?: boolean };
+/** `irreversible` confirms even when the "Confirm before removing things" setting is off. `items` lists what it acts on (thumbnails and names). */
+export type ConfirmationItem = { id: string; name: string; thumb?: string };
+export type ConfirmationOptions = { title: string; description: string; action: string; destructive?: boolean; irreversible?: boolean; items?: ConfirmationItem[] };
 export type ConfirmAction = (options: ConfirmationOptions) => Promise<boolean>;
 export type PromptOptions = { title: string; description?: string; label?: string; initialValue?: string; action?: string; placeholder?: string };
 export type PromptText = (options: PromptOptions) => Promise<string | null>;
 
-/** Confirm and prompt dialogs as promises, rendered through the shared Modal. */
+/**
+ * Confirmations ask in the status pill, inline, never in a dialog
+ * (UI-PATTERNS › Messages): the question and one line on what happens, then
+ * Cancel and the answer, with the list of what it acts on under the pill when
+ * there are several. Naming text (`promptText`) still uses the shared Modal.
+ */
 export function useConfirmation(enabled: boolean) {
-  const [pending, setPending] = useState<ConfirmationOptions | null>(null);
   const [prompt, setPrompt] = useState<PromptOptions | null>(null);
   const [draft, setDraft] = useState('');
-  const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const promptResolveRef = useRef<((value: string | null) => void) | null>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const open = useRef(new Set<string>());
 
-  // A second request while one is open waits its turn instead of being refused.
-  const queueRef = useRef<Array<{ options: ConfirmationOptions; resolve: (value: boolean) => void }>>([]);
-  const settle = useCallback((accepted: boolean) => {
-    const resolve = resolveRef.current;
-    resolveRef.current = null;
-    const next = queueRef.current.shift();
-    if (next) {
-      resolveRef.current = next.resolve;
-      setPending(next.options);
-    } else {
-      setPending(null);
-    }
-    resolve?.(accepted);
-  }, []);
   const settlePrompt = useCallback((value: string | null) => {
     const resolve = promptResolveRef.current;
     promptResolveRef.current = null;
@@ -39,20 +30,22 @@ export function useConfirmation(enabled: boolean) {
     resolve?.(value);
   }, []);
   useEffect(() => () => {
-    resolveRef.current?.(false);
-    queueRef.current.forEach((entry) => entry.resolve(false));
+    open.current.forEach((id) => dismissToast(id));
     promptResolveRef.current?.(null);
   }, []);
 
   const confirmAction: ConfirmAction = useCallback((options) => {
     if (!enabled && !options.irreversible) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
-      if (resolveRef.current) {
-        queueRef.current.push({ options, resolve });
-        return;
-      }
-      resolveRef.current = resolve;
-      setPending(options);
+      let answered = false;
+      const answer = (value: boolean) => { if (answered) return; answered = true; open.current.delete(id); resolve(value); };
+      const id = toast.warning(options.title, {
+        id: `confirm-${Math.random().toString(36).slice(2)}`,
+        confirm: { detail: options.description, destructive: options.destructive, items: options.items },
+        action: { label: options.action, onClick: () => answer(true) },
+        onClose: () => answer(false)
+      });
+      open.current.add(id);
     });
   }, [enabled]);
 
@@ -69,23 +62,6 @@ export function useConfirmation(enabled: boolean) {
 
   const confirmationDialog = (
     <>
-      <Modal
-        open={!!pending}
-        onOpenChange={(open) => { if (!open) settle(false); }}
-        size="alert"
-        tone={pending?.destructive ? 'danger' : 'default'}
-        icon={pending?.destructive ? <Trash2 size={18} /> : <AlertCircle size={18} />}
-        title={pending?.title}
-        description={pending?.description}
-        hideClose
-        initialFocus={cancelRef}
-        footer={
-          <>
-            <button ref={cancelRef} className="btn" onClick={() => settle(false)}>Cancel</button>
-            <button className={pending?.destructive ? 'btn is-danger' : 'btn is-primary'} onClick={() => settle(true)}>{pending?.action}</button>
-          </>
-        }
-      />
       <Modal
         open={!!prompt}
         onOpenChange={(open) => { if (!open) settlePrompt(null); }}

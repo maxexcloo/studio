@@ -351,3 +351,37 @@ button.activity-main { cursor: pointer; }
 @media (forced-colors: active) {
   .island { border-color: CanvasText; }
 }
+
+/* A question in the pill (useConfirmation): two short lines, Cancel and the answer; the list of what it acts on hangs under it. */
+.status-pill:has(.is-question) { height: auto; min-height: var(--bar-pill-h, 40px); padding-block: 3px; border-radius: 20px; }
+.status-pill-text.is-question { display: grid; line-height: 1.2; }
+.status-pill-text.is-question > * { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.status-pill-text.is-question small { color: hsl(var(--muted-foreground)); font-size: 11.5px; font-weight: 500; }
+.status-pill-action.is-cancel { background: transparent; }
+.status-pill-action.is-cancel:hover { background: var(--control-hover); }
+.status-pill-action.is-danger { background: hsl(0 74% 58% / .9); color: #fff; }
+.status-pill-action.is-danger:hover { background: hsl(0 74% 52%); }
+.status-pill-action.is-primary { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.status-pill-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: var(--z-popover);
+  display: grid;
+  gap: 2px;
+  width: min(340px, calc(100vw - 16px));
+  max-height: min(320px, 50dvh);
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-menu);
+  background: var(--glass-panel-solid);
+  box-shadow: var(--glass-panel-shadow);
+  translate: -50% 0;
+}
+.status-pill-list li { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 6px; border-radius: var(--r-item); font-size: 13px; }
+.status-pill-list li > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.status-pill-list img, .status-pill-list-blank { flex: none; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--well); }
