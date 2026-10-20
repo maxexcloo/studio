@@ -75,10 +75,10 @@ function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[
   if (profile.kind !== "image") return [];
   // Edit models read a reference; everything else can only start from a picture and redraw it.
   if (profile.capabilities.imageToImage) {
-    return [{ id: "reference", kind: "image", required: true, min: 1, max: 1, label: "Reference image", role: "reference" }];
+    return [{ id: "reference", kind: "image", required: true, min: 1, max: 1, label: "Reference Image", role: "reference" }];
   }
   if (profile.capabilities.startImage) {
-    return [{ id: "reference", kind: "image", required: false, min: 0, max: 1, label: "Start image", role: "start" }];
+    return [{ id: "reference", kind: "image", required: false, min: 0, max: 1, label: "Start Image", role: "start" }];
   }
   return [];
 }
@@ -743,7 +743,7 @@ function App() {
       })
       .catch((error) => {
         setStatus(error.message);
-        if (notify) showToast("Couldn’t refresh models", "error", { action: { label: "Try again", onClick: () => refreshModels(true) } });
+        if (notify) showToast("Couldn’t refresh models", "error", { action: { label: "Try Again", onClick: () => refreshModels(true) } });
       });
     modelsRefreshRef.current = request;
     return request;
@@ -771,7 +771,7 @@ function App() {
     showToast("Studio stopped unexpectedly last time", "warning", {
       description: `${exit.reason.replace(/\.?$/, ".")} Last seen running ${when}.`,
       duration: 20_000,
-      action: { label: "Copy details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
+      action: { label: "Copy Details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
     });
   }
 

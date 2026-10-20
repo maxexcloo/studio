@@ -221,6 +221,10 @@ destructive actions live in Maintenance, never beside everyday switches.
   (there is no long-press action sheet). The select bar offers Select All,
   Select Failed, then Download (a zip when several) or Share on a phone,
   Animate for the photos among them, Retry for failed items, Star and Delete.
+  Bulk actions keep their one-word visible names, but their tooltips,
+  accessible names and the several-item menu rows say what they act on:
+  "Animate Selected", "Download Selected as a Zip", "Delete Selected"; never
+  one item's copy such as "Make a Video From This Image".
   The desktop's right-click menu offers the same for several, under an
   "n Selected" heading, and the full list for one; its rows are full width
   with a muted icon, split by hairlines between the intent groups.
@@ -245,6 +249,7 @@ phones, default stroke):
 | Image / Video | `Image` / `Film` | Share | `Share` |
 | Use | `Undo2` | Star | `Star` (filled when on) |
 | Upscale | `UpscaleArrow` | Zoom | `Minus` / `Plus` |
+| Select All | `CheckSquare` | Select Failed | `AlertTriangle` |
 
 ## Phone
 

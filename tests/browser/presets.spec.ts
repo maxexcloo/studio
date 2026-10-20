@@ -87,7 +87,7 @@ test('import, reopen and apply image settings on desktop and phone', async ({ pa
   expect(generated!.loras).toEqual([{ name: 'film_grain_35mm.safetensors', strength: 0, enabled: true }]);
   await ui.openComposer();
   await ui.composer.getByRole('group', { name: 'Generation Mode', exact: true }).getByRole('button', { name: 'Video', exact: true }).click();
-  await expect(page.getByRole('button', { name: `Change reference image, currently ${preset.name}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `Change Reference Image, Currently ${preset.name}`, exact: true })).toBeVisible();
   generated = null;
   await ui.prompt.fill('Animate the imported image');
   await ui.generate.click();

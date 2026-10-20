@@ -375,7 +375,7 @@ export function ComposerBar(props: ComposerBarProps) {
             disabled={comfyRestarting || (comfyOffline ? comfyRetrying : false)}
             blocked={!comfyOffline && !comfyRestarting && generateDisabled}
             busy={comfyRestarting || (comfyOffline && comfyRetrying) || undefined}
-            aria-label={comfyRestarting ? "ComfyUI is restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI offline, check again") : generateDisabledReason || "Generate"}
+            aria-label={comfyRestarting ? "ComfyUI Is Restarting" : comfyOffline ? (comfyRetrying ? "Checking ComfyUI" : "ComfyUI Offline, Check Again") : generateDisabledReason || "Generate"}
           >
             {comfyRestarting
               ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>

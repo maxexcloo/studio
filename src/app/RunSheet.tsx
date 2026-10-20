@@ -98,7 +98,7 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
       </div>
       <button type="button" className="cover-flow-show" onClick={onShowInGallery}>
         <Rows3 size={18} />
-        <span>Show in gallery</span>
+        <span>Show in Gallery</span>
       </button>
     </div>
   );

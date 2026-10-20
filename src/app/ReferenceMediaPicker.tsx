@@ -98,7 +98,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     return () => window.clearTimeout(timer);
   }, [search]);
   const uploadInput = React.useRef<HTMLInputElement>(null);
-  const label = (input.label || "Reference image").toLowerCase();
+  const label = (input.label || "Reference Image").toLowerCase();
   const [newId, setNewId] = React.useState("");
 
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
@@ -450,7 +450,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
     hoverTimer.current = window.setTimeout(() => setHover(next), next ? hoverOpenDelay : hoverCloseDelay);
   };
 
-  const label = isStart ? "Reference Image" : input.label || "Reference image";
+  const label = isStart ? "Reference Image" : input.label || "Reference Image";
 
   if (busy) {
     return (
@@ -462,7 +462,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
 
   if (!selected) {
     return (
-      <Tip content={`Choose a ${label.toLowerCase()}, or drop one on the prompt`}>
+      <Tip content={`Choose a ${label}, or Drop One on the Prompt`}>
         <button
           type="button"
           data-open-trigger
@@ -484,7 +484,7 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   // hover holds the choices (Edit | Reference, the brush) and the other references with a + for more.
   const menu = Boolean(role || paint);
   const editing = role?.value === "edit";
-  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
+  const name = editing ? `Picture to Edit: ${referenceName(selected.name)}` : `${isStart ? "Start Image" : label}: ${referenceName(selected.name)}`;
   return (
     <div
       className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", editing && "is-edit")}
@@ -508,8 +508,8 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
           </span>
         ) : null}
       </div> : null}
-      <Tip content={`${name} · Click to change`}>
-        <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
+      <Tip content={`${name} · Click to Change`}>
+        <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label}, Currently ${selected.name}`} aria-expanded={open}>
           {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : <ImageIcon size={15} />}
         </button>
       </Tip>
@@ -542,7 +542,7 @@ function ReferenceGroupButton({ chain, assets, max, open, busy, progress, requir
   const count = assets.length;
   const name = count ? `References, ${count} of ${max} Selected` : `Add References${required ? ", Required" : ""}`;
   return (
-    <Tip content={count ? `${count} of ${max} · Click to change` : `Choose up to ${max} references, or drop them on the prompt`}>
+    <Tip content={count ? `${count} of ${max} · Click to Change` : `Choose up to ${max} References, or Drop Them on the Prompt`}>
       <button
         type="button"
         data-open-trigger

@@ -282,16 +282,6 @@
   padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
   scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
 }
-/* In Hidden the bar owns the top left; where both would touch, the field goes under it. */
-@media (max-width: 920px) {
-  .is-hidden-space .gallery-generation-mode { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px)); }
-  .app-shell.is-hidden-space:has(.gallery-generation-mode) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h) + 12px); }
-  .gallery-search.is-hidden-space { top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h, 0px)); }
-  .app-shell.is-hidden-space:has(.gallery-search) .stage-gallery {
-    padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + 42px + 8px + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
-  }
-}
-
 /* A stacked deck steps aside for the recent-prompts list, as for the composer's menus. */
 @media (max-width: 760px) {
   :is(.app-shell, .zen-shell):has(.zen-prompt .prompt-history) :is(.studio-dock, .zen-control-button) {

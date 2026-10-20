@@ -50,8 +50,8 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) {
         setState(error.reason === 'host'
-          ? { kind: 'refused', title: 'Open Studio by its address', text: error.message }
-          : { kind: 'refused', title: 'Not open to other devices', text: 'On the computer running Studio, turn on “Open on other devices” in Settings › Connection, then reload this page.' });
+          ? { kind: 'refused', title: 'Open Studio by Its Address', text: error.message }
+          : { kind: 'refused', title: 'Not Open to Other Devices', text: 'On the computer running Studio, turn on “Open on other devices” in Settings › Connection, then reload this page.' });
         return;
       }
       // Not reachable at all: the studio has its own offline screens.
@@ -166,8 +166,8 @@ function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recove
 
 function GateMessage({ title, text }: { title: string; text: string }) {
   return (
-    <section className="device-gate hidden-lockscreen">
-      <div className="empty stage-empty hidden-lock-stage">
+    <section className="device-gate lockscreen">
+      <div className="empty stage-empty lock-stage">
         <div className="stage-mark"><LockMark className="stage-layer" stage="locked" /></div>
         <div className="stage-copy">
           <h2>{title}</h2>
@@ -208,16 +208,16 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   };
 
   return (
-    <section className={cn('device-gate hidden-lockscreen', `is-${stage}`)}>
-      <div className="empty stage-empty hidden-lock-stage">
+    <section className={cn('device-gate lockscreen', `is-${stage}`)}>
+      <div className="empty stage-empty lock-stage">
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
           <h2>{stage === 'opening' ? 'Signed in' : 'Sign in to Studio'}</h2>
           <p>Enter the studio password set on the computer running Studio.</p>
           <div className="empty-actions">
             {stage !== 'opening' ? (
-              <div className="hidden-unlock">
-                <form className={cn('hidden-unlock-field', stage === 'failed' && 'is-wrong')} onSubmit={(event) => { event.preventDefault(); submit(); }}>
+              <div className="unlock">
+                <form className={cn('unlock-field', stage === 'failed' && 'is-wrong')} onSubmit={(event) => { event.preventDefault(); submit(); }}>
                   <KeyRound size={14} aria-hidden="true" />
                   {/* A name for password managers, so they file the password under this studio. */}
                   <input type="text" name="username" autoComplete="username" value="Studio" readOnly hidden />
@@ -228,18 +228,18 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
                     name="password"
                     autoComplete="current-password"
                     aria-label="Studio Password"
-                    placeholder="Studio password"
+                    placeholder="Studio Password"
                     value={password}
                     disabled={working}
                     onChange={(event) => { setPassword(event.target.value); if (stage === 'failed') setStage('locked'); }}
                   />
                   <button type="submit" disabled={!password || working}>{working ? '…' : 'Sign in'}</button>
                 </form>
-                <div className="hidden-unlock-meta" aria-live="polite">
+                <div className="unlock-meta" aria-live="polite">
                   {error ? <span className="is-error">{error}</span> : null}
                 </div>
               </div>
-            ) : <div className="hidden-unlock-spacer" />}
+            ) : <div className="unlock-spacer" />}
           </div>
         </div>
       </div>

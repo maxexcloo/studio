@@ -67,7 +67,7 @@ function StrengthControl({ value, onChange, disabled, label, info }: { value: nu
       <input
         type="range"
         disabled={disabled}
-        aria-label={`${label} strength`}
+        aria-label={`${label} Strength`}
         min={min}
         max={max}
         step={bounds?.step ?? 0.05}
@@ -80,7 +80,7 @@ function StrengthControl({ value, onChange, disabled, label, info }: { value: nu
         <input
           className="lora-strength-value is-bare"
           disabled={disabled}
-          aria-label={`${label} strength value`}
+          aria-label={`${label} Strength Value`}
           inputMode="decimal"
           value={draft ?? value.toFixed(2)}
           onFocus={(event) => { setDraft(value.toFixed(2)); requestAnimationFrame(() => event.target.select()); }}
@@ -122,7 +122,7 @@ function TriggerWords({ words }: { words: string[] }) {
     <p className="lora-triggers">
       <span>Trigger</span>
       {words.map((word) => (
-        <Tip key={word} content={copied === word ? 'Copied' : 'Copy for the prompt'}>
+        <Tip key={word} content={copied === word ? 'Copied' : 'Copy for the Prompt'}>
           <button type="button" className={cn('lora-trigger', copied === word && 'is-copied')} onClick={() => copy(word)}>{word}</button>
         </Tip>
       ))}
@@ -179,11 +179,11 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
         </button>
       ) : null}
       <div className="lora-card-top">
-        <Tip content={`${item.name} · Click to swap`}>
+        <Tip content={`${item.name} · Click to Swap`}>
           <button type="button" className="lora-name" onClick={onSwap}>{label}</button>
         </Tip>
         <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={13} /></button></Tip>
-        <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={(enabled) => onChange({ enabled })} />
+        <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={(enabled) => onChange({ enabled })} />
       </div>
       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={(strength) => onChange({ strength })} />
       {!missing && item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
@@ -409,7 +409,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <LoraDetails info={info} label={label} />
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: .32, ease: [.16, 1, .3, 1] }}><div className="lora-library-settings">
-                      <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
+                      <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
                       {inlineSelection.items.length > 1 ? <span className="lora-library-order">
                         <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); reorder(index, index - 1); }}><ChevronUp size={14} /></button>
@@ -538,7 +538,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
   const remove = async (stack: LoraSnapshot) => { if (await library.deleteStack(stack) && stack.id === activeId) setActiveId(''); };
 
   return (
-    <section className="lora-stacks" aria-label={`Saved stacks for ${family}`}>
+    <section className="lora-stacks" aria-label={`Saved Stacks for ${family}`}>
       {library.stacks.length ? (
         <div className="lora-chips">
           {library.stacks.map((stack) => {
@@ -563,7 +563,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
                     <span className="lora-chip-name">{stack.name}</span>
                     <em>{stack.loras.length}</em>
                   </button>
-                  <button type="button" className="lora-chip-remove" aria-label={`Delete stack ${stack.name}`} onClick={() => remove(stack)}><X size={11} /></button>
+                  <button type="button" className="lora-chip-remove" aria-label={`Delete Stack ${stack.name}`} onClick={() => remove(stack)}><X size={11} /></button>
                 </span>
               </Tip>
             );
@@ -580,8 +580,8 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
         />
       ) : modified && active ? (
         <div className="lora-stack-changes">
-          <span><i aria-hidden="true" />Unsaved changes</span>
-          <Tip content={`Save these LoRAs into ${active.name}`}><button type="button" className="lora-text-action is-strong" onClick={() => library.updateStack(active.id)}>Update</button></Tip>
+          <span><i aria-hidden="true" />Unsaved Changes</span>
+          <Tip content={`Save These LoRAs into ${active.name}`}><button type="button" className="lora-text-action is-strong" onClick={() => library.updateStack(active.id)}>Update</button></Tip>
           <button type="button" className="lora-text-action" onClick={() => setNaming({ mode: 'new' })}>Save As New</button>
         </div>
       ) : canSaveNew ? (
@@ -705,7 +705,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
         <span className="lora-count">{loras.length ? <>{activeCount} active <em>· {loras.length}/{cap}</em></> : `Up to ${cap} LoRAs`}</span>
         {loras.length ? (
           <>
-            <Tip content={allOff ? 'Turn all LoRAs back on' : 'Turn all LoRAs off'}>
+            <Tip content={allOff ? 'Turn All LoRAs Back On' : 'Turn All LoRAs Off'}>
               <button type="button" className="lora-head-action" onClick={() => setLoras((current) => current.map((item) => ({ ...item, enabled: allOff })))}>{allOff ? 'All on' : 'All off'}</button>
             </Tip>
             <Tip content="Remove All LoRAs">

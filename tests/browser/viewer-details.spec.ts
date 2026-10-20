@@ -48,5 +48,5 @@ test('Details shows each prompt with Copy and Use, Settings without a box, and R
   await expect(side.getByRole('button', { name: 'Copy Settings', exact: true })).toHaveCount(phone ? 1 : 0);
   await prompt.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(item.prompt);
-  if (phone) await expect(page.getByText('Prompt copied')).toBeVisible();
+  if (phone) await expect(page.locator('.status-message').filter({ hasText: 'Prompt copied' })).toBeVisible();
 });

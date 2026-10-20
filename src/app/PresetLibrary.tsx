@@ -133,7 +133,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
           <div className="preset-input-row"><input id="civitai-image-link" type="url" placeholder="https://civitai.com/images/…" disabled={busy} value={url} onChange={(event) => setUrl(event.target.value)} required autoComplete="off" /><button className="btn is-primary" disabled={busy}><Link size={15} />{importing ? 'Saving…' : 'Save Image'}</button></div>
           <p>Saves the image and its settings to your gallery. Missing model and LoRA files download automatically.</p>
         </form>
-        <div className="preset-section-head"><h3>Saved Images <span>{saved.length}</span></h3>{saved.length > 0 ? <input aria-label="Search Saved Images" type="search" placeholder="Search images…" value={query} onChange={(event) => setQuery(event.target.value)} /> : null}</div>
+        <div className="preset-section-head"><h3>Saved Images <span>{saved.length}</span></h3>{saved.length > 0 ? <input aria-label="Search Saved Images" type="search" placeholder="Search Images…" value={query} onChange={(event) => setQuery(event.target.value)} /> : null}</div>
         {loading ? <p role="status">Loading images…</p> : visible.length ? <div className="preset-grid">{visible.map((preset) => <button className="preset-card" disabled={busy} key={preset.id} onClick={() => { select(preset); void run(async () => { await resolve(preset.id); }); }}>
           <span className="preset-card-image"><SafeImg src={preset.thumbnailUrl} loading="lazy" fallback={<Image size={26} />} /></span>
           <strong>{preset.name}</strong><small>{[preset.baseModel, preset.creator && `by ${preset.creator}`].filter(Boolean).join(' · ') || 'Civitai'}</small>

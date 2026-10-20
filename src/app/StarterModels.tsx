@@ -150,7 +150,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                 <h3>{family.title}</h3>
                 <p>{family.blurb}</p>
               </header>
-              <div className="starter-versions" role="radiogroup" aria-label={`${family.title} versions`}>
+              <div className="starter-versions" role="radiogroup" aria-label={`${family.title} Versions`}>
                 {family.versions.map((item) => (
                   <button
                     key={item.id}
@@ -195,7 +195,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                 ) : progress.state === 'error' ? (
                   <div className="starter-progress">
                     <p className="starter-error">{progress.error || 'The download stopped.'}</p>
-                    <button type="button" className="btn" onClick={() => get(family, version)}><RotateCw size={13} /> {progress.retryable ? 'Resume' : 'Try again'}</button>
+                    <button type="button" className="btn" onClick={() => get(family, version)}><RotateCw size={13} /> {progress.retryable ? 'Resume' : 'Try Again'}</button>
                   </div>
                 ) : (
                   <button type="button" className="btn" onClick={() => get(family, version)}>
@@ -227,7 +227,7 @@ export function GetModelsSheet({ open, onOpenChange, showToast, onStarted, onUse
       title="Get a Model"
       description="Each downloads with everything it needs and is selected when it’s done."
       className="starter-sheet"
-      footer={onFindModels ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onFindModels(); }}>Find models on this computer</button> : undefined}
+      footer={onFindModels ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onFindModels(); }}>Find Models on This Computer</button> : undefined}
     >
       <StarterModels compact showToast={showToast} onStarted={onStarted} onUse={(file) => { onOpenChange(false); onUse(file); }} />
     </Modal>

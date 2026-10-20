@@ -106,7 +106,7 @@ export function useModelFolders({ connected, emptyModels, onModelsChanged, showT
     const value = signature(report?.folders || []);
     try { localStorage.setItem(dismissKey, value); } catch { /* the notice just comes back */ }
     setDismissed(value);
-    if (onStopHints) showToast('Hidden until new models are found', 'default', { action: { label: 'Don’t show again', onClick: onStopHints } });
+    if (onStopHints) showToast('Hidden until new models are found', 'default', { action: { label: 'Don’t Show Again', onClick: onStopHints } });
   }, [onStopHints, report, showToast]);
 
   /** Waits until ComfyUI reads every added folder, which it does from its next start; true once it does. */

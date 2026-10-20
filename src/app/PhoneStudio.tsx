@@ -233,7 +233,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
                 type="button"
                 className={cn('phone-go', pending.length > 0 && 'is-working')}
                 style={{ '--progress': progress } as React.CSSProperties}
-                aria-label={quickGo ? 'Generate' : 'Open the composer'}
+                aria-label={quickGo ? 'Generate' : 'Open the Composer'}
                 onClick={() => { if (quickGo) generate(); else setCreateOpen(true); }}
               >
                 {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
@@ -433,7 +433,7 @@ function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; ope
         <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
       </button>
       {menu ? (
-        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => menu.toggleFavorite(profile.id)}>
+        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
           <Star size={18} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
         </button>
       ) : null}
@@ -526,7 +526,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
         </AnimatePresence>
         {note ? <p className="phone-control-note">{note}</p> : null}
       </div>
-      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at this size' : 'Shape'}>
+      <div className="phone-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at This Size' : 'Shape'}>
         {rows.map((row) => (
           <button key={row.key} type="button" role="option" aria-selected={isActive(row)} className={cn('phone-row phone-size-row', isActive(row) && 'is-current')} {...pressHandlers(row)} onClick={() => pick(row)}>
             <span className="phone-size-shape"><span className="aspect-shape" style={aspectIconStyle(row.shape)} /></span>

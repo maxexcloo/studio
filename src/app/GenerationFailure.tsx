@@ -66,17 +66,17 @@ type FixButton = { label: string; icon: React.ReactNode; run: () => unknown };
  */
 function fixButtons(item: GalleryItem, failure: GenerationFailure, fixes: FailureFixes | undefined, admin: boolean): FixButton[] {
   if (!fixes) return [];
-  // An item from before fixes existed (or a Hidden one still locked) has nothing to rerun from.
+  // An item from before fixes existed has nothing to rerun from.
   const canRerun = Boolean(item.prompt && item.model && item.settings);
   if (failure.fix === 'memory' && canRerun) {
     return [
-      ...(admin ? [{ label: failure.retry?.tiledDecode ? 'Free memory, decode in tiles' : 'Free memory and try again', icon: <RotateCw size={14} />, run: () => fixes.freeMemoryAndRetry(item) }] : []),
-      { label: 'Try again smaller', icon: <Minimize2 size={14} />, run: () => fixes.retry(item, { smaller: true }) }
+      ...(admin ? [{ label: failure.retry?.tiledDecode ? 'Free Memory, Decode in Tiles' : 'Free Memory & Try Again', icon: <RotateCw size={14} />, run: () => fixes.freeMemoryAndRetry(item) }] : []),
+      { label: 'Try Again Smaller', icon: <Minimize2 size={14} />, run: () => fixes.retry(item, { smaller: true }) }
     ];
   }
-  if (failure.fix === 'redownload' && failure.redownload && admin) return [{ label: 'Download again', icon: <Download size={14} />, run: () => fixes.redownload(item) }];
-  if (failure.fix === 'rescan') return [{ label: 'Rescan models', icon: <RefreshCw size={14} />, run: fixes.rescan }];
-  if (failure.fix === 'retry' && canRerun) return [{ label: 'Try again', icon: <RotateCw size={14} />, run: () => fixes.retry(item) }];
+  if (failure.fix === 'redownload' && failure.redownload && admin) return [{ label: 'Download Again', icon: <Download size={14} />, run: () => fixes.redownload(item) }];
+  if (failure.fix === 'rescan') return [{ label: 'Rescan Models', icon: <RefreshCw size={14} />, run: fixes.rescan }];
+  if (failure.fix === 'retry' && canRerun) return [{ label: 'Try Again', icon: <RotateCw size={14} />, run: () => fixes.retry(item) }];
   return [];
 }
 
@@ -127,7 +127,7 @@ export function FailurePanel({ item, onCopy, onReuse, fixes, showToast, onNodesI
         {onReuse ? <button type="button" className={cn('btn', !buttons.length && 'is-primary', buttons.length > 0 && 'is-ghost')} onClick={onReuse}><RotateCcw size={14} /> Recreate</button> : null}
         <button type="button" className={cn('btn', buttons.length > 0 && 'is-ghost')} onClick={() => copyWith(copyReport)}><CopyIcon copied={Boolean(copied)} /> {copied ? 'Copied' : 'Copy Report'}</button>
         {/* Straight to the feedback board, filled in; the setup lines are added (and shown) in the dialog. */}
-        <button type="button" className="btn is-ghost" onClick={() => openFeedback({ kind: 'bug', title: `Generation failed: ${failure.title}`, body: reportFor(item, failure).split('\n').slice(1).join('\n').trim(), withSetup: true, from: 'failure' })}><Bug size={14} /> Report bug</button>
+        <button type="button" className="btn is-ghost" onClick={() => openFeedback({ kind: 'bug', title: `Generation failed: ${failure.title}`, body: reportFor(item, failure).split('\n').slice(1).join('\n').trim(), withSetup: true, from: 'failure' })}><Bug size={14} /> Report Bug</button>
         <a className="btn is-ghost" href={troubleshootingUrl(failure.help)} target="_blank" rel="noreferrer"><LifeBuoy size={14} /> Troubleshooting</a>
       </div>
       {hasDetail ? (

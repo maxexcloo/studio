@@ -101,10 +101,10 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
       progress: waiting ? undefined : ratio ?? 0,
       meta: [step, left].filter(Boolean).join(' · ') || prompt || 'Starting',
       metaTitle: prompt || undefined,
-      open: { label: 'Show the generation', run: () => onJump(current) },
+      open: { label: 'Show the Generation', run: () => onJump(current) },
       dismiss: {
-        label: 'Hide until the next run',
-        title: 'Hide until the next run',
+        label: 'Hide Until the Next Run',
+        title: 'Hide Until the Next Run',
         run: () => setPutAway((current) => new Set([...current, ...pendingJobs]))
       }
     };

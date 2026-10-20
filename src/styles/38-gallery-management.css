@@ -202,7 +202,6 @@
 .tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
 .stage-gallery { isolation: isolate; z-index: 0; overflow-anchor: none; }
 .app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
-.app-shell.is-hidden-space:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + 50px); }
 .virtual-gallery .tile,
 .virtual-gallery .run-stack { scroll-margin-top: 120px; }
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

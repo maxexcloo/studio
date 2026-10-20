@@ -11,28 +11,28 @@ export function workflowState(validation?: WorkflowValidation, comfyRestarting =
   const files = validation?.missingFiles?.length || 0;
   const packs = validation?.missingPacks || [];
   if (validation && !validation.ok && validation.outdatedComfy) {
-    return { state: 'missing-nodes', label: 'Needs newer ComfyUI', detail: 'This model needs a newer ComfyUI. Update it, then check again.' };
+    return { state: 'missing-nodes', label: 'Needs Newer ComfyUI', detail: 'This model needs a newer ComfyUI. Update it, then check again.' };
   }
   if (validation && !validation.ok && packs.length) {
-    return { state: 'missing-nodes', label: 'Needs ComfyUI nodes', detail: `Needs ${packs.join(' and ')}, which ComfyUI doesn’t include.` };
+    return { state: 'missing-nodes', label: 'Needs ComfyUI Nodes', detail: `Needs ${packs.join(' and ')}, which ComfyUI doesn’t include.` };
   }
   if (validation && !validation.ok && files) {
-    return { state: 'needs-setup', label: `Needs ${files} file${files === 1 ? '' : 's'}`, detail: files === 1 ? 'A file this model needs isn’t installed yet.' : `${files} files this model needs aren’t installed yet.` };
+    return { state: 'needs-setup', label: `Needs ${files} File${files === 1 ? '' : 's'}`, detail: files === 1 ? 'A file this model needs isn’t installed yet.' : `${files} files this model needs aren’t installed yet.` };
   }
   if (validation && !validation.ok && missing) {
-    return { state: 'missing-nodes', label: `Missing ${missing} node${missing === 1 ? '' : 's'}`, detail: 'Install the missing custom nodes in ComfyUI, then check again.' };
+    return { state: 'missing-nodes', label: `Missing ${missing} Node${missing === 1 ? '' : 's'}`, detail: 'Install the missing custom nodes in ComfyUI, then check again.' };
   }
   if (validation && !validation.ok) {
     const missingFiles = (validation.issues || []).filter((issue) => /^Missing (diffusion model|checkpoint|text encoder|VAE|upscale model|file):/.test(issue)).length;
     if (missingFiles && missingFiles === validation.issues.length) {
-      return { state: 'needs-setup', label: `Needs ${missingFiles} file${missingFiles === 1 ? '' : 's'}`, detail: 'These files aren’t in ComfyUI’s models folders yet. Add each one where it says, then check again.' };
+      return { state: 'needs-setup', label: `Needs ${missingFiles} File${missingFiles === 1 ? '' : 's'}`, detail: 'These files aren’t in ComfyUI’s models folders yet. Add each one where it says, then check again.' };
     }
-    return { state: 'needs-setup', label: 'Needs setup', detail: 'Something in the workflow needs fixing before it can run.' };
+    return { state: 'needs-setup', label: 'Needs Setup', detail: 'Something in the workflow needs fixing before it can run.' };
   }
   if (validation?.unverified) {
     return comfyRestarting
-      ? { state: 'unchecked', label: 'Checking soon', detail: 'ComfyUI is restarting. Checked again when it’s back.' }
-      : { state: 'unchecked', label: 'Not checked', detail: 'ComfyUI is offline, so its nodes can’t be checked yet.' };
+      ? { state: 'unchecked', label: 'Checking Soon', detail: 'ComfyUI is restarting. Checked again when it’s back.' }
+      : { state: 'unchecked', label: 'Not Checked', detail: 'ComfyUI is offline, so its nodes can’t be checked yet.' };
   }
   return { state: 'ready', label: 'Ready', detail: 'Everything this workflow needs is installed.' };
 }

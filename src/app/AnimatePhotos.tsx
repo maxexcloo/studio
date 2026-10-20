@@ -103,7 +103,7 @@ export function AnimatePhotos({ items, profiles, autoResizeInputs, onClose }: {
   </>}>
     {available.length ? <label className="animation-model">Video Model<select disabled={busy || queued > 0} value={profileId} onChange={(event) => setProfileId(event.target.value)}>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.displayName || candidate.label}</option>)}</select></label> : <p role="status">No ready MiniMax H3 image-to-video model is available. Add its workflow and required model files, then rescan models.</p>}
     {drafts.map((draft, index) => <section className="animation-photo" key={draft.item.id}>
-      <SafeImg src={draft.item.thumbnailUrl || draft.item.url} alt={`${extend ? 'Video' : 'Photo'} ${index + 1}`} fallback={<span className="animation-photo-fallback" role="img" aria-label={`${extend ? 'Video' : 'Photo'} ${index + 1} unavailable`}><Video size={24} /></span>} />
+      <SafeImg src={draft.item.thumbnailUrl || draft.item.url} alt={`${extend ? 'Video' : 'Photo'} ${index + 1}`} fallback={<span className="animation-photo-fallback" role="img" aria-label={`${extend ? 'Video' : 'Photo'} ${index + 1} Unavailable`}><Video size={24} /></span>} />
       <label>{extend ? 'Extension' : 'Animation'} Prompt {index + 1}<textarea disabled={busy || draft.queued} maxLength={profile?.constraints?.prompt?.max} rows={4} value={draft.prompt} onChange={(event) => patch(draft.item.id, { prompt: event.target.value })} /></label>
       {draft.queued ? <p role="status">Queued</p> : draft.error ? <p role="alert">{draft.error}</p> : null}
     </section>)}

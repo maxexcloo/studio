@@ -238,7 +238,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       if (profile.family && profile.family !== "custom" && !profile.id.startsWith("custom:")) known.set(profile.family, profile.familyName || profile.family);
     }
     if (current && current !== "custom" && !known.has(current)) known.set(current, current);
-    return [{ label: "Its own", value: "custom" }, ...[...known].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ label, value }))];
+    return [{ label: "Its Own", value: "custom" }, ...[...known].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ label, value }))];
   };
   // The same setup panel as the sidebar, for the model this workflow runs.
   const selectedProfile = selected ? models?.profiles.find((profile) => profile.id === selected.profileId) : undefined;
@@ -391,7 +391,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         const guessed = (item.metadata.guessed || []).filter((entry) => entry !== key);
         const mediaInputs = key === "startImage"
           ? node && input
-            ? [{ ...(item.metadata.mediaInputs?.[0] || { id: "reference", kind: "image" as const, label: "Reference image", required: false, min: 0, max: 1 }), control: { node, input } }, ...(item.metadata.mediaInputs || []).slice(1)]
+            ? [{ ...(item.metadata.mediaInputs?.[0] || { id: "reference", kind: "image" as const, label: "Reference Image", required: false, min: 0, max: 1 }), control: { node, input } }, ...(item.metadata.mediaInputs || []).slice(1)]
             : []
           : item.metadata.mediaInputs;
         return { ...item.metadata, controls, guessed, mediaInputs };
@@ -470,11 +470,11 @@ export function WorkflowGallery({ view }: { view: any }) {
       <aside className={cn("wf-detail", mobileDetailsOpen && "is-open-mobile")}>
         {selected && selectedStatus ? (
           <>
-            <button type="button" className="btn is-ghost wf-back" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft size={15} /> All workflows</button>
+            <button type="button" className="btn is-ghost wf-back" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft size={15} /> All Workflows</button>
             <div className="wf-detail-head">
               <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
               <h3>{workflowCardText(selected).name}</h3>
-              <button type="button" className={cn("wf-heart", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from favorites" : "Add to favorites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favorites", "error"))}>
+              <button type="button" className={cn("wf-heart", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from Favourites" : "Add to Favourites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favorites", "error"))}>
                 <Heart size={16} fill={selected.favorite ? "currentColor" : "none"} />
               </button>
             </div>
@@ -501,7 +501,7 @@ export function WorkflowGallery({ view }: { view: any }) {
 
             <div className="wf-detail-actions">
               <button className="btn is-primary" onClick={() => useWorkflow(selected)} disabled={busy || (!selected.validation.ok && !selectedProfile?.missing?.length) || selected.profileId === model}>
-                {selected.profileId === model ? <><Check size={15} /> In use</> : "Use workflow"}
+                {selected.profileId === model ? <><Check size={15} /> In Use</> : "Use workflow"}
               </button>
               {selected.deleteId && thisComputer ? <button className="btn is-ghost is-danger-text" disabled={busy} onClick={() => deleteWorkflow(selected)}><Trash2 size={14} /> Delete</button> : null}
             </div>
@@ -509,9 +509,9 @@ export function WorkflowGallery({ view }: { view: any }) {
             <dl className="wf-facts">
               <dt>Source</dt><dd>{selected.source === "builtin" ? "Built in" : "Imported"}</dd>
               <dt>Family</dt><dd>{selected.familyName || selected.family || "Unknown"}</dd>
-              <dt>Last used</dt><dd>{timeLabel(selected.lastUsedAt) || "Never"}</dd>
+              <dt>Last Used</dt><dd>{timeLabel(selected.lastUsedAt) || "Never"}</dd>
               {selected.controls?.length ? <><dt>Controls</dt><dd>{selected.controls.map(controlLabel).join(", ")}</dd></> : null}
-              {selected.mediaInputs?.length ? <><dt>Inputs</dt><dd>{selected.mediaInputs.map((input) => input.label || "Reference image").join(", ")}</dd></> : null}
+              {selected.mediaInputs?.length ? <><dt>Inputs</dt><dd>{selected.mediaInputs.map((input) => input.label || "Reference Image").join(", ")}</dd></> : null}
             </dl>
           </>
         ) : (
@@ -519,7 +519,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         )}
       </aside>
 
-      {dragging ? <div className="wf-drop"><FileJson size={24} /><strong>Drop to import</strong><span>Workflow JSON, API or visual format</span></div> : null}
+      {dragging ? <div className="wf-drop"><FileJson size={24} /><strong>Drop to Import</strong><span>Workflow JSON, API or visual format</span></div> : null}
 
       <Modal
         open={importOpen}
@@ -527,7 +527,7 @@ export function WorkflowGallery({ view }: { view: any }) {
         size="form"
         busy={busy}
         className="wf-import"
-        title={<>{importStep === "choose" ? "Import Workflows" : `Review ${imports.length} workflow${imports.length === 1 ? "" : "s"}`}</>}
+        title={<>{importStep === "choose" ? "Import Workflows" : `Review ${imports.length} Workflow${imports.length === 1 ? "" : "s"}`}</>}
         description={importStep === "choose"
           ? "Import workflow JSON in API or visual format. Connected inputs use your generation settings; the rest stay as saved."
           : "Check what follows the studio. Everything else keeps the workflow’s saved values."}
@@ -538,7 +538,7 @@ export function WorkflowGallery({ view }: { view: any }) {
           </>
         ) : (
           <>
-            <button className="btn" disabled={busy} onClick={() => setImportStep("choose")}><ArrowLeft size={14} /> Add more</button>
+            <button className="btn" disabled={busy} onClick={() => setImportStep("choose")}><ArrowLeft size={14} /> Add More</button>
             <button className="btn is-primary" onClick={saveImports} disabled={busy || !imports.length}>{busy ? "Importing…" : `Import ${imports.length === 1 ? "workflow" : `${imports.length} workflows`}`}</button>
           </>
         )}
@@ -576,7 +576,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                   </div>
                   <ImportFit item={item} />
                   <details className="wf-mapping">
-                    <summary>Change connections</summary>
+                    <summary>Change Connections</summary>
                     <div className="wf-map-grid">
                       {workflowControls.filter((control) => control.editable).map(({ key, label }) => (
                         <Field key={key} label={label}>
@@ -584,7 +584,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                             value={selectedNodeValue(item.metadata.controls[key])}
                             onChange={(value) => updateImportControl(index, key, value === "__none" ? "" : value)}
                             options={[
-                              { label: "Stays as saved", value: "__none" },
+                              { label: "Stays as Saved", value: "__none" },
                               ...item.metadata.nodes.flatMap((node) => node.inputs.map((input) => ({ label: `${node.title || node.classType} #${node.id} · ${input}`, value: `${node.id}.${input}` })))
                             ]}
                           />

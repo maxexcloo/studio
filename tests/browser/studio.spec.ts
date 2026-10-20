@@ -237,14 +237,14 @@ for (const selection of ['empty', 'previous', 'manual']) {
     // The full studio names the waiting button for what it waits on; the phone keeps Generate.
     await expect(ui.composer.getByRole('button', { name: /^(Generate|Loading the reused image)$/ })).toBeDisabled();
     if (selection === 'manual') {
-      await page.getByRole('button', { name: `Change reference image, currently ${previous.name}`, exact: true }).click();
+      await page.getByRole('button', { name: `Change Reference Image, Currently ${previous.name}`, exact: true }).click();
       await page.getByRole('button', { name: `Selected: ${previous.name}`, exact: true }).click();
       await page.getByRole('button', { name: manual.name, exact: true }).click();
       await page.keyboard.press('Escape');
     }
     releaseReference();
     const expected = selection === 'manual' ? manual : reference;
-    await expect(page.getByRole('button', { name: `Change reference image, currently ${expected.name}`, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Change Reference Image, Currently ${expected.name}`, exact: true })).toBeVisible();
     await ui.prompt.fill('Animate the image');
     await ui.generate.click();
     await expect.poll(() => body).not.toBeNull();
@@ -334,11 +334,11 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   const body = page.locator('.reference-popover-body');
   await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  await expect(page.getByRole('alert')).toContainText('Next page unavailable');
+  await expect(page.getByRole('alert').filter({ hasText: 'Next page unavailable' })).toBeVisible();
   await expect(page.locator('[data-reference-index="59"]')).toBeVisible();
   const initialHeight = await page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight);
   await page.getByRole('button', { name: 'Try Again', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'Next page unavailable' })).toHaveCount(0);
   await expect.poll(() => page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight)).toBeGreaterThan(initialHeight);
   for (let index = 0; index < 4; index++) {
     const height = await page.locator('[data-reference-grid]').evaluate((element) => element.clientHeight);
@@ -517,7 +517,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(1);
   await expect(menu.getByText('Recent', { exact: true })).toHaveCount(0);
   const shortcut = rows.filter({ hasText: 'Model 02' }).first();
-  await shortcut.locator('..').getByRole('button', { name: /Add .*favorites/ }).click();
+  await shortcut.locator('..').getByRole('button', { name: /Add .*Favourites/ }).click();
   await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
   await expect(menu.getByRole('heading', { name: 'Favourites', exact: true }).or(menu.getByRole('group', { name: 'Favourites', exact: true }))).toBeVisible();
   const search = menu.getByLabel('Search Models', { exact: true });
@@ -536,11 +536,11 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   }
   await search.fill('Model 28');
   await expect(rows).toHaveCount(1);
-  const favourite = rows.first().locator('..').getByRole('button', { name: /Add .*favorites/ });
+  const favourite = rows.first().locator('..').getByRole('button', { name: /Add .*Favourites/ });
   await favourite.focus();
   await favourite.press('Enter');
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('button', { name: /Remove .*favorites/ }).last()).toHaveAttribute('aria-pressed', 'true');
+  await expect(menu.getByRole('button', { name: /Remove .*Favourites/ }).last()).toHaveAttribute('aria-pressed', 'true');
   // The full studio's search field picks the first match on Enter; the phone sheet picks by tap.
   if (phone) await rows.first().click();
   else await search.press('Enter');
@@ -654,7 +654,7 @@ test('gallery selection stars several items and ends cleanly', async ({ page }, 
   await tile(0).click();
   await tile(1).click();
   await page.screenshot({ path: testInfo.outputPath('selection.png') });
-  await ui.selectionBar.getByRole('button', { name: /^Star Selected/ }).click();
+  await ui.selectionBar.getByRole('button', { name: 'Star Selected', exact: true }).click();
   await expect.poll(() => favourites.length).toBe(1);
   expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1']));
   await page.getByRole('button', { name: 'Stop Selecting' }).click();
@@ -687,15 +687,15 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   await bar.getByRole('button', { name: 'Select All' }).click();
   await expect(bar.getByRole('status')).toHaveText('80 Selected');
   await bar.getByRole('button', { name: 'Select None' }).click();
-  await expect(bar.getByRole('button', { name: /^Delete Selected/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Delete Selected', exact: true })).toBeDisabled();
   await tile(0).click();
   await tile(1).click();
-  await bar.getByRole('button', { name: /^Delete Selected/ }).click();
+  await bar.getByRole('button', { name: 'Delete Selected', exact: true }).click();
   const confirmation = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Delete 2 Items?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(bar.getByRole('status')).toHaveText('2 Selected');
-  await bar.getByRole('button', { name: /^Delete Selected/ }).click();
+  await bar.getByRole('button', { name: 'Delete Selected', exact: true }).click();
   await confirmation.getByRole('button', { name: 'Delete 2', exact: true }).click();
   await expect(tile(0)).toHaveCount(0);
   await expect(tile(1)).toHaveCount(0);
@@ -732,9 +732,9 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
   await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await page.locator('[data-tile-id="image-0"] .tile').click();
-  await expect(bar.getByRole('button', { name: /^Star Selected/ })).toBeDisabled();
-  await expect(bar.getByRole('button', { name: /^Download Selected/ })).toBeDisabled();
-  await expect(bar.getByRole('button', { name: /^Delete Selected/ })).toBeEnabled();
+  await expect(bar.getByRole('button', { name: 'Star Selected', exact: true })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: /^(Download|Share) Selected/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Delete Selected', exact: true })).toBeEnabled();
   await page.locator('[data-tile-id="image-2"] .tile').click();
   await expect(page.locator('.tile.is-selected')).toHaveCount(1);
   if (!await ui.isPhone()) {
