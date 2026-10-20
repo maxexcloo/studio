@@ -26,6 +26,7 @@ export const defaultPrefs: Preferences = {
   inpainting: true,
   upscaleQuality: "balanced",
   autoUpscale: "none",
+  runUpscale: 0,
   upscaleFaceDetail: false,
   modelFolderHints: true,
   shareWithoutSettings: false

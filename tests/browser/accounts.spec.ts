@@ -200,13 +200,13 @@ test('phones reach account settings and sign out from the More sheet', async ({ 
     return request.continue();
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('button', { name: /^Account\b/ }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign In to Studio', exact: true })).toBeVisible();
   expect(signedIn).toBe(false);
 });

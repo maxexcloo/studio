@@ -625,9 +625,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose, 
         {section === 'studio' ? (
           <>
             <h4 className="set-subhead">General</h4>
-            {phoneDevice || prefs.fullStudioOnPhone ? <Group title="Layout">
-              <SwitchRow label="Simple Phone Studio" description="A simpler layout for making, browsing and sharing. Everything else stays on the computer." checked={!prefs.fullStudioOnPhone} onChange={(next) => setPrefs({ fullStudioOnPhone: !next })} />
-            </Group> : null}
             <Group title="Keyboard" note="Shortcuts pause while you type in a field, except the ones that send the prompt.">
               <ShortcutsDrawer />
             </Group>

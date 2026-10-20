@@ -60,7 +60,7 @@ test('an applied query or filter tints the collapsed icon with a count', async (
   // Search is collapsed to its icon and still says a query is applied.
   await expect(searchButton(page).locator('.phone-tool-count')).toHaveText('1');
   await expect(filterButton(page).locator('.phone-tool-count')).toHaveText('2');
-  expect(await searchButton(page).evaluate((node) => getComputedStyle(node).color)).not.toBe(await page.getByRole('button', { name: 'More', exact: true }).evaluate((node) => getComputedStyle(node).color));
+  expect(await searchButton(page).evaluate((node) => getComputedStyle(node).color)).not.toBe(await page.getByRole('button', { name: 'Menu', exact: true }).evaluate((node) => getComputedStyle(node).color));
 });
 
 test('closing the shared row clears the query and every filter', async ({ page }) => {

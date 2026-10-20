@@ -60,6 +60,9 @@
 
   /* Deck geometry: a 40px control plus 4px of surface on each side. */
   --dock-h: 48px;
+  /* The phone's bars (top bar, select bar) and what lines up with them: the status pill, the viewer's corner buttons. */
+  --bar-h: var(--dock-h);
+  --bar-pill-h: 40px;
   --sidebar-w: min(390px, calc(100vw - 36px));
 
   /* The one accent: warm amber, the lock mark's glow. Every active, selected and

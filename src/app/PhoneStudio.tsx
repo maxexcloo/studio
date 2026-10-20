@@ -2,12 +2,15 @@ import { PromptField } from './PromptField';
 import { CatalogueFilters } from './CatalogueFilters';
 import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
 import React from 'react';
+import { createPortal } from 'react-dom';
+import { usePhoneLayer } from './phoneLayers';
+import { useDismiss } from './useDismiss';
 import { recipesFor } from './modelRecipes';
 import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { gridAutoplayEnabled, subscribeGridAutoplay, toggleGridAutoplay } from './videoPreviewScheduler';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, X, Film, Images } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, ChevronRight, CircleStop, Dices, Image as ImageIcon, Layers, Library, LogOut, MoreHorizontal, Plus, RefreshCw, ListRestart, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Film, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -22,9 +25,11 @@ import { generatingLabel } from './itemWording';
 import { RestartEtaText } from './ComfyRestart';
 import { estimatePhrase } from './useGenerationEstimate';
 import type { GalleryItem, Profile, SavedSize } from './types';
-import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type SizeRow, type SizeTier } from './SizeMenu';
-import { MEGAPIXEL, presetRatio, ratioName } from './sizing';
-import { ListButton, ListItem, ListSection } from './SheetList';
+import { LinkedSizeFields, MegapixelField, SizeTabs, sizeMenuModel, type SizeTier } from './SizeMenu';
+import { MEGAPIXEL, ratioName } from './sizing';
+import { ListButton, ListItem, ListSection, ListSelect } from './SheetList';
+import { AdvancedPopover, ComposerSurface } from './LoraPopover';
+import { practicalStepRange } from './SidebarControls';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
@@ -125,6 +130,9 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     });
   }, [gallery]); // eslint-disable-line react-hooks/exhaustive-deps
   const [moreOpen, setMoreOpen] = React.useState(false);
+  // What's running: a tap shows it, or stops it all.
+  const [runningOpen, setRunningOpen] = React.useState(false);
+  React.useEffect(() => { if (!runningCount) setRunningOpen(false); }, [runningCount]);
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   // Search and the filter row share one row under the bar; one is open at a time.
@@ -176,35 +184,37 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
   return (
     <>
-      {selecting ? (
-        <header className="phone-bar is-selecting">
-          <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
-          <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span></div>
-          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={15} aria-hidden="true" />Failed</button> : null}
-          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={15} aria-hidden="true" />{selection.allSelected ? 'None' : 'All'}</button>
-        </header>
-      ) : null}
-      {/* One slim top bar: iOS's status bar sits over it, and a tap there scrolls the page to the top.
-          Left, one element: the status light and the gallery's Images | Videos. Right, Search, Filter and More. */}
-      <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
-        <div className="phone-bar-row">
-          {/* A message takes the element over for a moment (UI-PATTERNS › Messages); the tools stay where they are. */}
-          {message ? <StatusPill message={message} className="is-bar" /> : (
+      {/* One top bar (UI-PATTERNS › Phone): iOS's status bar sits over it, and a tap there scrolls the page to the top.
+          Selecting swaps its contents (Close · n Selected · Failed · All) rather than bringing in a second bar. */}
+      <header ref={barRef} className={cn('phone-bar', selecting && 'is-selecting')}>
+        {selecting ? (
+          <div className="phone-bar-row">
+            <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
+            <span className="phone-bar-title">{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span>
+            <span className="phone-bar-gap" />
+            {selection.failedCount ? <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={20} /></button> : null}
+            <button type="button" className={cn('phone-icon', selection.allSelected && 'is-on')} aria-pressed={selection.allSelected} aria-label={selection.allSelected ? 'Select None' : 'Select All'} title={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={20} /></button>
+          </div>
+        ) : (
+          <div className={cn('phone-bar-row', message && 'has-message')}>
+            {/* Left: the status light and "Studio" (a tap on the light checks again), then what is running. */}
             <div className={cn('phone-heading', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')}>
               <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>
-              <MediaModeToggle kind="gallery" labelled className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />
+              <span className="phone-heading-name">Studio</span>
             </div>
-          )}
-          {runningCount ? <button type="button" className="phone-running-inline" aria-label={`${runningLabel}. Show It`} title={runningLabel} onClick={revealRunning}>
-            <RefreshCw size={13} className="spin" aria-hidden="true" /><span>{runningCount}</span>
-          </button> : null}
-          <span className="phone-bar-gap" />
-          <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
-          <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
-          <button type="button" className="phone-icon" aria-label="More" onClick={() => setMoreOpen(true)}><MoreHorizontal size={22} /></button>
-        </div>
+            {runningCount ? <button type="button" className="phone-running-inline" aria-label={runningLabel} aria-haspopup="menu" aria-expanded={runningOpen} title={runningLabel} onClick={() => setRunningOpen((value) => !value)}>
+              <LoaderCircle size={14} className="spin" aria-hidden="true" /><span>{runningCount}</span>
+            </button> : null}
+            {/* Centre: Images | Videos as two icons; a message takes the slot for a moment (UI-PATTERNS › Messages). */}
+            {message ? <StatusPill message={message} className="is-bar" /> : <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />}
+            <span className="phone-bar-gap" />
+            <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
+            <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
+            <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
+          </div>
+        )}
         {/* Search or the filters, full width under the bar, one at a time. */}
-        <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />
+        {selecting ? null : <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />}
       </header>
 
       <main className="phone-gallery" onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
@@ -232,7 +242,11 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       ) : null}
 
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
-      <MoreSheet view={view} open={moreOpen} onClose={() => setMoreOpen(false)} statusText={statusText} onSelect={selectable.length ? () => {
+      <PhoneMenu open={runningOpen} onClose={() => setRunningOpen(false)} trigger=".phone-running-inline" label={runningLabel} align="left" items={[
+        { id: 'show', Icon: Images, label: 'Show Running', run: () => { setRunningOpen(false); revealRunning(); } },
+        { id: 'stop', Icon: CircleStop, label: 'Stop All Generations', danger: true, run: () => { setRunningOpen(false); view.cancelQueue(); } }
+      ]} />
+      <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} onSelect={selectable.length ? () => {
         // Clearing the search changes the view, which ends a selection: start once that has landed.
         const cleared = searchActive(searchRef.current);
         closeTools();
@@ -263,8 +277,12 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
-  const many = (referenceAssets || []).length > 1;
-  const [sheet, setSheet] = React.useState<'' | 'workflow' | 'size' | 'advanced'>('');
+  const picked = (referenceAssets || []) as Array<{ slot: string; asset: unknown }>;
+  const many = picked.length > 1;
+  // One pop-up over Create at a time (UI-PATTERNS › Surfaces): Model, Size or Advanced; References and LoRAs have their own.
+  const [pop, setPop] = React.useState<'' | 'model' | 'size' | 'advanced'>('');
+  React.useEffect(() => { if (!open) setPop(''); }, [open]);
+  const toggle = (which: 'model' | 'size' | 'advanced') => setPop((current) => current === which ? '' : which);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
   const { prompts: recentNegatives } = usePromptHistory(open, 'negative');
@@ -278,12 +296,20 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const sizeText = `${ratioName(size.shown.width, size.shown.height)} · ${size.shown.width}×${size.shown.height}`;
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
-  const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
   const hasReferences = Boolean((referenceInputs || []).length || view.referenceWith?.profiles?.length);
   const lorasOffered = mode !== 'video' || currentProfile?.capabilities?.lora;
   const fixedSeed = String(seed || '').trim();
-  const advancedText = [currentProfile?.family !== 'grok' && steps ? `${steps} Steps` : '', sampler ? String(sampler) : '', fixedSeed ? `Seed ${fixedSeed}` : ''].filter(Boolean).join(' · ');
+  const stepsOffered = currentProfile?.family !== 'grok' && currentProfile?.capabilities?.steps !== false;
+  const advancedText = [sampler ? String(sampler) : '', fixedSeed ? `Seed ${fixedSeed}` : '', Number(view.prefs?.runUpscale) ? `Upscale ${Number(view.prefs.runUpscale) === 4096 ? '4K' : '2K'}` : ''].filter(Boolean).join(' · ');
   const blocked = restarting || (!comfyOffline && (!prompt.trim() || generateDisabled));
+  const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
+
+  // Clear at the end of the References and LoRAs rows, with Undo in the status pill.
+  const clearReferences = () => {
+    const cleared = [...picked];
+    removeReferenceAsset(cleared.map((item) => item.slot));
+    showToast('References cleared', 'default', { action: { label: 'Undo', onClick: () => cleared.forEach((item) => selectReferenceAsset(item.slot, item.asset)) } });
+  };
 
   const go = () => {
     if (comfyOffline) { retryComfyStatus(); return; }
@@ -301,15 +327,19 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       full
       className="phone-create"
       title="Create"
-      headerAction={<ComposerModeSelect mode={mode} onChange={view.changeMode} tips={false} />}
       footer={
         <>
-          {reason ? <p className="phone-reason">{reason}</p> : null}
-          {/* Always in view: how many, start again, and Generate. */}
+          {/* Two lines, always in view: Steps and the count, then Image | Video, Clear and Generate. */}
+          {stepsOffered || (variations && maxCount > 1) ? (
+            <div className="create-footer-tune">
+              {stepsOffered ? <NumberPicker className="create-tune create-steps" label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /> : null}
+              {variations && maxCount > 1 ? <NumberPicker className="create-tune composer-count-picker create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" /> : null}
+            </div>
+          ) : null}
           <div className="create-footer">
-            {variations && maxCount > 1 ? <NumberPicker className="composer-count-picker create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" density="compact" icon={mode === 'video' ? <Film size={16} /> : <Images size={16} />} /> : null}
+            <ComposerModeSelect mode={mode} onChange={view.changeMode} tips={false} />
             <button type="button" className="phone-icon create-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={19} /></button>
-            <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={blocked || undefined} onClick={go}>
+            <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-description={(generateDisabled && prompt.trim() ? generateDisabledReason : estimate) || undefined} aria-disabled={blocked || undefined} onClick={go}>
               {restarting || comfyOffline ? <RefreshCw size={18} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={18} strokeWidth={2.4} />}
               <span>{restarting ? 'Restarting' : comfyOffline ? 'Check Again' : 'Generate'}</span>
             </button>
@@ -320,16 +350,17 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       {/* One flat column: the prompt takes the room that's left, then one row per choice. */}
       <div className="create-flow">
         <div className="create-prompts">
-          <PromptField kind="positive" fill value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
-          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={1} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
+          <PromptField kind="positive" fill selectAll value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
+          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
         </div>
         <div className="list-group create-options">
-          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={sheet === 'workflow'} onClick={() => setSheet('workflow')} />
+          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} data-open-trigger aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={pop === 'model'} onClick={() => toggle('model')} />
           {hasReferences ? (
-            // The chooser's button lands here (ReferenceSlots portals into the tools), as wide as the row.
-            <div className="list-row is-static create-references">
+            // The chooser's button lands here (ReferenceSlots portals into the tools), as wide as the row; Clear sits at its end.
+            <div className={cn('list-row is-static create-references', picked.length > 0 && 'has-picks')}>
               <span className="list-row-label">References</span>
               <div className="composer-reference-tools" />
+              {picked.length ? <button type="button" className="list-row-clear" aria-label="Clear References" onClick={clearReferences}><X size={16} aria-hidden="true" /></button> : null}
             </div>
           ) : null}
           {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
@@ -345,18 +376,19 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
                     </button>
                   ))}
                 </div>
-                <small key={`${referenceRole.value}:${many}:${Boolean(referenceRole.locked)}`}>{referenceRole.locked ? 'The painted part changes this picture. Clear the paint to use it as a reference'
-                  : referenceRole.value === 'edit'
-                  ? many ? 'Changes the first picture, at its size. The others are what it can draw from' : 'Changes this picture, at its size and framing'
-                  : many ? 'They all guide a new picture, at the size you pick' : 'Guides a new picture, at the size you pick'}</small>
               </motion.div>
             ) : null}
           </AnimatePresence>
-          {lorasOffered ? <ListButton label="LoRAs" value={view.loraSummary || 'None'} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()} /> : null}
+          {lorasOffered ? (
+            <div className={cn('list-row-wrap', view.loraSummary && 'has-clear')}>
+              <ListButton label="LoRAs" value={view.loraSummary || 'None'} end={view.loraSummary ? 'none' : 'chevron'} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()} />
+              {view.loraSummary ? <button type="button" className="list-row-clear" aria-label="Clear LoRAs" onClick={view.clearLoras}><X size={16} aria-hidden="true" /></button> : null}
+            </div>
+          ) : null}
           {!aspectLocked ? (
-            <ListButton label="Size" value={sizeText} aria-label={`Size: ${sizeText}`} aria-haspopup="dialog" aria-expanded={sheet === 'size'} onClick={() => setSheet('size')} />
+            <ListButton label="Size" value={sizeText} data-open-trigger aria-label={`Size: ${sizeText}`} aria-haspopup="dialog" aria-expanded={pop === 'size'} onClick={() => toggle('size')} />
           ) : <ListItem label="Size"><span className="list-row-value">Follows the image · {size.shown.width}×{size.shown.height}</span></ListItem>}
-          <ListButton label="Advanced" value={advancedText} aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={sheet === 'advanced'} onClick={() => setSheet('advanced')} />
+          <ListButton label="Advanced" value={advancedText} data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={pop === 'advanced'} onClick={() => toggle('advanced')} />
         </div>
         <ReferenceSlots
           scope={`${mode}:${view.model}`}
@@ -380,137 +412,92 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         onError={(message) => showToast(message, 'error')}
       />
 
-      <WorkflowSheet view={view} open={sheet === 'workflow'} onClose={() => setSheet('')} />
-      <SizeSheet view={view} open={sheet === 'size'} onClose={() => setSheet('')} />
-      <Sheet open={sheet === 'advanced'} onClose={() => setSheet('')} title="Advanced Settings" full className="phone-advanced">
-        {grokMediaControls}
-        {phoneVideoDurationControls}
-        {phoneAdvancedControls}
-      </Sheet>
+      <AnimatePresence>
+        {open && pop === 'model' ? <ComposerSurface key="model" title="Model" icon={<Wand2 size={16} />} trigger='[data-open-trigger][aria-label="Choose Model"][aria-expanded="true"]' className="phone-model-pop" bodyClassName="phone-model-pop-body" onClose={() => setPop('')}><PhoneModelList view={view} onPicked={() => setPop('')} /></ComposerSurface> : null}
+        {open && pop === 'size' ? <ComposerSurface key="size" title="Size" icon={<Ratio size={16} />} trigger='[data-open-trigger][aria-label^="Size:"][aria-expanded="true"]' className="phone-size-pop" bodyClassName="phone-size-pop-body" onClose={() => setPop('')}><PhoneSize view={view} /></ComposerSurface> : null}
+      </AnimatePresence>
+      <AdvancedPopover open={open && pop === 'advanced'} onClose={() => setPop('')}>{grokMediaControls}{phoneVideoDurationControls}{phoneAdvancedControls}</AdvancedPopover>
     </Sheet>
   );
 }
 
-function WorkflowSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
+/** The model chooser's list (UI-PATTERNS › Pickers): search, Fast | Quality, favourites and family groups. */
+function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicked: () => void }) {
   const { modelProfiles, model, pickModel, modelMenu } = view as { modelProfiles: Profile[]; model: string; pickModel: (id: string) => void; modelMenu?: ModelMenuState };
   const { profiles, menu, isFavourite, query, setQuery, filters, setFilters, sections, noMatchText } = useModelCatalogue(modelProfiles, model, modelMenu);
-  React.useEffect(() => { if (!open) setQuery(''); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const recipes = recipesFor(modelProfiles || [], model);
   const row = (profile: Profile) => (
-    <div key={profile.id} className="phone-row-wrap">
-      <button type="button" className={cn('phone-row phone-model-option', profile.id === model && 'is-current')} onClick={() => { pickModel(profile.id); onClose(); }}>
-        {profile.id === model ? <Check size={18} className="model-selection-tick" aria-hidden="true" /> : null}
-        <span>{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
+    <div key={profile.id} className={cn('list-row model-pop-row', profile.id === model && 'is-selected')}>
+      <button type="button" className="model-pop-pick" aria-current={profile.id === model || undefined} onClick={() => { pickModel(profile.id); onPicked(); }}>
+        <span className="model-pop-name">{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
+        <Check size={17} className={cn('list-row-end list-row-check', profile.id !== model && 'is-off')} aria-hidden="true" />
       </button>
       {menu ? (
-        <button type="button" className={cn('phone-icon', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
-          <Star size={18} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
+        <button type="button" className={cn('picker-star', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
+          <Star size={16} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
         </button>
       ) : null}
     </div>
   );
   return (
-    <Sheet open={open} onClose={onClose} title="Model" full className="phone-model-sheet">
+    <>
       <div className="phone-model-tools">
-        {recipes.length ? <label className="phone-row">Recipe<select aria-label="Recipe" value={model} onChange={(event) => pickModel(event.target.value)}>{recipes.map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null}
+        {recipes.length ? <ListItem label="Recipe"><ListSelect native label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
         {profiles.length ? (
-          <label className="phone-search picker-search">
-            <Search size={17} aria-hidden="true" />
-            <input className="is-framed" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
+          <label className="picker-search">
+            <Search size={15} aria-hidden="true" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
+            {query ? <button type="button" aria-label="Clear Model Search" onClick={() => setQuery('')}><X size={14} /></button> : null}
           </label>
         ) : null}
         {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
       </div>
       {!profiles.length ? (view.comfyStatus?.connected ? <EmptyState title="No Models Yet">Add a model to ComfyUI to see it here.</EmptyState> : <EmptyState title="ComfyUI Is Offline">Models show up when it’s back.</EmptyState>) : null}
-      {sections.map((section) => <React.Fragment key={section.id}>{section.label ? <h3 className="phone-section">{section.label}</h3> : null}<div className="phone-group">{section.rows.map(row)}</div></React.Fragment>)}
+      {sections.map((section) => <ListSection key={section.id} title={section.label || undefined}>{section.rows.map(row)}</ListSection>)}
       {profiles.length && !sections.length ? <EmptyState title="No Matching Models">{noMatchText}</EmptyState> : null}
-    </Sheet>
+    </>
   );
 }
 
 /**
- * The size menu as a sheet: the frame the picture will fill on a stage at the
- * top (it stays in view while the shapes scroll), Default · 2K · Custom,
- * Custom's linked width and height, the shapes, and the sizes you saved.
- *
- * There is no hover on a phone, so a finger resting on a row shows its frame
- * on the stage, and the saved sizes' Rename and Remove wait behind Edit
- * rather than hiding under a pointer. Picking keeps the sheet open, as the
- * desktop panel stays open; in Custom a shape keeps the area.
+ * Size, in the pop-up over Create: the model's native resolutions as one
+ * full-width toggle, the shapes as one full-width toggle (their outline and
+ * ratio), then Width and Height, always in view, as on the desktop. Typing a
+ * side makes it a custom size; a shape or resolution goes back to the preset.
+ * The saved sizes follow, with Rename and Remove behind Edit.
  */
-/** A shape's outline fitted to the list's 24 × 18 lead, so every ratio reads true and the labels line up. */
-const shapeIn = (w: number, h: number) => { const scale = Math.min(24 / (w || 1), 18 / (h || 1)); return { width: Math.max(6, Math.round(w * scale)), height: Math.max(6, Math.round(h * scale)) }; };
+const shapeIn = (w: number, h: number) => { const scale = Math.min(22 / (w || 1), 16 / (h || 1)); return { width: Math.max(6, Math.round(w * scale)), height: Math.max(6, Math.round(h * scale)) }; };
 
-function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: boolean; onClose: () => void }) {
+function PhoneSize({ view }: { view: Record<string, any> }) {
   const {
     aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
-    chooseSizeTier, applyCustomRatio, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
+    chooseSizeTier, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
     sizeTiers, sizeArea, megapixelControl
   } = view;
   const saved = (savedSizes || []) as SavedSize[];
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
   const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0, offerTwoK: tiers.includes('2k') });
-  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, captionFor, note } = model;
-
-  // The row under a finger: shown on the stage after a beat, so a scroll that starts on a row doesn't flick the frame.
-  const [pressed, setPressed] = React.useState<SizeRow | null>(null);
-  const pressTimer = React.useRef(0);
-  const press = (row: SizeRow | null) => {
-    window.clearTimeout(pressTimer.current);
-    if (row) pressTimer.current = window.setTimeout(() => setPressed(row), 90);
-    else setPressed(null);
-  };
-  React.useEffect(() => () => window.clearTimeout(pressTimer.current), []);
+  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, note } = model;
   const [editing, setEditing] = React.useState(false);
-  React.useEffect(() => { if (!open) { press(null); setEditing(false); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { if (!saved.length) setEditing(false); }, [saved.length]);
-
-  const pressHandlers = (row: SizeRow) => ({
-    onPointerDown: () => press(row),
-    onPointerLeave: () => press(null),
-    onPointerCancel: () => press(null)
-  });
-  const pick = (row: SizeRow) => {
-    press(null);
-    if (custom) { applyCustomRatio(presetRatio(row.shape)); return; }
-    // The sheet stays open, so a resolution and a shape can be picked in one go.
-    applyAspect(row.value);
-  };
-  const pickSaved = (item: SavedSize) => {
-    press(null);
-    pickSavedSize(item);
-  };
-
   const resolutions = tiers.filter((item) => item !== 'custom');
   return (
-    <Sheet open={open} onClose={onClose} title="Size" className="phone-size">
-      {/* One flat list (UI-PATTERNS › Lists): the resolution, Custom Size as a row that opens its fields in place, then the shapes with a check on the one in use. */}
-      <div className="list-group">
-        {resolutions.length > 1 ? <ListItem label="Resolution"><SizeTabs tiers={resolutions} customButton={false} value={tier} onChange={(next) => { chooseSizeTier(next); }} /></ListItem> : null}
-        {tiers.includes('custom') ? <ListButton className="phone-size-custom" label="Custom Size" value={custom ? `${picked.width}×${picked.height}` : ''} end="check" selected={custom} aria-pressed={custom} onClick={() => chooseSizeTier(custom ? 'none' : 'custom')} /> : null}
-        <AnimatePresence initial={false}>
-          {custom && customLimits ? (
-            <motion.div key="custom" className="size-custom phone-size-fields" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+    <div className="phone-size">
+      {resolutions.length > 1 ? <SizeTabs tiers={resolutions} labelled={false} value={tier} onChange={(next) => { chooseSizeTier(next); }} /> : null}
+      <div className="size-shapes" role="radiogroup" aria-label="Shape">
+        {rows.map((row) => (
+          <button key={row.key} type="button" role="radio" aria-checked={isActive(row)} className={cn('size-shape', isActive(row) && 'is-active')}
+            aria-label={`${row.small ? `${row.label}, ${row.small}` : row.label}, ${row.size.width} × ${row.size.height}`}
+            onClick={() => applyAspect(row.value)}>
+            <span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} aria-hidden="true" />
+            <span aria-hidden="true">{row.key === 'default' ? 'Default' : row.label}</span>
+          </button>
+        ))}
       </div>
-      {note ? <p className="list-note">{note}</p> : null}
-      <ListSection title={custom ? 'Shape, at This Size' : 'Shape'}>
-        <div className="list-group phone-size-list" role="listbox" aria-label={custom ? 'Shape, at This Size' : 'Shape'}>
-          {rows.map((row) => (
-            <ListButton key={row.key} role="option" aria-selected={isActive(row)} className="phone-size-row" end="check" selected={isActive(row)}
-              lead={<span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} />}
-              label={row.small || row.label} value={`${row.size.width}×${row.size.height}`}
-              aria-label={`${row.small ? `${row.label}, ${row.small}` : row.label}, ${row.size.width} × ${row.size.height}`}
-              onClick={() => pick(row)} />
-          ))}
-        </div>
-      </ListSection>
-      {/* Under the shapes, as on the desktop: how big they're all drawn. */}
       {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
+      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} /></div> : null}
+      {note ? <p className="list-note">{note}</p> : null}
       {saved.length ? (
         <>
           <div className="phone-size-saved-head">
@@ -525,17 +512,17 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
                   saved={item}
                   active={savedMatch?.id === item.id}
                   editing={editing}
-                  pressHandlers={pressHandlers(savedRow(item))}
-                  onPick={() => pickSaved(item)}
+                  pressHandlers={{}}
+                  onPick={() => pickSavedSize(item)}
                   onRename={(name) => renameSavedSize(item.id, name)}
-                  onRemove={() => { press(null); removeSavedSize(item.id); }}
+                  onRemove={() => removeSavedSize(item.id)}
                 />
               ))}
             </AnimatePresence>
           </div>
         </>
       ) : null}
-    </Sheet>
+    </div>
   );
 }
 
@@ -607,56 +594,54 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
 
 /* ------------------------------------------------------------ More */
 
-function GridAutoplayRow({ toggle }: { toggle: (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => React.ReactNode }) {
-  const enabled = React.useSyncExternalStore(subscribeGridAutoplay, gridAutoplayEnabled);
-  return <>{toggle('Play Grid Previews', 'Videos play silently in the gallery', enabled, () => toggleGridAutoplay())}</>;
+type MenuItem = { id: string; Icon: typeof Search; label: string; run: () => void; danger?: boolean; disabled?: boolean } | 'divider';
+
+/**
+ * A small pop-up menu anchored under a top-bar button, over the page
+ * (UI-PATTERNS › Surfaces): compact rows with an icon, no boxes. The same
+ * glass and motion as the Create pop-ups; one at a time (phoneLayers.ts).
+ */
+function PhoneMenu({ open, onClose, trigger, label, items, align = 'right' }: { open: boolean; onClose: () => void; trigger: string; label: string; items: MenuItem[]; align?: 'left' | 'right' }) {
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const opener = React.useRef<HTMLElement | null>(null);
+  if (open && !opener.current) opener.current = document.querySelector<HTMLElement>(trigger);
+  if (!open) opener.current = null;
+  usePhoneLayer(open, 'pop');
+  useDismiss([menuRef, opener], open, onClose);
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  const [left] = React.useState(() => 0);
+  const anchorLeft = open && align === 'left' ? Math.max(8, (opener.current?.getBoundingClientRect().left || 8) - 4) : left;
+  const reduced = useReducedMotion();
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div ref={menuRef} key="menu" className={cn('phone-menu', align === 'left' && 'is-left')} style={align === 'left' ? { left: anchorLeft, right: 'auto' } : undefined} role="menu" aria-label={label}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: -4 }}
+          transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}>
+          {items.map((item, index) => item === 'divider'
+            ? <i key={`divider-${index}`} className="phone-menu-divider" aria-hidden="true" />
+            : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span></button>)}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
+  );
 }
 
-function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void; statusText: string }) {
-  const { prefs, setPrefs, retryComfyStatus, comfyRetrying } = view;
+/** The top bar's menu: Select, Library, Settings, then Account and Sign Out. Gallery switches live in Settings; Stop All is in what's running. */
+function MoreMenu({ view, open, onClose, onSelect }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void }) {
   const [signingOut, setSigningOut] = React.useState(false);
-  const toggle = (label: string, description: string, checked: boolean, onChange: (next: boolean) => void) => (
-    <label className="phone-row">
-      <span>{label}<small>{description}</small></span>
-      <Switch label={label} checked={checked} onChange={onChange} />
-    </label>
-  );
-  return (
-    <Sheet open={open} onClose={onClose} title="More">
-      {/* Account · Select · Library · Settings; the Studio mark top left is the status. Sign Out is first, in plain sight. */}
-      {hasAccountStorageScope() ? <>
-        <h3 className="phone-section">Account</h3>
-        <div className="phone-group">
-          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('account'); }}><UserRound size={20} /><span>Account<small>Your MCP token and session</small></span></button>
-          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutChecked(view.runningCount || 0, view.confirmAction).then((done) => { if (!done) setSigningOut(false); }).catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
-        </div>
-      </> : null}
-      <h3 className="phone-section">Select</h3>
-      <div className="phone-group">
-        {onSelect ? <button type="button" className="phone-row" aria-label="Select Items" onClick={() => { onClose(); onSelect(); }}><CheckSquare size={20} /><span>Select Items<small>Download, animate, star or delete several</small></span></button> : null}
-        {view.runningCount ? <button type="button" className="phone-row" onClick={() => { onClose(); view.cancelQueue(); }}><CircleStop size={20} /><span>Stop All Generations</span></button> : null}
-        <button type="button" className="phone-row" onClick={retryComfyStatus}>
-          <RefreshCw size={20} className={cn(comfyRetrying && 'spin')} /><span>{statusText}<small>Tap to check again</small></span>
-        </button>
-      </div>
-      <h3 className="phone-section">Library</h3>
-      <div className="phone-group phone-gallery-options">
-        {/* Toggles as rows with a switch, like every other setting here. */}
-        {toggle('Auto-Grouping', searchActive(view.gallerySearch || emptySearch) ? 'Paused while searching' : 'Groups the images of one run into a stack', Boolean(prefs.stackRuns), (next) => setPrefs({ stackRuns: next }))}
-        {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayRow toggle={toggle} /> : null}
-        {view.models?.features?.presets === true ? <button type="button" className="phone-row" aria-label="Image & Model Library" onClick={() => { onClose(); view.setPresetLibraryOpen(true); }}><Library size={20} /><span>Image & Model Library</span></button> : null}
-      </div>
-      <h3 className="phone-section">Settings</h3>
-      <div className="phone-group">
-        {toggle(preferenceLabels.smartUpscale, 'Shows an upscale arrow on finished images', prefs.smartUpscale, (next) => setPrefs({ smartUpscale: next }))}
-        {toggle(preferenceLabels.showFailedItems, 'Keeps them in the gallery so you can see why', prefs.showFailedItems, (next) => setPrefs({ showFailedItems: next }))}
-        {toggle(preferenceLabels.confirmActions, 'Also asks before stopping generations', prefs.confirmActions, (next) => setPrefs({ confirmActions: next }))}
-        <button type="button" className="phone-row" onClick={() => { onClose(); setPrefs({ fullStudioOnPhone: true }); }}>
-          <SlidersHorizontal size={20} /><span>Use the Full Studio<small>All controls, laid out for a larger screen</small></span>
-        </button>
-        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('studio'); }}><Settings size={20} /><span>All Settings</span></button>
-      </div>
-      <p className="phone-note">Models, folders and downloads are managed on the computer running Studio.</p>
-    </Sheet>
-  );
+  const items: MenuItem[] = [];
+  if (onSelect) items.push({ id: 'select', Icon: CheckSquare, label: 'Select', run: () => { onClose(); onSelect(); } });
+  if (view.models?.features?.presets === true) items.push({ id: 'library', Icon: Library, label: 'Library', run: () => { onClose(); view.setPresetLibraryOpen(true); } });
+  items.push({ id: 'settings', Icon: Settings, label: 'Settings', run: () => { onClose(); view.openSettings('studio'); } });
+  if (hasAccountStorageScope()) items.push('divider',
+    { id: 'account', Icon: UserRound, label: 'Account', run: () => { onClose(); view.openSettings('account'); } },
+    { id: 'sign-out', Icon: LogOut, label: signingOut ? 'Signing Out…' : 'Sign Out', danger: true, disabled: signingOut, run: () => { setSigningOut(true); signOutChecked(view.runningCount || 0, view.confirmAction).then((done) => { if (!done) setSigningOut(false); }).catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); } });
+  return <PhoneMenu open={open} onClose={onClose} trigger=".phone-menu-trigger" label="Menu" items={items} />;
 }

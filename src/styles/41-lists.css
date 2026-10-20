@@ -344,7 +344,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 
 /* One slim bar: the status light with Images | Videos as one element on the left, then the
    running count, and Search, Filter and More on the right. No boxes inside it. */
-.phone-bar-row { gap: 0; height: 48px; }
+.phone-bar-row { gap: 0; }
 .phone-bar-gap { flex: 1; min-width: 4px; }
 .phone-heading { display: flex; align-items: center; min-width: 0; }
 .phone-heading-light { display: grid; place-items: center; flex: none; width: 32px; height: 44px; margin-left: -4px; padding: 0; border: 0; background: transparent; }

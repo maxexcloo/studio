@@ -678,7 +678,7 @@
 .ref-menu-role.is-locked button[aria-disabled] { opacity: .4; cursor: not-allowed; }
 .ref-menu-role.is-locked button[aria-disabled]:hover { color: hsl(var(--muted-foreground)); }
 
-/* No hover (a tablet, the full studio on a phone): the references in a row, with Edit | Reference
+/* No hover (a tablet): the references in a row, with Edit | Reference
    as a chip of its own at its start, so the thumbnail's menu is only the brush; with the brush
    folded away (Reference) or absent, there's no menu to open. */
 .ref-role-chip { flex: none; align-self: center; }

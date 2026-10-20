@@ -13,7 +13,7 @@ export function studioUi(page: Page) {
   // Hidden too: a modal opened from the composer hides it from the accessibility tree, yet it stays the composer.
   const composer = page.getByRole('dialog', { name: 'Create', exact: true, includeHidden: true }).or(page.getByRole('region', { name: 'Create', exact: true, includeHidden: true }));
   const galleryMode = page.getByRole('group', { name: 'Gallery Mode', exact: true });
-  const more = page.getByRole('dialog', { name: 'More', exact: true });
+  const more = page.getByRole('menu', { name: 'Menu', exact: true });
   const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
   // The model picker has no shared role yet: a sheet on the phone, a popover menu in the full studio.
   const modelPicker = page.locator('.phone-model-sheet, .model-menu');
@@ -26,7 +26,7 @@ export function studioUi(page: Page) {
 
   /** Opens the phone's More sheet; the full studio has no such sheet. */
   async function openMore() {
-    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await expect(more).toBeVisible();
     return more;
   }
@@ -63,8 +63,8 @@ export function studioUi(page: Page) {
   /** Closes the phone's Create sheet. The full studio's box never covers the gallery, so stays. */
   async function closeComposer() {
     if (!await isPhone() || !await composer.count()) return;
-    // A picker opened from Create replaces it; Escape steps back to Create first.
-    for (let step = 0; step < 3 && await page.locator('.phone-sheet.phone-create.is-covered').count(); step++) await page.keyboard.press('Escape');
+    // A pop-up over Create (Model, References, LoRAs, Size, Advanced) closes first with Escape.
+    for (let step = 0; step < 3 && await page.locator('.phone-sheet.phone-create:is(.is-covered, .is-overlaid)').count(); step++) await page.keyboard.press('Escape');
     if (!await composer.isVisible()) return;
     await composer.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(composer).toHaveCount(0);
@@ -144,7 +144,7 @@ export function studioUi(page: Page) {
     async enterSelection() {
       if (await isPhone()) {
         await openMore();
-        await more.getByRole('button', { name: 'Select Items', exact: true }).click();
+        await more.getByRole('menuitem', { name: 'Select', exact: true }).click();
       } else await page.getByRole('group', { name: 'Gallery Management', exact: true }).getByRole('button', { name: 'Select', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Stop Selecting' })).toBeVisible();
     },
@@ -159,35 +159,40 @@ export function studioUi(page: Page) {
     },
 
     /**
-     * Opens Settings. The phone reaches them from More when signed in to an
-     * account; otherwise only the full studio has Settings, so it switches.
+     * Opens Settings: from the top bar's Menu on the phone.
      */
     async openSettings() {
       if (await isPhone()) {
         await openMore();
-        const settings = more.getByRole('button', { name: 'Settings', exact: true });
-        if (await settings.count()) {
-          await settings.click();
-          return;
-        }
-        await more.getByRole('button', { name: /^Use the Full Studio/ }).click();
-        await expect(page.locator('.app-shell, .zen-shell')).toHaveCount(1);
+        await more.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+        return;
       }
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
     },
 
-    /** Stops everything running: More on the phone, the dock's Stop chip in the full studio. */
+    /** Stops everything running: the running count's menu on the phone, the dock's Stop chip on the desktop. */
     async stopAll() {
       if (await isPhone()) {
-        await openMore();
-        await more.getByRole('button', { name: 'Stop All Generations', exact: true }).click();
+        await page.locator('.phone-running-inline').click();
+        await page.getByRole('menuitem', { name: 'Stop All Generations', exact: true }).click();
       } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
     },
 
-    /** The viewer's Recreate (an exact rerun): in its action bar, on the phone and the desktop. */
+    /** The viewer's Rerun (an exact rerun): in its action bar, on the phone and the desktop. */
     async reuseButton() {
+      // With Details open, Rerun is in its footer and the bar leaves it out.
+      if (await page.locator('.viewer-side').count()) return page.locator('.viewer-side').getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Rerun', exact: true });
       const actions = await isPhone() ? viewer.getByRole('navigation', { name: 'Image Actions', exact: true }) : viewer.getByRole('toolbar', { name: 'Image Actions', exact: true });
-      return actions.getByRole('button', { name: 'Recreate', exact: true });
+      return actions.getByRole('button', { name: 'Rerun', exact: true });
+    },
+
+    /** Closes Details: its own Close on the desktop, Info (pressed) on the phone. */
+    async hideDetails() {
+      const details = page.locator('.viewer-side');
+      if (!await details.count()) return;
+      if (await isPhone()) await viewer.getByRole('button', { name: 'Info', exact: true }).click();
+      else await details.getByRole('button', { name: 'Close Details', exact: true }).click();
+      await expect(details).toHaveCount(0);
     },
 
     /** Shows the viewer's Details, from Info. */

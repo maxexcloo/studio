@@ -78,7 +78,7 @@ test('the phone top bar holds Images/Videos and the tools, with Create floating 
     await page.setViewportSize(viewport);
     const bar = (await page.locator('.phone-bar').first().boundingBox())!;
     const create = (await page.getByRole('button', { name: 'Create', exact: true }).boundingBox())!;
-    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'More', exact: true })]) {
+    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'Menu', exact: true })]) {
       const box = (await button.boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(40);
       expect(box.height).toBeGreaterThanOrEqual(44);

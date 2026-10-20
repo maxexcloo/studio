@@ -32,7 +32,7 @@ import { useModelDownloadActivity } from './ModelDownloadActivity';
 import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
-import { DetailsFooter, DetailsShortcuts, PromptReadout, settingsText } from './ViewerActions';
+import { DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
 
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
@@ -143,7 +143,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const [searchOpen, setSearchOpen] = React.useState(false);
   // Phones get the simplified phone studio, unless someone chose the full one.
   const phoneDevice = usePhone();
-  const phone = phoneDevice && !prefs.fullStudioOnPhone;
+  const phone = phoneDevice;
   const [composerExpanded, setComposerExpanded] = React.useState(false);
   const [composerPrimaryTarget, setComposerPrimaryTarget] = React.useState<HTMLDivElement | null>(null);
   const [lorasOpen, setLorasOpen] = React.useState(false);
@@ -283,7 +283,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       copyPrompt: (item, announce) => live().copyToClipboard(item.prompt || "", announce ?? (phoneRef.current ? "Prompt copied" : "")),
       copyItem: (item) => live().copyItemToClipboard(item),
       reuse: (item) => { live().applyAllSettings(item); compose(); },
-      promptsOnly: (item) => { live().applyPromptsOnly(item); compose(); },
+      // Edit: the prompts and settings with a new seed; Rerun (reuse): all of it, seed included.
+      promptsOnly: (item) => { live().applyAllSettings(item, { newSeed: true }); compose(); },
       useAsReference: canUseStartImage ? (item) => {
         live().useOutputAsStartImage(item);
         if (phoneRef.current) { live().setActive(null); setPhoneCreate(true); }
@@ -434,15 +435,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <div className="studio-dock" ref={studioDockRef}>
       <div className="dock-transients">
         <AnimatePresence initial={false}>
-          {phoneDevice && prefs.fullStudioOnPhone ? (
-            // Chose the full studio on a phone: the way back stays in plain sight.
-            <motion.div key="simple" {...dockChip}>
-              <button type="button" className="dock-chip" onClick={() => setPrefs({ fullStudioOnPhone: false })}>
-                <Smartphone size={14} />
-                <span>Simple View</span>
-              </button>
-            </motion.div>
-          ) : null}
           {dockMessage ? (
             // Zen mode: messages rise above the dock, beside the status light (UI-PATTERNS › Messages).
             <motion.div key="message" {...dockChip}><StatusPill message={dockMessage} className="is-dock" /></motion.div>
@@ -826,16 +818,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()}>
                     <div className="viewer-side-head">
                       <h3>Details</h3>
-                      {/* The panel closes itself; on the desktop it covers the corner Info sits in. */}
-                      <Tip content="Close Details (I)"><button type="button" className="icon-button viewer-side-close" aria-label="Close Details" onClick={() => setShowDetails(false)}><X size={16} /></button></Tip>
+                      {/* The desktop panel closes itself, as it covers the corner Info sits in; on the phone Info (pressed) closes it, so there is one close. */}
+                      {phone ? null : <Tip content="Close Details (I)"><button type="button" className="icon-button viewer-side-close" aria-label="Close Details" onClick={() => setShowDetails(false)}><X size={16} /></button></Tip>}
                     </div>
                     <div className="viewer-side-body">
-                      {phone ? <DetailsShortcuts
-                        onCopyPrompt={active.prompt ? () => itemActionHandlers.copyPrompt(active, "Prompt copied") : undefined}
-                        onCopySettings={generationDetailEntries(active).length ? () => copyToClipboard(settingsText(generationDetailEntries(active)), "Settings copied") : undefined}
-                      /> : null}
-                      <PromptReadout label="Prompt" text={active.prompt || ""} onCopy={() => copyToClipboard(active.prompt || "", phone ? "Prompt copied" : "")} onUse={active.prompt ? () => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); composeFromViewer.current(); } : undefined} />
-                      {active.negative ? <PromptReadout label="Negative" text={active.negative} onCopy={() => copyToClipboard(active.negative || "", phone ? "Negative prompt copied" : "")} onUse={() => { setNegative(clampText(active.negative || "", negativeLimit)); setShowNegativePrompt(true); showToast("Negative prompt applied."); composeFromViewer.current(); }} /> : null}
+                      <PromptReadout label="Prompt" text={active.prompt || ""} onCopy={() => copyToClipboard(active.prompt || "", phone ? "Prompt copied" : "")} />
+                      {active.negative ? <PromptReadout label="Negative" text={active.negative} onCopy={() => copyToClipboard(active.negative || "", phone ? "Negative prompt copied" : "")} /> : null}
                       {generationDetailEntries(active).length ? (
                         <section className="detail-settings" aria-labelledby="viewer-generation-settings">
                           <h3 id="viewer-generation-settings" className="detail-settings-title">Settings</h3>
@@ -868,8 +856,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       ) : null}
                     </div>
                     <DetailsFooter
-                      onReuse={active.prompt ? () => itemActionHandlers.promptsOnly(active) : undefined}
-                      onRecreate={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
+                      onCopyPrompts={active.prompt ? () => copyToClipboard([active.prompt, active.negative ? `Negative: ${active.negative}` : ""].filter(Boolean).join("\n\n"), "Prompts copied") : undefined}
+                      onCopySettings={generationDetailEntries(active).length ? () => copyToClipboard(settingsText(generationDetailEntries(active)), "Settings copied") : undefined}
+                      onEdit={active.prompt ? () => itemActionHandlers.promptsOnly(active) : undefined}
+                      onRerun={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
                     />
                   </aside>
                 ) : null}
@@ -895,6 +885,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     compare={{ open: compareOpen, toggle: () => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); } }}
                     upscaleNotice={upscaleNotices?.get(active.id)}
                     onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
+                    details={Boolean(showDetails)}
                   />
                   <span className="viewer-divider" />
                   <Tip content="Close (Esc)" side="top"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>

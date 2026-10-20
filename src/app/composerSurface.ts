@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * The floating pickers above the composer (LoRAs, references) share one place,
  * size and motion: as wide as the composer, kept on screen however tall a draft
- * grows, and quick to settle. On the phone they come up as a bottom sheet.
+ * grows, and quick to settle. On the phone they pop up over the Create sheet.
  */
 export const surfaceMotion = {
   initial: { opacity: 0, y: 8, scale: 0.98 },
@@ -16,12 +16,37 @@ export function composerAnchor(opener?: Element | null) {
   return (opener?.closest('.zen-prompt, .phone-create') || document.querySelector('.phone-create, .zen-prompt')) as HTMLElement | null;
 }
 
-/** Where the surface sits: above the anchor, its width, and never taller than the room above it. */
-export function useComposerSurfaceBox(anchor: HTMLElement | null) {
+/**
+ * Where the surface sits. On the desktop: above the anchor (the composer), its
+ * width, and never taller than the room above it. On the phone (the anchor is
+ * the Create sheet) it is a pop-up over Create, anchored to the row that opened
+ * it: above the row when the row sits low, below it otherwise, the screen's
+ * width less a margin, and as tall as the room on that side allows. Create stays
+ * in view behind it (UI-PATTERNS › Surfaces).
+ */
+export function useComposerSurfaceBox(anchor: HTMLElement | null, opener?: HTMLElement | null) {
   const [box, setBox] = React.useState<React.CSSProperties | null>(null);
+  const onPhone = Boolean(anchor?.classList.contains('phone-create'));
+  // The row it came from, measured once at opening: rows don't move under a pop-up.
+  const [row] = React.useState(() => onPhone ? (opener?.closest<HTMLElement>('.list-row') || opener || anchor?.querySelector<HTMLElement>('[aria-expanded="true"]') || null) : null);
   React.useLayoutEffect(() => {
     if (!anchor) return;
     const measure = () => {
+      if (onPhone) {
+        const view = window.visualViewport;
+        const viewTop = view?.offsetTop || 0;
+        const viewHeight = view?.height || window.innerHeight;
+        const sheet = anchor.getBoundingClientRect();
+        const rect = row?.getBoundingClientRect() || sheet;
+        const top = Math.max(viewTop + 12, sheet.top + 8);
+        const bottom = viewTop + viewHeight - 12;
+        const above = rect.top - top - 6;
+        const below = bottom - rect.bottom - 6;
+        // Low rows (Model to Advanced) open upwards over the prompt; the keyboard's room counts.
+        if (above >= below) setBox({ left: 10, right: 10, bottom: window.innerHeight - rect.top + 6, '--pop-max': `${Math.round(Math.min(above, 620))}px` } as React.CSSProperties);
+        else setBox({ left: 10, right: 10, top: rect.bottom + 6, '--pop-max': `${Math.round(Math.min(below, 620))}px` } as React.CSSProperties);
+        return;
+      }
       const rect = anchor.getBoundingClientRect();
       // A long draft can leave less room above the composer than the usual height.
       const bottom = Math.min(window.innerHeight - rect.top + 10, window.innerHeight - 248);
@@ -31,9 +56,10 @@ export function useComposerSurfaceBox(anchor: HTMLElement | null) {
     const observer = new ResizeObserver(measure);
     observer.observe(anchor);
     window.addEventListener('resize', measure);
-    return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
-  }, [anchor]);
-  return { box, asSheet: Boolean(anchor?.classList.contains('phone-create')) };
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure); };
+  }, [anchor, onPhone, row]);
+  return { box, onPhone };
 }
 
 /**

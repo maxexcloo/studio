@@ -302,6 +302,8 @@ export type Preferences = {
   inpainting: boolean;
   upscaleQuality: UpscaleQuality;
   autoUpscale: AutoUpscale;
+  /** Advanced Settings › Upscale: each image of a run is upscaled to this long side as part of the run (0: off). */
+  runUpscale: 0 | 2048 | 4096;
   /** Settings › Studio: the size menu sets megapixels instead of offering 2K. */
   megapixelSizing?: boolean;
   /** The megapixels Default draws every shape at, with megapixelSizing on; unset, each model's own size. */
@@ -314,8 +316,6 @@ export type Preferences = {
   /** Point out models in folders ComfyUI doesn’t read (sidebar notice, model menu, first-run dialog). */
   modelFolderHints: boolean;
   mobileZenDefaulted?: boolean;
-  /** On a phone, show the full studio instead of the simplified phone one. */
-  fullStudioOnPhone?: boolean;
   /** Downloads and shares from the gallery leave out the prompt and workflow saved in the file. */
   shareWithoutSettings: boolean;
 };

@@ -1,5 +1,5 @@
-import { History, X } from 'lucide-react';
-import type { KeyboardEventHandler, Ref } from 'react';
+import { History, TextSelect, X } from 'lucide-react';
+import { useCallback, useRef, type KeyboardEventHandler, type Ref } from 'react';
 import { useAutosizeTextarea } from '@/hooks/use-autosize-textarea';
 import { Tip } from './components';
 import { cn } from './format';
@@ -20,15 +20,24 @@ export type PromptFieldProps = {
   fill?: boolean;
   /** The fewest lines it shows (two by default). */
   minRows?: number;
+  /** A Select All action beside History and Clear (the phone, where a long press is fiddly). */
+  selectAll?: boolean;
 };
 
 /** One prompt field and its own actions; compact presentation is supplied by the composer. */
-export function PromptField({ kind, value, onChange, onClear, onHistory, historyAvailable, historyOpen = false, textareaRef, onKeyDown, ariaLabel, placeholder, fill = false, minRows = 2 }: PromptFieldProps) {
+export function PromptField({ kind, value, onChange, onClear, onHistory, historyAvailable, historyOpen = false, textareaRef, onKeyDown, ariaLabel, placeholder, fill = false, minRows = 2, selectAll = false }: PromptFieldProps) {
   const negative = kind === 'negative';
   const label = negative ? 'Negative Prompt' : 'Prompt';
   const clearLabel = negative ? 'Clear Negative Prompt' : 'Clear Prompt';
   const historyLabel = negative ? 'Recent Negative Prompts' : 'Recent Prompts';
-  const ref = useAutosizeTextarea(value, textareaRef, negative ? 180 : 240, fill ? undefined : minRows, !fill);
+  const field = useRef<HTMLTextAreaElement | null>(null);
+  const forward = useCallback((node: HTMLTextAreaElement | null) => {
+    field.current = node;
+    if (typeof textareaRef === 'function') textareaRef(node);
+    else if (textareaRef) (textareaRef as { current: HTMLTextAreaElement | null }).current = node;
+  }, [textareaRef]);
+  const ref = useAutosizeTextarea(value, forward, negative ? 180 : 240, fill ? undefined : minRows, !fill);
+  const selectAllLabel = negative ? 'Select All of the Negative Prompt' : 'Select All of the Prompt';
 
   return <div className={cn('composer-prompt-field', negative && 'is-negative', fill && 'is-fill')}>
     <span className="composer-prompt-preview" aria-hidden="true">{value || placeholder || (negative ? label : 'Prompt...')}</span>
@@ -43,6 +52,9 @@ export function PromptField({ kind, value, onChange, onClear, onHistory, history
       style={fill ? undefined : { paddingRight: 72 }}
     />
     <div className="composer-field-tools">
+      {selectAll ? <Tip content={selectAllLabel}>
+        <button type="button" className="prompt-action prompt-select-all" aria-label={selectAllLabel} disabled={!value} onClick={() => { const node = field.current; if (!node) return; node.focus({ preventScroll: true }); node.setSelectionRange(0, node.value.length); }}><TextSelect size={15} aria-hidden="true" /></button>
+      </Tip> : null}
       {<Tip content={historyLabel}>
         <button type="button" data-history-trigger disabled={!historyAvailable} className={cn('prompt-action', historyOpen && 'active')} aria-label={historyLabel} aria-expanded={historyOpen} aria-haspopup="dialog" onClick={onHistory}><History size={15} aria-hidden="true" /></button>
       </Tip>}

@@ -14,7 +14,6 @@ import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
-import { SurfaceStatus } from './StatusMessage';
 import { ClearSelection } from './SheetList';
 import { useReorderDrag } from './useReorderDrag';
 
@@ -108,13 +107,13 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
 
   // Pinned above the prompt bar. It lives in <body>, not inside the bar, because
   // the bar's own backdrop blur would stop this one from blurring the gallery.
-  const { box, asSheet } = useComposerSurfaceBox(anchor);
-  // As a phone sheet it replaces the Create sheet rather than stacking on it.
-  usePhoneLayer(Boolean(asSheet && present));
+  const { box, onPhone } = useComposerSurfaceBox(anchor);
+  // On the phone it pops up over the Create sheet, which stays in view behind it.
+  usePhoneLayer(Boolean(onPhone && present), 'pop');
   React.useEffect(() => {
     if (!box) return;
     // Open and type: search takes focus on desktop. On the phone the sheet does, so no keyboard pops up.
-    if (asSheet) popRef.current?.focus({ preventScroll: true });
+    if (onPhone) popRef.current?.focus({ preventScroll: true });
     else searchRef.current?.focus({ preventScroll: true });
   }, [Boolean(box)]);
 
@@ -253,14 +252,13 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   }, [page.error, tab]);
   const settling = useSettling();
   if (!box) return null;
-  // In the phone studio the prompt sits at the top of a full-height sheet, so the
-  // picker comes up from the bottom edge as a sheet of its own.
+  // In the phone studio it pops up over the Create sheet, anchored to the References row.
   // An exiting picker must not intercept Escape intended for the next overlay.
   return createPortal(
     <motion.div
       ref={popRef}
-      className={cn("reference-popover", dropActive && "is-drop-target", asSheet && "is-sheet")}
-      style={asSheet ? undefined : box}
+      className={cn("reference-popover", dropActive && "is-drop-target", onPhone && "is-pop")}
+      style={box}
       role={present ? "dialog" : undefined}
       aria-hidden={!present || undefined}
       inert={!present}
@@ -274,7 +272,6 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       {/* The chooser pattern (UI-PATTERNS › Pickers): a title bar, then the tabs with Clear Selection, then search. */}
       <header className="reference-popover-head">
         <strong className="picker-title"><ImagePlus size={16} aria-hidden="true" />{multiple ? "References" : input.label || "Reference Image"}</strong>
-        <SurfaceStatus active={Boolean(asSheet && present)} />
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
@@ -910,7 +907,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
       <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef} role="group" aria-label="Reference Images">
         {inputs.length > 1 && !grouped ? <span className="reference-count" aria-live="polite">{count}/{inputs.length} References</span> : null}
         <div className="reference-slot-list">
-        {/* Without a hover strip (a group, a tablet, the full studio on a phone): Edit | Reference in plain
+        {/* Without a hover strip (a group, a tablet): Edit | Reference in plain
             sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
         {(inline || grouped) && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
         {chains.map((chain) => chain.length > 1 ? renderGroup(chain) : renderSlot(chain[0]))}

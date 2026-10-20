@@ -10,7 +10,6 @@ import { composerAnchor, surfaceMotion, useComposerSurfaceBox, useSettling } fro
 import { useDismiss } from './useDismiss';
 import type { Profile } from './types';
 import { usePhoneLayer } from './phoneLayers';
-import { SurfaceStatus } from './StatusMessage';
 
 /** The ready profiles that take a reference image, of the kind the composer makes. */
 export type ReferenceWithChoice = { profiles: Profile[]; onPick: (profileId: string) => void };
@@ -20,16 +19,16 @@ function Surface({ profiles, onPick, onClose }: { profiles: Profile[]; onPick: (
   const surface = React.useRef<HTMLDivElement>(null);
   const opener = React.useRef(document.querySelector<HTMLElement>('[data-open-trigger][aria-label="Reference With"][aria-expanded="true"]') || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   const [anchor] = React.useState(() => composerAnchor(opener.current));
-  const { box, asSheet } = useComposerSurfaceBox(anchor);
-  // As a phone sheet it replaces the Create sheet rather than stacking on it.
-  usePhoneLayer(Boolean(asSheet && present));
+  const { box, onPhone } = useComposerSurfaceBox(anchor, opener.current);
+  // On the phone it pops up over the Create sheet, which stays in view behind it.
+  usePhoneLayer(Boolean(onPhone && present), 'pop');
   const close = React.useCallback(() => { onClose(); opener.current?.focus({ preventScroll: true }); }, [onClose]);
   useDismiss([surface, opener], present, close);
   // Grouped by family, as the model picker lists them.
   const groups = modelGroups(profiles);
   const settling = useSettling();
-  return createPortal(<motion.div ref={surface} className={cn('reference-popover reference-with', asSheet && 'is-sheet')} style={asSheet ? undefined : box || undefined} role={present ? 'dialog' : undefined} aria-label="Reference With" aria-hidden={!present || undefined} inert={!present} data-open-surface {...surfaceMotion} {...settling}>
-    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong><SurfaceStatus active={Boolean(asSheet && present)} /><button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={15} /></button></header>
+  return createPortal(<motion.div ref={surface} className={cn('reference-popover reference-with', onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label="Reference With" aria-hidden={!present || undefined} inert={!present} data-open-surface {...surfaceMotion} {...settling}>
+    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong><button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={15} /></button></header>
     <div className="reference-popover-body reference-with-body">
       {groups.map((group) => (
         <section key={group.id} className="reference-with-group" aria-label={group.label || undefined}>

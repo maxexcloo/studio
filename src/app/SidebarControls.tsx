@@ -18,6 +18,7 @@ import { referenceName } from './ReferenceMediaPicker';
 import { ListItem, ListSection, ListSelect } from './SheetList';
 import { partOptions } from './partNames';
 import { usePhone } from './device';
+import { Switch } from './SettingsControls';
 import React from 'react';
 
 function WorkflowPreviewCard({ workflow, onOpen }: { workflow: WorkflowSummary | null; onOpen: () => void }) {
@@ -91,7 +92,8 @@ export function practicalStepRange(profile: any, meta: { min?: number; max?: num
  * popover and the phone sheet: one line per setting, the label on the left
  * and its control on the right. Steppers for numbers, the studio's select on
  * the desktop and the phone's own picker on a phone, friendly names for the
- * model parts. The phone adds Steps, which the desktop has in the composer.
+ * model parts, Smart Upscale for the run, and Back to Recommended. Steps sit
+ * in the composer (the phone's Create footer); width and height belong to Size.
  */
 export function PhoneAdvancedControls({ view }: { view: any }) {
   const {
@@ -100,9 +102,14 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
     setCfg, setDenoise, setHeight, setSampler, setScheduler, setSeed, setTextEncoder, setVae,
     setWeightDtype, setWidth, textEncoder, vae, weightDtype, width, widthMeta,
     textEncoders, setTextEncoders, refreshModels, refreshWorkflows, showToast,
-    inpaintActive, inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, steps, stepsMeta, setSteps
+    inpaintActive, inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, steps, stepsMeta, setSteps,
+    prefs, setPrefs, upscaleStatus, recommended
   } = view;
   const phone = usePhone();
+  // Smart Upscale as part of the run (server/run-upscale.js): offered for pictures once Settings › Studio has it on.
+  const upscaleOffered = mode === "image" && Boolean(prefs?.smartUpscale) && currentProfile?.family !== "grok";
+  const runUpscale = Number(prefs?.runUpscale) || 0;
+  const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
   const samplers = profileOptions.samplers?.length ? profileOptions.samplers : models?.samplers?.length ? models.samplers : fallbackSamplers;
   const schedulers = profileOptions.schedulers?.length ? profileOptions.schedulers : models?.schedulers?.length ? models.schedulers : fallbackSchedulers;
   const sizeStep = widthMeta.step || (mode === "video" ? 32 : 64);
@@ -110,7 +117,6 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   const showVae = currentProfile?.capabilities.vae && (currentProfile.vaeBuiltIn || (profileOptions.vaes || []).length || (models?.vaes || []).length);
   const parts = encoderSlots.length || currentProfile?.capabilities.textEncoder || showVae || currentProfile?.capabilities.weightDtype;
   const sampling = currentProfile?.capabilities.sampler !== false;
-  const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
   const fixedSeed = String(seed || "").trim();
   const select = (label: string, value: string, options: Array<string | { label: string; value: string }>, onChange: (value: string) => void, friendly = false) => (
     <ListItem label={label}><ListSelect native={phone} label={label} value={value} options={friendly ? partOptions(options) : options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} onChange={onChange} /></ListItem>
@@ -123,7 +129,6 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
       {currentProfile ? <ModelSetup key={currentProfile.id} profile={currentProfile} showToast={showToast} onInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
 
       <ListSection title="Sampling">
-        {phone && currentProfile?.family !== "grok" && currentProfile?.capabilities.steps !== false ? stepper("Steps", steps, setSteps, stepMin, stepMax, 1) : null}
         {sampling ? select("Sampler", sampler, samplers, setSampler) : null}
         {sampling ? select("Scheduler", scheduler, schedulers, setScheduler) : null}
         {stepper("Prompt Strength (CFG)", cfg, setCfg, cfgMeta.min ?? 0, Math.min(cfgMeta.max ?? 30, 30), cfgMeta.step || 0.5, 1)}
@@ -145,12 +150,17 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
         </ListSection>
       ) : null}
 
-      {customSize && !aspectLocked ? (
-        <ListSection title="Size">
-          {stepper("Width", width, (value) => setWidth(imageDimension(value, widthMeta)), widthMeta.min ?? 64, widthMeta.max ?? 4096, sizeStep)}
-          {stepper("Height", height, (value) => setHeight(imageDimension(value, heightMeta)), heightMeta.min ?? 64, heightMeta.max ?? 4096, heightMeta.step || sizeStep)}
+      {upscaleOffered ? (
+        <ListSection title="Upscale">
+          {select("Upscale", String(runUpscale), [{ value: "0", label: "Off" }, { value: "2048", label: "2K" }, { value: "4096", label: "4K" }], (value) => setPrefs({ runUpscale: Number(value) }))}
+          {runUpscale ? (
+            <ListItem label="Face Detail">
+              <Switch label="Face Detail" checked={Boolean(prefs.upscaleFaceDetail) && faceDetailReady} disabled={!faceDetailReady} onChange={(next) => setPrefs({ upscaleFaceDetail: next })} />
+            </ListItem>
+          ) : null}
+          {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Smart Upscale needs its models first: set it up in Settings › Studio.</p> : null}
         </ListSection>
-      ) : aspectLocked ? <p className="list-note">The size follows the image being edited ({width}×{height}).</p> : null}
+      ) : null}
 
       {parts ? (
         <ListSection title="Model Parts">
@@ -164,6 +174,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           {currentProfile?.capabilities.weightDtype ? select("Weight Type", weightDtype, profileOptions.weightDtypes || models?.weightDtypes || [], setWeightDtype, true) : null}
         </ListSection>
       ) : null}
+      {recommended?.differs ? <button type="button" className="list-row list-row-action" onClick={recommended.restore}><RotateCcw size={15} aria-hidden="true" /><span className="list-row-label">Back to Recommended</span></button> : null}
     </div>
   );
 }

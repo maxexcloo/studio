@@ -1706,7 +1706,7 @@ function App() {
   };
   // The first reference, shown at the top of the sidebar's Basics with how much it may change.
   const sidebarReference = referenceInput && referenceAsset ? { asset: referenceAsset, label: referenceInput.role === "start" ? "Start image" : referenceInput.label || "Reference image", remove: () => removeReferenceAsset(referenceInput.id) } : null;
-  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, sidebarTab, setSidebarTab, recommended };
+  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, confirmAction, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, sidebarTab, setSidebarTab, recommended, prefs, setPrefs, upscaleStatus };
   const sidebarControls = <StableSidebarControls view={sidebarView} />;
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
   const modelLoraControls = <StableModelLoraControls view={sidebarView} />;
@@ -1730,7 +1730,9 @@ function App() {
     locked: Boolean(activeInpaintMask),
     onChange: (value: ReferenceRole) => { if (!activeInpaintMask) setPrefs({ referenceRole: value }); }
   } : null;
-  const view = { ...baseView, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  // The phone's LoRAs row clears the stack in one tap, with Undo in the status pill.
+  const clearLoras = () => { const before = loras; setLoras([]); showToast('LoRAs cleared', 'default', { action: { label: 'Undo', onClick: () => setLoras(before) } }); };
+  const view = { ...baseView, clearLoras, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />

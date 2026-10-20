@@ -45,10 +45,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
 }
-.phone-bar.is-selecting { display: flex; align-items: center; gap: 2px; height: calc(env(safe-area-inset-top) + 41px); }
-.phone-bar.is-selecting .phone-icon,
-.phone-bar.is-selecting .phone-pill { height: 40px; min-height: 40px; }
-.phone-bar-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: 40px; }
+.phone-bar-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: var(--bar-h); }
 .phone-bar-row .phone-title { font-size: 16px; }
 .phone-bar-row .phone-scroll-top { min-height: 40px; }
 /* Search and Filter: tinted with a count while something is applied, filled while their row is open. */
@@ -780,7 +777,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 
 /* ----------------------------------------------------------- Selecting */
 
-.phone-bar.is-behind { display: none; }
 .phone-select-bar {
   position: fixed;
   left: max(12px, env(safe-area-inset-left));

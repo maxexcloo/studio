@@ -308,10 +308,13 @@ export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items 
         {expanded === 'search' ? <label className="phone-tools-field">
           <Search size={17} aria-hidden="true" />
           <input ref={inputRef} value={search.q} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="Search" aria-label="Search Gallery" spellCheck={false} autoComplete="off" enterKeyHint="search" />
+          {/* Close sits inside the field, at its end: it clears the words and closes the row. */}
+          <button type="button" className="phone-tools-close" aria-label="Clear Search" title="Clear & Close" onClick={(event) => { event.preventDefault(); onClose(); }}><X size={18} /></button>
         </label> : <div className="phone-filter-row gallery-filter-controls" role="group" aria-label="Gallery Filters">
           <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} />
+          {/* Clear ends the row, in the filters' own style: it clears them all and closes the row. */}
+          <button type="button" className="gallery-filter-select phone-filter-clear" aria-label="Clear Filters" title="Clear & Close" onClick={onClose}><X size={14} aria-hidden="true" /><span>Clear</span></button>
         </div>}
-        <button type="button" className="phone-icon phone-tools-close" aria-label={expanded === 'search' ? 'Clear Search' : 'Clear Filters'} title="Clear & Close" onClick={onClose}><X size={20} /></button>
       </div>
     </motion.div> : null}
   </AnimatePresence>;

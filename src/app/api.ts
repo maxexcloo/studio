@@ -259,6 +259,8 @@ export function loadPrefs(): Preferences {
     delete parsed.runCooldownMinutes;
     // Its trays and card decks went before release.
     delete parsed.runOpenStyle;
+    // The phone has one layout now: the full studio on a phone went in batch 5.
+    delete parsed.fullStudioOnPhone;
     if (parsed.runStackStyle === "deck") delete parsed.runStackStyle;
     // Carry an explicit Original choice from the earlier size control into the switch.
     if (parsed.autoResizeInputs === undefined && parsed.referenceMaxEdge === 0) parsed.autoResizeInputs = false;

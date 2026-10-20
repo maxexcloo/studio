@@ -13,7 +13,8 @@ import { StatusPill, useStatusHost } from './StatusMessage';
  * A bottom sheet: grab handle, swipe down (or Back, or Escape, or a tap on the
  * dimmed page) to close, focus kept inside while open. A sheet opened from
  * another replaces it (phoneLayers.ts): it shows Back instead of Close, and the
- * one under it hides until it closes.
+ * one under it hides until it closes. A pop-up over it (a Create picker) leaves
+ * it in view, dimmed and inert.
  */
 export function Sheet({ open, onClose, title, children, footer, full = false, className, headerAction }: {
   open: boolean;
@@ -29,8 +30,9 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   const titleId = React.useId();
   const drag = useDragControls();
   const reduced = useReducedMotion();
-  const { covered, nested } = usePhoneLayer(open);
-  const message = useStatusHost(open && !covered);
+  const { covered, hidden, overlaid, nested } = usePhoneLayer(open);
+  // Under a pop-up the sheet stays in view, so its title row keeps the messages (UI-PATTERNS › Messages).
+  const message = useStatusHost(open && !hidden);
   const settling = useSettling();
   useFocusTrap(panelRef, open);
   useHistoryDismiss(open, onClose);
@@ -76,9 +78,10 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            className={cn('phone-sheet', full && 'is-full', nested && 'is-nested', covered && 'is-covered', className)}
+            className={cn('phone-sheet', full && 'is-full', nested && 'is-nested', hidden && 'is-covered', overlaid && 'is-overlaid', className)}
             {...settling}
             aria-hidden={covered || undefined}
+            inert={overlaid || undefined}
             initial={reduced ? { opacity: 0 } : nested ? { opacity: 0, y: 24 } : { y: '100%' }}
             animate={reduced ? { opacity: 1 } : nested ? { opacity: 1, y: 0 } : { y: 0 }}
             exit={reduced ? { opacity: 0 } : nested ? { opacity: 0, y: 24 } : { y: '100%' }}

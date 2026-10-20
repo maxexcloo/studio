@@ -1,0 +1,211 @@
+/* ---------------------------------------------------------------------------
+   Phone pop-ups and the Create sheet (UI-PATTERNS › Surfaces, Composer)
+
+   Model, References, LoRAs, Size and Advanced Settings open as one kind of
+   pop-up over the Create sheet: anchored to the row that opened it, the
+   screen's width less a margin, as tall as the room on that side allows.
+   Create stays in view behind it, dimmed and inert (phoneLayers.ts).
+--------------------------------------------------------------------------- */
+
+.reference-popover.is-pop {
+  z-index: 70;
+  height: auto;
+  max-height: var(--pop-max, 70dvh);
+  border-radius: 22px;
+  transform-origin: 50% 100%;
+}
+/* Pickers with a grid or a long list take the room they're given, so tabs don't make them jump. */
+.reference-popover.is-pop:not(.composer-advanced, .phone-size-pop) { height: var(--pop-max, 70dvh); }
+.reference-popover.is-pop .reference-popover-head { min-height: 52px; padding: 6px 6px 6px 16px; }
+.reference-popover.is-pop .reference-popover-head > strong,
+.reference-popover.is-pop .picker-title { flex: 1; min-width: 0; font-size: 16px; }
+/* Close on the right, a 44 px target like every phone icon button. */
+.reference-popover.is-pop .reference-popover-close { width: 44px; height: 44px; margin-left: auto; border-radius: 999px; }
+.reference-popover.is-pop .reference-popover-close > svg { width: 19px; height: 19px; }
+.reference-popover.is-pop .reference-popover-body { padding: 0 14px 12px; }
+.reference-popover.is-pop .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+
+/* Create under a pop-up: in view, dimmed, not touchable. */
+.phone-sheet.is-overlaid { pointer-events: none; }
+.phone-sheet.is-overlaid > :not(.phone-sheet-grab) { opacity: .45; transition: opacity var(--motion-fast) var(--motion-ease); }
+html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
+
+/* Model, in its pop-up: search and filters, then the families. */
+.phone-model-pop-body { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; overscroll-behavior: contain; }
+.phone-model-pop .phone-model-tools { display: grid; gap: 8px; padding: 2px 0 6px; }
+.model-pop-row { gap: 4px; padding: 0; }
+.model-pop-pick { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; min-height: 52px; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+.model-pop-name { display: grid; flex: 1; min-width: 0; font-size: 15px; }
+.model-pop-name small { overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; }
+.model-pop-name small.is-setup { color: var(--accent-amber); }
+.model-pop-row .picker-star { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border: 0; border-radius: 999px; background: transparent; color: hsl(var(--muted-foreground)); }
+.model-pop-row .picker-star.is-on { color: var(--accent-amber); }
+
+/* Size, in its pop-up: the resolutions and the shapes as full-width toggles, then Width and Height. */
+.phone-size-pop-body { overflow-y: auto; overscroll-behavior: contain; }
+.phone-size { display: grid; gap: 10px; padding-top: 4px; }
+.phone-size .size-resolution { display: block; }
+.phone-size .aspect-upscale-tabs { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; width: 100%; }
+.phone-size .aspect-upscale-tabs button { min-height: 40px; font-size: 14px; }
+.size-shapes { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 4px; padding: 3px; border-radius: 16px; background: var(--well); }
+.size-shape {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  min-height: 58px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.size-shape .aspect-shape { border-width: 1.5px; border-radius: 3px; }
+.size-shape.is-active { background: var(--accent-amber-subtle); color: var(--accent-amber); }
+.size-shape:active { background-color: var(--control-press, rgb(255 255 255 / .1)); }
+.phone-size .phone-size-fields { padding: 2px 0 0; }
+
+/* -------------------------------------------------------------- The Create sheet */
+
+/* History, Select All and Clear stand at the middle of the field's right edge, close together. */
+.create-prompts .composer-prompt-field { padding-right: 44px; }
+.create-prompts .composer-field-tools,
+.create-prompts .is-negative .composer-field-tools {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  display: flex;
+  flex-direction: column;
+  align-self: auto;
+  gap: 0;
+  padding: 0;
+  transform: translateY(-50%);
+}
+.create-prompts .composer-field-tools .prompt-action { width: 40px; height: 36px; border-radius: 10px; }
+.create-prompts .is-negative .composer-field-tools { flex-direction: row; }
+.create-prompts .is-negative { padding-right: 84px; }
+.create-prompts .is-negative .composer-field-tools .prompt-action { width: 40px; height: 40px; }
+.create-prompts .is-negative .prompt-select-all { display: none; }
+.create-prompts .is-fill textarea { padding-bottom: 12px; }
+
+/* Clear at the end of the References and LoRAs rows. */
+.list-row-clear { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: 0 -6px 0 2px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: hsl(var(--muted-foreground)); position: relative; z-index: 2; }
+.list-row-clear:active { background: var(--control-press, rgb(255 255 255 / .1)); }
+.list-row-wrap { position: relative; display: flex; align-items: center; }
+.list-row-wrap > .list-row { flex: 1; min-width: 0; }
+.list-row-wrap > .list-row-clear { margin-right: -6px; }
+.create-references.has-picks .composer-reference-tools { padding-right: 0; }
+
+/* The footer: Steps and the count over Image | Video, Clear and Generate. */
+.create-footer-tune { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.create-footer-tune .create-tune { display: flex; flex: 1; align-items: center; justify-content: space-between; min-width: 0; height: 44px; padding: 0 2px 0 14px; border-radius: 999px; background: var(--well); }
+.create-footer-tune .create-tune .number-picker-label { flex: 1; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.create-footer .composer-mode-select { flex: none; }
+.create-footer .composer-mode-select button { min-height: 40px; min-width: 44px; }
+
+/* Advanced Settings and Back to Recommended. */
+.list-row.list-row-action { justify-content: flex-start; gap: 10px; width: 100%; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; }
+
+/* -------------------------------------------------------------- The top bar and the select bar */
+
+/* One bar height for the top bar, the select bar and everything that lines up with them. */
+.phone-bar-row { position: relative; height: var(--bar-h); }
+.phone-bar.is-selecting .phone-bar-row { gap: 2px; }
+.phone-bar-title { min-width: 0; overflow: hidden; padding-left: 2px; font-size: 16px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
+.phone-heading-name { padding-right: 4px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+/* Images | Videos: two icons in the middle of the bar. */
+.phone-bar .phone-gallery-mode.media-mode-toggle { position: absolute; left: 50%; top: 50%; translate: -50% -50%; gap: 2px; }
+.phone-bar .phone-gallery-mode button { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: 50%; color: hsl(var(--muted-foreground)); }
+.phone-bar .phone-gallery-mode button > svg { width: 20px; height: 20px; }
+.phone-bar .phone-gallery-mode button[aria-pressed="true"] { color: hsl(var(--foreground)); background: rgb(255 255 255 / .1); }
+/* A message takes the middle: between "Studio" and the tools, its words centred, as tall as the bar's controls. */
+.phone-bar-row.has-message .phone-bar-gap { display: none; }
+.status-pill.is-bar { flex: 1 1 auto; justify-content: center; height: var(--bar-pill-h); margin: 0 4px; }
+.status-pill.is-bar .status-pill-body { flex: 1; justify-content: center; }
+.phone-menu-trigger.is-open { background: rgb(255 255 255 / .1); }
+
+/* The select bar: the top bar's height and glass, at the bottom edge. */
+.phone-select-bar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  gap: 0;
+  height: calc(var(--bar-h) + env(safe-area-inset-bottom));
+  padding: 0 max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.phone-select-bar button { gap: 2px; min-height: 0; height: 44px; border-radius: 12px; font-size: 10.5px; }
+.phone-select-bar button > svg { width: 19px; height: 19px; }
+.phone-select-bar .viewer-phone-divider { height: 24px; }
+
+/* The menu: a small pop-up under its button, over the page. */
+.phone-menu {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--bar-h) + 6px);
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 70;
+  display: grid;
+  width: min(240px, calc(100vw - 16px));
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
+  transform-origin: 92% 0;
+}
+.phone-menu-item { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 15px; text-align: left; }
+.phone-menu-item > svg { flex: none; color: hsl(var(--muted-foreground)); }
+.phone-menu-item:active { background: var(--control-press); }
+.phone-menu-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.phone-menu-item.is-danger, .phone-menu-item.is-danger > svg { color: var(--danger-ink); }
+.phone-menu-divider { height: 1px; margin: 4px 8px; background: var(--list-hairline); }
+
+/* Search's close inside its field; the filters' Clear at the end of their row, styled like them. */
+.phone-tools-field .phone-tools-close { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin-right: -8px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: hsl(var(--muted-foreground)); }
+.phone-tools-field .phone-tools-close:active { background: var(--control-press); }
+.phone-filter-row .phone-filter-clear { display: inline-flex; align-items: center; gap: 6px; border: 0; color: hsl(var(--foreground)); }
+/* Too narrow to centre Images | Videos clear of the tools: they follow "Studio" instead. */
+@media (max-width: 359px) {
+  .phone-bar .phone-gallery-mode.media-mode-toggle { position: static; translate: none; margin-left: 2px; }
+  .phone-bar .phone-gallery-mode button { width: 40px; min-width: 40px; }
+}
+.create-footer-tune .create-tune { gap: 0; }
+.create-footer-tune .create-tune .number-picker-btn { width: 38px; min-width: 38px; }
+.create-footer-tune .create-tune input, .create-footer-tune .create-tune .number-picker-value { min-width: 24px; width: 28px; }
+
+/* -------------------------------------------------------------- Phone viewer & Details */
+
+/* With Details open the bar steps aside (its actions are in the footer); Star and Info stay in their corners. */
+.viewer-phone-bar.is-details { padding: 0; }
+.viewer-phone-bar.is-details::before { display: none; }
+/* Details: a sheet from under the corner buttons to the bottom edge, clean edges, the footer clear of the home indicator. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+  border-radius: 24px 24px 0 0;
+  background: var(--glass-panel-solid, #161616);
+}
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side-body { scrollbar-width: none; }
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side-body::-webkit-scrollbar { display: none; }
+.scrim .viewer-stage:has(.viewer-phone-bar) .details-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+/* Messages over the viewer: centred between the corner buttons, as tall as the bar's pill and on their centre line. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {
+  top: calc(max(10px, env(safe-area-inset-top)) + (var(--bar-h) - var(--bar-pill-h)) / 2);
+  left: 50%;
+  height: var(--bar-pill-h);
+  max-width: calc(100% - 4 * var(--bar-h) - 40px);
+  translate: -50% 0;
+}
