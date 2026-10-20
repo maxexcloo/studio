@@ -52,7 +52,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-dock .phone-gallery-mode button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); }
 .phone-dock .phone-gallery-mode button[aria-pressed="true"] { background: rgb(255 255 255 / .14); color: hsl(var(--foreground)); }
 /* Search and Filter: tinted with a count while something is applied, filled while their row is open. */
-.phone-tool.is-active { color: var(--ember); }
+.phone-tool.is-active { color: var(--accent-amber); }
 .phone-tool.is-open { background: rgb(255 255 255 / .1); }
 .phone-tool-count {
   position: absolute;
@@ -64,8 +64,8 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   height: 17px;
   padding: 0 4px;
   border-radius: var(--r-pill);
-  background: var(--ember);
-  color: #1a0d04;
+  background: var(--accent-amber);
+  color: var(--accent-amber-ink);
   font-size: 10.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -109,7 +109,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-filter-row .gallery-filter-icon { flex: none; height: 44px; min-height: 44px; max-width: 200px; padding: 0 12px; background: rgb(255 255 255 / .06); font-size: 14px; }
 .phone-filter-row .gallery-filter-icon { width: 44px; padding: 0; }
 .phone-filter-row .gallery-filter-select.is-on,
-.phone-filter-row .gallery-filter-icon.is-on { background: var(--ember-soft); color: var(--ember); }
+.phone-filter-row .gallery-filter-icon.is-on { background: var(--accent-amber-subtle); color: var(--accent-amber); }
 .phone-title {
   flex: 1;
   min-width: 0;
@@ -136,7 +136,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   letter-spacing: inherit;
 }
 .phone-scroll-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.phone-ember { color: var(--ember, #ff9a6a); }
+.phone-ember { color: var(--accent-amber); }
 .phone-title-inline { display: inline-flex; align-items: center; gap: 8px; }
 
 .phone-icon {
@@ -153,7 +153,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   color: hsl(var(--foreground));
 }
 .phone-icon:active { background: rgb(255 255 255 / .08); }
-.phone-icon.is-on { color: var(--ember, #ff9a6a); }
+.phone-icon.is-on { color: var(--accent-amber); }
 .phone-icon.has-dot::after {
   content: "";
   position: absolute;
@@ -162,7 +162,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 6px;
   height: 6px;
   border-radius: 2px;
-  background: var(--ember, #ff9a6a);
+  background: var(--accent-amber);
 }
 
 .phone-status {
@@ -578,7 +578,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 
 .phone-seed { margin-bottom: 12px; border-radius: 18px; background: rgb(255 140 90 / .1); }
 .phone-seed,
-.phone-seed > svg { color: var(--ember, #ff9a6a); }
+.phone-seed > svg { color: var(--accent-amber); }
 
 .phone-control {
   display: grid;

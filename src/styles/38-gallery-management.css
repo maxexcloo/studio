@@ -158,9 +158,10 @@
 .gallery-filter-select:hover { background: var(--control-hover); }
 .gallery-filter-menu { position: fixed; right: auto; bottom: auto; border-radius: var(--r-menu); z-index: var(--z-popover); display: flex; flex-direction: column; gap: 6px; width: min(240px, calc(100vw - 16px)); overflow: hidden; padding: 6px; }
 .gallery-filter-menu .aspect-option { display: flex; justify-content: flex-start; min-height: 40px; width: 100%; padding: 8px 10px; text-align: left; overflow-wrap: anywhere; }
+/* Active filters take the accent, as on the phone (docs/guides/UI-PATTERNS.md). */
 .gallery-filter-icon.is-on,
 .gallery-filter-select.is-on,
-.gallery-filter-trigger.is-on { background: var(--selected); color: hsl(var(--foreground)); }
+.gallery-filter-trigger.is-on { background: var(--accent-amber-subtle); color: var(--accent-amber); }
 /* A narrow lane gives the sliding icons their own compact row, without scrolling. */
 @media (max-width: 1600px) {
   .gallery-toolbar .gallery-search-tools { position: relative; }
