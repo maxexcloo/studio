@@ -1,5 +1,4 @@
 import React from 'react';
-import { haptic } from './phoneControls';
 import type { GalleryItem } from './types';
 
 /**
@@ -47,9 +46,9 @@ export function useGallerySelection(items: GalleryItem[], resetKey: string): Gal
     const selectedItems = selection ? selectable.filter((item) => selection.has(item.id)) : [];
     const allSelected = selectable.length > 0 && selectedItems.length === selectable.length;
     const selectAll = () => setSelection(new Set(selectable.map((item) => item.id)));
+    const failed = selectable.filter((item) => item.status === 'error');
     const toggle = (item: GalleryItem) => {
       if (!isSelectable(item)) return;
-      haptic('tap');
       anchor.current = item.id;
       setSelection((current) => {
         const next = new Set(current || []);

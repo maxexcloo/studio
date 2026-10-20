@@ -13,7 +13,6 @@ import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
 import type { UpscaleNotice } from './useUpscale';
 import { useDismiss } from './useDismiss';
-import { HapticTarget } from './phoneControls';
 import { GallerySelectionContext } from './gallerySelection';
 import { downloadName } from './share';
 import { useItemActions } from './itemActions';
@@ -160,7 +159,6 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
           {/* A failed tile already says so in its middle; "Failed" again is noise. */}
           {item.status === "error" ? null : <em>{item.status === "pending" ? <ElapsedTime startedAt={item.createdAt} format={formatElapsed} /> : (item.timing?.runMs || item.durationMs) ? formatElapsed(item.timing?.runMs || item.durationMs || 0) : item.outputName || item.type}</em>}
         </span>
-        {phoneTiles && selecting && selectable ? <HapticTarget /> : null}
       </button>
       {/* Controls are siblings of the tile's button, never inside it: a button
           inside a button is invalid and unreachable by keyboard. */}

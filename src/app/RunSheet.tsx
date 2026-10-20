@@ -3,7 +3,6 @@ import { Rows3 } from 'lucide-react';
 import { Sheet } from './Sheet';
 import { Media } from './components';
 import { Still, modelName, runKind, timeSpan } from './RunStack';
-import { haptic } from './phoneControls';
 import { runTitle, type Run } from './runs';
 import type { GalleryItem } from './types';
 
@@ -25,7 +24,7 @@ export function RunSheet({ run, onClose, openItem, onShowInGallery }: {
   const shown = run || last.current;
   return (
     <Sheet open={Boolean(run)} onClose={onClose} title={shown ? runKind(shown) : ""} className="run-sheet">
-      {shown ? <CoverFlow run={shown} onOpen={(item) => { onClose(); openItem(item); }} onShowInGallery={() => { haptic("tap"); onShowInGallery(shown); }} /> : null}
+      {shown ? <CoverFlow run={shown} onOpen={(item) => { onClose(); openItem(item); }} onShowInGallery={() => { onShowInGallery(shown); }} /> : null}
     </Sheet>
   );
 }
@@ -57,7 +56,6 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
         if (Math.abs(distance) < nearestDistance) { nearestDistance = Math.abs(distance); nearest = position; }
       });
       if (nearest !== last) {
-        if (last >= 0) haptic("tap");
         last = nearest;
         setIndex(nearest);
       }

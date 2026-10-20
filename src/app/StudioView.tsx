@@ -251,13 +251,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     />
   );
   const [phoneCreate, setPhoneCreate] = React.useState(false);
-  const [phoneActionsFor, setPhoneActionsFor] = React.useState<GalleryItem | null>(null);
-  const openTileActions = React.useCallback((item: GalleryItem) => { haptic('press'); setPhoneActionsFor(item); }, []);
   const [animationItems, setAnimationItems] = React.useState<GalleryItem[] | null>(null);
   // Selecting several, in either layout. A change of layout, privacy domain or filtered view ends it.
   const selection = useGallerySelection(renderedGallery, JSON.stringify([phone, hiddenSpace, hiddenLocked, mode, gallerySearch]));
   useHistoryDismiss(Boolean(phone && selection.selecting), selection.end);
-  const phoneTiles = React.useMemo(() => phone ? { onLongPress: openTileActions } : null, [phone, openTileActions]);
+  // A long press selects: the item's actions live in the viewer and the select bar.
+  const startSelection = React.useRef(selection.start);
+  startSelection.current = selection.start;
+  const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]) } : null, [phone]);
   // Zen shows one image at a time: a search there would narrow a strip with nothing to say so.
   React.useEffect(() => {
     if (!prefs.zenMode) return;

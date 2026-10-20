@@ -3,7 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './Sheet';
-import { haptic } from './phoneControls';
 import { forgetPrompt, matchPrompt, pinPrompt, usePromptHistory, whenUsed, type PromptEntry, type PromptKind } from './recentPrompts';
 
 /* ---------------------------------------------------------------------------
@@ -237,10 +236,10 @@ export function PromptHistorySheet({ open, onClose, onPick, onError, kind = 'pos
           <div className="phone-group">
             {section.rows.map((row) => (
               <div key={row.entry.text} className="phone-row-wrap phone-history-row">
-                <button type="button" className="phone-row" onClick={() => { haptic('tap'); onPick(row.entry.text); }}>
+                <button type="button" className="phone-row" onClick={() => { onPick(row.entry.text); }}>
                   <span><span className="phone-history-text"><Highlighted text={row.entry.text} ranges={row.ranges} /></span><small>{meta(row.entry)}</small></span>
                 </button>
-                <button type="button" className={cn('phone-icon', row.entry.pinned && 'is-on')} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} onClick={() => { haptic('tap'); pin(row.entry); }}>
+                <button type="button" className={cn('phone-icon', row.entry.pinned && 'is-on')} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar this prompt' : 'Star this prompt to keep it'} onClick={() => { pin(row.entry); }}>
                   <Star size={18} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                 </button>
                 <button type="button" className="phone-icon" aria-label="Remove this prompt" onClick={() => forget(row.entry)}>

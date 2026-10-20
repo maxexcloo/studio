@@ -12,11 +12,10 @@ import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
 import { preferenceLabels, Switch } from './SettingsControls';
-import { ItemActionSheet } from './ItemActionSurfaces';
+import { startsGroup } from './ItemActionSurfaces';
 import { bulkItemActions, useItemActionHandlers } from './itemActions';
 import type { GallerySelection } from './gallerySelection';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import { haptic, HapticTarget } from './phoneControls';
 import { Media } from './components';
 import { progressReading } from './GenerationProgress';
 import { generatingLabel } from './itemWording';
@@ -121,7 +120,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     const landed = gallery.find((item) => item.status === 'done' && pendingJobs.current.has(item.jobId || item.id) && !nowPending.has(item.jobId || item.id));
     pendingJobs.current = nowPending;
     if (!landed) return;
-    haptic('success');
     if (!createOpen && !active) showToast(landed.type === 'video' ? 'Video Ready' : 'Image Ready', 'success', {
       duration: 5500,
       group: 'phone-generation-ready',
@@ -147,7 +145,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     if (searchActive(searchRef.current)) setGallerySearch(clearedSearch(searchRef.current));
   }, [setSearchOpen, setGallerySearch]);
   const toggleTools = (which: 'search' | 'filters') => {
-    haptic('tap');
     if (expanded === which) { closeTools(); return; }
     setSearchOpen(which === 'search');
     setFiltersOpen(which === 'filters');
@@ -183,10 +180,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         <header className="phone-bar is-selecting">
           <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
           <div className="phone-title"><span>{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span></div>
-          <button type="button" className="phone-pill" aria-label={selection.allSelected ? "Deselect All" : "Select All Loaded"} onClick={() => { haptic('tap'); selection.toggleAll(); }}>
-            {selection.allSelected ? 'None' : 'All'}
-            <HapticTarget />
-          </button>
+          {selection.failedCount ? <button type="button" className="phone-pill" aria-label="Select Failed" onClick={selection.selectFailed}>Failed</button> : null}
+          <button type="button" className="phone-pill" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}>{selection.allSelected ? 'None' : 'All'}</button>
         </header>
       ) : null}
       {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
@@ -214,10 +209,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
 
       {selecting ? (
         <nav className="phone-select-bar" aria-label="Selected Items">
-          {bulkActions.map((action) => (
-            <button key={action.id} type="button" className={cn(action.danger && 'is-danger')} aria-label={action.short ? action.label : undefined} disabled={action.disabled} onClick={() => { if (action.haptic) haptic(action.haptic); action.run(); }}>
-              <action.Icon size={21} /><span>{action.short || action.label}</span>{action.haptic ? <HapticTarget /> : null}
-            </button>
+          {bulkActions.map((action, index) => (
+            <React.Fragment key={action.id}>
+              {startsGroup(bulkActions, index) ? <i className="viewer-phone-divider" aria-hidden="true" /> : null}
+              <button type="button" className={cn(action.danger && 'is-danger')} disabled={action.disabled} onClick={action.run}>
+                <action.Icon size={20} /><span>{action.label}</span>
+              </button>
+            </React.Fragment>
           ))}
         </nav>
       ) : null}
@@ -236,15 +234,15 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
                 className={cn('phone-go', pending.length > 0 && 'is-working')}
                 style={{ '--progress': progress } as React.CSSProperties}
                 aria-label={quickGo ? 'Generate' : 'Open the composer'}
-                onClick={() => { haptic('tap'); if (quickGo) generate(); else setCreateOpen(true); }}
+                onClick={() => { if (quickGo) generate(); else setCreateOpen(true); }}
               >
                 {restarting ? <RefreshCw size={20} className="spin" /> : <ArrowUp size={22} strokeWidth={2.4} />}
-                <HapticTarget />
+                
               </button>
             </div>
           ) : null}
           <div className="phone-dock-row">
-            <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} onPress={() => haptic('tap')} />
+            <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false}  />
             {!hiddenLocked ? <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} /> : null}
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
             <span className="phone-dock-gap" />
@@ -260,7 +258,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         closeTools();
         if (cleared) window.requestAnimationFrame(() => selection.start()); else selection.start();
       } : undefined} />
-      <ItemActionSheet item={actionsFor} onClose={() => setActionsFor(null)} onSelect={(item) => { haptic('press'); selection.start([item.id]); }} />
     </>
   );
 }
@@ -321,7 +318,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const reason = restarting ? <>ComfyUI is restarting. <RestartEtaText fallback="Back in a few seconds." /></> : comfyOffline ? 'ComfyUI is offline.' : !prompt.trim() ? '' : generateDisabled ? generateDisabledReason : estimate;
 
   const go = () => {
-    haptic('tap');
     if (comfyOffline) { retryComfyStatus(); return; }
     if (restarting) return;
     // generate() explains anything missing; only close when it can actually run.
@@ -352,7 +348,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
             <button type="button" className="phone-creation-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={18} /></button>
             <div className="composer-submit-actions">
               <button type="button" className={cn('phone-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-disabled={restarting || (!comfyOffline && (!prompt.trim() || generateDisabled)) || undefined} onClick={go}>
-                {restarting || comfyOffline ? <RefreshCw size={20} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={20} strokeWidth={2.4} />}<HapticTarget />
+                {restarting || comfyOffline ? <RefreshCw size={20} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={20} strokeWidth={2.4} />}
               </button>
             </div>
           </div>
@@ -381,8 +377,8 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
                 <i aria-hidden="true" />
                 {(['edit', 'reference'] as const).map((value) => (
                   // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
-                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { haptic('warning'); return; } haptic('tap'); referenceRole.onChange(value); }}>
-                    {value === 'edit' ? 'Edit' : 'Reference'}<HapticTarget />
+                  <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { return; } referenceRole.onChange(value); }}>
+                    {value === 'edit' ? 'Edit' : 'Reference'}
                   </button>
                 ))}
               </div>
@@ -501,16 +497,13 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
   });
   const pick = (row: SizeRow) => {
     press(null);
-    haptic('tap');
     if (custom) { applyCustomRatio(presetRatio(row.shape)); return; }
+    // The sheet stays open, so a resolution and a shape can be picked in one go.
     applyAspect(row.value);
-    onClose();
   };
   const pickSaved = (item: SavedSize) => {
     press(null);
-    haptic('tap');
     pickSavedSize(item);
-    if (!custom) onClose();
   };
 
   const stage = pressed ? pressed.size : shown;
@@ -520,11 +513,11 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
         <SizePreview className="is-stage" size={stage} label={captionFor(pressed)} sub={`${stage.width} × ${stage.height}`} accent={!pressed && (tier !== 'none' || sizeArea > 0)} inset={18} />
       </div>
       <div className="phone-size-top">
-        <SizeTabs tiers={tiers} value={tier} onChange={(next) => { haptic('tap'); chooseSizeTier(next); }} />
+        <SizeTabs tiers={tiers} value={tier} onChange={(next) => { chooseSizeTier(next); }} />
         <AnimatePresence initial={false}>
           {custom && customLimits ? (
             <motion.div key="custom" className="size-custom" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { haptic('success'); saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
+              <LinkedSizeFields size={picked} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} />
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -545,7 +538,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
         <>
           <div className="phone-size-saved-head">
             <h3 className="phone-section">Saved</h3>
-            <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { haptic('tap'); setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}<HapticTarget /></button>
+            <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}</button>
           </div>
           <div className={cn('phone-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved sizes">
             <AnimatePresence initial={false}>
@@ -558,7 +551,7 @@ function SizeSheet({ view, open, onClose }: { view: Record<string, any>; open: b
                   pressHandlers={pressHandlers(savedRow(item))}
                   onPick={() => pickSaved(item)}
                   onRename={(name) => renameSavedSize(item.id, name)}
-                  onRemove={() => { haptic('warning'); press(null); removeSavedSize(item.id); }}
+                  onRemove={() => { press(null); removeSavedSize(item.id); }}
                 />
               ))}
             </AnimatePresence>
@@ -664,7 +657,7 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
       </div>
       <h3 className="phone-section">Gallery</h3>
       <div className="phone-group phone-gallery-options">
-        <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchActive(view.gallerySearch || emptySearch)} onToggle={() => { haptic('tap'); setPrefs({ stackRuns: !prefs.stackRuns }); }} />
+        <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchActive(view.gallerySearch || emptySearch)} onToggle={() => { setPrefs({ stackRuns: !prefs.stackRuns }); }} />
         {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}
         {view.models?.features?.presets === true ? <button type="button" className="phone-row" aria-label="Image & Model Library" onClick={() => { onClose(); view.setPresetLibraryOpen(true); }}><Library size={20} /><span>Image & Model Library</span></button> : null}
         {view.runningCount ? <button type="button" className="phone-row" onClick={() => { onClose(); view.cancelQueue(); }}><CircleStop size={20} /><span>Stop All Generations</span></button> : null}

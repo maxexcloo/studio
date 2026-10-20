@@ -1114,25 +1114,6 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora { min-height: 40px; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora-name { font-size: 14px; }
 
-/* iPhone haptics (HapticTarget): a see-through label over the whole button,
-   its switch hidden. Zero-specificity host rules, so a button that is already
-   positioned keeps its own position. */
-:where(:has(> .haptic-target)) { position: relative; isolation: isolate; }
-.haptic-target {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-  -webkit-tap-highlight-color: transparent;
-}
-.haptic-target input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  visibility: hidden;
-}
-
 /* Toasts never cover controls (docs/guides/UI-PATTERNS.md): under the top bar,
    under a full sheet's header, or under the viewer's top buttons. */
 html:has(.phone-shell) .toasts { top: calc(var(--phone-bar-h, 56px) + 8px + var(--toasts-offset, 0px)); }

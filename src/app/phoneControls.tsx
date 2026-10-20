@@ -19,7 +19,7 @@ export function PhoneSelect({ label, value, options, onChange, icon }: { label: 
       {icon}
       <span>{label}<small>{current ? optionLabel(current) : value || 'Not set'}</small></span>
       <ChevronDown size={18} className="phone-row-end" aria-hidden="true" />
-      <select value={value} aria-label={label} onChange={(event) => { haptic('tap'); onChange(event.target.value); }}>
+      <select value={value} aria-label={label} onChange={(event) => onChange(event.target.value)}>
         {current || !value ? null : <option value={value}>{value}</option>}
         {options.map((option) => <option key={optionValue(option)} value={optionValue(option)}>{optionLabel(option)}</option>)}
       </select>
@@ -48,43 +48,3 @@ export function PhoneSlider({ label, value, min, max, step = 1, onChange, format
   );
 }
 
-/**
- * Haptic feedback where the phone allows it. Android's browsers vibrate, so
- * haptic() does it from the handler. iPhones have no vibrate API and, since
- * iOS 26.5, no script-triggered tick either: only a real tap that toggles a
- * switch checkbox ticks. So on iPhones, buttons that should tick carry a
- * <HapticTarget />, one light tick whatever the kind; haptics without a tap
- * behind them (long press, an image landing) stay silent there.
- */
-const patterns = {
-  tap: 8,
-  press: 16,
-  success: [12, 60, 18],
-  warning: [28, 40, 28]
-} as const;
-
-export function haptic(kind: keyof typeof patterns) {
-  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
-  try { navigator.vibrate(patterns[kind] as number | number[]); } catch { /* not allowed right now */ }
-}
-
-const switchHaptics = typeof window !== 'undefined'
-  && typeof navigator.vibrate !== 'function'
-  && /iPhone|iPod/.test(navigator.userAgent)
-  && window.matchMedia('(pointer: coarse)').matches;
-
-/**
- * A see-through label over its button (the button's last child) with a hidden
- * switch inside. The tap lands on the label, which iOS turns into a trusted
- * click on the switch: that ticks. The label's own click still reaches the
- * button's onClick; the switch's forwarded one is stopped so it does not run
- * twice. A label has no touch handling of its own, so scrolling still works.
- */
-export function HapticTarget() {
-  if (!switchHaptics) return null;
-  return (
-    <label className="haptic-target" aria-hidden="true">
-      <input type="checkbox" tabIndex={-1} ref={(input) => { input?.setAttribute('switch', ''); }} onClick={(event) => event.stopPropagation()} />
-    </label>
-  );
-}
