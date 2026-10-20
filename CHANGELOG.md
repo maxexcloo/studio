@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-10-20
+
 > Chat asks for 2K only when the user does, and imported FLUX.3 workflows can draw it
 
 ### Fixed
@@ -1338,7 +1340,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.30.1...HEAD
+[0.30.1]: https://github.com/maxexcloo/studio/compare/v0.30.0...v0.30.1
 [0.30.0]: https://github.com/maxexcloo/studio/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/maxexcloo/studio/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/maxexcloo/studio/compare/v0.27.0...v0.28.0
