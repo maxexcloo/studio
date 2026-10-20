@@ -9,15 +9,25 @@
   /* Type. Geist Mono ships with the app; Consolas is the Windows fallback. */
   --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Material. Floating chrome over content, and solid modal sheets. */
-  /* Frosted: translucent enough for the blur to read, with a faint grain. */
-  --surface-float: rgb(24 24 24 / .76);
-  --surface-float-blur: blur(34px) saturate(1.7);
+  /* Glass: every translucent surface takes one of two levels (docs/guides/UI-PATTERNS.md).
+     Bar: floating bars and chips over content. Panel: popovers, menus, sheets and side panels. */
+  --glass-border: rgb(255 255 255 / .1);
+  --glass-bar-bg: rgb(22 22 22 / .66);
+  --glass-bar-blur: blur(22px) saturate(1.5);
+  --glass-bar-shadow: 0 8px 26px rgb(0 0 0 / .36), inset 0 1px 0 rgb(255 255 255 / .06);
+  --glass-panel-bg: rgb(24 24 24 / .76);
+  --glass-panel-blur: blur(34px) saturate(1.7);
+  --glass-panel-shadow: 0 24px 80px rgb(0 0 0 / .5), 0 2px 10px rgb(0 0 0 / .38), inset 0 1px 0 rgb(255 255 255 / .045);
+  /* A faint grain over the glass. */
   --surface-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Older names for the panel level, kept for upstream-owned rules. */
+  --surface-float: var(--glass-panel-bg);
+  --surface-float-blur: var(--glass-panel-blur);
+  --surface-border: var(--glass-border);
+  --shadow-float: var(--glass-panel-shadow);
+  --shadow-float-sm: var(--glass-bar-shadow);
+  /* Solid modal sheets. */
   --surface-modal: #161616;
-  --surface-border: rgb(255 255 255 / .1);
-  --shadow-float: 0 24px 80px rgb(0 0 0 / .5), 0 2px 10px rgb(0 0 0 / .38), inset 0 1px 0 rgb(255 255 255 / .045);
-  --shadow-float-sm: 0 8px 26px rgb(0 0 0 / .36), inset 0 1px 0 rgb(255 255 255 / .06);
 
   /* Controls. Values sit in a dark well; actions are ghost until hovered. */
   --control-h: 40px;

@@ -9,13 +9,13 @@
 
 .island {
   position: relative;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-island);
-  background-color: var(--surface-float);
+  background-color: var(--glass-bar-bg);
   background-image: var(--surface-grain);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
 }

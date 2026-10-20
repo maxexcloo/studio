@@ -49,7 +49,7 @@
 .heiss-video-buffer { width: var(--media-slider-buffer); background: rgb(255 255 255 / .3); }
 .heiss-video-thumb { position: absolute; left: var(--media-slider-fill); width: 12px; height: 12px; border-radius: 50%; transform: translateX(-50%); background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
 .heiss-video-time { display: flex; align-items: center; gap: 5px; margin-top: -6px; font: 10px var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .75); }
-.heiss-video-desktop-controls { left: 12px; right: 12px; bottom: 12px; gap: 8px; padding: 2px 6px; height: 44px; box-sizing: border-box; border-radius: 999px; background: rgb(24 24 24 / .94); border: 1px solid rgb(255 255 255 / .09); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: blur(18px); }
+.heiss-video-desktop-controls { left: 12px; right: 12px; bottom: 12px; gap: 8px; padding: 2px 6px; height: 44px; box-sizing: border-box; border-radius: 999px; background: var(--glass-bar-bg); border: 1px solid rgb(255 255 255 / .09); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: var(--glass-bar-blur); }
 .heiss-video-desktop-controls .heiss-video-button { width: 38px; height: 38px; }
 .heiss-video-desktop-controls .heiss-video-button:hover,
 .heiss-video-desktop-controls .heiss-video-button:active { background: transparent; }

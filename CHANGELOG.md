@@ -27,6 +27,7 @@ version opens with a `> ` summary line.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed
+- **One glass:** every translucent surface uses one set of tokens at two levels: bars (toolbars, the dock, the Images/Videos switch, search, the viewer bar, the phone top bar, create pill and select bar, toasts and tile chips) and panels (popovers, menus, sheets and side panels). The phone's top bar, sheets and viewer bar are frosted glass instead of solid fills and fades.
 - **Details panel:** its actions read Animate (Extend Video for a video), Copy Prompt, Use Prompt and Use Settings, in that order, with Copy Prompt above Use Settings. Generation Settings sit unboxed under a label like Prompt's, and Copy as Text is gone.
 - **Use Prompt and Use Settings:** from the viewer, its Details, a tile or a menu, they now apply, close the viewer and open the prompt box with the reused text ready to edit: the desktop composer expanded and focused, or the phone's Create sheet.
 - **Viewer dock:** the desktop dock reads Zoom Out, a zoom percentage that steps through Fit, 1:1 and Full Size when clicked, and Zoom In, then Copy, Download, Star, Upscale and Delete, then Details. Use as Reference, Animate and Move to Hidden stay in the menus and on the phone.

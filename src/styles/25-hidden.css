@@ -59,12 +59,12 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
-  background: var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float-sm);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
 }
 .hidden-bar button {
   display: inline-flex;
@@ -169,11 +169,11 @@
   gap: 6px;
   height: 36px;
   padding: 0 14px 0 11px;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
-  background: var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   color: hsl(var(--muted-foreground));
   font-size: 12px;
   font-weight: 550;

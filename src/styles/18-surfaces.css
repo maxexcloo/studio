@@ -130,10 +130,10 @@
   top: 12px;
   right: 12px;
   margin: 0;
-  border: 1px solid var(--surface-border);
-  background: var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   color: hsl(var(--foreground));
 }
 

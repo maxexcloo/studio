@@ -160,10 +160,12 @@
     width: var(--dock-h);
     height: var(--dock-h);
     padding: 0;
-    border: 0;
+    border: 1px solid var(--glass-border);
     border-radius: var(--r-pill);
-    background: rgb(22 22 22 / .86);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 6px 20px rgb(0 0 0 / .4);
+    background: var(--glass-bar-bg);
+    -webkit-backdrop-filter: var(--glass-bar-blur);
+    backdrop-filter: var(--glass-bar-blur);
+    box-shadow: var(--glass-bar-shadow);
     color: hsl(var(--foreground));
   }
 }
@@ -315,7 +317,7 @@
     backdrop-filter: none !important;
     background-color: rgb(14 14 14 / .82);
   }
-  :root { --surface-float-blur: blur(16px) saturate(1.4); }
+  :root { --glass-bar-blur: blur(14px) saturate(1.4); --glass-panel-blur: blur(16px) saturate(1.4); }
 }
 /* One GPU layer per tile adds up to a lot of memory in a long gallery; only a
    tile that is still easing in keeps its layer. */

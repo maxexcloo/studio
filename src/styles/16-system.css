@@ -10,8 +10,6 @@
 /* ------------------------------------------------------ 1. Floating chrome
    Everything that floats over content: one glass. */
 
-.zen-prompt,
-.zen-controls,
 .studio-dock,
 .dock-chip,
 .zen-control-button,
@@ -22,21 +20,28 @@
 .viewer-arrow,
 .zen-gallery-strip,
 .zen-gallery-toggle,
-.zen-latest,
+.zen-latest {
+  border: 1px solid var(--glass-border);
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+}
+.zen-prompt,
+.zen-controls,
 .model-menu,
 .aspect-menu,
 .fluid-select-content,
 .composer-drawer {
-  border: 1px solid var(--surface-border);
-  background: var(--surface-grain), var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
+  border: 1px solid var(--glass-border);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
 }
 
 /* Windows, video gallery: Chrome may put playing videos on a hardware layer
    the blur can't read, and the glass would show them through at its tint.
    The glass goes nearly opaque there instead (main.tsx sets the classes). */
-:root.is-windows.is-video-mode { --surface-float: rgb(20 20 20 / .95); }
+:root.is-windows.is-video-mode { --glass-bar-bg: rgb(20 20 20 / .95); --glass-panel-bg: rgb(20 20 20 / .95); }
 
 /* The composer and its drawer hold menus that pop out past their edges. An
    element with backdrop-filter becomes the backdrop root for everything inside
@@ -57,10 +62,17 @@
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: var(--surface-grain), var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
   pointer-events: none;
+}
+
+/* Closed, the composer is a bar over the gallery; open, a panel. */
+.zen-prompt:not(.is-expanded)::before {
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
 }
 
 /* Large surfaces carry the deep shadow, small ones the tight one. */
@@ -69,7 +81,7 @@
 .model-menu,
 .aspect-menu,
 .fluid-select-content,
-.composer-drawer { box-shadow: var(--shadow-float); }
+.composer-drawer { box-shadow: var(--glass-panel-shadow); }
 .studio-dock,
 .dock-chip,
 .zen-control-button,
@@ -80,7 +92,7 @@
 .viewer-arrow,
 .zen-gallery-strip,
 .zen-gallery-toggle,
-.zen-latest { box-shadow: var(--shadow-float-sm); }
+.zen-latest { box-shadow: var(--glass-bar-shadow); }
 .zen-gallery-toggle,
 .zen-latest { height: var(--control-h); min-height: var(--control-h); border-radius: var(--r-pill); }
 .zen-gallery-toggle { width: var(--control-h); }
@@ -244,11 +256,11 @@
 /* --------------------------------------------------------------- 7. Tooltip */
 
 .heiss-tooltip {
-  border: 1px solid var(--surface-border);
-  background: var(--surface-grain), var(--surface-float) !important;
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--surface-grain), var(--glass-panel-bg) !important;
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
   font-size: 12px;
 }
 
@@ -272,9 +284,9 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgb(10 10 10 / .56);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), 0 2px 10px rgb(0 0 0 / .28);
   color: #fff;
   text-decoration: none;

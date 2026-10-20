@@ -198,9 +198,9 @@
 .tile-action {
   position: absolute; top: 8px; right: 8px;
   border: 1px solid rgb(255 255 255 / 0.12);
-  background: rgb(0 0 0 / 0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   color: #fff !important;
   margin: 0 !important;
   font-size: 11px !important;
@@ -632,12 +632,12 @@
   margin: auto;
   padding: 32px 28px 22px;
   overflow: auto;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-menu);
-  background-color: var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float);
+  background-color: var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
   text-align: center;
   cursor: auto;
   user-select: text;

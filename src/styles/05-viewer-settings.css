@@ -428,10 +428,10 @@
   translate: -50% -50%;
   border: 2px solid rgb(255 255 255 / .95);
   border-radius: 50%;
-  background: rgb(18 18 18 / .55);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
-  backdrop-filter: blur(10px) saturate(1.4);
-  box-shadow: 0 4px 18px rgb(0 0 0 / .45);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
   color: #fff;
   transition: scale 180ms var(--ease-out), background 180ms;
 }
@@ -440,11 +440,11 @@
 .upscale-compare-tag {
   position: absolute; top: 12px;
   padding: 4px 10px;
-  border: 1px solid rgb(255 255 255 / .12);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
-  background: rgb(0 0 0 / .5);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   color: #fff;
   font-size: 11.5px; font-weight: 550;
   letter-spacing: -.01em;
@@ -487,7 +487,7 @@
 .viewer-zoom-controls { display: flex; align-items: center; gap: 2px; }
 .viewer-zoom-percent { min-width: 42px; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 .viewer-zoom-percent.is-toggle { min-width: 52px; color: hsl(var(--foreground)); }
-.viewer-phone-zoom { position: absolute; z-index: 12; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); left: 50%; transform: translateX(-50%); padding: 4px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-float); }
+.viewer-phone-zoom { position: absolute; z-index: 12; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); left: 50%; transform: translateX(-50%); padding: 4px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--glass-bar-bg); }
 .viewer-phone-zoom button { min-width: 44px; min-height: 44px; }
 
 /* The viewer's picture loads in layers (GenerationPreview.tsx StagedImage):

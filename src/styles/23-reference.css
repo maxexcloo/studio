@@ -74,9 +74,9 @@
   padding: 0 74px 0 6px;
   border-radius: 18px;
   /* Opaque enough that the prompt it slides over never reads through, blurred for the rest. */
-  background: var(--surface-grain), rgb(30 30 30 / .97);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
   box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
   white-space: nowrap;
   opacity: 0;
@@ -221,13 +221,13 @@
   flex-direction: column;
   height: min(440px, 58dvh);
   overflow: hidden;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-panel);
   /* The same frosted glass as the prompt bar. */
-  background: var(--surface-grain), var(--surface-float);
-  -webkit-backdrop-filter: var(--surface-float-blur);
-  backdrop-filter: var(--surface-float-blur);
-  box-shadow: var(--shadow-float);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
   transform-origin: 94% 100%;
 }
 .reference-popover-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 12px; box-shadow: inset 0 -1px 0 var(--surface-border); }
@@ -307,9 +307,9 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: rgb(10 10 10 / .6);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
   color: #fff;
   opacity: 0;
   cursor: pointer;
@@ -680,7 +680,7 @@
 }
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }
-.reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--surface-float); }
+.reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--glass-panel-bg); }
 
 /* Full capacity is said in the picker itself, on the phone too. */
 .reference-popover .reference-popover-hint.is-full { display: block; color: hsl(var(--foreground)); }

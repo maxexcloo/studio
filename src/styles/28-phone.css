@@ -37,9 +37,11 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 10px max(8px, env(safe-area-inset-left));
-  background: linear-gradient(#0a0a0a 55%, rgb(10 10 10 / 0));
-  pointer-events: none;
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
 }
 .phone-bar > * { pointer-events: auto; }
 .phone-title {
@@ -177,11 +179,14 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   gap: 6px;
   min-height: 64px;
   padding: 8px;
+  border: 1px solid var(--glass-border);
   border-radius: 32px;
-  background: #1c1c1c;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1), 0 14px 40px rgb(0 0 0 / .55);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
 }
-.phone-create-pill.is-hidden { box-shadow: inset 0 0 0 1px rgb(255 140 90 / .28), 0 14px 40px rgb(0 0 0 / .55); }
+.phone-create-pill.is-hidden { border-color: rgb(255 140 90 / .28); }
 .phone-mode-select {
   flex: none;
   display: flex;
@@ -268,9 +273,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
      page to the field, so the layout height less the keyboard would put the top off screen. */
   max-height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(20px, env(safe-area-inset-top)));
   padding-bottom: max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--glass-border);
   border-radius: 24px 24px 0 0;
-  background: #151515;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .08), 0 -20px 60px rgb(0 0 0 / .5);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
   color: hsl(var(--foreground));
   outline: none;
 }
@@ -577,7 +585,10 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   z-index: 2;
   margin: -4px 0 0;
   padding: 4px 0 12px;
-  background: #151515;
+  /* Glass of its own: the shapes scroll under it inside the sheet. */
+  background: var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
 }
 .phone-size .size-peek.is-stage {
   position: relative;
@@ -748,8 +759,20 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 2px;
-  padding: 18px max(6px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
-  background: linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / .82) 38%);
+  padding: 6px max(6px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+}
+/* The glass is on a layer of its own: a backdrop-filter on the bar would become
+   the containing block of the star and Details buttons it pins to the corners. */
+.viewer-phone-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-top: 1px solid var(--glass-border);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  pointer-events: none;
 }
 .viewer-phone-bar button {
   display: grid;
@@ -858,7 +881,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* ----------------------------------------------------------- Selecting */
 
 .phone-bar.is-behind { display: none; }
-.phone-bar.is-selecting { background: linear-gradient(#0a0a0a 65%, rgb(10 10 10 / 0)); }
 .phone-select-bar {
   position: fixed;
   left: max(12px, env(safe-area-inset-left));
@@ -870,9 +892,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   grid-auto-columns: 1fr;
   gap: 4px;
   padding: 6px;
+  border: 1px solid var(--glass-border);
   border-radius: 28px;
-  background: #1c1c1c;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1), 0 14px 40px rgb(0 0 0 / .55);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
 }
 .phone-select-bar button {
   display: grid;
@@ -963,8 +988,11 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
   height: var(--dock-h);
   min-height: 0;
   border-radius: var(--r-pill);
-  background: rgb(22 22 22 / .86);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 6px 20px rgb(0 0 0 / .4);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
 }
 .viewer-phone-bar .viewer-phone-star {
   right: auto;
