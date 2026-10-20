@@ -21,8 +21,8 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   const notification = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   await expect(notification).toBeVisible();
   await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
-  const box = await notification.boundingBox();
-  expect(box!.height).toBeLessThanOrEqual(56);
+  // The island shrinks from the running height (72 px) on a spring, so measure it once it settles.
+  await expect.poll(async () => (await notification.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(56);
   const drag = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   const origin = await drag.boundingBox();
   await page.mouse.move(origin!.x + origin!.width / 2, origin!.y + origin!.height / 2);
