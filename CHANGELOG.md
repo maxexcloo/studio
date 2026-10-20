@@ -11,6 +11,15 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Ten images per chat call:** MCP Generate and Reuse queue 1–10 jobs per call (`prompts` × `count`, each a separate job), stated in the tool and parameter descriptions. An excess is refused by Studio itself, naming the field, its range and how to split the request, instead of a chat client's generic schema error. The account's outstanding-job limit still applies to each job.
+- **Turbo finds the fast profiles:** MCP Models with tier `turbo` or `fast` lists both speed tiers, the named one first, and Generate's `turbo` falls back to Fast when no Super Fast profile is ready. Profile names match model words fuzzily ("flux 3", "flux3", "FLUX.3", "turbo flux 3"); words naming several models ("klein") list them.
+- **The named model is the one used:** in an MCP `profile_id`, the model words pick the family and speed words only choose within it ("moss turbo" is MOSS Image Base · Fast, not Boogu Turbo; "turbo radiance flux 3" is the Radiance FLUX.3 [klein] Distilled profile). A `tier` the family lacks falls back to its nearest tier with a note, never to another family; a miss lists that family's profiles or says the model isn't available, and the chat is told not to substitute another. When the chat leaves `profile_id` out, a model the request names ("six baby ducks, fast moss") is used, and Queued and Done replies name the profile that ran.
+- **Clearer MCP replies:** Generate's description asks for one call with `count` or `prompts` for several different images ("six photos" is count 6) instead of repeated calls, and for a named model in `profile_id`; finished replies say not to call Studio again for this request, and queued replies say to share links, not images.
+
+### Fixed
+- **LoRAs for another model are refused:** generation refuses an optional LoRA trained for another family (a Z-Image LoRA on Tesserafine), from the studio and from MCP, instead of applying it; Studio reads a worker LoRA's family before checking. MCP Reuse leaves such a LoRA out of a rerun and says so. `compatibleLoras` in `server/lora-policy.js` filters a reused stack and counts what it dropped.
+
 ## [0.32.0] - 2026-10-20
 
 > One References chooser for many-reference models, Hidden folded back into the gallery, multi-select gallery filters, Animate from the select bars and a tidier viewer, menu and phone sheets
