@@ -1,10 +1,14 @@
+import { forcedPhone, NARROW_QUERY } from './device';
+
 /** One visibility observer and a small decoder budget for every video tile. */
 type Preview = { video: HTMLVideoElement; update: (load: boolean) => void; ratio: number; near: boolean; loaded: boolean };
 const previews = new Map<HTMLVideoElement, Preview>();
 let nearObserver: IntersectionObserver | undefined;
 let visibleObserver: IntersectionObserver | undefined;
 let suspended = 0;
-let autoplay = typeof window === 'undefined' || !window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+// Phones and touch screens start with grid autoplay off.
+const SMALL_QUERY = `${NARROW_QUERY}, (pointer: coarse)`;
+let autoplay = typeof window === 'undefined' || !window.matchMedia(SMALL_QUERY).matches;
 try {
   const saved = localStorage.getItem('heiss-grid-autoplay');
   if (saved !== null) autoplay = saved !== 'off';
@@ -19,21 +23,16 @@ export function toggleGridAutoplay() {
   autoplayListeners.forEach((listener) => listener());
 }
 const motion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)') : undefined;
-const phone = typeof window !== 'undefined' ? window.matchMedia('(max-width: 760px), (pointer: coarse)') : undefined;
+const phone = typeof window !== 'undefined' ? window.matchMedia(SMALL_QUERY) : undefined;
 
 // Read once: reconcile runs on every scroll step, and this only changes with a reload.
 let forcedPhoneValue: boolean | undefined;
-function forcedPhone() {
-  if (forcedPhoneValue !== undefined) return forcedPhoneValue;
-  forcedPhoneValue = new URLSearchParams(window.location.search).get('phone') === '1';
-  try { forcedPhoneValue ||= window.sessionStorage.getItem('heiss-force-phone') === '1'; } catch { /* Storage may be disabled. */ }
-  return forcedPhoneValue;
-}
+const phoneForced = () => (forcedPhoneValue ??= forcedPhone());
 
 function reconcile() {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   // A screenful of tiles plays at once on a computer; phones decode fewer, and Data Saver fewer still.
-  const limit = connection?.saveData ? 2 : phone?.matches || forcedPhone() ? 2 : 24;
+  const limit = connection?.saveData ? 2 : phone?.matches || phoneForced() ? 2 : 24;
   const candidates = [...previews.values()].filter((p) => p.near).sort((a, b) => b.ratio - a.ratio);
   const selected = new Set(!suspended && autoplay ? candidates.slice(0, limit) : []);
   for (const p of previews.values()) {

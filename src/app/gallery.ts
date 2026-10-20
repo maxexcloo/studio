@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { GalleryItem } from './types';
+import { NARROW_QUERY } from './device';
 export { galleryTime, sortGalleryItems } from '../../server/gallery-order.js';
 
 export type GalleryPhoto = {
@@ -25,7 +26,7 @@ export function dedupeGalleryItems(items: GalleryItem[]) {
 export function galleryColumnTarget() {
   if (typeof window === "undefined") return 6;
   if (window.matchMedia("(max-width: 480px)").matches) return 2;
-  if (window.matchMedia("(max-width: 760px)").matches) return 3;
+  if (window.matchMedia(NARROW_QUERY).matches) return 3;
   if (window.matchMedia("(max-width: 1100px)").matches) return 4;
   if (window.matchMedia("(max-width: 1440px)").matches) return 5;
   return 6;

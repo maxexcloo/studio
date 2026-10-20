@@ -59,8 +59,10 @@ export function useAtComputer() {
   return atComputer.use();
 }
 
+/** The phone layout's width breakpoint, shared with the CSS (max-width: 760px). */
+export const NARROW_QUERY = '(max-width: 760px)';
 // Narrow, or short (a phone held sideways is wide but only ~400px tall).
-const PHONE_QUERY = '(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-height: 500px)';
+export const PHONE_QUERY = `(pointer: coarse) and ${NARROW_QUERY}, (pointer: coarse) and (max-height: 500px)`;
 
 /** Phones say so in their user agent; tablets and touch laptops do not. */
 function mobileAgent() {
@@ -76,7 +78,7 @@ function phoneNow(query: MediaQueryList) {
 
 // ?phone=1 forces the phone studio (and ?phone=0 turns the force off) for this
 // tab, so it can be tried or checked on a desktop.
-function forcedPhone() {
+export function forcedPhone() {
   if (typeof window === 'undefined') return false;
   try {
     const flag = new URLSearchParams(window.location.search).get('phone');
