@@ -6,59 +6,62 @@ test.use({ launchOptions: { ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const items = Array.from({ length: 8 }, (_, index) => ({ id: `toolbar-${index}`, url: picture, filename: `toolbar-${index}.png`, type: 'image', status: 'done', prompt: 'Toolbar picture', model: 'Flux', settings: { workflow: 'Portrait', loras: [{ name: 'Film' }] }, createdAt: '2026-01-01T00:00:00Z', width: 512, height: 512 }));
 
-test('gallery tools expand independently and clear every active filter', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Phone gallery tools use the compact header.');
-  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
-  await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
-  await page.goto('/');
-  const toolbar = page.locator('.gallery-toolbar');
-  const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
-  const clear = toolbar.getByRole('button', { name: 'Clear Search', exact: true });
-  const filters = toolbar.getByRole('button', { name: 'Gallery Filters', exact: true });
-  const select = toolbar.getByRole('button', { name: 'Select', exact: true });
-  const grouping = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
-  await expect(search).toHaveCount(0);
-  await expect(clear).toHaveCount(0);
-  await expect(grouping).toBeVisible();
-  await expect(select).toHaveAttribute('aria-expanded', 'false');
-  await expect(select).toBeEnabled();
-  expect(await select.evaluate(n => getComputedStyle(n).opacity)).toBe('1');
-  await expect(toolbar.getByRole('group', { name: 'Gallery Mode' }).getByRole('button', { name: 'Images', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await filters.click();
-  const filterTools = toolbar.getByRole('group', { name: 'Gallery Filters', exact: true });
-  await expect(filterTools.getByRole('button', { name: 'Starred', exact: true })).toBeVisible();
-  await expect.poll(() => filterTools.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Filter By Model' }).scrollIntoViewIfNeeded();
-  expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
-  await expect(toolbar.getByRole('button', { name: 'Search Gallery', exact: true })).toBeInViewport();
-  await page.getByRole('button', { name: 'Filter By Model' }).click();
-  await page.getByRole('option', { name: 'Flux', exact: true }).click();
-  await expect(clear).toHaveCount(0);
-  await expect(search).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await toolbar.getByRole('button', { name: 'Clear Filters', exact: true }).click();
-  await expect(clear).toHaveCount(0);
-  if (!await search.count()) await toolbar.getByRole('button', { name: 'Search Gallery', exact: true }).click();
-  await search.fill('picture');
-  await expect(search).toBeFocused();
-  expect((await page.locator('.gallery-search').boundingBox())!.width).toBeLessThanOrEqual(260);
-  await clear.click();
-  await select.click();
-  await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveAttribute('aria-expanded', 'true');
-  await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveText('0 Selected');
-  await toolbar.getByRole('button', { name: 'Select All' }).click();
-  await expect(toolbar.getByRole('status')).toHaveText('8 Selected');
-  const centred = await toolbar.locator('.gallery-selection-actions button').evaluateAll(buttons => buttons.every(button => { const a = button.getBoundingClientRect(), b = button.querySelector('svg')!.getBoundingClientRect(); return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 0.5 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 0.5; }));
-  expect(centred).toBe(true);
-  await expect(grouping).toBeVisible();
-  await toolbar.getByRole('button', { name: 'Stop Selecting' }).click();
-  for (const width of [1440, 900, 640]) {
-    await page.setViewportSize({ width, height: 900 });
-    expect(await toolbar.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-    await expect(grouping).toBeInViewport();
-    await expect(select).toBeInViewport();
-  }
+// A narrow or short window with a mouse keeps the full studio; a touch screen that size is a phone.
+test.describe('with a mouse', () => {
+  test.use({ hasTouch: false });
+  test('gallery tools expand independently and clear every active filter', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Phone gallery tools use the compact header.');
+    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+    await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+    await page.goto('/');
+    const toolbar = page.locator('.gallery-toolbar');
+    const search = page.getByRole('textbox', { name: 'Search Gallery', exact: true });
+    const clear = toolbar.getByRole('button', { name: 'Clear Search', exact: true });
+    const filters = toolbar.getByRole('button', { name: 'Gallery Filters', exact: true });
+    const select = toolbar.getByRole('button', { name: 'Select', exact: true });
+    const grouping = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
+    await expect(search).toHaveCount(0);
+    await expect(clear).toHaveCount(0);
+    await expect(grouping).toBeVisible();
+    await expect(select).toHaveAttribute('aria-expanded', 'false');
+    await expect(select).toBeEnabled();
+    expect(await select.evaluate(n => getComputedStyle(n).opacity)).toBe('1');
+    await expect(toolbar.getByRole('group', { name: 'Gallery Mode' }).getByRole('button', { name: 'Images', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await filters.click();
+    const filterTools = toolbar.getByRole('group', { name: 'Gallery Filters', exact: true });
+    await expect(filterTools.getByRole('button', { name: 'Starred', exact: true })).toBeVisible();
+    await expect.poll(() => filterTools.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Filter By Model' }).scrollIntoViewIfNeeded();
+    expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
+    await expect(toolbar.getByRole('button', { name: 'Search Gallery', exact: true })).toBeInViewport();
+    await page.getByRole('button', { name: 'Filter By Model' }).click();
+    await page.getByRole('option', { name: 'Flux', exact: true }).click();
+    await expect(clear).toHaveCount(0);
+    await expect(search).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await toolbar.getByRole('button', { name: 'Clear Filters', exact: true }).click();
+    await expect(clear).toHaveCount(0);
+    if (!await search.count()) await toolbar.getByRole('button', { name: 'Search Gallery', exact: true }).click();
+    await search.fill('picture');
+    await expect(search).toBeFocused();
+    expect((await page.locator('.gallery-search').boundingBox())!.width).toBeLessThanOrEqual(260);
+    await clear.click();
+    await select.click();
+    await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveAttribute('aria-expanded', 'true');
+    await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveText('0 Selected');
+    await toolbar.getByRole('button', { name: 'Select All' }).click();
+    await expect(toolbar.getByRole('status')).toHaveText('8 Selected');
+    const centred = await toolbar.locator('.gallery-selection-actions button').evaluateAll(buttons => buttons.every(button => { const a = button.getBoundingClientRect(), b = button.querySelector('svg')!.getBoundingClientRect(); return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 0.5 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 0.5; }));
+    expect(centred).toBe(true);
+    await expect(grouping).toBeVisible();
+    await toolbar.getByRole('button', { name: 'Stop Selecting' }).click();
+    for (const width of [1440, 900, 640]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await toolbar.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+      await expect(grouping).toBeInViewport();
+      await expect(select).toBeInViewport();
+    }
+  });
 });
 
 test('size and aspect filters reach the server and clear with the others', async ({ page, isMobile }) => {
@@ -157,34 +160,37 @@ test('search closes smoothly while retaining its input until the animation ends'
   }
 });
 
-test('compact studio keeps active search and every filter inside the viewport', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Full studio compact desktop layout.');
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
-  await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('picture');
-  await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
-  const panel = page.getByRole('group', { name: 'Gallery Filters', exact: true });
-  await panel.getByRole('button', { name: 'Filter By Model' }).click();
-  await page.getByRole('option', { name: 'Flux', exact: true }).click();
-  await page.waitForTimeout(400);
-  for (const control of [page.getByRole('textbox', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Clear Search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
-  await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
-  const bounds = await panel.boundingBox();
-  expect(bounds!.x).toBeGreaterThanOrEqual(0);
-  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1440);
-  expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
-  await page.setViewportSize({ width: 640, height: 900 });
-  await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
-  const narrow = await panel.boundingBox();
-  expect(narrow!.x).toBeGreaterThanOrEqual(0);
-  expect(narrow!.x + narrow!.width).toBeLessThanOrEqual(640);
-  expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
-  const gallery = await page.locator('.virtual-gallery').boundingBox();
-  expect(gallery!.y).toBeGreaterThanOrEqual(narrow!.y + narrow!.height + 12);
+// A narrow or short window with a mouse keeps the full studio; a touch screen that size is a phone.
+test.describe('with a mouse', () => {
+  test.use({ hasTouch: false });
+  test('compact studio keeps active search and every filter inside the viewport', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Full studio compact desktop layout.');
+    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('picture');
+    await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+    const panel = page.getByRole('group', { name: 'Gallery Filters', exact: true });
+    await panel.getByRole('button', { name: 'Filter By Model' }).click();
+    await page.getByRole('option', { name: 'Flux', exact: true }).click();
+    await page.waitForTimeout(400);
+    for (const control of [page.getByRole('textbox', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Clear Search', exact: true }), ...await panel.locator('button, select').all()]) await expect(control).toBeInViewport();
+    await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    expect(await page.getByRole('main').evaluate(n => n.scrollLeft)).toBe(0);
+    const bounds = await panel.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1440);
+    expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
+    await page.setViewportSize({ width: 640, height: 900 });
+    await expect.poll(() => panel.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
+    const narrow = await panel.boundingBox();
+    expect(narrow!.x).toBeGreaterThanOrEqual(0);
+    expect(narrow!.x + narrow!.width).toBeLessThanOrEqual(640);
+    expect((await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(48);
+    const gallery = await page.locator('.virtual-gallery').boundingBox();
+    expect(gallery!.y).toBeGreaterThanOrEqual(narrow!.y + narrow!.height + 12);
+  });
 });
 
 
@@ -378,7 +384,15 @@ test('video gallery actions run from playback through grouping to Select', async
   const play = toolbar.getByRole('button', { name: /^Grid Autoplay:/ });
   const group = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
+  const failed = toolbar.getByRole('button', { name: 'Failed', exact: true });
   await expect(play).toBeVisible();
-  expect((await play.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
-  expect((await group.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
+  // The view controls in their one order (UI-PATTERNS): Auto-Grouping, Grid Autoplay, Failed, then Select.
+  expect((await group.boundingBox())!.x).toBeLessThan((await play.boundingBox())!.x);
+  expect((await play.boundingBox())!.x).toBeLessThan((await failed.boundingBox())!.x);
+  expect((await failed.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
+  // Failed shows or hides failed outputs, remembered like the other view controls.
+  await expect(failed).toHaveAttribute('aria-pressed', 'true');
+  await failed.click();
+  await expect(failed).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').showFailedItems)).toBe(false);
 });

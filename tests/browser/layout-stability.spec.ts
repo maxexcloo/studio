@@ -123,19 +123,21 @@ test('horizontal dock and Generate keep separate lanes without changing dock ori
   }
 });
 
-test('short desktop filter tools stay above the composer', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Full studio filter and composer overlap.');
-  // A 500px-high touch screen counts as a phone held sideways; the full studio is chosen to keep it.
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ fullStudioOnPhone: true })));
-  await page.setViewportSize({ width: 900, height: 500 });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
-  const clear = page.getByRole('button', { name: 'Filter By Model', exact: true });
-  await clear.scrollIntoViewIfNeeded();
-  await reachable(clear);
-  const panel = await page.locator('.gallery-filter-panel').boundingBox();
-  const composer = await page.locator('.zen-prompt').boundingBox();
-  expect(panel!.y + panel!.height).toBeLessThanOrEqual(composer!.y);
+// A narrow or short window with a mouse keeps the full studio; a touch screen that size is a phone.
+test.describe('with a mouse', () => {
+  test.use({ hasTouch: false });
+  test('short desktop filter tools stay above the composer', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Full studio filter and composer overlap.');
+    await page.setViewportSize({ width: 900, height: 500 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Gallery Filters', exact: true }).click();
+    const clear = page.getByRole('button', { name: 'Filter By Model', exact: true });
+    await clear.scrollIntoViewIfNeeded();
+    await reachable(clear);
+    const panel = await page.locator('.gallery-filter-panel').boundingBox();
+    const composer = await page.locator('.zen-prompt').boundingBox();
+    expect(panel!.y + panel!.height).toBeLessThanOrEqual(composer!.y);
+  });
 });
 
 test('the composer model menu stays within the composer, under its trigger', async ({ page, isMobile }) => {
