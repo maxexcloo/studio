@@ -8,7 +8,7 @@
 --------------------------------------------------------------------------- */
 
 .reference-popover.is-pop {
-  z-index: 70;
+  z-index: var(--z-phone-pop);
   height: auto;
   max-height: var(--pop-max, 70dvh);
   border-radius: 22px;
@@ -152,7 +152,7 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
   position: fixed;
   top: calc(env(safe-area-inset-top) + var(--bar-h) + 6px);
   right: max(8px, env(safe-area-inset-right));
-  z-index: 70;
+  z-index: var(--z-phone-pop);
   display: grid;
   width: min(240px, calc(100vw - 16px));
   padding: 6px;

@@ -89,6 +89,11 @@
   --z-viewer: 40;
   --z-modal: 100;
   --z-popover: 150;
+  /* The phone's own layers (phoneLayers.ts): its bars, a sheet's dimmed page, the sheet, then a pop-up over the sheet. */
+  --z-phone-bar: 20;
+  --z-phone-scrim: 60;
+  --z-phone-sheet: 61;
+  --z-phone-pop: 70;
   --z-tooltip: 250;
 
   /* Motion */
