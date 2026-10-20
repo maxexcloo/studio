@@ -200,7 +200,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onAdd, onSwap, onClose }: {
   options: string[];
   profile: Profile | null;
   fitOf: FitOf;
@@ -212,6 +212,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   favorites: string[];
   recents: string[];
   remaining: number;
+  /** How many this model takes in all. */
+  max: number;
   swapping: string | null;
   libraryView?: boolean;
   stackControls?: React.ReactNode;
@@ -228,7 +230,10 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [showAll, setShowAll] = useState(false);
+  // This Model | All Models | Selected n/max, as in the reference chooser.
+  const [view, setView] = useState<'model' | 'all' | 'selected'>('model');
+  const showAll = view === 'all';
+  const reviewing = libraryView && view === 'selected';
   const [selected, setSelected] = useState<string[]>([]);
   const [highlight, setHighlight] = useState(0);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -251,6 +256,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const sections = useMemo<PickerSection[]>(() => {
     const q = query.trim().toLowerCase();
     if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(filteredOptions.filter((name) => `${name} ${nameOf(name)}`.toLowerCase().includes(q)), profile, '', fitOf).map((name) => ({ key: `q:${name}`, name })) }];
+    if (reviewing) return [{ id: 'selected', label: '', rows: current.map((name) => ({ key: name, name })) }];
     if (libraryView) {
       const ranked = rankedLoras(filteredOptions, profile, '', fitOf);
       const lead = [...current.filter((name) => pinned.has(name)), ...[...pinned].filter((name) => !current.includes(name) && available.has(name))];
@@ -268,10 +274,12 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }
     return out;
-  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents, libraryView, current, pinned]);
+  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents, libraryView, current, pinned, reviewing]);
 
   const visibleRows = useMemo(() => sections.flatMap((section) => collapsed.has(section.id) ? [] : section.rows), [collapsed, sections]);
-  useEffect(() => { setHighlight(0); }, [query, showAll]);
+  useEffect(() => { setHighlight(0); }, [query, view]);
+  // Nothing left to review: back to this model's LoRAs.
+  useEffect(() => { if (view === 'selected' && !current.length) setView('model'); }, [current.length, view]);
   useEffect(() => {
     listRef.current?.querySelector('[data-highlight="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [highlight]);
@@ -325,10 +333,10 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       </label>
       <div className="lora-filter">
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
-          <button type="button" className={cn(!showAll && 'active')} aria-pressed={!showAll} onClick={() => setShowAll(false)}>This Model</button>
-          <button type="button" className={cn(showAll && 'active')} aria-pressed={showAll} onClick={() => setShowAll(true)}>All Models</button>
+          <button type="button" className={cn(view === 'model' && 'active')} aria-pressed={view === 'model'} onClick={() => setView('model')}>This Model</button>
+          <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All Models</button>
+          {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
-        {libraryView ? <span className="lora-selection-count">{current.length} Selected</span> : null}
       </div>
       <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi}>
         {sections.map((section) => {
@@ -350,7 +358,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                   const item = inlineSelection.items.find(item => item.name === row.name);
                   const label = nameOf(row.name);
                   const info = inlineSelection.infoOf(row.name);
-                  return <motion.div key={row.key} layout="position" initial={false} transition={{ type: 'spring', duration: .38, bounce: .12 }} data-lora-name={row.name} className={cn('lora-library-row', item && 'is-selected', dragged.current === row.name && 'is-dragging', dragTarget === row.name && dragged.current !== row.name && 'is-drop-target')}>
+                  return <div key={row.key} data-lora-name={row.name} className={cn('lora-library-row', item && 'is-selected', dragged.current === row.name && 'is-dragging', dragTarget === row.name && dragged.current !== row.name && 'is-drop-target')}>
                     {item && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`}
                       onPointerDown={event => {
                         if (event.button !== 0) return;
@@ -392,7 +400,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Unfavorite ${fileName(row.name)}` : `Favorite ${fileName(row.name)}`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     <LoraDetails info={info} label={label} />
                     {policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
-                    <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ type: 'spring', duration: .38, bounce: .12 }}><div className="lora-library-settings">
+                    <AnimatePresence initial={false}>{item ? <motion.div className="lora-library-expansion" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: .32, ease: [.16, 1, .3, 1] }}><div className="lora-library-settings">
                       <Switch size="sm" label={item.enabled ? `Turn off ${label}` : `Turn on ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
                       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
                       {inlineSelection.items.length > 1 ? <span className="lora-library-order">
@@ -401,7 +409,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                       </span> : null}
                       {item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
                     </div></motion.div> : null}</AnimatePresence>
-                  </motion.div>;
+                  </div>;
                 }
                 return (
                   <div
@@ -439,7 +447,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
             </div>
           );
         })}
-        {!visibleRows.length ? <div className="lora-empty"><p>{query ? `No LoRAs match “${query}”.` : 'No compatible LoRAs found. Choose All Models to browse the rest.'}</p></div> : null}
+        {!visibleRows.length ? <div className="lora-empty"><p>{query ? `No LoRAs match “${query}”.` : reviewing ? 'Nothing selected yet.' : 'No compatible LoRAs found. Choose All Models to browse the rest.'}</p></div> : null}
       </div>
       {libraryView && stackControls ? <div className="lora-library-footer">{stackControls}</div> : null}
       {multi && !libraryView ? (
@@ -660,6 +668,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           favorites={library.favorites}
           recents={library.recents}
           remaining={Math.max(0, cap - loras.length)}
+          max={cap}
           swapping={picker?.swap || null}
           libraryView={browseFirst}
           stackControls={browseFirst ? <>

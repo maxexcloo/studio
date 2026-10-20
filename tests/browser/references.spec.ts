@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
-const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '', privacyDomain: 'gallery' });
+const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '' });
 
 async function prepare(page: Page, capacity: number, inpaint = false) {
   const models = await (await page.request.get('/api/models')).json();
@@ -24,6 +24,10 @@ async function prepare(page: Page, capacity: number, inpaint = false) {
   return { phone: await ui.isPhone(), ui, uploads };
 }
 
+/** A model with several slots shows one References button, named with how many are picked. */
+const references = (page: Page) => page.locator('.ref-group');
+const expectPicked = (page: Page, count: number, max: number) => expect(references(page)).toHaveAttribute('aria-label', count ? `References, ${count} of ${max} Selected` : 'Add References');
+
 async function drop(target: Locator, count: number) {
   await target.evaluate((element, count) => {
     const transfer = new DataTransfer();
@@ -32,23 +36,27 @@ async function drop(target: Locator, count: number) {
   }, count);
 }
 
-test('multiple upload selection fills declared slots and removal closes gaps', async ({ page }) => {
+test('several slots share one References button whose chooser fills, reviews and empties them', async ({ page }) => {
   const { ui, uploads } = await prepare(page, 3);
-  await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
-  const input = page.locator('.reference-popover input[type="file"]');
+  await expect(page.locator('[data-reference-slot]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
+  const input = picker.locator('input[type="file"]');
   await expect(input).toHaveAttribute('multiple', '');
   await input.setInputFiles([1, 2, 3].map((index) => ({ name: `reference-${index}.png`, mimeType: 'image/png', buffer: Buffer.from('image') })));
-  await expect(page.locator('.ref-thumb')).toHaveCount(3);
-  await expect(page.locator('.reference-count')).toHaveText('3/3 References');
+  await expectPicked(page, 3, 3);
   expect(uploads).toHaveLength(3);
-  await expect(page.locator('.reference-popover')).toHaveCount(0);
-  const firstRemove = page.getByRole('group', { name: 'Reference Images', exact: true }).getByRole('button', { name: 'Remove reference image', exact: true });
-  await firstRemove.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.ref-thumb')).toHaveCount(2);
-  await expect(page.locator('.ref-thumb').first()).toHaveAttribute('aria-label', /uploaded-2.png/);
-  await expect(page.locator('.reference-count')).toHaveText('2/3 References');
-  await expect(page.getByRole('button', { name: 'Add Reference 3', exact: true })).toBeVisible();
+  // Picking several stays open for the rest; Selected reviews them in order.
+  await picker.getByRole('tab', { name: 'Selected 3 of 3', exact: true }).click();
+  const rows = picker.getByRole('list', { name: 'Selected References' }).getByRole('listitem');
+  await expect(rows).toHaveCount(3);
+  await picker.getByRole('button', { name: 'Remove uploaded-1', exact: true }).click();
+  await expectPicked(page, 2, 3);
+  await expect(rows.first()).toContainText('uploaded-2');
+  await picker.getByRole('button', { name: 'Move uploaded-2 Later', exact: true }).click();
+  await expect(rows.first()).toContainText('uploaded-3');
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
   const layout = await ui.composer.evaluate((element) => {
     const prompt = element.querySelector('textarea')!.getBoundingClientRect();
     const references = element.querySelector('.composer-reference-tools')!.getBoundingClientRect();
@@ -62,22 +70,22 @@ test('multiple upload selection fills declared slots and removal closes gaps', a
   await ui.prompt.fill('A scene with both references');
   await ui.generate.click();
   await expect.poll(() => generated).not.toBeNull();
-  expect(generated!.referenceAssets).toEqual([{ slot: 'reference', assetId: 'uploaded-2' }, { slot: 'reference_2', assetId: 'uploaded-3' }]);
+  expect(generated!.referenceAssets).toEqual([{ slot: 'reference', assetId: 'uploaded-3' }, { slot: 'reference_2', assetId: 'uploaded-2' }]);
 });
 
-test('multi-file drops add references, respect capacity and allow explicit replacement', async ({ page }) => {
+test('multi-file drops add references and respect capacity', async ({ page }) => {
   const { ui, uploads } = await prepare(page, 3);
   await drop(ui.composer, 2);
-  await expect(page.locator('.ref-thumb')).toHaveCount(2);
+  await expectPicked(page, 2, 3);
   await drop(ui.composer, 2);
-  await expect(page.locator('.reference-count')).toHaveText('3/3 References');
+  await expectPicked(page, 3, 3);
   expect(uploads).toHaveLength(3);
   await drop(ui.composer, 1);
   await expect(page.getByText('All reference slots are filled.', { exact: false })).toBeVisible();
   expect(uploads).toHaveLength(3);
-  await drop(page.locator('.ref-thumb[data-reference-slot="reference_2"]'), 1);
-  await expect(page.locator('[data-reference-slot="reference_2"]')).toHaveAttribute('aria-label', /uploaded-4.png/);
-  await expect(page.locator('.ref-thumb').first()).toHaveAttribute('aria-label', /uploaded-1.png/);
+  // Dropped on the button, a picture is added like anywhere else on the prompt.
+  await drop(references(page), 1);
+  expect(uploads).toHaveLength(3);
 });
 
 test('single-reference models keep one slot and show the full image if the thumbnail expires', async ({ page }) => {
@@ -154,7 +162,7 @@ test('the image editor fills a usable workspace with reachable mobile tools', as
 test('reference sources name their search and keep one upload action', async ({ page }) => {
   const { phone } = await prepare(page, 2);
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
-  await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.locator('.reference-popover');
   // Open and type on desktop; the phone sheet takes focus itself so no keyboard pops up.
   if (!phone) await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
@@ -175,14 +183,14 @@ test('reference selection stays open, pins selections across searches and tabs, 
   await page.route('**/api/reference-assets?*', route => route.fulfill({ json: {
     items: new URL(route.request().url()).searchParams.get('q') ? [] : [image('first'), image('second'), image('third')], nextCursor: '',
   } }));
-  await page.getByRole('button', { name: 'Add Reference Image', exact: true }).click();
-  const picker = page.getByRole('dialog', { name: 'Choose reference image', exact: false });
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
   await picker.getByRole('button', { name: 'second.png', exact: true }).click();
   await expect(picker).toBeVisible();
   await expect(picker.locator('.reference-tile-select').first()).toHaveAttribute('aria-label', 'Selected: second.png');
   await picker.getByRole('button', { name: 'first.png', exact: true }).click();
-  await expect(page.locator('.reference-count')).toHaveText('2/2 References');
-  await expect(picker.getByRole('button', { name: 'third.png', exact: true })).toBeDisabled();
+  await expectPicked(page, 2, 2);
+  await expect(picker.getByRole('button', { name: 'third.png', exact: true })).toHaveAttribute('aria-disabled', 'true');
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeEnabled();
   const search = picker.getByRole('searchbox');
   await search.fill('no matching images');
@@ -190,11 +198,11 @@ test('reference selection stays open, pins selections across searches and tabs, 
   await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'Selected: second.png', exact: true }).click();
-  await expect(page.locator('.reference-count')).toHaveText('1/2 References');
+  await expectPicked(page, 1, 2);
   await search.clear();
   await picker.getByRole('button', { name: 'third.png', exact: true }).click();
-  await expect(page.locator('.reference-count')).toHaveText('2/2 References');
+  await expectPicked(page, 2, 2);
   await page.keyboard.press('Escape');
   await expect(picker).not.toBeVisible();
-  await expect(page.locator('.reference-slot-list button[data-reference-slot]').first()).toBeFocused();
+  await expect(references(page)).toBeFocused();
 });

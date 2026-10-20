@@ -1,13 +1,12 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
-import { Brush, Check, Image as ImageIcon, Images, LoaderCircle, LockKeyhole, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Brush, Check, Image as ImageIcon, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { Tip } from "./components";
 import { useDismiss } from "./useDismiss";
 import { surfaceMotion, useComposerSurfaceBox } from "./composerSurface";
-import { useHiddenActions } from "./hiddenContext";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
@@ -17,7 +16,9 @@ import { usePhoneLayer } from './phoneLayers';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
-type PickerTab = "generation" | "hidden" | "upload";
+/** Where pictures come from; Selected reviews what is picked. */
+type SourceTab = "generation" | "upload";
+type PickerTab = SourceTab | "selected";
 
 // Files dragged from Windows Explorer can arrive with an empty type (often
 // .webp and .avif): fall back to the extension. The server sniffs the bytes.
@@ -34,9 +35,8 @@ type PageState = {
 };
 
 const emptyPage = (): PageState => ({ items: [], cursor: "", hasMore: false, loading: false, loaded: false, error: "" });
-type PickerMemory = { tab?: PickerTab; query: string; pages: Record<PickerTab, PageState>; scroll: Record<PickerTab, number> };
-const pickerMemory = (): PickerMemory => ({ query: '', pages: { generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() }, scroll: { generation: 0, hidden: 0, upload: 0 } });
-const spring = { type: "spring", duration: 0.38, bounce: 0.12 } as const;
+type PickerMemory = { tab?: SourceTab; query: string; pages: Record<SourceTab, PageState>; scroll: Record<SourceTab, number> };
+const pickerMemory = (): PickerMemory => ({ query: '', pages: { generation: emptyPage(), upload: emptyPage() }, scroll: { generation: 0, upload: 0 } });
 
 function assetImage(asset: ReferenceAsset) {
   return asset.thumbnailUrl || asset.url || "";
@@ -45,19 +45,27 @@ function assetImage(asset: ReferenceAsset) {
 /* --------------------------------------------------------------- Popover */
 
 /**
- * The reference library as a popover that rises out of the composer: recent
- * generations and uploads in a grid, an upload button, drop and paste.
+ * The reference chooser as a popover that rises out of the composer (a sheet
+ * on the phone): recent generations and uploads in a grid, an upload button,
+ * drop and paste. It picks several at once, up to the model's limit; tapping a
+ * picked image takes it off again, and Selected n/max reviews, reorders and
+ * removes what is picked.
  */
-function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
   memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
   popRef: React.RefObject<HTMLDivElement | null>;
   dropActive: boolean;
   dropped: { asset: ReferenceAsset; nonce: number } | null;
+  /** What is picked for these slots, in slot order. */
   selected: ReferenceAsset[];
+  /** How many these slots take. */
+  max: number;
   atCapacity: boolean;
   onDeselect: (asset: ReferenceAsset) => void;
+  /** Swaps the picture at `from` with the one at `to`, in slot order. */
+  onMove: (from: number, to: number) => void;
   onClose: () => void;
   onSelect: (asset: ReferenceAsset) => void;
   /** An upload was deleted for good: whichever slots hold it let it go. */
@@ -67,13 +75,10 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
   upload: { busy: boolean; progress: number; multiple: boolean; start: (files: File[]) => Promise<ReferenceAsset | null> };
 }) {
   const present = useIsPresent();
-  // Hidden images sit on their own shelf, behind the same lock as Hidden itself.
-  // It opens first when the picked image came from there, or when making in Hidden.
-  const hidden = useHiddenActions();
-  const hiddenShelf = Boolean(hidden?.enabled);
-  const hiddenOpen = Boolean(hidden?.unlocked);
-  const [tab, setTab] = React.useState<PickerTab>(() => memory.tab && (memory.tab !== "hidden" || hiddenShelf && hiddenOpen) ? memory.tab : hiddenShelf && (selected.some(asset => asset.source === "vault") || (hidden?.space === "hidden" && hiddenOpen)) ? "hidden" : "generation");
-  const [pages, setPages] = React.useState<Record<PickerTab, PageState>>(() => memory.pages);
+  const [tab, setTab] = React.useState<PickerTab>(() => memory.tab || "generation");
+  // The source shown under Selected's review, and the one a search runs in.
+  const source: SourceTab = tab === "selected" ? memory.tab || "generation" : tab;
+  const [pages, setPages] = React.useState<Record<SourceTab, PageState>>(() => memory.pages);
   const [selectingId, setSelectingId] = React.useState("");
   const active = React.useRef(true);
   React.useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -81,6 +86,7 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
   const [query, setQuery] = React.useState(memory.query);
   const previousQuery = React.useRef(query);
   const restoreTab = React.useRef<PickerTab | null>(tab);
+  const multiple = max > 1;
   const searchRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const pageErrorRef = React.useRef<HTMLDivElement>(null);
@@ -115,9 +121,9 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
     setPages((current) => ({ ...current, upload: { ...current.upload, items: [dropped.asset, ...current.upload.items.filter((item) => item.id !== dropped.asset.id)] } }));
   }, [dropped]);
 
-  const requests = React.useRef(new Map<PickerTab, AbortController>());
+  const requests = React.useRef(new Map<SourceTab, AbortController>());
   React.useEffect(() => () => { requests.current.forEach((request) => request.abort()); requests.current.clear(); }, []);
-  const load = React.useCallback(async (target: PickerTab, cursor = "", refresh = false) => {
+  const load = React.useCallback(async (target: SourceTab, cursor = "", refresh = false) => {
     if (requests.current.has(target)) return;
     const controller = new AbortController();
     requests.current.set(target, controller);
@@ -152,54 +158,52 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
   React.useEffect(() => {
     if (previousQuery.current === query) return;
     previousQuery.current = query;
-    memory.scroll = { generation: 0, hidden: 0, upload: 0 };
+    memory.scroll = { generation: 0, upload: 0 };
     restoreTab.current = tab;
     requests.current.forEach((request) => request.abort());
     requests.current.clear();
-    setPages({ generation: emptyPage(), hidden: emptyPage(), upload: emptyPage() });
+    setPages({ generation: emptyPage(), upload: emptyPage() });
     bodyRef.current?.scrollTo({ top: 0 });
   }, [query]);
   React.useLayoutEffect(() => {
-    memory.tab = tab;
-    memory.query = tab === 'hidden' ? '' : query;
-    // Hidden images are never retained after the picker closes.
-    memory.pages = Object.fromEntries(Object.entries(pages).map(([source, page]) => [source, source === 'hidden' ? emptyPage() : { ...page, loading: false }])) as PickerMemory['pages'];
+    if (tab !== "selected") memory.tab = tab;
+    memory.query = query;
+    memory.pages = Object.fromEntries(Object.entries(pages).map(([key, page]) => [key, { ...page, loading: false }])) as PickerMemory['pages'];
   }, [memory, pages, query, tab]);
   React.useLayoutEffect(() => {
-    if (!box || restoreTab.current !== tab) return;
+    if (!box || restoreTab.current !== tab || tab === "selected") return;
     let secondFrame = 0;
     const frame = requestAnimationFrame(() => { secondFrame = requestAnimationFrame(() => {
       bodyRef.current?.scrollTo({ top: memory.scroll[tab], behavior: 'instant' });
       restoreTab.current = null;
     }); });
     return () => { cancelAnimationFrame(frame); cancelAnimationFrame(secondFrame); };
-  }, [Boolean(box), memory, pages[tab].items.length, tab]);
+  }, [Boolean(box), memory, pages[source].items.length, tab]);
   const changeTab = (next: PickerTab) => { if (next === tab) return; restoreTab.current = next; setTab(next); };
   React.useEffect(() => {
     // Refresh the newest page when reopening, while retaining loaded rows and their position.
-    if (tab !== 'hidden' && memory.pages[tab].loaded && !memory.pages[tab].error) void load(tab, '', true);
+    if (memory.pages[source].loaded && !memory.pages[source].error) void load(source, '', true);
   }, []);
-
-  // Locking empties the shelf; unlocking fills it afresh.
-  React.useEffect(() => { requests.current.get("hidden")?.abort(); requests.current.delete("hidden"); setPages((current) => ({ ...current, hidden: emptyPage() })); }, [hiddenOpen]);
-  React.useEffect(() => { if (tab === "hidden" && !hiddenShelf) setTab("generation"); }, [hiddenShelf, tab]);
+  // Nothing left to review: back to where the pictures come from.
+  React.useEffect(() => { if (tab === "selected" && !selected.length) setTab(source); }, [selected.length, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
-    if (pages[tab].loaded || pages[tab].loading || (tab === "hidden" && !hiddenOpen)) return;
-    load(tab);
-  }, [hiddenOpen, load, pages, tab]);
+    if (pages[source].loaded || pages[source].loading) return;
+    load(source);
+  }, [load, pages, source]);
 
   const uploadAndUse = async (files: File[]) => {
     const asset = await upload.start(files);
     if (!asset) return;
     setPages((current) => ({ ...current, upload: { ...current.upload, items: [asset, ...current.upload.items.filter((item) => item.id !== asset.id)] } }));
-    onClose();
+    // Picking several: stay open for the rest.
+    if (!multiple) onClose();
   };
 
   async function choose(asset: ReferenceAsset) {
     if (selectingId || upload.busy) return;
     if (selected.some(item => item.id === asset.id)) { onDeselect(asset); return; }
-    if (atCapacity) return;
+    if (atCapacity) { showToastTone(fullMessage(max), "default"); return; }
     setSelectingId(asset.id);
     try {
       const resolved = asset.source === "generation" && asset.galleryItemId ? await referenceAssetFromGallery(asset.galleryItemId) : asset;
@@ -225,17 +229,17 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
     }
   }
 
-  const page = pages[tab];
+  const page = pages[source];
   // Selected references remain available across source tabs and filtered server pages.
   const items = [...new Map([...selected, ...page.items].map(asset => [asset.id, asset])).values()];
   React.useEffect(() => {
     if (!page.hasMore || page.loading || page.error || search.trim() !== query || !moreRef.current) return;
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) load(tab, page.cursor);
+      if (entry.isIntersecting) load(source, page.cursor);
     }, { root: bodyRef.current, rootMargin: '120px' });
     observer.observe(moreRef.current);
     return () => observer.disconnect();
-  }, [load, page.cursor, page.error, page.hasMore, page.loading, query, search, tab]);
+  }, [load, page.cursor, page.error, page.hasMore, page.loading, query, search, source, tab]);
   React.useEffect(() => {
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
@@ -251,7 +255,7 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
       role={present ? "dialog" : undefined}
       aria-hidden={!present || undefined}
       inert={!present}
-      aria-label={`Choose ${label}`}
+      aria-label={multiple ? "Choose References" : `Choose ${label}`}
       aria-busy={upload.busy || Boolean(selectingId) || undefined}
       tabIndex={-1}
       data-open-surface
@@ -260,10 +264,10 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
       <header className="reference-popover-head">
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
           <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
-          {hiddenShelf ? <button role="tab" aria-selected={tab === "hidden"} className={cn(tab === "hidden" && "active")} onClick={() => changeTab("hidden")}><LockKeyhole size={14} /> Hidden</button> : null}
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
+          {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
-        <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? "All slots filled · select an image to remove it" : "Drop or paste an image anywhere on the prompt"}</span>
+        <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
           <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
@@ -272,34 +276,41 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={15} /></button></Tip>
       </header>
 
-      <div className="reference-search picker-search">
+      {tab !== "selected" ? <div className="reference-search picker-search">
         <Search size={15} aria-hidden="true" />
         <input ref={searchRef} type="search" aria-label={tab === "upload" ? "Search Uploads" : "Search Library"} placeholder={tab === "upload" ? "Search Uploads" : "Search Library"} value={search} onChange={(event) => setSearch(event.target.value)} />
         {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
-      </div>
-      <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null) memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
-        {tab === "hidden" && !hiddenOpen ? (
-          <div className="reference-empty">
-            <LockKeyhole size={22} />
-            <strong>Hidden Is Locked</strong>
-            <p>Unlock it to use a hidden image. The image stays in Hidden.</p>
-            <button className="btn is-primary" onClick={() => hidden?.unlock()}><LockKeyhole size={14} /> Unlock</button>
-          </div>
+      </div> : null}
+      <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null && tab !== "selected") memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
+        {tab === "selected" ? (
+          <ol className="reference-selected-list" aria-label="Selected References">
+            {selected.map((asset, index) => (
+              <li key={asset.id} className="reference-selected-row">
+                <span className="reference-selected-number" aria-hidden="true">{index + 1}</span>
+                <span className="reference-selected-thumb"><SafeImg src={assetImage(asset)} draggable={false} fallback={<ImageIcon size={16} />} /></span>
+                <span className="reference-selected-name" title={asset.name}>{referenceName(asset.name)}</span>
+                <span className="reference-selected-actions">
+                  <Tip content="Move Earlier"><button type="button" className="prompt-action" aria-label={`Move ${referenceName(asset.name)} Earlier`} disabled={index === 0} onClick={() => onMove(index, index - 1)}><ArrowUp size={14} /></button></Tip>
+                  <Tip content="Move Later"><button type="button" className="prompt-action" aria-label={`Move ${referenceName(asset.name)} Later`} disabled={index === selected.length - 1} onClick={() => onMove(index, index + 1)}><ArrowDown size={14} /></button></Tip>
+                  <Tip content="Remove"><button type="button" className="prompt-action" aria-label={`Remove ${referenceName(asset.name)}`} onClick={() => onDeselect(asset)}><X size={14} /></button></Tip>
+                </span>
+              </li>
+            ))}
+          </ol>
         ) : page.loading && !items.length ? (
           <div className="reference-grid is-loading" aria-label="Loading Images">
             {Array.from({ length: 12 }, (_, index) => <div className="reference-skeleton" key={index} />)}
           </div>
         ) : page.error && !items.length ? (
-          <div className="reference-empty"><ImageIcon size={22} /><strong>Images Unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(tab)}>Try Again</button></div>
+          <div className="reference-empty"><ImageIcon size={22} /><strong>Images Unavailable</strong><p>{page.error}</p><button className="btn" onClick={() => load(source)}>Try Again</button></div>
         ) : !items.length ? (
           <div className="reference-empty">
             <ImageIcon size={22} />
-            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : tab === "hidden" ? "Nothing Hidden Yet" : "No Uploads Yet"}</strong>
-            <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : tab === "hidden" ? "Images you hide show up here." : "Upload one, or drop it on the prompt."}</p>
+            <strong>{query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : "No Uploads Yet"}</strong>
+            <p>{query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : "Upload one, or drop it on the prompt."}</p>
           </div>
         ) : (
           <>
-            {tab === "hidden" && hidden?.space !== "hidden" ? <p className="reference-shelf-note"><LockKeyhole size={12} /> What you make from a hidden image goes to Hidden too.</p> : null}
             <ReferenceGrid items={items} render={(asset, index, style, tabIndex) => {
                 const isSelected = selected.some(item => item.id === asset.id);
                 return (
@@ -315,18 +326,19 @@ function ReferencePopover({ memory, input, selected, atCapacity, onDeselect, anc
                       className="reference-tile-select"
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? "Selected: " : ""}${asset.name}`}
+                      aria-disabled={(!isSelected && atCapacity) || undefined}
                       onClick={() => choose(asset)}
-                      disabled={Boolean(selectingId || upload.busy) || (!isSelected && atCapacity)}
+                      disabled={Boolean(selectingId || upload.busy)}
                     >
                       <SafeImg src={assetImage(asset)} loading="lazy" draggable={false} fallback={<ImageIcon size={16} />} />
-                      {isSelected ? <i className="reference-tile-check"><Check size={12} strokeWidth={3} /></i> : null}
+                      {isSelected ? <i className="reference-tile-check">{multiple ? selected.findIndex((item) => item.id === asset.id) + 1 : <Check size={12} strokeWidth={3} />}</i> : null}
                     </button>
                     {asset.source === "upload" ? <button type="button" tabIndex={tabIndex} className="reference-tile-delete" aria-label={`Delete ${asset.name}`} onClick={(event) => removeUpload(event, asset)}><Trash2 size={13} /></button> : null}
                     {selectingId === asset.id ? <span className="reference-tile-busy"><LoaderCircle className="spin" size={16} /></span> : null}
                   </div>
                 );
               }} />
-            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(tab, page.cursor)}>Try Again</button></div> : page.hasMore ? <button ref={moreRef} className="btn is-ghost reference-more" onClick={() => load(tab, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load More"}</button> : null}
+            {page.error ? <div ref={pageErrorRef} className="reference-page-error" role="alert"><p>{page.error}</p><button className="btn" onClick={() => load(source, page.cursor)}>Try Again</button></div> : page.hasMore ? <button ref={moreRef} className="btn is-ghost reference-more" onClick={() => load(source, page.cursor)} disabled={page.loading}>{page.loading ? "Loading…" : "Load More"}</button> : null}
           </>
         )}
       </div>
@@ -382,83 +394,7 @@ function useNoHover() {
 }
 const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey, "1"); } catch { /* shown again next time, which is fine */ } };
 
-/** One of the other references in a stack: what it holds, and how to change or remove it. */
-type StackItem = { input: MediaInput; asset: ReferenceAsset; open: boolean; busy: boolean; progress: number; fresh: boolean; onOpen: () => void; onRemove: () => void };
-/**
- * The references that follow the first one (a model that reads several): the
- * first stays the chip in the corner, the others sit behind it as a deck and
- * fan out into its strip, with a + for the next one (greyed once all are used).
- */
-type ReferenceStack = {
-  items: StackItem[];
-  /** The next empty slot, or null when every slot holds a picture. */
-  add: { open: boolean; busy: boolean; progress: number; onOpen: () => void } | null;
-  max: number;
-  /** No + in Edit: it changes one picture. */
-  canAdd: boolean;
-  /** Open the strip for a moment, to show where a dropped picture went. */
-  intro: boolean;
-};
-
-const foldEase = "cubic-bezier(.16, 1, .3, 1)";
-/**
- * Something in a row that comes and goes with a state switch (Edit | Reference): it stays
- * mounted and folds to nothing, width and the row's gap with it, so its neighbours glide
- * instead of jumping. Folded, it can't be reached by pointer, keyboard or screen reader.
- */
-function Fold({ shown, children, gap = 6 }: { shown: boolean; children: React.ReactNode; gap?: number }) {
-  const ref = React.useRef<HTMLSpanElement>(null);
-  const was = React.useRef(shown);
-  // Its width while shown, kept up to date: once folded (width 0) its content can be squeezed.
-  const openWidth = React.useRef(0);
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (el && shown && !el.classList.contains("is-folding")) openWidth.current = el.offsetWidth;
-  });
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.inert = !shown;
-    const before = was.current;
-    was.current = shown;
-    if (before === shown || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Unfolding, it's back at its natural width to measure; folding, the last width it had.
-    const width = `${shown ? el.offsetWidth : openWidth.current}px`;
-    if (!shown && !openWidth.current) return;
-    const open = { width, marginLeft: "0px", opacity: 1, scale: "1" };
-    const shut = { width: "0px", marginLeft: `${-gap}px`, opacity: 0, scale: ".7" };
-    // Clipped only while it moves, so a focus ring or a corner × isn't cut off at rest.
-    el.classList.add("is-folding");
-    const animation = el.animate(shown ? [shut, open] : [open, shut], { duration: 340, easing: foldEase });
-    const done = () => el.classList.remove("is-folding");
-    animation.onfinish = done;
-    animation.oncancel = done;
-    return () => animation.cancel();
-  }, [shown, gap]);
-  return <span ref={ref} className={cn("ref-fold", !shown && "is-folded")} style={{ "--fold-gap": `${-gap}px` } as React.CSSProperties} aria-hidden={!shown || undefined}>{children}</span>;
-}
-
-const fullMessage = (max: number) => `Up to ${max} references. Remove one to add another`;
-
-/** The + for another reference: greyed, with why, once every slot is used. */
-function AddMore({ max, add, className, size = 15 }: { max: number; add: ReferenceStack["add"]; className: string; size?: number }) {
-  if (add?.busy) return <span className={cn(className, "is-busy")} aria-live="polite"><LoaderCircle className="spin" size={size} /></span>;
-  return (
-    <Tip content={add ? "Add another reference, or drop one on the prompt" : fullMessage(max)}>
-      <button
-        type="button"
-        data-open-trigger={add ? true : undefined}
-        className={cn(className, add?.open && "is-open", !add && "is-full")}
-        aria-label={add ? "Add another reference" : fullMessage(max)}
-        aria-disabled={!add || undefined}
-        aria-expanded={add ? add.open : undefined}
-        onClick={() => add ? add.onOpen() : showToastTone(fullMessage(max), "default")}
-      >
-        <Plus size={size} strokeWidth={2.2} />
-      </button>
-    </Tip>
-  );
-}
+const fullMessage = (max: number) => `Up to ${max} references. Take one off to add another`;
 
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
@@ -466,7 +402,7 @@ function AddMore({ max, add, className, size = 15 }: { max: number; add: Referen
  * image-to-image). With an
  * image it becomes a large thumbnail with visible remove and paint actions.
  */
-function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, stack = null, guide = false, onOpen, onRemove }: {
+function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, role = null, onOpen, onRemove }: {
   input: MediaInput;
   selected: ReferenceAsset | null;
   open: boolean;
@@ -477,10 +413,6 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   paint?: { masked: boolean; open: boolean; intro: boolean; hidden?: boolean; onOpen: () => void } | null;
   /** For a reference that can frame the output: edit this image, or only use it as a reference. */
   role?: ReferenceRoleControl | null;
-  /** The references after this one, folded behind it (desktop only; a phone lays them out in a row). */
-  stack?: ReferenceStack | null;
-  /** A later reference while the first is edited: it isn't changed, only drawn from. */
-  guide?: boolean;
   onOpen: () => void;
   onRemove: () => void;
 }) {
@@ -545,21 +477,19 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
   // The thumbnail is the anchor and says what the image is at rest: EDIT when it's the picture
   // being changed, a deck behind it when others come with it. The strip that grows out of it on
   // hover holds the choices (Edit | Reference, the brush) and the other references with a + for more.
-  const menu = Boolean(role || paint || stack);
-  const many = Boolean(stack?.items.length);
+  const menu = Boolean(role || paint);
   const editing = role?.value === "edit";
-  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}${guide ? " · Not edited, only drawn from" : ""}`;
-  const stackOpen = Boolean(stack && (stack.add?.open || stack.items.some((item) => item.open)));
+  const name = editing ? `Picture to edit: ${referenceName(selected.name)}` : `${isStart ? "Start image" : label}: ${referenceName(selected.name)}`;
   return (
     <div
-      className={cn("ref-chip ref-selected", (open || paint?.open || stackOpen) && "is-open", hover && "is-hover", (paint?.intro || stack?.intro) && "is-intro", fresh && "is-new", editing && "is-edit", many && "has-deck")}
+      className={cn("ref-chip ref-selected", (open || paint?.open) && "is-open", hover && "is-hover", paint?.intro && "is-intro", fresh && "is-new", editing && "is-edit")}
       onPointerEnter={(event) => hoverTo(true, event)}
       onPointerLeave={(event) => hoverTo(false, event)}
     >
       {/* The menu reveals leftward from behind the thumbnail with a clip-path, so
           nothing reflows and the thumbnail never moves. */}
       {menu ? <div className="ref-menu">
-        {role ? <RoleSwitch role={role} many={many} /> : null}
+        {role ? <RoleSwitch role={role} many={false} /> : null}
         {paint ? (
           // Folds away (rather than vanishing) while the image is a Ref, so the menu glides to its new width.
           <span ref={paintSlot} className={cn("ref-menu-paint-slot", paint.hidden && "is-hidden")} aria-hidden={paint.hidden || undefined}>
@@ -572,23 +502,10 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
             </Tip>
           </span>
         ) : null}
-        {stack ? (
-          <span className="ref-stack">
-            {/* The divider goes with the last thing after it: in Edit with no other pictures, nothing is. */}
-            {role || paint ? <Fold shown={stack.items.length > 0 || stack.canAdd} gap={0}><span className="ref-menu-divider" aria-hidden="true" /></Fold> : null}
-            {stack.items.map((item, index) => <StackThumb key={item.input.id} item={item} number={index + 2} guide={editing} />)}
-            <Fold shown={stack.canAdd}><AddMore max={stack.max} add={stack.add} className="ref-stack-add" /></Fold>
-          </span>
-        ) : null}
       </div> : null}
-      {/* The others peek out from behind the thumbnail, so it says "and more" at rest. */}
-      {stack?.items.slice(0, 2).map((item, index) => {
-        const src = assetImage(item.asset);
-        return <i key={item.input.id} className={cn("ref-deck-card", `is-${index + 1}`)} aria-hidden="true" style={src ? { backgroundImage: `url("${src.replace(/"/g, "%22")}")` } : undefined} />;
-      })}
       <Tip content={`${name} · Click to change`}>
         <button type="button" data-open-trigger data-reference-slot={input.id} className="ref-thumb" onClick={onOpen} aria-label={`Change ${label.toLowerCase()}, currently ${selected.name}`} aria-expanded={open}>
-          {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : selected.source === "vault" ? <LockKeyhole size={14} /> : <ImageIcon size={15} />}
+          {image && !broken ? <img src={image} alt="" draggable={false} onError={(event) => { if (selected.url && event.currentTarget.getAttribute("src") !== selected.url) event.currentTarget.src = selected.url; else setBroken(true); }} /> : <ImageIcon size={15} />}
         </button>
       </Tip>
       {/* Remove on the thumbnail's corner, where it's expected and far from Edit | Reference; Undo is in its toast. */}
@@ -599,6 +516,46 @@ function ReferenceSlot({ input, selected, open, busy, progress, fresh, paint, ro
       {/* The picture being edited is the one that's different from the rest: Ref leaves every image a plain reference. */}
       {role ? <i className={cn("ref-role-badge", editing && "is-on")} aria-hidden="true">EDIT</i> : null}
     </div>
+  );
+}
+
+/**
+ * Every slot of a model that reads several references, as one button: the
+ * picked pictures as small overlapping thumbnails, "References" and n/max.
+ * It opens the chooser, which picks, reorders and removes them all.
+ */
+function ReferenceGroupButton({ chain, assets, max, open, busy, progress, required, onOpen }: {
+  chain: MediaInput[];
+  assets: ReferenceAsset[];
+  max: number;
+  open: boolean;
+  busy: boolean;
+  progress: number;
+  required: boolean;
+  onOpen: () => void;
+}) {
+  const count = assets.length;
+  const name = count ? `References, ${count} of ${max} Selected` : `Add References${required ? ", Required" : ""}`;
+  return (
+    <Tip content={count ? `${count} of ${max} · Click to change` : `Choose up to ${max} references, or drop them on the prompt`}>
+      <button
+        type="button"
+        data-open-trigger
+        data-reference-chain={chain.map((input) => input.id).join(" ")}
+        className={cn("ref-chip ref-add ref-group", count > 0 && "has-items", required && !count && "is-required", open && "is-open")}
+        aria-label={name}
+        aria-expanded={open}
+        onClick={onOpen}
+      >
+        {busy ? <LoaderCircle className="spin" size={15} /> : count ? (
+          <span className="ref-group-thumbs" aria-hidden="true">
+            {assets.slice(0, 3).map((asset) => <SafeImg key={asset.id} src={assetImage(asset)} draggable={false} fallback={<ImageIcon size={12} />} />)}
+          </span>
+        ) : <Plus size={15} strokeWidth={2.2} />}
+        <span className="ref-group-label">References{required && !count ? <em aria-hidden="true">*</em> : null}</span>
+        {busy ? <span className="ref-group-count">{progress ? `${progress}%` : "…"}</span> : count ? <span className="ref-group-count">{count}/{max}</span> : null}
+      </button>
+    </Tip>
   );
 }
 
@@ -614,25 +571,6 @@ export function RoleSwitch({ role, many, className }: { role: ReferenceRoleContr
         <button type="button" role="radio" aria-checked={role.value === "reference"} aria-disabled={role.locked || undefined} className={cn(role.value === "reference" && "is-active")} onClick={() => { if (!role.locked) role.onChange("reference"); }}>Reference</button>
       </Tip>
     </div>
-  );
-}
-
-/** Another reference in the stack's strip: click to change it, × to take it off. */
-function StackThumb({ item, number, guide }: { item: StackItem; number: number; /** Edit: it isn't changed, only drawn from. */ guide: boolean }) {
-  const src = assetImage(item.asset);
-  const [broken, setBroken] = React.useState(false);
-  React.useEffect(() => { setBroken(false); }, [src]);
-  return (
-    <span className={cn("ref-stack-item", item.open && "is-open", item.fresh && "is-new")}>
-      <Tip content={`Reference ${number}: ${referenceName(item.asset.name)}${guide ? " · Not edited, only drawn from" : ""} · Click to change`}>
-        <button type="button" data-open-trigger className="ref-stack-thumb" aria-label={`Change reference ${number}, currently ${item.asset.name}`} aria-expanded={item.open} onClick={item.onOpen}>
-          {item.busy ? <LoaderCircle className="spin" size={14} /> : src && !broken ? <img src={src} alt="" draggable={false} onError={() => setBroken(true)} /> : item.asset.source === "vault" ? <LockKeyhole size={13} /> : <ImageIcon size={14} />}
-        </button>
-      </Tip>
-      <Tip content={`Remove reference ${number}`}>
-        <button type="button" className="ref-stack-remove" aria-label={`Remove reference ${number}`} onClick={item.onRemove}><X size={9} strokeWidth={2.8} /></button>
-      </Tip>
-    </span>
   );
 }
 
@@ -693,7 +631,7 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     setOpenSlot("");
     if (restore) requestAnimationFrame(() => {
       if (document.activeElement !== document.body && !popRef.current?.contains(document.activeElement)) return;
-      slotsRef.current?.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(slot)}"]`)?.focus({ preventScroll: true });
+      slotsRef.current?.querySelector<HTMLElement>(`[data-reference-slot="${CSS.escape(slot)}"], [data-reference-chain~="${CSS.escape(slot)}"]`)?.focus({ preventScroll: true });
     });
   }, [openSlot]);
   // A drop only belongs to the popover it landed on; forget it on close so the
@@ -744,22 +682,15 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     const chain = input.follows ? chains.find((items) => items.some((item) => item.id === input.follows)) : null;
     if (chain) chain.push(input); else chains.push([input]);
   }
-  // A phone, or a screen without hover, lays the stack out in a row: there's nothing to hover open.
+  // A phone, or a screen without hover, shows Edit | Reference in the row: there's nothing to hover open.
   const phone = Boolean(host?.classList.contains("phone-create"));
   const inline = phone || noHover;
-  // New images go to the slot that's open, else the first empty one. With every one of several
-  // references used, a new one replaces none of them (least of all the picture being edited);
-  // a single slot, or a workflow's own inputs, swap the first.
-  const chained = inputs.some((input) => input.follows);
-  const targetSlot = () => openSlot || usable.find((input) => !assetFor(input.id))?.id || (chained ? "" : inputs[0]?.id || "");
-  const maxReferences = Math.max(1, ...chains.map((chain) => chain.length));
   // The picker open on a slot that's no longer offered (Edit, or the picture before it removed):
   // close it, so nothing lands there and a later paste doesn't reopen it.
   const usableIds = usable.map((input) => input.id).join(" ");
   React.useEffect(() => {
     if (openSlot && !usableIds.split(" ").includes(openSlot)) setOpenSlot("");
   }, [openSlot, usableIds]);
-  const blockedMessage = editOnly ? "Edit changes one picture. Switch to Reference to add more" : fullMessage(maxReferences);
 
   // Explicit replacement targets win; otherwise add to the first free slot.
   const uploadFiles = React.useCallback(async (files: File[], preferred = "") => {
@@ -881,7 +812,6 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     const target = host?.querySelector(".composer-reference-tools");
     return <div className="composer-reference" ref={rootRef}>{target ? createPortal(button, target) : button}</div>;
   }
-  const visibleInputs = inputs.filter((input) => !input.follows || assetFor(input.id) || assetFor(input.follows));
   const count = inputs.filter((input) => assetFor(input.id)).length;
   const revision = context.current.revision;
   const openInput = inputs.find((input) => input.id === openSlot) || null;
@@ -901,7 +831,14 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
       before.forEach((item) => onSelect(item.slot, item.asset));
     } } });
   };
-  const renderSlot = (input: MediaInput, stack: ReferenceStack | null, guide = false) => (
+  const paintFor = (input: MediaInput) => inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
+    hidden: role?.slot === input.id && role.value === "reference",
+    masked: Boolean(inpaint.mask),
+    open: painting,
+    intro: introSlot === input.id,
+    onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
+  } : null;
+  const renderSlot = (input: MediaInput) => (
     <ReferenceSlot
       key={input.id}
       input={input}
@@ -910,52 +847,54 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
       busy={uploadSlot === input.id}
       progress={progress}
       fresh={freshSlot === input.id}
-      stack={stack}
-      guide={guide}
       // Inpainting changes part of this very image, which is an edit: a Ref only guides a new picture.
-      paint={inpaint && inpaint.slot === input.id && assetFor(input.id) ? {
-        hidden: role?.slot === input.id && role.value === "reference",
-        masked: Boolean(inpaint.mask),
-        open: painting,
-        intro: introSlot === input.id,
-        onOpen: () => { setOpenSlot(""); setIntroSlot(""); rememberInpaintIntro(); setPainting((current) => !current); }
-      } : null}
+      paint={paintFor(input)}
       role={role && role.slot === input.id && assetFor(input.id) ? role : null}
       onOpen={openFor(input.id)}
       onRemove={removeFor(input)}
     />
   );
+  // Several slots read as one: a single References button opens the chooser on
+  // the next empty one (or the first), which then fills the rest in order.
+  const renderGroup = (chain: MediaInput[]) => {
+    const [lead] = chain;
+    const assets = chain.flatMap((input) => assetFor(input.id) || []);
+    const offered = usable.filter((input) => chain.includes(input));
+    const paint = paintFor(lead);
+    return (
+      <React.Fragment key={lead.id}>
+        {paint && !paint.hidden ? (
+          <Tip content={paint.masked ? "Change the Painted Part" : "Paint Over a Part to Change Only That"}>
+            <button type="button" className={cn("ref-chip ref-brush", paint.masked && "is-masked", paint.open && "is-open")} aria-label={paint.masked ? "Edit the Painted Part" : "Paint the Part to Change"} aria-pressed={paint.open} onClick={paint.onOpen}><Brush size={15} /></button>
+          </Tip>
+        ) : null}
+        <ReferenceGroupButton
+          chain={chain}
+          assets={assets}
+          max={editOnly ? Math.max(1, assets.length) : chain.length}
+          open={chain.some((input) => input.id === openSlot)}
+          busy={chain.some((input) => input.id === uploadSlot)}
+          progress={progress}
+          required={Boolean(lead.required || (lead.min || 0) > 0)}
+          onOpen={() => {
+            setPainting(false);
+            setOpenSlot((current) => chain.some((input) => input.id === current) ? "" : offered.find((input) => !assetFor(input.id))?.id || lead.id);
+          }}
+        />
+      </React.Fragment>
+    );
+  };
+  const grouped = chains.some((chain) => chain.length > 1);
 
   const tools = host?.querySelector(".composer-reference-tools");
   const slots = (
       <div className={cn("composer-reference-slots", inline && "is-inline")} ref={slotsRef} role="group" aria-label="Reference Images">
-        {inputs.length > 1 ? <span className="reference-count" aria-live="polite">{count}/{inputs.length} References</span> : null}
+        {inputs.length > 1 && !grouped ? <span className="reference-count" aria-live="polite">{count}/{inputs.length} References</span> : null}
         <div className="reference-slot-list">
-        {/* No hover to open the strip (a tablet, the full studio on a phone): Edit | Reference in plain
+        {/* Without a hover strip (a group, a tablet, the full studio on a phone): Edit | Reference in plain
             sight at the row's start. The phone's create sheet has its own row for it, with a line. */}
-        {inline && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
-        {chains.flatMap((chain) => {
-          const [lead, ...rest] = chain;
-          const stacked = Boolean(role) && !inline && rest.length > 0 && Boolean(assetFor(lead.id));
-          const filled = rest.filter((input) => assetFor(input.id));
-          const next = rest.find((input) => !assetFor(input.id)) || null;
-          const stack: ReferenceStack | null = stacked ? {
-            items: filled.map((input) => ({ input, asset: assetFor(input.id)!, open: openSlot === input.id, busy: uploadSlot === input.id, progress, fresh: freshSlot === input.id, onOpen: openFor(input.id), onRemove: removeFor(input) })),
-            add: next ? { open: openSlot === next.id, busy: uploadSlot === next.id, progress, onOpen: openFor(next.id) } : null,
-            max: chain.length,
-            canAdd: !editOnly,
-            // Open while one uploads into it too, so its progress shows (it's in the strip).
-            intro: rest.some((input) => freshSlot === input.id || uploadSlot === input.id)
-          } : null;
-          const shown = stacked ? [lead] : chain;
-          // In a row, every slot of a full chain is used: a greyed + says how many it takes.
-          // Edit folds the row's empty slot and this + away (Fold), rather than dropping them.
-          const full = !stacked && rest.length > 0 && chain.every((input) => assetFor(input.id));
-          return [
-            ...shown.map((input) => input === lead ? renderSlot(input, stack) : <Fold key={input.id} shown={!editOnly || Boolean(assetFor(input.id))}>{renderSlot(input, null, editOnly)}</Fold>),
-            ...(full ? [<Fold key={`${lead.id}:full`} shown={!editOnly}><AddMore max={chain.length} add={null} className="ref-chip ref-add" /></Fold>] : [])
-          ];
-        })}
+        {(inline || grouped) && !phone && role ? <RoleSwitch role={role} many={selected.length > 1} className="ref-role-chip" /> : null}
+        {chains.map((chain) => chain.length > 1 ? renderGroup(chain) : renderSlot(chain[0]))}
         </div>
       </div>
   );
@@ -969,7 +908,16 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             memory={memory}
             input={openInput}
             selected={selected.filter(item => pickerInputs.some(input => input.id === item.slot)).map(item => item.asset)}
+            max={pickerInputs.length}
             atCapacity={pickerInputs.every(input => assetFor(input.id))}
+            onMove={(from, to) => {
+              const filled = pickerInputs.filter((input) => assetFor(input.id));
+              const [a, b] = [filled[from], filled[to]];
+              const [first, second] = [a && assetFor(a.id), b && assetFor(b.id)];
+              if (!a || !b || !first || !second) return;
+              onSelect(a.id, second);
+              onSelect(b.id, first);
+            }}
             onDeselect={asset => onRemove(selected.filter(item => item.asset.id === asset.id && pickerInputs.some(input => input.id === item.slot)).map(item => item.slot))}
             anchor={host}
             popRef={popRef}
