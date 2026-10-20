@@ -39,6 +39,8 @@ type VirtualMasonryGalleryProps = {
   /** Scroll this run into view once it is laid out (opened from zen or the sheet). */
   focusRun?: string;
   onFocused?: () => void;
+  /** The item open in the viewer: its tile is scrolled into view whenever the viewer moves to another one. */
+  followItem?: string;
   smartUpscale?: boolean;
   upscaleBusyIds?: Set<string>;
   onUpscale?: (item: GalleryItem) => void;
@@ -81,6 +83,7 @@ export function VirtualMasonryGallery({
   cancelJob,
   columns,
   focusRun,
+  followItem,
   formatElapsed,
   groups = null,
   items,
@@ -265,6 +268,27 @@ export function VirtualMasonryGallery({
     scrollElement.scrollTo({ top: Math.max(0, offset + tray.y - 96), behavior: reducedMotion ? "auto" : "smooth" });
     onFocused?.();
   }, [focusRun, layout, scrollElement]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stepping through the viewer brings each item's tile (or the stack holding
+  // it) into view behind it, so closing the viewer lands where you are. Only a
+  // change of item scrolls, and only when its tile is out of sight; new results
+  // or relayouts while the viewer stays on one item leave the scroll alone.
+  const followed = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (followed.current === followItem) return;
+    const container = containerRef.current;
+    if (!followItem || !scrollElement || !container) { followed.current = followItem; return; }
+    const entry = layout.entries.find((item) => item.kind === "tile" && item.item.id === followItem)
+      || layout.entries.find((item) => item.kind === "stack" && item.run.items.some((runItem) => runItem.id === followItem));
+    // Not laid out yet (a page still loading): tried again with the next layout.
+    if (!entry) return;
+    followed.current = followItem;
+    const offset = container.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop;
+    const top = offset + entry.y;
+    const view = scrollElement.clientHeight;
+    if (top >= scrollElement.scrollTop && top + entry.h <= scrollElement.scrollTop + view) return;
+    scrollElement.scrollTo({ top: Math.max(0, entry.h >= view ? top : top - (view - entry.h) / 2), behavior: "auto" });
+  }, [followItem, layout, scrollElement]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The stretch of the grid to draw, in the grid's own coordinates: the screen
   // and one more above and below. It moves in steps of half a screen, so

@@ -530,6 +530,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               onStackPress={phone ? setRunSheet : undefined}
               focusRun={focusRun}
               onFocused={() => setFocusRun("")}
+              followItem={active?.id}
               columns={galleryColumnCount}
               spanWide={Boolean(prefs.spanWideImages) && !phone}
               formatElapsed={formatElapsed}
