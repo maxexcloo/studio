@@ -177,6 +177,7 @@
 }
 
 /* Keep mode selection above the library and its optional search field. */
+.app-shell:has(.gallery-generation-mode) { --gallery-mode-h: 0px; }
 .gallery-generation-mode {
   position: sticky;
   top: 0;
@@ -274,6 +275,12 @@
   scroll-padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px) + var(--gallery-mode-h, 0px) + var(--dock-h) + 12px);
 }
 /* A stacked deck steps aside for the recent-prompts list, as for the composer's menus. */
+@media (max-width: 760px) {
+  .app-shell:has(.zen-prompt .prompt-history) :is(.studio-dock, .zen-control-button) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
 
 /* Nothing matched: the magnifier scene, then the caption. */
 .search-empty h2 { overflow-wrap: anywhere; }
