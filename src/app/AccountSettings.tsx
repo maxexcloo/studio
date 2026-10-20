@@ -149,6 +149,11 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
     }
   };
 
+  const dismissGatewayIdentity = async (identity: string) => {
+    if (!await confirmAction({ title: 'Dismiss This Chat User?', description: 'They leave this list. If the gateway sends them again, they return here waiting to be linked.', action: 'Dismiss Chat User', destructive: true })) return;
+    if (await run(() => apiJson('/api/accounts/gateway-pending/dismiss', jsonPost('POST', { identity })), 'Could not dismiss the chat user.')) await refresh();
+  };
+
   // Stored grants stay listed while discovery is degraded, marked unavailable.
   const grantable = [...new Set([...(admin?.availableProfiles || []), ...selectedProfiles])];
   const unavailable = new Set(grantable.filter((id) => !admin?.availableProfiles.includes(id)));
@@ -215,6 +220,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       {(admin?.gateway?.pending || []).map((item) => <Row key={item.identity} label={item.identity} description={`Waiting since ${new Date(item.firstSeenAt).toLocaleString('en-AU')}`}>
         <div className="set-type-picker"><StudioSelect ariaLabel={`Account for ${item.identity}`} value={gatewayChoice[item.identity] || NONE} options={[...choose('Choose an Account', gatewayChoice[item.identity] || ''), ...accountOptions(admin?.accounts || [])]} onChange={(value) => setGatewayChoice((current) => ({ ...current, [item.identity]: value === NONE ? '' : value }))} /></div>
         <button className="btn is-primary" disabled={busy || !gatewayChoice[item.identity]} onClick={() => void setGatewayLink(item.identity, gatewayChoice[item.identity])}><Link2 size={14} /> Link</button>
+        <button className="btn is-ghost" disabled={busy} aria-label={`Dismiss ${item.identity}`} onClick={() => void dismissGatewayIdentity(item.identity)}><X size={14} /> Dismiss</button>
       </Row>)}
       {!admin?.gateway?.links.length && !admin?.gateway?.pending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
     </Group> : null}

@@ -23,6 +23,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
     }
+    if (url.pathname === '/api/accounts/gateway-pending/dismiss') {
+      posts.push({ url: url.pathname, body: request.request().postDataJSON() });
+      return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
+    }
     if (url.pathname === '/api/accounts/profiles' && request.request().method() === 'POST') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, profile: request.request().postDataJSON() } });
@@ -95,6 +99,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByRole('option', { name: 'Artist One (artist.one)', exact: true }).click();
   await page.getByRole('button', { name: 'Link', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-links')?.body).toEqual({ identity: 'librechat-user-7', accountId: 'artist-id' });
+  await page.getByRole('button', { name: 'Dismiss librechat-user-7', exact: true }).click();
+  expect(posts.some((post) => post.url === '/api/accounts/gateway-pending/dismiss')).toBe(false);
+  await page.getByRole('button', { name: 'Dismiss Chat User', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-pending/dismiss')?.body).toEqual({ identity: 'librechat-user-7' });
 
   await page.getByRole('button', { name: 'Create Token', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Copy Token', exact: true })).toBeVisible();

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { accountAccessForId, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, setAccountPassword, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
@@ -247,6 +247,15 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     if (!requireAccountAdmin(req, res)) return;
     try {
       res.json({ ok: true, gateway: setGatewayLink(req.body?.identity, typeof req.body?.accountId === "string" ? req.body.accountId : "") });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  post("/api/accounts/gateway-pending/dismiss", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      res.json({ ok: true, gateway: dismissGatewayIdentity(req.body?.identity) });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

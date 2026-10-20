@@ -305,6 +305,17 @@ export function setGatewayLink(identity, accountId) {
   return listGatewayIdentities();
 }
 
+/** Forget one pending gateway identity. It reappears if the gateway sends it again. */
+export function dismissGatewayIdentity(identity) {
+  if (!validGatewayIdentity(identity)) throw new Error("Choose a valid gateway user ID.");
+  const store = readStore();
+  const pending = store.gatewayPending.filter((item) => item.identity !== identity);
+  if (pending.length === store.gatewayPending.length) throw new Error("That chat user is not waiting.");
+  store.gatewayPending = pending;
+  saveStore({ scrubBackup: true });
+  return listGatewayIdentities();
+}
+
 /* ------------------------------------------------------- OpenID Connect sign-in */
 
 /**

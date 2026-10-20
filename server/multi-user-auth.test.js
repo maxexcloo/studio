@@ -202,3 +202,26 @@ test("a forwarded gateway email links its identity to the enabled account with t
   // An email never overrides an existing link.
   assert.equal(gatewayAccountAccess("librechat-painter", "stranger@example.test").userId, painter.id);
 });
+
+test("administrators can dismiss a pending gateway identity, which returns only if the gateway sends it again", async () => {
+  const { noteGatewayIdentity } = await import("./account-store.js");
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], local({ username: "recovery", password: "a secure recovery password" }));
+  const admin = { ...local(), headers: { ...local().headers, cookie: [].concat(signedIn.headers["Set-Cookie"])[0].split(";")[0] } };
+  const pending = async () => (await call(routes["GET /api/accounts/admin"], admin)).body.gateway.pending.map((item) => item.identity);
+  noteGatewayIdentity("librechat-probe");
+  assert.ok((await pending()).includes("librechat-probe"));
+
+  const refused = await call(routes["POST /api/accounts/gateway-pending/dismiss"], { ...local({ identity: "librechat-probe" }), socket: { remoteAddress: "192.168.1.30" } });
+  assert.equal(refused.statusCode, 403);
+  assert.ok((await pending()).includes("librechat-probe"));
+
+  const dismissed = await call(routes["POST /api/accounts/gateway-pending/dismiss"], { ...admin, body: { identity: "librechat-probe" } });
+  assert.equal(dismissed.body.ok, true);
+  assert.equal(dismissed.body.gateway.pending.some((item) => item.identity === "librechat-probe"), false);
+  assert.equal((await pending()).includes("librechat-probe"), false);
+  const missing = await call(routes["POST /api/accounts/gateway-pending/dismiss"], { ...admin, body: { identity: "librechat-probe" } });
+  assert.equal(missing.statusCode, 400);
+
+  noteGatewayIdentity("librechat-probe");
+  assert.ok((await pending()).includes("librechat-probe"));
+});
