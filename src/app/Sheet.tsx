@@ -6,6 +6,7 @@ import { cn } from './format';
 import { useFocusTrap } from './useFocusTrap';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { usePhoneLayer } from './phoneLayers';
+import { StatusPill, useStatusHost } from './StatusMessage';
 
 /**
  * A bottom sheet: grab handle, swipe down (or Back, or Escape, or a tap on the
@@ -28,6 +29,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   const drag = useDragControls();
   const reduced = useReducedMotion();
   const { covered, nested } = usePhoneLayer(open);
+  const message = useStatusHost(open && !covered);
   useFocusTrap(panelRef, open);
   useHistoryDismiss(open, onClose);
   React.useEffect(() => {
@@ -93,7 +95,9 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
               <div className="phone-sheet-handle" aria-hidden="true" />
               <header className="phone-sheet-head">
                 {nested ? <button type="button" className="phone-icon phone-sheet-back" aria-label="Back" onClick={onClose}><ArrowLeft size={20} /></button> : null}
-                <h2 id={titleId}>{title}</h2>
+                {/* A message takes the title's place for a moment, short of Back and Close (UI-PATTERNS › Messages). */}
+                <h2 id={titleId} className={cn(message && 'sr-only')}>{title}</h2>
+                {message ? <StatusPill message={message} className="is-surface" /> : null}
                 {headerAction}
                 {nested ? null : <button type="button" className="phone-icon" aria-label="Close" onClick={onClose}><X size={20} /></button>}
               </header>

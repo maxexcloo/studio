@@ -45,7 +45,7 @@ import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
 import { usePhone, useThisComputer } from './device';
 import { ConnectedCard } from './ConnectedCard';
-import { Toaster } from './Toaster';
+import { StatusAnnouncer, StatusPill, SurfaceStatus, useStatusHost } from './StatusMessage';
 import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
@@ -174,7 +174,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     if (!composerExpanded || phone) return;
     const outside = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"]')) return;
+      // The status pill (an Undo) is never a press outside: the composer stays as it was.
+      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"], [data-status-message]')) return;
       setComposerExpanded(false);
     };
     document.addEventListener('pointerdown', outside, true);
@@ -437,6 +438,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // cancel queue) rise above it as small chips, so the dock never changes size.
   const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
   const studioDockRef = React.useRef<HTMLDivElement>(null);
+  // The gallery's top bar hosts messages; zen mode has no top bar, so its dock does.
+  const dockMessage = useStatusHost(!phone && Boolean(prefs.zenMode));
   React.useLayoutEffect(() => {
     const dock = studioDockRef.current;
     const shell = dock?.closest<HTMLElement>('.app-shell, .zen-shell');
@@ -460,6 +463,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 <span>Simple view</span>
               </button>
             </motion.div>
+          ) : null}
+          {dockMessage ? (
+            // Zen mode: messages rise above the dock, beside the status light (UI-PATTERNS › Messages).
+            <motion.div key="message" {...dockChip}><StatusPill message={dockMessage} className="is-dock" /></motion.div>
           ) : null}
           {runningCount ? (
             <motion.div key="cancel" {...dockChip}>
@@ -749,7 +756,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} status={<SurfaceStatus className="is-toolbar" />} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}
@@ -924,6 +931,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                 {!showDetails ? <Tip content="Show Details (I)"><button type="button" data-open-trigger className="viewer-info" aria-label="Info" aria-pressed={false} onClick={() => setShowDetails(true)}><Info size={17} /></button></Tip> : null}
                 </>
                 )}
+                {/* Over the viewer, messages sit at its top edge, between the corner buttons. */}
+                <SurfaceStatus className="is-viewer" />
                 {/* Phones and tablets: the dock has no room for Close, so it sits in the corner. */}
                 <button className="viewer-close" aria-label="Close Viewer" onClick={() => setActive(null)}><X size={18} /></button>
               </div>
@@ -935,8 +944,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>
-      {/* Portaled to <body>: inside the fixed shell it would sit under every dialog's scrim. */}
-      <Toaster offset={islandsHeight ? islandsHeight + 8 : 0} />
+      <StatusAnnouncer />
     </div>
     </GenerationProfiles.Provider>
     </FavoriteContext.Provider>

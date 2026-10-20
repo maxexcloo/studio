@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
-   Shared surfaces: Modal, buttons and the prompt field (toasts: 30-islands)
+   Shared surfaces: Modal, buttons and the prompt field (status messages: 30-islands)
 
    Every dialog in the app is <Modal> (src/app/Modal.tsx). It owns the scrim,
    the sheet, the head/body/foot anatomy and the sizes; feature CSS only lays

@@ -216,7 +216,7 @@
 
 .reference-popover {
   position: fixed;
-  z-index: 90; /* over the deck and composer, under modals and toasts */
+  z-index: 90; /* over the deck and composer, under modals */
   display: flex;
   flex-direction: column;
   height: min(440px, 58dvh);

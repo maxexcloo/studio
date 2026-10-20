@@ -18,12 +18,12 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   // The full studio shows progress in its activity island; the phone shows a running badge.
   if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
   complete = true;
-  const notification = page.locator(phone ? '.toast' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  const notification = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   await expect(notification).toBeVisible();
   await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
   const box = await notification.boundingBox();
   expect(box!.height).toBeLessThanOrEqual(56);
-  const drag = page.locator(phone ? '.toast-drag' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
+  const drag = page.locator(phone ? '.status-message' : '.activity.is-compact').filter({ hasText: 'Image Ready' });
   const origin = await drag.boundingBox();
   await page.mouse.move(origin!.x + origin!.width / 2, origin!.y + origin!.height / 2);
   await page.mouse.down();

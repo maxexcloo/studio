@@ -121,7 +121,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(strength).toBeEnabled();
   await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
-  await picker.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'true');
   await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });

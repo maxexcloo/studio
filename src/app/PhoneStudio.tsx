@@ -31,6 +31,7 @@ import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
+import { StatusPill, useStatusHost } from './StatusMessage';
 
 /* ---------------------------------------------------------------------------
    The phone studio
@@ -168,6 +169,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
   const statusText = restarting ? `${connectionName} is restarting` : comfyStatus?.busy ? `${connectionName} is busy` : connected ? `${connectionName} connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? `${connectionName} is offline` : `Checking ${connectionName}…`;
+  const message = useStatusHost();
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
   return (
@@ -184,10 +186,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
         <div className="phone-bar-row">
           {/* The Studio mark is the status: its light says whether generation can run, a tap checks again. */}
-          <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
-            <span /><strong>Studio</strong>
-          </button>
-          <div className="phone-title">
+          {/* A message takes the pill over for a moment (UI-PATTERNS › Messages); the title steps aside. */}
+          {message ? <StatusPill message={message} className="is-bar" /> : (
+            <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
+              <span /><strong>Studio</strong>
+            </button>
+          )}
+          <div className={cn('phone-title', message && 'is-yielding')}>
             <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
               <span>Gallery</span>
             </button>

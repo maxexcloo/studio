@@ -8,7 +8,7 @@
 
 .inpaint-studio {
   position: fixed;
-  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals and toasts */
+  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals */
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--r-panel);

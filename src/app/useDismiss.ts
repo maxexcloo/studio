@@ -23,6 +23,8 @@ export function useDismiss(refs: Refs, open: boolean, onDismiss: () => void) {
     const dialogOpen = () => Array.from(document.querySelectorAll('[role="dialog"]:not([data-focus-trap]), [role="alertdialog"]')).some((dialog) => !dialog.closest('[inert], [aria-hidden="true"]') && !owns(dialog));
     function onPointerDown(event: PointerEvent) {
       if (inForeignDialog(event.target)) return;
+      // The status message (an Undo, a Dismiss) is never a click away from the surface.
+      if (event.target instanceof Element && event.target.closest('[data-status-message]')) return;
       if (!inside(event.target as Node)) onDismiss();
     }
     function onKeyDown(event: KeyboardEvent) {

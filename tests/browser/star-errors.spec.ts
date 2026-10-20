@@ -26,6 +26,6 @@ test('starring in the viewer sends the picture’s id and address, and a refusal
   await expect(star).toHaveAttribute('aria-pressed', 'true');
   refuse = true;
   await star.click();
-  await expect(page.getByText('Couldn’t save the star: Blocked a request from another website. (HTTP 403, origin)')).toBeVisible();
+  await expect(page.locator('.status-message').filter({ hasText: 'Couldn’t save the star: Blocked a request from another website. (HTTP 403, origin)' })).toBeVisible();
   await expect(star).toHaveAttribute('aria-pressed', 'true');
 });

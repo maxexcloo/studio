@@ -48,9 +48,7 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
   only the newest shows, the ones under it step aside (`is-covered`) until it
   closes, one dimmed backdrop stays behind, and a nested sheet shows Back
   instead of Close. A destructive confirmation is the one exception.
-- Toasts and status never cover controls. On the phone they sit under the
-  status strip; over a full sheet they sit on its title row, short of Close or
-  Back; in the viewer, under its top buttons.
+- Messages and status never cover controls (see [Messages](#messages)).
 - Stacking uses the `--z-*` tokens, never raw numbers.
 
 ## Surfaces
@@ -73,7 +71,7 @@ two levels:
 
 | Level | Used for | Tokens |
 | --- | --- | --- |
-| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar, create pill and select bar, toasts | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
+| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar, create pill and select bar, the status pill | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
 | Panel | Popovers, menus, sheets and side panels | `--glass-panel-bg`, `--glass-panel-blur`, `--glass-border`, `--glass-panel-shadow` |
 
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
@@ -87,6 +85,36 @@ One accent, warm amber like the lock mark's glow: `--accent-amber`,
 highlight state uses it: active filters and search, selected tabs and chips,
 pressed toggles, Star and progress. Errors and destructive actions keep their
 own colours. `--ember` is an older name for the same colour.
+
+## Messages
+
+There are no floating toasts. A message (a confirmation, a failure, an Undo)
+shows in the **Studio status pill** (`src/app/StatusMessage.tsx`): the
+status light takes the message's tone, then the words, its one action (Undo,
+View, Try Again) and Dismiss. It times out (failures wait), pauses while
+hovered or focused, and a sideways flick dismisses it. Screen readers hear it
+through one announcer (polite, failures assertive).
+
+- **Where:** the phone's top bar, where the Studio pill sits (the title steps
+  aside for the moment); the desktop gallery's top bar, before its tools
+  (narrowing rather than pushing them); above the dock in zen mode, which has
+  no top bar.
+- **Covered:** a surface that covers the bar (a sheet, a sheet-style picker, a
+  dialog, the viewer) shows the pill at its own top edge while open: on its
+  title row short of Back and Close, or between the viewer's corner buttons.
+  Only the newest open host shows it, so a message is never on screen twice.
+- **Never over controls:** the pill takes the place of a title or hint, never
+  floats over fields, and touching it never dismisses the surface under it.
+- Undo stays inside the pill; a surface never grows its own undo strip.
+
+## Pickers
+
+- The reference and LoRA choosers share one top bar: the tab pills (This
+  Model | All Models | Selected n/max), then **Clear All** beside them, shown
+  only while something is picked. Clear All empties the selection at once and
+  offers Undo in the status pill; it never asks first.
+- One tap adds or removes; a picked item shows its order number and stays
+  pinned across searches and tabs.
 
 ## Composer
 
@@ -174,7 +202,7 @@ own colours. `--ember` is an older name for the same colour.
   with a muted icon, split by hairlines between the intent groups.
 - **Copying on phones:** call the clipboard synchronously inside the tap
   (iOS Safari requires it), fall back to a selected text box where there is
-  no clipboard API, and confirm with the button's own "Copied" and a toast.
+  no clipboard API, and confirm with the button's own "Copied" and a message.
 - The desktop downloads; phones share (iOS's share sheet has Save Image).
 - No haptics.
 
@@ -262,4 +290,4 @@ padding, and the page returns to where it rested once the keyboard closes.
   Model, Prompt, Negative Prompt, Reference Image, LoRAs, Animate, Star.
 - Item actions: "Use Prompt", "Use Settings", "Copy Prompt", "Retry".
 - Chat and links name results "Result N".
-- Toasts: "Couldn’t …" for failures, without a full stop; "Prompt copied".
+- Messages: "Couldn’t …" for failures, without a full stop; "Prompt copied".

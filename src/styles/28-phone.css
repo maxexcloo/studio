@@ -1113,9 +1113,11 @@ body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16p
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora { min-height: 40px; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora-name { font-size: 14px; }
 
-/* Toasts never cover controls (docs/guides/UI-PATTERNS.md): under the top bar,
-   under a full sheet's header, or under the viewer's top buttons. */
-html:has(.phone-shell) .toasts { top: calc(var(--phone-bar-h, 56px) + 8px + var(--toasts-offset, 0px)); }
-/* Over a full sheet: on its title row, short of its Close or Back, never over the fields below. */
-html:has(.phone-shell):has(.phone-sheet.is-full:not(.is-covered)) .toasts { top: calc(max(12px, env(safe-area-inset-top)) + 8px); left: 12px; width: calc(100vw - 76px); translate: none; }
-html:has(.phone-shell):has(.scrim) .toasts { top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 12px); }
+
+/* The status pill over the phone viewer: between Star and Info, never over either. */
+.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {
+  top: calc(max(10px, env(safe-area-inset-top)) + 4px);
+  left: calc(max(10px, env(safe-area-inset-left)) + var(--dock-h) + 8px);
+  max-width: calc(100% - 20px - 3 * var(--dock-h) - 32px);
+  translate: none;
+}

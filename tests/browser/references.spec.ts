@@ -82,7 +82,7 @@ test('multi-file drops add references and respect capacity', async ({ page }) =>
   await expectPicked(page, 3, 3);
   expect(uploads).toHaveLength(3);
   await drop(ui.composer, 1);
-  await expect(page.getByText('All reference slots are filled.', { exact: false })).toBeVisible();
+  await expect(page.locator('.status-message').filter({ hasText: 'Reference slots are full' })).toBeVisible();
   expect(uploads).toHaveLength(3);
   // Dropped on the button, a picture is added like anywhere else on the prompt.
   await drop(references(page), 1);

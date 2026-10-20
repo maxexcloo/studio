@@ -13,6 +13,7 @@ import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
+import { SurfaceStatus } from './StatusMessage';
 
 const InpaintStudio = React.lazy(() => import("./InpaintStudio").then((module) => ({ default: module.InpaintStudio })));
 
@@ -270,6 +271,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         </div>
         {/* Clear All sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
         {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear All</button> : null}
+        <SurfaceStatus active={Boolean(asSheet && present)} />
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
@@ -703,8 +705,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     if (!images.length) { onError?.("Choose an image file"); return null; }
     const empty = usable.filter((input) => !selected.some((item) => item.slot === input.id)).map((input) => input.id);
     const targets = preferred ? [preferred, ...empty.filter((id) => id !== preferred)] : empty;
-    if (!targets.length) { onError?.("All reference slots are filled. Remove an image or drop onto a thumbnail to replace it."); return null; }
-    if (images.length > targets.length) onError?.(`This model has room for ${targets.length} more reference ${targets.length === 1 ? "image" : "images"}. Extra files were skipped.`);
+    if (!targets.length) { onError?.("Reference slots are full · remove one or drop on a thumbnail"); return null; }
+    if (images.length > targets.length) onError?.(`Room for ${targets.length} more · extra files skipped`);
     uploading.current = true;
     const revision = context.current.revision;
     const current = () => context.current.active && context.current.revision === revision;

@@ -9,8 +9,10 @@ import { ActionIcon, startsGroup } from './ItemActionSurfaces';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 
-export function GalleryManagement({ children, modeSelector, search, selection, showToolbar = true, tools }: {
+export function GalleryManagement({ children, modeSelector, search, selection, showToolbar = true, status, tools }: {
   children: React.ReactNode;
+  /** The status pill's message host: the top bar is where desktop messages show. */
+  status?: React.ReactNode;
   modeSelector: React.ReactNode;
   search: React.ReactNode;
   selection: GallerySelection;
@@ -96,7 +98,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
     }
   }), [selection]);
   return <GallerySelectionContext.Provider value={menuSelection}>
-    {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{tools}<div className={selecting ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
+    {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{status}{tools}<div className={selecting ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       <button type="button" className="gallery-select-toggle" aria-label={selecting ? 'Stop Selecting' : 'Select'} aria-expanded={selecting} title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => selecting ? selection.end() : selection.start()}>{selecting ? <X size={16} /> : <CheckSquare size={16} />}<span role={selecting ? 'status' : undefined}>{selecting ? `${selected.length} Selected` : 'Select'}</span></button>
       <AnimatePresence initial={false}>{selecting ? <motion.div className="gallery-selection-actions" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <button type="button" title={selection.allSelected ? 'Select None' : 'Select All Loaded'} aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Select None' : 'Select All'}</button>
