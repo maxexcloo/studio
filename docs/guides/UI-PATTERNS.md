@@ -72,7 +72,7 @@ two levels:
 
 | Level | Used for | Tokens |
 | --- | --- | --- |
-| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar, create pill and select bar, the status pill | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
+| Bar | Floating bars and chips over content: toolbars, the dock, the Images/Videos switch, search and filters, the viewer bar, the phone top bar and select bar, the status pill | `--glass-bar-bg`, `--glass-bar-blur`, `--glass-border`, `--glass-bar-shadow` |
 | Panel | Popovers, menus, sheets and side panels | `--glass-panel-bg`, `--glass-panel-blur`, `--glass-border`, `--glass-panel-shadow` |
 
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
@@ -103,8 +103,8 @@ View, Try Again) and Dismiss. It times out (failures wait), pauses while
 hovered or focused, and a sideways flick dismisses it. Screen readers hear it
 through one announcer (polite, failures assertive).
 
-- **Where:** the phone's top bar, where the Studio pill sits (the title steps
-  aside for the moment); the desktop gallery's top bar, before its tools
+- **Where:** the phone's top bar, in place of the status light and Images |
+  Videos (the tools on the right stay); the desktop gallery's top bar, before its tools
   (narrowing rather than pushing them); above the dock in zen mode, which has
   no top bar.
 - **Covered:** a surface that covers the bar (a sheet, a sheet-style picker, a
@@ -115,15 +115,50 @@ through one announcer (polite, failures assertive).
   floats over fields, and touching it never dismisses the surface under it.
 - Undo stays inside the pill; a surface never grows its own undo strip.
 
+## Lists
+
+Every phone sheet and step (Create, Model, References, LoRAs, Size, Advanced
+Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
+`41-lists.css`), like iOS Settings without the cards:
+
+- **Rows** are full width and one line: the label on the left, the value
+  muted on the right (cut short with an ellipsis), then a chevron when the row
+  opens a step or a check when it is the selected option. 48 px high on a
+  phone (44 px on short screens), 38 px in desktop popovers, hairlines between
+  them. No row sits in a card, and no card sits in a card.
+- **Controls stay in the row:** a `NumberPicker` for numbers (Steps, CFG,
+  percentages), a select that shows the friendly name (the phone's own picker
+  on a phone, the studio's select on the desktop), a pill toggle for one choice
+  (Seed's Random), a switch for on and off.
+- **Names, not files:** model parts read as names ("Qwen3 VL 8B INT8"), with
+  the file name only in the picker (`partNames.js`).
+- **Sections** have one quiet heading, never repeating the row label under it
+  ("Sampling", then Steps, Sampler, Scheduler, CFG and Seed).
+- **Size** lists the shapes with their outline in one fixed lead, so labels line
+  up, a check on the one in use, and Custom Size as a normal row that opens its
+  fields in place. No preview stage on the phone.
+
 ## Pickers
 
-- The reference and LoRA choosers share one top bar: the tab pills (This
-  Model | All Models | Selected n/max), then **Clear Selection** beside them,
-  shown only while something is picked. Clear Selection empties the selection
-  at once and offers Undo in the status pill; it never asks first.
-- One tap adds or removes; a picked item shows its order number and stays
-  picked across searches and tabs. It never moves: every item keeps its place
-  in the list, and only the Selected tab lists the picks, in their order.
+One chooser pattern for References, LoRAs and Models: a title bar with Close,
+the tab pills with Clear Selection, a search field, then the grid or list. On
+the desktop it is an anchored popover; on the phone a sheet step of Create.
+
+- The reference and LoRA choosers share one tab row: the pills (Library |
+  Uploads | Selected n/max, or This Model | All Models | Selected n/max), then
+  **Clear Selection** beside them (just "Clear" under 480 px), shown only while
+  something is picked. Clear Selection empties the selection at once and offers
+  Undo in the status pill; it never asks first.
+- One tap adds or removes; a picked item shows its order number (an empty ring,
+  then the number on white, the same mark in every chooser) and stays picked
+  across searches and tabs. It never moves: every item keeps its place in the
+  list, and only the Selected tab lists the picks, in their order.
+- **Reordering** happens in the Selected tab: drag a row's grip with a mouse,
+  pen or finger (`useReorderDrag.ts`), or press the arrow keys on the grip.
+- A LoRA row's actions sit on the right in this order: View Source (a link
+  icon, when the catalogue has a source), Info, Star.
+- **Models** have no modal: the model button opens the chooser with search,
+  favourites, Fast | Quality and family groups, and nothing else.
 
 ## Empty States
 
@@ -154,16 +189,22 @@ A picker, tab or list with nothing to show uses `EmptyState`
 - **Number steppers:** one `NumberPicker` (minus, value, plus) everywhere; on
   touch screens each part is a 44 px target. Names read "Decrease Images",
   "Increase Steps".
-- **Phone Create sheet order:** Prompt · Negative · Image/Video with Model ·
-  References with LoRAs · Size, count, Advanced and Generate.
+- **Phone Create sheet:** one flat column. Image/Video sits in the title bar
+  beside Close. The prompt takes the height the rest leaves (it scrolls rather
+  than grows), with History and Clear in a small toolbar along its lower edge;
+  Negative starts at one line with its actions at its end. Then one row each
+  for Model, References, LoRAs, Size and Advanced, and a sticky footer with the
+  count, Reset and a wide Generate, always in view. Nothing reaches past the
+  right edge at 320–430 px (`phone-create.spec.ts`).
 
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers.
 - **Advanced Settings** open in the composer popover, like LoRAs and
   References: anchored above the composer at its width, the same glass,
   motion and dismissal (outside click, Escape, its button again; focus returns
-  to the button). The phone shows the same controls as a sheet that replaces
-  the Create sheet, with Back (one layer).
+  to the button). It is the flat list, dense, in two columns where the popover
+  is wide. The phone shows the same list as a sheet that replaces the Create
+  sheet, with Back (one layer), and adds Steps.
 - **Size** stays open while choosing: the resolution is a segmented toggle of
   the model's native options (Default · 2K · 4K), beside the shapes, so both
   can be picked in one go.
@@ -182,10 +223,20 @@ holds:
 | Models | Defaults, model types, installed models, the manifest, LoRA library, integrations (Civitai, Hugging Face) and output folders | Administrators |
 | Workers | ComfyUI connections, restart and other devices | Administrators |
 | Maintenance | Clean up, export, reset and diagnostics | Everyone (each item as the device allows) |
-| About | Version, stats, links and credits | Everyone |
+| About | The version, the repository and the changelog | Everyone |
 
 A new setting goes in the section that matches who changes it and why;
 destructive actions live in Maintenance, never beside everyday switches.
+Every row does something in the running deployment: rows for a local install
+(output folders, finding ComfyUI on its own, the studio password for other
+devices) hide in account mode, and there are no upstream community, feedback
+or donation links. Settings use the flat list (see [Lists](#lists)), dense:
+44 px rows, a one-line description, one heading per group. **Sign Out** is in
+the desktop dock's Account menu and at the top of the phone's More, as well as
+Settings › Account; it asks first only while something is generating.
+
+Gallery **Date Headers** ("Today", "This Evening") are a Studio › Gallery
+switch, off by default.
 
 ## Buttons & Icon Bars
 
@@ -212,10 +263,11 @@ destructive actions live in Maintenance, never beside everyday switches.
 - Icon bars group related actions with a divider between groups; the same
   action has the same icon everywhere. Action icons are outlines at one stroke
   weight, including Upscale's arrow.
-- **Image/Video switches:** the composer's Image/Video mode and the phone
-  dock's Images/Videos switch are icon pairs (the same image and video icons,
-  with accessible names and tooltips). The desktop gallery's top switch has
-  the room for words and reads "Images" | "Videos".
+- **Image/Video switches:** the composer's and the phone Create sheet's
+  Image/Video mode are icon pairs (the same image and video icons, with
+  accessible names and tooltips). The gallery's switches have the room for
+  words and read "Images" | "Videos": the desktop's at the top, the phone's in
+  its top bar.
 - Segmented toggles (`role="group"` with `aria-pressed` buttons) choose one of
   a few native options, such as Image/Video or a resolution (1K | 2K | 4K).
 
@@ -297,38 +349,42 @@ phones, default stroke):
 
 The gallery scrolls `document.scrollingElement`, not a box inside the page:
 iOS only scrolls the document to the top on a tap on the status bar. The top
-bar, search, create pill and select bar are `position: fixed` with safe-area
+bar with its search row, the Create button and the select bar are `position: fixed` with safe-area
 insets. Sheets and the viewer scroll inside themselves and lock the page behind
 them (`overflow: hidden` on `html`), so the gallery keeps its place. Code that
 reads the gallery's scroller uses `src/app/scroller.ts`, which treats the
 document and a scrolling box alike. History entries for overlays never restore
 scroll (`history.scrollRestoration = 'manual'`).
 
-### Bottom-up
+### Top bar and Create
 
-Frequently used controls sit within thumb reach, above the home indicator and
-Safari's bottom bar (safe-area insets). The top keeps only a thin status strip
-(status, title, what is running), so a tap on the iOS status bar still scrolls
-the document to the top.
+One slim top bar and nothing else fixed but Create; a tap on the iOS status
+bar still scrolls the document to the top. No bottom bar and no boxes in the
+bar.
 
-The **status** is the small Studio pill top left: its light says whether
-generation can run and a tap checks again. **More** reads Select · Library ·
-Settings · Account.
+- **Left, one element:** the status light (its colour says whether generation
+  can run; a tap checks again) and the gallery's **Images | Videos** as words,
+  the current one bright. It doubles as the title.
+- Then what is running (a spinner and count; a tap shows it), and on the right
+  **Search**, **Filter** and **More**. More reads Account (with Sign Out, first,
+  in plain sight) · Select · Library · Settings.
+- **Create** is a round floating button bottom right, in thumb reach, with a
+  dot while a prompt waits in Create. It opens the Create sheet.
+- The select bar replaces nothing: it shows at the bottom only while selecting.
+- Prefer tall, vertically scrolling surfaces over small floating popovers.
 
-The **dock** at the bottom holds, from the top down: the shared Search/Filter
-row when open, the create pill (prompt preview and Generate), then the
-Images/Videos icon pair, Search, Filter and More. Prefer tall, vertically
-scrolling surfaces over small floating popovers on the phone.
-
-- **Search and Filter share one row.** Opening one expands it, full width and
-  as tall as the Images/Videos icons, upwards above the create pill; the other
-  stays an icon. Opening the other swaps them. Only one is open at a time.
+- **Search and Filter share one row**, under the bar, full width and as tall as
+  the icons. It overlays the top of the gallery rather than pushing it down.
+  Opening the other swaps them. Only one is open at a time.
 - **Active indication:** with a query or any filter applied, the Search or
   Filter icon is tinted with the accent and carries a count badge; the open
   row shows an accent outline.
 - **Closing clears:** closing the row (its X, its icon, Escape, or starting
-  Select) clears the query and every filter. It is part of the dock, not an
+  Select) clears the query and every filter. It is part of the top bar, not an
   overlay, so scrolling the gallery leaves it open.
+- **The viewer keeps the gallery's place:** opening a tile, even one half under
+  the bar, never scrolls the gallery; closing lands on the same scroll position.
+  Only stepping to another item brings its tile into view behind the viewer.
 
 ### Filter row
 
