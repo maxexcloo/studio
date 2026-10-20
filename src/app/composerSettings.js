@@ -55,9 +55,6 @@ export function savedModeReferences(references) {
   return Object.fromEntries(Object.entries(references).map(([kind, value]) => [kind, {
     ...value,
     image: '',
-    name: String(value.id || '').startsWith('vault:') ? 'Hidden image' : value.name,
-    assets: value.assets.map(({ slot, asset }) => asset.privacyDomain === 'vault' || asset.source === 'vault'
-      ? { slot, asset: { id: asset.id, source: 'vault', privacyDomain: 'vault', galleryItemId: asset.galleryItemId, name: 'Hidden image', mime: '', width: 0, height: 0, size: 0, createdAt: '', thumbnailUrl: '' } }
-      : { slot, asset })
+    assets: value.assets.map(({ slot, asset }) => ({ slot, asset }))
   }]));
 }

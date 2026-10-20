@@ -5,7 +5,7 @@ import { deleteConfirmation, generatingLabel } from '../src/app/itemWording.js';
 test('delete confirmations name videos as videos and use Title Case', () => {
   assert.equal(deleteConfirmation({ type: 'video' }).title, 'Delete This Video?');
   assert.equal(deleteConfirmation({ type: 'image' }).title, 'Delete This Image?');
-  assert.match(deleteConfirmation({ type: 'video', privateVault: true }).description, /^This video /);
+  assert.equal(deleteConfirmation({ type: 'video' }).description, 'The file is deleted from disk.');
   assert.equal(deleteConfirmation({ type: 'image', library: {} }).title, 'Remove from Gallery?');
 });
 

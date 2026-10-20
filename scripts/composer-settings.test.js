@@ -45,27 +45,20 @@ test('image and video prompts and negatives remain independent across reloads', 
   assert.equal(reusedNegative(undefined, modePrompts(draft).image.negative), image.negative, 'missing image negatives retain the image draft');
 });
 
-test('legacy prompts migrate only to the active mode and Hidden starts empty', () => {
+test('legacy prompts migrate only to the active mode', () => {
   assert.deepEqual(modePrompts({ mode: 'video', prompt: 'legacy video', negative: 'avoid blur' }), {
     image: { prompt: '', negative: '' }, video: { prompt: 'legacy video', negative: 'avoid blur' }
   });
-  const gallery = modePrompts({ mode: 'image', prompt: 'public prompt' });
-  let hidden = modePrompts();
-  hidden.image = { prompt: 'private image', negative: 'private exclusions' };
-  hidden.video = { prompt: 'private video', negative: '' };
-  const draft = { mode: 'image', ...gallery.image, modePrompts: gallery };
-  assert.doesNotMatch(JSON.stringify(draft), /private/);
-  hidden = modePrompts();
-  assert.deepEqual(hidden, { image: { prompt: '', negative: '' }, video: { prompt: '', negative: '' } }, 'locking clears both private modes');
+  assert.deepEqual(modePrompts(), { image: { prompt: '', negative: '' }, video: { prompt: '', negative: '' } });
 });
 
-test('photo and video reference selections survive reloads without sharing private previews', () => {
+test('photo and video reference selections survive reloads without saving inline pixels', () => {
   const references = modeReferences({ mode: 'image', referenceAssets: [{ slot: 'reference', asset: { id: 'photo-reference' } }], modeReferences: { video: { id: 'video-reference', name: 'First Frame', assets: [] } } });
   assert.equal(references.image.assets[0].asset.id, 'photo-reference');
   assert.equal(references.video.id, 'video-reference');
-  references.image = { id: 'vault:private-id', image: 'private-pixels', name: 'private-name', assets: [{ slot: 'reference', asset: { id: 'vault:private-id', source: 'vault', name: 'private-name', thumbnailUrl: 'private-preview' } }] };
+  references.image = { id: 'upload-id', image: 'inline-pixels', name: 'Upload', assets: [{ slot: 'reference', asset: { id: 'upload-id', source: 'upload', name: 'Upload', thumbnailUrl: '/thumb' } }] };
   const saved = savedModeReferences(references);
-  assert.doesNotMatch(JSON.stringify(saved), /private-pixels|private-name|private-preview/);
-  assert.equal(saved.image.assets[0].asset.id, 'vault:private-id');
+  assert.doesNotMatch(JSON.stringify(saved), /inline-pixels/);
+  assert.equal(saved.image.assets[0].asset.id, 'upload-id');
   assert.equal(saved.video.id, 'video-reference');
 });
