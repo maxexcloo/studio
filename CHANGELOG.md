@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-20
+
 > A thumb-first phone dock, one layer at a time, viewer actions by intent with Recreate and Reuse, Retry for failed items, and chat prompts written by Studio
 
 ### Added
@@ -1387,7 +1389,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.30.2...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/maxexcloo/studio/compare/v0.30.2...v0.31.0
 [0.30.2]: https://github.com/maxexcloo/studio/compare/v0.30.1...v0.30.2
 [0.30.1]: https://github.com/maxexcloo/studio/compare/v0.30.0...v0.30.1
 [0.30.0]: https://github.com/maxexcloo/studio/compare/v0.29.0...v0.30.0
