@@ -237,7 +237,6 @@ export function NumberPicker({
     setEditing(false);
   };
 
-  const labelLower = label.toLowerCase();
   const showSteppers = density !== "mini";
   return (
     <div
@@ -249,10 +248,10 @@ export function NumberPicker({
       ) : (
         <Tip content={label}><span className="number-picker-icon" aria-hidden="true">{icon}</span></Tip>
       )}
-      {showSteppers ? <Tip content={`Decrease ${labelLower}`}><button
+      {showSteppers ? <Tip content={`Decrease ${label}`}><button
         type="button"
         className="number-picker-btn"
-        aria-label={`Decrease ${labelLower}`}
+        aria-label={`Decrease ${label}`}
         disabled={value <= min}
         onPointerDown={(event) => { event.preventDefault(); startHold(-1); }}
         // Enter or Space from the keyboard: a click with no pointer behind it (detail 0).
@@ -285,10 +284,10 @@ export function NumberPicker({
       ) : (
         <Tip content={`${label}: ${formatValue(value)}`}><button type="button" className="number-picker-value" onClick={beginEdit} aria-label={`${label}: ${formatValue(value)}`}><AnimatedNumber value={formatValue(value)} /></button></Tip>
       )}
-      {showSteppers ? <Tip content={`Increase ${labelLower}`}><button
+      {showSteppers ? <Tip content={`Increase ${label}`}><button
         type="button"
         className="number-picker-btn"
-        aria-label={`Increase ${labelLower}`}
+        aria-label={`Increase ${label}`}
         disabled={value >= max}
         onPointerDown={(event) => { event.preventDefault(); startHold(1); }}
         // Enter or Space from the keyboard: a click with no pointer behind it (detail 0).

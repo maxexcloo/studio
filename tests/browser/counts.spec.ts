@@ -89,7 +89,7 @@ test('image defaults and outgoing count honour a model maximum of one', async ({
   const root = ui.composer;
   // The phone hides a count that cannot change.
   if (!await ui.isPhone()) await expect(root.getByRole('button', { name: 'Images: 1', exact: true })).toBeVisible();
-  const increase = root.getByRole('button', { name: 'Increase images', exact: true });
+  const increase = root.getByRole('button', { name: 'Increase Images', exact: true });
   if (await increase.count()) await expect(increase).toBeDisabled();
   let payload: Record<string, any> | null = null;
   await page.route('**/api/generate', (route) => {

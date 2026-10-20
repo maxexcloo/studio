@@ -696,7 +696,7 @@
    ten): the picked pictures overlap at its start, then References and n/max.
    It opens the chooser; the slots never get a control each. */
 .ref-chip.ref-group,
-:is(.zen-prompt, .phone-creation-submit-row, .phone-creation-resource-left) .ref-chip.ref-group { width: auto; min-width: 0; flex-direction: row; gap: 7px; padding: 0 12px 0 10px; border-style: solid; border-radius: var(--r-pill); white-space: nowrap; }
+:is(.zen-prompt, .composer-prompt-tools, .phone-creation-submit-row, .phone-creation-resource-left) .ref-chip.ref-group { width: auto; min-width: 0; flex-direction: row; gap: 7px; padding: 0 12px 0 10px; border-style: solid; border-radius: var(--r-pill); white-space: nowrap; }
 .ref-chip.ref-group { height: var(--control-h); }
 .phone-create .ref-chip.ref-group { height: 44px; }
 .ref-group.has-items { padding-left: 5px; color: hsl(var(--foreground)); }

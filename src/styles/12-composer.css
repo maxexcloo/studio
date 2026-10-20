@@ -334,12 +334,13 @@
   .composer-prompt-tools .ref-add-label, .composer-prompt-tools .ref-add-label > span { gap: 0; font-size: 0; }
 }
 
-/* Count remains minus/value/plus when labels compact; each touch action has its own target. */
+/* One stepper everywhere (count, steps, Advanced): minus/value/plus stays when
+   labels compact, and on touch each part is its own 44 px target. */
 @media (pointer: coarse) {
-  .composer-count-picker.number-picker { min-height: 44px; }
-  .composer-count-picker.number-picker .number-picker-btn,
-  .composer-count-picker.number-picker .number-picker-value,
-  .composer-count-picker.number-picker .number-picker-input { min-width: 44px; min-height: 44px; }
+  .number-picker { min-height: 44px; }
+  .number-picker .number-picker-btn,
+  .number-picker .number-picker-value,
+  .number-picker .number-picker-input { min-width: 44px; min-height: 44px; }
 }
 
 .recipe-control { display: flex; flex-direction: column; gap: 3px; min-width: 110px; max-width: 220px; font-size: 11px; }

@@ -21,8 +21,8 @@ test('image count keeps minus and plus across profile widths and mobile sizes', 
       const picker = root.locator('.composer-count-picker').filter({ visible: true });
       if (!await picker.count()) await root.getByRole('button', { name: 'More settings', exact: true }).click();
       await expect(picker).toBeVisible();
-      const decrease = picker.getByRole('button', { name: 'Decrease images', exact: true });
-      const increase = picker.getByRole('button', { name: 'Increase images', exact: true });
+      const decrease = picker.getByRole('button', { name: 'Decrease Images', exact: true });
+      const increase = picker.getByRole('button', { name: 'Increase Images', exact: true });
       await expect(decrease).toBeVisible();
       await expect(increase).toBeVisible();
       await expect(picker).not.toHaveClass(/is-density-mini/);
