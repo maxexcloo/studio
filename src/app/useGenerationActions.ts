@@ -23,7 +23,7 @@ export function useGenerationActions(view: any) {
     active, canUseStartImage, confirmAction, count, currentProfile, denoise,
     frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loras, missingRequiredReference, mode,
     model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery,
-    upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, setZenSelectedId, showToast, startImage, startImageId, startImageName, steps, cfg,
+    upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, showToast, startImage, startImageId, startImageName, steps, cfg,
     referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
   // Callbacks must follow the studio as it changes under a run: a generation
@@ -206,7 +206,6 @@ export function useGenerationActions(view: any) {
         const optimisticBody = { ...requestBody, ...(paintedOn?.width && paintedOn?.height ? { width: paintedOn.width, height: paintedOn.height } : {}), seed: runSeed, count: requestCount, startImageId: retry ? requestBody.startImageId : canUseStartImage ? startImageId : "" };
         const optimisticItems = pendingItemsFor(clientJobId, optimisticBody);
         galleryUpsert(optimisticItems);
-        if (prefs.zenMode) setZenSelectedId(optimisticItems[0].id);
         await nextPaint();
         let response: { jobId: string; items: GalleryItem[]; hidden?: boolean; revision?: number; notice?: string };
         try {
@@ -232,7 +231,6 @@ export function useGenerationActions(view: any) {
         firstItemOf.set(jobId, items?.[0] || optimisticItems[0]);
         if (items?.length) {
           galleryUpsert(items);
-          if (prefs.zenMode) setZenSelectedId(items[0].id);
         }
       }
       generatePostingRef.current = false;
@@ -296,15 +294,6 @@ export function useGenerationActions(view: any) {
         }
       }));
       await (latest.current.loadGalleryDelta ? latest.current.loadGalleryDelta() : latest.current.loadGallery());
-      if (latest.current.prefs.zenMode && latest.current.prefs.followLatest && latest.current.mode === runMode) {
-        const data = await apiJson<GalleryPayload>(`/api/gallery?type=${encodeURIComponent(runMode)}&limit=80`).catch(() => null);
-        const outputs = payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled");
-        const newest = outputs.find((item: GalleryItem) => item.type === runMode && item.status === "done");
-        if (newest && latest.current.prefs.zenMode && latest.current.prefs.followLatest && latest.current.mode === runMode) {
-          galleryUpsert(outputs);
-          setZenSelectedId(newest.id);
-        }
-      }
       if (postingError) setStatus(`${queuedJobs.length ? `${queuedJobs.length} of ${imageRuns} generations queued. ` : ""}${postingError}`);
       else if (results.some((job) => !job)) setStatus("Lost the connection. Reload to check remaining generations.");
       else if (results.some((job) => job?.status === "error" || job?.status === "missing")) setStatus("Some generations failed. Finished outputs are in the gallery.");

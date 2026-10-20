@@ -177,7 +177,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   font-weight: 600;
 }
 
-
 /* ------------------------------------------------------------- Gallery */
 
 .phone-gallery {
@@ -746,7 +745,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 
 /* ------------------------------------------------------------ Advanced */
 
-
 /* A native <select> laid invisibly over the row: the tap opens the phone's own picker. */
 .phone-select { position: relative; }
 .phone-select select {
@@ -931,7 +929,6 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-copy.is-copied { color: var(--ember); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora { min-height: 40px; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora-name { font-size: 14px; }
-
 
 /* The status pill over the phone viewer: between Star and Info, never over either. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {

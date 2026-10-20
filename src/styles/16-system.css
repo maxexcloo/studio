@@ -13,21 +13,14 @@
 .studio-dock,
 .dock-chip,
 .zen-control-button,
-.zen-zoom-dock,
-.zen-gallery-restore,
-.zen-arrows button,
 .viewer-dock,
-.viewer-arrow,
-.zen-gallery-strip,
-.zen-gallery-toggle,
-.zen-latest {
+.viewer-arrow {
   border: 1px solid var(--glass-border);
   background: var(--surface-grain), var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
 }
 .zen-prompt,
-.zen-controls,
 .model-menu,
 .aspect-menu,
 .fluid-select-content,
@@ -77,7 +70,6 @@
 
 /* Large surfaces carry the deep shadow, small ones the tight one. */
 .zen-prompt,
-.zen-controls,
 .model-menu,
 .aspect-menu,
 .fluid-select-content,
@@ -85,22 +77,11 @@
 .studio-dock,
 .dock-chip,
 .zen-control-button,
-.zen-zoom-dock,
-.zen-gallery-restore,
-.zen-arrows button,
 .viewer-dock,
-.viewer-arrow,
-.zen-gallery-strip,
-.zen-gallery-toggle,
-.zen-latest { box-shadow: var(--glass-bar-shadow); }
-.zen-gallery-toggle,
-.zen-latest { height: var(--control-h); min-height: var(--control-h); border-radius: var(--r-pill); }
-.zen-gallery-toggle { width: var(--control-h); }
-.zen-gallery-strip { border-radius: calc(var(--r-media) + 10px); }
+.viewer-arrow { box-shadow: var(--glass-bar-shadow); }
 
 /* Radius = inner control radius + padding. The composer pads its 40px pills by 8. */
-.zen-prompt,
-.zen-controls { border-radius: var(--r-panel); }
+.zen-prompt { border-radius: var(--r-panel); }
 .model-menu,
 .aspect-menu,
 .fluid-select-content,
@@ -114,7 +95,6 @@
    the composer. Single buttons and arrows use the same 48px circle. */
 
 .studio-dock,
-.zen-zoom-dock,
 .viewer-dock {
   height: var(--dock-h);
   min-height: var(--dock-h);
@@ -123,8 +103,6 @@
   border-radius: var(--r-pill);
 }
 .zen-control-button,
-.zen-gallery-restore,
-.zen-arrows button,
 .viewer-arrow {
   width: var(--dock-h);
   height: var(--dock-h);
@@ -139,8 +117,6 @@
 /* Ghost icon buttons: every icon-only action, in docks, headers and toolbars. */
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot,
-.zen-zoom-dock .icon-button,
-.zen-zoom-dock .viewer-zoom,
 .viewer-dock .icon-button,
 .viewer-dock .text-button,
 .composer-drawer .icon-button {
@@ -155,11 +131,8 @@
   color: hsl(var(--muted-foreground));
   box-shadow: none;
 }
-.zen-zoom-dock .viewer-zoom,
 .viewer-dock .text-button { width: auto; padding: 0 12px; color: hsl(var(--foreground)); }
 .studio-dock .icon-button:hover:not(:disabled),
-.zen-zoom-dock .icon-button:hover:not(:disabled),
-.zen-zoom-dock .viewer-zoom:hover,
 .viewer-dock .icon-button:hover:not(:disabled),
 .viewer-dock .text-button:hover:not(:disabled),
 .composer-drawer .icon-button:hover {
@@ -174,7 +147,6 @@
    at --motion-fast; a press shrinks the icon a touch at --motion-instant. The
    keyboard ring traces the fill circle, inside the bar. */
 .studio-dock .icon-button,
-.zen-zoom-dock .icon-button,
 .viewer-dock .icon-button,
 .composer-drawer .icon-button {
   padding: var(--icon-fill-inset);
@@ -182,19 +154,15 @@
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), scale var(--motion-instant) var(--motion-ease);
 }
 .studio-dock .icon-button:active:not(:disabled),
-.zen-zoom-dock .icon-button:active:not(:disabled),
 .viewer-dock .icon-button:active:not(:disabled),
 .composer-drawer .icon-button:active:not(:disabled) { background-color: var(--control-press); scale: .94; }
 .viewer-dock .icon-button.danger-tone:active:not(:disabled) { background-color: var(--danger-ring); }
 .studio-dock .icon-button:focus-visible,
-.zen-zoom-dock .icon-button:focus-visible,
 .viewer-dock .icon-button:focus-visible,
 .composer-drawer .icon-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 /* The countdown widens the button; the fill stays a pill around it. */
 .viewer-dock .icon-button.has-count { padding-inline: calc(var(--icon-fill-inset) + 6px); }
-.zen-control-button:hover,
-.zen-gallery-restore:hover,
-.zen-arrows button:hover { background: rgb(36 36 36 / .94); transform: none; }
+.zen-control-button:hover { background: rgb(36 36 36 / .94); transform: none; }
 /* The viewer arrows are centred with translateY(-50%), so resetting the
    transform on hover made them jump half their height. Tint only. */
 .viewer-arrow:hover { background: rgb(36 36 36 / .94); box-shadow: var(--shadow-float-sm); }
@@ -208,8 +176,6 @@
 /* --------------------------------------------------------------- 4. Fields
    Every value you type or pick sits in the same 40px well as the composer's. */
 
-.zen-controls input:not(.is-bare, .is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
-.zen-controls .number-picker,
 .settings-modal input:not(.is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
 .settings-modal .number-picker {
   height: var(--control-h);
@@ -219,18 +185,13 @@
   background: var(--well);
   font-size: 13px;
 }
-.zen-controls input:not(.is-bare, .is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
 .settings-modal input:not(.is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) { padding: 0 16px; }
-.zen-controls input:not(.is-bare, .is-framed):focus-visible,
 .settings-modal input:not(.is-framed):focus-visible,
 .fluid-select-trigger:focus-visible {
   border-color: rgb(255 255 255 / .22);
   box-shadow: 0 0 0 3px rgb(255 255 255 / .06);
 }
-.zen-controls .number-picker .number-picker-btn,
 .settings-modal .number-picker .number-picker-btn { height: calc(var(--control-h) - 2px); border-radius: var(--r-pill); }
-.zen-controls .number-picker-value,
-.zen-controls .number-picker-input,
 .settings-modal .number-picker-value,
 .settings-modal .number-picker-input { height: calc(var(--control-h) - 2px); }
 
@@ -251,9 +212,6 @@
 .reconnect-btn:not(.primary) { background: var(--control-fill) !important; color: hsl(var(--foreground)) !important; }
 .reconnect-btn:not(.primary):hover { background: var(--control-hover) !important; }
 .reconnect-btn.primary { background: var(--action) !important; color: var(--action-ink) !important; }
-
-.zen-controls .mode-tabs button { min-height: var(--control-h); border-radius: var(--r-item); }
-.zen-controls .mode-tabs { padding: 4px; border-radius: calc(var(--r-item) + 4px); background: var(--well); }
 
 .tile-action { border-radius: var(--r-pill); }
 

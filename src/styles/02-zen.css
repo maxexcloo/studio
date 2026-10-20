@@ -1,52 +1,3 @@
-.zen-shell {
-  /* Replaced at runtime with the composer's measured height (ComposerBar). */
-  --zen-prompt-h: 160px;
-  position: fixed; inset: 0; overflow: hidden;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  animation: appIn 500ms var(--ease-soft) both;
-}
-.zen-stage {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  background: hsl(var(--background));
-}
-.zen-output {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  border: 0;
-  padding: 12px 12px 110px;
-  background: transparent;
-  cursor: zoom-in;
-  overflow: hidden;
-  touch-action: none;
-}
-.zen-output.is-zoomed { cursor: grab; }
-.zen-output.is-zoomed:active { cursor: grabbing; }
-.zen-output.is-pending { cursor: default; }
-.zen-output img, .zen-output video {
-  width: 100%; height: 100%;
-  object-fit: contain;
-  display: block;
-  transform: translate(var(--pan-x, 0), var(--pan-y, 0)) scale(var(--zoom, 1));
-  transform-origin: center;
-  transition: transform 80ms var(--ease-soft);
-}
-.zen-output.is-zoomed img, .zen-output.is-zoomed video,
-.zen-output.is-dragging img, .zen-output.is-dragging video { transition: none; }
-.zen-empty { width: 100%; height: 100%; display: grid; place-items: center; background: hsl(var(--background)); }
-.zen-empty img { width: 56px; height: 56px; opacity: 0.4; }
-.zen-fade {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--background) / 0.5) 0%,
-    hsl(var(--background) / 0.16) 12%,
-    transparent 24%,
-    transparent 70%,
-    hsl(var(--background) / 0.22) 86%,
-    hsl(var(--background) / 0.72) 100%
-  );
-}
 
 .zen-control-button {
   position: fixed; bottom: 18px; left: 18px; z-index: 13;
@@ -55,48 +6,6 @@
   transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
 }
 .zen-control-button:hover { border-color: hsl(var(--border-strong)); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
-
-.zen-zoom-dock {
-  position: fixed;
-  bottom: 18px;
-  left: 64px;
-  z-index: 12;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  color: hsl(var(--foreground));
-  transition: left 260ms var(--ease-out);
-}
-.zen-zoom-dock .icon-button:hover { background-color: hsl(var(--accent)); color: hsl(var(--foreground)); border: 0; }
-.zen-zoom-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
-.zen-zoom-dock .viewer-zoom {
-  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  font-size: 12px; font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  transition: background 120ms var(--ease-out);
-}
-
-.zen-gallery-restore {
-  position: fixed; top: 12px; left: 12px; z-index: 12;
-  display: grid; place-items: center;
-  cursor: pointer;
-  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
-}
-.zen-gallery-restore:hover { border-color: hsl(var(--border-strong)); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
-
-.zen-controls {
-  position: fixed; left: 12px; bottom: 70px; z-index: 11;
-  padding: 14px;
-  overflow: hidden;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  opacity: 0; transform: translateX(-8px); filter: blur(3px); pointer-events: none;
-  transition: opacity 240ms var(--ease-out), transform 280ms var(--ease-out), filter 240ms var(--ease-out);
-}
-.zen-controls.open { opacity: 1; transform: translateX(0); filter: blur(0); pointer-events: auto; }
 
 .sidebar-dismiss {
   position: fixed;

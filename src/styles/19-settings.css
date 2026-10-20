@@ -442,7 +442,6 @@
 
 .set-note.is-error, .list-note.is-error { color: var(--danger-ink); }
 
-
 .account-profile-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 16px; margin: 8px 18px 16px; padding: 10px 12px; border: 1px solid var(--surface-border); border-radius: var(--r-item); }
 .account-profile-list legend { padding: 0 6px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 /* A name and its switch; the whole line toggles. */

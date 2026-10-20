@@ -71,7 +71,6 @@
 .unlock.is-compact .unlock-field { width: 100%; }
 .unlock-spacer { height: 70px; }
 
-
 @media (prefers-reduced-motion: reduce) {
   .unlock-field.is-wrong { animation: none; }
 }

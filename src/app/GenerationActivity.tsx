@@ -10,8 +10,7 @@ import { useCellGap } from './cells';
 
 /**
  * A generation you can't see, as an activity. While the viewer is on another
- * image, zen shows an older one, or the gallery is scrolled away from the
- * rendering tiles, it floats at the top: the live preview, how far it is and
+ * image or the gallery is scrolled away from the rendering tiles, it floats at the top: the live preview, how far it is and
  * how long is left. Clicking it brings the work into view; the × puts it away
  * until the next run.
  *

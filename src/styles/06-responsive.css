@@ -43,14 +43,6 @@
   .aspect-option { min-height: 44px; }
   /* Phone placement for the deck lives in 17-deck.css, and the later
      small-screen fixes in 27-mobile.css. */
-  .zen-controls {
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-height: none;
-    padding: 12px;
-  }
-  .zen-output { padding: 60px 8px calc(var(--zen-prompt-h, 160px) + 26px); }
   .zen-prompt {
     width: calc(100vw - 16px);
     max-width: none;
@@ -84,8 +76,6 @@
     white-space: nowrap;
   }
   .prompt-left-actions { gap: 5px; }
-  .zen-gallery-wrap { top: 58px; max-width: calc(100vw - 16px); grid-template-columns: auto auto minmax(0, 1fr); }
-  .zen-gallery-strip button { width: 46px; height: 46px; }
   .scrim { overflow: hidden; }
   .viewer-shell { grid-template-rows: minmax(0, 1fr); }
   .viewer-stage.with-side { grid-template-columns: minmax(0, 1fr); }

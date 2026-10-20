@@ -20,7 +20,7 @@ export function studioUi(page: Page) {
 
   /** Whether the page shows the phone studio. */
   async function isPhone() {
-    await expect(page.locator('.phone-shell, .app-shell, .zen-shell')).toHaveCount(1);
+    await expect(page.locator('.phone-shell, .app-shell')).toHaveCount(1);
     return (await page.locator('.phone-shell').count()) > 0;
   }
 

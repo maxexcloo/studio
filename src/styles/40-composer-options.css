@@ -64,7 +64,6 @@
 /* Advanced Settings: the composer popover (LoraPopover.tsx), scrolling inside itself. */
 .composer-advanced .composer-advanced-body { max-height: none; gap: 10px; padding: 12px 14px 14px; overflow-y: auto; }
 
-
 /* LoRA browsing shares the reference picker's anchored glass surface. */
 .composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
 .composer-loras .lora-popover-body { display: flex; flex-direction: column; mask-image: none; }
@@ -178,7 +177,6 @@
 
 /* The closed composer names the active LoRAs instead of counting them. */
 .lora-pill-summary { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 
 /* Image/Video: one icon pair everywhere (ComposerModeSelect.tsx, docs/guides/UI-PATTERNS.md). */
 .media-mode-toggle { display: inline-flex; flex: none; width: auto; gap: 2px; }

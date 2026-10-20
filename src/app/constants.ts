@@ -12,10 +12,8 @@ export const defaultPrefs: Preferences = {
   autoResizeInputs: true,
   generationPreviewMode: "advanced",
   variationQueueMode: "batch",
-  zenMode: false,
   confirmActions: true,
   enterToGenerate: true,
-  followLatest: true,
   spanWideImages: false,
   showFailedItems: true,
   // Off until chosen: a new key, so preferences saved under the old hidden showMoments don't switch it on.

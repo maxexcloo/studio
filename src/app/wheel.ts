@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useRef } from 'react';
 
 /**
  * Wheel deltas in CSS pixels. Firefox and some Windows drivers report lines
@@ -15,7 +15,7 @@ export function wheelPixels(event: WheelEvent, pageSize = window.innerHeight) {
  * Lets a plain vertical wheel scroll a sideways strip (Windows mice have no
  * horizontal wheel). Only takes over while the strip can actually move that
  * way, so at either end the page scrolls as usual. Needs a non-passive
- * listener: use it through useHorizontalWheel or useWheelRef.
+ * listener: use it through useWheelRef.
  */
 export function scrollSideways(event: WheelEvent, element: HTMLElement) {
   if (event.ctrlKey) return;
@@ -26,17 +26,6 @@ export function scrollSideways(event: WheelEvent, element: HTMLElement) {
   if ((y < 0 && element.scrollLeft <= 0) || (y > 0 && element.scrollLeft >= maxScroll - 1)) return;
   event.preventDefault();
   element.scrollLeft += y;
-}
-
-/** scrollSideways on an element held in an object ref; `enabled` re-attaches when it mounts. */
-export function useHorizontalWheel(ref: RefObject<HTMLElement | null>, enabled = true) {
-  useEffect(() => {
-    const element = ref.current;
-    if (!element || !enabled) return;
-    const onWheel = (event: WheelEvent) => scrollSideways(event, element);
-    element.addEventListener('wheel', onWheel, { passive: false });
-    return () => element.removeEventListener('wheel', onWheel);
-  }, [ref, enabled]);
 }
 
 /**

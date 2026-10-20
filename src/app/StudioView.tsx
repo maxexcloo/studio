@@ -7,21 +7,20 @@ import React from 'react';
 import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
-import { ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, GalleryHorizontalEnd, Info, Library, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { CircleStop, ChevronLeft, ChevronRight, GalleryHorizontalEnd, Info, Library, Maximize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, type GenerationDetailSection } from './format';
-import { GallerySkeleton, Media, Skeleton, Tip } from './components';
-import { useHorizontalWheel, useWheelRef } from './wheel';
+import { GallerySkeleton, Tip } from './components';
+import { useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
 import { GenerationMedia, GenerationPreviewMode } from './GenerationPreview';
 import { GenerationProfiles, GenerationProgress } from './GenerationProgress';
 import { ComposerBar } from './ComposerBar';
 import { ExpandingComposer } from './ExpandingComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
-import { RunCard, runKind } from './RunStack';
 import { RunSheet } from './RunSheet';
 import { StackRunsButton } from './StackRunsButton';
-import { runTitle, type Run } from './runs';
+import { type Run } from './runs';
 import { UpscaleCompare } from './UpscaleCompare';
 import { upscaledWithRun } from './useUpscale';
 import { UpscaleSetupDialog } from './UpscaleDialogs';
@@ -48,7 +47,7 @@ import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
 import { usePhone, useThisComputer } from './device';
 import { ConnectedCard } from './ConnectedCard';
-import { StatusAnnouncer, StatusPill, SurfaceStatus, useStatusHost } from './StatusMessage';
+import { StatusAnnouncer, SurfaceStatus } from './StatusMessage';
 import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
@@ -71,37 +70,6 @@ import { memoLatest } from '@/lib/memo-latest';
 // these skip re-rendering unless their data actually changed.
 const StableGallery = memoLatest(VirtualMasonryGallery);
 const StableComposerBar = memoLatest(ComposerBar);
-
-type ZenStripProps = {
-  items: GalleryItem[];
-  activeId?: string;
-  stripRef: React.Ref<HTMLDivElement>;
-  onPointerDown: React.PointerEventHandler<HTMLDivElement>;
-  onPointerMove: React.PointerEventHandler<HTMLDivElement>;
-  onPointerUp: React.PointerEventHandler<HTMLDivElement>;
-  onSelect: (id: string) => void;
-  titleFromPrompt: (text: string) => string;
-};
-
-const ZenStrip = memoLatest(function ZenStrip({ items, activeId, stripRef, onPointerDown, onPointerMove, onPointerUp, onSelect, titleFromPrompt }: ZenStripProps) {
-  return (
-    <div
-      ref={stripRef}
-      className="zen-gallery-strip"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      {items.map((item) => (
-        <Tip key={item.id} content={item.run ? `${runTitle(item.run)} · ${runKind(item.run)}` : titleFromPrompt(item.prompt || item.filename || "")}><button data-zen-id={item.id} className={cn(item.id === activeId && "active", item.run && "is-run")} onClick={(event) => { event.stopPropagation(); onSelect(item.id); }} onDragStart={(event) => event.preventDefault()}>
-          <Media item={item} muted />
-          {item.run ? <span className="zen-run-count" aria-hidden="true">{item.run.count}</span> : null}
-        </button></Tip>
-      ))}
-    </div>
-  );
-});
 
 function comfyStatusLabel(status: any) {
   const name = status?.label || "ComfyUI";
@@ -135,7 +103,7 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
 }
 
 export function StudioView({ view }: { view: Record<string, any> }) {
-  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, zenGallery, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, goLatestZen, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, moveZen, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setZenControls, setZenGalleryOpen, setZenMode, showDetails, settings, showNegativePrompt, showToast, sidebarControls, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitZenPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, zenControls, zenDisplayItem, zenGalleryOpen, zenItem, zenPromptRef, zenStripRef, dragViewer, dragZenStrip, endViewerTouch, selectZenItem, startZenStripDrag, stopZenStripDrag, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
+  const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, showDetails, settings, showNegativePrompt, showToast, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, promptRef, dragViewer, endViewerTouch, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, upscaleNotices, dismissUpscaleNotice, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
@@ -172,11 +140,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     document.addEventListener('pointerdown', outside, true);
     return () => document.removeEventListener('pointerdown', outside, true);
   }, [composerExpanded, phone]);
-  React.useEffect(() => {
-    if (!zenControls) return;
-    setComposerExpanded(true);
-    setZenControls(false);
-  }, [zenControls, setZenControls]);
   // Recent prompts: ↑ in an empty prompt or the clock in the composer opens them.
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
@@ -195,7 +158,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     else setPrompt(clampText(text, promptLimit));
     setHistoryOpen(false);
     window.requestAnimationFrame(() => {
-      const field = historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : zenPromptRef.current as HTMLTextAreaElement | null;
+      const field = historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : promptRef.current as HTMLTextAreaElement | null;
       if (!field) return;
       field.focus();
       field.setSelectionRange(field.value.length, field.value.length);
@@ -211,13 +174,13 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       setHistoryOpen(true);
       return;
     }
-    submitZenPrompt(event);
+    submitPrompt(event);
   };
   const historyPopover = (
     <PromptHistoryPopover
       kind={historyKind}
       open={historyOpen && !phone}
-      onClose={(reason) => { setHistoryOpen(false); if (reason === "escape") (historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : zenPromptRef.current as HTMLTextAreaElement | null)?.focus(); }}
+      onClose={(reason) => { setHistoryOpen(false); if (reason === "escape") (historyKind === 'negative' ? document.querySelector<HTMLTextAreaElement>('.zen-prompt textarea[aria-label="Negative Prompt"]') : promptRef.current as HTMLTextAreaElement | null)?.focus(); }}
       onPick={insertPrompt}
       onError={(message) => showToast(message, "error")}
     />
@@ -231,17 +194,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const startSelection = React.useRef(selection.start);
   startSelection.current = selection.start;
   const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]) } : null, [phone]);
-  // Zen shows one image at a time: a search there would narrow a strip with nothing to say so.
-  React.useEffect(() => {
-    if (!prefs.zenMode) return;
-    setSearchOpen(false);
-    if (searchActive(gallerySearch)) setGallerySearch(emptySearch);
-  }, [prefs.zenMode]); // eslint-disable-line react-hooks/exhaustive-deps
   const openSearch = React.useCallback(() => {
     setSearchOpen(true);
     document.querySelector<HTMLInputElement>('.gallery-search input, .phone-searchbar input')?.focus();
   }, []);
-  useGallerySearchKeys(!prefs.zenMode, openSearch);
+  useGallerySearchKeys(true, openSearch);
   // The viewer stars with F, as the tile's star and the dock's do.
   React.useEffect(() => {
     if (!active || !canStar(active)) return;
@@ -276,7 +233,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     setComposerExpanded(true);
     // Once the viewer has gone and handed focus back.
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const field = zenPromptRef.current;
+      const field = promptRef.current;
       if (!field) return;
       field.focus({ preventScroll: true });
       field.setSelectionRange(field.value.length, field.value.length);
@@ -351,15 +308,14 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const starterModels = (
     <StarterModels showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} />
   );
-  // A run opened from somewhere other than its stack (zen, a phone's sheet) is scrolled to once laid out.
+  // A run opened from somewhere other than its stack (a phone's sheet) is scrolled to once laid out.
   const [focusRun, setFocusRun] = React.useState("");
   const [runSheet, setRunSheet] = React.useState<Run | null>(null);
   const showRunInGallery = React.useCallback((run: Run) => {
     setRunSheet(null);
-    if (prefs.zenMode) setZenMode(false);
     setRunOpen(run.id, true);
     setFocusRun(run.id);
-  }, [prefs.zenMode, setRunOpen, setZenMode]);
+  }, [setRunOpen]);
   // Long-running work floats at the top as activities, in this order; the toasts start under them.
   const upscaleActivity = useUpscaleDownloadActivity(upscaleSetup, upscaleInstall);
   // A text encoder or VAE landing rescans models, so every panel catches up at once.
@@ -372,10 +328,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   });
   const thisComputer = useThisComputer();
   // A generation stands in for itself only where its tile can't be seen: the
-  // viewer on another image, zen on an older one, the gallery scrolled away.
+  // viewer on another image, or the gallery scrolled away.
   const pendingIds = React.useMemo(() => ((visibleGallery || []) as GalleryItem[]).filter((item) => item.status === "pending").map((item) => item.id), [visibleGallery]);
-  const pendingTileOnScreen = useTilesOnScreen(galleryStageRef, !phone && !prefs.zenMode && !active ? pendingIds : []);
-  const watchingGeneration = active ? active.status === "pending" : prefs.zenMode ? zenDisplayItem?.status === "pending" : pendingTileOnScreen;
+  const pendingTileOnScreen = useTilesOnScreen(galleryStageRef, !phone && !active ? pendingIds : []);
+  const watchingGeneration = active ? active.status === "pending" : pendingTileOnScreen;
   const generationActivity = useGenerationActivity({
     items: visibleGallery || [],
     enabled: !phone,
@@ -383,7 +339,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     reveal: () => true,
     onJump: (item) => {
       if (active) setActive(null);
-      if (prefs.zenMode) { selectZenItem(item.id); return; }
       // The run's own tile, wherever it is; the top when it isn't rendered yet.
       window.requestAnimationFrame(() => {
         const tile = galleryStageRef.current?.querySelector(`[data-tile-id="${CSS.escape(String(item.id))}"]`);
@@ -409,12 +364,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     viewerRef.current = node;
     return scrimWheelRef(node);
   }, [scrimWheelRef]);
-  // A plain wheel scrolls the zen thumbnail strip sideways.
-  useHorizontalWheel(zenStripRef, Boolean(prefs.zenMode && zenGallery.length && zenGalleryOpen));
   // .bottom-fade is fixed and full width: keep it off the gallery's scrollbar.
   React.useEffect(() => {
     const gallery = galleryStageRef.current as HTMLElement | null;
-    if (prefs.zenMode || !gallery) return;
+    if (!gallery) return;
     const update = () => {
       // With "both-edges" the gutter is mirrored on the left; only the right half is the scrollbar.
       const gutters = gallery.offsetWidth - gallery.clientWidth;
@@ -425,32 +378,26 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     const observer = new ResizeObserver(update);
     observer.observe(gallery);
     return () => observer.disconnect();
-  }, [prefs.zenMode]);
+  }, []);
   // One compact dock, bottom right, in both layouts. Transient actions (tidy up,
   // cancel queue) rise above it as small chips, so the dock never changes size.
   const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
   const studioDockRef = React.useRef<HTMLDivElement>(null);
-  // The gallery's top bar hosts messages; zen mode has no top bar, so its dock does.
-  const dockMessage = useStatusHost(!phone && Boolean(prefs.zenMode));
   React.useLayoutEffect(() => {
     const dock = studioDockRef.current;
-    const shell = dock?.closest<HTMLElement>('.app-shell, .zen-shell');
+    const shell = dock?.closest<HTMLElement>('.app-shell');
     if (!dock || !shell) return;
     const measure = () => shell.style.setProperty('--studio-dock-w', `${dock.offsetWidth}px`);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(dock);
     return () => { observer.disconnect(); shell.style.removeProperty('--studio-dock-w'); };
-  }, [phone, prefs.zenMode]);
+  }, [phone]);
 
   const studioDock = (
     <div className="studio-dock" ref={studioDockRef}>
       <div className="dock-transients">
         <AnimatePresence initial={false}>
-          {dockMessage ? (
-            // Zen mode: messages rise above the dock, beside the status light (UI-PATTERNS › Messages).
-            <motion.div key="message" {...dockChip}><StatusPill message={dockMessage} className="is-dock" /></motion.div>
-          ) : null}
           {runningCount ? (
             <motion.div key="cancel" {...dockChip}>
               <Tip content="Stop Everything Running & Queued" side="left">
@@ -468,9 +415,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" aria-haspopup="dialog" aria-expanded={Boolean(view.presetLibraryOpen)} onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {hasAccountStorageScope() ? <AccountMenu running={runningCount} confirmAction={view.confirmAction} openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
-      {prefs.zenMode ? (
-        <Tip content="Exit Zen (Esc)"><button className="icon-button" aria-label="Exit Zen" onClick={() => setZenMode(false)}><Minimize2 size={16} /></button></Tip>
-      ) : null}
     </div>
   );
   // The gallery, its empty and offline stages and the lock: the same in every layout.
@@ -539,7 +483,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
-              <PromptField kind="positive" value={prompt} textareaRef={zenPromptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
+              <PromptField kind="positive" value={prompt} textareaRef={promptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
               <div className="composer-primary-actions" ref={setComposerPrimaryTarget} />
             </div>
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
@@ -640,7 +584,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     <GallerySelectionContext.Provider value={selection}>
     <FavoriteContext.Provider value={toggleFavorite}>
     <GenerationProfiles.Provider value={models?.profiles || noProfiles}>
-    <div className={cn(phone ? "phone-shell" : prefs.zenMode ? "zen-shell" : "app-shell", canUseNegativePrompt && "negative-open", (searchOpen || searchOn) && "is-searching")} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
+    <div className={cn(phone ? "phone-shell" : "app-shell", canUseNegativePrompt && "negative-open", (searchOpen || searchOn) && "is-searching")} style={!phone ? { "--islands-h": `${islandsHeight ? islandsHeight + 8 : 0}px` } as React.CSSProperties : undefined}>
       {phone ? <RunSheet run={runSheet} onClose={() => setRunSheet(null)} openItem={openItem} onShowInGallery={showRunInGallery} /> : null}
       {phone ? (
         <PhoneShell
@@ -652,83 +596,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           setCreateOpen={setPhoneCreate}
           selection={selection}
         />
-      ) : prefs.zenMode ? (
-        <>
-          <div className="zen-stage">
-            {zenDisplayItem?.run ? (
-              <RunCard key={zenDisplayItem.run.id} run={zenDisplayItem.run} onOpen={() => showRunInGallery(zenDisplayItem.run)} />
-            ) : zenDisplayItem ? (
-              <button
-                aria-label={zenDisplayItem.status === "pending" ? "Generating" : "Open in the Viewer"}
-                className={cn("zen-output", viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging", zenDisplayItem.status === "pending" && "is-pending")}
-                onClick={() => {
-                  if (zenDisplayItem.status === "pending") return;
-                  if (Date.now() - viewerDragEndRef.current < 220) return;
-                  if (viewerDragRef.current?.moved) return;
-                  openItem(zenDisplayItem);
-                }}
-                ref={viewerWheelRef}
-                onPointerDown={startViewerDrag}
-                onPointerMove={dragViewer}
-                onPointerUp={stopViewerDrag}
-                onPointerCancel={stopViewerDrag}
-                onTouchStart={startViewerTouch}
-                onTouchMove={moveViewerTouch}
-                onTouchEnd={endViewerTouch}
-                onTouchCancel={endViewerTouch}
-                style={{ "--tile-ratio": `${zenDisplayItem.width || 1} / ${zenDisplayItem.height || 1}`, "--zoom": viewerZoom, "--pan-x": `${viewerPan.x}px`, "--pan-y": `${viewerPan.y}px` } as React.CSSProperties}
-              >
-                <GenerationMedia item={zenDisplayItem} muted fit="contain">
-                {zenDisplayItem.status === "pending" ? <GenerationProgress item={zenDisplayItem} formatElapsed={formatElapsed} /> : null}
-                </GenerationMedia>
-              </button>
-            ) : galleryCrossing ? null : !galleryLoaded ? (
-              <div className="zen-empty skeleton-stage">
-                <Skeleton className="skeleton-logo" />
-              </div>
-            ) : (
-              <div className="zen-empty">
-                <img src="/heiss-mark-white.svg" alt="Studio" />
-              </div>
-            )}
-            <div className="zen-fade" />
-            <div className="bottom-fade" />
-          </div>
-          {zenGallery.length > 1 ? (
-            <div className="zen-arrows">
-              <Tip content="Previous Output"><button aria-label="Previous Output" onClick={() => moveZen(-1)}><ChevronLeft size={22} /></button></Tip>
-              <Tip content="Next Output"><button aria-label="Next Output" onClick={() => moveZen(1)}><ChevronRight size={22} /></button></Tip>
-            </div>
-          ) : null}
-          {zenItem && !zenItem.run ? (
-            <div className={cn("zen-zoom-dock", zenControls && "with-side")}>
-              {zenDisplayItem.type === "image" ? imageZoomControls : null}
-            </div>
-          ) : null}
-          {zenGallery.length && !zenGalleryOpen ? (
-            <Tip content="Show Gallery"><button data-open-trigger className="zen-gallery-restore" aria-label="Show Gallery" onClick={() => setZenGalleryOpen(true)}>
-              <ChevronDown size={16} />
-            </button></Tip>
-          ) : null}
-          {studioDock}
-          {composer}
-          {zenGallery.length && zenGalleryOpen ? (
-            <div data-open-surface className="zen-gallery-wrap">
-              <Tip content="Hide Gallery"><button className="zen-gallery-toggle" aria-label="Hide Gallery" onClick={() => setZenGalleryOpen(false)}><ChevronUp size={16} /></button></Tip>
-              {zenGallery[0]?.id !== zenItem?.id ? <Tip content="Jump to Latest Output"><button className="zen-latest" onClick={goLatestZen}>Latest</button></Tip> : null}
-              <ZenStrip
-                items={zenGallery}
-                activeId={zenItem?.id}
-                stripRef={zenStripRef}
-                onPointerDown={startZenStripDrag}
-                onPointerMove={dragZenStrip}
-                onPointerUp={stopZenStripDrag}
-                onSelect={selectZenItem}
-                titleFromPrompt={titleFromPrompt}
-              />
-            </div>
-          ) : null}
-        </>
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>

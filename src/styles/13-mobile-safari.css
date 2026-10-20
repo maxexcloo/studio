@@ -21,7 +21,6 @@ body {
 }
 
 .app-shell,
-.zen-shell,
 .scrim {
   width: 100%;
   height: 100dvh;
@@ -37,10 +36,6 @@ body {
 .stage-gallery {
   touch-action: pan-y;
   overscroll-behavior-y: contain;
-}
-
-.zen-controls {
-  bottom: calc(var(--zen-prompt-h, 160px) + 24px + env(safe-area-inset-bottom));
 }
 
 @media (max-width: 760px) {
@@ -66,31 +61,7 @@ body {
     transform: none;
   }
 
-  .zen-output {
-    padding-top: calc(58px + env(safe-area-inset-top));
-    padding-right: max(8px, env(safe-area-inset-right));
-    padding-bottom: calc(var(--zen-prompt-h, 160px) + 24px + env(safe-area-inset-bottom));
-    padding-left: max(8px, env(safe-area-inset-left));
-  }
-
   /* Bottom deck placement (controls button, zoom, dock) lives in 17-deck.css. */
-
-  .zen-controls {
-    left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
-    bottom: calc(var(--zen-prompt-h, 160px) + 16px + env(safe-area-inset-bottom));
-    width: auto;
-    max-height: none;
-  }
-
-  .zen-gallery-wrap {
-    top: calc(56px + env(safe-area-inset-top));
-    left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
-    width: auto;
-    max-width: none;
-    transform: none;
-  }
 
   input,
   textarea,
@@ -140,8 +111,4 @@ body {
 @media (orientation: landscape) and (max-height: 520px) {
   .zen-prompt { bottom: max(6px, env(safe-area-inset-bottom)); }
   .zen-prompt textarea { min-height: 40px; max-height: 64px; font-size: 16px; }
-  .zen-controls {
-    bottom: calc(var(--zen-prompt-h, 112px) + 14px + env(safe-area-inset-bottom));
-  }
-  .zen-gallery-wrap { top: calc(54px + env(safe-area-inset-top)); }
 }

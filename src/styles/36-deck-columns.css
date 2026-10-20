@@ -14,8 +14,7 @@
 --------------------------------------------------------------------------- */
 
 @media (min-width: 761px) and (max-width: 1040px) {
-  .app-shell,
-  .zen-shell { --deck-step: calc(var(--deck-h) + 8px); }
+  .app-shell { --deck-step: calc(var(--deck-h) + 8px); }
 
   .studio-dock {
     flex-direction: column;
@@ -23,8 +22,7 @@
     bottom: var(--deck-gap);
   }
 
-  .app-shell .zen-control-button,
-  .zen-shell .zen-control-button { bottom: var(--deck-gap); }
+  .app-shell .zen-control-button { bottom: var(--deck-gap); }
 
   .app-shell .zen-control-button.gallery-search-button,
   .app-shell .zen-control-button.grid-autoplay-button,
@@ -37,13 +35,4 @@
   .app-shell .zen-control-button.stack-runs-button { bottom: calc(var(--deck-gap) + 2 * var(--deck-step)); }
   .app-shell:has(.grid-autoplay-button) .zen-control-button.stack-runs-button { bottom: calc(var(--deck-gap) + 3 * var(--deck-step)); }
 
-  .zen-shell .zen-zoom-dock,
-  .zen-shell .zen-zoom-dock.with-side {
-    flex-direction: column;
-    height: auto;
-    left: max(var(--deck-gap), env(safe-area-inset-left));
-    bottom: calc(var(--deck-gap) + var(--deck-step));
-  }
-
-  .zen-controls { bottom: calc(var(--deck-gap) + var(--deck-step)); }
 }

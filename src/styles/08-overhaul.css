@@ -92,26 +92,14 @@ button:not(:disabled):active { scale: .96; }
    different baselines. One surface, one height, one bottom offset - matched to
    the composer's 18px - so they read as a set. */
 .zen-control-button,
-.zen-zoom-dock,
-.studio-dock,
-.zen-gallery-restore {
+.studio-dock {
   box-sizing: border-box;
 }
-.zen-control-button,
-.zen-zoom-dock { bottom: 18px; }
+.zen-control-button { bottom: 18px; }
 .zen-control-button { left: 18px; }
-.zen-zoom-dock { left: 72px; }
-.zen-zoom-dock .icon-button,
-.zen-zoom-dock .viewer-zoom,
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot {
   transition-property: background-color, color, scale;
-}
-.zen-controls {
-  left: 18px;
-  bottom: 84px;
-  padding: 16px;
-  gap: 14px;
 }
 .mode-tabs {
   padding: 4px;

@@ -6,11 +6,9 @@
    tab while you choose, so nothing floats or clips inside the panel.
 --------------------------------------------------------------------------- */
 
-.zen-controls { width: var(--sidebar-w); }
 .sidebar-scroll { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .sidebar-scroll > * { flex-shrink: 0; }
 .sidebar-scroll .sidebar-body { flex: none; overflow: visible; }
-.zen-zoom-dock.with-side { left: calc(var(--sidebar-w) + 28px); }
 
 /* ---------------------------------------------------------- Workflow card */
 
@@ -103,7 +101,6 @@
 /* ------------------------------------------------------------ LoRA panel */
 
 .lora-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-
 
 /* Header: count on the left, quiet bulk actions on the right. */
 .lora-head { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 2px; }

@@ -350,7 +350,6 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 }
 .size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
 
-
 /* Every composer menu leaves the way it came. */
 @keyframes surfaceOut {
   from { opacity: 1; transform: none; }

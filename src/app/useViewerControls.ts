@@ -34,13 +34,13 @@ function containedRect(media: HTMLImageElement | HTMLVideoElement) {
 
 export function useViewerControls(view: any) {
   const {
-    active, doneGallery, generate, generateDisabled, height, lastTapRef,
+    active, generate, generateDisabled, height, lastTapRef,
     models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps,
     setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
     setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps,
     setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth,
-    setZenSelectedId, showToast, viewerDragEndRef, viewerDragRef, viewerPan,
-    viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef
+    showToast, viewerDragEndRef, viewerDragRef, viewerPan,
+    viewerZoom, visibleGallery, width
   } = view;
   const [viewerNativeZoom, setViewerNativeZoom] = useState(1);
   const nativeZoomRef = useRef(1);
@@ -54,12 +54,12 @@ export function useViewerControls(view: any) {
   const homeZoom = () => phoneRef.current ? 1 : nativeZoomRef.current;
   const swipeZoom = useRef(1);
   useLayoutEffect(() => {
-    const item = active || (prefs.zenMode ? zenItem : null);
+    const item = active;
     if (item?.type !== 'image') {
       if (item?.type === 'video') { nativeZoomRef.current = 1; setViewerNativeZoom(1); setViewerZoom(1); }
       return;
     }
-    const canvas = document.querySelector<HTMLElement>(active ? '.viewer-canvas' : '.zen-output');
+    const canvas = document.querySelector<HTMLElement>('.viewer-canvas');
     if (!canvas) return;
     sizeMode.current = openingMode();
     let first = true;
@@ -89,7 +89,7 @@ export function useViewerControls(view: any) {
     const media = new MutationObserver(measure);
     media.observe(canvas, { childList: true, subtree: true });
     return () => { canvas.removeEventListener('load', measure, true); resize.disconnect(); media.disconnect(); };
-  }, [active?.id, active?.url, active?.upscaleActive, prefs.zenMode, zenItem?.id]);
+  }, [active?.id, active?.url, active?.upscaleActive]);
   function fitViewer() {
     sizeMode.current = 'fit';
     setViewerZoom(1);
@@ -101,7 +101,7 @@ export function useViewerControls(view: any) {
    * skipping a step that would look the same as where it is.
    */
   function cycleViewerSize() {
-    const canvas = document.querySelector<HTMLElement>(active ? '.viewer-canvas' : '.zen-output');
+    const canvas = document.querySelector<HTMLElement>('.viewer-canvas');
     const geometry = canvas ? measureViewer(canvas) : null;
     const fill = geometry?.w && geometry.h ? Math.max((geometry.right - geometry.left) / geometry.w, (geometry.bottom - geometry.top) / geometry.h) : 1;
     const steps: Array<['fit' | 'native' | 'fill', number]> = [['fit', 1], ['native', nativeZoomRef.current], ['fill', fill]];
@@ -141,7 +141,6 @@ export function useViewerControls(view: any) {
 
   function openItem(item: GalleryItem) {
     resetViewer(openingMode());
-    setZenSelectedId(item.id);
     // The side panel squeezes the image below laptop widths, so it starts closed there.
     setShowDetails(typeof window === "undefined" ? true : !window.matchMedia("(max-width: 1024px)").matches);
     setActive(item);
@@ -270,14 +269,6 @@ export function useViewerControls(view: any) {
     showToast(removed ? `LoRAs applied · ${removedLorasNote(removed)}` : "LoRAs applied", "success");
   }
 
-  function moveZen(direction: 1 | -1) {
-    const current = latestView.current;
-    const items: GalleryItem[] = current.doneGallery || [];
-    if (!items.length) return;
-    const currentIndex = Math.max(0, items.findIndex((item: GalleryItem) => item.id === current.zenItem?.id));
-    setZenSelectedId(items[(currentIndex + direction + items.length) % items.length].id);
-  }
-
   /** What the viewer steps through: the gallery in the order it is laid out (main.tsx viewerGallery). */
   function viewerItems(): GalleryItem[] {
     return view.viewerGallery || visibleGallery.filter((item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error");
@@ -296,12 +287,7 @@ export function useViewerControls(view: any) {
     setActive(doneItems[(currentIndex + direction + doneItems.length) % doneItems.length]);
   }
 
-  function goLatestZen() {
-    const latest = doneGallery[0];
-    if (latest) setZenSelectedId(latest.id);
-  }
-
-  function submitZenPrompt(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function submitPrompt(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter" || event.shiftKey) return;
     // Cmd/Ctrl+Enter always generates, even with "Enter to generate" off.
     const modified = event.metaKey || event.ctrlKey;
@@ -311,39 +297,6 @@ export function useViewerControls(view: any) {
     event.preventDefault();
     // generate() explains itself when something is missing, instead of doing nothing.
     generate();
-  }
-
-  function startZenStripDrag(event: React.PointerEvent<HTMLDivElement>) {
-    // Touch scrolls the strip natively, with momentum; a tap selects via onClick.
-    if (!zenStripRef.current || event.pointerType === "touch") return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    zenStripDragRef.current = { id: event.pointerId, x: event.clientX, scrollLeft: zenStripRef.current.scrollLeft, moved: false };
-  }
-
-  function dragZenStrip(event: React.PointerEvent<HTMLDivElement>) {
-    const drag = zenStripDragRef.current;
-    if (!drag || drag.id !== event.pointerId || !zenStripRef.current) return;
-    if (Math.abs(event.clientX - drag.x) > 4) drag.moved = true;
-    zenStripRef.current.scrollLeft = drag.scrollLeft - (event.clientX - drag.x);
-  }
-
-  function stopZenStripDrag(event: React.PointerEvent<HTMLDivElement>) {
-    const drag = zenStripDragRef.current;
-    if (drag?.id === event.pointerId) {
-      if (!drag.moved) {
-        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-zen-id]") as HTMLElement | null;
-        const itemId = target?.dataset.zenId;
-        if (itemId) setZenSelectedId(itemId);
-      }
-      window.setTimeout(() => {
-        zenStripDragRef.current = null;
-      }, 0);
-    }
-  }
-
-  function selectZenItem(itemId: string) {
-    if (zenStripDragRef.current?.moved) return;
-    setZenSelectedId(itemId);
   }
 
   /** The pan that keeps the point under the cursor still as the zoom changes. */
@@ -556,8 +509,7 @@ export function useViewerControls(view: any) {
   }
 
   function viewerNeighbors() {
-    if (!active) return doneGallery.length > 1;
-    return viewerItems().length > 1;
+    return Boolean(active) && viewerItems().length > 1;
   }
 
   /** The next picture slides in from the side the finger was heading away from. */
@@ -565,7 +517,7 @@ export function useViewerControls(view: any) {
     if (swiping.current) return;
     swiping.current = true;
     const width = canvas.clientWidth || window.innerWidth;
-    const itemId = () => (latestView.current.active || latestView.current.zenItem)?.id || "";
+    const itemId = () => latestView.current.active?.id || "";
     const fromId = itemId();
     paint(canvas, 1, { x: -direction * width, y: 0 }, "slide");
     swipeTimer.current = setTimeout(() => {
@@ -583,7 +535,6 @@ export function useViewerControls(view: any) {
       // Rendered now, so the next picture is in place before it slides in.
       flushSync(() => {
         if (current.active) moveViewer(direction);
-        else moveZen(direction);
       });
       const moved = Boolean(itemId() && itemId() !== fromId);
       requestAnimationFrame(() => {
@@ -691,5 +642,5 @@ export function useViewerControls(view: any) {
     // A pan ends where the finger left it.
     settleViewer(canvas, gesture.zoom, gesture.current, false);
   }
-  return { fitViewer, cycleViewerSize, stepViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveZen, moveViewer, goLatestZen, submitZenPrompt, startZenStripDrag, dragZenStrip, stopZenStripDrag, selectZenItem, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
+  return { fitViewer, cycleViewerSize, stepViewer, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveViewer, submitPrompt, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch };
 }

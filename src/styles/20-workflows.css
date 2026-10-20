@@ -182,7 +182,6 @@
 .wf-facts dt { color: hsl(var(--muted-foreground)); }
 .wf-facts dd { margin: 0; color: hsl(var(--foreground)); overflow-wrap: anywhere; }
 
-
 .wf-drop {
   position: absolute;
   inset: 10px;

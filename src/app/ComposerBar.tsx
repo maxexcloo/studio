@@ -137,7 +137,7 @@ function useDensityLevel(contentKey: string) {
 function useComposerHeightVar(rowRef: React.RefObject<HTMLDivElement | null>) {
   React.useEffect(() => {
     const composer = rowRef.current?.closest(".zen-prompt") as HTMLElement | null;
-    const shell = rowRef.current?.closest(".zen-shell, .app-shell") as HTMLElement | null;
+    const shell = rowRef.current?.closest(".app-shell") as HTMLElement | null;
     if (!composer || !shell || typeof ResizeObserver === "undefined") return;
     const publish = () => shell.style.setProperty("--zen-prompt-h", `${Math.round(composer.offsetHeight)}px`);
     publish();

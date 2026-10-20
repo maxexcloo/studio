@@ -281,12 +281,10 @@ export type Preferences = {
   autoResizeInputs: boolean;
   generationPreviewMode: "advanced" | "simple";
   variationQueueMode: "batch" | "separate";
-  zenMode: boolean;
   controlsPinned?: boolean;
   countDefaultsVersion?: number;
   confirmActions: boolean;
   enterToGenerate: boolean;
-  followLatest: boolean;
   /** Wide images take two gallery columns, from three columns up. */
   spanWideImages: boolean;
   showFailedItems: boolean;
@@ -315,7 +313,6 @@ export type Preferences = {
   upscaleFaceDetail: boolean;
   /** Point out models in folders ComfyUI doesn’t read (sidebar notice, model menu, first-run dialog). */
   modelFolderHints: boolean;
-  mobileZenDefaulted?: boolean;
   /** Downloads and shares from the gallery leave out the prompt and workflow saved in the file. */
   shareWithoutSettings: boolean;
 };

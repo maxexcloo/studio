@@ -270,7 +270,6 @@
   .composer-drawer-row { min-height: 48px; }
 }
 
-
 /* --- Pinned seed ----------------------------------------------------------
    A fixed seed makes every run the same picture; while one is set it shows
    beside the negative toggle, and one tap goes back to random. */

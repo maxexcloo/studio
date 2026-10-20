@@ -9,7 +9,7 @@ export const shortcuts: ReadonlyArray<readonly [string, string]> = [
   ['Any letter', 'Start typing in the prompt'],
   ['/  or  ⌘/Ctrl + F', 'Search the gallery'],
   ['F', 'Star the open image (viewer)'],
-  ['← →', 'Previous or next image (viewer and zen)'],
+  ['← →', 'Previous or next image in the viewer'],
   ['⌘/Ctrl + Click', 'Toggle a gallery selection'],
   ['Shift + Click', 'Select a range of gallery items'],
   ['⌘/Ctrl + A', 'Select all loaded items (gallery)'],
