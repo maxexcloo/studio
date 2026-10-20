@@ -168,6 +168,8 @@ destructive actions live in Maintenance, never beside everyday switches.
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost
   until hovered, with an accessible name and a tooltip naming the action.
+  A tooltip starts with the action's name and fits on one line ("Recreate
+  With the Same Seed"), so it never covers a neighbouring control.
 - Icon bars group related actions with a divider between groups; the same
   action has the same icon everywhere.
 - **Image/Video switches:** the composer's Image/Video mode and the phone
