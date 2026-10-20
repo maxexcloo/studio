@@ -7,6 +7,7 @@ import { referenceImageSize } from './generation-defaults.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assertAdjustable, maxJobsPerCall, mcpControls, mcpGenerationCount, mcpSize, prepareLoras, resolveLoraName } from './mcp-controls.js';
 import { compatibleLoras, loraCompatibility } from './lora-policy.js';
+import { recommendedNegative, withLoraPrompting } from './lora-prompts.js';
 import { chooseProfile, isCloudProfile, localVideoUnavailable } from './mcp-tiers.js';
 import { isLocalVideoProfile } from './comfy-backends.js';
 
@@ -251,7 +252,15 @@ export class McpMedia {
     if (negative_prompt !== undefined && adjustable.negative_prompt) controls.negative = negative_prompt;
     for (const [key, value] of Object.entries({ cfg, denoise, sampler, scheduler })) if (value !== undefined) controls[key] = value;
     // Names resolve to the profile's files and take their recommended strength unless one is given.
-    const stack = loras.length ? prepareLoras(profile, await this.loraInfos(owner), loras) : [];
+    const infos = loras.length ? await this.loraInfos(owner) : {};
+    const stack = loras.length ? prepareLoras(profile, infos, loras) : [];
+    // The guide's recommended negative when the caller gave none (only where the profile takes one, above CFG 1).
+    if (negative_prompt === undefined && adjustable.negative_prompt) {
+      const filled = recommendedNegative(profile.prompting, { cfg: cfg ?? profile.defaults?.cfg, stack, infos });
+      if (filled) controls.negative = filled;
+    }
+    // Written prompts (not exact ones) carry each LoRA's triggers and, for tag-trained LoRAs, a line of tags.
+    const styled = (prompt) => record.styled && stack.length ? withLoraPrompting(prompt, stack, infos, record.request || '') : prompt;
     const slots = profile.mediaInputs || [];
     if (reference_asset_ids.length > slots.length || slots.some((slot, index) => slot.required && !reference_asset_ids[index])) throw new Error('Supply the references required by this profile.');
     for (const id of reference_asset_ids) this.own(owner, id, 'assets');
@@ -270,7 +279,7 @@ export class McpMedia {
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;
     const queued = [];
-    for (const prompt of prompts) for (let variant = 0; variant < runs; variant++) {
+    for (const prompt of prompts.map(styled)) for (let variant = 0; variant < runs; variant++) {
       const id = crypto.randomUUID();
       try {
         // Persist the client id before dispatch: interrupted connections cannot lose job ownership.

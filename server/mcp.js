@@ -6,7 +6,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { hostAllowed } from './request-guard.js';
-import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
+import { closest, listedControls, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
@@ -259,7 +259,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (matches.length > 1) return mcpJson(listed(matches));
         const { profile, note: tierNote } = named ? (named.id === profile_id ? { profile: named, note: '' } : withinFamily(profiles, named, wanted)) : namedInTier(profiles, profile_id, wanted);
         const infos = profile.options?.loras?.length && profile.capabilities?.lora !== false ? await media.loraInfos(owner) : {};
-        const controls = mcpControls(profile);
+        const controls = listedControls(profile);
         // A LoRA lookup answers only that question; the profile's guide and controls come without one.
         if (controls.loras && (lora_query || lora_names.length)) {
           const { loras, total, more, missing } = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
@@ -271,13 +271,13 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const modes = profile.imageModes && Object.fromEntries(Object.entries(profile.imageModes).map(([mode, settings]) => {
           // The same merge Generate validates against when references select this mode.
           const merged = { ...profile, ...settings };
-          return [mode, { controls: mcpControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
+          return [mode, { controls: listedControls(merged), ...(settings?.prompting ? { prompting: settings.prompting } : {}) }];
         }));
         const { loras, total } = mcpLoras(profile, infos);
         const detail = {
           ...Object.fromEntries(['id', 'label', 'kind', 'family', 'description', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native'].filter(key => key in profile).map(key => [key, profile[key]])),
           tier: tierOf(profile), ...(tierNote ? { note: tierNote.trim() } : {}), defaults, controls, ...(modes ? { imageModes: modes, imageModes_note: 'A mode applies when its media is supplied, such as reference with references.' } : {}),
-          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Put the trigger word in the prompt.' } : {}),
+          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Studio adds trigger words to prompts it writes; with exact_prompt, put them in yourself.' } : {}),
           prompting: prompting(profile, true)
         };
         return mcpJson(detail);
@@ -323,7 +323,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           faceNote = 'Face detail on for the full-body person. ';
           args.face_detail = true;
         }
-        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request } : {});
+        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request, styled: source !== 'exact' } : {});
         return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
       });
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
@@ -378,7 +378,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const fallback = [request ? `${item.prompt}, ${request}` : item.prompt];
           source = usePrompts(plan.args, await write(plan.profile, { request: base, changes, count, references, role: kind !== own ? 'first-frame' : references ? item.settings?.referenceRole || 'reference' : '', fallback, signal }), count);
         }
-        const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes });
+        const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes, styled: source !== 'exact' });
         const dropped = plan.droppedLoras?.length ? `Left out ${plan.droppedLoras.length === 1 ? 'a LoRA' : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(', ')}); tell the user. ` : '';
         return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source, `${plan.tierNote || ''}${dropped}`);
       });
