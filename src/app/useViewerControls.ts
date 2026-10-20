@@ -148,7 +148,7 @@ export function useViewerControls(view: any) {
 
   /**
    * Loads an output's prompt and settings into the composer. The seed stays
-   * as it is, so "Use these settings" makes a new picture, not the same one.
+   * as it is, so "Use Settings" makes a new picture, not the same one.
    * Returns whether its model is installed.
    */
   function applyAllSettings(item: GalleryItem) {

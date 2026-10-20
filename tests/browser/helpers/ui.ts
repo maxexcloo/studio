@@ -176,10 +176,10 @@ export function studioUi(page: Page) {
       } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
     },
 
-    /** The viewer's Use This Prompt: in the phone's action bar, or the full studio's Reuse group. */
+    /** The viewer's Use Settings: in the phone's action bar, or the full studio's Reuse group. */
     async reuseButton() {
       const actions = await isPhone() ? viewer.getByRole('navigation', { name: 'Image actions', exact: true }) : viewer.getByRole('group', { name: 'Reuse', exact: true });
-      return actions.getByRole('button', { name: 'Use This Prompt', exact: true });
+      return actions.getByRole('button', { name: 'Use Settings', exact: true });
     },
 
     /** Shows the viewer's details panel, from Details on the phone or Toggle Details in the dock. */

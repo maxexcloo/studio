@@ -43,7 +43,7 @@ for (const kind of ['image', 'video'] as const) {
       const source = failed ? null : await media.getAttribute('src');
       const phone = await ui.isPhone();
       // The full studio offers a failed run's reuse in its failure panel.
-      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: /Use (?:This Prompt|these settings)/ }) : await ui.reuseButton();
+      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Use Settings', exact: true }) : await ui.reuseButton();
 
       // Reuse opens the phone's Create sheet over the viewer, which each dismissal must leave open.
       for (const dismiss of phone ? ['button', 'escape', 'back'] : ['viewer']) {
@@ -100,8 +100,8 @@ for (const promptsOnly of [false, true]) {
       await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
       await ui.showDetails();
       const readouts = viewer.locator('.prompt-readout');
-      await readouts.getByRole('button', { name: 'Use This Prompt', exact: true }).click();
-      await readouts.getByRole('button', { name: 'Use This Negative Prompt', exact: true }).click();
+      await readouts.getByRole('button', { name: 'Use Prompt', exact: true }).click();
+      await readouts.getByRole('button', { name: 'Use Negative Prompt', exact: true }).click();
     } else await (await ui.reuseButton()).click();
     await ui.closeComposer();
     await expect(viewer).toBeVisible();
@@ -147,7 +147,7 @@ for (const field of ['prompt', 'negative'] as const) {
     await ui.showDetails();
     const readout = viewer.locator('.prompt-readout').nth(field === 'prompt' ? 0 : 1);
     const copy = readout.getByRole('button', { name: /^Copy/ });
-    const reuse = readout.getByRole('button', { name: /^Use This/ });
+    const reuse = readout.getByRole('button', { name: /^Use (?:Negative )?Prompt$/ });
     const copyBox = await copy.boundingBox();
     const reuseBox = await reuse.boundingBox();
     expect(reuseBox!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);

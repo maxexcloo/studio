@@ -114,7 +114,7 @@ test('missing LoRAs and filename conflicts remain explicit and download errors a
   await expect(dialog.getByRole('button', { name: /Download Missing Files/ })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Retry Missing Files', exact: true }).click();
   await expect(dialog.getByRole('alert')).toHaveText('Civitai requires access to this resource.');
-  await expect(dialog.getByRole('button', { name: 'Use Prompt Only', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Use Prompt', exact: true })).toBeEnabled();
   await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { preset: { ...missing, resources: missing.resources.map((item) => item.versionId === 18 ? { ...item, status: 'conflict' } : item) } } }));
   await dialog.getByRole('button', { name: 'Check Again', exact: true }).click();
   await expect(dialog.getByText('Filename Conflict', { exact: true })).toBeVisible();

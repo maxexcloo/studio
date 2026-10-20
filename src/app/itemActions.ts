@@ -128,13 +128,13 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     extras.compare && item.type === 'image' && Boolean(item.upscale?.url) && !upscaledWithRun(item) && {
       id: 'compare', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare with the Original', Icon: Columns2, pressed: extras.compare.open, haptic: 'tap', run: extras.compare.toggle,
     },
-    Boolean(item.prompt) && { id: 'reuse', label: 'Use This Prompt', Icon: Wand2, run: () => handlers.reuse(item) },
+    Boolean(item.prompt) && { id: 'reuse', label: 'Use Settings', Icon: Wand2, run: () => handlers.reuse(item) },
     Boolean(item.prompt) && {
       id: 'copyPrompt', label: 'Copy Prompt', Icon: Copy,
       copy: () => handlers.copyPrompt(item),
       run: () => { void handlers.copyPrompt(item, 'Prompt copied'); },
     },
-    Boolean(item.prompt) && { id: 'promptsOnly', label: 'Prompts Only', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
+    Boolean(item.prompt) && { id: 'promptsOnly', label: 'Use Prompt', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
     handlers.animate && canAnimatePhoto(item) && { id: 'animate', label: 'Animate', Icon: Video, run: () => handlers.animate!(item) },
     handlers.animate && canExtendVideo(item) && { id: 'extend', label: 'Extend Video', short: 'Extend', Icon: FastForward, run: () => handlers.animate!(item) },
     done && handlers.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library && {

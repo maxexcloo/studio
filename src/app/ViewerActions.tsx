@@ -11,7 +11,7 @@ export function ViewerReuseAction({ compact = false, onUseSettings }: {
   return (
     <div className={cn('viewer-reuse', compact && 'is-compact')}>
       <Tip content="Load its model, prompts and compatible settings. You can undo this.">
-        <button type="button" className="btn is-primary viewer-action-main" onClick={onUseSettings}><Wand2 size={compact ? 21 : 15} /><span>Use This Prompt</span></button>
+        <button type="button" className="btn is-primary viewer-action-main" onClick={onUseSettings}><Wand2 size={compact ? 21 : 15} /><span>Use Settings</span></button>
       </Tip>
     </div>
   );

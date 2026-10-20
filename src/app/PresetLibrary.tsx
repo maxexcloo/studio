@@ -120,7 +120,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
 
   return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="wide" title="Image & Model Library" icon={<Library size={20} />} description={tab === 'images' ? 'Save an image with its settings, then use it as a starting point.' : 'Preview and download model files for your workflows.'} className="preset-library" busy={busy}
     footer={selected && tab === 'images' ? <>
-      <button className="btn" disabled={busy || !selected.prompt} onClick={() => { onPrompt(selected); onClose(); }}><Wand2 size={15} />Use Prompt Only</button>
+      <button className="btn" disabled={busy || !selected.prompt} onClick={() => { onPrompt(selected); onClose(); }}><Wand2 size={15} />Use Prompt</button>
       <button className="btn is-primary" disabled={busy || Boolean(fit?.blockers.length) || !profile} onClick={() => { if (profile) { onApply(selected, profile); onClose(); } }}><SlidersHorizontal size={15} />Use Settings</button>
     </> : undefined}>
     <fieldset className="preset-tabs" disabled={busy}><Segmented value={tab} onChange={(value) => { setTab(value); setError(''); }} options={[{ value: 'images', label: 'Saved Images' }, { value: 'models', label: 'Download Models' }]} label="Library View" /></fieldset>
