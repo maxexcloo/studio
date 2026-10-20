@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
@@ -205,4 +206,34 @@ test('reference selection stays open, pins selections across searches and tabs, 
   await page.keyboard.press('Escape');
   await expect(picker).not.toBeVisible();
   await expect(references(page)).toBeFocused();
+});
+
+test('a real ten-slot profile shows one References button, however its slots are declared', async ({ page }) => {
+  // FLUX.3 [klein] Base as synced from the deployment: ten "Reference Image" slots, with no `follows` or `role`.
+  const real = JSON.parse(readFileSync(new URL('../../server/fixtures/profiles/flux3-klein-base-10-references.json', import.meta.url), 'utf8'));
+  const slots = real.heissUi.mediaInputs.map(({ control, ...input }: { control: unknown }) => input);
+  const models = await (await page.request.get('/api/models')).json();
+  for (const profile of models.profiles) if (profile.kind === 'image') profile.mediaInputs = slots;
+  await page.route('**/api/models', (route) => route.fulfill({ json: models }));
+  await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [image('library-image')], nextCursor: '' } }));
+  await page.goto('/');
+  await studioUi(page).openComposer();
+  await expect(page.locator('[data-reference-slot]')).toHaveCount(0);
+  await expect(references(page)).toHaveCount(1);
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
+  await expect(picker.getByRole('tab', { name: 'Selected 0 of 10', exact: true })).toBeVisible();
+});
+
+test('Clear All beside the chooser tabs empties every reference and Undo brings them back', async ({ page }) => {
+  await prepare(page, 3);
+  await page.getByRole('button', { name: 'Add References', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
+  await expect(picker.getByRole('button', { name: 'Clear All', exact: true })).toHaveCount(0);
+  await picker.locator('input[type="file"]').setInputFiles([1, 2].map((index) => ({ name: `reference-${index}.png`, mimeType: 'image/png', buffer: Buffer.from('image') })));
+  await expectPicked(page, 2, 3);
+  await picker.getByRole('button', { name: 'Clear All', exact: true }).click();
+  await expectPicked(page, 0, 3);
+  await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
+  await expectPicked(page, 2, 3);
 });

@@ -51,7 +51,7 @@ function assetImage(asset: ReferenceAsset) {
  * picked image takes it off again, and Selected n/max reviews, reorders and
  * removes what is picked.
  */
-function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onClearAll, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
   memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
@@ -64,6 +64,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   max: number;
   atCapacity: boolean;
   onDeselect: (asset: ReferenceAsset) => void;
+  onClearAll?: () => void;
   /** Swaps the picture at `from` with the one at `to`, in slot order. */
   onMove: (from: number, to: number) => void;
   onClose: () => void;
@@ -267,6 +268,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
           {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
+        {/* Clear All sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
+        {multiple && selected.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear All</button> : null}
         <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
         <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
           {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
@@ -918,6 +921,11 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
               if (!a || !b || !first || !second) return;
               onSelect(a.id, second);
               onSelect(b.id, first);
+            }}
+            onClearAll={() => {
+              const cleared = selected.filter(item => pickerInputs.some(input => input.id === item.slot));
+              onRemove(cleared.map(item => item.slot));
+              showToastTone("References cleared", "removed", { action: { label: "Undo", onClick: () => cleared.forEach((item) => onSelect(item.slot, item.asset)) } });
             }}
             onDeselect={asset => onRemove(selected.filter(item => item.asset.id === asset.id && pickerInputs.some(input => input.id === item.slot)).map(item => item.slot))}
             anchor={host}

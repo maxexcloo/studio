@@ -9,6 +9,7 @@ import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLora
 import { Switch } from './SettingsControls';
 import { Tip } from './components';
 import { copyText } from './api';
+import { showToastTone } from './toast';
 import { loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
 import type { LoraSnapshot } from './lora-storage';
 import type { LoraSelection, Profile } from './types';
@@ -200,7 +201,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onClearAll, onAdd, onSwap, onClose }: {
   options: string[];
   profile: Profile | null;
   fitOf: FitOf;
@@ -225,6 +226,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     update: (name: string, patch: Partial<LoraSelection>) => void;
   };
   onToggleFavorite: (name: string) => void;
+  /** Takes every LoRA off; shown beside the tabs while some are picked. */
+  onClearAll?: () => void;
   onAdd: (names: string[]) => void;
   onSwap: (name: string) => void;
   onClose: () => void;
@@ -337,6 +340,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
           <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All Models</button>
           {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
+        {libraryView && current.length > 0 && onClearAll ? <button type="button" className="picker-clear-all" onClick={onClearAll}><X size={13} aria-hidden="true" /> Clear All</button> : null}
       </div>
       <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi}>
         {sections.map((section) => {
@@ -587,7 +591,6 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
 
 /* ----------------------------------------------------------------- Panel */
 
-type Undo = { label: string; restore: LoraSelection[] };
 
 export function LoraPanel({ loras, setLoras, options, profile, limit, library, rememberedStrength, unavailableReason, browseFirst = false }: {
   loras: LoraSelection[];
@@ -602,9 +605,6 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
 }) {
   const [picker, setPicker] = useState<{ swap: string | null } | null>(() => browseFirst ? { swap: null } : null);
   const [activeStackId, setActiveStackId] = useState('');
-  const [undo, setUndo] = useState<Undo | null>(null);
-  const undoTimer = useRef<number | null>(null);
-  useEffect(() => () => { if (undoTimer.current) window.clearTimeout(undoTimer.current); }, []);
   useEffect(() => { setActiveStackId(''); }, [library.familyLabel]);
 
   const available = useMemo(() => new Set(options), [options]);
@@ -623,13 +623,11 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
     );
   }
 
-  /** Every change that drops LoRAs can be taken back for a few seconds. */
+  /** Every change that drops LoRAs can be taken back from the status pill. */
   const withUndo = (label: string, next: LoraSelection[]) => {
     const before = loras;
     setLoras(next);
-    setUndo({ label, restore: before });
-    if (undoTimer.current) window.clearTimeout(undoTimer.current);
-    undoTimer.current = window.setTimeout(() => setUndo(null), 6000);
+    showToastTone(label, "removed", { action: { label: "Undo", onClick: () => setLoras(before) } });
   };
   const update = (index: number, patch: Partial<LoraSelection>) => setLoras((current) => current.map((item, i) => i === index ? { ...item, ...patch } : item));
   const remove = (index: number) => withUndo(`Removed ${fileName(loras[index].name)}`, loras.filter((_, i) => i !== index));
@@ -673,8 +671,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           libraryView={browseFirst}
           stackControls={browseFirst ? <>
             <Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} />
-            {loras.length ? <div className="lora-library-actions"><button type="button" className="lora-head-action" onClick={() => setLoras(current => current.map(item => ({ ...item, enabled: allOff })))}>{allOff ? 'Enable All' : 'Disable All'}</button><button type="button" className="lora-head-action" onClick={clearAll}>Clear All</button></div> : null}
-            {undo ? <div className="lora-undo" role="status"><span>{undo.label}</span><button type="button" onClick={() => { setLoras(undo.restore); setUndo(null); }}><RotateCcw size={12} /> Undo</button></div> : null}
+            {loras.length ? <div className="lora-library-actions"><button type="button" className="lora-head-action" onClick={() => setLoras(current => current.map(item => ({ ...item, enabled: allOff })))}>{allOff ? 'Enable All' : 'Disable All'}</button></div> : null}
           </> : undefined}
           inlineSelection={{
             items: loras,
@@ -688,6 +685,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
             },
             update: (name, patch) => setLoras(current => current.map(item => item.name === name ? { ...item, ...patch } : item))
           }}
+          onClearAll={browseFirst ? clearAll : undefined}
           onToggleFavorite={library.toggleFavorite}
           onAdd={add}
           onSwap={(name) => picker?.swap && swap(picker.swap, name)}
@@ -740,13 +738,6 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           <p>LoRAs steer style, characters or detail on top of the model.{library.stacks.length ? ' Load a saved stack above, or add one.' : ' Add one to start.'}</p>
         </div>
       )}
-
-      {undo ? (
-        <div className="lora-undo" role="status">
-          <span>{undo.label}</span>
-          <button type="button" onClick={() => { setLoras(undo.restore); setUndo(null); }}><RotateCcw size={12} /> Undo</button>
-        </div>
-      ) : null}
 
       <button type="button" className="btn lora-add" onClick={() => setPicker({ swap: null })} disabled={loras.length >= cap}>
         <Plus size={14} /> {loras.length >= cap ? `This workflow takes ${cap}` : 'Add LoRA'}
