@@ -56,7 +56,7 @@ jobs:
       - name: Build Studio
         run: mise run build
       - name: Install Browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
       - name: Check Studio Interactions
         run: npm run test:browser -- --shard=${{ matrix.shard }}/4
       - if: failure()
