@@ -445,6 +445,42 @@ test('Generate returns immediately with one saved-size image and passes explicit
   assert.equal(f.requests.some(request => request.path.startsWith('/jobs/')), false);
 });
 
+test('a full-body person turns face detail on unless the caller chose, and the reply says so', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const person = 'Full body photo of a woman on a city street';
+  const auto = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person] });
+  assert.match(texts(auto), /Face detail on for the full-body person, with fast smart upscale\. /);
+  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'fast', faceDetail: true });
+  // A chosen upscale quality stays, with face detail added.
+  const chosen = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person], upscale_quality: 'high' });
+  assert.match(texts(chosen), /Face detail on for the full-body person\. /);
+  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: 'high', faceDetail: true });
+  // An explicit false wins, and other prompts are unchanged.
+  const off = await call(client, 'Generate', { profile_id: imageProfile.id, prompts: [person], face_detail: false });
+  assert.doesNotMatch(texts(off), /Face detail/);
+  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  const portrait = await call(client, 'Generate', { profile_id: imageProfile.id, request: 'Close-up portrait of a woman', exact_prompt: true });
+  assert.doesNotMatch(texts(portrait), /Face detail/);
+  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  // Video has no face detail.
+  const video = await call(client, 'Generate', { profile_id: videoProfile.id, prompts: [person] });
+  assert.doesNotMatch(texts(video), /Face detail/);
+  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+});
+
+test('an exact prompt holding generation instructions is refused with the count to pass instead', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const refused = await call(client, 'Generate', { kind: 'image', request: 'Generate five distinct amateur-snapshot variations of this scene: a woman reading in a café', exact_prompt: true });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /^exact_prompt is for a finished prompt only, and this request holds instructions \("Generate five"\)\. Call Generate again with count: 5 \(1–10 per call\) and request set to just the plain prompt/);
+  assert.equal(f.submitted.length, 0);
+  // The same words without exact_prompt are a request, not a refusal.
+  assert.equal(data(await call(client, 'Generate', { kind: 'image', request: 'Generate five variations of a red fox' })).status, 'queued');
+  assert.match((await client.listTools()).tools.find(item => item.name === 'Generate').description, /exact_prompt \(a finished prompt only; for variations use count\)/);
+});
+
 test('omitted counts queue one image or video job and an explicit count queues independent jobs', async t => {
   const f = await fixture(t);
   const client = await f.client();

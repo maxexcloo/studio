@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { hostAllowed } from './request-guard.js';
 import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
+import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
 import { familyMatches, fastestFirst, findProfile, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
@@ -276,15 +277,18 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt, use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
         profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
         width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
-        wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().default(false)
+        wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().optional()
       }, async ({ kind, tier: wanted, wait_seconds, aspect, size, request, exact_prompt, ...args }, signal) => {
         if (Boolean(request) === Boolean(args.prompts)) throw new Error(request ? 'Pass request or prompts, not both.' : "Pass request with the user's words.");
+        // Instructions sent as an exact prompt would run literally, and their number of images would be lost.
+        const instructed = exact_prompt && request ? exactPromptInstructions(request) : '';
+        if (instructed) throw new Error(instructed);
         // "count: 4" beside four prompts means one image each, not sixteen.
         if (args.count > 1 && args.count === args.prompts?.length && args.count * args.prompts.length > maxJobsPerCall) args.count = 1;
         // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
@@ -305,8 +309,15 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const written = exact_prompt ? { prompts: [request], source: 'exact' } : await write(profile, { request, count, references, role: references ? args.reference_role || 'reference' : '', fallback: [request], signal });
           source = usePrompts(args, written, count);
         }
+        // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose;
+        // face detail runs within smart upscale, so it brings the fast upscale when none was chosen.
+        let faceNote = '';
+        if (args.face_detail === undefined && !references && mcpControls(profile).face_detail && args.prompts.some(fullBodyPerson)) {
+          faceNote = `Face detail on for the full-body person${args.upscale_quality ? '' : ', with fast smart upscale'}. `;
+          Object.assign(args, { face_detail: true, upscale_quality: args.upscale_quality || 'fast' });
+        }
         const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request } : {});
-        return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, tierNote);
+        return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
       });
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
         const id = resolve(job_id);
