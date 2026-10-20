@@ -10,7 +10,7 @@ import { closest, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './m
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js';
 import { loadMcpPrompting } from './mcp-prompting.js';
-import { familyMatches, fastestFirst, findProfile, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
+import { asksForCloud, familyMatches, fastestFirst, findProfile, isCloudProfile, localUnlessAsked, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
 import { createControlClient } from './ai-control.js';
 
@@ -166,12 +166,11 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
     const respond = async (submission, profile, waitSeconds, signal, guide = '', promptSource = 'exact', notice = '') => {
       const label = profile.label || profile.id;
-      // A cloud fallback is named up front: it is not the local model the user may expect, and it can cost money.
-      const note = `${profile.remote ? `The local video worker is unavailable, so this video runs on the cloud profile ${label}; tell the user. ` : ''}${notice}`;
+      const note = notice;
       // Quick jobs come back finished, so the agent needs no Result call.
       const seconds = waitSeconds ?? (profile.kind === 'video' ? 0 : imageWaitSeconds);
       const markdown = await media.settle(owner, submission, seconds, { signal });
-      const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(profile.remote ? { remote: true } : {}) }, prompt_source: promptSource, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...(guide ? { prompting: guide } : {}) };
+      const structured = { status: markdown ? 'done' : submission.status, profile: { id: profile.id, label, tier: tierOf(profile), ...(isCloudProfile(profile) ? { remote: true } : {}) }, prompt_source: promptSource, jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({ job_id, ref, link, ...(status ? { status } : {}) })), ...(guide ? { prompting: guide } : {}) };
       // The prompt each result ran, shortened; one line when every job shares it.
       const prompted = submission.jobs.filter(({ prompt }) => prompt);
       const distinct = new Set(prompted.map(({ prompt }) => prompt));
@@ -189,7 +188,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     };
     /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
     const namedInTier = (profiles, value, wanted) => {
-      const found = profileNamed(profiles, value);
+      // A cloud (Grok) profile only by its exact id or when the name asks for the cloud.
+      const found = profileNamed(profiles.some(profile => profile.id === value) ? profiles : localUnlessAsked(profiles, { name: value }), value);
       return found.id === value ? { profile: found, note: '' } : withinFamily(profiles, found, wanted);
     };
     /** Profiles as Models lists them: "id — label" grouped by kind. */
@@ -246,9 +246,13 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       tool(server, 'Models', 'Find Models', 'List ready profiles as "id — label" by kind. With profile_id (id, label or words: "flux 3"), return its prompting guide, defaults, controls, reference slots and compatible LoRAs; lora_query or lora_names details up to five LoRAs. Not needed for ordinary requests.', { kind: z.enum(['all', 'image', 'video']).default('all'), tier: tier.optional(), profile_id: z.string().optional(), lora_query: z.string().max(200).optional().describe('Looks up LoRAs by name, title or trigger.'), lora_names: z.array(z.string().min(1)).max(5).optional() }, async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [] }) => {
         let profiles = await media.profiles(kind, owner);
         if (profile_id === undefined) {
+          // Cloud (Grok) profiles list apart: Generate uses one only when the user asks for Grok or the cloud.
+          const cloud = profiles.filter(isCloudProfile);
+          profiles = profiles.filter(profile => !isCloudProfile(profile));
           if (wanted) profiles = profilesNearTier(profiles, wanted);
-          return mcpJson(listed(profiles));
+          return mcpJson({ ...listed(profiles), ...(cloud.length ? { cloud: listed(cloud), cloud_note: 'Only when the user asks for Grok or the cloud.' } : {}) });
         }
+        if (!profiles.some(profile => profile.id === profile_id)) profiles = localUnlessAsked(profiles, { name: profile_id });
         // Words that name several models ("klein", "flux") list them instead of choosing one.
         const named = findProfile(profiles, profile_id);
         const matches = named ? [] : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
@@ -278,9 +282,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Grok only if asked. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
-        profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional().describe('Default image.'), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
+        profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
         width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
@@ -296,10 +300,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         assertJobCount(args.prompts?.length || 1, args.count ?? 1);
         const references = args.reference_asset_ids?.length || 0;
         // A model the request names ("fast moss") counts as its profile_id when the chat left it out.
-        const fromRequest = args.profile_id === undefined && request && !args.loras?.length ? profileFromRequest(await media.profiles(kind || 'image', owner), request, wanted) : null;
+        // Cloud (Grok) profiles only when the user asks for Grok or the cloud.
+        const cloud = asksForCloud(request);
+        const fromRequest = args.profile_id === undefined && request && !args.loras?.length ? profileFromRequest(localUnlessAsked(await media.profiles(kind || 'image', owner), { request }), request, wanted) : null;
         const fits = fromRequest && (fromRequest.profile.mediaInputs || []).length >= references;
         const { profile, note: tierNote } = args.profile_id === undefined
-          ? (fits ? fromRequest : { profile: await media.choose(owner, { kind, tier: wanted, references, loras: args.loras || [] }), note: '' })
+          ? (fits ? fromRequest : { profile: await media.choose(owner, { kind, tier: wanted, references, loras: args.loras || [], cloud }), note: '' })
           : namedInTier(await media.profiles(kind || 'all', owner), args.profile_id, wanted);
         const sized = mcpSize(profile, { aspect, size });
         if (sized && (args.width !== undefined || args.height !== undefined)) throw new Error('Pass aspect and size, or width and height, not both.');
@@ -353,10 +359,11 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (kind !== own && own === 'video') throw new Error('A video result can only run again as a video.');
         if (kind !== own && profile_id) throw new Error('Pass tier, not profile_id, to choose the video model when animating.');
         let plan;
-        if (kind !== own) plan = await media.animate(owner, id, output_index, item, { tier: wanted, count });
+        const cloud = asksForCloud(request);
+        if (kind !== own) plan = await media.animate(owner, id, output_index, item, { tier: wanted, count, cloud });
         else if (wanted || profile_id) {
           const references = (item.settings?.referenceAssets || []).filter(asset => asset?.assetId).length;
-          const target = profile_id ? namedInTier(await media.profiles(kind, owner), profile_id, wanted) : { profile: await media.choose(owner, { kind, tier: wanted, references }), note: '' };
+          const target = profile_id ? namedInTier(await media.profiles(kind, owner), profile_id, wanted) : { profile: await media.choose(owner, { kind, tier: wanted, references, cloud }), note: '' };
           plan = { ...media.retarget(item, target.profile, { count }), tierNote: target.note };
         } else plan = await media.rerun(owner, item, { count });
         // Changes re-expand the original request for the target profile, so no prompt or guide piles up in the chat.
