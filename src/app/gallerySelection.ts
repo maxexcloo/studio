@@ -21,6 +21,9 @@ export type GallerySelection = {
   /** Everything loaded, or nothing once all of it is. */
   toggleAll: () => void;
   selectAll: () => void;
+  /** Every failed item loaded, for Retry or Delete. */
+  selectFailed: () => void;
+  failedCount: number;
   /** A tile's click: true when selection took it, so the viewer stays shut. */
   click: (item: GalleryItem, event: React.MouseEvent) => boolean;
   /** A tile's context menu, where the gallery offers one. */
@@ -67,6 +70,8 @@ export function useGallerySelection(items: GalleryItem[], resetKey: string): Gal
       toggle,
       toggleAll: () => (allSelected ? setSelection(new Set()) : selectAll()),
       selectAll,
+      selectFailed: () => setSelection(new Set(failed.map((item) => item.id))),
+      failedCount: failed.length,
       click: (item, event) => {
         if (!selection && !event.ctrlKey && !event.metaKey && !event.shiftKey) { anchor.current = item.id; return false; }
         if (!isSelectable(item)) return true;

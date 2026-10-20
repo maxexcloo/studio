@@ -72,7 +72,7 @@ function zipEnd(count, centralSize, centralOffset) {
  * gallery file is read only when its turn comes, so exporting a gallery of
  * tens of thousands never holds more than one file in memory.
  */
-function archiveEntries(privateAssets, includeGallery = true, req = null) {
+function archiveEntries(privateAssets, includeGallery = true, req = null, ids = null) {
   const entries = [];
   const names = new Set();
   const add = (folder, item, source) => {
@@ -90,6 +90,7 @@ function archiveEntries(privateAssets, includeGallery = true, req = null) {
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.STUDIO_MULTI_USER === "1" ? [] : gallery;
   for (const item of includeGallery ? filterVisibleGallery(sourceGallery) : []) {
+    if (ids && ![item.id, item.url].some((key) => ids.has(String(key)))) continue;
     // HEISS media lives in its own folder; everything else in ComfyUI's.
     const itemBase = isMediaUrl(item.url) ? mediaRoot : base;
     if (item.status !== "done" || !itemBase) continue;
@@ -124,7 +125,8 @@ async function measure(file) {
 /** The attachment name of a download, such as `studio-gallery-2026-10-20.zip`. */
 export const exportFilename = (kind, extension, date = new Date()) => `studio-${kind}-${date.toISOString().slice(0, 10)}.${extension}`;
 
-export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true, req = null } = {}) {
+/** `ids`: only these items (a selection), by id or address. */
+export async function sendGalleryExport(res, privateAssets = [], { gallery: includeGallery = true, req = null, ids = null } = {}) {
   let closed = false;
   res.on("close", () => { closed = true; });
   const write = (chunk) => new Promise((resolve) => {
@@ -136,7 +138,7 @@ export async function sendGalleryExport(res, privateAssets = [], { gallery: incl
   try {
     const central = [];
     let offset = 0;
-    for (const entry of archiveEntries(privateAssets, includeGallery, req)) {
+    for (const entry of archiveEntries(privateAssets, includeGallery, req, ids)) {
       if (closed) return;
       // Most files are read once, into memory, and checked from that copy; a
       // big one (a video) is read through for its CRC and then streamed. A file

@@ -179,59 +179,49 @@
   .btn.viewer-action { height: 40px; min-height: 40px; }
 }
 
-.prompt-readout { display: grid; gap: 6px; }
-.prompt-readout span,
+/* Details: each prompt unboxed under its label, its Copy and Use beside the label. */
+.prompt-readout { display: grid; gap: 6px; min-width: 0; }
+.prompt-readout-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.prompt-readout-head > span:first-child,
 .detail-grid span {
   color: hsl(var(--muted-foreground));
   font-size: 11px; font-weight: 500;
   letter-spacing: -0.005em;
 }
-.readout-box {
-  position: relative;
-  min-width: 0;
-}
+.prompt-readout-actions { display: inline-flex; gap: 2px; }
 .prompt-readout p {
-  min-height: 84px;
   max-height: 32vh;
   overflow: auto;
   margin: 0;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--input));
-  border-radius: var(--radius);
-  padding: 12px;
   color: hsl(var(--foreground));
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  padding-right: 46px;
 }
-.readout-copy {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
+.prompt-readout p.is-empty { color: hsl(var(--muted-foreground)); }
+.readout-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 28px;
-  display: grid;
-  place-items: center;
-  border: 1px solid hsl(var(--border));
-  border-radius: calc(var(--radius) - 2px);
-  background: hsl(var(--card) / 0.92);
-  color: hsl(var(--foreground));
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
   cursor: pointer;
-  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.readout-use { top: 44px; }
-@media (pointer: coarse) {
-  .prompt-readout p { min-height: 108px; padding-right: 64px; }
-  .readout-copy { width: 44px; height: 44px; }
-  .readout-use { top: 56px; }
-}
-.readout-copy:hover {
-  background: hsl(var(--accent));
-  border-color: hsl(var(--border-strong));
-  transform: translateY(-1px);
-}
+.readout-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.readout-action.is-copied { color: var(--accent-amber); }
+.readout-action:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+@media (pointer: coarse) { .readout-action { height: 36px; padding: 0 12px; } }
+.details-shortcuts { display: flex; gap: 6px; }
+.details-shortcuts .readout-action { background: var(--control-fill); color: hsl(var(--foreground)); }
+.details-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); }
+.details-footer .btn.viewer-action { width: 100%; justify-content: center; }
 .detail-grid {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
@@ -484,11 +474,35 @@
 .viewer-profile-summary strong { white-space: normal; overflow-wrap: anywhere; }
 .viewer-profile-summary span { color: rgb(255 255 255 / .85); overflow-wrap: anywhere; }
 
-.viewer-zoom-controls { display: flex; align-items: center; gap: 2px; }
+.viewer-zoom-controls { display: flex; align-items: center; gap: 0; }
+/* The zoom: a small − 100% + pill, bottom middle above the action bar, fading with the other controls. */
+.viewer-zoom-pill {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + var(--dock-h) + 10px);
+  z-index: 6;
+  translate: -50% 0;
+  padding: 2px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  opacity: .72;
+  transition: opacity var(--motion-fast) var(--motion-ease), left 260ms var(--ease-out);
+}
+.viewer-zoom-pill:hover,
+.viewer-zoom-pill:focus-within { opacity: 1; }
+.viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { left: calc(50% - 190px); }
+.viewer-zoom-step { display: grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
+.viewer-zoom-step:hover:not(:disabled) { background: var(--control-hover); }
+.viewer-zoom-step:disabled { opacity: .35; }
+.viewer-zoom-pill .viewer-zoom-percent { height: 28px; border: 0; border-radius: var(--r-pill); background: transparent; cursor: pointer; }
+.viewer-zoom-pill.is-phone { bottom: calc(var(--viewer-bar-h, 84px) + 10px); }
+.viewer-zoom-pill.is-phone .viewer-zoom-step { width: 36px; height: 36px; }
+.viewer-zoom-pill.is-phone .viewer-zoom-percent { height: 36px; min-width: 48px; }
 .viewer-zoom-percent { min-width: 42px; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 .viewer-zoom-percent.is-toggle { min-width: 52px; color: hsl(var(--foreground)); }
-.viewer-phone-zoom { position: absolute; z-index: 12; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px); left: 50%; transform: translateX(-50%); padding: 4px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--glass-bar-bg); }
-.viewer-phone-zoom button { min-width: 44px; min-height: 44px; }
 
 /* The viewer's picture loads in layers (GenerationPreview.tsx StagedImage):
    the thumbnail, then the display copy or original fading in over it. Both

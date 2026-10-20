@@ -40,7 +40,7 @@ for (const kind of ['image', 'video'] as const) {
       const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
       const phone = await ui.isPhone();
       // The full studio offers a failed run's reuse in its failure panel.
-      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Use Settings', exact: true }) : await ui.reuseButton();
+      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Recreate', exact: true }) : await ui.reuseButton();
       await reuse.click();
       await expect(viewer).toHaveCount(0);
       await expect(ui.composer).toBeVisible();
@@ -84,7 +84,7 @@ for (const promptsOnly of [false, true]) {
       await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
       await ui.showDetails();
       const readouts = viewer.locator('.prompt-readout');
-      await viewer.getByRole('group', { name: 'Reuse', exact: true }).getByRole('button', { name: 'Use Prompt', exact: true }).click();
+      await viewer.getByRole('group', { name: 'Reuse', exact: true }).getByRole('button', { name: 'Reuse', exact: true }).click();
       await expect(viewer).toHaveCount(0);
       await ui.closeComposer();
       await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
@@ -118,7 +118,7 @@ for (const promptsOnly of [false, true]) {
   });
 }
 
-// Use Prompt (Details) loads both prompts; the negative readout's own button loads only that.
+// Reuse (Details) loads both prompts; the negative's own Use loads only that.
 for (const field of ['negative'] as const) {
   test(`reusing only ${field} text preserves the other draft`, async ({ page }) => {
     const item = { id: 'text-reuse', url: picture, filename: 'text.png', type: 'image', status: 'done', prompt: 'Saved positive text', negative: 'Saved negative text', model: 'flux1-schnell.safetensors', createdAt: new Date().toISOString(), width: 512, height: 512 };
@@ -137,7 +137,9 @@ for (const field of ['negative'] as const) {
     const reuse = readout.getByRole('button', { name: /^Use (?:Negative )?Prompt$/ });
     const copyBox = await copy.boundingBox();
     const reuseBox = await reuse.boundingBox();
-    expect(reuseBox!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);
+    // Use sits beside Copy, on the label's row.
+    expect(Math.abs(reuseBox!.y - copyBox!.y)).toBeLessThan(2);
+    expect(reuseBox!.x).toBeGreaterThan(copyBox!.x);
     await reuse.click();
     await expect(viewer).toHaveCount(0);
     await ui.openComposer();

@@ -161,10 +161,12 @@ export function registerGalleryReadRoutes(app) {
 export function registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory }) {
   app.get("/api/gallery/export", (req, res) => {
     if (!requireGalleryAccess(req, res)) return res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' });
+    // `ids` (comma-separated) downloads a selection as one archive.
+    const ids = String(req.query.ids || "").split(",").map((id) => id.trim()).filter(Boolean).slice(0, 1000);
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${exportFilename("gallery", "zip")}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${exportFilename(ids.length ? "selection" : "gallery", "zip")}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    sendGalleryExport(res, [], { req });
+    sendGalleryExport(res, [], { req, ids: ids.length ? new Set(ids) : null });
   });
 
   app.post("/api/gallery/recover", async (req, res) => {

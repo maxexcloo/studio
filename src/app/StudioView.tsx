@@ -34,7 +34,7 @@ import { useModelDownloadActivity } from './ModelDownloadActivity';
 import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
-import { ViewerActions } from './ViewerActions';
+import { DetailsFooter, DetailsShortcuts, PromptReadout, settingsText } from './ViewerActions';
 
 import { HiddenLockScreen, HiddenUnlockSheet } from './HiddenLock';
 import { HiddenSetupDialog } from './HiddenSetup';
@@ -306,7 +306,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, toggleFavorite]);
-  // The viewer offers Animate and Extend Video only where a first-frame video profile can run them.
+  // The viewer offers Animate and Extend only where a first-frame video profile can run them.
   const canAnimate = animationProfiles(models?.profiles || []).length > 0;
   // The item actions' handlers read the latest view, so the memoised tiles keep one stable value.
   const liveView = React.useRef(view);
@@ -315,7 +315,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   phoneRef.current = phone;
   const smartUpscale = prefs.smartUpscale;
   /**
-   * After Use Prompt or Use Settings: the viewer closes and the prompt box
+   * After Use, Reuse or Recreate: the viewer closes and the prompt box
    * opens with the reused text ready to edit, the phone's Create sheet or
    * the desktop composer, expanded and focused at the end of the prompt.
    */
@@ -355,11 +355,12 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       unhide: (item) => live().unhideItems([item]),
       remove: (item) => live().deleteItem(item),
       star: (item) => live().toggleFavorite([item], !item.favorite),
-      animateItems: (items) => setAnimationItems(items),
       starItems: (items, favorite) => live().toggleFavorite(items, favorite),
-      hideItems: (items) => live().hideItems(items),
-      unhideItems: (items) => live().unhideItems(items),
       removeItems: (items) => live().deleteItems(items),
+      animateItems: (items) => setAnimationItems(items),
+      retry: (item) => { void live().failureFixes?.retry(item); },
+      // One at a time, each its own new job with its own settings.
+      retryItems: (items) => { void (async () => { for (const item of items) await live().failureFixes?.retry(item); })(); },
     };
   }, [smartUpscale, canUseStartImage, canAnimate]);
   const hiddenCount = hiddenSpace ? renderedGallery.filter((item: GalleryItem) => item.status === "done").length : 0;
@@ -627,7 +628,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   );
 
   // The desktop's percentage steps through Fit, 1:1 and Full Size; the phone keeps its buttons.
-  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onNative={() => resetViewer()} onFit={view.fitViewer} onCycle={phone ? undefined : view.cycleViewerSize} />;
+  const imageZoomControls = <ViewerZoomControls zoom={viewerZoom} nativeZoom={view.viewerNativeZoom || 1} onZoom={zoomViewer} onCycle={view.cycleViewerSize} />;
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
@@ -754,8 +755,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           toggleHiddenSpace={toggleHiddenSpace}
           createOpen={phoneCreate}
           setCreateOpen={setPhoneCreate}
-          actionsFor={phoneActionsFor}
-          setActionsFor={setPhoneActionsFor}
           selection={selection}
         />
       ) : prefs.zenMode ? (
@@ -948,35 +947,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       <h3>Details</h3>
                     </div>
                     <div className="viewer-side-body">
-                      <div className="prompt-readout">
-                        <span>Prompt</span>
-                        <div className="readout-box">
-                          <p>{active.prompt || "No prompt recorded"}</p>
-                        </div>
-                      </div>
-                      {active.negative ? (
-                        <div className="prompt-readout">
-                          <span>Negative</span>
-                          <div className="readout-box">
-                            <p>{active.negative}</p>
-                            <Tip content="Copy Negative Prompt"><button className="readout-copy" aria-label="Copy Negative Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.negative || ""), "negative")}><CopyIcon copied={viewerCopy.copied === "negative"} size={13} /></button></Tip>
-                            <Tip content="Use Negative Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Negative Prompt" disabled={!active.negative} onClick={() => { setNegative(clampText(active.negative || "", negativeLimit)); showToast("Negative prompt applied."); composeFromViewer.current(); }}><Wand2 size={13} /></button></Tip>
-                          </div>
-                        </div>
-                      ) : null}
-                      {/* The prompt's actions, in name order; Use Prompt and Use Settings close the viewer for the prompt box. */}
-                      <ViewerActions
-                        item={active}
-                        onAnimate={itemActionHandlers.animate && (canAnimatePhoto(active) || canExtendVideo(active)) ? () => itemActionHandlers.animate!(active) : undefined}
-                        onCopyPrompt={() => itemActionHandlers.copyPrompt(active)}
-                        onUsePrompt={() => itemActionHandlers.promptsOnly(active)}
-                        onUseSettings={() => itemActionHandlers.reuse(active)}
-                        onUseLoras={() => applyLoras(active)}
-                        onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
-                      />
+                      {phone ? <DetailsShortcuts
+                        onCopyPrompt={active.prompt ? () => itemActionHandlers.copyPrompt(active, "Prompt copied") : undefined}
+                        onCopySettings={generationDetailEntries(active).length ? () => copyToClipboard(settingsText(generationDetailEntries(active)), "Settings copied") : undefined}
+                      /> : null}
+                      <PromptReadout label="Prompt" text={active.prompt || ""} onCopy={() => copyToClipboard(active.prompt || "", phone ? "Prompt copied" : "")} onUse={active.prompt ? () => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); composeFromViewer.current(); } : undefined} />
+                      {active.negative ? <PromptReadout label="Negative" text={active.negative} onCopy={() => copyToClipboard(active.negative || "", phone ? "Negative prompt copied" : "")} onUse={() => { setNegative(clampText(active.negative || "", negativeLimit)); setShowNegativePrompt(true); showToast("Negative prompt applied."); composeFromViewer.current(); }} /> : null}
                       {generationDetailEntries(active).length ? (
                         <section className="detail-settings" aria-labelledby="viewer-generation-settings">
-                          <h3 id="viewer-generation-settings" className="detail-settings-title">Generation Settings</h3>
+                          <h3 id="viewer-generation-settings" className="detail-settings-title">Settings</h3>
                           {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
@@ -1005,6 +984,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         </section>
                       ) : null}
                     </div>
+                    <DetailsFooter
+                      onReuse={active.prompt ? () => itemActionHandlers.promptsOnly(active) : undefined}
+                      onRecreate={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
+                    />
                   </aside>
                 ) : null}
                 {phone ? (
@@ -1012,7 +995,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     {upscaleNotices?.get(active.id) ? (
                       <div className="viewer-phone-notice"><UpscaleNoticePopover notice={upscaleNotices.get(active.id)} placement="viewer" onDismiss={() => dismissUpscaleNotice(active.id)} /></div>
                     ) : null}
-                    {active.type === "image" && !showDetails ? <div className="viewer-phone-zoom">{imageZoomControls}</div> : null}
+                    {active.type === "image" && !showDetails ? <div data-open-trigger className="viewer-zoom-pill is-phone">{imageZoomControls}</div> : null}
                     <PhoneViewerBar
                       item={active}
                       showDetails={Boolean(showDetails)}
@@ -1021,9 +1004,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     />
                   </>
                 ) : (
-                <div data-open-trigger className={cn("viewer-dock", showDetails && "with-side")}>
-                  {active.type === "image" ? imageZoomControls : null}
-                  <span className="viewer-divider is-zoom-control" />
+                <>
+                {active.type === "image" ? <div data-open-trigger className={cn("viewer-zoom-pill", showDetails && "with-side")}>{imageZoomControls}</div> : null}
+                <div data-open-trigger className={cn("viewer-dock", showDetails && "with-side")} role="toolbar" aria-label="Image Actions">
                   <ViewerDockActions
                     item={active}
                     compare={{ open: compareOpen, toggle: () => { setCompareOpen((value) => !value); if (!compareOpen) resetViewer(); } }}
@@ -1031,9 +1014,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     onDismissUpscaleNotice={() => dismissUpscaleNotice(active.id)}
                   />
                   <span className="viewer-divider" />
-                  <Tip content={showDetails ? "Hide Details" : "Show Details"}><button className={cn("icon-button", showDetails && "active")} aria-label="Toggle Details" aria-pressed={showDetails} onClick={() => setShowDetails((value: boolean) => !value)}><SlidersHorizontal size={15} /></button></Tip>
+                  <Tip content={showDetails ? "Hide Info" : "Show Info (I)"}><button className={cn("icon-button", showDetails && "active")} aria-label="Info" aria-pressed={showDetails} onClick={() => setShowDetails((value: boolean) => !value)}><Info size={16} /></button></Tip>
                   <Tip content="Close (Esc)"><button className="icon-button viewer-dock-close" aria-label="Close" onClick={() => setActive(null)}><X size={16} /></button></Tip>
                 </div>
+                </>
                 )}
                 {/* Phones and tablets: the dock has no room for Close, so it sits in the corner. */}
                 <button className="viewer-close" aria-label="Close Viewer" onClick={() => setActive(null)}><X size={18} /></button>

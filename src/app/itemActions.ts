@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Columns2, Copy, Download, Eye, EyeOff, FastForward, ImagePlus, Share, Star, TextQuote, Trash2, Video, Wand2 } from 'lucide-react';
+import { CheckCircle2, Columns2, Copy, Download, Eye, EyeOff, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, TextQuote, Trash2, Clapperboard } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
 import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
@@ -10,17 +10,22 @@ import type { ShowToast } from './toast';
 
 /**
  * One list of what can be done to a gallery item, shared by every place that
- * offers it: the phone viewer's bar, the phone's long-press sheet, the desktop
- * viewer's dock, a tile's quick actions and the gallery's context menu. Each
- * action says when it applies; each surface picks the ones it has room for,
- * always in this order and with these labels.
+ * offers it: the phone viewer's bar, the desktop viewer's bar, a tile's quick
+ * actions and the gallery's context menu. Each action says when it applies;
+ * each surface picks the ones it has room for, always in this order, with
+ * these one-word names and icons, grouped by intent (docs/guides/UI-PATTERNS.md):
+ * keep it (Copy, Download or Share) | make more (Animate or Extend, Recreate,
+ * Reuse, Reference, Upscale, Compare) | organise (Star, Move, Select, Delete).
  */
 
-export type ItemSurface = 'bar' | 'sheet' | 'dock' | 'tile' | 'menu';
+export type ItemSurface = 'bar' | 'dock' | 'tile' | 'menu';
+
+/** Where an action sits by intent; surfaces draw a divider between groups. */
+export type ItemActionGroup = 'keep' | 'make' | 'organise';
 
 export type ItemActionId =
-  | 'share' | 'download' | 'copyItem' | 'star' | 'upscale' | 'compare' | 'reuse' | 'copyPrompt'
-  | 'promptsOnly' | 'animate' | 'extend' | 'reference' | 'move' | 'select' | 'delete';
+  | 'copyItem' | 'share' | 'download' | 'animate' | 'extend' | 'reuse' | 'promptsOnly' | 'reference'
+  | 'retry' | 'upscale' | 'compare' | 'star' | 'move' | 'select' | 'delete';
 
 export type ItemActionHandlers = {
   showToast: ShowToast;
@@ -32,21 +37,24 @@ export type ItemActionHandlers = {
   copyPrompt: (item: GalleryItem, announce?: string) => Promise<boolean>;
   /** The image itself, its link, or its details. */
   copyItem: (item: GalleryItem) => Promise<boolean>;
+  /** Recreate: an exact rerun, with its model, prompts, size, LoRAs, references, settings and seed. */
   reuse: (item: GalleryItem) => void;
+  /** Reuse: both prompts only. */
   promptsOnly: (item: GalleryItem) => void;
   /** Left out when the current model takes no reference image. */
   useAsReference?: (item: GalleryItem) => void;
   /** Animates a photo or extends a video; left out when no first-frame video profile is ready. */
   animate?: (item: GalleryItem) => void;
+  /** Runs a failed item again as a new job, with its own model, prompts, settings and references. */
+  retry: (item: GalleryItem) => void;
   hide: (item: GalleryItem) => void;
   unhide: (item: GalleryItem) => void;
   remove: (item: GalleryItem) => void;
   star: (item: GalleryItem) => void;
   /* The same for several selected items at once. */
+  retryItems: (items: GalleryItem[]) => void;
   animateItems: (items: GalleryItem[]) => void;
   starItems: (items: GalleryItem[], favorite: boolean) => void;
-  hideItems: (items: GalleryItem[]) => void;
-  unhideItems: (items: GalleryItem[]) => void;
   removeItems: (items: GalleryItem[]) => Promise<unknown>;
 };
 
@@ -54,6 +62,7 @@ export type ItemActionIcon = React.ComponentType<{ size?: number; fill?: string;
 
 export type ItemAction = {
   id: ItemActionId;
+  group: ItemActionGroup;
   /** The full name, used in sheets, menus and as the accessible name. */
   label: string;
   /** A shorter visible label for the phone viewer's bar. */
@@ -68,8 +77,6 @@ export type ItemAction = {
   href?: string;
   pressed?: boolean;
   danger?: boolean;
-  /** A haptic cue on phones. */
-  haptic?: 'tap' | 'warning';
   /** Bulk actions stay in place, unavailable, when nothing selected fits them. */
   disabled?: boolean;
 };
@@ -81,26 +88,25 @@ export type ItemActionExtras = {
   select?: (item: GalleryItem) => void;
 };
 
-// Where each action appears. Share is the phone's: its bar and sheet share where
-// they can, and download only where the share sheet cannot take the file to save it.
-// The desktop downloads and never shares. The desktop viewer's dock keeps to
-// Copy, Download, Star, Upscale and Delete; the rest are in its menus and Details.
+// Where each action appears. The phone viewer's bar shares where it can and
+// downloads only where the share sheet can't take the file; it keeps Star and
+// Info in the top corners. The desktop downloads and never shares.
 const placement: Record<ItemActionId, readonly ItemSurface[]> = {
-  share: ['bar', 'sheet'],
-  download: canShareFiles ? ['dock', 'tile', 'menu'] : ['bar', 'sheet', 'dock', 'tile', 'menu'],
-  copyItem: ['dock', 'menu'],
-  star: ['bar', 'sheet', 'dock', 'tile', 'menu'],
-  upscale: ['bar', 'sheet', 'dock', 'menu'],
+  copyItem: ['bar', 'dock', 'menu'],
+  share: ['bar'],
+  download: canShareFiles ? ['dock', 'tile', 'menu'] : ['bar', 'dock', 'tile', 'menu'],
+  animate: ['bar', 'dock', 'menu'],
+  extend: ['bar', 'dock', 'menu'],
+  reuse: ['bar', 'dock', 'menu'],
+  promptsOnly: ['menu'],
+  reference: ['bar', 'dock', 'menu'],
+  retry: ['bar', 'dock', 'tile', 'menu'],
+  upscale: ['bar', 'dock', 'menu'],
   compare: ['bar', 'dock'],
-  reuse: ['bar', 'sheet', 'menu'],
-  copyPrompt: ['bar', 'sheet', 'tile', 'menu'],
-  promptsOnly: ['sheet', 'menu'],
-  animate: ['bar', 'sheet', 'menu'],
-  extend: ['bar', 'sheet', 'menu'],
-  reference: ['sheet', 'menu'],
-  move: ['bar', 'sheet', 'tile', 'menu'],
-  select: ['sheet', 'menu'],
-  delete: ['bar', 'sheet', 'dock', 'tile', 'menu'],
+  star: ['dock', 'tile', 'menu'],
+  move: ['menu'],
+  select: ['menu'],
+  delete: ['bar', 'dock', 'tile', 'menu'],
 };
 
 export function upscaleLabel(item: GalleryItem) {
@@ -113,42 +119,38 @@ export function upscaleLabel(item: GalleryItem) {
 export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, surface: ItemSurface, extras: ItemActionExtras = {}): ItemAction[] {
   const done = item.status === 'done' && Boolean(item.url);
   const upscaled = Boolean(item.upscaleActive && !upscaledWithRun(item));
-  const copyLabel = item.url ? item.type === 'image' ? 'Copy Image' : 'Copy Output Link' : 'Copy Generation Details';
+  const copyTip = item.url ? item.type === 'image' ? 'Copy Image' : 'Copy Link' : 'Copy Details';
   const actions: (ItemAction | false | undefined)[] = [
-    done && canShareFiles && { id: 'share', label: 'Share', Icon: Share, run: () => { void shareItem(item, handlers.showToast); } },
-    Boolean(item.url) && item.status !== 'pending' && { id: 'download', label: 'Download', short: 'Save', tip: upscaled ? 'Download the Upscale' : 'Download', Icon: Download, href: downloadUrl(item), run: () => downloadItem(item) },
     item.status !== 'pending' && {
-      id: 'copyItem', label: copyLabel, Icon: Copy,
+      id: 'copyItem', group: 'keep', label: 'Copy', tip: copyTip, Icon: Copy,
       copy: () => handlers.copyItem(item),
       run: () => { void handlers.copyItem(item).then((copied) => { if (copied) handlers.showToast('Copied', 'success'); }); },
     },
-    canStar(item) && { id: 'star', label: item.favorite ? 'Unstar' : 'Star', Icon: Star, pressed: Boolean(item.favorite), haptic: 'tap', run: () => handlers.star(item) },
+    done && canShareFiles && { id: 'share', group: 'keep', label: 'Share', Icon: Share, run: () => { void shareItem(item, handlers.showToast); } },
+    Boolean(item.url) && item.status !== 'pending' && { id: 'download', group: 'keep', label: 'Download', tip: upscaled ? 'Download the Upscale' : 'Download', Icon: Download, href: downloadUrl(item), run: () => downloadItem(item) },
+    handlers.animate && canAnimatePhoto(item) && { id: 'animate', group: 'make', label: 'Animate', tip: 'Make a Video From This Image', Icon: Clapperboard, run: () => handlers.animate!(item) },
+    handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Continue This Video', Icon: FastForward, run: () => handlers.animate!(item) },
+    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Load Everything, Seed Included, Into the Prompt Box', Icon: RotateCcw, run: () => handlers.reuse(item) },
+    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Reuse', tip: 'Load Its Prompts Into the Prompt Box', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
+    done && handlers.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library && {
+      id: 'reference', group: 'make', label: 'Reference', tip: 'Use as a Reference Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
+    },
+    item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Run It Again as a New Job', Icon: RotateCw, run: () => handlers.retry(item) },
     handlers.smartUpscale && canUpscaleItem(item) && {
-      id: 'upscale', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
+      id: 'upscale', group: 'make', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
       run: () => (item.upscale?.status === 'running' ? handlers.cancelUpscale(item) : handlers.upscale(item)),
     },
     extras.compare && item.type === 'image' && Boolean(item.upscale?.url) && !upscaledWithRun(item) && {
-      id: 'compare', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare with the Original', Icon: Columns2, pressed: extras.compare.open, haptic: 'tap', run: extras.compare.toggle,
+      id: 'compare', group: 'make', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare With the Original', Icon: Columns2, pressed: extras.compare.open, run: extras.compare.toggle,
     },
-    Boolean(item.prompt) && { id: 'reuse', label: 'Use Settings', Icon: Wand2, run: () => handlers.reuse(item) },
-    Boolean(item.prompt) && {
-      id: 'copyPrompt', label: 'Copy Prompt', Icon: Copy,
-      copy: () => handlers.copyPrompt(item),
-      run: () => { void handlers.copyPrompt(item, 'Prompt copied'); },
-    },
-    Boolean(item.prompt) && { id: 'promptsOnly', label: 'Use Prompt', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
-    handlers.animate && canAnimatePhoto(item) && { id: 'animate', label: 'Animate', Icon: Video, run: () => handlers.animate!(item) },
-    handlers.animate && canExtendVideo(item) && { id: 'extend', label: 'Extend Video', short: 'Extend', Icon: FastForward, run: () => handlers.animate!(item) },
-    done && handlers.useAsReference && item.type === 'image' && !item.vaultLocked && !item.library && {
-      id: 'reference', label: 'Use as Reference', tip: 'Use as Reference Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
-    },
+    canStar(item) && { id: 'star', group: 'organise', label: item.favorite ? 'Unstar' : 'Star', Icon: Star, pressed: Boolean(item.favorite), run: () => handlers.star(item) },
     done && !item.library && (item.privateVault
-      ? { id: 'move', label: 'Move to Gallery', short: 'Unhide', Icon: Eye, run: () => handlers.unhide(item) }
-      : { id: 'move', label: 'Move to Hidden', short: 'Hide', Icon: EyeOff, run: () => handlers.hide(item) }),
-    extras.select && (item.status === 'done' || item.status === 'error') && { id: 'select', label: 'Select', Icon: CheckCircle2, run: () => extras.select!(item) },
+      ? { id: 'move', group: 'organise', label: 'Move to Gallery', short: 'Unhide', Icon: Eye, run: () => handlers.unhide(item) }
+      : { id: 'move', group: 'organise', label: 'Move to Hidden', short: 'Hide', Icon: EyeOff, run: () => handlers.hide(item) }),
+    extras.select && (item.status === 'done' || item.status === 'error') && { id: 'select', group: 'organise', label: 'Select', Icon: CheckCircle2, run: () => extras.select!(item) },
     item.status !== 'pending' && {
-      id: 'delete', label: item.library ? 'Remove' : 'Delete', tip: item.privateVault ? 'Delete from Hidden' : item.library ? 'Remove from Gallery' : 'Delete from Gallery',
-      Icon: Trash2, danger: true, haptic: 'warning', run: () => handlers.remove(item),
+      id: 'delete', group: 'organise', label: item.library ? 'Remove' : 'Delete', tip: item.privateVault ? 'Delete From Hidden' : item.library ? 'Remove From Gallery' : 'Delete',
+      Icon: Trash2, danger: true, run: () => handlers.remove(item),
     },
   ];
   return actions.filter((action): action is ItemAction => Boolean(action) && placement[(action as ItemAction).id].includes(surface));
@@ -156,24 +158,25 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 
 /**
  * What can be done to several selected items, in the same order and with the
- * same names as for one. `hiddenSpace` says which way Move goes; on a `phone`
- * they share, as one item does, and on the desktop they download.
+ * same names as for one: Share on a phone that can (Download elsewhere, a zip
+ * when several), Retry for failed ones, Star and Delete; the desktop's
+ * right-click menu adds Animate.
  */
-export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, hiddenSpace: boolean, phone = false): ItemAction[] {
+export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, phone = false, surface: 'bar' | 'menu' = 'bar'): ItemAction[] {
   const ready = items.filter((item) => item.status === 'done' && item.url);
-  const movable = ready.filter((item) => !item.library);
+  const failed = items.filter((item) => item.status === 'error' && !item.library);
   const starrable = items.filter(canStar);
   const allStarred = starrable.length > 0 && starrable.every((item) => item.favorite);
+  // Without a ready first-frame model the review says so, rather than the option vanishing.
   const photos = items.filter(canAnimatePhoto);
   const actions: (ItemAction | false)[] = [
-    phone && canShareFiles && { id: 'share', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
-    !(phone && canShareFiles) && { id: 'download', label: 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
-    { id: 'star', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, haptic: 'tap', run: () => handlers.starItems(starrable, !allStarred) },
-    { id: 'animate', label: 'Animate', Icon: Video, disabled: !photos.length, run: () => handlers.animateItems(photos) },
-    hiddenSpace
-      ? { id: 'move', label: 'Move to Gallery', short: 'Unhide', Icon: Eye, disabled: !movable.length, run: () => handlers.unhideItems(movable) }
-      : { id: 'move', label: 'Move to Hidden', short: 'Hide', Icon: EyeOff, disabled: !movable.length, run: () => handlers.hideItems(movable) },
-    { id: 'delete', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', Icon: Trash2, danger: true, haptic: 'warning', disabled: !items.length, run: () => { void handlers.removeItems(items); } },
+    phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
+    !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? `Download ${ready.length} as a Zip` : 'Download', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    // Animating several stays in the desktop's right-click menu; the select bars keep to the essentials.
+    surface === 'menu' && photos.length > 0 && { id: 'animate', group: 'make', label: 'Animate', tip: `Animate ${photos.length}`, Icon: Clapperboard, run: () => handlers.animateItems(photos) },
+    failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: failed.length > 1 ? `Retry ${failed.length} Failed` : 'Retry', Icon: RotateCw, run: () => handlers.retryItems(failed) },
+    { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
+    { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
   ];
   return actions.filter((action): action is ItemAction => Boolean(action));
 }

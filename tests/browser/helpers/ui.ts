@@ -128,10 +128,11 @@ export function studioUi(page: Page) {
     /** Opens a tile's actions: a long press on the phone, a right click in the full studio. */
     async openItemActions(tile: Locator) {
       if (await isPhone()) {
+        // A long press selects; the select bar holds the actions.
         await tile.dispatchEvent('contextmenu');
-        const sheet = page.locator('.phone-item-actions');
-        await expect(sheet).toBeVisible();
-        return sheet;
+        const bar = page.getByRole('navigation', { name: 'Selected Items', exact: true });
+        await expect(bar).toBeVisible();
+        return bar;
       }
       await tile.click({ button: 'right' });
       const menu = page.getByRole('menu');
@@ -183,15 +184,15 @@ export function studioUi(page: Page) {
       } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
     },
 
-    /** The viewer's Use Settings: in the phone's action bar, or the full studio's Reuse group. */
+    /** The viewer's Recreate (an exact rerun): in its action bar, on the phone and the desktop. */
     async reuseButton() {
-      const actions = await isPhone() ? viewer.getByRole('navigation', { name: 'Image actions', exact: true }) : viewer.getByRole('group', { name: 'Reuse', exact: true });
-      return actions.getByRole('button', { name: 'Use Settings', exact: true });
+      const actions = await isPhone() ? viewer.getByRole('navigation', { name: 'Image Actions', exact: true }) : viewer.getByRole('toolbar', { name: 'Image Actions', exact: true });
+      return actions.getByRole('button', { name: 'Recreate', exact: true });
     },
 
-    /** Shows the viewer's details panel, from Details on the phone or Toggle Details in the dock. */
+    /** Shows the viewer's Details, from Info. */
     async showDetails() {
-      const toggle = viewer.getByRole('button', { name: /^(Toggle )?Details$/ });
+      const toggle = viewer.getByRole('button', { name: 'Info', exact: true });
       if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
       await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     },

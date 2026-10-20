@@ -34,7 +34,7 @@ test('viewer images permit native context menus without zooming or closing', asy
 });
 
 test('gallery keeps management actions and Shift-right-click permits native image actions', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'Phones use their existing action sheet on gallery long press.');
+  test.skip(isMobile, 'A phone’s long press selects.');
   await page.goto('/');
   const tile = page.locator('[data-tile-id]').first().locator('.tile');
   await expect(await studioUi(page).openItemActions(tile)).toHaveAccessibleName('Item Actions');
@@ -47,44 +47,24 @@ test('gallery keeps management actions and Shift-right-click permits native imag
   await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
 });
 
-test('phone image actions stay compact, expose Copy Prompt and start selecting', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'The compact action sheet belongs to the phone gallery.');
+test('a long press on a phone tile starts selecting with that tile, with no action sheet', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Long press is the phone gallery’s.');
   await page.goto('/');
   const ui = studioUi(page);
-  const sheet = await ui.openItemActions(page.locator('[data-tile-id]').first().locator('.tile'));
-  await expect(sheet.getByRole('button', { name: 'Copy Prompt', exact: true })).toBeVisible();
-  const bounds = await sheet.boundingBox();
-  expect(bounds!.height).toBeLessThan(440);
-  const rows = sheet.locator('.phone-row');
-  for (const row of await rows.all()) {
-    const box = await row.boundingBox();
-    expect(box!.height).toBeGreaterThanOrEqual(44);
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  }
-  await sheet.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.locator('[data-tile-id]').first().locator('.tile').dispatchEvent('contextmenu');
   await expect(ui.selectionBar).toBeVisible();
   await expect(page.locator('.tile.is-selected')).toHaveCount(1);
+  await expect(page.locator('.phone-sheet')).toHaveCount(0);
 });
 
-test('phone viewer keeps Star at the top and copies prompts directly', async ({ page, isMobile }) => {
+test('phone viewer keeps Star at the top and copies the image from its bar', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'The phone viewer has its own action layout.');
-  await page.addInitScript(() => {
-    let copied = '';
-    Object.defineProperty(navigator, 'clipboard', { value: {
-      writeText: async (text: string) => { copied = text; },
-      readText: async () => copied,
-    } });
-  });
   await page.goto('/');
   const viewer = await studioUi(page).openViewer(page.locator('[data-tile-id]').first().locator('.tile'));
   const star = viewer.getByRole('button', { name: 'Star', exact: true });
   await expect(star).toBeVisible();
   expect((await star.boundingBox())!.y).toBeLessThan(80);
-  await viewer.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(image.prompt);
-  await expect(viewer).toBeVisible();
-  await expect(viewer.locator('.viewer-phone-bar')).toContainText('Copied');
+  await expect(viewer.getByRole('navigation', { name: 'Image Actions' }).getByRole('button', { name: 'Copy', exact: true })).toBeVisible();
 });
 
 test('phone double taps zoom in and back out without browser click interference', async ({ page, isMobile }) => {

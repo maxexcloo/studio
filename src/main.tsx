@@ -991,6 +991,19 @@ function App() {
     }
   }
 
+  /** Recreate: the references a run used, back in their slots (by asset id; one deleted since shows as missing). */
+  function applyReusedReferences(profile: Profile, recorded: unknown) {
+    const inputs = imageInputsForProfile(profile);
+    const records = (Array.isArray(recorded) ? recorded : []) as Array<{ slot?: string; assetId?: string; source?: string; name?: string }>;
+    if (!inputs.length || !records.length) return;
+    setReferenceAssets(records.flatMap((record, index) => {
+      const input = inputs.find((candidate) => candidate.id === record.slot) || inputs[index];
+      if (!input || !record.assetId) return [];
+      const asset: ReferenceAsset = { id: record.assetId, source: record.source === 'generation' ? 'generation' : 'upload', name: record.name || 'Reference image', mime: '', width: 0, height: 0, size: 0, createdAt: '', thumbnailUrl: `/api/reference-assets/${encodeURIComponent(record.assetId)}/thumbnail` };
+      return [{ slot: input.id, asset }];
+    }));
+  }
+
   /** Updates the LoRA stack and remembers it for a workflow: the current one by
    *  default, or the one being switched to when settings are applied together. */
   function setLorasWithMemory(update: React.SetStateAction<LoraSelection[]>, workflowId: string = model) {
@@ -1708,7 +1721,7 @@ function App() {
   const { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem, deleteItems } = generationActions;
 
   const viewerActions = useViewerControls({
-    onReuseProfile: applyProfileReferences, referenceForAspect,
+    onReuseProfile: applyProfileReferences, onReuseReferences: applyReusedReferences, referenceForAspect,
     onReuseOutput: (item: GalleryItem | null) => { reusedImages.current[hidden.space] = item?.type === 'image' && item.status === 'done' && item.url && !item.vaultLocked && !item.library ? item : null; },
     negativeForMode: (next: Mode) => spacePrompts.current[hidden.space][next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt, clipType, customSize, denoise, fps, frames, sampler, scheduler, textEncoder, textEncoders, vae, weightDtype, startImage, startImageId, startImageName }, active, deleteItem, doneGallery: zenGallery, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, setZenSelectedId, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, zenItem, zenStripDragRef, zenStripRef, viewerGallery
   });

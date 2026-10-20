@@ -97,13 +97,16 @@ export async function shareItems(items: GalleryItem[], showToast: ShowToast) {
   await downloadItems(ready, showToast);
 }
 
+/** One item downloads as itself; several come as one zip from the server, so nothing is dropped. */
 export async function downloadItems(items: GalleryItem[], showToast: ShowToast) {
   const ready = items.filter((item) => item.status === 'done' && item.url);
   if (!ready.length) return;
-  for (const item of ready) {
-    downloadItem(item);
-    // Browsers drop downloads fired in one burst.
-    await new Promise((resolve) => setTimeout(resolve, 450));
-  }
-  showToast(`Saved ${ready.length} items to downloads`, 'success');
+  if (ready.length === 1) { downloadItem(ready[0]); return; }
+  const link = document.createElement('a');
+  link.href = `/api/gallery/export?ids=${ready.map((item) => encodeURIComponent(String(item.id))).join(',')}`;
+  link.download = '';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  showToast(`Downloading ${ready.length} items as a zip`, 'success');
 }

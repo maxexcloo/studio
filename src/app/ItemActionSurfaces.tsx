@@ -1,16 +1,14 @@
 import React from 'react';
-import { Info, RefreshCw, Square } from 'lucide-react';
+import { Info, RefreshCw, Square, Star } from 'lucide-react';
 import { cn } from './format';
 import { Tip } from './components';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
-import { haptic, HapticTarget } from './phoneControls';
 import { downloadName, prefetchShare } from './share';
-import { Sheet } from './Sheet';
 import { UpscaleArrow } from './UpscaleArrow';
 import { UpscaleNoticePopover } from './UpscaleNotice';
-import { ViewerReuseAction } from './ViewerActions';
 import { shortLeft, upscaleLeftLine, upscaleTooltip, useUpscaleClock, type UpscaleNotice } from './useUpscale';
-import { useItemActionHandlers, useItemActions, type ItemAction, type ItemActionExtras, type ItemActionId } from './itemActions';
+import { useItemActionHandlers, useItemActions, type ItemAction, type ItemActionExtras } from './itemActions';
+import { canStar } from './favorites';
 import type { GalleryItem } from './types';
 
 /* Every surface that renders the shared item actions (itemActions.ts). */
@@ -20,50 +18,9 @@ export function ActionIcon({ action, size }: { action: ItemAction; size: number 
   return action.id === 'star' ? <Icon size={size} fill={action.pressed ? 'currentColor' : 'none'} /> : <Icon size={size} />;
 }
 
-function press(action: ItemAction) {
-  if (action.haptic) haptic(action.haptic);
-  action.run();
-}
-
-/* ------------------------------------------------------------ Phone sheet */
-
-/** The sheet's upscale row; a running upscale says how long is left under its label. Its own component, so the clock re-renders it alone. */
-function UpscaleSheetRow({ item, action, run }: { item: GalleryItem; action: ItemAction; run: (action: ItemAction) => void }) {
-  const running = item.upscale?.status === 'running';
-  const clock = useUpscaleClock(item);
-  const busy = Boolean(useItemActionHandlers()?.upscaleBusy(item));
-  return (
-    <button type="button" className="phone-row" disabled={busy} onClick={() => run(action)}>
-      {running ? <Square size={16} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={20} />}
-      <span>{action.label}{running && clock.leftMs !== null ? <small>{upscaleLeftLine(item, clock.leftMs)}</small> : null}</span>
-    </button>
-  );
-}
-
-function truncate(text: string, length: number) {
-  const clean = text.replace(/\s+/g, ' ').trim();
-  return clean.length > length ? `${clean.slice(0, length - 1)}…` : clean;
-}
-
-/** A compact action sheet keeps the picture and its actions within reach. */
-export function ItemActionSheet({ item, onClose, onSelect }: { item: GalleryItem | null; onClose: () => void; onSelect?: (item: GalleryItem) => void }) {
-  React.useEffect(() => { prefetchShare(item); }, [item]);
-  const actions = useItemActions(item, 'sheet', { select: onSelect });
-  const run = (action: ItemAction) => { onClose(); press(action); };
-  return (
-    <Sheet className="phone-item-actions" open={Boolean(item)} onClose={onClose} title={item?.prompt ? truncate(item.prompt, 60) : 'Image'}>
-      {item ? (
-        <div className="phone-group">
-          {actions.map((action) => {
-            if (action.id === 'upscale') return <UpscaleSheetRow key={action.id} item={item} action={action} run={run} />;
-            const className = cn('phone-row', action.danger && 'is-danger', action.id === 'star' && action.pressed && 'is-starred');
-            const body = <><ActionIcon action={action} size={20} /><span>{action.label}</span>{action.haptic ? <HapticTarget /> : null}</>;
-            return <button key={action.id} type="button" className={className} onClick={() => run(action)}>{body}</button>;
-          })}
-        </div>
-      ) : null}
-    </Sheet>
-  );
+/** Where the intent changes along a bar: a divider goes before these. */
+export function startsGroup(actions: ItemAction[], index: number) {
+  return index > 0 && actions[index].group !== actions[index - 1].group;
 }
 
 /* ------------------------------------------------------------ Phone viewer bar */
@@ -95,30 +52,34 @@ function UpscaleBarButton({ item, action }: { item: GalleryItem; action: ItemAct
   );
 }
 
-/** Direct actions below the image, with Star and Details beside the close control. */
+/**
+ * The phone viewer: Copy · Share | Animate · Recreate · Reference · Upscale |
+ * Delete along the bottom, Star in the top left and Info (Details) in the top
+ * right beside Close. The bar is a trigger surface, so a tap on Info while
+ * Details is open closes it rather than closing and reopening it.
+ */
 export function PhoneViewerBar({ item, showDetails, onToggleDetails, compare }: { item: GalleryItem; showDetails: boolean; onToggleDetails: () => void; compare: NonNullable<ItemActionExtras['compare']> }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
-  const actions = useItemActions(item, 'bar', { compare });
-  const promptCopy = useCopyFeedback();
-  const star = actions.find((action) => action.id === 'star');
+  const handlers = useItemActionHandlers();
+  const all = useItemActions(item, 'bar', { compare });
+  const actions = all.filter((action) => action.id !== 'star');
+  const star = handlers && canStar(item) ? { pressed: Boolean(item.favorite), run: () => handlers.star(item) } : null;
+  const copy = useCopyFeedback();
   return (
-    <nav className="viewer-phone-bar" aria-label="Image actions">
-      {actions.map((action) => {
-        if (action.id === 'star') return null;
-        if (action.id === 'upscale') return <UpscaleBarButton key={action.id} item={item} action={action} />;
-        if (action.id === 'reuse') return <ViewerReuseAction key={action.id} compact onUseSettings={action.run} />;
-        if (action.id === 'copyPrompt') return <button key={action.id} type="button" aria-label={action.label} onClick={() => { void promptCopy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(promptCopy.copied)} size={21} /><span>{promptCopy.copied ? 'Copied' : action.label}</span></button>;
+    <nav className="viewer-phone-bar" aria-label="Image Actions" data-open-trigger>
+      {actions.map((action, index) => {
+        const divider = startsGroup(actions, index) ? <i key={`${action.id}-divider`} className="viewer-phone-divider" aria-hidden="true" /> : null;
+        if (action.id === 'upscale') return <React.Fragment key={action.id}>{divider}<UpscaleBarButton item={item} action={action} /></React.Fragment>;
+        if (action.copy) return <React.Fragment key={action.id}>{divider}<button type="button" aria-label={action.label} onClick={() => { void copy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(copy.copied)} size={19} /><span>{copy.copied ? 'Copied' : action.label}</span></button></React.Fragment>;
         const className = cn(action.danger && 'is-danger', action.id === 'compare' && action.pressed && 'is-on');
-        const body = <><ActionIcon action={action} size={21} /><span>{action.short || action.label}</span>{action.haptic ? <HapticTarget /> : null}</>;
-        return <button key={action.id} type="button" className={className} aria-label={action.short ? action.label : undefined} aria-pressed={action.id === 'compare' ? action.pressed : undefined} onClick={() => press(action)}>{body}</button>;
+        return <React.Fragment key={action.id}>{divider}<button type="button" className={className} aria-pressed={action.id === 'compare' ? action.pressed : undefined} onClick={action.run}><ActionIcon action={action} size={19} /><span>{action.label}</span></button></React.Fragment>;
       })}
       {star ? (
-        <button type="button" className={cn('viewer-phone-star', star.pressed && 'is-starred')} aria-label={star.label} aria-pressed={star.pressed} onClick={() => press(star)}>
-          <ActionIcon action={star} size={21} /><HapticTarget />
+        <button type="button" className={cn('viewer-phone-star', star.pressed && 'is-starred')} aria-label={star.pressed ? 'Unstar' : 'Star'} aria-pressed={star.pressed} onClick={star.run}>
+          <Star size={20} fill={star.pressed ? 'currentColor' : 'none'} />
         </button>
       ) : null}
-      {/* Info sits beside Close at the top right, so the bar keeps room for actions. */}
-      <button type="button" className={cn('viewer-phone-info', showDetails && 'is-on')} aria-pressed={showDetails} aria-label="Details" onClick={onToggleDetails}><Info size={20} /></button>
+      <button type="button" className={cn('viewer-phone-info', showDetails && 'is-on')} aria-pressed={showDetails} aria-label="Info" onClick={onToggleDetails}><Info size={20} /></button>
     </nav>
   );
 }
@@ -139,7 +100,7 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
     <Tip content={tip}>
       <button
         className={cn('icon-button', item.upscaleActive && item.upscale?.url && 'active', running && clock.leftMs !== null && 'has-count')}
-        aria-label={running ? tip : 'Smart upscale'}
+        aria-label={running ? tip : action.label}
         aria-pressed={action.pressed}
         disabled={busy}
         onClick={action.run}
@@ -154,17 +115,15 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
 // Keyboard shortcuts the viewer handles, named in the dock's tips.
 const dockKeys: Partial<Record<ItemAction['id'], string>> = { star: 'F', delete: 'Del' };
 
-/** The desktop viewer dock's item actions, between the zoom controls and Details. */
-const dockOrder: ItemActionId[] = ['copyItem', 'download', 'star', 'upscale', 'compare', 'delete'];
 
 export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpscaleNotice }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; upscaleNotice?: UpscaleNotice; onDismissUpscaleNotice: () => void }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
-  // The dock's own order: copy and save first, then star, upscale and delete.
-  const actions = [...useItemActions(item, 'dock', { compare })].sort((a, b) => dockOrder.indexOf(a.id) - dockOrder.indexOf(b.id));
+  // By intent: Copy · Download | Animate · Recreate · Reference · Upscale | Star · Delete.
+  const actions = useItemActions(item, 'dock', { compare });
   const copy = useCopyFeedback();
   return (
     <>
-      {actions.map((action) => {
+      {actions.map((action, index) => <React.Fragment key={action.id}>{startsGroup(actions, index) ? <span className="viewer-divider" /> : null}{(() => {
         if (action.id === 'upscale') return (
           <span key={action.id} className="upscale-notice-anchor">
             {upscaleNotice ? <UpscaleNoticePopover notice={upscaleNotice} placement="viewer" onDismiss={onDismissUpscaleNotice} /> : null}
@@ -172,12 +131,12 @@ export function ViewerDockActions({ item, compare, upscaleNotice, onDismissUpsca
           </span>
         );
         const name = action.tip || action.label;
-        const tip = dockKeys[action.id] ? `${action.label} (${dockKeys[action.id]})` : name;
+        const tip = dockKeys[action.id] ? `${name} (${dockKeys[action.id]})` : name;
         const className = cn('icon-button', action.id === 'star' && 'viewer-star', action.id === 'star' && action.pressed && 'is-on', action.id === 'compare' && action.pressed && 'active', action.danger && 'danger-tone');
-        if (action.href) return <Tip key={action.id} content={tip}><a className={className} aria-label={name} href={action.href} download={downloadName(item)}><ActionIcon action={action} size={15} /></a></Tip>;
-        if (action.copy) return <Tip key={action.id} content={tip}><button className={className} aria-label={name} onClick={() => { void copy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(copy.copied)} size={15} /></button></Tip>;
-        return <Tip key={action.id} content={tip}><button className={className} aria-label={name} aria-pressed={action.pressed} onClick={action.run}><ActionIcon action={action} size={15} /></button></Tip>;
-      })}
+        if (action.href) return <Tip key={action.id} content={tip}><a className={className} aria-label={action.label} href={action.href} download={downloadName(item)}><ActionIcon action={action} size={16} /></a></Tip>;
+        if (action.copy) return <Tip key={action.id} content={tip}><button className={className} aria-label={action.label} onClick={() => { void copy.copyWith(action.copy!); }}><CopyIcon copied={Boolean(copy.copied)} size={16} /></button></Tip>;
+        return <Tip key={action.id} content={tip}><button className={className} aria-label={action.label} aria-pressed={action.pressed} onClick={action.run}><ActionIcon action={action} size={16} /></button></Tip>;
+      })()}</React.Fragment>)}
     </>
   );
 }

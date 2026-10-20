@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { springs } from '@/lib/springs';
-import { CheckSquare, X } from 'lucide-react';
+import { AlertTriangle, CheckSquare, X } from 'lucide-react';
 import { GallerySelectionContext, type GallerySelection } from './gallerySelection';
 import { useHiddenActions } from './hiddenContext';
 import { bulkItemActions, useItemActionHandlers, useItemActions, type ItemAction } from './itemActions';
-import { ActionIcon } from './ItemActionSurfaces';
+import { ActionIcon, startsGroup } from './ItemActionSurfaces';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
 
@@ -77,9 +77,13 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   // One item has the full list of item actions; several share the bulk ones.
   const single = menu && targets.length === 1 ? targets[0] : null;
   const singleActions = useItemActions(single, 'menu', { select: selectFromMenu });
-  const bulkActions = handlers ? bulkItemActions(targets, handlers, hidden?.space === 'hidden') : [];
-  const actionButton = (action: ItemAction, inMenu: boolean) => (
-    <button key={action.id} type="button" role={inMenu ? 'menuitem' : undefined} className={action.danger ? 'is-danger' : undefined} title={inMenu ? undefined : action.label} disabled={action.disabled} onClick={() => act(action.run)}><ActionIcon action={action} size={16} />{action.label}</button>
+  const bulkActions = handlers ? bulkItemActions(targets, handlers) : [];
+  const menuBulkActions = handlers ? bulkItemActions(targets, handlers, false, 'menu') : [];
+  const actionButton = (action: ItemAction, inMenu: boolean, divider = false) => (
+    <React.Fragment key={action.id}>
+      {divider ? <span className={inMenu ? 'gallery-menu-divider' : 'gallery-selection-divider'} role={inMenu ? 'separator' : undefined} aria-hidden={inMenu ? undefined : true} /> : null}
+      <button type="button" role={inMenu ? 'menuitem' : undefined} className={action.danger ? 'is-danger' : undefined} title={inMenu ? undefined : action.tip || action.label} aria-label={inMenu ? undefined : action.label} disabled={action.disabled} onClick={() => act(action.run)}><ActionIcon action={action} size={16} />{action.label}</button>
+    </React.Fragment>
   );
   const menuSelection = React.useMemo<GallerySelection>(() => ({
     ...selection,
@@ -98,8 +102,10 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
     {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{tools}<div className={selecting ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       <button type="button" className="gallery-select-toggle" aria-label={selecting ? 'Stop Selecting' : 'Select'} aria-expanded={selecting} title="Ctrl/Cmd-click to select; Shift-click to select a range" onClick={() => selecting ? selection.end() : selection.start()}>{selecting ? <X size={16} /> : <CheckSquare size={16} />}<span role={selecting ? 'status' : undefined}>{selecting ? `${selected.length} Selected` : 'Select'}</span></button>
       <AnimatePresence initial={false}>{selecting ? <motion.div className="gallery-selection-actions" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-        <button type="button" title={selection.allSelected ? "Deselect All" : "Select All Loaded"} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Deselect All' : 'Select All Loaded'}</button>
-        {bulkActions.map((action) => actionButton(action, false))}
+        <button type="button" title={selection.allSelected ? 'Select None' : 'Select All Loaded'} aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Select None' : 'Select All'}</button>
+        {selection.failedCount ? <button type="button" title="Select Every Failed Item" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={16} />Select Failed</button> : null}
+        <span className="gallery-selection-divider" aria-hidden="true" />
+        {bulkActions.map((action, index) => actionButton(action, false, startsGroup(bulkActions, index)))}
       </motion.div> : null}</AnimatePresence>
     </div></div></header> : null}
     {children}
@@ -111,7 +117,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
         buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus({ preventScroll: true });
       } else if (event.key === 'Tab') closeMenu();
     }}>
-      {(single ? singleActions : bulkActions).map((action) => actionButton(action, true))}
+      {(single ? singleActions : menuBulkActions).map((action, index, list) => actionButton(action, true, startsGroup(list, index)))}
     </div>, document.body) : null}
   </GallerySelectionContext.Provider>;
 }

@@ -26,18 +26,18 @@ for (const [width, height] of [[160, 100], [2400, 3600], [3600, 2400]]) test(`vi
   if (phone) await expect.poll(fitted).toBe(true);
   else await expect.poll(async () => Math.abs((await drawn()).width - width)).toBeLessThan(2);
   const opened = await drawn();
+  const fittedPercent = await viewer.getByRole('button', { name: 'Image Zoom Percentage', exact: true }).textContent();
   await page.screenshot({ path: `/tmp/studio-shots-viewer/opens-${test.info().project.name}-${width}x${height}.png` });
   const zoom = viewer.getByRole('group', { name: 'Image Zoom', exact: true });
   await expect(zoom.getByRole('button', { name: 'Zoom In', exact: true })).toBeVisible();
   await expect(zoom.getByRole('button', { name: 'Zoom Out', exact: true })).toBeVisible();
   await zoom.getByRole('button', { name: 'Zoom In', exact: true }).click();
   await expect.poll(async () => (await drawn()).width).toBeGreaterThan(opened.width + 1);
-  // The phone has 1:1 and Fit buttons; the desktop's percentage steps through Fit, 1:1 and Full Size.
+  // The percentage steps through Fit, 1:1 and Full Size, the same on both.
   const percent = zoom.getByRole('button', { name: 'Image Zoom Percentage', exact: true });
   const native = async () => Math.abs((await drawn()).width - width) < 2;
   const reach = async (state: () => Promise<boolean>, button: string) => {
-    if (phone) await zoom.getByRole('button', { name: button, exact: true }).click();
-    else for (let step = 0; step < 3 && !await state(); step += 1) {
+    for (let step = 0; step < 3 && !await state(); step += 1) {
       const before = await percent.textContent();
       await percent.click();
       await expect(percent).not.toHaveText(before!);
@@ -53,7 +53,9 @@ for (const [width, height] of [[160, 100], [2400, 3600], [3600, 2400]]) test(`vi
       return size.width >= bounds!.width - 1 && size.height >= bounds!.height - 1 && Math.min(size.width - bounds!.width, size.height - bounds!.height) < 2;
     }).toBe(true);
   }
-  await reach(fitted, 'Fit Whole Image');
+  // Fit is where a phone opened; the desktop opened at 1:1, so Fit is whatever fits.
+  const openedPercent = phone ? fittedPercent : '';
+  await reach(phone ? async () => (await percent.textContent()) === openedPercent : fitted, 'Fit');
   const size = await drawn();
   if (phone) expect(Math.abs(opened.width - size.width)).toBeLessThan(2);
   expect(size.width / size.height).toBeCloseTo(width / height, 5);

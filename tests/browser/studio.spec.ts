@@ -107,9 +107,8 @@ test('swipes move through previews and generation details stay accessible', asyn
   const canvas = page.locator('.viewer-canvas');
   await expect(canvas).toBeVisible();
   for (const delta of [-200, 200, -200, 200]) {
-    // Fitted: the phone's Fit button, or the desktop's percentage stepped round to it.
-    if (await ui.isPhone()) await page.getByRole('button', { name: 'Fit Whole Image', exact: true }).click();
-    else {
+    // Fitted: a phone opens fitted and each swipe lands fitted; the desktop's percentage steps round to it.
+    if (!await ui.isPhone()) {
       const percent = page.getByRole('button', { name: 'Image Zoom Percentage', exact: true });
       for (let step = 0; step < 3 && await canvas.evaluate((element) => Math.abs(Number(getComputedStyle(element).getPropertyValue('--zoom')) - 1) > 0.001); step += 1) await percent.click();
     }
@@ -125,8 +124,8 @@ test('swipes move through previews and generation details stay accessible', asyn
     await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--pan-x'))).toBe('0px');
   }
   await ui.showDetails();
-  await expect(page.getByRole('heading', { name: 'Generation Settings', exact: true })).toBeVisible();
-  await expect(page.locator('details').filter({ hasText: 'Generation Settings' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.locator('details').filter({ hasText: 'Settings' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -141,14 +140,14 @@ test('the full studio viewer summary is selectable text', async ({ page, isMobil
   expect(await page.evaluate(() => window.getSelection()?.toString().length || 0)).toBeGreaterThan(0);
 });
 
-test('the phone viewer keeps Details beside Close in both orientations', async ({ page, isMobile }) => {
+test('the phone viewer keeps Info beside Close in both orientations', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'The phone viewer bar.');
   await page.goto('/');
   await studioUi(page).openViewer(page.locator('[data-tile-id]').first());
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await expect(page.locator('.viewer-profile-summary')).toBeHidden();
-    const info = await page.getByRole('button', { name: 'Details', exact: true }).boundingBox();
+    const info = await page.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await page.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
     expect(info!.x).toBeGreaterThan(viewport.width / 2);
     expect(close!.x - info!.x - info!.width).toBeCloseTo(8, 0);
@@ -685,9 +684,9 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   await menu.getByRole('menuitem', { name: 'Star', exact: true }).click();
   await expect.poll(() => favourites.length).toBe(1);
   expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1', 'image-2', 'image-3']));
-  await bar.getByRole('button', { name: 'Select All Loaded' }).click();
+  await bar.getByRole('button', { name: 'Select All' }).click();
   await expect(bar.getByRole('status')).toHaveText('80 Selected');
-  await bar.getByRole('button', { name: 'Deselect All' }).click();
+  await bar.getByRole('button', { name: 'Select None' }).click();
   await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
   await tile(0).click();
   await tile(1).click();
@@ -728,11 +727,11 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   // The smallest phone still fits the whole selection bar.
   if (isMobile) await page.setViewportSize({ width: 320, height: 568 });
   await ui.enterSelection();
-  await page.getByRole('button', { name: 'Select All Loaded', exact: true }).click();
+  await page.getByRole('button', { name: 'Select All', exact: true }).click();
   const bar = ui.selectionBar;
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
   await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  await expect(bar.getByRole('button', { name: 'Move to Hidden', exact: true })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: 'Move to Hidden', exact: true })).toHaveCount(0);
   await page.locator('[data-tile-id="image-0"] .tile').click();
   await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();
   await expect(bar.getByRole('button', { name: 'Download', exact: true })).toBeDisabled();

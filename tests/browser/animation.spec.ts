@@ -4,14 +4,17 @@ import { studioUi } from './helpers/ui';
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const images = ['A quiet lake below a mountain', 'A dog resting in a garden'].map((prompt, index) => ({ id: `animate-${index}`, url: picture, filename: `photo-${index}.png`, type: 'image', status: 'done', prompt, createdAt: `2026-01-0${2 - index}T00:00:00Z`, width: 512, height: 512 }));
 
+/** Several photos animate from the desktop's right-click menu on a selection. */
 async function selectPhotos(page: import('@playwright/test').Page) {
   const ui = studioUi(page);
   await ui.enterSelection();
-  await page.getByRole('button', { name: 'Select All Loaded', exact: true }).click();
-  await ui.selectionBar.getByRole('button', { name: 'Animate', exact: true }).click();
+  await page.getByRole('button', { name: 'Select All', exact: true }).click();
+  await page.locator('[data-tile-id="animate-0"] .tile').click({ button: 'right' });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Animate' }).click();
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Animating several is in the desktop’s right-click menu.');
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: images, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
 });

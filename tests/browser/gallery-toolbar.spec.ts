@@ -47,7 +47,7 @@ test('gallery tools expand independently and clear every active filter', async (
   await select.click();
   await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveAttribute('aria-expanded', 'true');
   await expect(toolbar.getByRole('button', { name: 'Stop Selecting' })).toHaveText('0 Selected');
-  await toolbar.getByRole('button', { name: 'Select All Loaded' }).click();
+  await toolbar.getByRole('button', { name: 'Select All' }).click();
   await expect(toolbar.getByRole('status')).toHaveText('8 Selected');
   const centred = await toolbar.locator('.gallery-selection-actions button').evaluateAll(buttons => buttons.every(button => { const a = button.getBoundingClientRect(), b = button.querySelector('svg')!.getBoundingClientRect(); return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 0.5 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 0.5; }));
   expect(centred).toBe(true);

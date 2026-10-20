@@ -50,7 +50,7 @@ import { hasAccountStorageScope } from './api';
 
 /* ------------------------------------------------------------ The shell */
 
-export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, actionsFor, setActionsFor, selection }: {
+export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, hiddenLocked, toggleHiddenSpace, createOpen, setCreateOpen, selection }: {
   view: Record<string, any>;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
@@ -59,8 +59,6 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   toggleHiddenSpace: () => void;
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
-  actionsFor: GalleryItem | null;
-  setActionsFor: (item: GalleryItem | null) => void;
   selection: GallerySelection;
 }) {
   const {
@@ -70,7 +68,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const gallery = (visibleGallery || []) as GalleryItem[];
   const { selecting, selectedItems, selectable } = selection;
   const handlers = useItemActionHandlers();
-  const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, Boolean(hiddenSpace), true) : [];
+  const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, true) : [];
   const reducedMotion = useReducedMotion();
   // The gallery scrolls the document, so iOS's tap on the status bar takes it to the top.
   const loadMore = React.useRef(onGalleryScroll);

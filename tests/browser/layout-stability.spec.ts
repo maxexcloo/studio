@@ -42,7 +42,7 @@ test('composer menus stay reachable and side controls are removed', async ({ pag
   await page.keyboard.press('Escape');
   await page.locator('[data-tile-id]').first().locator('.tile').click();
   const viewer = page.getByRole('dialog', { name: 'Image Viewer', exact: true });
-  await reachable(viewer.getByRole('button', { name: 'Toggle Details', exact: true }));
+  await reachable(viewer.getByRole('button', { name: 'Info', exact: true }));
 });
 
 test('search and selection preserve toolbar geometry while open surfaces remain reachable', async ({ page, isMobile }) => {
@@ -55,7 +55,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     const modeBefore = await toolbar.locator('.gallery-generation-mode').boundingBox();
     const management = page.getByRole('group', { name: 'Gallery Management' });
     await management.getByRole('button', { name: 'Select', exact: true }).click();
-    await management.getByRole('button', { name: 'Select All Loaded', exact: true }).click();
+    await management.getByRole('button', { name: 'Select All', exact: true }).click();
     await expect(management.getByRole('status')).toHaveText('12 Selected');
     const actionsBox = await toolbar.locator('.gallery-toolbar-actions').boundingBox();
     const modeBox = await toolbar.locator('.gallery-generation-mode').boundingBox();

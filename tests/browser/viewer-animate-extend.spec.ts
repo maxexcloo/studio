@@ -59,8 +59,8 @@ test('the video viewer extends a video from its last frame with its prompt', asy
   const { profile, references, generated } = await capture(page);
   const viewer = await openTile(page, clip.id, 'Videos');
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
-  await expect(viewer.getByRole('button', { name: 'Extend Video', exact: true })).toBeVisible();
-  await viewer.getByRole('button', { name: 'Extend Video', exact: true }).click();
+  await expect(viewer.getByRole('button', { name: 'Extend', exact: true })).toBeVisible();
+  await viewer.getByRole('button', { name: 'Extend', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Extend Video', exact: true });
   await expect(dialog).toBeVisible();
   const prompt = dialog.getByRole('textbox', { name: 'Extension Prompt 1' });
@@ -78,5 +78,5 @@ test('the viewer offers neither action without a first-frame video profile', asy
   const viewer = await openTile(page, image.id, 'Images');
   await expect(viewer.locator('.viewer-canvas img.generation-result')).toBeVisible();
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
-  await expect(viewer.getByRole('button', { name: 'Extend Video', exact: true })).toHaveCount(0);
+  await expect(viewer.getByRole('button', { name: 'Extend', exact: true })).toHaveCount(0);
 });

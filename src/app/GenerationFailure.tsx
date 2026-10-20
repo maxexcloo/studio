@@ -124,8 +124,8 @@ export function FailurePanel({ item, onCopy, onReuse, fixes, showToast, onNodesI
         </div>
       ) : null}
       <div className={cn('failure-actions', buttons.length > 0 && 'is-secondary')}>
-        {onReuse ? <button type="button" className={cn('btn', !buttons.length && 'is-primary', buttons.length > 0 && 'is-ghost')} onClick={onReuse}><RotateCcw size={14} /> Use Settings</button> : null}
-        <button type="button" className={cn('btn', buttons.length > 0 && 'is-ghost')} onClick={() => copyWith(copyReport)}><CopyIcon copied={Boolean(copied)} /> {copied ? 'Copied' : 'Copy report'}</button>
+        {onReuse ? <button type="button" className={cn('btn', !buttons.length && 'is-primary', buttons.length > 0 && 'is-ghost')} onClick={onReuse}><RotateCcw size={14} /> Recreate</button> : null}
+        <button type="button" className={cn('btn', buttons.length > 0 && 'is-ghost')} onClick={() => copyWith(copyReport)}><CopyIcon copied={Boolean(copied)} /> {copied ? 'Copied' : 'Copy Report'}</button>
         {/* Straight to the feedback board, filled in; the setup lines are added (and shown) in the dialog. */}
         <button type="button" className="btn is-ghost" onClick={() => openFeedback({ kind: 'bug', title: `Generation failed: ${failure.title}`, body: reportFor(item, failure).split('\n').slice(1).join('\n').trim(), withSetup: true, from: 'failure' })}><Bug size={14} /> Report bug</button>
         <a className="btn is-ghost" href={troubleshootingUrl(failure.help)} target="_blank" rel="noreferrer"><LifeBuoy size={14} /> Troubleshooting</a>

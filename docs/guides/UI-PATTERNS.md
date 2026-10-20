@@ -28,6 +28,15 @@ the pattern occurs in the same piece of work.
 - No decorative motion: no bouncing rows, no reorder animation, no odd
   open/close flourishes on pickers.
 
+## Media
+
+Media pauses when it is covered or closed. Closing the video viewer, stepping
+to another item or hiding the tab stops playback for good (pause, drop the
+source and `load()`), so nothing plays in the background. On a phone, a
+sheet, picker or Details over a playing video or the gallery pauses the
+viewer's video and the grid previews (`mediaCover.ts`); when the last cover
+goes, the viewer resumes only if it was playing, and previews resume as usual.
+
 ## Layering
 
 - Avoid modals unless they are clearly the best option. Modals are for
@@ -70,6 +79,26 @@ two levels:
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
 ad-hoc alpha, blur or shadow values.
 
+### Accent
+
+One accent, warm amber like the lock mark's glow: `--accent-amber`,
+`--accent-amber-hover`, `--accent-amber-subtle` (backgrounds and tints) and
+`--accent-amber-ink` (text on a solid accent). Every active, selected and
+highlight state uses it: active filters and search, selected tabs and chips,
+pressed toggles, Star and progress. Errors and destructive actions keep their
+own colours. `--ember` is an older name for the same colour.
+
+## Composer
+
+- The desktop composer stays bottom centre and expands upwards; its pickers
+  are anchored popovers.
+- **Advanced** expands inline below the composer's controls with a height
+  transition, remembered per account; Escape folds it. The phone shows the
+  same controls as a tall panel within the Create flow, with Back.
+- **Size** stays open while choosing: the resolution is a segmented toggle of
+  the model's native options (Default · 2K · 4K), beside the shapes, so both
+  can be picked in one go.
+
 ## Buttons & Icon Bars
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost
@@ -95,12 +124,55 @@ ad-hoc alpha, blur or shadow values.
 ## Action Placement
 
 - `src/app/itemActions.ts` is the one list of what an item offers on each
-  surface (tile, context menu, viewer, long-press sheet, selection bar) and in
-  which order. Surfaces render from it and never build their own lists.
-- Bulk actions come from `bulkItemActions`: Select All, Select Failed,
-  Download (a zip when several), Star, Retry for failed items and Delete.
-- The desktop downloads; phones share (iOS's share sheet has Save Image) and
-  keep Download only where the browser can't share files.
+  surface (viewer bar, tile, context menu, select bar) and in which order.
+  Surfaces render from it and never build their own lists.
+- **Order by intent,** with a divider between groups: keep it (Copy,
+  Download or Share) | make more (Animate or Extend, Recreate, Reuse,
+  Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete) | Info.
+- **One-word names** everywhere: Copy, Download, Share, Animate, Extend,
+  Recreate, Reuse, Reference, Retry, Upscale, Star, Delete, Info. Tooltips
+  may say more.
+- **Recreate** is an exact rerun: it loads the model, both prompts, size,
+  LoRAs, references, every setting and the same seed into the prompt box.
+  **Reuse** loads both prompts only; a prompt's own **Use** loads just that
+  prompt. After any of them the viewer closes and the prompt box opens.
+- **Viewer, desktop:** Copy · Download | Animate · Recreate · Reference ·
+  Upscale | Star · Delete | Info, then Close.
+- **Viewer, phone:** Star top left; Info top right beside Close; the bottom
+  bar Copy · Share | Animate · Recreate · Reference · Upscale | Delete.
+  Download replaces Share only where the browser can't share files. Info
+  toggles Details: the bar is a trigger surface, so a tap on Info while
+  Details is open closes it.
+- **Zoom:** a small `− 100% +` pill, bottom middle above the bar, faded until
+  used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
+- **Details:** Prompt and Negative each with Copy and Use beside their label,
+  Settings unboxed below, and a footer of Reuse · Recreate. Phones add Copy
+  (the prompt) and Settings (the settings as text) at the top.
+- **Selecting:** a long press on a phone tile starts selecting with that item
+  (there is no long-press action sheet). The select bar offers Select All,
+  Select Failed, then Download (a zip when several) or Share on a phone,
+  Retry for failed items, Star and Delete.
+- **Copying on phones:** call the clipboard synchronously inside the tap
+  (iOS Safari requires it), fall back to a selected text box where there is
+  no clipboard API, and confirm with the button's own "Copied" and a toast.
+- The desktop downloads; phones share (iOS's share sheet has Save Image).
+- No haptics.
+
+### Icons
+
+One icon per action everywhere (Lucide, 16 px on the desktop, 19–20 px on
+phones, default stroke):
+
+| Action | Icon | Action | Icon |
+| --- | --- | --- | --- |
+| Animate | `Clapperboard` | Info | `Info` |
+| Copy | `Copy` | Recreate | `RotateCcw` |
+| Delete | `Trash2` | Reference | `ImagePlus` |
+| Download | `Download` | Retry | `RotateCw` |
+| Extend | `FastForward` | Reuse | `TextQuote` |
+| Image / Video | `Image` / `Film` | Share | `Share` |
+| Use | `Undo2` | Star | `Star` (filled when on) |
+| Upscale | `UpscaleArrow` | Zoom | `Minus` / `Plus` |
 
 ## Phone
 
