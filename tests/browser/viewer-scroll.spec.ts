@@ -18,15 +18,19 @@ test('closing the viewer leaves the gallery exactly where it was, deep in the ga
   await expect(page.locator('[data-tile-id="deep-0"]')).toBeVisible();
   const scroller = ui.scroller;
   const scrollTop = () => scroller.evaluate((element) => element === document.documentElement ? document.scrollingElement!.scrollTop : element.scrollTop);
-  await scroller.evaluate((element) => { (element === document.documentElement ? document.scrollingElement! : element).scrollTo({ top: 3000, behavior: 'instant' }); });
-  await expect.poll(scrollTop).toBeGreaterThan(2500);
-  // The tile nearest the top edge, partly scrolled away: opening it must not bring it into view behind the viewer.
-  const tile = await page.evaluate(() => {
+  // Deep in the gallery, at a place where a tile straddles the top edge, partly scrolled away.
+  const findPartial = () => page.evaluate(() => {
     const tiles = Array.from(document.querySelectorAll<HTMLElement>('[data-tile-id]'));
-    const partial = tiles.find((node) => { const box = node.getBoundingClientRect(); return box.top < 40 && box.bottom > 120; });
+    const partial = tiles.find((node) => { const box = node.getBoundingClientRect(); return box.top < 40 && box.top > -200 && box.bottom > 160; });
     const box = partial?.getBoundingClientRect();
     return { id: partial?.dataset.tileId || '', x: box ? box.left + box.width / 2 : 0, y: box ? box.bottom - 40 : 0 };
   });
+  let tile = { id: '', x: 0, y: 0 };
+  for (let top = 3000; top < 4200 && !tile.id; top += 53) {
+    await scroller.evaluate((element, top) => { (element === document.documentElement ? document.scrollingElement! : element).scrollTo({ top, behavior: 'instant' }); }, top);
+    await expect.poll(scrollTop).toBe(top);
+    tile = await findPartial();
+  }
   expect(tile.id).not.toBe('');
   {
     const before = await scrollTop();
