@@ -95,7 +95,6 @@ export function videoPreviewUrl(source: string) {
     if (url.origin !== window.location.origin) return '';
     if (url.pathname === '/comfy/view') url.pathname = '/comfy/video-preview';
     else if (url.pathname === '/api/library/file') url.pathname = '/api/library/video-preview';
-    else if (url.pathname.startsWith('/api/vault/media/')) url.pathname = url.pathname.replace('/media/', '/video-preview/');
     else if (/^\/api\/presets\/\d+\/media$/.test(url.pathname)) url.pathname = url.pathname.replace(/\/media$/, '/video-preview');
     else return '';
     url.searchParams.delete('download'); url.searchParams.delete('clean');

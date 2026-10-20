@@ -224,8 +224,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 }
 .phone-gallery .empty.stage-empty { min-height: calc(100dvh - 200px); }
 /* The phone bar carries the way back; the lock screen's own button would sit under it. */
-.phone-shell .hidden-lockscreen-back { display: none; }
-
+.phone-shell 
 /* Tiles: no corner buttons and no caption; a long press opens the actions. */
 .phone-shell .tile-caption { display: none; }
 .tile.is-pressable,
@@ -1024,7 +1023,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* ------------------------------------------- Shared dialogs, phone-shaped */
 
 /* Dialogs render outside the phone shell, so they key off the page holding it:
-   confirmations, the Hidden unlock and the rest come up as bottom sheets. */
+   confirmations, the sign-in and the rest come up as bottom sheets. */
 body:has(.phone-shell) .modal-scrim:has(.modal:not(.modal-sheet, .modal-wide)) {
   place-items: end stretch;
   padding: 0;
@@ -1044,10 +1043,9 @@ body:has(.phone-shell) .modal-foot { gap: 8px; }
 body:has(.phone-shell) .modal-foot .btn { flex: 1; min-height: 52px; font-size: 16px; }
 body:has(.phone-shell) .modal.has-hero .modal-hero { max-height: 180px; }
 
-/* The Hidden password field, sized for a thumb. */
-body:has(.phone-shell) .hidden-unlock-field { min-height: 56px; }
-body:has(.phone-shell) .hidden-unlock-field button,
-body:has(.phone-shell) .hidden-unlock-primary { min-height: 48px; font-size: 16px; }
+/* The device password field, sized for a thumb. */
+body:has(.phone-shell) .unlock-field { min-height: 56px; }
+body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px; }
 
 /* A failed generation in the viewer: readable and with big buttons. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .failure-panel { width: calc(100% - 16px); max-height: calc(100% - 24px); overflow-y: auto; }
