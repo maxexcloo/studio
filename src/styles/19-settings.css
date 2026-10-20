@@ -66,6 +66,9 @@
 @keyframes set-page-in { from { opacity: 0; transform: translateY(4px); } }
 .set-page-head h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
 .set-page-head p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: hsl(var(--muted-foreground)); }
+/* Studio gathers several areas on one page: a quiet subheading starts each (General, Generation, Features, Gallery). */
+.set-subhead { margin: 18px 2px -4px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.set-subhead:first-of-type { margin-top: 4px; }
 
 .set-group { display: grid; gap: 8px; }
 .set-group-title {

@@ -305,7 +305,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const viewerRef = React.useRef<HTMLDivElement | null>(null);
   useFocusTrap(viewerRef, Boolean(active));
   useHistoryDismiss(Boolean(workflowGalleryOpen), () => setWorkflowGalleryOpen(false));
-  const [settingsSection, setSettingsSection] = React.useState<SettingsSection>("general");
+  const [settingsSection, setSettingsSection] = React.useState<SettingsSection>("studio");
   const openSettings = React.useCallback((section?: SettingsSection) => {
     if (section) setSettingsSection(section);
     setSettings(true);
@@ -511,7 +511,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               device={comfyStatus?.device}
               retrying={Boolean(comfyRetrying)}
               onRetry={retryComfyStatus}
-              onOpenConnection={() => openSettings("connection")}
+              onOpenConnection={() => openSettings("workers")}
               comfyUrl={comfyStatus?.url || health?.comfyUrl}
               nearby={comfyStatus?.nearby}
               onNoComfy={() => setNoComfyOpen(true)}
@@ -735,7 +735,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </>
       )}
       {settings ? <React.Suspense fallback={<Modal open title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
-      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("connection") : undefined} />
+      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("workers") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
       {familySetup.family ? (
         <FamilySetupDialog
@@ -763,7 +763,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         quality={upscaleSetup.quality}
         comfyUrl={health?.comfyUrl}
         onQualityChange={(upscaleQuality) => setPrefs({ upscaleQuality })}
-        onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("library"); }}
+        onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("models"); }}
         showToast={showToast}
       />
       <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />

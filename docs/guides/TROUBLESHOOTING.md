@@ -2,7 +2,7 @@
 
 Common problems and how to get past them. A failed generation's card links to its section below.
 
-Still stuck? **Settings › About › Copy diagnostics** copies the Studio, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/maxexcloo/studio/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself. Or skip the pasting: **Report bug** on a failed card, **Idea or bug?** at the bottom of the Settings sidebar send it to the [feedback board](https://heiss-ui.vercel.app/board/), with the setup lines if you want them. For a quick hand, ask in the [Discord](https://discord.gg/Hf7ysvDeGa).
+Still stuck? **Settings › Maintenance › Copy Diagnostics** copies the Studio, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/maxexcloo/studio/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself. Or skip the pasting: **Report bug** on a failed card, **Idea or bug?** at the bottom of the Settings sidebar send it to the [feedback board](https://heiss-ui.vercel.app/board/), with the setup lines if you want them. For a quick hand, ask in the [Discord](https://discord.gg/Hf7ysvDeGa).
 
 - [Starting Studio](#starting-studio)
 - [When a generation fails](#when-a-generation-fails)
@@ -17,7 +17,7 @@ Still stuck? **Settings › About › Copy diagnostics** copies the Studio, Node
 
 ComfyUI makes every image, so it has to be running. Start it and the studio connects.
 
-ComfyUI Desktop usually uses port 8000, a manual or portable install 8188. Both are checked on this computer. For another address, set it in **Settings › Connection** (a port such as `8000` is enough) or set `COMFY_URL` in `.env`. ComfyUI on another computer needs to be started with `--listen`.
+ComfyUI Desktop usually uses port 8000, a manual or portable install 8188. Both are checked on this computer. For another address, set it in **Settings › Workers** (a port such as `8000` is enough) or set `COMFY_URL` in `.env`. ComfyUI on another computer needs to be started with `--listen`.
 
 ### Which address to open
 
@@ -51,7 +51,7 @@ The file can't be read. A download may have stopped early, or saved a web page i
 
 ### The GPU ran out of memory
 
-The model, the image size and the number of images didn't fit in the GPU's memory. Try a smaller size, fewer images per run, or a lighter model (an fp8 or smaller variant). **Settings › General › Clear cache** frees what ComfyUI still holds from earlier runs. On a Mac, closing other large apps helps too.
+The model, the image size and the number of images didn't fit in the GPU's memory. Try a smaller size, fewer images per run, or a lighter model (an fp8 or smaller variant). **Settings › Maintenance › Clear Cache** frees what ComfyUI still holds from earlier runs. On a Mac, closing other large apps helps too.
 
 <a name="comfyui-does-not-have-a-file-this-run-asked-for"></a>
 
@@ -101,7 +101,7 @@ Anything else. **Show details** on the card has ComfyUI's own message and traceb
 
 ### The inpainting brush is missing
 
-The brush sits in a reference or start image's menu. When it isn't there, **Inpainting** is turned off in **Settings › Features**, or the current model can't inpaint. Ideogram 4, MageFlow, Sana, video models and imported workflows can't. The model menu marks which models can, and **Settings › Features › Inpainting** lists yours.
+The brush sits in a reference or start image's menu. When it isn't there, **Inpainting** is turned off in **Settings › Studio**, or the current model can't inpaint. Ideogram 4, MageFlow, Sana, video models and imported workflows can't. The model menu marks which models can, and **Settings › Studio › Inpainting** lists yours.
 
 ### 2K was skipped, or a 2K picture repeats or warps
 
@@ -113,7 +113,7 @@ The upscale arrow needs the ComfyUI-SeedVR2 nodes and a SeedVR2 model. If they'r
 
 ### Auto-grouping doesn't stack anything
 
-Auto-grouping is off by default. Turn it on with the stack button next to the gallery search, or in **Settings › Library › Auto-grouping**. A stack needs at least 3 pictures from similar prompts, and it forms about 5 minutes after you stop working on that prompt. While you're still generating, the pictures stay ordinary tiles. Coming back to a prompt after 6 hours or more starts a new stack.
+Auto-grouping is off by default. Turn it on with the stack button next to the gallery search, or in **Settings › Studio › Auto-Grouping**. A stack needs at least 3 pictures from similar prompts, and it forms about 5 minutes after you stop working on that prompt. While you're still generating, the pictures stay ordinary tiles. Coming back to a prompt after 6 hours or more starts a new stack.
 
 ## Downloads and node packs
 
@@ -150,7 +150,7 @@ The first time a new version starts, it saves a copy of the settings, the galler
 
 ### A phone can't open the studio
 
-1. Turn on **Settings › Connection › Other devices** and restart Studio.
+1. Turn on **Settings › Workers › Other devices** and restart Studio.
 2. Use one of the addresses Settings shows. The phone must be on the same network.
 3. Set a studio password on this computer first. Other devices sign in with it.
 4. If the page still doesn't load, the computer's firewall may block the port. Allow Node.js (or port 8787) on private networks.

@@ -10,7 +10,7 @@ import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
 /* ---------------------------------------------------------------------------
-   Settings › Library additions: earlier images, Civitai-ready files (beta),
+   Settings additions: earlier images, Civitai-ready files (beta),
    and forgetting recent prompts. The row pieces come from SettingsDialog, as
    every section takes them, so every row reads the same.
 --------------------------------------------------------------------------- */
@@ -77,7 +77,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
             <RefreshCw size={14} className={busy === folder.id ? 'spin' : undefined} /> Rescan
           </button>
           <button className="btn is-ghost" disabled={Boolean(busy)} onClick={async () => {
-            if (!await confirmAction({ title: `Stop showing ${folder.name}?`, description: 'Its images are removed from the gallery. The files stay where they are.', action: 'Remove folder' })) return;
+            if (!await confirmAction({ title: `Stop Showing ${folder.name}?`, description: 'Its images are removed from the gallery. The files stay where they are.', action: 'Remove folder' })) return;
             try {
               const result = await apiJson<ImportResult>(`/api/library/folders/${encodeURIComponent(folder.id)}`, { method: 'DELETE' });
               if (result.folders) setFolders(result.folders);
@@ -104,7 +104,7 @@ export function EarlierImagesGroup({ Group, Row, showToast, confirmAction, outpu
   );
 }
 
-/** Civitai-ready PNGs: off unless switched on. A row of Library › Sharing. */
+/** Civitai-ready PNGs: off unless switched on. A row of Models › Civitai. */
 export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'Group'> & { canChange: boolean }) {
   const [enabled, setEnabled] = React.useState<boolean | null>(null);
   React.useEffect(() => {
@@ -125,11 +125,11 @@ export function CivitaiRow({ Row, Switch, showToast, canChange }: Omit<Parts, 'G
   };
   return (
     <Row
-      label={<>Civitai-ready images<BetaTag /></>}
+      label={<>Civitai-Ready Images<BetaTag /></>}
       description="Saves the prompt, LoRAs, steps, sampler, seed and model in each new PNG the way AUTOMATIC1111 does, so Civitai fills them in on upload. ComfyUI’s workflow stays in the file."
       disabled={enabled === null || !canChange}
     >
-      <Switch label="Civitai-ready Images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
+      <Switch label="Civitai-Ready Images" checked={Boolean(enabled)} onChange={change} disabled={enabled === null || !canChange} />
     </Row>
   );
 }
@@ -141,7 +141,7 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
   const recent = prompts.length - starred;
   const fail = (error: unknown) => showToast(error instanceof Error ? error.message : 'Couldn’t change recent prompts', 'error');
   const toggle = async (next: boolean) => {
-    if (!next && recent && !await confirmAction({ title: 'Turn off recent prompts?', description: `${plural(recent, 'recent prompt')} ${recent === 1 ? 'is' : 'are'} forgotten.${starred ? ' Starred prompts stay.' : ''}`, action: 'Turn off' })) return;
+    if (!next && recent && !await confirmAction({ title: 'Turn Off Recent Prompts?', description: `${plural(recent, 'recent prompt')} ${recent === 1 ? 'is' : 'are'} forgotten.${starred ? ' Starred prompts stay.' : ''}`, action: 'Turn off' })) return;
     setPromptHistoryEnabled(next).catch(fail);
   };
   return (
@@ -155,7 +155,7 @@ export function PromptHistoryRow({ Row, Switch, showToast, confirmAction }: Pick
       {enabled && recent ? (
         <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
           <button className="btn" onClick={async () => {
-            if (!await confirmAction({ title: 'Forget recent prompts?', description: starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.', action: 'Forget' })) return;
+            if (!await confirmAction({ title: 'Forget Recent Prompts?', description: starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.', action: 'Forget' })) return;
             clearPrompts().catch(fail);
           }}>Forget</button>
         </Row>

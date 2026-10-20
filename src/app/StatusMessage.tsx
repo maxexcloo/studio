@@ -45,7 +45,8 @@ export function StatusAnnouncer() {
   return (
     <>
       <div className="sr-only" role="status" aria-live="polite">{front && front.tone !== 'error' ? text : ''}</div>
-      <div className="sr-only" role="alert" aria-live="assertive">{front?.tone === 'error' ? text : ''}</div>
+      {/* An alert is announced as it appears, so it exists only while there is one. */}
+      {front?.tone === 'error' ? <div className="sr-only" role="alert" aria-live="assertive">{text}</div> : null}
     </>
   );
 }

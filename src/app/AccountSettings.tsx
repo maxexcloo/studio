@@ -26,7 +26,12 @@ const NONE = '__none__';
 const choose = (label: string, value: string) => value ? [] : [{ label, value: NONE }];
 
 /** profileLabels names generation profiles from /api/models; an unknown ID shows as itself. */
-export function AccountSettings({ showToast, copyToClipboard, confirmAction, isAdmin, profileLabels }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction; isAdmin: boolean; profileLabels?: Record<string, string> }) {
+/**
+ * Settings › Account (your MCP connection and session) or, for administrators,
+ * Settings › Users (access profiles, accounts, chat gateway users, passwords).
+ */
+export function AccountSettings({ part = 'account', showToast, copyToClipboard, confirmAction, isAdmin, profileLabels }: { part?: 'account' | 'users'; showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction; isAdmin: boolean; profileLabels?: Record<string, string> }) {
+  const users = part === 'users' && isAdmin;
   const [admin, setAdmin] = React.useState<AdminData | null>(null);
   const [token, setToken] = React.useState<TokenStatus | null>(null);
   const [loadError, setLoadError] = React.useState('');
@@ -48,8 +53,8 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
   const refresh = React.useCallback(async () => {
     setBusy(true);
     try {
-      setToken(await apiJson<TokenStatus>('/api/accounts/mcp-token'));
-      if (isAdmin) {
+      if (!users) setToken(await apiJson<TokenStatus>('/api/accounts/mcp-token'));
+      if (users) {
         const adminResult = await apiJson<AdminData>('/api/accounts/admin');
         setAdmin(adminResult);
         setAssignedProfile((current) => current || adminResult.accessProfiles[0]?.id || '');
@@ -58,7 +63,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
     } catch (error) {
       setLoadError(message(error, 'Could not load account settings.'));
     } finally { setBusy(false); }
-  }, [isAdmin]);
+  }, [users]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
 
@@ -164,7 +169,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
 
   return <>
     {loadError ? <Group><Row label="Account Settings Unavailable" description={loadError}><button className="btn is-ghost" disabled={busy} onClick={() => void refresh()}><RefreshCw size={14} /> Retry</button></Row></Group> : null}
-    <Group title="Personal MCP Connection" note="The bearer token belongs to your account and uses its current access profile. It only works for MCP, never for account or studio administration.">
+    {users ? null : <Group title="Personal MCP Connection" note="The bearer token belongs to your account and uses its current access profile. It only works for MCP, never for account or studio administration.">
       <Row label="Endpoint" description={token?.endpoint || (loadError ? 'Unavailable until account settings load.' : 'Loading the configured endpoint…')}>
         {token?.endpoint ? <button className="btn is-ghost" onClick={() => void copy(token.endpoint, 'URL')}><Copy size={14} /> Copy URL</button> : null}
       </Row>
@@ -176,9 +181,9 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
         <input className="modal-input set-path-input" aria-label="New MCP Token" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} />
         <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
       </Row> : null}
-    </Group>
+    </Group>}
 
-    {isAdmin ? <Group title="Access Profiles" note="Ordinary accounts receive one profile. Administrators always retain full access. New generation profiles stay administrator-only until granted here.">
+    {users ? <Group title="Access Profiles" note="Ordinary accounts receive one profile. Administrators always retain full access. New generation profiles stay administrator-only until granted here.">
       {admin?.accessProfiles.map((profile) => <Row key={profile.id} label={profile.name} description={`${profile.generationProfiles.length} generation profile${profile.generationProfiles.length === 1 ? '' : 's'} · ${profile.id}`}>
         <button className="btn is-ghost" disabled={busy} aria-label={`Edit ${profile.name}`} onClick={() => editProfile(profile)}><Pencil size={14} /> Edit</button>
       </Row>)}
@@ -196,21 +201,21 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       </Row>
     </Group> : null}
 
-    {isAdmin ? <Group title="Accounts">
+    {users ? <Group title="Accounts">
       {admin?.accounts.map((account) => <Row key={account.id} label={account.displayName} description={`${account.username} · ${account.role === 'administrator' ? 'Administrator' : 'User'}${account.pending ? ' · Pending Approval: assign a profile to approve' : ''}${account.signInLinked ? ' · Single Sign-On' : ''}${account.disabled ? ' · Disabled' : ''}`}>
         {account.role === 'user' ? <>
-          <div className="set-type-picker"><StudioSelect ariaLabel={`Access profile for ${account.username}`} value={account.accessProfileId || NONE} options={[...choose('Choose a Profile', account.accessProfileId || ''), ...profileOptions]} onChange={(value) => { if (!busy && value !== NONE && value !== account.accessProfileId) void patchAccount(account, { accessProfileId: value }); }} /></div>
+          <div className="set-type-picker"><StudioSelect ariaLabel={`Access Profile for ${account.username}`} value={account.accessProfileId || NONE} options={[...choose('Choose a Profile', account.accessProfileId || ''), ...profileOptions]} onChange={(value) => { if (!busy && value !== NONE && value !== account.accessProfileId) void patchAccount(account, { accessProfileId: value }); }} /></div>
           <button className="btn is-ghost" disabled={busy} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
         </> : null}
       </Row>)}
       <Row label="Email" description={username.trim() && !looksLikeEmail(username) ? 'Enter an email address. It is the account’s sign-in name.' : undefined}><input className="modal-input account-field" aria-label="Email" autoComplete="off" {...emailFieldProps} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="artist@example.com" /></Row>
       <Row label="Display Name"><input className="modal-input account-field" aria-label="Display Name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
       <Row label="Temporary Password" description="Share it directly with the account holder."><input className="modal-input account-field" aria-label="Temporary Password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
-      <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access profile for the new account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
+      <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access Profile for the New Account" value={assignedProfile || NONE} options={[...choose('Choose a Profile', assignedProfile), ...profileOptions]} onChange={(value) => setAssignedProfile(value === NONE ? '' : value)} /></div></Row>
       <Row label="Create Account"><button className="btn is-primary" disabled={busy || !looksLikeEmail(username) || !password || !assignedProfile} onClick={() => void createAccount()}><UserPlus size={14} /> Create User</button></Row>
     </Group> : null}
 
-    {isAdmin ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, either here or automatically when the gateway forwards an enabled account's email.">
+    {users ? <Group title="Chat Gateway Users" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, either here or automatically when the gateway forwards an enabled account's email.">
       {(admin?.gateway?.links || []).map((link) => {
         const account = admin?.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
@@ -225,14 +230,14 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction, isA
       {!admin?.gateway?.links.length && !admin?.gateway?.pending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
     </Group> : null}
 
-    {isAdmin ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
-      <Row label="Account"><div className="set-type-picker"><StudioSelect ariaLabel="Account to reset" value={resetAccount || NONE} options={[...choose('Choose an Account', resetAccount), ...accountOptions(localAccounts)]} onChange={(value) => setResetAccount(value === NONE ? '' : value)} /></div></Row>
+    {users ? <Group title="Reset Password" note="Resetting a password signs that account out of every browser. Its MCP token and outputs are kept.">
+      <Row label="Account"><div className="set-type-picker"><StudioSelect ariaLabel="Account to Reset" value={resetAccount || NONE} options={[...choose('Choose an Account', resetAccount), ...accountOptions(localAccounts)]} onChange={(value) => setResetAccount(value === NONE ? '' : value)} /></div></Row>
       <Row label="New Password"><input className="modal-input account-field" aria-label="New Password" type="password" autoComplete="new-password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} /></Row>
       <Row label="Reset Password"><button className="btn is-ghost" disabled={busy || !resetAccount || !resetPassword} onClick={() => void submitPasswordReset()}><KeyRound size={14} /> Reset Password</button></Row>
     </Group> : null}
 
-    <Group title="Account Session" note="Sign out of this browser before handing it to someone else.">
+    {users ? null : <Group title="Account Session" note="Sign out of this browser before handing it to someone else.">
       <Row label="This Browser"><button className="btn is-ghost" disabled={busy} onClick={() => void signOut()}><LogOut size={14} /> Sign Out</button></Row>
-    </Group>
+    </Group>}
   </>;
 }

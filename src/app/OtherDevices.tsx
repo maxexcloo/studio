@@ -77,7 +77,7 @@ function HttpsRows({ tls, showToast, onSaved, Row, Status }: { tls: NonNullable<
           </form>
         ) : atComputer && !tls.fromShell ? (
           <>
-            {next.configured ? <button className="btn is-ghost" disabled={busy} onClick={() => save(true)}>Turn off</button> : null}
+            {next.configured ? <button className="btn is-ghost" disabled={busy} onClick={() => save(true)}>Turn Off</button> : null}
             <button className="btn" onClick={() => setEditing(true)}>{next.configured ? 'Change' : 'Add certificate'}</button>
           </>
         ) : null}
@@ -176,12 +176,12 @@ function AddressRow({ url, detail, open, onToggle, copyToClipboard, Row }: { url
   return (
     <>
       <Row label={<span className="set-model-name">{url}</span>} description={detail}>
-        <button className={cn('btn is-ghost', open && 'is-active')} aria-expanded={open} aria-label={open ? `Hide QR code for ${url}` : `Show QR code for ${url}`} onClick={onToggle}><QrIcon size={14} /></button>
+        <button className={cn('btn is-ghost', open && 'is-active')} aria-expanded={open} aria-label={open ? `Hide QR Code for ${url}` : `Show QR Code for ${url}`} onClick={onToggle}><QrIcon size={14} /></button>
         <button className="btn" onClick={() => copy.copyWith(() => copyToClipboard(url), url)}><CopyIcon copied={copy.copied === url} /> {copy.copied === url ? 'Copied' : 'Copy'}</button>
       </Row>
       {open ? (
         <div className="set-qr">
-          <QrCode value={url} label={`QR code for ${url}`} />
+          <QrCode value={url} label={`QR Code for ${url}`} />
           <p>Scan with your phone’s camera, then sign in with the studio password.</p>
         </div>
       ) : null}
@@ -243,7 +243,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
 
   const setAdmin = async (enabled: boolean) => {
     if (enabled && !await confirmAction({
-      title: 'Trust other devices with admin?',
+      title: 'Trust Other Devices with Admin?',
       description: 'Signed-in devices can then install nodes and models, change the output folder and clear the gallery.',
       action: 'Allow admin'
     })) return;
@@ -257,7 +257,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
 
   const signOutAll = async () => {
     if (!await confirmAction({
-      title: 'Sign out all devices?',
+      title: 'Sign Out All Devices?',
       description: 'They need the studio password to sign in again. This computer isn’t affected.',
       action: 'Sign out all',
       destructive: true
@@ -327,7 +327,7 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
         </Row>
         {!atComputer ? (
           <Row label="Sign Out This Device" description="The studio password is needed again next time.">
-            <button className="btn" onClick={() => apiJson('/api/access/sign-out', { method: 'POST' }).catch(() => null).then(() => window.location.reload())}><LogOut size={14} /> Sign out</button>
+            <button className="btn" onClick={() => apiJson('/api/access/sign-out', { method: 'POST' }).catch(() => null).then(() => window.location.reload())}><LogOut size={14} /> Sign Out</button>
           </Row>
         ) : null}
       </Group>
@@ -335,12 +335,12 @@ export function OtherDevicesGroup({ canChange, confirmAction, copyToClipboard, s
       {canChange && (devices.length || (atComputer && on)) ? (
         <Group title="Signed-in Devices" note={devices.length ? 'Devices stay signed in for a week.' : undefined}>
           {devices.map((device) => (
-            <Row key={device.id} label={device.current ? `${device.label} · this device` : device.label} description={`Signed in ${ago(device.createdAt)} · last seen ${ago(device.lastSeenAt)}`} />
+            <Row key={device.id} label={device.current ? `${device.label} · This Device` : device.label} description={`Signed in ${ago(device.createdAt)} · last seen ${ago(device.lastSeenAt)}`} />
           ))}
           {!devices.length ? <Row label="No Devices Signed In" description="Devices appear here after they sign in." /> : null}
           {atComputer && devices.length ? (
             <Row label="Sign Out All Devices" description="They need the studio password to sign in again.">
-              <button className="btn is-danger-soft" onClick={signOutAll}><LogOut size={14} /> Sign out all</button>
+              <button className="btn is-danger-soft" onClick={signOutAll}><LogOut size={14} /> Sign Out All</button>
             </Row>
           ) : null}
         </Group>

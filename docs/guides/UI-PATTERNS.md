@@ -145,6 +145,25 @@ through one announcer (polite, failures assertive).
   the model's native options (Default · 2K · 4K), beside the shapes, so both
   can be picked in one go.
 
+## Settings
+
+One side panel with a list of sections on the left (a sideways row on the
+phone) and one page at a time, each with its title and one line on what it
+holds:
+
+| Section | Holds | Who |
+| --- | --- | --- |
+| Account | Your MCP connection and this browser's session | Every account |
+| Users | Access profiles, accounts, chat gateway users, password resets | Administrators |
+| Studio | General (layout, keyboard, safety), Generation, Features (Smart Upscale, Inpainting) and the gallery's display, grouping and sharing, each under a quiet subheading | Everyone |
+| Models | Defaults, model types, installed models, the manifest, LoRA library, integrations (Civitai, Hugging Face) and output folders | Administrators |
+| Workers | ComfyUI connections, restart and other devices | Administrators |
+| Maintenance | Clean up, export, reset and diagnostics | Everyone (each item as the device allows) |
+| About | Version, stats, links and credits | Everyone |
+
+A new setting goes in the section that matches who changes it and why;
+destructive actions live in Maintenance, never beside everyday switches.
+
 ## Buttons & Icon Bars
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost

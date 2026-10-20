@@ -40,7 +40,7 @@ export function TrashRow({ confirmAction, showToast, Row }: {
     }
   };
   const emptyNow = async () => {
-    if (!await confirmAction({ title: 'Empty the trash?', description: `${trash.files} file${trash.files === 1 ? ' is' : 's are'} deleted permanently. This can’t be undone.`, action: 'Empty trash', destructive: true, irreversible: true })) return;
+    if (!await confirmAction({ title: 'Empty the Trash?', description: `${trash.files} file${trash.files === 1 ? ' is' : 's are'} deleted permanently. This can’t be undone.`, action: 'Empty Trash', destructive: true, irreversible: true })) return;
     setBusy(true);
     try {
       const data = await apiJson<{ trash: TrashSummary }>('/api/gallery/trash/empty', { method: 'POST' });

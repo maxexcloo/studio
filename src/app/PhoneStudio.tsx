@@ -667,12 +667,12 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
         <button type="button" className="phone-row" onClick={() => { onClose(); setPrefs({ fullStudioOnPhone: true }); }}>
           <SlidersHorizontal size={20} /><span>Use the Full Studio<small>All controls, laid out for a larger screen</small></span>
         </button>
-        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('general'); }}><Settings size={20} /><span>All Settings</span></button>
+        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('studio'); }}><Settings size={20} /><span>All Settings</span></button>
       </div>
       {hasAccountStorageScope() ? <>
         <h3 className="phone-section">Account</h3>
         <div className="phone-group">
-          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('accounts'); }}><UserRound size={20} /><span>Accounts & MCP<small>Your MCP token and session</small></span></button>
+          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('account'); }}><UserRound size={20} /><span>Account<small>Your MCP token and session</small></span></button>
           <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
         </div>
       </> : null}

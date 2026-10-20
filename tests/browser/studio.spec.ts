@@ -395,7 +395,7 @@ test('secondary panels load only when opened and connections identify each gener
   await ui.openSettings();
   await expect(page.locator('.set-nav')).toBeVisible();
   expect(loaded.some((url) => /\/SettingsDialog-/.test(url))).toBe(true);
-  await page.getByRole('button', { name: 'Connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Workers', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Generation Connections' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Video' }).filter({ hasText: 'Offline' })).toBeVisible();
@@ -654,7 +654,7 @@ test('gallery selection stars several items and ends cleanly', async ({ page }, 
   await tile(0).click();
   await tile(1).click();
   await page.screenshot({ path: testInfo.outputPath('selection.png') });
-  await ui.selectionBar.getByRole('button', { name: 'Star', exact: true }).click();
+  await ui.selectionBar.getByRole('button', { name: /^Star Selected/ }).click();
   await expect.poll(() => favourites.length).toBe(1);
   expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1']));
   await page.getByRole('button', { name: 'Stop Selecting' }).click();
@@ -681,21 +681,21 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   const menu = page.getByRole('menu', { name: '4 Selected Items' });
   await expect(menu).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('desktop-selection-menu.png') });
-  await menu.getByRole('menuitem', { name: 'Star', exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'Star Selected', exact: true }).click();
   await expect.poll(() => favourites.length).toBe(1);
   expect(favourites[0].ids).toEqual(expect.arrayContaining(['image-0', 'image-1', 'image-2', 'image-3']));
   await bar.getByRole('button', { name: 'Select All' }).click();
   await expect(bar.getByRole('status')).toHaveText('80 Selected');
   await bar.getByRole('button', { name: 'Select None' }).click();
-  await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: /^Delete Selected/ })).toBeDisabled();
   await tile(0).click();
   await tile(1).click();
-  await bar.getByRole('button', { name: 'Delete', exact: true }).click();
+  await bar.getByRole('button', { name: /^Delete Selected/ }).click();
   const confirmation = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Delete 2 Items?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(bar.getByRole('status')).toHaveText('2 Selected');
-  await bar.getByRole('button', { name: 'Delete', exact: true }).click();
+  await bar.getByRole('button', { name: /^Delete Selected/ }).click();
   await confirmation.getByRole('button', { name: 'Delete 2', exact: true }).click();
   await expect(tile(0)).toHaveCount(0);
   await expect(tile(1)).toHaveCount(0);
@@ -732,9 +732,9 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
   await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await page.locator('[data-tile-id="image-0"] .tile').click();
-  await expect(bar.getByRole('button', { name: 'Star', exact: true })).toBeDisabled();
-  await expect(bar.getByRole('button', { name: 'Download', exact: true })).toBeDisabled();
-  await expect(bar.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
+  await expect(bar.getByRole('button', { name: /^Star Selected/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: /^Download Selected/ })).toBeDisabled();
+  await expect(bar.getByRole('button', { name: /^Delete Selected/ })).toBeEnabled();
   await page.locator('[data-tile-id="image-2"] .tile').click();
   await expect(page.locator('.tile.is-selected')).toHaveCount(1);
   if (!await ui.isPhone()) {
