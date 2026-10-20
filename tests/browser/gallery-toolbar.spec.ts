@@ -398,7 +398,7 @@ test('the search’s clear X is a round plain icon button', async ({ page, isMob
   const box = await close.boundingBox();
   expect(Math.abs(box!.width - box!.height)).toBeLessThan(1);
   await page.mouse.move(0, 500);
-  expect(await close.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await expect.poll(() => close.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
 
 test('search keeps a neutral shell without a selected input highlight', async ({ page }, testInfo) => {
@@ -491,7 +491,7 @@ test('selection dims only unselected media and keeps the right-hand action order
   await expect(count).toHaveText('1 Selected');
   await count.focus();
   await page.mouse.move(0, 500);
-  expect(await count.evaluate(n => { const s = getComputedStyle(n); return [s.backgroundColor, s.boxShadow]; })).toEqual(['rgba(0, 0, 0, 0)', 'none']);
+  await expect.poll(() => count.evaluate(n => { const s = getComputedStyle(n); return [s.backgroundColor, s.boxShadow]; })).toEqual(['rgba(0, 0, 0, 0)', 'none']);
   await toolbar.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
   await expect.poll(() => opacity(tiles.nth(1))).toBe(1);
 });
