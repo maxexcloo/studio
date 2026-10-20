@@ -211,6 +211,13 @@ function applyRgthreeLoraStack(graph, body, config) {
   }
 }
 
+// Radiance takes the stack as one JSON string and adds the LoRA tags itself, so the prompt text stays as written.
+function applyRadianceLoraStack(graph, body, config) {
+  const node = graph[config.node];
+  if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
+  (node.inputs ||= {}).loras = JSON.stringify(enabledLoras(body, config.max).map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) })));
+}
+
 /**
  * Points every save node (SaveImage, SaveVideo, VHS_VideoCombine and anything
  * else with a filename_prefix) at the heiss-ui folder, or an account's folder.
@@ -234,6 +241,7 @@ export async function customWorkflowGraph(body) {
   const graph = cloneGraph(workflow.graph);
   await applyMappedInputs(graph, workflow, body);
   if (workflow.loraStack?.adapter === "rgthree-stack-v1") applyRgthreeLoraStack(graph, body, workflow.loraStack);
+  else if (workflow.loraStack?.adapter === "radiance-tags-v1") applyRadianceLoraStack(graph, body, workflow.loraStack);
   else applyPowerLoraStack(graph, body, workflow.loraStack);
   return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
 }

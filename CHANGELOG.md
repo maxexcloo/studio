@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> LoRAs for Radiance workflows
+
+### Added
+- **Radiance LoRAs:** a workflow's `loraStack` can use the `radiance-tags-v1` adapter (up to 4 LoRAs by default, at most 8). Studio sets the Radiance node's `loras` input to the enabled LoRAs as JSON (`[{"name","strength"}]`, in stack order) and leaves the prompt text alone; Radiance adds the tags itself.
+
 ## [0.34.1] - 2026-10-20
 
 > MCP face detail only beside a requested upscale, and exact prompts that refuse only clear instructions

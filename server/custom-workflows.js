@@ -37,11 +37,11 @@ function workflowMeta(raw = {}) {
 
 function loraStackConfig(meta = {}) {
   const stack = meta.loraStack;
-  if (!stack || !["rgthree-power-v1", "rgthree-stack-v1"].includes(stack.adapter) || !stack.node) return null;
+  if (!stack || !["rgthree-power-v1", "rgthree-stack-v1", "radiance-tags-v1"].includes(stack.adapter) || !stack.node) return null;
   return {
     adapter: stack.adapter,
     node: String(stack.node),
-    max: Math.max(1, Math.min(8, Number(stack.max) || (stack.adapter === "rgthree-stack-v1" ? 4 : 8)))
+    max: Math.max(1, Math.min(8, Number(stack.max) || (stack.adapter === "rgthree-power-v1" ? 8 : 4)))
   };
 }
 

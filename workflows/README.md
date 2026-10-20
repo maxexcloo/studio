@@ -107,3 +107,23 @@ supported:
   }
 }
 ```
+
+A Radiance node (such as `RadianceImageGenerate`) takes its LoRAs as one JSON
+string instead of loader slots:
+
+```json
+{
+  "heissUi": {
+    "capabilities": { "lora": true },
+    "loraStack": {
+      "adapter": "radiance-tags-v1",
+      "node": "1",
+      "max": 4
+    }
+  }
+}
+```
+
+Studio sets the node's `loras` input to the enabled LoRAs in stack order, such
+as `[{"name":"style.safetensors","strength":0.8}]`, or `[]` when none are
+chosen. The prompt text is left as written; Radiance adds the LoRA tags itself.

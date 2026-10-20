@@ -80,9 +80,9 @@ function validateWorkflow(workflow, info = {}, profile = null) {
   }
   if (workflow.loraStack) {
     const node = workflow.graph?.[workflow.loraStack.node];
-    const expected = workflow.loraStack.adapter === "rgthree-stack-v1" ? "Lora Loader Stack (rgthree)" : "Power Lora Loader (rgthree)";
+    const expected = { "rgthree-stack-v1": "Lora Loader Stack (rgthree)", "radiance-tags-v1": "" }[workflow.loraStack.adapter] ?? "Power Lora Loader (rgthree)";
     if (!node) issues.push(`Configured LoRA loader node is missing: ${workflow.loraStack.node}`);
-    else if (node.class_type !== expected) issues.push(`Configured LoRA node must be ${expected}: ${workflow.loraStack.node}`);
+    else if (expected && node.class_type !== expected) issues.push(`Configured LoRA node must be ${expected}: ${workflow.loraStack.node}`);
   }
   for (const mediaInput of workflow.mediaInputs || []) {
     const mapping = mediaInput.control;
