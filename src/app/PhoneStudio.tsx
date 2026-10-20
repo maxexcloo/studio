@@ -183,8 +183,9 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {/* A thin strip: iOS's status bar sits over it, and a tap there scrolls the page to the top. */}
       <header ref={barRef} className={cn('phone-bar', selecting && 'is-behind')}>
         <div className="phone-bar-row">
-          <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} onClick={retryComfyStatus}>
-            <span />
+          {/* The Studio mark is the status: its light says whether generation can run, a tap checks again. */}
+          <button type="button" className={cn('phone-status', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')} aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}>
+            <span /><strong>Studio</strong>
           </button>
           <div className="phone-title">
             <button type="button" className="phone-scroll-top" aria-label="Scroll To Top" onClick={scrollToTop}>
@@ -638,36 +639,36 @@ function MoreSheet({ view, open, onClose, onSelect, statusText }: { view: Record
   );
   return (
     <Sheet open={open} onClose={onClose} title="More">
-      {onSelect ? <div className="phone-group"><button type="button" className="phone-row" aria-label="Select Items" onClick={() => { onClose(); onSelect(); }}><CheckSquare size={20} /><span>Select Items<small>Save, star, move or delete several items</small></span></button></div> : null}
+      {/* Select · Library · Settings · Account; the Studio mark top left is the status. */}
+      <h3 className="phone-section">Select</h3>
       <div className="phone-group">
+        {onSelect ? <button type="button" className="phone-row" aria-label="Select Items" onClick={() => { onClose(); onSelect(); }}><CheckSquare size={20} /><span>Select Items<small>Download, animate, star or delete several</small></span></button> : null}
+        {view.runningCount ? <button type="button" className="phone-row" onClick={() => { onClose(); view.cancelQueue(); }}><CircleStop size={20} /><span>Stop All Generations</span></button> : null}
         <button type="button" className="phone-row" onClick={retryComfyStatus}>
           <RefreshCw size={20} className={cn(comfyRetrying && 'spin')} /><span>{statusText}<small>Tap to check again</small></span>
         </button>
       </div>
-      <h3 className="phone-section">Gallery</h3>
+      <h3 className="phone-section">Library</h3>
       <div className="phone-group phone-gallery-options">
         <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchActive(view.gallerySearch || emptySearch)} onToggle={() => { setPrefs({ stackRuns: !prefs.stackRuns }); }} />
         {(view.visibleGallery || []).some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}
         {view.models?.features?.presets === true ? <button type="button" className="phone-row" aria-label="Image & Model Library" onClick={() => { onClose(); view.setPresetLibraryOpen(true); }}><Library size={20} /><span>Image & Model Library</span></button> : null}
-        {view.runningCount ? <button type="button" className="phone-row" onClick={() => { onClose(); view.cancelQueue(); }}><CircleStop size={20} /><span>Stop All Generations</span></button> : null}
       </div>
-      <h3 className="phone-section">Studio</h3>
+      <h3 className="phone-section">Settings</h3>
       <div className="phone-group">
         {toggle(preferenceLabels.smartUpscale, 'Shows an upscale arrow on finished images', prefs.smartUpscale, (next) => setPrefs({ smartUpscale: next }))}
         {toggle(preferenceLabels.showFailedItems, 'Keeps them in the gallery so you can see why', prefs.showFailedItems, (next) => setPrefs({ showFailedItems: next }))}
         {toggle(preferenceLabels.confirmActions, 'Also asks before stopping generations', prefs.confirmActions, (next) => setPrefs({ confirmActions: next }))}
-      </div>
-      <div className="phone-group">
         <button type="button" className="phone-row" onClick={() => { onClose(); setPrefs({ fullStudioOnPhone: true }); }}>
-          <SlidersHorizontal size={20} /><span>Use the full studio<small>All controls, laid out for a larger screen</small></span>
+          <SlidersHorizontal size={20} /><span>Use the Full Studio<small>All controls, laid out for a larger screen</small></span>
         </button>
+        <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('general'); }}><Settings size={20} /><span>All Settings</span></button>
       </div>
       {hasAccountStorageScope() ? <>
         <h3 className="phone-section">Account</h3>
         <div className="phone-group">
           <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('accounts'); }}><UserRound size={20} /><span>Accounts & MCP<small>Your MCP token and session</small></span></button>
-          <button type="button" className="phone-row" onClick={() => { onClose(); view.openSettings('general'); }}><Settings size={20} /><span>Settings</span></button>
-          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Could not sign out.', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
+          <button type="button" className="phone-row is-danger" disabled={signingOut} onClick={() => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); }}><LogOut size={20} /><span>{signingOut ? 'Signing Out…' : 'Sign Out'}</span></button>
         </div>
       </> : null}
       <p className="phone-note">Models, folders and downloads are managed on the computer running Studio.</p>
