@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Bot, Check, ClipboardPaste, FileJson, Heart, Minus, RefreshCw, Search, ShieldAlert, Trash2, Upload, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Bot, Check, ClipboardPaste, FileJson, Minus, RefreshCw, Search, ShieldAlert, Star, Trash2, Upload, Wand2, X } from 'lucide-react';
 import { Modal } from './Modal';
 import type { ConfirmAction } from './useConfirmation';
 import { apiJson, copyText } from './api';
@@ -447,7 +447,7 @@ export function WorkflowGallery({ view }: { view: any }) {
                 <span className="wf-card-heading">
                   <span className="wf-thumb"><WorkflowThumbnail key={workflow.thumbnail} src={workflow.thumbnail} /></span>
                   <strong>{workflowCardText(workflow).name}</strong>
-                  {workflow.favorite ? <span className="wf-fav" aria-label="Favourite"><Heart size={12} fill="currentColor" /></span> : null}
+                  {workflow.favorite ? <span className="wf-fav" aria-label="Favourite"><Star size={12} fill="currentColor" /></span> : null}
                 </span>
                 {workflowCardText(workflow).recipe ? <span className="wf-card-recipe">{workflowCardText(workflow).recipe}</span> : null}
                 <span className="wf-card-footer">
@@ -475,8 +475,8 @@ export function WorkflowGallery({ view }: { view: any }) {
             <div className="wf-detail-head">
               <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
               <h3>{workflowCardText(selected).name}</h3>
-              <button type="button" className={cn("wf-heart", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from Favourites" : "Add to Favourites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favorites", "error"))}>
-                <Heart size={16} fill={selected.favorite ? "currentColor" : "none"} />
+              <button type="button" className={cn("wf-star", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from Favourites" : "Add to Favourites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favourites", "error"))}>
+                <Star size={16} fill={selected.favorite ? "currentColor" : "none"} />
               </button>
             </div>
             {workflowCardText(selected).recipe || workflowCardText(selected).time ? <p className="wf-detail-recipe">{[workflowCardText(selected).recipe, workflowCardText(selected).time].filter(Boolean).join(" · ")}</p> : null}
