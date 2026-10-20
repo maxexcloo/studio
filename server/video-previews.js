@@ -25,7 +25,7 @@ const version = 'v2-720-24-8';
 const previewEdge = 720;
 const posterEdge = 768;
 const maxSourceBytes = 512 * 1024 * 1024;
-const maxCacheBytes = Math.max(16, Number(process.env.HEISS_VIDEO_PREVIEW_CACHE_MB) || 512) * 1024 * 1024;
+export const maxCacheBytes = Math.max(16, Number(process.env.HEISS_VIDEO_PREVIEW_CACHE_MB) || 512) * 1024 * 1024;
 const pending = new Map();
 const remoteVersions = new Map();
 const queue = [];
@@ -50,6 +50,9 @@ async function drain() {
   }
   running = false;
 }
+
+/** Nothing encoding or waiting to: background work (media-warmup.js) goes only then. */
+export function encoderIdle() { return !running && !posterQueue.length && !queue.length; }
 
 /** Only one low-priority, single-threaded child encodes at a time. */
 function encode(input, output = 'pipe:1') {
@@ -231,6 +234,7 @@ export async function forgetItemVideoPreviews(item) {
   if (!identity) return 0;
   const key = identityKey(identity);
   await pending.get(key)?.catch(() => {});
+  await pending.get(`poster:${key}`)?.catch(() => {});
   remoteVersions.delete(key);
   let removed = 0;
   for (const name of await fs.promises.readdir(dir).catch(() => [])) {

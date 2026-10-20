@@ -15,6 +15,7 @@ import { releaseHiddenRun, rememberHiddenRun } from './hidden-runs.js';
 import { attachVaultUpscale, patchVaultItem, storeHiddenOutputs } from './vault.js';
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from './run-upscale.js';
 import { writeCivitaiParameters } from './civitai.js';
+import { warmNewOutputs } from './media-warmup.js';
 import { markWorkflowUsed } from './workflow-catalog.js';
 import { remainingMs, RunTimer, slowSteps } from './generation-timing.js';
 import { generationEstimate, generationWarm, recordGeneration, recordUpscale, upscaleEstimate } from './timings.js';
@@ -567,6 +568,8 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       } else {
         // Before the gallery shows them, so no browser reads a file mid-write.
         writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
+        // Thumbnails now, from the final files, rather than on first view.
+        warmNewOutputs([...outputs, ...results.map((result) => result.upscale).filter(Boolean)]);
         const withUpscales = results.map((result) => {
           const done = upscaled(result);
           if (done) return { ...result.output, upscale: done, upscaleActive: true };

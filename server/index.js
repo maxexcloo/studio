@@ -44,6 +44,7 @@ import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
 import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
+import { startMediaWarmup } from './media-warmup.js';
 import { civitaiPrefs, saveCivitaiPrefs } from './civitai.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
 import { jobs, queueClearsAt, setTerminalJob } from './jobs.js';
@@ -1907,6 +1908,8 @@ setTimeout(() => recoverGalleryFromHistory().catch(() => null)
   // Videos imported before their size was read get it now.
   .then(() => fillVideoSizes()).catch(() => null), 1200);
 scheduleTrashPurge();
+// Studio media's thumbnails and posters are built ahead of their first view.
+if (mediaStorageEnabled) startMediaWarmup();
 
 // Under `npm run dev*` the page comes from Vite, which forwards to this exact port, so it stays put there.
 const dev = /^dev/.test(process.env.npm_lifecycle_event || "");

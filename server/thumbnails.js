@@ -72,7 +72,7 @@ function indexRemove(name) {
  * in the last 15 minutes counts as in use (an open gallery page) and stays;
  * a removed thumbnail is simply made again when it is next asked for.
  */
-const cacheLimitBytes = Math.max(16, Number(process.env.HEISS_THUMBNAIL_CACHE_MB) || 2048) * 1024 * 1024;
+export const cacheLimitBytes = Math.max(16, Number(process.env.HEISS_THUMBNAIL_CACHE_MB) || 2048) * 1024 * 1024;
 const inUseMs = 15 * 60 * 1000;
 const sweepEveryMs = 10 * 60 * 1000;
 // When each thumbnail was last served by this server. The file's access time
@@ -324,6 +324,11 @@ export async function getThumbnail(filename, subfolder, type) {
   const result = await findOrBuild(filename, subfolder, type);
   if (result?.file) noteUsed(result.file);
   return result;
+}
+
+/** Builds an output's thumbnail ahead of its first view (media-warmup.js); unlike a request, not a use. */
+export function warmThumbnail(filename, subfolder = "", type = "output") {
+  return findOrBuild(filename, subfolder, type);
 }
 
 async function findOrBuild(filename, subfolder, type) {
