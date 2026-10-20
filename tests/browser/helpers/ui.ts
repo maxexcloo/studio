@@ -37,6 +37,7 @@ export function studioUi(page: Page) {
    * one short step a frame, so a busy machine stretches it well past a second.
    */
   async function composerSettled() {
+    // A sheet that finishes closing between the count and the measurement would leave the evaluation waiting for it; the short timeout lets the next poll see it gone.
     await expect.poll(async () => {
       if (!await composer.count()) return 'gone';
       return composer.evaluate((element) => new Promise<string>((resolve) => {
@@ -45,7 +46,7 @@ export function studioUi(page: Page) {
           const now = element.getBoundingClientRect().top;
           resolve(!element.isConnected ? 'gone' : now !== top ? `moving ${top} to ${now}` : now >= innerHeight / 2 ? `low at ${now}` : 'open');
         }));
-      })).catch((error: Error) => error.message.split('\n')[0]);
+      }), undefined, { timeout: 1000 }).catch((error: Error) => error.message.split('\n')[0]);
     }, { timeout: 15000 }).toMatch(/^(gone|open)$/);
   }
 
