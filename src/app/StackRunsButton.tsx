@@ -6,8 +6,8 @@ import { Tip } from './components';
  * tiles laid out as masonry while runs are spread, gathered into one card with
  * two edges behind it while they are stacked, moving between the two.
  */
-export function StackRunsButton({ on, onToggle, disabled = false, labelled = false, phone = false }: { on: boolean; onToggle: () => void; disabled?: boolean; labelled?: boolean; phone?: boolean }) {
-  const size = phone ? 22 : 18;
+export function StackRunsButton({ on, onToggle, disabled = false, labelled = false }: { on: boolean; onToggle: () => void; disabled?: boolean; labelled?: boolean }) {
+  const size = 18;
   const spring = { type: "spring" as const, stiffness: 520, damping: 34 };
   const rects = on
     ? [{ x: 6.5, y: 2.25, width: 7, height: 0.01 }, { x: 4.5, y: 4.75, width: 11, height: 0.01 }, { x: 2.5, y: 7.5, width: 15, height: 10 }]
@@ -17,7 +17,7 @@ export function StackRunsButton({ on, onToggle, disabled = false, labelled = fal
     <span className="gallery-action-shell"><Tip content={label}>
       <button
         type="button"
-        className={`${phone ? "phone-icon" : "zen-control-button stack-runs-button"}${on ? " is-on" : ""}`}
+        className={`zen-control-button gallery-view-toggle stack-runs-button${on ? " is-on" : ""}`}
         aria-label="Auto-Grouping"
         aria-pressed={on}
         disabled={disabled}

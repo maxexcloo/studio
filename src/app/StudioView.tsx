@@ -1,13 +1,13 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
-import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
+import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
 import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
-import { GridAutoplayButton } from './GridAutoplayButton';
-import { CircleStop, ChevronLeft, ChevronRight, GalleryHorizontalEnd, Info, Library, Maximize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { GalleryViewControls } from './GalleryViewControls';
+import { CircleStop, ChevronLeft, ChevronRight, Info, Library, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Tip } from './components';
@@ -19,7 +19,6 @@ import { ComposerBar } from './ComposerBar';
 import { ExpandingComposer } from './ExpandingComposer';
 import { VirtualMasonryGallery } from './VirtualMasonryGallery';
 import { RunSheet } from './RunSheet';
-import { StackRunsButton } from './StackRunsButton';
 import { type Run } from './runs';
 import { UpscaleCompare } from './UpscaleCompare';
 import { upscaledWithRun } from './useUpscale';
@@ -31,7 +30,7 @@ import { FailurePanel } from './GenerationFailure';
 import { useModelDownloadActivity } from './ModelDownloadActivity';
 import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
-import { CopyIcon, useCopyFeedback } from './CopyFeedback';
+import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
 import { itemProfile, itemProfileName } from './itemProfile';
 import { loraName, modelName } from './catalogueNames';
@@ -196,7 +195,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]) } : null, [phone]);
   const openSearch = React.useCallback(() => {
     setSearchOpen(true);
-    document.querySelector<HTMLInputElement>('.gallery-search input, .phone-searchbar input')?.focus();
+    document.querySelector<HTMLInputElement>('.gallery-search input, .phone-tools-field input')?.focus();
   }, []);
   useGallerySearchKeys(true, openSearch);
   // The viewer stars with F, as the tile's star and the dock's do.
@@ -403,7 +402,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               <Tip content="Stop Everything Running & Queued" side="left">
                 <button type="button" className="dock-chip is-cancel" onClick={cancelQueue}>
                   <CircleStop size={14} />
-                  <span>Stop</span>
+                  <span>Stop All</span>
                   <i className="dock-count"><AnimatedNumber value={runningCount} /></i>
                 </button>
               </Tip>
@@ -599,7 +598,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       ) : (
         <>
           <main ref={galleryStageRef} className="stage-gallery" onScroll={onGalleryScroll} onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
-            <GalleryManagement selection={selection} status={<SurfaceStatus className="is-toolbar" />} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<>{renderedGallery.some((item: GalleryItem) => item.type === 'video') ? <GridAutoplayButton labelled /> : null}<StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searchOn} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} /></>}>{galleryBody}</GalleryManagement>
+            <GalleryManagement selection={selection} status={<SurfaceStatus className="is-toolbar" />} modeSelector={<MediaModeToggle kind="gallery" className="gallery-generation-mode" labelled mode={mode} onChange={view.changeMode} />} search={<GallerySearchBar search={gallerySearch} setSearch={setGallerySearch} count={view.galleryTotalApprox} open={searchOpen} setOpen={setSearchOpen} items={renderedGallery} />} showToolbar tools={<GalleryViewControls prefs={prefs} setPrefs={setPrefs} hasVideos={renderedGallery.some((item: GalleryItem) => item.type === 'video')} searching={Boolean(searchOn)} />}>{galleryBody}</GalleryManagement>
             <div className="bottom-fade" />
           </main>
           {studioDock}

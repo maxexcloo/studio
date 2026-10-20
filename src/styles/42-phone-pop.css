@@ -216,3 +216,11 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .reference-popover.is-pop .reference-popover-head:has(.status-pill) > strong,
 .reference-popover.is-pop .reference-popover-head:has(.status-pill) > .reference-upload { display: none; }
 .reference-popover.is-pop .reference-popover-head .status-pill.is-surface { flex: 1 1 auto; min-width: 0; height: var(--bar-pill-h, 36px); margin: 0 4px 0 0; }
+
+/* The gallery view controls end the phone's filter row, in the filters' size and shape (UI-PATTERNS › Gallery View Controls). */
+.phone-filter-row .gallery-action-shell { display: contents; }
+.phone-filter-row .gallery-view-toggle { position: static; display: inline-flex; flex: none; align-items: center; gap: 6px; width: auto; height: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: rgb(255 255 255 / .06); box-shadow: none; color: hsl(var(--muted-foreground)); font-size: 14px; white-space: nowrap; }
+.phone-filter-row .gallery-view-toggle[aria-pressed="true"] { color: hsl(var(--foreground)); background: rgb(255 255 255 / .12); }
+.phone-filter-row .gallery-view-toggle:disabled { opacity: .45; }
+.phone-filter-divider { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--list-hairline); }
+.phone-menu-count { margin-left: auto; padding: 1px 8px; border-radius: var(--r-pill); background: rgb(255 120 100 / .18); font-style: normal; font-size: 13px; font-variant-numeric: tabular-nums; }

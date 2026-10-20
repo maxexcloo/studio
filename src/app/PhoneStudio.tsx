@@ -32,6 +32,7 @@ import { AdvancedPopover, ComposerSurface } from './LoraPopover';
 import { practicalStepRange } from './SidebarControls';
 import { PromptHistorySheet } from './PromptHistory';
 import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
+import { GalleryViewControls } from './GalleryViewControls';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutChecked } from './accounts';
@@ -214,7 +215,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           </div>
         )}
         {/* Search or the filters, full width under the bar, one at a time. */}
-        {selecting ? null : <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} />}
+        {selecting ? null : <PhoneGalleryTools expanded={expanded} search={gallerySearch} setSearch={setGallerySearch} onClose={closeTools} items={gallery} viewControls={<GalleryViewControls prefs={view.prefs} setPrefs={view.setPrefs} hasVideos={gallery.some((item: GalleryItem) => item.type === 'video')} searching={searchActive(gallerySearch)} />} />}
       </header>
 
       <main className="phone-gallery" onWheel={view.onGalleryUserScroll} onTouchStart={view.onGalleryUserScroll}>
@@ -244,7 +245,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       <CreateSheet view={view} open={createOpen} onClose={() => setCreateOpen(false)} canUseNegativePrompt={canUseNegativePrompt} comfyOffline={comfyOffline} />
       <PhoneMenu open={runningOpen} onClose={() => setRunningOpen(false)} trigger=".phone-running-inline" label={runningLabel} align="left" items={[
         { id: 'show', Icon: Images, label: 'Show Running', run: () => { setRunningOpen(false); revealRunning(); } },
-        { id: 'stop', Icon: CircleStop, label: 'Stop All Generations', danger: true, run: () => { setRunningOpen(false); view.cancelQueue(); } }
+        { id: 'stop', Icon: CircleStop, label: 'Stop All', count: runningCount, danger: true, run: () => { setRunningOpen(false); view.cancelQueue(); } }
       ]} />
       <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} onSelect={selectable.length ? () => {
         // Clearing the search changes the view, which ends a selection: start once that has landed.
@@ -594,7 +595,7 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
 
 /* ------------------------------------------------------------ More */
 
-type MenuItem = { id: string; Icon: typeof Search; label: string; run: () => void; danger?: boolean; disabled?: boolean } | 'divider';
+type MenuItem = { id: string; Icon: typeof Search; label: string; run: () => void; danger?: boolean; disabled?: boolean; /** A count after the label, as on the desktop's Stop All. */ count?: number } | 'divider';
 
 /**
  * A small pop-up menu anchored under a top-bar button, over the page
@@ -625,7 +626,7 @@ function PhoneMenu({ open, onClose, trigger, label, items, align = 'right' }: { 
           transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}>
           {items.map((item, index) => item === 'divider'
             ? <i key={`divider-${index}`} className="phone-menu-divider" aria-hidden="true" />
-            : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span></button>)}
+            : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} aria-label={item.count ? `${item.label} (${item.count})` : undefined} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span>{item.count ? <i className="phone-menu-count">{item.count}</i> : null}</button>)}
         </motion.div>
       ) : null}
     </AnimatePresence>,

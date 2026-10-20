@@ -156,7 +156,7 @@ type SearchProps = {
   setFiltersOpen?: (open: boolean) => void;
 };
 
-export function GallerySearchBar({ search, setSearch, open, setOpen, filterTriggerRef, searchTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [], phone = false }: SearchProps & { islandsHeight?: number; items?: GalleryItem[]; phone?: boolean }) {
+export function GallerySearchBar({ search, setSearch, open, setOpen, filterTriggerRef, searchTriggerRef, filtersOpen: controlledFiltersOpen, setFiltersOpen: controlledSetFiltersOpen, items = [] }: SearchProps & { items?: GalleryItem[] }) {
   const present = useIsPresent();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const toolsRef = React.useRef<HTMLDivElement>(null);
@@ -168,50 +168,31 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
   const filterActive = filterCount > 0;
   const queryActive = Boolean(search.q.trim());
   const active = queryActive || filterActive;
-  // On the phone each opens only from its own button; on desktop an active one stays open.
-  const searchExpanded = open || (!phone && queryActive);
+  // An active search or filter stays open.
+  const searchExpanded = open || queryActive;
   const filtersRequested = controlledFiltersOpen ?? localFiltersOpen;
-  const filtersOpen = filtersRequested || (!phone && filterActive);
+  const filtersOpen = filtersRequested || filterActive;
   const setFiltersOpen = controlledSetFiltersOpen ?? setLocalFiltersOpen;
   // An open filter menu takes the outside tap or Escape for itself.
   const closeFilters = React.useCallback(() => { if (!floatingRef.current?.isConnected) setFiltersOpen(false); }, [setFiltersOpen]);
-  // Dismissing the phone overlay (an outside tap or Escape) also clears its query; its own button keeps it.
   const closeSearch = React.useCallback(() => {
     if (floatingRef.current?.isConnected) return;
-    if (phone && search.q) setSearch({ ...search, q: '' });
     setOpen(false);
-  }, [phone, search, setSearch, setOpen]);
+  }, [setOpen]);
   const reducedMotion = useReducedMotion();
-  // The phone overlay closes on an outside tap or Escape even while its filters stay applied.
   const triggers = [filterTriggerRef || toolsRef, searchTriggerRef || toolsRef];
-  useDismiss([toolsRef, floatingRef, ...triggers], filtersOpen && (phone || !filterActive), closeFilters);
-  useDismiss([toolsRef, floatingRef, ...triggers], open && (phone || !queryActive), closeSearch);
-  // The phone overlay hangs under the header button that opened it, over the gallery.
-  const [anchor, setAnchor] = React.useState<{ top: number; right: number } | null>(null);
-  const anchorTrigger = filtersOpen ? filterTriggerRef : searchTriggerRef;
-  React.useLayoutEffect(() => {
-    if (!phone) return;
-    const measure = () => {
-      const trigger = anchorTrigger?.current;
-      if (!trigger) { setAnchor(null); return; }
-      const rect = trigger.getBoundingClientRect();
-      const next = { top: Math.round(rect.bottom + 6), right: Math.max(0, Math.round(document.documentElement.clientWidth - rect.right)) };
-      setAnchor(previous => previous && previous.top === next.top && previous.right === next.right ? previous : next);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [phone, anchorTrigger]);
+  useDismiss([toolsRef, floatingRef, ...triggers], filtersOpen && !filterActive, closeFilters);
+  useDismiss([toolsRef, floatingRef, ...triggers], open && !queryActive, closeSearch);
   React.useEffect(() => {
-    if (!phone && filterActive && !filtersRequested) setFiltersOpen(true);
-  }, [phone, filterActive, filtersRequested, setFiltersOpen]);
+    if (filterActive && !filtersRequested) setFiltersOpen(true);
+  }, [filterActive, filtersRequested, setFiltersOpen]);
   React.useLayoutEffect(() => {
     const controls = filterControlsRef.current;
     if (!controls) { setFilterHeight(0); return; }
     const measure = () => {
       const height = controls.getBoundingClientRect().height + 8;
       setFilterHeight(height);
-      toolsRef.current?.closest<HTMLElement>('.gallery-toolbar, .phone-shell')?.style.setProperty('--gallery-filter-row-h', `${height}px`);
+      toolsRef.current?.closest<HTMLElement>('.gallery-toolbar')?.style.setProperty('--gallery-filter-row-h', `${height}px`);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -222,9 +203,9 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
   React.useEffect(() => {
     if (open) { inputRef.current?.focus({ preventScroll: true }); inputRef.current?.select(); }
   }, [open]);
-  return <motion.div ref={toolsRef} className={cn(phone ? 'phone-searchbar' : 'gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px`, ...(phone && anchor ? { '--phone-search-top': `${anchor.top}px`, '--phone-search-right': `${anchor.right}px` } : {}) } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={phone ? { opacity: 0, y: -6 } : false} animate={{ opacity: 1, y: 0 }} exit={phone ? { opacity: 0, y: -6 } : undefined} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-    {phone && !searchExpanded ? null : <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={phone ? undefined : { width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-      <button type="button" className="gallery-search-trigger" aria-label={phone ? 'Expand Search' : 'Search Gallery'} aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
+  return <motion.div ref={toolsRef} className={cn('gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={false} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+      <button type="button" className="gallery-search-trigger" aria-label="Search Gallery" aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
       <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}
           onKeyDown={(event) => {
@@ -233,8 +214,8 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
           }} placeholder="Search" aria-label="Search Gallery" spellCheck={false} autoComplete="off" enterKeyHint="search" />
       </motion.div>
       {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear Search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
-    </motion.div>}
-    {phone && !filtersOpen ? null : <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+    </motion.div>
+    <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
       <button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
       <AnimatePresence initial={false}>
         {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
@@ -243,8 +224,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
           </div>
         </motion.div> : null}
       </AnimatePresence>
-    </motion.div>}
-
+    </motion.div>
   </motion.div>;
 }
 
@@ -278,8 +258,10 @@ export function SearchEmpty({ search, onClear }: { search: GallerySearch; onClea
  * there, tinted with a count while it has something applied. Closing it, by
  * its X, its icon, Escape or starting Select, clears the query and every filter.
  */
-export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items = [] }: {
+export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items = [], viewControls }: {
   expanded: '' | 'search' | 'filters';
+  /** The gallery view controls (GalleryViewControls), after the filters and before Clear. */
+  viewControls?: React.ReactNode;
   search: GallerySearch;
   setSearch: (next: GallerySearch) => void;
   onClose: () => void;
@@ -312,6 +294,8 @@ export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items 
           <button type="button" className="phone-tools-close" aria-label="Clear Search" title="Clear & Close" onClick={(event) => { event.preventDefault(); onClose(); }}><X size={18} /></button>
         </label> : <div className="phone-filter-row gallery-filter-controls" role="group" aria-label="Gallery Filters">
           <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} />
+          {viewControls ? <span className="phone-filter-divider" aria-hidden="true" /> : null}
+          {viewControls}
           {/* Clear ends the row, in the filters' own style: it clears them all and closes the row. */}
           <button type="button" className="gallery-filter-select phone-filter-clear" aria-label="Clear Filters" title="Clear & Close" onClick={onClose}><X size={14} aria-hidden="true" /><span>Clear</span></button>
         </div>}

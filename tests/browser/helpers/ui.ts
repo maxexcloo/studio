@@ -174,7 +174,7 @@ export function studioUi(page: Page) {
     async stopAll() {
       if (await isPhone()) {
         await page.locator('.phone-running-inline').click();
-        await page.getByRole('menuitem', { name: 'Stop All Generations', exact: true }).click();
+        await page.getByRole('menuitem', { name: /^Stop All \(\d+\)$/ }).click();
       } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
     },
 
