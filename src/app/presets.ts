@@ -4,6 +4,7 @@ export type PresetResource = {
   versionId: number | string; weight: number | null; name: string; nameOnly?: boolean; version?: string; type: string; baseModel?: string;
   sourceUrl?: string; file?: string; folder?: string; bytes?: number; supported: boolean; note?: string;
   status?: 'installed' | 'missing' | 'conflict' | 'unsupported'; localName?: string; profileId?: string;
+  /** Installed by name and size; the checksum is checked when the image opens. */ unverified?: boolean;
 };
 export type ImagePreset = {
   type?: 'image' | 'video';

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import test from 'node:test';
 import { civitaiFetch, civitaiRequest } from './civitai-access.js';
-import { civitaiLink, imagePreset, importCivitaiImage, matchResources, versionResource } from './civitai-import.js';
+import { civitaiLink, imagePreset, importCivitaiImage, matchResources, useModelHashCache, versionResource } from './civitai-import.js';
 
 const bytes = Buffer.from('test model weights');
 const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
@@ -106,6 +106,38 @@ test('installed resources are identified by checksum, including renamed weights'
     fs.writeFileSync(path.join(dir, 'renamed.safetensors'), 'changed weights');
     const changed = await matchResources(preset, { loras: ['renamed.safetensors'] }, { foldersFor: () => [dir] });
     assert.equal(changed.resources[0].status, 'missing');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the quick match never reads a model, and a worked-out checksum outlives a restart', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-quick-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'style.safetensors'), bytes);
+    const preset = { resources: [versionResource(version)] };
+    const read = fs.createReadStream;
+    let reads = 0;
+    fs.createReadStream = (...args) => { reads += 1; return read(...args); };
+    try {
+      // Same name and size: installed, but unverified, and nothing was read.
+      const quick = await matchResources(preset, { loras: ['style.safetensors'] }, { foldersFor: () => [dir], verify: false });
+      assert.equal(quick.resources[0].status, 'installed');
+      assert.equal(quick.resources[0].unverified, true);
+      assert.equal(reads, 0);
+      // The full check reads it once and keeps the checksum on disk.
+      const cache = path.join(dir, 'model-hashes.json');
+      useModelHashCache(cache);
+      const full = await matchResources(preset, { loras: ['style.safetensors'] }, { foldersFor: () => [dir] });
+      assert.equal(full.resources[0].status, 'installed');
+      assert.equal(full.resources[0].unverified, undefined);
+      assert.equal(reads, 1);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      assert.ok(Object.values(JSON.parse(fs.readFileSync(cache, 'utf8'))).includes(sha256));
+      // After a restart the saved checksum answers the quick match as verified, still without reading.
+      useModelHashCache(cache);
+      const again = await matchResources(preset, { loras: ['style.safetensors'] }, { foldersFor: () => [dir], verify: false });
+      assert.equal(again.resources[0].unverified, undefined);
+      assert.equal(reads, 1);
+    } finally { fs.createReadStream = read; useModelHashCache(''); }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

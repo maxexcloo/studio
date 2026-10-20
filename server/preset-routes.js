@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { civitaiFetch, civitaiJson, civitaiTokenStatus, limitedBody, saveCivitaiToken } from './civitai-access.js';
-import { importCivitaiImage, matchResources, versionResource } from './civitai-import.js';
+import { importCivitaiImage, matchResources, useModelHashCache, versionResource } from './civitai-import.js';
 import { dataDir, deleteGalleryFiles, filterVisibleGallery, gallery, importedImageFile, setGallery } from './gallery-store.js';
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from './civitai-library.js';
 import { stripMetadata } from './metadata-strip.js';
@@ -21,10 +21,28 @@ const imported = new Map();
 
 function summary(preset) {
   const { previewUrl, ...rest } = preset;
-  return { ...rest, thumbnailUrl: previewUrl || fs.existsSync(path.join(previewsDir, `${preset.id}.webp`)) ? `/api/presets/${preset.id}/thumbnail` : '' };
+  // A saved image always has its own picture; an older recipe has its preview file or link.
+  const picture = Boolean(preset.galleryItemId || previewUrl || fs.existsSync(path.join(previewsDir, `${preset.id}.webp`)));
+  return { ...rest, thumbnailUrl: picture ? `/api/presets/${preset.id}/thumbnail` : '' };
+}
+
+const thumbnailsDir = path.join(previewsDir, 'thumbnails');
+/** A saved image's 768 px WebP, made once per version of its file and kept beside the previews. */
+async function cachedThumbnail(id, source) {
+  const stat = fs.statSync(source);
+  const file = path.join(thumbnailsDir, `${id}-${Math.round(stat.mtimeMs)}.webp`);
+  if (fs.existsSync(file)) return file;
+  const buffer = await sharp(source).resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+  fs.mkdirSync(thumbnailsDir, { recursive: true });
+  for (const old of fs.readdirSync(thumbnailsDir)) if (old.startsWith(`${id}-`)) fs.rmSync(path.join(thumbnailsDir, old), { force: true });
+  const temporary = `${file}.tmp`;
+  fs.writeFileSync(temporary, buffer);
+  fs.renameSync(temporary, file);
+  return file;
 }
 
 export function registerPresetRoutes(app, { models, json = civitaiJson, imageRequest = civitaiFetch, download = startLibraryDownload }) {
+  useModelHashCache(path.join(dataDir, 'model-hashes.json'));
   const route = (handler, write = false) => async (req, res) => {
     if (!presetsEnabled()) { res.status(404).json({ ok: false, error: 'Image & Model Library is disabled on this instance.' }); return; }
     if (write && !requireLocal(req, res)) return;
@@ -32,10 +50,11 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     try { await handler(req, res); }
     catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   };
-  const matched = async (preset, catalogue) => {
-    const resolved = await matchResources(preset, catalogue || await models());
+  // The list matches by name and size only (never reading a model); opening one image verifies its checksums and updates its gallery copy.
+  const matched = async (preset, catalogue, { verify = true } = {}) => {
+    const resolved = await matchResources(preset, catalogue || await models(), { verify });
     resolved.downloadWarnings = (resolved.downloadWarnings || []).filter((warning) => resolved.resources.some((resource) => resource.status === 'missing' && warning.startsWith(`${resource.name}:`)));
-    refreshImportedItem(resolved);
+    if (verify) refreshImportedItem(resolved);
     return summary(resolved);
   };
   const forgetLegacy = (id) => {
@@ -60,7 +79,10 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
   app.get('/api/presets', route(async (_req, res) => {
     migrate();
     const catalogue = await models();
-    res.json({ ok: true, presets: await Promise.all([...images(), ...presets.filter((item) => !images().some((image) => image.id === item.id))].map((item) => matched(item, catalogue))), downloads: libraryDownloadAccess() });
+    const saved = images();
+    const ids = new Set(saved.map((image) => image.id));
+    const list = [...saved, ...presets.filter((item) => !ids.has(item.id))];
+    res.json({ ok: true, presets: await Promise.all(list.map((item) => matched(item, catalogue, { verify: false }))), downloads: libraryDownloadAccess() });
   }));
   app.post('/api/presets/import', route(async (req, res) => {
     const source = await importCivitaiImage(req.body?.url, { json });
@@ -112,9 +134,10 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
     const local = importedImageFile(item);
     if (local && fs.existsSync(local)) {
+      // Made once per file version; the browser keeps it and only checks that it is unchanged.
+      res.setHeader('Cache-Control', 'private, no-cache');
       if (item.type === 'video') { res.type('jpeg').sendFile(await getFileVideoPoster(local), { dotfiles: 'allow' }); return; }
-      const buffer = await sharp(local).resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
-      res.type('webp').send(buffer); return;
+      res.type('webp').sendFile(await cachedThumbnail(req.params.id, local), { dotfiles: 'allow' }); return;
     }
     if (presets.some((entry) => entry.id === req.params.id) && fs.existsSync(file) && !item) { res.type('webp').send(fs.readFileSync(file)); return; }
     const preset = lookup(req.params.id);

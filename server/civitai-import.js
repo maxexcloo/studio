@@ -4,6 +4,7 @@ import path from 'node:path';
 import { modelFolders } from './comfy.js';
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from './civitai-access.js';
 import { sameResourceFilename, workflowModelSources } from './civitai-workflow.js';
+import { readJsonFile, writeJsonFile } from './json-store.js';
 
 const samplers = {
   'DPM++ 2M': 'dpmpp_2m', 'DPM++ 2M SDE': 'dpmpp_2m_sde', 'DPM++ 2S a': 'dpmpp_2s_ancestral',
@@ -186,15 +187,57 @@ export async function importCivitaiImage(value, { generation = civitaiGeneration
   return { ...preset, resources };
 }
 
+/*
+ * Model checksums. Hashing a checkpoint means reading every byte of a file that
+ * can run to tens of gigabytes on network storage, so a hash is worked out once
+ * per file version (path, size and modified time) and, once the Library names a
+ * file for it (useModelHashCache), kept on disk across restarts.
+ */
+let hashCacheFile = '';
+let savedHashes = new Map();
+let saveTimer = null;
+const hashKey = (file, stat) => `${file}|${stat.size}|${stat.mtimeMs}`;
+
+/** Keeps worked-out model checksums in `file`, so a restart doesn't read every model again. */
+export function useModelHashCache(file) {
+  hashCacheFile = file;
+  try {
+    const saved = readJsonFile(file);
+    savedHashes = new Map(Object.entries(saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {}).filter(([, value]) => /^[a-f0-9]{64}$/.test(String(value))));
+  } catch { savedHashes = new Map(); }
+}
+
+function rememberHash(key, hex) {
+  savedHashes.set(key, hex);
+  while (savedHashes.size > 2000) savedHashes.delete(savedHashes.keys().next().value);
+  if (!hashCacheFile || saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try { writeJsonFile(hashCacheFile, Object.fromEntries(savedHashes), { compact: true }); } catch { /* A lost cache only costs a rehash. */ }
+  }, 500);
+  saveTimer.unref?.();
+}
+
+/** A checksum already worked out for this exact file version, or '' without reading the file. */
+async function knownHash(file) {
+  const key = hashKey(file, await fs.promises.stat(file));
+  if (savedHashes.has(key)) return savedHashes.get(key);
+  const pending = hashes.get(key);
+  return pending ? await pending.catch(() => '') : '';
+}
+
 /** Only candidate files are hashed; cached hashes are invalidated when the file changes. */
 async function hashFile(file) {
   const stat = await fs.promises.stat(file);
-  const key = `${file}|${stat.size}|${stat.mtimeMs}`;
+  const key = hashKey(file, stat);
+  if (savedHashes.has(key)) return savedHashes.get(key);
   if (!hashes.has(key)) {
     const promise = (async () => {
       const hash = crypto.createHash('sha256');
       for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
-      return hash.digest('hex');
+      const hex = hash.digest('hex');
+      rememberHash(key, hex);
+      return hex;
     })();
     hashes.set(key, promise);
     promise.catch(() => hashes.delete(key));
@@ -203,12 +246,19 @@ async function hashFile(file) {
   return hashes.get(key);
 }
 
-export async function matchResources(preset, { profiles = [], loras = [], textEncoders = [], vaes = [] } = {}, { foldersFor = modelFolders } = {}) {
+/**
+ * Finds each resource's file among the installed models. `verify: false` (the
+ * Library's list) never reads a model: a known checksum decides, otherwise the
+ * same file name and size count as installed (marked `unverified`); opening one
+ * image checks its checksums in full.
+ */
+export async function matchResources(preset, { profiles = [], loras = [], textEncoders = [], vaes = [] } = {}, { foldersFor = modelFolders, verify = true } = {}) {
   const resources = [];
   for (const resource of preset.resources) {
     let localName = '';
     let profileId = '';
     let conflict = false;
+    let unverified = false;
     const candidates = resource.folder === 'loras' ? loras : resource.folder === 'vae' ? vaes : resource.folder === 'text_encoders' ? textEncoders
       : profiles.filter((item) => item.kind === (preset.type || 'image')).flatMap((item) => [item.defaults?.model, item.model, item.baseModel]).filter(Boolean);
     for (const name of [...new Set(candidates)]) {
@@ -221,18 +271,24 @@ export async function matchResources(preset, { profiles = [], loras = [], textEn
         try {
           const stat = await fs.promises.stat(file);
           const sameName = resource.nameOnly ? sameResourceFilename(name, resource.file) : path.basename(name) === resource.file;
+          const sameSize = Boolean(resource.bytes) && Math.abs(stat.size - resource.bytes) <= 2048;
           // Civitai rounds sizeKB; use a small tolerance to find renamed files.
-          if (!stat.isFile() || (!sameName && (!resource.bytes || Math.abs(stat.size - resource.bytes) > 2048))) continue;
+          if (!stat.isFile() || (!sameName && !sameSize)) continue;
           if (resource.nameOnly && sameName) { localName = name; break; }
-          if (resource.sha256 && await hashFile(file) === resource.sha256) { localName = name; break; }
+          if (resource.sha256) {
+            const hash = verify ? await hashFile(file) : await knownHash(file);
+            if (hash === resource.sha256) { localName = name; unverified = false; break; }
+            if (!hash && sameName && sameSize) { localName = name; unverified = true; break; }
+          }
           if (sameName) conflict = true;
         } catch { /* Try another configured model folder. */ }
       }
       if (localName) break;
     }
+    if (localName) conflict = false;
     if (localName && ['checkpoints', 'diffusion_models'].includes(resource.folder)) profileId = profiles.find((item) => item.kind === (preset.type || 'image') && [item.defaults?.model, item.model, item.baseModel].includes(localName))?.id || '';
     const { spec, ...publicResource } = resource;
-    resources.push({ ...publicResource, conflict, localName, profileId, ...(resource.nameOnly && localName ? { note: 'Matched by filename only; the exact version is unverified.' } : {}), status: localName ? 'installed' : conflict ? 'conflict' : resource.supported ? 'missing' : 'unsupported' });
+    resources.push({ ...publicResource, conflict, localName, profileId, ...(unverified ? { unverified: true } : {}), ...(resource.nameOnly && localName ? { note: 'Matched by filename only; the exact version is unverified.' } : {}), status: localName ? 'installed' : conflict ? 'conflict' : resource.supported ? 'missing' : 'unsupported' });
   }
   return { ...preset, resources };
 }
