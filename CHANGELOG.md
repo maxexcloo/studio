@@ -17,6 +17,7 @@ version opens with a `> ` summary line.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed
+- **Details panel:** its actions read Animate (Extend Video for a video), Copy Prompt, Use Prompt and Use Settings, in that order, with Copy Prompt above Use Settings. Generation Settings sit unboxed under a label like Prompt's, and Copy as Text is gone.
 - **Use Prompt and Use Settings:** from the viewer, its Details, a tile or a menu, they now apply, close the viewer and open the prompt box with the reused text ready to edit: the desktop composer expanded and focused, or the phone's Create sheet.
 - **Viewer dock:** the desktop dock reads Zoom Out, a zoom percentage that steps through Fit, 1:1 and Full Size when clicked, and Zoom In, then Copy, Download, Star, Upscale and Delete, then Details. Use as Reference, Animate and Move to Hidden stay in the menus and on the phone.
 - **Share and Download:** the desktop viewer, tiles, context menu and selection bar download and no longer offer Share. On a phone the viewer bar, long-press sheet and selection bar offer Share instead of Download (iOS's share sheet has Save Image), and keep Download only where the browser can't share files.

@@ -1,6 +1,6 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
-import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
+import { AnimatePhotos, animationProfiles, canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { PromptField } from './PromptField';
 import { LoraPopover } from './LoraPopover';
 import React from 'react';
@@ -8,7 +8,7 @@ import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GridAutoplayButton } from './GridAutoplayButton';
 import { ArrowLeft, ChevronDown, CircleStop, ChevronLeft, ChevronRight, ChevronUp, EyeOff, GalleryHorizontalEnd, Library, Lock, LockKeyhole, Maximize2, Minimize2, PanelLeft, Pin, PinOff, MoreHorizontal, RotateCcw, Settings, SlidersHorizontal, Smartphone, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, settingsText, type GenerationDetailSection } from './format';
+import { cn, nearTextLimit, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Media, Skeleton, Tip } from './components';
 import { useHorizontalWheel, useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -317,7 +317,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       upscaleBusy: (item) => Boolean(live().upscaleBusyIds?.has(item.id)),
       upscale: (item) => live().activateUpscale(item),
       cancelUpscale: (item) => live().cancelUpscale(item),
-      copyPrompt: (item, announce) => live().copyToClipboard(item.prompt || "", announce),
+      // A phone's buttons give no check of their own everywhere, so a toast says it worked.
+      copyPrompt: (item, announce) => live().copyToClipboard(item.prompt || "", announce ?? (phoneRef.current ? "Prompt copied" : "")),
       copyItem: (item) => live().copyItemToClipboard(item),
       reuse: (item) => { live().applyAllSettings(item); compose(); },
       promptsOnly: (item) => { live().applyPromptsOnly(item); compose(); },
@@ -922,8 +923,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                         <span>Prompt</span>
                         <div className="readout-box">
                           <p>{active.prompt || "No prompt recorded"}</p>
-                          <Tip content="Copy Prompt"><button className="readout-copy" aria-label="Copy Prompt" onClick={() => viewerCopy.copyWith(() => copyToClipboard(active.prompt || ""), "prompt")}><CopyIcon copied={viewerCopy.copied === "prompt"} size={13} /></button></Tip>
-                          <Tip content="Use Prompt"><button type="button" className="readout-copy readout-use" aria-label="Use Prompt" disabled={!active.prompt} onClick={() => { setPrompt(clampText(active.prompt || "", promptLimit)); showToast("Prompt applied."); composeFromViewer.current(); }}><Wand2 size={13} /></button></Tip>
                         </div>
                       </div>
                       {active.negative ? (
@@ -936,16 +935,19 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                           </div>
                         </div>
                       ) : null}
-                      {/* On a phone the composer is a sheet: each of these opens it with the change in place, as Reuse does. */}
+                      {/* The prompt's actions, in name order; Use Prompt and Use Settings close the viewer for the prompt box. */}
                       <ViewerActions
                         item={active}
+                        onAnimate={itemActionHandlers.animate && (canAnimatePhoto(active) || canExtendVideo(active)) ? () => itemActionHandlers.animate!(active) : undefined}
+                        onCopyPrompt={() => itemActionHandlers.copyPrompt(active)}
+                        onUsePrompt={() => itemActionHandlers.promptsOnly(active)}
                         onUseSettings={() => itemActionHandlers.reuse(active)}
                         onUseLoras={() => applyLoras(active)}
                         onUseAsReference={canUseStartImage && active.status === "done" && active.type === "image" && active.url && !active.vaultLocked && !active.library ? () => useOutputAsStartImage(active) : undefined}
                       />
                       {generationDetailEntries(active).length ? (
-                        <section className="settings-disclosure">
-                          <div className="detail-heading"><h3>Generation Settings</h3><button type="button" className="detail-copy" aria-label="Copy Generation Settings" onClick={() => viewerCopy.copyWith(() => copyToClipboard(settingsText(active)), "settings")}><CopyIcon copied={viewerCopy.copied === "settings"} size={13} /><span>{viewerCopy.copied === "settings" ? "Copied" : "Copy as Text"}</span></button></div>
+                        <section className="detail-settings" aria-labelledby="viewer-generation-settings">
+                          <span id="viewer-generation-settings" className="detail-settings-title">Generation Settings</span>
                           {generationDetailEntries(active).map((section: GenerationDetailSection) => (
                             <div className="detail-section" key={section.title}>
                               <h4>{section.title}</h4>
