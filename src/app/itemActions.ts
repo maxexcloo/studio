@@ -14,8 +14,8 @@ import type { ShowToast } from './toast';
  * actions and the gallery's context menu. Each action says when it applies;
  * each surface picks the ones it has room for, always in this order, with
  * these one-word names and icons, grouped by intent (docs/guides/UI-PATTERNS.md):
- * keep it (Copy, Download or Share) | make more (Animate or Extend, Recreate,
- * Reuse, Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete).
+ * keep it (Copy, Download or Share) | make more (Animate or Extend, Rerun,
+ * Edit, Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete).
  */
 
 export type ItemSurface = 'bar' | 'dock' | 'tile' | 'menu';
@@ -37,9 +37,9 @@ export type ItemActionHandlers = {
   copyPrompt: (item: GalleryItem, announce?: string) => Promise<boolean>;
   /** The image itself, its link, or its details. */
   copyItem: (item: GalleryItem) => Promise<boolean>;
-  /** Recreate: an exact rerun, with its model, prompts, size, LoRAs, references, settings and seed. */
+  /** Rerun: an exact rerun, with its model, prompts, size, LoRAs, references, settings and seed, loaded into Create. */
   reuse: (item: GalleryItem) => void;
-  /** Reuse: both prompts only. */
+  /** Edit: the prompts and settings, with a new seed, loaded into Create to change. */
   promptsOnly: (item: GalleryItem) => void;
   /** Left out when the current model takes no reference image. */
   useAsReference?: (item: GalleryItem) => void;
@@ -127,8 +127,8 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     Boolean(item.url) && item.status !== 'pending' && { id: 'download', group: 'keep', label: 'Download', tip: upscaled ? 'Download the Upscale' : 'Download', Icon: Download, href: downloadUrl(item), run: () => downloadItem(item) },
     handlers.animate && canAnimatePhoto(item) && { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Into a Video', Icon: Clapperboard, run: () => handlers.animate!(item) },
     handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Extend This Video', Icon: FastForward, run: () => handlers.animate!(item) },
-    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Recreate With the Same Seed', Icon: RotateCcw, run: () => handlers.reuse(item) },
-    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Reuse', tip: 'Reuse the Prompts', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
+    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Rerun', tip: 'Rerun With the Same Seed', Icon: RotateCcw, run: () => handlers.reuse(item) },
+    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Edit', tip: 'Edit Prompt & Settings in Create', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
     done && handlers.useAsReference && item.type === 'image' && !item.library && {
       id: 'reference', group: 'make', label: 'Reference', tip: 'Reference This Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
     },
@@ -163,12 +163,9 @@ export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandle
   const failed = items.filter((item) => item.status === 'error' && !item.library);
   const starrable = items.filter(canStar);
   const allStarred = starrable.length > 0 && starrable.every((item) => item.favorite);
-  // Without a ready first-frame model the review says so, rather than the option vanishing.
-  const photos = items.filter(canAnimatePhoto);
   const actions: (ItemAction | false)[] = [
     phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
     !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
-    { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Selected', Icon: Clapperboard, disabled: !photos.length, run: () => handlers.animateItems(photos) },
     failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
     { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
     { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },

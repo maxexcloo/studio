@@ -40,7 +40,7 @@ for (const kind of ['image', 'video'] as const) {
       const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
       const phone = await ui.isPhone();
       // The full studio offers a failed run's reuse in its failure panel.
-      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Recreate', exact: true }) : await ui.reuseButton();
+      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Rerun', exact: true }) : await ui.reuseButton();
       await reuse.click();
       await expect(viewer).toHaveCount(0);
       await expect(ui.composer).toBeVisible();
@@ -57,7 +57,7 @@ for (const kind of ['image', 'video'] as const) {
 }
 
 for (const promptsOnly of [false, true]) {
-  test(`${promptsOnly ? 'prompts-only reuse preserves' : 'missing-model reuse safely adapts to'} the current model`, async ({ page }) => {
+  test(`${promptsOnly ? 'Edit' : 'Rerun'} of a missing model's output safely adapts to the current model`, async ({ page }) => {
     const models = await (await page.request.get('/api/models')).json();
     const current = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
     current.capabilities.negativePrompt = true;
@@ -83,13 +83,7 @@ for (const promptsOnly of [false, true]) {
     if (promptsOnly) {
       await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
       await ui.showDetails();
-      const readouts = viewer.locator('.prompt-readout');
-      await viewer.getByRole('group', { name: 'Reuse', exact: true }).getByRole('button', { name: 'Reuse', exact: true }).click();
-      await expect(viewer).toHaveCount(0);
-      await ui.closeComposer();
-      await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
-      await ui.showDetails();
-      await readouts.getByRole('button', { name: 'Use Negative Prompt', exact: true }).click();
+      await viewer.getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click();
     } else await (await ui.reuseButton()).click();
     await expect(viewer).toHaveCount(0);
     await ui.openComposer();
@@ -105,46 +99,11 @@ for (const promptsOnly of [false, true]) {
     expect(body!.loras || []).toEqual([]);
     const referenceSlot = current.mediaInputs?.find((input: any) => input.kind === 'image')?.id || 'reference';
     expect(body!.referenceAssets).toEqual([{ slot: referenceSlot, assetId: reference.id }]);
-    if (promptsOnly) {
-      expect(body!.width).toBe(current.defaults.width);
-      expect(body!.height).toBe(current.defaults.height);
-      expect(body!.steps).toBe(current.defaults.steps);
-      expect(body!.seed).not.toBe('123');
-    } else {
-      expect(body!.width).toBe(896);
-      expect(body!.height).toBe(704);
-      expect(body!.steps).toBeLessThanOrEqual(current.constraints.steps.max);
-    }
-  });
-}
-
-// Reuse (Details) loads both prompts; the negative's own Use loads only that.
-for (const field of ['negative'] as const) {
-  test(`reusing only ${field} text preserves the other draft`, async ({ page }) => {
-    const item = { id: 'text-reuse', url: picture, filename: 'text.png', type: 'image', status: 'done', prompt: 'Saved positive text', negative: 'Saved negative text', model: 'flux1-schnell.safetensors', createdAt: new Date().toISOString(), width: 512, height: 512 };
-    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
-    await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
-    await page.goto('/');
-    const ui = studioUi(page);
-    await ui.openComposer();
-    await ui.prompt.fill('Positive draft');
-    await ui.negativePrompt.fill('Negative draft');
-    await ui.closeComposer();
-    const viewer = await ui.openViewer(page.locator('[data-tile-id="text-reuse"]'));
-    await ui.showDetails();
-    const readout = viewer.locator('.prompt-readout').nth(field === 'prompt' ? 0 : 1);
-    const copy = readout.getByRole('button', { name: /^Copy/ });
-    const reuse = readout.getByRole('button', { name: /^Use (?:Negative )?Prompt$/ });
-    const copyBox = await copy.boundingBox();
-    const reuseBox = await reuse.boundingBox();
-    // Use sits beside Copy, on the label's row.
-    expect(Math.abs(reuseBox!.y - copyBox!.y)).toBeLessThan(2);
-    expect(reuseBox!.x).toBeGreaterThan(copyBox!.x);
-    await reuse.click();
-    await expect(viewer).toHaveCount(0);
-    await ui.openComposer();
-    await expect(ui.prompt).toHaveValue(field === 'prompt' ? item.prompt : 'Positive draft');
-    await expect(ui.negativePrompt).toHaveValue(field === 'negative' ? item.negative : 'Negative draft');
+    // Edit adapts the settings like Rerun, with a new seed.
+    expect(body!.width).toBe(896);
+    expect(body!.height).toBe(704);
+    expect(body!.steps).toBeLessThanOrEqual(current.constraints.steps.max);
+    if (promptsOnly) expect(body!.seed).not.toBe('123');
   });
 }
 

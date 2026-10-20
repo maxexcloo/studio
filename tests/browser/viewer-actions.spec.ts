@@ -34,7 +34,7 @@ test('the action bar is ordered by intent, with Star and Info in the phone’s t
     const bar = viewer.getByRole('navigation', { name: 'Image Actions' });
     const order = await barOrder(bar);
     // Share where the browser can share files, Download where it can't.
-    expect(order.map((name) => name === 'Share' ? 'Download' : name)).toEqual(['Copy', 'Download', '|', 'Recreate', 'Reference', 'Upscale', '|', 'Delete']);
+    expect(order.map((name) => name === 'Share' ? 'Download' : name)).toEqual(['Copy', 'Download', '|', 'Rerun', 'Reference', 'Upscale', '|', 'Delete']);
     const star = await viewer.getByRole('button', { name: 'Star', exact: true }).boundingBox();
     const info = await viewer.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await viewer.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
@@ -51,11 +51,12 @@ test('the action bar is ordered by intent, with Star and Info in the phone’s t
       expect(box!.x + box!.width).toBeLessThanOrEqual(320);
     }
   } else {
-    const order = await barOrder(viewer.getByRole('toolbar', { name: 'Image Actions' }));
-    expect(order).toEqual(['Copy', 'Download', '|', 'Recreate', 'Reference', 'Upscale', '|', 'Star', 'Delete', '|', 'Close']);
-    // Info sits on its own in the top right, while Details is shut.
-    const details = page.locator('.viewer-side');
-    if (await details.count()) await details.getByRole('button', { name: 'Close Details', exact: true }).click();
+    // Info sits on its own in the top right, while Details is shut; open, its footer has Rerun and the dock leaves it out.
+    const toolbar = viewer.getByRole('toolbar', { name: 'Image Actions' });
+    if (await page.locator('.viewer-side').count()) expect(await barOrder(toolbar)).not.toContain('Rerun');
+    await studioUi(page).hideDetails();
+    const order = await barOrder(toolbar);
+    expect(order).toEqual(['Copy', 'Download', '|', 'Rerun', 'Reference', 'Upscale', '|', 'Star', 'Delete', '|', 'Close']);
     const info = await viewer.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const viewport = page.viewportSize()!;
     expect(info!.y).toBeLessThan(80);
@@ -69,7 +70,7 @@ test('Info opens Details, which closes with its own Close (or Info on a phone)',
   const info = viewer.getByRole('button', { name: 'Info', exact: true });
   const details = page.locator('.viewer-side');
   const closeDetails = details.getByRole('button', { name: 'Close Details', exact: true });
-  if (await details.count()) { await closeDetails.click(); await expect(details).toHaveCount(0); }
+  await studioUi(page).hideDetails();
   await info.click();
   await expect(details).toBeVisible();
   if (phone) {
@@ -77,8 +78,10 @@ test('Info opens Details, which closes with its own Close (or Info on a phone)',
     await info.click();
     await expect(details).toHaveCount(0);
     await expect(info).toHaveAttribute('aria-pressed', 'false');
-    await info.click();
-  } else await expect(info).toHaveCount(0);
+    await expect(closeDetails).toHaveCount(0);
+    return;
+  }
+  await expect(info).toHaveCount(0);
   await closeDetails.click();
   await expect(details).toHaveCount(0);
   await expect(info).toBeVisible();
@@ -87,7 +90,7 @@ test('Info opens Details, which closes with its own Close (or Info on a phone)',
 test('zoom is a small − % + pill, clear of the action bar, whose percentage cycles the fit', async ({ page }) => {
   await page.goto('/');
   const { viewer, phone } = await open(page);
-  if (await page.locator('.viewer-side').count()) await page.locator('.viewer-side').getByRole('button', { name: 'Close Details', exact: true }).click();
+  await studioUi(page).hideDetails();
   const zoom = viewer.getByRole('group', { name: 'Image Zoom' });
   const viewport = page.viewportSize()!;
   if (phone) {
@@ -112,43 +115,42 @@ test('zoom is a small − % + pill, clear of the action bar, whose percentage cy
   await expect(percent).not.toHaveText(before!);
 });
 
-test('each prompt copies and uses on its own; Reuse loads both prompts', async ({ page }) => {
-  await page.goto('/');
-  const { ui, viewer, phone } = await open(page);
-  if (!await page.locator('.viewer-side').count()) await viewer.getByRole('button', { name: 'Info', exact: true }).click();
-  const details = page.locator('.viewer-side');
-  for (const [name, text] of [['Copy Prompt', item.prompt], ['Copy Negative Prompt', item.negative]]) {
-    // The phone's shortcut row has its own Copy Prompt; the prompt's own is the last.
-    await details.getByRole('button', { name, exact: true }).last().click();
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
-    await page.evaluate(() => navigator.clipboard.writeText(''));
-  }
-  if (phone) {
-    await details.getByRole('button', { name: 'Copy Settings', exact: true }).click();
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Seed: 424242');
-  }
-  await details.getByRole('button', { name: 'Use Negative Prompt', exact: true }).click();
-  await expect(viewer).toHaveCount(0);
-  await ui.openComposer();
-  await expect(ui.negativePrompt).toHaveValue(item.negative);
-  await ui.prompt.fill('Something else');
-  await ui.closeComposer();
-  // Messages live in the status pill and never cover the gallery: the tile is reachable at once.
-  await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
-  if (!await page.locator('.viewer-side').count()) await page.getByRole('button', { name: 'Info', exact: true }).click();
-  await page.locator('.viewer-side').getByRole('button', { name: 'Reuse', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Image Viewer' })).toHaveCount(0);
-  await ui.openComposer();
-  await expect(ui.prompt).toHaveValue(item.prompt);
-  await expect(ui.negativePrompt).toHaveValue(item.negative);
-});
-
-test('Recreate is an exact rerun: same prompts and the same seed', async ({ page }) => {
+test('each prompt copies on its own; Copy Prompts, Copy Settings, and Edit loads the prompts with a new seed', async ({ page }) => {
   let body: Record<string, any> | null = null;
   await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Captured' } }); });
   await page.goto('/');
   const { ui, viewer } = await open(page);
-  await viewer.getByRole('button', { name: 'Recreate', exact: true }).first().click();
+  if (!await page.locator('.viewer-side').count()) await viewer.getByRole('button', { name: 'Info', exact: true }).click();
+  const details = page.locator('.viewer-side');
+  for (const [name, text] of [['Copy Prompt', item.prompt], ['Copy Negative Prompt', item.negative]]) {
+    await details.getByRole('button', { name, exact: true }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+  }
+  // No per-prompt Use: Edit and Rerun in the footer load Create.
+  await expect(details.getByRole('button', { name: /^Use / })).toHaveCount(0);
+  await details.getByRole('button', { name: 'Copy Settings', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Seed: 424242');
+  await details.getByRole('button', { name: 'Copy Prompts', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(item.negative);
+  await details.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Image Viewer' })).toHaveCount(0);
+  await ui.openComposer();
+  await expect(ui.prompt).toHaveValue(item.prompt);
+  await expect(ui.negativePrompt).toHaveValue(item.negative);
+  await ui.generate.click();
+  await expect.poll(() => body).not.toBeNull();
+  // Edit keeps the settings but not the seed: Rerun is the exact one.
+  expect(body!.seed).not.toBe('424242');
+  expect(body!.steps).toBe(4);
+});
+
+test('Rerun is an exact rerun: same prompts and the same seed', async ({ page }) => {
+  let body: Record<string, any> | null = null;
+  await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Captured' } }); });
+  await page.goto('/');
+  const { ui, viewer } = await open(page);
+  await viewer.getByRole('button', { name: 'Rerun', exact: true }).first().click();
   await expect(viewer).toHaveCount(0);
   await ui.openComposer();
   await expect(ui.prompt).toHaveValue(item.prompt);

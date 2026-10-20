@@ -21,11 +21,25 @@ test('select-mode actions use bulk wording, never one item’s copy', async ({ p
   const names = async () => bar.locator('button').evaluateAll((buttons) => buttons.map((button) => ({ name: button.getAttribute('aria-label') || button.textContent?.trim() || '', title: button.getAttribute('title') || '' })));
   await expect.poll(async () => (await names()).map((entry) => entry.name)).toEqual(expect.arrayContaining([
     phone ? expect.stringMatching(/^(Share|Download) Selected/) : 'Download Selected as a Zip',
-    'Animate Selected', 'Retry Selected', 'Star Selected', 'Delete Selected'
+    'Retry Selected', 'Star Selected', 'Delete Selected'
   ]));
+  // Animate is for one picture at a time: select mode offers no bulk Animate, on either layout.
+  expect((await names()).map((entry) => entry.name)).not.toContain('Animate Selected');
   for (const { name, title } of await names()) {
     expect(`${name} ${title}`, name).not.toMatch(/This Image|From This|this image/);
   }
   // Visible names stay one word.
-  if (!phone) await expect(bar.getByRole('button', { name: 'Animate Selected', exact: true })).toHaveText('Animate');
+  if (!phone) await expect(bar.getByRole('button', { name: 'Star Selected', exact: true })).toHaveText('Star');
+  if (phone) {
+    // Selecting swaps the top bar's contents: the same bar, the same height, its icon buttons.
+    const top = page.locator('.phone-bar');
+    await expect(top).toHaveCount(1);
+    const topRow = (await top.locator('.phone-bar-row').boundingBox())!;
+    const selectAll = (await page.getByRole('button', { name: /^Select (All|None)$/ }).boundingBox())!;
+    expect(selectAll.width).toBe(44);
+    expect(selectAll.height).toBe(44);
+    // The bottom action bar is as tall as the top bar's row.
+    const bottom = (await bar.boundingBox())!;
+    expect(Math.round(bottom.height)).toBe(Math.round(topRow.height));
+  }
 });

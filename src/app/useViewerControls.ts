@@ -172,11 +172,12 @@ export function useViewerControls(view: any) {
   }
 
   /**
-   * Recreate: loads an output's model, prompts, size, LoRAs, references and
+   * Rerun: loads an output's model, prompts, size, LoRAs, references and
    * settings into the composer, seed included, so generating makes the same
-   * picture again unless something is changed. Returns whether its model is installed.
+   * picture again unless something is changed. Edit (`newSeed`) loads the same
+   * with a new seed, to change it. Returns whether its model is installed.
    */
-  function applyAllSettings(item: GalleryItem) {
+  function applyAllSettings(item: GalleryItem, options: { newSeed?: boolean } = {}) {
     const before = view.draft ? { ...view.draft } : null;
     const itemSettings = item.settings || {};
     const matchingProfile = outputProfile(models?.profiles || [], item);
@@ -204,7 +205,7 @@ export function useViewerControls(view: any) {
     setSteps(settings.steps);
     setCfg(settings.cfg);
     setDenoise(settings.denoise);
-    if (itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
+    if (!options.newSeed && itemSettings.seed && itemSettings.seed !== "Random") setSeed(String(itemSettings.seed));
     else setSeed("");
     setCount(clampProfileCount(targetProfile, itemSettings.variationCount || itemSettings.count || view.draft?.count || 1));
     setFrames(settings.frames);
@@ -237,10 +238,10 @@ export function useViewerControls(view: any) {
     setCustomSize(!matchingAspects.some((option: { w: number; h: number }) => option.w === settings.width && option.h === settings.height));
     if (matchingProfile) view.onReuseReferences?.(targetProfile, itemSettings.referenceAssets);
     view.onReuseOutput?.(item);
-    const seedNote = itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
+    const seedNote = !options.newSeed && itemSettings.seed && itemSettings.seed !== "Random" ? ` Seed ${itemSettings.seed} is fixed until you change it.` : "";
     const removed = settings.removedLoras ? ` ${removedLorasNote(settings.removedLoras)}.` : "";
     const message = matchingProfile
-      ? `Ready to recreate.${removed}${seedNote}`
+      ? `${options.newSeed ? "Ready to edit" : "Ready to rerun"}.${removed}${seedNote}`
       : `Its model isn’t available. Settings adjusted for ${targetProfile.displayName || targetProfile.label}.${removed}${seedNote}`;
     toast(message, {
       duration: 8000,

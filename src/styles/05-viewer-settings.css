@@ -218,10 +218,12 @@
 .readout-action.is-copied { color: var(--accent-amber); }
 .readout-action:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 @media (pointer: coarse) { .readout-action { height: 36px; padding: 0 12px; } }
-.details-shortcuts { display: flex; gap: 6px; }
-.details-shortcuts .readout-action { background: var(--control-fill); color: hsl(var(--foreground)); }
-.details-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); }
-.details-footer .btn.viewer-action { width: 100%; justify-content: center; }
+.details-footer { display: grid; gap: 6px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); }
+/* Two equal buttons a row: Copy Prompts · Copy Settings, then Edit · Rerun (Rerun the primary). Never a faded ghost. */
+.details-footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.details-footer-row > *, .details-footer-btn { width: 100%; min-width: 0; justify-content: center; }
+.details-footer-btn:not(.is-primary) { background: var(--control-fill); color: hsl(var(--foreground)); }
+.details-footer-btn.is-copied { color: var(--accent-amber); }
 .detail-grid {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);

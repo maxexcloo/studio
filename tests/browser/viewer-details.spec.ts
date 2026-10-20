@@ -27,7 +27,7 @@ test('a video offers Extend in place of Animate', async ({ page }) => {
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
 });
 
-test('Details shows each prompt with Copy and Use, Settings without a box, and Reuse · Recreate', async ({ page }) => {
+test('Details shows each prompt with Copy, Settings without a box, and a footer of Copy Prompts · Copy Settings over Edit · Rerun', async ({ page }) => {
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.goto('/');
@@ -39,13 +39,19 @@ test('Details shows each prompt with Copy and Use, Settings without a box, and R
   const side = viewer.locator('.viewer-side');
   const prompt = side.getByRole('region', { name: 'Prompt', exact: true });
   await expect(prompt.getByRole('button', { name: 'Copy Prompt', exact: true })).toBeVisible();
-  await expect(prompt.getByRole('button', { name: 'Use Prompt', exact: true })).toBeVisible();
-  const footer = side.getByRole('group', { name: 'Reuse', exact: true });
-  expect((await footer.getByRole('button').allInnerTexts()).map((name) => name.trim())).toEqual(['Reuse', 'Recreate']);
+  await expect(prompt.getByRole('button', { name: 'Use Prompt', exact: true })).toHaveCount(0);
+  const footer = side.getByRole('group', { name: 'Details Actions', exact: true });
+  expect((await footer.getByRole('button').allInnerTexts()).map((name) => name.trim())).toEqual(['Copy Prompts', 'Copy Settings', 'Edit', 'Rerun']);
+  // Edit and Rerun are equal-weight buttons, neither a faded ghost.
+  const [edit, rerun] = [footer.getByRole('button', { name: 'Edit', exact: true }), footer.getByRole('button', { name: 'Rerun', exact: true })];
+  expect(Math.abs((await edit.boundingBox())!.width - (await rerun.boundingBox())!.width)).toBeLessThan(2);
+  // On the phone Info closes Details: one close, and the bar doesn't repeat the footer.
+  if (phone) {
+    await expect(side.getByRole('button', { name: 'Close Details', exact: true })).toHaveCount(0);
+    await expect(viewer.getByRole('navigation', { name: 'Image Actions', exact: true }).getByRole('button', { name: 'Rerun', exact: true })).toHaveCount(0);
+  }
   await expect(side.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   expect(await side.locator('.detail-settings').evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  // The phone has its own shortcuts at the top.
-  await expect(side.getByRole('button', { name: 'Copy Settings', exact: true })).toHaveCount(phone ? 1 : 0);
   await prompt.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(item.prompt);
   if (phone) await expect(page.locator('.status-message').filter({ hasText: 'Prompt copied' })).toBeVisible();
