@@ -849,9 +849,11 @@ test('creation options expand in the bottom box without a side panel', async ({ 
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).focus();
   await expect(composer).toHaveClass(/is-expanded/);
   await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
-  const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
+  const advanced = page.getByRole('region', { name: 'Advanced Settings', exact: true });
   await expect(advanced.getByRole('textbox', { name: 'Seed', exact: true })).toBeVisible();
-  await advanced.getByRole('button', { name: 'Close', exact: true }).click();
+  // Its own button folds it again, and it stays folded or open per account.
+  await composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
+  await expect(advanced).toHaveCount(0);
   await page.getByRole('main').click({ position: { x: 200, y: 150 } });
   await expect(composer).not.toHaveClass(/is-expanded/);
   await expect(page.getByRole('complementary', { name: 'Generation Controls' })).toHaveCount(0);

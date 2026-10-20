@@ -459,7 +459,7 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("aspect", aspectPicker)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
-          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
+          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" aria-label="Advanced Settings" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
           {tucked.length ? (
             <Tip content="More settings">
               <button

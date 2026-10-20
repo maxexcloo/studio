@@ -88,27 +88,24 @@
 .model-menu .model-menu-browse:hover { background: var(--control-hover); }
 .model-menu-browse .model-copy strong { max-width: none; font-size: 13px; }
 .model-menu-browse .model-copy em { margin-top: 2px; color: hsl(var(--muted-foreground)); }
-.composer-advanced-modal { width: min(600px, calc(100vw - 32px)); border-radius: var(--r-panel); background: var(--surface-grain), var(--glass-panel-bg); -webkit-backdrop-filter: var(--glass-panel-blur); backdrop-filter: var(--glass-panel-blur); }
-.composer-advanced-modal .modal-head { align-items: center; padding: 16px 16px 8px; }
-.composer-advanced-modal .modal-titles h2 { font-size: 15px; }
-.composer-advanced-modal .modal-body { padding: 8px 16px 16px; }
-.composer-advanced-modal .composer-advanced-body { max-height: none; overflow: visible; gap: 10px; }
-.composer-advanced-modal .phone-advanced-controls, .phone-advanced .phone-advanced-controls { gap: 8px; }
-.composer-advanced-modal .phone-section, .phone-advanced .phone-section { margin: 10px 2px 2px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; }
-.composer-advanced-modal .phone-group, .phone-advanced .phone-group { margin: 0; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
-.composer-advanced-modal .phone-row, .phone-advanced .phone-row { min-height: 44px; padding: 10px 12px; font-size: 13px; }
-.composer-advanced-modal .phone-row small, .phone-advanced .phone-row small { font-size: 11px; }
-.composer-advanced-modal .phone-control, .phone-advanced .phone-control { margin: 0; padding: 10px 12px; gap: 6px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
-.composer-advanced-modal .phone-control-label, .phone-advanced .phone-control-label { font-size: 13px; font-weight: 500; }
-.composer-advanced-modal .phone-slider, .phone-advanced .phone-slider { height: 32px; }
-.composer-advanced-modal .phone-control-hint, .phone-advanced .phone-control-hint { font-size: 11px; }
-.composer-advanced-modal .phone-seed-field input, .phone-advanced .phone-seed-field input { min-height: 40px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--well); }
+.composer-advanced-inline { overflow: hidden; }
+.composer-advanced-inline .composer-advanced-body { max-height: min(40dvh, 420px); gap: 10px; padding: 10px 2px 2px; border-top: 1px solid var(--glass-border); margin-top: 8px; }
+.composer-advanced-inline .phone-advanced-controls, .phone-advanced .phone-advanced-controls { gap: 8px; }
+.composer-advanced-inline .phone-section, .phone-advanced .phone-section { margin: 10px 2px 2px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; }
+.composer-advanced-inline .phone-group, .phone-advanced .phone-group { margin: 0; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
+.composer-advanced-inline .phone-row, .phone-advanced .phone-row { min-height: 44px; padding: 10px 12px; font-size: 13px; }
+.composer-advanced-inline .phone-row small, .phone-advanced .phone-row small { font-size: 11px; }
+.composer-advanced-inline .phone-control, .phone-advanced .phone-control { margin: 0; padding: 10px 12px; gap: 6px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); }
+.composer-advanced-inline .phone-control-label, .phone-advanced .phone-control-label { font-size: 13px; font-weight: 500; }
+.composer-advanced-inline .phone-slider, .phone-advanced .phone-slider { height: 32px; }
+.composer-advanced-inline .phone-control-hint, .phone-advanced .phone-control-hint { font-size: 11px; }
+.composer-advanced-inline .phone-seed-field input, .phone-advanced .phone-seed-field input { min-height: 40px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--well); }
 
 .phone-creation-resource-left > .composer-resource-add { height: 44px; min-height: 44px; }
-.composer-advanced-modal .phone-slider::-webkit-slider-runnable-track { height: 4px; }
-.composer-advanced-modal .phone-slider::-moz-range-track { height: 4px; }
-.composer-advanced-modal .phone-slider::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
-.composer-advanced-modal .phone-slider::-moz-range-thumb { width: 18px; height: 18px; }
+.composer-advanced-inline .phone-slider::-webkit-slider-runnable-track { height: 4px; }
+.composer-advanced-inline .phone-slider::-moz-range-track { height: 4px; }
+.composer-advanced-inline .phone-slider::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
+.composer-advanced-inline .phone-slider::-moz-range-thumb { width: 18px; height: 18px; }
 
 /* LoRA browsing shares the reference picker's anchored glass surface. */
 .composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }

@@ -48,8 +48,10 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await ui.prompt.fill('Scene detail\n'.repeat(60));
   await ui.negativePrompt.fill('Avoid defects\n'.repeat(60));
   await ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
-  const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
+  // Inline below the composer's controls, not a dialog.
+  const advanced = page.getByRole('region', { name: 'Advanced Settings', exact: true });
   await expect(advanced).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Advanced Settings', exact: true })).toHaveCount(0);
   await expect.poll(() => advanced.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return bounds.top >= 0 && bounds.bottom <= innerHeight;
