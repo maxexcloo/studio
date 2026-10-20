@@ -114,6 +114,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
         buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus({ preventScroll: true });
       } else if (event.key === 'Tab') closeMenu();
     }}>
+      {single ? null : <p className="gallery-menu-title" aria-hidden="true">{targets.length} Selected</p>}
       {(single ? singleActions : bulkActions).map((action, index, list) => actionButton(action, true, startsGroup(list, index)))}
     </div>, document.body) : null}
   </GallerySelectionContext.Provider>;

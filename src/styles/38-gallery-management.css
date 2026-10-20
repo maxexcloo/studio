@@ -46,8 +46,8 @@
 .gallery-context-menu .is-danger { color: var(--danger-ink); }
 .gallery-context-menu {
   position: fixed;
-  z-index: 19;
-  width: 210px;
+  z-index: var(--z-popover);
+  width: 224px;
   max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 16px);
   overflow-y: auto;
@@ -59,7 +59,16 @@
   backdrop-filter: var(--glass-panel-blur);
   box-shadow: var(--glass-panel-shadow);
 }
-.gallery-context-menu button { justify-content: flex-start; width: 100%; min-height: 40px; border-radius: var(--r-item); }
+/* A menu, not a bar: full-width rows, the icon muted beside its name, groups
+   split by a hairline, focus as an inset ring rather than an outline. */
+.gallery-context-menu button { justify-content: flex-start; gap: 10px; width: 100%; min-height: 36px; padding: 7px 10px; border-radius: var(--r-item); color: hsl(var(--foreground)); font-size: 13px; }
+.gallery-context-menu button > svg { flex: none; color: hsl(var(--muted-foreground)); transition: color var(--motion-fast) var(--motion-ease); }
+.gallery-context-menu button:hover > svg, .gallery-context-menu button:focus-visible > svg { color: hsl(var(--foreground)); }
+.gallery-context-menu button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px hsl(var(--ring)); }
+.gallery-context-menu .is-danger, .gallery-context-menu .is-danger > svg { color: var(--danger-ink); }
+.gallery-context-menu .is-danger:hover { background: var(--danger-fill); }
+.gallery-menu-divider { display: block; height: 1px; margin: 5px 8px; background: var(--glass-border); }
+.gallery-menu-title { margin: 0; padding: 6px 10px 4px; color: hsl(var(--muted-foreground)); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tile-overlay.is-selecting > :not(.tile-check) { display: none; }
 @media (forced-colors: active) {
   .gallery-management, .gallery-context-menu { border-color: CanvasText; background: Canvas; }
