@@ -12,6 +12,7 @@ version opens with a `> ` summary line.
 ## [Unreleased]
 
 ### Fixed
+- **Reuse in chat:** Reuse's `job_id` says to pass the result's ref exactly as the reply header shows it ("result 1") or its job id, and never "all", which only Result takes; link ids still work. A chat model's first Reuse had passed a link id or "all".
 - **Selection and search:** "N Selected" in the gallery toolbar reads as plain text rather than a highlighted pill (the phone header says "N Selected" too), and the search's clear X is a round plain icon button. A focus ring shows only for keyboard focus.
 - **Copy Prompt on phones:** copying asks the clipboard within the tap, as iOS Safari requires, falls back to a selected text box where there is no clipboard API, and says "Prompt copied".
 - **Stars:** a star the server refuses now says why, with the HTTP status, and starring sends the picture's address as well as its id so a record is found either way.

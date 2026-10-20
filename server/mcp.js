@@ -252,8 +252,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
       tool(server, 'Upload', 'Upload Reference', 'Upload a PNG, JPEG or WebP image (base64, at most 20 MB) as a reference asset for Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
-      tool(server, 'Reuse', 'Reuse Result', `Follow up on a finished result. With the result\u2019s own kind, run it again with the same profile and settings and a new seed; kind=video animates an image from its first frame. prompt replaces the original prompt. Replies like Generate. Without kind, return the image as a reference asset for Generate.`, {
-        ...output, kind: z.enum(['image', 'video']).optional(), tier: tier.optional().describe('Only when animating.'),
+      tool(server, 'Reuse', 'Reuse Result', `Follow up on one finished result. Same kind: rerun with the same settings and a new seed; kind=video animates an image. prompt replaces its prompt. Replies like Generate. Without kind, returns it as a Generate reference.`, {
+        ...output, job_id: z.string().min(1).max(200).describe('Its ref as the reply header shows it ("result 1") or job_id, never "all". Link ids work; refs are preferred.'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional().describe('Only when animating.'),
         prompt: z.string().trim().min(1).optional(), count: z.number().int().min(1).max(4).default(1),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional()
       }, async ({ job_id, output_index, kind, tier: wanted, prompt, count, wait_seconds }, signal) => {

@@ -296,6 +296,10 @@ test('media and administrator credentials discover only their own friendly tools
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(media.getInstructions(), /share the result links and end the turn\. Call Result only when the user asks/);
   assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
+  // Reuse names one result by its ref or job id; "all" belongs to Result alone, and a link id is only a fallback.
+  const reuse = tools.find(tool => tool.name === 'Reuse');
+  assert.match(reuse.description, /^Follow up on one finished result\./);
+  assert.equal(reuse.inputSchema.properties.job_id.description, 'Its ref as the reply header shows it ("result 1") or job_id, never "all". Link ids work; refs are preferred.');
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
