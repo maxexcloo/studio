@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:26.11.1-bookworm-slim AS build
 
 WORKDIR /app

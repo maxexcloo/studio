@@ -26,7 +26,7 @@ The browser checks run the built studio on desktop and phone viewports with temp
 
 `npm run dev:demo` (or `STUDIO_DEMO=1`) is for agent and UI testing without a GPU. When ComfyUI is unreachable it offers fake models and returns placeholder images. It's off otherwise, so a normal install shows ComfyUI as offline instead.
 
-`npm run check:updates` lists outdated dependencies.
+`mise run dependencies:check` previews dependency updates.
 
 ## Pull requests
 
