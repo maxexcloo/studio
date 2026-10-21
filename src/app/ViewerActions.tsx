@@ -36,21 +36,27 @@ export function PromptReadout({ label, text, onCopy, onUse }: {
 }
 
 /**
- * The Details footer, the same on both: Copy Prompts · Copy Settings, then
+ * The Details footer, the same on both: Edit · Rerun, with Copy and Copy Settings in the header.
  * Edit · Rerun as two equal buttons (Rerun the primary). Neither repeats in
  * the viewer's bar while Details is open.
  */
-export function DetailsFooter({ onCopyPrompts, onCopySettings, onEdit, onRerun }: { onCopyPrompts?: () => Promise<boolean>; onCopySettings?: () => Promise<boolean>; onEdit?: () => void; onRerun?: () => void }) {
+export function DetailsCopyActions({ onCopyAll, onCopySettings }: { onCopyAll?: () => Promise<boolean>; onCopySettings?: () => Promise<boolean> }) {
   const copy = useCopyFeedback();
-  if (!onCopyPrompts && !onCopySettings && !onEdit && !onRerun) return null;
-  return (
-    <div className="details-footer" role="group" aria-label="Details Actions">
-      {onCopyPrompts || onCopySettings ? (
+  return <div className="details-copy-actions" role="group" aria-label="Copy Details">
+      {onCopyAll || onCopySettings ? (
         <div className="details-footer-row">
-          {onCopyPrompts ? <button type="button" className={cn('btn details-footer-btn', copy.copied === 'prompts' && 'is-copied')} onClick={() => { void copy.copyWith(onCopyPrompts, 'prompts'); }}><CopyIcon copied={copy.copied === 'prompts'} size={15} /><span>{copy.copied === 'prompts' ? 'Copied' : 'Copy Prompts'}</span></button> : null}
+          {onCopyAll ? <button type="button" className={cn('btn details-footer-btn', copy.copied === 'all' && 'is-copied')} onClick={() => { void copy.copyWith(onCopyAll, 'all'); }}><CopyIcon copied={copy.copied === 'all'} size={15} /><span>{copy.copied === 'all' ? 'Copied' : 'Copy'}</span></button> : null}
           {onCopySettings ? <button type="button" className={cn('btn details-footer-btn', copy.copied === 'settings' && 'is-copied')} onClick={() => { void copy.copyWith(onCopySettings, 'settings'); }}>{copy.copied === 'settings' ? <CopyIcon copied size={15} /> : <ListChecks size={15} />}<span>{copy.copied === 'settings' ? 'Copied' : 'Copy Settings'}</span></button> : null}
         </div>
       ) : null}
+  </div>;
+}
+
+export function DetailsFooter({ onEdit, onRerun, onCompare }: { onCompare?: () => void; onEdit?: () => void; onRerun?: () => void }) {
+  if (!onEdit && !onRerun) return null;
+  return (
+    <div className="details-footer" role="group" aria-label="Details Actions">
+      {onCompare ? <button type="button" className="btn" onClick={onCompare}>Compare Variants</button> : null}
       {onEdit || onRerun ? (
         <div className="details-footer-row">
           {onEdit ? <Tip content="Edit Prompt & Settings in Create"><button type="button" className="btn details-footer-btn" onClick={onEdit}><TextQuote size={15} /><span>Edit</span></button></Tip> : null}

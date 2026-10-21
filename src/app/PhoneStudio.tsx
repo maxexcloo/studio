@@ -147,6 +147,11 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     setFiltersOpen(false);
     if (searchActive(searchRef.current)) setGallerySearch(clearedSearch(searchRef.current));
   }, [setSearchOpen, setGallerySearch]);
+  const startSelecting = () => {
+    const cleared = searchActive(searchRef.current);
+    closeTools();
+    if (cleared) window.requestAnimationFrame(() => selection.start()); else selection.start();
+  };
   const toggleTools = (which: 'search' | 'filters') => {
     if (expanded === which) { closeTools(); return; }
     setSearchOpen(which === 'search');
@@ -199,14 +204,13 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           </div>
         ) : (
           <div className={cn('phone-bar-row', message && 'has-message')}>
-            {/* Left: the status light and "Studio" (a tap on the light checks again), then what is running. */}
+            {/* Left: status or running jobs share one slot beside Menu and "Studio". */}
             <div className={cn('phone-heading', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')}>
-              <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>
-              <span className="phone-heading-name">Studio</span>
+              {runningCount ? <button type="button" className="phone-running-inline" aria-label={runningLabel} aria-haspopup="menu" aria-expanded={runningOpen} title={runningLabel} onClick={() => setRunningOpen((value) => !value)}>
+                <LoaderCircle size={14} className="spin" aria-hidden="true" /><span>{runningCount}</span>
+              </button> : <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>}
+              <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button><span className="phone-heading-name">Studio</span>
             </div>
-            {runningCount ? <button type="button" className="phone-running-inline" aria-label={runningLabel} aria-haspopup="menu" aria-expanded={runningOpen} title={runningLabel} onClick={() => setRunningOpen((value) => !value)}>
-              <LoaderCircle size={14} className="spin" aria-hidden="true" /><span>{runningCount}</span>
-            </button> : null}
             {/* Centre: Images | Videos as two icons; a message takes the slot for a moment (UI-PATTERNS › Messages). */}
             {message ? <StatusPill message={message} className="is-bar" /> : <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />}
             {/* A question takes the whole row but "Studio": its answers need the room, and nothing else applies until it is answered. */}
@@ -214,7 +218,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             <span className="phone-bar-gap" />
             <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
-            <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
+            <button type="button" className="phone-icon phone-select-trigger" disabled={!selectable.length} onClick={startSelecting}>Select</button>
             </>}
           </div>
         )}
@@ -256,12 +260,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         { id: 'show', Icon: Images, label: 'Show Running', run: () => { setRunningOpen(false); revealRunning(); } },
         { id: 'stop', Icon: CircleStop, label: 'Stop All', count: runningCount, danger: true, run: () => { setRunningOpen(false); view.cancelQueue(); } }
       ]} />
-      <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} onSelect={selectable.length ? () => {
-        // Clearing the search changes the view, which ends a selection: start once that has landed.
-        const cleared = searchActive(searchRef.current);
-        closeTools();
-        if (cleared) window.requestAnimationFrame(() => selection.start()); else selection.start();
-      } : undefined} />
+      <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} />
     </>
   );
 }

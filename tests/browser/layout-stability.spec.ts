@@ -59,6 +59,7 @@ test('search and selection preserve toolbar geometry while open surfaces remain 
     expect(actionsBox!.x + actionsBox!.width).toBeLessThanOrEqual(width);
     await expect.poll(async () => (await toolbar.boundingBox())!.height).toBe(before!.height);
     expect((await toolbar.locator('.gallery-generation-mode').boundingBox())!.x).toBe(modeBefore!.x);
+    expect(await page.locator('.stage-gallery').evaluate(node => ({ left: node.scrollLeft, overflow: node.scrollWidth > node.clientWidth }))).toEqual({ left: 0, overflow: false });
     await management.getByRole('button', { name: 'Stop Selecting', exact: true }).click();
     await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
     await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('Layout');

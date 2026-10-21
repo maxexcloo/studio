@@ -25,6 +25,9 @@ the pattern occurs in the same piece of work.
 - **Media:** a picture never resizes while it loads. Reserve its final box from
   its known size, show the thumbnail in it, and cross-fade the sharp copy over
   the top (no fade with reduced motion).
+- Gallery column changes keep moving tiles inside the grid horizontally. Clip
+  overflow on the virtual spacer without creating another scrolling container,
+  so focus and selection cannot pan the gallery or move its toolbar sideways.
 - No decorative motion: no bouncing rows, no reorder animation, no odd
   open/close flourishes on pickers.
 
@@ -54,6 +57,8 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
   stays in view, dimmed and inert, and Escape, Close or a tap outside closes
   it.
 - Messages and status never cover controls (see [Messages](#messages)).
+  In the phone viewer, a confirmation takes Star and Info’s space so both
+  answers fit; Close remains available.
 - Stacking uses the `--z-*` tokens, never raw numbers. The phone's order is
   `--z-phone-bar` < `--z-phone-scrim` < `--z-phone-sheet` < `--z-phone-pop`.
 
@@ -390,8 +395,11 @@ phone) and one page at a time with its title and one line.
   used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
 - **Details:** Prompt and Negative each with Copy beside their label (no
   per-prompt Use and no shortcut chips), Settings unboxed below with friendly
-  profile, weight and LoRA names, and one footer, the same on both: Copy
-  Prompts · Copy Settings above Edit · Rerun, equal weight. One Close only.
+  profile, weight and LoRA names. Header actions are Copy (both prompts and
+  every recorded setting) and Copy Settings (settings only). Each prompt
+  keeps its own Copy. The footer offers Edit · Rerun · Compare Variants.
+  LoRA information includes compatibility, suggested strength, triggers and
+  source links; Civitai sources offer both civitai.com and civitai.red. One Close only.
 - **Selecting:** a long press on a phone tile starts selecting with that item
   (there is no long-press action sheet). Selecting offers Select All, then
   Select Failed (in that order on both), then Download (a zip when several)
@@ -450,13 +458,15 @@ iOS status bar still scrolls the document to the top. No bottom navigation
 and no boxes in the bars.
 
 - **Left:** the status light (its colour says whether generation can run; a
-  tap checks again) and "Studio", then what is running (a spinner and count;
-  a tap opens Show Running and Stop All with its count).
+  tap checks again) and "Studio". While jobs run, a spinner and count replace
+  the light in the same space; a tap opens Show Running and Stop All. On
+  narrow phones the name hides and the mode buttons follow Menu in normal
+  flow, keeping every touch target separate.
 - **Centre:** the gallery's **Images | Videos** as two icons. A message takes
   this slot while it shows (see [Messages](#messages)).
-- **Right:** **Search**, **Filter** and the **Menu** icon. The menu is a
-  pop-up list: Select · Library · Settings, then Account and Sign Out in
-  account mode.
+- **Right:** **Search**, **Filter** and **Select**. Menu sits on the left
+  beside the status light; its pop-up list holds Library · Settings, then
+  Account and Sign Out in account mode.
 - **One bar height:** the top bar, the select bar, the viewer's top icons and
   the status pill share `--bar-h` and `--bar-pill-h`, so nothing jumps when one
   replaces another.
@@ -535,7 +545,20 @@ The caret stays in view.
   "Catalogue", "Colour").
 - Standard words: Images/Videos (gallery modes), Image/Video (generation),
   Model, Prompt, Negative Prompt, Reference Image, LoRAs, Animate, Star.
-- Item actions: "Edit", "Rerun", "Copy Prompts", "Copy Settings", "Retry";
+- Item actions: "Edit", "Rerun", "Copy", "Copy Settings", "Retry";
   the Library's "Use Prompt" and "Use Settings".
 - Chat and links name results "Result N".
 - Messages: "Couldn’t …" for failures, without a full stop; "Prompt copied".
+
+
+## Comparisons
+
+Compare Variants opens one sheet from Details or the gallery action menu.
+Start with one image or 2–4 selected images; each variant has a prompt and
+editable generation settings. One numeric seed applies to every variant,
+including seed 0. Validate every editor before submitting any jobs; an accepted
+job remains in the gallery if a later request fails, without automatic retries.
+History and votes belong to the signed-in account. Only available finished
+images can receive a vote; removed images show as unavailable and lose their
+visible vote. A shared seed helps compare changes, although different model
+families may interpret it differently.

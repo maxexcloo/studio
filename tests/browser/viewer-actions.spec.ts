@@ -116,7 +116,7 @@ test('zoom is a small − % + pill, clear of the action bar, whose percentage cy
   await expect(percent).not.toHaveText(before!);
 });
 
-test('each prompt copies on its own; Copy Prompts, Copy Settings, and Edit loads the prompts with a new seed', async ({ page }) => {
+test('each prompt copies on its own; Copy, Copy Settings, and Edit loads the prompts with a new seed', async ({ page }) => {
   let body: Record<string, any> | null = null;
   await page.route('**/api/generate', async (route) => { body = route.request().postDataJSON(); await route.fulfill({ status: 400, json: { error: 'Captured' } }); });
   await page.goto('/');
@@ -132,8 +132,9 @@ test('each prompt copies on its own; Copy Prompts, Copy Settings, and Edit loads
   await expect(details.getByRole('button', { name: /^Use / })).toHaveCount(0);
   await details.getByRole('button', { name: 'Copy Settings', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Seed: 424242');
-  await details.getByRole('button', { name: 'Copy Prompts', exact: true }).click();
+  await details.getByRole('button', { name: 'Copy', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(item.negative);
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Seed: 424242');
   await details.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Image Viewer' })).toHaveCount(0);
   await ui.openComposer();
@@ -179,4 +180,23 @@ test('a message over the viewer shows in the status pill at its top edge, clear 
     const overlaps = box.x < other.x + other.width && other.x < box.x + box.width && box.y < other.y + other.height && other.y < box.y + box.height;
     expect(overlaps, `the pill covers ${await button.getAttribute('aria-label')}`).toBe(false);
   }
+});
+
+
+test('deleting an already removed image keeps it removed without a not-found message', async ({ page }) => {
+  let deleted = false;
+  await page.route('**/api/gallery/viewer-actions-0', async route => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    deleted = true;
+    await route.fulfill({ status: 404, json: { error: 'That item was not found' } });
+  });
+  await page.goto('/');
+  const { viewer } = await open(page);
+  await viewer.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+  await expect.poll(() => deleted).toBe(true);
+  await expect(page.locator('[data-tile-id="viewer-actions-0"]')).toHaveCount(0);
+  await expect(page.getByText('That item was not found', { exact: true })).toHaveCount(0);
 });

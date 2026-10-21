@@ -143,8 +143,7 @@ export function studioUi(page: Page) {
     /** Starts selecting gallery items, from More on the phone or the gallery toolbar. */
     async enterSelection() {
       if (await isPhone()) {
-        await openMore();
-        await more.getByRole('menuitem', { name: 'Select', exact: true }).click();
+        await page.locator('.phone-bar').getByRole('button', { name: 'Select', exact: true }).click();
       } else await page.getByRole('group', { name: 'Gallery Management', exact: true }).getByRole('button', { name: 'Select', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Stop Selecting' })).toBeVisible();
     },

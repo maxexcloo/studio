@@ -19,7 +19,9 @@
 /* The live gallery places every tile itself (VirtualMasonryGallery): one
    layer across all the grid's columns, each cell moved into its column and
    down to its row. The columns above are for the loading skeleton. */
+/* Resizing columns must not let moving tiles widen the gallery scroller. */
 .virtual-gallery-spacer {
+  overflow-x: clip;
   position: relative;
   grid-column: 1 / -1;
   width: 100%;

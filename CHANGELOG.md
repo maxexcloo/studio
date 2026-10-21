@@ -11,6 +11,24 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Controlled comparisons, clearer Details actions and steadier gallery layouts
+
+### Added
+- **Compare Variants:** make 2–4 images with a shared seed, edit each prompt and settings, vote on finished results and return to account-owned comparison history.
+- **LoRA information in Details:** compatibility, suggested strengths, notes and triggers, with both civitai.com and civitai.red links for Civitai sources.
+- **MCP Handover:** copy a conversation summary with current result references when requested or when a chat host reports its context is nearly full. Studio never guesses the host's context usage.
+
+### Changed
+- **Details copying:** Copy includes both prompts and all settings; Copy Settings includes only settings. Each prompt keeps its own Copy action.
+- **Phone selection:** Select is directly available at the top right; Menu moves beside the status light.
+
+### Fixed
+- Resizing gallery columns no longer lets moving tiles pan the gallery and shift the desktop toolbar.
+- Ordinary visual-viewport scroll events no longer restore an old gallery scroll position; keyboard close still restores its resting position.
+- Deleting an image already removed elsewhere keeps it removed without a not-found error.
+- Phone viewer confirmations reserve space for their answers so Star and Info cannot cover Delete.
+- Phone header controls stay separate at narrow widths; running jobs reuse the status slot instead of pushing into Menu or the gallery modes.
+
 ## [0.36.0] - 2026-10-21
 
 > Visual image review on request through MCP and a generation timing breakdown

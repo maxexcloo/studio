@@ -25,7 +25,7 @@ export type ItemActionGroup = 'keep' | 'make' | 'organise';
 
 export type ItemActionId =
   | 'copyItem' | 'share' | 'download' | 'animate' | 'extend' | 'reuse' | 'promptsOnly' | 'reference'
-  | 'retry' | 'upscale' | 'compare' | 'star' | 'select' | 'delete';
+  | 'retry' | 'upscale' | 'compareVariants' | 'compare' | 'star' | 'select' | 'delete';
 
 export type ItemActionHandlers = {
   showToast: ShowToast;
@@ -50,6 +50,7 @@ export type ItemActionHandlers = {
   remove: (item: GalleryItem) => void;
   star: (item: GalleryItem) => void;
   /* The same for several selected items at once. */
+  compareVariants?: (items: GalleryItem[]) => void;
   retryItems: (items: GalleryItem[]) => void;
   starItems: (items: GalleryItem[], favorite: boolean) => void;
   removeItems: (items: GalleryItem[]) => Promise<unknown>;
@@ -100,6 +101,7 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   retry: ['bar', 'dock', 'tile', 'menu'],
   upscale: ['bar', 'dock', 'menu'],
   compare: ['bar', 'dock'],
+  compareVariants: ['menu'],
   star: ['dock', 'tile', 'menu'],
   select: ['menu'],
   delete: ['bar', 'dock', 'tile', 'menu'],
@@ -136,6 +138,7 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
       id: 'upscale', group: 'make', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
       run: () => (item.upscale?.status === 'running' ? handlers.cancelUpscale(item) : handlers.upscale(item)),
     },
+    done && item.type === 'image' && Boolean(item.prompt && item.settings?.profileId) && handlers.compareVariants && { id: 'compareVariants', group: 'make', label: 'Compare Variants', Icon: Columns2, run: () => handlers.compareVariants!([item]) },
     extras.compare && item.type === 'image' && Boolean(item.upscale?.url) && !upscaledWithRun(item) && {
       id: 'compare', group: 'make', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare With the Original', Icon: Columns2, pressed: extras.compare.open, run: extras.compare.toggle,
     },
@@ -165,6 +168,7 @@ export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandle
   const actions: (ItemAction | false)[] = [
     phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
     !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
+    Boolean(handlers.compareVariants) && { id: 'compareVariants', group: 'make', label: 'Compare', tip: 'Compare Variants', Icon: Columns2, disabled: ready.length < 1 || ready.length > 4 || ready.some(item => item.type !== 'image' || !item.settings?.profileId), run: () => handlers.compareVariants!(ready) },
     failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
     { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
     { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },

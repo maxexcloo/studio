@@ -292,9 +292,9 @@ test('media and administrator credentials discover only their own friendly tools
   const f = await fixture(t, { environment: adminEnvironment });
   const media = await f.client();
   const tools = (await media.listTools()).tools;
-  assert.deepEqual(tools.map(tool => tool.name).sort(), ['Cancel', 'Generate', 'Models', 'Result', 'Reuse', 'Review', 'Status', 'Upload']);
+  assert.deepEqual(tools.map(tool => tool.name).sort(), ['Cancel', 'Generate', 'Handover', 'Models', 'Result', 'Reuse', 'Review', 'Status', 'Upload']);
   // Hosts that show MCP titles name each call in plain words.
-  assert.deepEqual(Object.fromEntries(tools.map(tool => [tool.name, tool.title])), { Cancel: 'Cancel', Generate: 'Generate', Models: 'Find Models', Result: 'Show Result', Reuse: 'Reuse Result', Review: 'Review Image', Status: 'Check Status', Upload: 'Upload Reference' });
+  assert.deepEqual(Object.fromEntries(tools.map(tool => [tool.name, tool.title])), { Cancel: 'Cancel', Generate: 'Generate', Handover: 'Copy Chat Summary', Models: 'Find Models', Result: 'Show Result', Reuse: 'Reuse Result', Review: 'Review Image', Status: 'Check Status', Upload: 'Upload Reference' });
   await failure(media, 'GPUStatus');
   const admin = await f.client('administrator', controlKey);
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
@@ -318,7 +318,7 @@ test('media and administrator credentials discover only their own friendly tools
   assert.match(tools.find(tool => tool.name === 'Generate').description, /Cloud profiles only if asked\./);
   assert.doesNotMatch(JSON.stringify(tools) + media.getInstructions(), /Grok/, 'every caller gets the same text, so none names Grok: an account may have no cloud profile');
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
-  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 8800, `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`);
+  assert.ok(JSON.stringify(tools).length + media.getInstructions().length < 9700, `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`);
   await failure(admin, 'Generate', { profile_id: imageProfile.id, prompts: ['A landscape'] });
   assert.equal(f.submitted.length, 0);
   await call(admin, 'GPUStatus');
@@ -931,7 +931,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   });
   const base = started.url.replace('localhost', '127.0.0.1');
   await client.connect(new StreamableHTTPClientTransport(new URL('/mcp', base), { requestInit: { headers: { authorization: `Bearer ${mediaKey}`, 'x-ai-user-id': 'real-server-fixture' } } }));
-  assert.equal((await client.listTools()).tools.length, 8);
+  assert.equal((await client.listTools()).tools.length, 9);
   const [first] = data(await call(client, 'Models', { kind: 'image' })).image;
   assert.ok(first);
   const profileId = first.split(' — ')[0];
@@ -2092,4 +2092,36 @@ test('Reuse preserves the seed for a requested revision only, and refuses an unk
   f.jobs.get(id).settings.seed = '9007199254740993';
   await failure(client, 'Reuse', { job_id: 'result 1', kind: 'image', preserve_seed: true });
   assert.equal(f.submitted.length, count);
+});
+
+test('Handover preserves decisions and owned job IDs for a fresh chat without generating', async t => {
+  const f = await fixture(t); const client = await f.client();
+  const id = jobId(await generate(client, { prompts: ['A heron'] }));
+  const handover = await call(client, 'Handover', { summary: 'Keep the seed. Next compare the lighting.' });
+  assert.match(texts(handover), /Keep the seed/); assert.ok(texts(handover).includes(id));
+  assert.match(texts(handover), /result numbers are local/); assert.equal(f.submitted.length, 1);
+});
+
+
+test('Handover includes only the current account and conversation and omits removed jobs', async t => {
+  const f = await fixture(t);
+  const first = await chat(t, f, 'alice', 'handover-a');
+  const second = await chat(t, f, 'alice', 'handover-b');
+  const other = await chat(t, f, 'bob', 'handover-a');
+  const kept = jobId(await generate(first));
+  const removed = jobId(await generate(first));
+  const hidden = jobId(await generate(first));
+  Object.assign(f.jobs.get(hidden), { status: 'done', outputs: [{ url: '/comfy/view?filename=removed.png' }], gallery: [] });
+  const elsewhere = jobId(await generate(second));
+  const foreign = jobId(await generate(other));
+  f.jobs.delete(removed);
+  const result = await call(first, 'Handover', { summary: 'Keep the lighting and continue the comparison.' });
+  const text = texts(result);
+  assert.ok(text.includes(kept));
+  for (const id of [removed, hidden, elsewhere, foreign]) assert.ok(!text.includes(id));
+  assert.equal(f.submitted.length, 5, 'a handover never submits another generation');
+  const fresh = await chat(t, f, 'alice', 'fresh-chat');
+  const empty = await call(fresh, 'Handover', { summary: 'Continue with the saved preferences.' });
+  assert.match(texts(empty), /saved preferences/);
+  assert.ok(!texts(empty).includes(kept));
 });

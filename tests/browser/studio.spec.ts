@@ -78,7 +78,7 @@ test('the phone top bar holds Images/Videos and the tools, with Create floating 
     await page.setViewportSize(viewport);
     const bar = (await page.locator('.phone-bar').first().boundingBox())!;
     const create = (await page.getByRole('button', { name: 'Create', exact: true }).boundingBox())!;
-    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'Menu', exact: true })]) {
+    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'Menu', exact: true }), page.getByRole('button', { name: 'Select', exact: true })]) {
       const box = (await button.boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(40);
       expect(box.height).toBeGreaterThanOrEqual(44);
@@ -88,6 +88,12 @@ test('the phone top bar holds Images/Videos and the tools, with Create floating 
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
     }
     expect(bar.height).toBeLessThanOrEqual(52);
+    if (viewport.width >= 390) await expect(page.locator('.phone-heading-name')).toBeVisible();
+    const select = await page.getByRole('button', { name: 'Select', exact: true }).boundingBox();
+    const filter = await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).boundingBox();
+    const modeBox = await mode.boundingBox();
+    expect(modeBox!.x + modeBox!.width).toBeLessThanOrEqual(filter!.x + 1);
+    expect(filter!.x + filter!.width).toBeLessThanOrEqual(select!.x + 1);
     // Create floats bottom right, within thumb reach.
     expect(create.width).toBeGreaterThanOrEqual(56);
     expect(create.y).toBeGreaterThan(viewport.height / 2);
@@ -706,6 +712,7 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   const confirmation = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Delete 2 Items?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(confirmation).toHaveCount(0);
   await expect(bar.getByRole('status')).toHaveText('2 Selected');
   await bar.getByRole('button', { name: 'Delete Selected', exact: true }).click();
   await confirmation.getByRole('button', { name: 'Delete 2', exact: true }).click();
@@ -900,5 +907,62 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
     await expect(running.getByRole('menuitem', { name: /^Stop All \(\d+\)$/ })).toBeVisible();
     await running.getByRole('menuitem', { name: 'Show Running', exact: true }).click();
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
+  }
+});
+
+
+test('viewport scrolling leaves the gallery in place and only keyboard close restores its resting position', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone gallery scrolls the document.');
+  await page.goto('/');
+  await expect(page.locator('[data-tile-id="image-0"]')).toBeVisible();
+  await page.evaluate(() => window.scrollTo({ top: 1500, behavior: 'instant' }));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1400);
+  const resting = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => window.visualViewport!.dispatchEvent(new Event('scroll')));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(resting);
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport!, 'height', { configurable: true, value: window.innerHeight - 300 });
+    window.visualViewport!.dispatchEvent(new Event('resize'));
+  });
+  await expect(page.locator('html')).toHaveClass(/kb-open/);
+  await page.evaluate(() => window.scrollTo({ top: 1000, behavior: 'instant' }));
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport!, 'height', { configurable: true, value: window.innerHeight });
+    window.visualViewport!.dispatchEvent(new Event('resize'));
+  });
+  await expect(page.locator('html')).not.toHaveClass(/kb-open/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(resting);
+});
+
+
+test('phone header targets never overlap with or without running jobs', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Phone header target geometry.');
+  for (const running of [false, true]) {
+    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: running ? [{ ...images[0], id: 'running-layout', status: 'pending', url: '' }, ...images] : images, revision: 1, hasMore: false } }));
+    await page.goto('/');
+    await expect(page.locator('[data-tile-id="image-0"]')).toBeAttached();
+    for (const width of [320, 360, 375, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      const header = page.locator('.phone-bar');
+      await expect(header.locator('.phone-running-inline')).toHaveCount(running ? 1 : 0);
+      const boxes = await header.locator('button:visible').evaluateAll(nodes => nodes.map(node => {
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { name: node.getAttribute('aria-label') || node.textContent, x, y, width, height };
+      }));
+      for (const [i, a] of boxes.entries()) {
+        expect(a.x, `${width}px ${a.name} starts on-screen`).toBeGreaterThanOrEqual(0);
+        expect(a.x + a.width, `${width}px ${a.name} ends on-screen`).toBeLessThanOrEqual(width);
+        for (const b of boxes.slice(i + 1)) {
+          const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+          const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+          expect(overlapX > 0.5 && overlapY > 0.5, `${width}px running=${running}: ${a.name} overlaps ${b.name}`).toBe(false);
+        }
+      }
+    }
+    if (running) {
+      await page.locator('.phone-running-inline').click();
+      await expect(page.getByRole('menuitem', { name: 'Show Running', exact: true })).toBeVisible();
+    }
+    await page.unroute('**/api/gallery?*');
   }
 });

@@ -36,6 +36,7 @@ export function useKeyboardInset() {
         // only a keyboard-sized gap counts.
         const open = inset > 120;
         if (open && !wasOpen) resting = window.scrollY;
+        const closed = wasOpen && !open;
         wasOpen = open;
         root.style.setProperty('--kb-inset', `${open ? inset : 0}px`);
         root.classList.toggle('kb-open', open);
@@ -46,7 +47,7 @@ export function useKeyboardInset() {
           // Closed: the layout comes back to 100dvh, and any pan iOS left behind goes with it.
           root.style.removeProperty('--vv-height');
           root.style.removeProperty('--vv-top');
-          if (viewport.offsetTop > 0 && window.scrollY !== resting) window.scrollTo(0, resting);
+          if (closed && window.scrollY !== resting) window.scrollTo(0, resting);
         }
         // A Home Screen app drawn under the status bar (black-translucent) gets a
         // window one status bar shorter than the screen, so whatever is pinned to

@@ -129,18 +129,29 @@ function TriggerWords({ words }: { words: string[] }) {
   );
 }
 
-/** Where a LoRA came from (its Civitai or Hugging Face page), as a link icon beside its info. */
-function LoraSource({ info, label }: { info?: LoraInfo; label: string }) {
-  const source = info?.sourceUrl && /^https?:\/\//i.test(info.sourceUrl) ? info.sourceUrl : '';
-  if (!source) return null;
-  return <Tip content="View Source"><a className="lora-source" href={source} target="_blank" rel="noopener noreferrer" aria-label={`View Source of ${label}`}><ExternalLink size={14} /></a></Tip>;
+/** Valid source links retain their path and query on both Civitai hosts. */
+export function loraSources(info?: LoraInfo): Array<{ label: string; url: string }> {
+  try {
+    const url = new URL(info?.sourceUrl || '');
+    if (!['https:', 'http:'].includes(url.protocol)) return [];
+    if (!['civitai.com', 'www.civitai.com', 'civitai.red', 'www.civitai.red'].includes(url.hostname)) return [{ label: 'Source', url: url.href }];
+    return ['civitai.com', 'civitai.red'].map(host => { const link = new URL(url); link.hostname = host; return { label: host, url: link.href }; });
+  } catch { return []; }
 }
 
-function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
+function LoraSource({ info, label }: { info?: LoraInfo; label: string }) {
+  const source = loraSources(info)[0];
+  return source ? <Tip content="View Source"><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View Source of ${label}`}><ExternalLink size={14} /></a></Tip> : null;
+}
+
+export function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
   const description = info?.description || info?.about;
   return <details className="lora-details">
     <summary aria-label={`Information About ${label}`} title="Info"><Info size={14} /></summary>
     <div>
+      {info?.families?.length ? <p>Family: {info.families.join(', ')}</p> : info?.base ? <p>Family: {info.base}</p> : null}
+      {info?.strengthRange ? <p>Suggested Strength: {info.strengthRange.min}–{info.strengthRange.max}</p> : null}
+      {loraSources(info).map(source => <p key={source.label}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label === 'Source' ? 'View Source' : source.label}</a></p>)}
       {description ? <p>{description}</p> : <p>No description is available.</p>}
       {info?.note ? <p>{info.note}</p> : null}
       {info?.guidance ? <p className="lora-guidance">{info.guidance}</p> : null}

@@ -455,7 +455,7 @@ export function useGenerationActions(view: any) {
 
   async function commitDelete(item: GalleryItem) {
     const response = await apiFetch(`/api/gallery/${encodeURIComponent(item.id)}`, { method: "DELETE", keepalive: true }).catch(() => null);
-    if (response?.ok) return;
+    if (response?.ok || response?.status === 404) return;
     // Put it back: the server still has it, and the screen must say so.
     galleryUpsert([item]);
     const reason = await response?.json().then((data: { error?: string }) => data?.error).catch(() => null);

@@ -9,6 +9,7 @@ import { addProbe, logDir, logWarning } from "./crash-log.js";
 import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
 import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
+import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
@@ -944,6 +945,7 @@ app.delete("/api/workflows/:id", (req, res) => {
 });
 
 registerGalleryReadRoutes(app);
+registerComparisonRoutes(app, { dataDir, gallery: () => filterVisibleGallery(gallery) });
 
 
 app.delete("/api/loras", (req, res) => {

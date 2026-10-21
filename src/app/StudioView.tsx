@@ -1,3 +1,4 @@
+import { CompareVariants } from './CompareVariants';
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
@@ -30,8 +31,9 @@ import { useModelDownloadActivity } from './ModelDownloadActivity';
 import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { useCopyFeedback } from './CopyFeedback';
-import { DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
+import { DetailsCopyActions, DetailsFooter, PromptReadout, settingsText } from './ViewerActions';
 import { itemProfile, itemProfileName } from './itemProfile';
+import { LoraDetails } from './LoraPanel';
 import { loraName, modelName } from './catalogueNames';
 import { fetchLoraInfo, knownLoraInfo } from './useLoraInfo';
 import { partName } from './partNames';
@@ -237,6 +239,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       field.setSelectionRange(field.value.length, field.value.length);
     }));
   };
+  const [comparisonItems, setComparisonItems] = React.useState<GalleryItem[] | null>(null);
   const itemActionHandlers = React.useMemo<ItemActionHandlers>(() => {
     const live = () => liveView.current;
     const compose = () => composeFromViewer.current();
@@ -257,6 +260,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         if (phoneRef.current) { live().setActive(null); setPhoneCreate(true); }
       } : undefined,
       animate: canAnimate ? (item) => setAnimationItems([item]) : undefined,
+      compareVariants: (items) => { live().setActive(null); setComparisonItems(items); },
       remove: (item) => live().deleteItem(item),
       star: (item) => live().toggleFavorite([item], !item.favorite),
       starItems: (items, favorite) => live().toggleFavorite(items, favorite),
@@ -628,6 +632,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</AdvancedPopover>}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
+      {comparisonItems ? <CompareVariants items={comparisonItems} onClose={() => setComparisonItems(null)} /> : null}
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
       <UpscaleSetupDialog
@@ -705,6 +710,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()}>
                     <div className="viewer-side-head">
                       <h3>Details</h3>
+                      <DetailsCopyActions
+                        onCopyAll={() => copyToClipboard([active.prompt ? `Prompt: ${active.prompt}` : '', active.negative ? `Negative: ${active.negative}` : '', settingsText(detailEntries)].filter(Boolean).join('\n\n'), 'Details copied')}
+                        onCopySettings={detailEntries.length ? () => copyToClipboard(settingsText(detailEntries), 'Settings copied') : undefined}
+                      />
                       {/* The desktop panel closes itself, as it covers the corner Info sits in; on the phone Info (pressed) closes it, so there is one close. */}
                       {phone ? null : <Tip content="Close Details (I)"><button type="button" className="icon-button viewer-side-close" aria-label="Close Details" onClick={() => setShowDetails(false)}><X size={16} /></button></Tip>}
                     </div>
@@ -731,6 +740,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                                   {section.loras.map((lora, index) => (
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
                                       <span className="detail-lora-name" title={lora.file}>{lora.name}</span>
+                                      <LoraDetails info={loraInfos?.[lora.file] || Object.entries(loraInfos || {}).find(([file]) => file.split(/[\\/]/).pop() === lora.file)?.[1]} label={lora.name} />
                                       <i aria-hidden="true" />
                                       <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
                                     </li>
@@ -743,8 +753,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                       ) : null}
                     </div>
                     <DetailsFooter
-                      onCopyPrompts={active.prompt ? () => copyToClipboard([active.prompt, active.negative ? `Negative: ${active.negative}` : ""].filter(Boolean).join("\n\n"), "Prompts copied") : undefined}
-                      onCopySettings={detailEntries.length ? () => copyToClipboard(settingsText(detailEntries), "Settings copied") : undefined}
+                      onCompare={active.type === "image" && active.settings?.profileId ? () => itemActionHandlers.compareVariants?.([active]) : undefined}
                       onEdit={active.prompt ? () => itemActionHandlers.promptsOnly(active) : undefined}
                       onRerun={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
                     />

@@ -143,7 +143,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect.poll(async () => Math.abs((await other.boundingBox())!.y - before!.y)).toBeLessThan(2);
   await picker.getByLabel('Information About Cards One', { exact: true }).click();
   await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
-  await expect(picker.getByRole('link', { name: 'View Source' })).toHaveAttribute('href', 'https://example.com/cards');
+  await expect(picker.getByRole('link', { name: 'View Source', exact: true })).toHaveAttribute('href', 'https://example.com/cards');
   await expect(other).toHaveAttribute('aria-checked', 'true');
   // Rows never move: the stack order shows in the Selected tab, where they reorder by drag, grip keys or Move.
   const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');

@@ -22,7 +22,7 @@ const maxGenerateWaitSeconds = 60;
 const tierWords = '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
 const mediaInstructions = (writing) => `Studio makes images and videos. For each one the user asks for, follow their instructions: call Generate once with request (the user's words, with anything they refer back to), kind and tier (${tierWords}). ${writing
   ? "Studio writes the prompt; don't expand the request."
-  : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply briefly as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all"). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Only when asked to judge, compare or improve images, call Review. Assess its pixels; rerender only when asked.`;
+  : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply briefly as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all"). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Only when asked to judge, compare or improve images, call Review. Assess its pixels; rerender only when asked. When the host reports about 90% context used, call Handover with decisions and unfinished work and show its copy-paste summary. Never estimate usage yourself.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
 const unlinkedMessage = 'This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.';
 const anonymousMessage = 'The gateway must forward its user identity.';
@@ -333,6 +333,16 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
       tool(server, 'Result', 'Show Result', 'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for "show them" or "show me all"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its link: share it and stop. Never poll.', { ...output, job_id: z.string().min(1).max(200), delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => /^\s*all\s*$/i.test(job_id) ? media.resultsAll(owner, refs, { signal }) : media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      tool(server, 'Handover', 'Copy Chat Summary', 'Prepare a copy-paste summary when asked or when the host reports about 90% context used. Pass decisions, preferences and unfinished work as summary. Never guesses context usage.', {
+        summary: z.string().trim().min(1).max(12000)
+      }, async ({ summary }, signal) => {
+        const jobs = (await media.scopeJobs(owner, refs, { signal }))
+          .filter(({ job }) => !['done', 'completed', 'succeeded'].includes(job.status) || job.outputs?.some(output => mcpOutputPath(output.url)))
+          .slice(-12);
+        const results = jobs.map(({ jobId, number, job }) => `- Result ${number}: job_id ${jobId} (${job.status}) — ${media.pageUrl(owner, jobId)}`);
+        const handover = ['Continue this Studio task.', '', summary, '', 'Studio Results', ...results, '', 'Use the job_id values above in the new chat; result numbers are local to the old chat. Do not regenerate or poll unless asked.'].join('\n');
+        return { content: [{ type: 'text', text: handover }], structuredContent: { summary: handover } };
+      }, { readOnlyHint: true });
       tool(server, 'Review', 'Review Image', 'Inspect images only when asked. Returns pixels, prompt and settings; compare_to adds another result’s first output. Read-only.', {
         ...output, compare_to: z.string().min(1).max(200).optional()
       }, async ({ job_id, output_index, compare_to }, signal) => {
