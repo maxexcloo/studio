@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Menu search stays in place, gallery searches and filters swap without a reload, Upload leads Uploads, This Model shows the family's LoRAs, Advanced uses one dropdown, and Generate is labelled
+
 ### Changed
 - **Menu search:** in every dropdown and gallery filter menu, the search icon sits right after the menu's title and stays there, amber and pressed while the field is open; pressing it again clears and folds the search. The field drops down under the title and folds back up, and the menu keeps the full list's height while searching instead of shrinking to the matches.
 - **Desktop gallery:** the search field opens and folds smoothly. A search, a filter or Hide Failed & Queued keeps the list on screen until the new one arrives and swaps it in place, without the blank frame and fade of a fresh load; only the first load and Images | Videos fade in.
