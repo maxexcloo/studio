@@ -614,7 +614,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
           ) : (
             <span className="model-copy">
               <strong>{modelName(selected).name}</strong>
-              <em>{selected ? familyLabel(selected) : "No model yet"}</em>
+              <em>{selected ? familyLabel(selected) : "No Model Yet"}</em>
             </span>
           )}
           <ChevronDown size={14} className={cn(open && "flip")} />
@@ -624,7 +624,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
           <header className="reference-popover-head model-menu-head" aria-label="Models">{/* No title on the desktop: the filter dropdown leads the heading. */}<span ref={heading.ref} className="surface-head-slot" /><button type="button" className="reference-popover-close" aria-label="Close Models" onClick={close}><X size={16} /></button></header>
           {profiles.length ? null : (
             <EmptyState title="No Models Yet" action={onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}>
-              {emptyHint || "No usable models in ComfyUI yet."}
+              {emptyHint || "Add a model to ComfyUI to see it here."}
             </EmptyState>
           )}
           {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" searchMode="row" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">

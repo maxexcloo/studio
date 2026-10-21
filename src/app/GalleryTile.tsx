@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Check, Loader2, MoreHorizontal, Square } from 'lucide-react';
+import { Check, LoaderCircle, MoreHorizontal, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { tweens } from "@/lib/springs";
 import { clockTime, cn } from './format';
@@ -86,7 +86,7 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale, className }: { 
         aria-disabled={busy}
         onClick={() => { if (!busy) (running ? onCancelUpscale(item) : onUpscale(item)); }}
       >
-        {busy ? <Loader2 size={14} className="spin" /> : running ? <Square size={10} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
+        {busy ? <LoaderCircle size={14} className="spin" /> : running ? <Square size={10} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
         {running ? (
           // A stroked circle, not a masked gradient: hard gradient stops are not anti-aliased and read as jagged.
           <svg className="tile-upscale-ring" viewBox="0 0 30 30" aria-hidden="true" focusable="false">

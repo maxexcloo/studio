@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockGallery } from './helpers/ui';
 
 /*
  * First and incremental gallery loads on a throttled CPU (Remaining UI
@@ -15,14 +16,11 @@ const all = Array.from({ length: 240 }, (_, index) => {
 const PAGE = 80;
 
 async function open(page: Page) {
-  await page.route('**/api/gallery?*', (route) => {
-    const url = new URL(route.request().url());
+  await mockGallery(page, (url) => {
     const start = Number(url.searchParams.get('cursor') || 0);
-    const items = url.searchParams.get('type') === 'video' ? [] : all.slice(start, start + PAGE);
     const next = start + PAGE < all.length ? String(start + PAGE) : '';
-    return route.fulfill({ json: { items, revision: 1, hasMore: Boolean(next), nextCursor: next, totalApprox: all.length } });
+    return { items: url.searchParams.get('type') === 'video' ? [] : all.slice(start, start + PAGE), hasMore: Boolean(next), nextCursor: next, totalApprox: all.length };
   });
-  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.addInitScript(() => {
     const stats = { shift: 0, longTasks: [] as number[], moved: 0, frames: 0 };
     (window as any).__load = stats;

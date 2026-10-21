@@ -103,7 +103,7 @@ function useWorkerRestart(worker: Draft, live: WorkerState | undefined, showToas
       setPhase('restarting');
       window.dispatchEvent(new CustomEvent('studio:comfy-restart'));
     } catch {
-      showToast('Can’t reach Studio. Make sure it’s running.', 'error');
+      showToast('Couldn’t reach Studio. Make sure it’s running', 'error');
       setPhase('');
     }
   };
@@ -226,7 +226,7 @@ export function WorkerSettings({ status, showToast, onChanged, onCheck }: { stat
       showToast('Workers saved', 'success');
       onChanged();
     } catch {
-      showToast('Can’t reach Studio. Make sure it’s running.', 'error');
+      showToast('Couldn’t reach Studio. Make sure it’s running', 'error');
     } finally { setBusy(false); }
   };
   if (!list) {

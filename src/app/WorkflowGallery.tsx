@@ -255,12 +255,12 @@ export function WorkflowGallery({ view }: { view: any }) {
   const agentCopy = useCopyFeedback();
   const copyAgent = (text: string, key: string) => agentCopy.copyWith(async () => {
     const ok = await copyText(text);
-    if (!ok) showToast("Copy failed", "error");
+    if (!ok) showToast("Couldn’t copy", "error");
     return ok;
   }, key);
   const copyMissing = (nodes: string[]) => nodesCopy.copyWith(async () => {
     const ok = await copyText(nodes.join("\n"));
-    if (!ok) showToast("Copy failed", "error");
+    if (!ok) showToast("Couldn’t copy", "error");
     return ok;
   });
 
@@ -460,7 +460,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             title={query ? "No Matching Workflows" : filter === "favorites" ? "No Favourites Yet" : `No ${kind === "video" ? "Video" : "Image"} Workflows Yet`}
             action={query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
           >
-            {query ? "Try another name." : filter === "favorites" ? "Tap the heart on a workflow to add it here." : thisComputer ? "Import one to start." : ""}
+            {query ? "Try another name." : filter === "favorites" ? "Star a workflow to add it here." : thisComputer ? "Import one to start." : ""}
           </EmptyState>
         )}
       </section>
@@ -472,7 +472,7 @@ export function WorkflowGallery({ view }: { view: any }) {
             <div className="wf-detail-head">
               <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
               <h3>{workflowCardText(selected).name}</h3>
-              <button type="button" className={cn("wf-star", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Remove from Favourites" : "Add to Favourites"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favourites", "error"))}>
+              <button type="button" className={cn("wf-star", selected.favorite && "active")} aria-pressed={Boolean(selected.favorite)} aria-label={selected.favorite ? "Unstar" : "Star"} disabled={busy} onClick={() => updateFavorites(selected.id).catch((error) => showToast(error instanceof Error ? error.message : "Couldn’t update favourites", "error"))}>
                 <Star size={16} fill={selected.favorite ? "currentColor" : "none"} />
               </button>
             </div>

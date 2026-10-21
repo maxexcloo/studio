@@ -258,7 +258,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             <Group title="Features">
               {administrator && inpaintFlag
                 ? <SwitchRow label="Inpainting" description={`Paint over part of a reference image to change just that part. For everyone${inpaintFlag.locked ? '; locked by the server' : '; applies after a restart'}`} checked={inpaintOn} disabled={inpaintFlag.locked || inpaintBusy} onChange={(next) => void setInpainting(next)} />
-                : <Row label="Inpainting" description={inpaintOn ? 'Paint over part of a reference image to change just that part' : 'Off for this Studio'}><Status tone={inpaintOn ? 'ok' : undefined}>{inpaintOn ? 'On' : 'Off'}</Status></Row>}
+                : <Row label="Inpainting" description={inpaintOn ? 'Paint over part of a reference image to change just that part' : 'Off for This Deployment'}><Status tone={inpaintOn ? 'ok' : undefined}>{inpaintOn ? 'On' : 'Off'}</Status></Row>}
               <SwitchRow label={preferenceLabels.smartUpscale} description="An upscale arrow on finished images saves a larger copy beside the original" checked={prefs.smartUpscale} onChange={(next) => setPrefs({ smartUpscale: next })} />
             </Group>
             <Group title="Gallery">

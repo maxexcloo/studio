@@ -61,12 +61,8 @@ export function formatGB(value: number) {
   return `${Number.isInteger(value) ? value : value.toFixed(value < 10 ? 1 : 0)} GB`;
 }
 
-/** Decimal, like the setup panel and the file browser: 12.5 GB, 250 MB. */
-export function formatDownload(bytes = 0) {
-  if (!bytes) return '';
-  const gb = bytes / 1e9;
-  return gb >= 1 ? `${gb.toFixed(gb >= 10 ? 0 : 1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
-}
+/** Decimal, like the setup panel and the file browser: 12.5 GB, 250 MB (format.ts has the one definition). */
+export { formatDownloadSize as formatDownload } from './format';
 
 /**
  * A rough memory figure for a model file already in ComfyUI: its weights, and

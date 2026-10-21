@@ -125,7 +125,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     const landed = gallery.find((item) => item.status === 'done' && pendingJobs.current.has(item.jobId || item.id) && !nowPending.has(item.jobId || item.id));
     pendingJobs.current = nowPending;
     if (!landed) return;
-    if (!createOpen && !active) showToast(landed.type === 'video' ? 'Video Ready' : 'Image Ready', 'success', {
+    if (!createOpen && !active) showToast(landed.type === 'video' ? 'Video ready' : 'Image ready', 'success', {
       duration: 5500,
       group: 'phone-generation-ready',
       action: { label: 'View', onClick: () => openItem(landed) }

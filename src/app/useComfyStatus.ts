@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { apiJson } from './api';
+import { apiFetch, apiJson } from './api';
 import { tellPreviousExit } from './clipboardNotices';
 import { setAtComputer, setThisComputer } from './device';
 import { showToastTone as showToast } from './toast';
@@ -20,7 +20,7 @@ export function useComfyStatus({ refreshModels }: { refreshModels: () => unknown
   function refreshHealth() {
     // 503 only means ComfyUI isn't answering: its body still says whether
     // this is the computer that looks after Studio, so read it either way.
-    fetch("/api/health", { cache: "no-store" })
+    apiFetch("/api/health", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => null) as Health | null;
         if (!data) throw new Error(response.statusText || "Connection failed");
@@ -29,7 +29,7 @@ export function useComfyStatus({ refreshModels }: { refreshModels: () => unknown
         if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
         if (data.previousExit) tellPreviousExit(data.previousExit);
       })
-      .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach Studio. Make sure it’s running." }));
+      .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Couldn’t reach Studio. Make sure it’s running" }));
   }
 
   /** The status poll mostly returns the same answer; a new object would re-render the whole app every five seconds. */

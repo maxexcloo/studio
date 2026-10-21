@@ -119,7 +119,7 @@ function AccountSignIn({ recovery, setupToken, oidcLabel, onSignedIn }: { recove
       window.setTimeout(onSignedIn, 400);
     } catch (reason) {
       setStage('failed');
-      setError(reason instanceof Error ? reason.message : 'Sign-in failed.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t sign in');
     }
   };
   const edit = (set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +213,7 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="empty stage-empty lock-stage">
         <div className="stage-mark"><LockMark className="stage-layer" stage={stage} /></div>
         <div className="stage-copy">
-          <h2>{stage === 'opening' ? 'Signed in' : 'Sign in to Studio'}</h2>
+          <h2>{stage === 'opening' ? 'Signed In' : 'Sign In to Studio'}</h2>
           <p>Enter the studio password set on the computer running Studio.</p>
           <div className="empty-actions">
             {stage !== 'opening' ? (
@@ -234,7 +234,7 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
                     disabled={working}
                     onChange={(event) => { setPassword(event.target.value); if (stage === 'failed') setStage('locked'); }}
                   />
-                  <button type="submit" disabled={!password || working}>{working ? '…' : 'Sign in'}</button>
+                  <button type="submit" disabled={!password || working}>{working ? '…' : 'Sign In'}</button>
                 </form>
                 <div className="unlock-meta" aria-live="polite">
                   {error ? <span className="is-error">{error}</span> : null}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, apiJson } from './api';
+import { ApiError, apiFetch, apiJson } from './api';
 import type { AutoUpscale, GalleryItem, NativeSize, NativeSupport, Preferences, UpscaleInstall, UpscaleQuality, UpscaleStatus } from './types';
 import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
@@ -245,9 +245,9 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     const url = `/api/upscale/status?quality=${encodeURIComponent(quality)}${fresh ? "&fresh=1" : ""}`;
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await apiFetch(url);
     } catch {
-      return failStatus("Can’t reach Studio.", true);
+      return failStatus("Couldn’t reach Studio", true);
     }
     // Report what actually came back rather than guessing at a cause: a non-JSON
     // body means something other than this route answered (SPA shell, proxy).

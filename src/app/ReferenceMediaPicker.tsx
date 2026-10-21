@@ -9,7 +9,7 @@ import { Tip } from "./components";
 import { EmptyState } from "./EmptyState";
 import { useDismiss } from "./useDismiss";
 import { popoverMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
-import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
+import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, scopedStorageKey, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
@@ -157,7 +157,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     } catch (error) {
       if (requests.current.get(target) !== controller) return;
       const aborted = error instanceof Error && error.name === "AbortError";
-      setPages((current) => ({ ...current, [target]: { ...current[target], loading: false, loaded: true, error: aborted ? "The list took too long to load. Try again." : error instanceof Error ? error.message : "Couldn’t load images" } }));
+      setPages((current) => ({ ...current, [target]: { ...current[target], loading: false, loaded: true, error: aborted ? "Couldn’t load the list in time" : error instanceof Error ? error.message : "Couldn’t load images" } }));
     } finally {
       window.clearTimeout(timeout);
       if (requests.current.get(target) === controller) requests.current.delete(target);
@@ -401,7 +401,7 @@ export function referenceName(name: string) {
 const hoverOpenDelay = 70;
 const hoverCloseDelay = 260;
 const inpaintIntroKey = "studio-inpaint-introduced";
-const inpaintIntroduced = () => { try { return localStorage.getItem(inpaintIntroKey) === "1"; } catch { return true; } };
+const inpaintIntroduced = () => { try { return (localStorage.getItem(scopedStorageKey(inpaintIntroKey)) ?? localStorage.getItem(inpaintIntroKey)) === "1"; } catch { return true; } };
 const coarsePointer = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 const noHoverQuery = "(hover: none)";
 /** A screen with no hover (a phone, a tablet without a trackpad), kept live: a trackpad can come and go. The CSS's always-shown × uses the same test. */
@@ -417,7 +417,7 @@ function useNoHover() {
   }, []);
   return none;
 }
-const rememberInpaintIntro = () => { try { localStorage.setItem(inpaintIntroKey, "1"); } catch { /* shown again next time, which is fine */ } };
+const rememberInpaintIntro = () => { try { localStorage.setItem(scopedStorageKey(inpaintIntroKey), "1"); } catch { /* shown again next time, which is fine */ } };
 
 const fullMessage = (max: number) => `Up to ${max} references. Take one off to add another`;
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockGallery } from './helpers/ui';
 
 /*
  * Geometry probes for the full studio (Verification › Desktop view): while
@@ -24,13 +25,7 @@ const layouts = [
 ];
 
 async function open(page: Page, viewport: { width: number; height: number }) {
-  await page.route('**/api/gallery?*', (route) => {
-    const url = new URL(route.request().url());
-    const q = url.searchParams.get('q') || '';
-    const list = url.searchParams.get('type') === 'video' ? [] : items.filter((item) => item.prompt.includes(q));
-    return route.fulfill({ json: { items: list, revision: 1, hasMore: false } });
-  });
-  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await mockGallery(page, (url) => url.searchParams.get('type') === 'video' ? [] : items.filter((item) => item.prompt.includes(url.searchParams.get('q') || '')));
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
   await page.setViewportSize(viewport);
   await page.goto('/');

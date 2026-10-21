@@ -285,7 +285,7 @@ export function startLoraSync() {
     lastPull = Date.now();
     if (pending.length) return flush();
     try {
-      const response = await fetch('/api/loras/library');
+      const response = await apiFetch('/api/loras/library');
       if (!response.ok) return;
       const data = await response.json();
       if (pending.length) return flush();

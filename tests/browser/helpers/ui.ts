@@ -255,3 +255,18 @@ export async function expectPickerView(surface: Locator, name: string) {
   }
   await expect(surface.locator('.dropdown-trigger.picker-view')).toContainText(name);
 }
+
+/**
+ * Serves the gallery from `items` (or a function of the request URL, for
+ * modes, searches and pages) with an empty delta, so the list stays as given.
+ * The shape most specs mock by hand.
+ */
+export async function mockGallery(page: Page, items: object[] | ((url: URL) => { items: object[]; hasMore?: boolean; nextCursor?: string; totalApprox?: number } | object[])) {
+  await page.route('**/api/gallery?*', (route) => {
+    const url = new URL(route.request().url());
+    const result = typeof items === 'function' ? items(url) : items;
+    const body = Array.isArray(result) ? { items: result, hasMore: false } : { hasMore: false, ...result };
+    return route.fulfill({ json: { revision: 1, ...body } });
+  });
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+}

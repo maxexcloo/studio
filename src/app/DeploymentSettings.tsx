@@ -67,7 +67,7 @@ function useSaveSetting(showToast: ShowToast, onSaved: () => void) {
       if (!response.ok) { showToast(data.error || 'Couldn’t save that setting.', 'error'); return; }
       showToast(data.setting?.applies === 'restart' ? 'Saved. Restart Studio to apply it.' : 'Saved', 'success');
       onSaved();
-    } catch { showToast('Can’t reach Studio. Make sure it’s running.', 'error'); }
+    } catch { showToast('Couldn’t reach Studio. Make sure it’s running', 'error'); }
     finally { setBusy(''); }
   };
   return { busy, save };
@@ -114,7 +114,7 @@ function AssistantRows({ assistant, showToast, onSaved }: { assistant: Assistant
       if (!response.ok) { showToast?.(data.error || 'Couldn’t save that setting.', 'error'); return; }
       showToast?.('Saved', 'success');
       onSaved?.();
-    } catch { showToast?.('Can’t reach Studio. Make sure it’s running.', 'error'); }
+    } catch { showToast?.('Couldn’t reach Studio. Make sure it’s running', 'error'); }
     finally { setBusy(''); }
   };
   const options = (entry: AssistantModel, first: { label: string; value: string }) => {

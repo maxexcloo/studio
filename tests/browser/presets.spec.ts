@@ -147,7 +147,7 @@ test('missing LoRAs and filename conflicts remain explicit and download errors a
   await expect(dialog.getByText('Civitai requires access to this resource.', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Download Missing', exact: true }).click();
   // The failure goes to the status pill, not a box in the panel.
-  await expect(statusPill(page).filter({ hasText: 'Civitai requires access to this resource.' })).toBeVisible();
+  await expect(statusPill(page).filter({ hasText: 'Civitai requires access to this resource' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Use Prompt', exact: true })).toBeEnabled();
   await page.route('**/api/presets/resolve', (route) => route.fulfill({ json: { preset: { ...missing, resources: missing.resources.map((item) => item.versionId === 18 ? { ...item, status: 'conflict' } : item) } } }));
   await dialog.getByRole('button', { name: 'Check Again', exact: true }).click();

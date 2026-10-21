@@ -593,7 +593,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
       value={active?.id || ''}
       reselect
       searchFrom={Infinity}
-      empty="No saved stacks yet."
+      empty="No saved stacks yet"
       onChange={(id) => { const stack = sorted.find((item) => item.id === id); if (stack) { onLoad(stack); setActiveId(stack.id); } }}
       actions={[
         { id: 'new', label: 'Save Current as New Stack', disabled: !loras.length, keepOpen: true, onSelect: () => setNaming('new') },

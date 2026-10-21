@@ -34,6 +34,8 @@ const tint = "#ff9a52";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
+/** A focused control keeps its own keys: Space presses a button, arrows move a slider. */
+const control = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest('button, a[href], [role="slider"], [role="menuitem"], [role="option"], [role="switch"]'));
 
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Extract<Stroke, { kind: "stroke" }>, from = 0) {
   const { points, size } = stroke;
@@ -491,10 +493,20 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
     return () => viewport.removeEventListener("wheel", handler);
   }, [size]);
 
+  // Focus moves into the studio as it opens (it is not modal: the prompt stays usable) and goes back where it was when it closes.
+  React.useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    requestAnimationFrame(() => { if (popRef.current && !popRef.current.contains(document.activeElement)) popRef.current.focus({ preventScroll: true }); });
+    return () => { if (opener?.isConnected && (!document.activeElement || document.activeElement === document.body)) opener.focus({ preventScroll: true }); };
+  }, []);
+
   /* ---- Keys: B, E, H, Space, [ ], 0, ⌘Z, ⇧⌘Z, Delete. Never while typing the prompt. */
   React.useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      if (typing(event.target)) return;
+      if (typing(event.target) || control(event.target)) return;
+      // Only for the painting: focus in the studio, or nowhere in particular.
+      const target = event.target instanceof Node ? event.target : null;
+      if (target && target !== document.body && !popRef.current?.contains(target)) return;
       const mod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
       let handled = true;
@@ -550,6 +562,7 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
       style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom, height, transformOrigin: "bottom center" }}
       role="dialog"
       aria-label="Paint the Part to Change"
+      tabIndex={-1}
       data-open-surface
       {...popoverMotion}
       {...settling}
