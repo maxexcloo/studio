@@ -14,7 +14,9 @@ import type { LoraSuggestion, PromptAssistant } from './usePromptAssistant';
 export const assistantButtonWidth = 52;
 export const negativeAssistantWidth = 30;
 
-const presetOptions = (assistant: PromptAssistant) => assistant.presets.map((preset) => ({ value: preset.id, label: preset.label, detail: preset.description }));
+// Enhance leads, the other presets read alphabetically, and Suggest LoRAs (an action) closes the menu.
+const presetOrder = (a: { id: string; label: string }, b: { id: string; label: string }) => Number(b.id === 'enhance') - Number(a.id === 'enhance') || a.label.localeCompare(b.label);
+const presetOptions = (assistant: PromptAssistant) => [...assistant.presets].sort(presetOrder).map((preset) => ({ value: preset.id, label: preset.label, detail: preset.description }));
 const presetActions = (assistant: PromptAssistant): DropdownAction[] => assistant.lorasOffered ? [{ id: 'loras', label: 'Suggest LoRAs', onSelect: assistant.suggestLoras, disabled: Boolean(assistant.busy) }] : [];
 
 /**

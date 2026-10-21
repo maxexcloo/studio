@@ -59,6 +59,18 @@ async function rewriteWith(page: Page, phone: boolean, preset = 'Enhance') {
   }
 }
 
+test('the preset menu reads Enhance, the other presets alphabetically, then Suggest LoRAs', async ({ page }) => {
+  await mockStudio(page);
+  await page.goto('/');
+  const ui = studioUi(page);
+  const phone = await ui.isPhone();
+  const composer = await ui.openComposer();
+  await composer.getByRole('combobox', { name: phone ? 'Prompt Assistant' : 'Rewrite Presets', exact: true }).click();
+  const menu = page.locator('.dropdown-menu');
+  const rows = (await menu.locator('[role="option"], [role="group"] button').allInnerTexts()).map((text) => text.split('\n')[0].trim());
+  expect(rows).toEqual(['Enhance', 'Cinematic', 'Photographic', 'Suggest LoRAs']);
+});
+
 test('the magic button streams a rewrite in place, with Undo and the old text in History', async ({ page }) => {
   const { recorded } = await mockStudio(page);
   const rewrite = await holdRewrite(page);

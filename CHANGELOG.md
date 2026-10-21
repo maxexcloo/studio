@@ -12,6 +12,7 @@ version opens with a `> ` summary line.
 ## [Unreleased]
 
 ### Changed
+- **Prompt Assistant menus:** Enhance leads, the other presets read alphabetically, and Suggest LoRAs closes the menu, on the desktop caret and the phone list.
 - **Details › Timing:** reads Active (the time shown everywhere else), Total, Queue, Setup, Sampling and Finishing, without "(Est.)".
 - **Server:** the exit record finds the data folder through the shared helper the rest of the server uses; trash batches, download resume notes, the SeedVR2 validation cache, Studio imports and the exit record are written with the server's crash-safe JSON write.
 - **Docs:** Security and Troubleshooting describe account mode first; LAN mode and the studio password are described only for a single-user studio.
