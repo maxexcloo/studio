@@ -17,6 +17,12 @@ version opens with a `> ` summary line.
 - **Details:** the Model group shows the Profile only; there is no Weights row. LoRAs show by name with their information, and Copy lists their files and strengths.
 - **Gallery:** a desktop tile's hover caption names the profile, as Details does.
 
+### Fixed
+- **Long video runs:** a worker too busy to answer in time (decoding and saving a long video) keeps its run waiting instead of being given up after a minute; only 20 minutes without any answer or progress ends it. A run given up on while still in ComfyUI's queue is followed again and delivered from its history as soon as it finishes, rather than five minutes later.
+- **Recovered results:** an output restored from ComfyUI's history keeps its tile's place in the job, request time, settings, references and owner, and takes its elapsed and run time from the run's own start and end. MCP Status and Result list its outputs again, and its result links open.
+- **Job recovery:** while every unfinished job is one Studio is following, recovery no longer asks each worker for its queue and 500 history entries every five seconds or compares the whole gallery; a recovered job with a known prompt is looked up on its own.
+- **MCP Status:** a job read that stalls ends after 15 seconds with a reply that the generation keeps running and to check its link later without resubmitting, instead of holding the chat for up to a minute per read.
+
 ## [0.42.0] - 2026-10-21
 
 > Studio gains the Library (Civitai, Hugging Face and image imports, graded with their missing files, substitutes, version offers and update checks), a prompt assistant in the composer, Refine in Chat, Studio-owned profiles and guides with versions and AI drafts, and MCP admin tools for the Library and profiles, plus a round of UI polish: Groups, pickers, selection and the phone shell
