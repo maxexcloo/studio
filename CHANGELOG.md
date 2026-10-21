@@ -15,6 +15,7 @@ version opens with a `> ` summary line.
 
 ### Changed
 - **Details:** the Model group shows the Profile only; there is no Weights row. LoRAs show by name with their information, and Copy lists their files and strengths.
+- **Gallery:** a desktop tile's hover caption names the profile, as Details does.
 
 ## [0.42.0] - 2026-10-21
 
