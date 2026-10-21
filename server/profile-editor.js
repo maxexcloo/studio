@@ -6,20 +6,22 @@ import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { requireAdmin } from "./route-access.js";
 import { profileStore } from "./profile-store.js";
+import { profileBlock, profileBlockName, profileBlocksIn } from "./profile-block.js";
 
 /**
- * Settings › Profiles: an administrator edits Studio's own copy of one model
- * profile (a workflow JSON in the data folder) as text. Each save keeps the
- * previous file in backups and is listed in `.studio-edits.json` beside the
- * profiles, which says which copies differ from the profiles repository until
- * those edits are committed there.
+ * Settings › Profiles: an administrator edits one of Studio's model profiles
+ * (a workflow JSON in the data folder) as text. Studio is the only writer of
+ * live profiles; the profiles repository is seed and backup (profile-seed.js,
+ * profile-export.js). Each save keeps the previous file in backups, becomes a
+ * version (profile-store.js) and is listed in `.studio-edits.json` beside the
+ * profiles.
  */
 export const editsFile = () => path.join(userWorkflowsDir, ".studio-edits.json");
 const backupsDir = () => path.join(dataDir, "backups", "profile-edits");
 const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
 const hashOf = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const fileFor = (id) => path.join(userWorkflowsDir, `${id}.json`);
-const metaOf = (raw) => raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio || null;
+const metaOf = (raw) => profileBlock(raw);
 
 function readEdits() {
   try { const saved = readJsonFile(editsFile()); return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {}; }
@@ -30,19 +32,58 @@ function readEdits() {
 export function listEditableProfiles() {
   if (!fs.existsSync(userWorkflowsDir)) return [];
   const edits = readEdits();
+  const versions = profileStore({ workflowsDir: userWorkflowsDir }).metas();
   return fs.readdirSync(userWorkflowsDir).filter((name) => name.endsWith(".json") && !name.startsWith(".")).map((name) => {
     const id = name.slice(0, -5);
     let raw = null;
     try { raw = JSON.parse(fs.readFileSync(path.join(userWorkflowsDir, name), "utf8")); } catch { /* listed as unreadable */ }
     const meta = metaOf(raw) || {};
-    return { id, profileId: `custom:${meta.id || id}`, name: String(meta.name || id), kind: meta.kind === "video" ? "video" : "image", family: String(meta.family || ""), readable: Boolean(raw), edited: edits[id] || null };
+    const version = versions[id] || null;
+    return {
+      id, profileId: `custom:${meta.id || id}`, name: String(meta.name || id), kind: meta.kind === "video" ? "video" : "image", family: String(meta.family || ""), readable: Boolean(raw), edited: edits[id] || null,
+      version: version?.version || 0, origin: version?.origin || "seed", aiDrafted: version?.aiDrafted === true, nsfw: meta.nsfw === true
+    };
   }).filter((item) => validId(item.id)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function readEditableProfile(id) {
   if (!validId(id) || !fs.existsSync(fileFor(id))) throw Object.assign(new Error("That profile was not found."), { status: 404 });
   const text = fs.readFileSync(fileFor(id), "utf8");
-  return { id, text, hash: hashOf(text), edited: readEdits()[id] || null };
+  return { id, text, hash: hashOf(text), edited: readEdits()[id] || null, version: profileStore({ workflowsDir: userWorkflowsDir }).meta(id) };
+}
+
+/** Whether a profile id is in use now or was ever held by Studio (so a new draft never reuses it). */
+export function profileIdTaken(id) {
+  return !validId(id) || fs.existsSync(fileFor(id)) || profileStore({ workflowsDir: userWorkflowsDir }).known(id);
+}
+
+/**
+ * Adds a new profile file (an AI draft from a checkpoint import), checked like any edit. It is
+ * listed in `.studio-edits.json` too, so no seed deploy would ever write over it, and becomes the
+ * profile's next version with its origin and AI-Drafted marker.
+ */
+export function createEditableProfile(id, text, { by = "", info = null, origin = "ai", aiDrafted = true, note = "" } = {}) {
+  if (!validId(id)) throw Object.assign(new Error("Choose a profile id: lowercase letters, digits, dots, dashes or underscores."), { status: 400 });
+  if (fs.existsSync(fileFor(id))) throw Object.assign(new Error("A profile with that id already exists."), { status: 409 });
+  const checked = validateProfileText(id, text, { info });
+  if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
+  const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
+  fs.mkdirSync(userWorkflowsDir, { recursive: true });
+  const temporary = `${fileFor(id)}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, next, { flag: "wx" });
+  fs.renameSync(temporary, fileFor(id));
+  const at = new Date().toISOString();
+  const edits = readEdits();
+  edits[id] = { editedAt: at, by: String(by || ""), baseHash: "" };
+  writeJsonFile(editsFile(), edits);
+  profileStore({ workflowsDir: userWorkflowsDir }).record(id, next, { by, origin, aiDrafted, at, note });
+  return { ...readEditableProfile(id), warnings: checked.warnings };
+}
+
+/** Clears AI-Drafted on a profile: an administrator reviewed it, so it follows access profiles. */
+export function approveEditableProfile(id, { by = "" } = {}) {
+  readEditableProfile(id);
+  return profileStore({ workflowsDir: userWorkflowsDir }).approve(id, { by });
 }
 
 const controlTargets = (meta) => Object.entries(meta?.controls || {}).filter(([, value]) => value && typeof value === "object" && "node" in value);
@@ -61,14 +102,18 @@ export function validateProfileText(id, text, { info = null } = {}) {
   catch (error) { return { ok: false, errors: [`Not valid JSON: ${error.message}`], warnings }; }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, errors: ["The profile must be a JSON object."], warnings };
   const meta = metaOf(raw);
-  if (!meta || typeof meta !== "object") errors.push("Missing the heissUi block that describes the profile.");
+  // Studio reads the new "studio" name and "heissUi"; both at once leaves it unclear which applies.
+  const block = profileBlockName(raw) || "heissUi";
+  const blocks = profileBlocksIn(raw);
+  if (blocks.length > 1) errors.push(`Keep one profile block: this file has ${blocks.join(" and ")}.`);
+  if (!meta || typeof meta !== "object") errors.push("Missing the heissUi (or studio) block that describes the profile.");
   else {
-    if (!String(meta.name || "").trim()) errors.push("heissUi.name is required.");
-    if (meta.id && meta.id !== id) errors.push(`heissUi.id must stay "${id}"; save a copy under a new file to rename it.`);
-    if (meta.kind && !["image", "video"].includes(meta.kind)) errors.push("heissUi.kind must be image or video.");
-    if ("nsfw" in meta && typeof meta.nsfw !== "boolean") errors.push("heissUi.nsfw must be true or false.");
-    if (!meta.controls || typeof meta.controls !== "object") errors.push("heissUi.controls is required.");
-    else if (!meta.controls.prompt) errors.push("heissUi.controls.prompt is required.");
+    if (!String(meta.name || "").trim()) errors.push(`${block}.name is required.`);
+    if (meta.id && meta.id !== id) errors.push(`${block}.id must stay "${id}"; save a copy under a new file to rename it.`);
+    if (meta.kind && !["image", "video"].includes(meta.kind)) errors.push(`${block}.kind must be image or video.`);
+    if ("nsfw" in meta && typeof meta.nsfw !== "boolean") errors.push(`${block}.nsfw must be true or false.`);
+    if (!meta.controls || typeof meta.controls !== "object") errors.push(`${block}.controls is required.`);
+    else if (!meta.controls.prompt) errors.push(`${block}.controls.prompt is required.`);
   }
   let workflow = null;
   try {

@@ -8,7 +8,8 @@
  * The engine resolves a link (library-sources.js), matches its files against what is installed,
  * grades it (library-grade.js), writes catalogue entries for LoRAs and queues Download Missing
  * through the worker model API (library-downloads.js → model-downloads.js → worker-models.js).
- * Nothing downloads on its own. Checkpoint imports are recorded only; profile drafts come later.
+ * Nothing downloads on its own. A checkpoint or diffusion model import drafts a profile and guide
+ * (profile-drafts.js, through the injected `draftProfile`), adding the parts it needs as files.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -99,7 +100,7 @@ export function importStore(options = {}) {
 /** A record as the browser and MCP see it: no download specs. */
 export function publicImport(record) {
   if (!record) return null;
-  const { pendingEntries: _pending, ...rest } = record;
+  const { pendingEntries: _pending, sourceText: _source, ...rest } = record;
   return { ...rest, resources: (record.resources || []).map(({ spec, ...resource }) => resource) };
 }
 
@@ -131,8 +132,9 @@ export function gradeRecord(record, preset = null) {
  *   catalogue                             library-catalogue.js store (edit)
  *   importImage(url)                      a saved image: the matched preset (preset-routes.js)
  *   resolvePreset(id, {verify})           a saved image again, matched
+ *   draftProfile(record, {by})            optional: drafts a checkpoint's profile and guide in place
  */
-export function createImportEngine({ store = importStore(), resolveCivitai, resolveHf, detect, inspect, downloads, startDownload, catalogue, importImage, resolvePreset }) {
+export function createImportEngine({ store = importStore(), resolveCivitai, resolveHf, detect, inspect, downloads, startDownload, catalogue, importImage, resolvePreset, draftProfile = null }) {
   /** Each resource's status from the files and the download queue, then the grade and state. */
   async function refresh(record, { verify = false } = {}) {
     if (record.state === 'failed' || record.state === 'resolving') return record;
@@ -198,7 +200,8 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
       const resolved = kind === 'civitai-model' ? await resolveCivitai(record.input.url) : await resolveHf(record.input.url);
       Object.assign(record, {
         title: resolved.title, version: resolved.version || '', baseModel: resolved.baseModel || '', modelType: resolved.type || '', nsfw: resolved.nsfw ?? null, links: resolved.links || {},
-        resources: resolved.resources.map((resource) => ({ ...resource, status: 'missing' })), state: 'needs-files'
+        resources: resolved.resources.map((resource) => ({ ...resource, status: 'missing' })), state: 'needs-files',
+        ...(resolved.sourceText ? { sourceText: String(resolved.sourceText).slice(0, 12000) } : {})
       });
       await refresh(record);
       const entries = kind === 'civitai-model' ? [{ resource: record.resources[0], patch: resolved.entry }]
@@ -206,6 +209,7 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
       // A repository's many optional files are catalogued when one is downloaded, not all up front.
       record.results.catalogueKeys = writeCatalogue(record, entries.filter(({ resource }) => !resource.optional), by);
       if (kind !== 'civitai-model') record.pendingEntries = Object.fromEntries(entries.filter(({ resource, patch }) => resource.optional && patch).map(({ resource, patch }) => [resource.want.file, patch]));
+      if (draftProfile && draftable(record)) await draftInto(record, { by });
       return store.put(record);
     } catch (error) {
       record.state = 'failed';
@@ -213,6 +217,41 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
       record.grade = { value: 'partial', reasons: [record.error], missingFields: [] };
       return store.put(record);
     }
+  }
+
+  /** The model file a profile could be drafted for: one required checkpoint or diffusion model. */
+  const draftTarget = (record, index = null) => {
+    const models = (record.resources || []).map((resource, at) => ({ resource, at })).filter(({ resource }) => ['checkpoint', 'diffusion_model'].includes(resource.role));
+    if (index !== null) return models.find(({ at }) => at === index) || null;
+    const required = models.filter(({ resource }) => !resource.optional);
+    return required.length === 1 ? required[0] : null;
+  };
+  const draftable = (record) => ['civitai-model', 'hf-file'].includes(record.input.kind) && Boolean(draftTarget(record)) && !record.results?.profileId;
+
+  /** Drafts the profile and guide; a failure is a warning on the record, never a failed import. */
+  async function draftInto(record, { by = '', index = null, rethrow = false } = {}) {
+    const target = draftTarget(record, index);
+    if (!target) throw new Error('Choose the model file to draft a profile for.');
+    try {
+      await draftProfile(record, { by, index: target.at });
+      record.warnings = (record.warnings || []).filter((warning) => !warning.startsWith('No profile drafted'));
+    } catch (error) {
+      record.warnings = [...(record.warnings || []).filter((warning) => !warning.startsWith('No profile drafted')), `No profile drafted: ${error.message}`];
+      if (rethrow) { await refresh(record); throw error; }
+    }
+    await refresh(record);
+  }
+
+  /** Drafts (or redrafts after a failure) the profile for a checkpoint import, on request. */
+  async function draft(id, { by = '', index = null } = {}) {
+    const record = store.get(id);
+    if (!record) throw new Error('That import is gone. Import the link again.');
+    if (!draftProfile) throw new Error('Profile drafts are unavailable here.');
+    if (record.state === 'failed') throw new Error('This import failed. Import the link again.');
+    if (record.results?.profileId) throw new Error('This import already drafted a profile. Review it in Settings › Profiles.');
+    try { await draftInto(record, { by, index, rethrow: true }); }
+    finally { store.put(record); }
+    return record;
   }
 
   /** Queue the missing files (or the chosen ones by index); unavailable files are never queued. */
@@ -280,5 +319,5 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
     return store.put(record);
   }
 
-  return { create, list, open, refresh, downloadMissing, setFolder };
+  return { create, list, open, refresh, downloadMissing, setFolder, draft };
 }

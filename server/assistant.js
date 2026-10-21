@@ -13,6 +13,7 @@
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
  * or the LoRA pre-filter.
  */
+import { profileBlock, withWrittenBlock } from './profile-block.js';
 import { assistantPreset, defaultPreset, familyUpsampler } from './assistant-presets.js';
 import { loraCompatibility, loraName, strengthRange } from './lora-policy.js';
 import { cleanTriggers } from './lora-catalogue.js';
@@ -540,7 +541,7 @@ export function createAssistant(environment = process.env, { fetchImpl = fetch, 
    * else `recommended`). The caller checks it with validateProfileText before saving.
    */
   async function draftProfile({ id, template, modelFile, recommended = {}, sourceText = '', nsfw, signal } = {}) {
-    if (!template || typeof template !== 'object' || !template.heissUi || !template.graph) throw new AssistantError('Choose a family template with a heissUi block and a graph.', { status: 400 });
+    if (!template || typeof template !== 'object' || !profileBlock(template) || !template.graph) throw new AssistantError('Choose a family template with a heissUi (or studio) block and a graph.', { status: 400 });
     let read = {};
     let source = 'template';
     const started = now();
@@ -581,9 +582,12 @@ export function validDraftGuide(value) {
   };
 }
 
-/** The template with the model file, recommended settings and page details in place. Pure. */
+/**
+ * The template with the model file, recommended settings and page details in place. Pure. The
+ * template's block may be `studio` or `heissUi`; the draft is written as `heissUi` (profile-block.js).
+ */
 export function draftedProfile({ id, template, modelFile, recommended = {}, read = {}, nsfw }) {
-  const profile = structuredClone(template);
+  const profile = withWrittenBlock(structuredClone(template));
   const meta = profile.heissUi;
   const previousModel = meta.defaults?.model;
   if (id) meta.id = id;

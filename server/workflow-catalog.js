@@ -1,3 +1,4 @@
+import { profileBlock } from "./profile-block.js";
 import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from './gallery-store.js';
@@ -167,6 +168,7 @@ export function workflowSummaries({ info = {}, profiles = [], preferences = load
       kind: profile.kind,
       family: profile.family,
       ...(profile.nsfw ? { nsfw: true } : {}),
+      ...(profile.aiDrafted || custom?.aiDrafted ? { aiDrafted: true } : {}),
       familyName: profile.familyName || "",
       // Every workflow-JSON profile is `custom:*`, bundled or not, so the id
       // prefix cannot tell them apart - use the record's actual folder.
@@ -243,7 +245,7 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
   const source = format === "comfyui-api-wrapper" ? raw.prompt : raw;
   const graph = graphFromJson(format === "comfyui-visual" ? { ...raw } : source, info);
   // A wrapper ({ prompt: graph }) or a visual file can carry the heissUi block beside the graph.
-  const declared = raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio;
+  const declared = profileBlock(raw);
   const detected = detectWorkflowMetadata({ ...(declared ? { heissUi: declared } : {}), ...source, graph }, path.basename(filename || "", path.extname(filename || "")), info);
   const validation = validateWorkflow({
     id: detected.id,
@@ -262,7 +264,7 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
     graph,
     detected,
     format,
-    hasStudioBlock: Boolean(raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio),
+    hasStudioBlock: Boolean(profileBlock(raw)),
     validation,
     // Nodes that run code, touch files elsewhere or go online: the review says so before saving.
     risks: workflowRisks(graph)

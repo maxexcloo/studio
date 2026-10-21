@@ -174,9 +174,19 @@ The **Prompt Assistant** access-profile feature gates every assistant route. It 
 These files live in the data folder (`STUDIO_DATA_DIR`, `/data` in Kubelab). Each one is written atomically by a single module. The first start of a new version snapshots the small state files first (`.backups/`), and every migration below is safe to run again.
 
 - **`library/catalogue.json`:** one entry per model file, keyed by `folder/file`, with hash, size, title, triggers, strength, licence, links and provenance (`origin`, `source`, `by`, the last 20 changes). It takes in `config/lora-catalogue.json` (seed), `lora-catalogue.json` (installed by hand, wins over the seed), `model-download-sources.json` (provider links and hashes), `model-hashes.json` (hashes of unchanged files) and the restore manifest. Those files are never written or removed: a changed file refreshes its layer, and a removed one keeps its last copy. Studio's own catalogue edits sit above all of them.
-- **`guides/prompting.json`:** the prompting guides, in `prompting.json`'s schema plus `meta.<packId>` (version, origin, AI-Drafted). The first start copies `MCP_PROMPTING_PATH` in as version 1. Later seed changes still flow into packs Studio hasn't changed, and the guide loader reads this file first, falling back to `MCP_PROMPTING_PATH`.
+- **`guides/prompting.json`:** the prompting guides, in `prompting.json`'s schema plus `meta.<packId>` (version, origin, AI-Drafted). The first start copies the seed in as version 1. After that the seed only adds packs and bindings the store doesn't have: a pack Studio holds is never replaced, whoever last changed it. The guide loader reads this file first, falling back to the seed.
 - **`history/profiles/<id>/<n>.json` and `history/guides/<packId>/<n>.json`:** immutable versions, recording who saved each one (an account, `assistant`, `chat` or `seed`). The first start records each profile's `backups/profile-edits` copies and current file as versions: the oldest is `seed`, and later ones are `studio` when `.studio-edits.json` lists the profile. A revert saves an earlier version as a new one.
-- **`workflows/.studio-meta.json`:** each profile's current version, origin, AI-Drafted marker, editor and seed hash. `workflows/.studio-edits.json` is still written for every profile changed in Studio, so the seed deploy never overwrites one.
+- **`workflows/.studio-meta.json`:** each profile's current version, origin, AI-Drafted marker, editor, seed hash and last exported hash. `workflows/.studio-edits.json` is still written for every profile Studio changed or drafted.
+- **`exports/studio-profiles-<time>.zip`:** the 20 newest exports (see [Seed, Export & the Retired Deploy](#seed-export--the-retired-deploy)).
+
+### Seed, Export & the Retired Deploy
+
+Studio is the only writer of live profiles and prompting guides. The profiles repository (`ai/profiles/`) is their **seed and backup**, and `mise run profiles:deploy` is **retired**: do not run it against a Studio data folder. Changes flow one way, Studio → **Settings › Profiles › Export** → a reviewed commit in `ai/profiles/`.
+
+- **`STUDIO_SEED_DIR`** names a directory in the seed's layout: `config/studio/workflows/*.json`, `config/prompting.json`, `config/lora-catalogue.json` and `config/models.json` (an unpacked export has the same layout). It is read-only and optional. At each start Studio copies only what is missing: a profile file it has never held (one removed in Studio is not brought back) and a `config/` file the data folder lacks. Nothing Studio holds is overwritten. Without the variable nothing is copied.
+- **Guides' seed:** `MCP_PROMPTING_PATH`, else (with `STUDIO_SEED_DIR`) the data folder's `config/prompting.json`. It fills a new install and adds missing packs only.
+- **Export** (`GET /api/profiles/export`, administrators) is a zip in the seed's layout: every profile file exactly as on disk, `config/prompting.json` (the guide store without `meta`), `config/lora-catalogue.json` (the LoRA catalogue by file name, with Studio's edits), `config/models.json` (the restore manifest, when there is one) and `EXPORT.json`, which lists each profile's and guide's version, origin and AI-Drafted state, what changed since the last export, and the AI drafts nobody has approved yet.
+- **AI drafts:** a checkpoint or diffusion model imported in the Library drafts a profile from the nearest same-family profile and the page's recommended settings, and a guide from the page. It is checked against ComfyUI's `object_info` before it is written (nothing is activated while ComfyUI can't be asked, or when it doesn't know a node type), marked NSFW unless the source says otherwise, and the parts it needs (VAE, text encoders) join the import's files for Download Missing. It is **AI-Drafted**: live for administrators only, and hidden from every other account (even with an explicit grant) until an administrator approves it or edits it in Settings › Profiles.
 
 ## Hidden Removal
 
@@ -245,7 +255,7 @@ Some names on disk still come from HEISS UI. Gallery records, account media and 
 | `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`) | `studio/` |
 | `.heiss-trash/` | Beside trashed files in the output and media folders | `.studio-trash/` (skipped by snapshots) |
 | `heiss_generation` | Run records in ComfyUI's queue and history | `studio_generation` (written now) |
-| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, `studio-profiles`) | Not renamed: it is the profile file format |
+| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, the `ai/profiles/` seed) | `studio` (read; Studio still writes `heissUi`) |
 | `heiss_*` sections, `.heiss-backup` | ComfyUI's `extra_model_paths.yaml` (single-user mode) | Not renamed |
 | `heiss` text chunk | Metadata in PNGs Studio wrote | Not renamed |
 | `heiss-ui-reference-*`, `heiss-ui-upscale-*` | File names in ComfyUI's input folder | Not renamed |
@@ -265,4 +275,4 @@ A later release adds an explicit migration command. It is never run automaticall
 4. **Switch.** The release that ships the command changes `outputFolderName` and `trashFolderName` in `server/data-names.js` to the Studio names; the old names stay readable for one more release.
 5. **Recovery.** `--undo <manifest>` renames the folders back and restores the records from the backups the apply step made. If anything else is wrong, restore the snapshots from step 1 and redeploy the previous image.
 
-The `heissUi` profile block is a file format shared with `studio-profiles`; renaming it needs a reader for both names first and its own decision.
+The profile block is a file format shared with the `ai/profiles/` seed. Studio reads both `studio` and `heissUi` (a file with both is refused by the profile check), and keeps writing `heissUi` (`writtenBlockName` in `server/profile-block.js`) until the seed and its checks are migrated to `studio`; that switch is its own change.

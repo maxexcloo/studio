@@ -27,7 +27,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, help and reset.' },
   { id: 'models', label: 'Models', icon: Boxes, description: 'Default models and integrations. LoRAs, models and downloads are in the Library.' },
-  { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'One model profile’s JSON at a time, checked and reviewed before it is saved.' },
+  { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'Studio’s model profiles and their guides: JSON, versions, AI drafts to approve and the export for the profiles repository.' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: features, the gallery, generation and sharing.' },
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Access profiles, accounts and chat gateway users.' },
   { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, what it runs, its status and whether Upscale is ready.' }

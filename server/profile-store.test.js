@@ -81,12 +81,11 @@ const seedGuides = (summary = 'Seed summary.') => ({
   negatives: { 'custom:fixture': { effect: 'none', notes: 'No negative.' } }
 });
 
-test('guides copy from the seed once, follow it for unchanged packs, and keep Studio’s edits', (t) => {
+test('guides copy from the seed once, then take only packs and bindings they lack: nothing Studio holds is replaced', (t) => {
   const dir = scratch(t);
   const seedFile = path.join(dir, 'config', 'prompting.json');
   fs.mkdirSync(path.dirname(seedFile), { recursive: true });
   fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const seedText = fs.readFileSync(seedFile, 'utf8');
   const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
   assert.deepEqual(store.migrate(), { packs: 2, versions: 2 });
   assert.deepEqual(store.read().meta.krea2, { version: 1, origin: 'seed', aiDrafted: false, editedAt: store.read().meta.krea2.editedAt, by: 'seed', seedHash: hashOf(seedGuides().packs.krea2), exportedHash: '' });
@@ -95,10 +94,18 @@ test('guides copy from the seed once, follow it for unchanged packs, and keep St
   const { hash } = store.pack('other');
   assert.throws(() => store.save('other', { summary: 'x' }, { baseHash: 'stale' }), /changed since you opened it/);
   store.save('other', { name: 'Other', summary: 'Studio summary.' }, { by: 'admin-1', baseHash: hash });
-  // The seed changes both packs: only the unchanged one follows.
-  fs.writeFileSync(seedFile, JSON.stringify({ ...seedGuides('Seed summary v2.'), packs: { ...seedGuides('Seed summary v2.').packs, other: { summary: 'Seed other v2.' } } }));
-  assert.deepEqual(store.migrate(), { packs: 2, versions: 1 });
-  assert.deepEqual([store.pack('krea2').pack.summary, store.pack('krea2').meta.version, store.pack('other').pack.summary], ['Seed summary v2.', 2, 'Studio summary.']);
+  // The seed changes both packs and adds one pack and one binding: only the new ones arrive.
+  const next = seedGuides('Seed summary v2.');
+  next.packs.other = { summary: 'Seed other v2.' };
+  next.packs.added = { name: 'Added', summary: 'New in the seed.' };
+  next.families.added = { image: 'added' };
+  next.families.krea2 = { image: 'other' };
+  fs.writeFileSync(seedFile, JSON.stringify(next));
+  const seedText = fs.readFileSync(seedFile, 'utf8');
+  assert.deepEqual(store.migrate(), { packs: 3, versions: 1 });
+  assert.deepEqual([store.pack('krea2').pack.summary, store.pack('krea2').meta.version, store.pack('other').pack.summary, store.pack('added').meta.origin], ['Seed summary.', 1, 'Studio summary.', 'seed']);
+  assert.deepEqual([store.read().families.krea2, store.read().families.added], [{ image: 'krea2' }, { image: 'added' }], 'an existing binding stays; a new one is added');
+  assert.equal(fs.readFileSync(seedFile, 'utf8'), seedText, 'the seed file is only read');
   // An AI draft is marked until approved; revert restores an earlier version as a new one.
   store.save('other', { summary: 'AI summary.' }, { by: 'assistant', origin: 'ai', aiDrafted: true });
   assert.equal(store.pack('other').meta.aiDrafted, true);
@@ -106,7 +113,26 @@ test('guides copy from the seed once, follow it for unchanged packs, and keep St
   store.revert('other', 1, { by: 'admin-1' });
   assert.deepEqual([store.pack('other').pack.summary, store.versions('other').map((item) => item.version)], ['Other summary.', [4, 3, 2, 1]]);
   assert.throws(() => store.save('broken', 'text'), /JSON object/);
-  assert.equal(fs.readFileSync(seedFile, 'utf8').length > 0 && fs.readFileSync(seedFile, 'utf8') !== seedText, true, 'only the test changed the seed');
+});
+
+test('a guide resolves per profile, binds to a drafted profile and records its export', (t) => {
+  const dir = scratch(t);
+  const seedFile = path.join(dir, 'prompting.json');
+  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
+  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
+  store.migrate();
+  assert.deepEqual(store.resolve({ id: 'custom:fixture', family: 'krea2', kind: 'image' }), { packId: 'other', source: 'profile' });
+  assert.deepEqual(store.resolve({ id: 'custom:new', family: 'krea2', kind: 'image' }), { packId: 'krea2', source: 'family' });
+  assert.equal(store.resolve({ id: 'custom:new', family: 'unknown', kind: 'image' }), null);
+  store.save('drafted', { summary: 'Drafted.' }, { by: 'assistant', origin: 'ai', aiDrafted: true });
+  store.bind('custom:new', 'drafted');
+  assert.deepEqual(store.resolve({ id: 'custom:new', family: 'krea2', kind: 'image' }), { packId: 'drafted', source: 'profile' });
+  assert.throws(() => store.bind('custom:new', 'missing'), /not found/);
+  store.markExported({ drafted: store.pack('drafted').hash });
+  assert.equal(store.pack('drafted').meta.exportedHash, store.pack('drafted').hash);
+  // The live loader follows the binding without a restart.
+  const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet });
+  assert.equal(prompting({ id: 'custom:new', family: 'krea2', kind: 'image' }, true).summary, 'Drafted.');
 });
 
 test('the guide loader reads the store first, falls back to the seed, reloads on change and fills negatives', (t) => {
