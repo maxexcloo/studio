@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-21
+
 > Studio becomes a hard fork of HEISS UI: Studio names everywhere, with the old settings, headers, cookie and browser storage still read, and dead upstream code removed
 
 ### Changed
@@ -1645,7 +1647,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.40.1...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.41.0...HEAD
+[0.41.0]: https://github.com/maxexcloo/studio/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/maxexcloo/studio/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/maxexcloo/studio/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/maxexcloo/studio/compare/v0.38.0...v0.39.0
