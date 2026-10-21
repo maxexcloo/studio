@@ -14,6 +14,9 @@ version opens with a `> ` summary line.
 ### Removed
 - **Orphan server routes:** nothing in Studio, MCP or the docs called these since their Settings went: gallery bundles (`/api/gallery/bundles*`) and the server-side run grouping behind them (Auto-Grouping in the browser is unchanged), `/api/gallery/recover` (history is still recovered on start), `/api/gallery/clear` and the trash routes (`/api/gallery/trash*`; an existing trash still empties itself after `STUDIO_TRASH_DAYS`), the earlier-images folder routes (`/api/library/folders*`, `/api/library/output`; folders added before are still read), the model manifest routes (`/api/models/manifest*`), the Hugging Face and Civitai token routes (`/api/settings/hf-token`, `/api/settings/civitai-token`; tokens come from the environment) and `/api/shutdown` (containers stop Studio with a signal).
 
+### Changed
+- **Server:** the exit record finds the data folder through the shared helper the rest of the server uses; trash batches, download resume notes, the SeedVR2 validation cache, Studio imports and the exit record are written with the server's crash-safe JSON write.
+
 ## [0.43.0] - 2026-10-21
 
 > A steadier desktop gallery, one progress pattern, consolidated stylesheets with 44 px phone targets, recovered long video runs keeping their outputs, and Details naming the profile and LoRAs

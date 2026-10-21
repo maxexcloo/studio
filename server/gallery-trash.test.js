@@ -54,6 +54,12 @@ test("a file whose name is taken again stays in the trash instead of overwriting
   assert.equal(missing, 1);
   assert.equal(fs.readFileSync(file("image_00003_.png"), "utf8"), "new");
   assert.equal(trash.trashSummary().files, 1);
+  // The batch record is rewritten the crash-safe way (json-store.js): whole, private, the previous copy kept.
+  const dir = path.join(trash.trashDir(outputDir), batch);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "batch.json"), "utf8")).files.length, 1);
+  assert.ok(fs.existsSync(path.join(dir, "batch.json.bak")));
+  assert.equal(fs.readdirSync(dir).some((name) => name.includes(".tmp-")), false);
+  if (process.platform !== "win32") assert.equal(fs.statSync(path.join(dir, "batch.json")).mode & 0o777, 0o600);
 });
 
 test("account trash summaries and restore operations stay within the selected owner", async () => {

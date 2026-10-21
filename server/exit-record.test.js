@@ -66,3 +66,26 @@ test("a second copy that finds one running (exit 78) leaves that run's record al
   assert.equal(exitWith(1).status, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(logs, "last-exit.json"), "utf8")).code, 1);
 });
+
+test("the record finds the data folder the way the server does, with the launcher's settings file filling gaps", async () => {
+  const { exitRecordDataDir } = await import("./exit-record.js");
+  const { currentDataDir, projectRoot } = await import("./data-root.js");
+  assert.equal(exitRecordDataDir(process.env), currentDataDir());
+  assert.equal(exitRecordDataDir({}, {}), path.join(projectRoot, "data"));
+  assert.equal(exitRecordDataDir({}, { STUDIO_DATA_DIR: "/srv/from-file" }), path.resolve("/srv/from-file"));
+  assert.equal(exitRecordDataDir({ STUDIO_DATA_DIR: "/srv/shell" }, { STUDIO_DATA_DIR: "/srv/from-file" }), path.resolve("/srv/shell"));
+  // An old name in the shell still beats the file; an empty shell value does not hide it.
+  assert.equal(exitRecordDataDir({ HEISS_DATA_DIR: "/srv/legacy" }, { STUDIO_DATA_DIR: "/srv/from-file" }), path.resolve("/srv/legacy"));
+  assert.equal(exitRecordDataDir({ STUDIO_DATA_DIR: "" }, { STUDIO_DATA_DIR: "/srv/from-file" }), path.resolve("/srv/from-file"));
+});
+
+test("records are written whole and a told record stays gone", () => {
+  reset();
+  startSession({ now: 1000, bootedAt: 0 });
+  recordExit({ who: "server", code: 1, reason: "Crashed" });
+  recordExit({ who: "server", code: 1, reason: "Crashed again" });
+  assert.equal(fs.readdirSync(logs).some((name) => name.includes(".tmp-")), false, "no temporary file is left behind");
+  assert.equal(startSession({ now: 5000, bootedAt: 0 }).reason, "Crashed");
+  assert.equal(fs.existsSync(path.join(logs, "last-exit.json")), false);
+  assert.equal(fs.existsSync(path.join(logs, "last-exit.json.bak")), false, "its backup goes with it");
+});
