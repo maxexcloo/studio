@@ -531,7 +531,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         recordUpscale({ ...clock.learn, ms: (clock.endAt ?? Date.now()) - clock.startAt, predicted: clock.estimate });
       }
       // Before the gallery shows them, so no browser reads a file mid-write.
-      writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
+      await writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
       // Thumbnails now, from the final files, rather than on first view.
       warmNewOutputs([...outputs, ...results.map((result) => result.upscale).filter(Boolean)]);
       const withUpscales = results.map((result) => {

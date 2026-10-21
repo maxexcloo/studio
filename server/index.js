@@ -41,6 +41,7 @@ import { stripMetadata } from './metadata-strip.js';
 import { startServers } from './listen.js';
 import { httpsPort, startupTls, tlsHostNames } from './tls.js';
 import { legacyEnvInUse, removeLocalEnvValue } from './env.js';
+import { sharedRequests } from './shared-requests.js';
 import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from './env-names.js';
 import { retireFeatureSwitches } from './feature-options.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
@@ -167,15 +168,31 @@ function forgetWorker(id) {
 }
 const backendUnreachable = (error) => (error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error));
 
-async function loadComfyContext({ force = false } = {}) {
+// One fetch of a worker's context at a time: callers that arrive meanwhile share it.
+const shareContextRequest = sharedRequests();
+
+/**
+ * A worker's node list, stats and model folders, cached for 30 seconds. A
+ * request already on its way is shared, so a burst of callers (a page load's
+ * models, workflows and upscale status) asks ComfyUI once. `force` always
+ * asks again, since something changed after any request already sent.
+ */
+function loadComfyContext({ force = false } = {}) {
   const backend = currentComfyBackend();
   const cached = contextFor(backend);
   const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
-  if (fresh) return cached;
-  const info = await comfy("/object_info");
-  const stats = await comfy("/system_stats").catch(() => ({}));
-  // Where ComfyUI keeps models, extra_model_paths.yaml included, so headers can be read there too.
-  setComfyFolderPaths(await comfy("/internal/folder_paths").catch(() => ({})));
+  if (fresh) return Promise.resolve(cached);
+  return shareContextRequest(backend, () => fetchComfyContext(backend), { fresh: force });
+}
+
+async function fetchComfyContext(backend) {
+  const [info, stats, folderPaths] = await Promise.all([
+    comfy("/object_info"),
+    comfy("/system_stats").catch(() => ({})),
+    // Where ComfyUI keeps models, extra_model_paths.yaml included, so headers can be read there too.
+    comfy("/internal/folder_paths").catch(() => ({}))
+  ]);
+  setComfyFolderPaths(folderPaths);
   // Model-type detection is synchronous; fetch what it needs from a remote ComfyUI first.
   await primeModelMetadata({
     unet: optionsFor(info, "UNETLoader", "unet_name"),

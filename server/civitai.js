@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { localOutputFile, modelFolders } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
-import { readJsonFile, renameWithRetry, writeJsonFile } from "./json-store.js";
+import { readJsonFile, renameWithRetryAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 
 /**
@@ -191,30 +191,31 @@ function outputFile(output) {
 }
 
 /**
- * Writes the parameters text into a run's PNGs in the output folder. A file
- * this cannot reach (ComfyUI on another computer) or that is not a PNG is
- * left as it is. Never throws: a run's images matter more than their tags.
+ * Writes the parameters text into a run's PNGs in the output folder, all of
+ * them at once and without holding up the server. A file this cannot reach
+ * (ComfyUI on another computer) or that is not a PNG is left as it is. Never
+ * rejects: a run's images matter more than their tags. Resolves to how many
+ * it wrote.
  */
-export function writeCivitaiParameters(outputs, body) {
-  let written = 0;
+export async function writeCivitaiParameters(outputs, body) {
   const hashes = hashesFor(body);
-  for (const output of outputs || []) {
-    if (output?.type === "video") continue;
-    const file = outputFile(output);
-    if (!file || !/\.png$/i.test(file)) continue;
+  const files = (outputs || []).filter((output) => output?.type !== "video").map(outputFile).filter((file) => file && /\.png$/i.test(file));
+  const results = await Promise.all(files.map(async (file) => {
+    const temp = `${file}.${process.pid}.${crypto.randomUUID()}.studio-tmp`;
     try {
-      const buffer = fs.readFileSync(file);
+      const buffer = await fs.promises.readFile(file);
       const width = buffer.length > 24 ? buffer.readUInt32BE(16) : 0;
       const height = buffer.length > 24 ? buffer.readUInt32BE(20) : 0;
       const next = withPngText(buffer, "parameters", parametersText(body, { width, height, hashes }));
-      if (!next) continue;
-      const temp = `${file}.${process.pid}.heiss-tmp`;
-      fs.writeFileSync(temp, next);
-      renameWithRetry(temp, file);
-      written += 1;
+      if (!next) return false;
+      await fs.promises.writeFile(temp, next);
+      await renameWithRetryAsync(temp, file);
+      return true;
     } catch {
       // Read-only folder, or the file moved: it simply goes without.
+      await fs.promises.rm(temp, { force: true }).catch(() => null);
+      return false;
     }
-  }
-  return written;
+  }));
+  return results.filter(Boolean).length;
 }

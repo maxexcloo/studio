@@ -47,7 +47,7 @@ test("a finished PNG in the output folder always carries it", async () => {
   const outputs = [{ url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" })}`, filename: "image_00001_.png", type: "image" }];
 
   assert.equal(readPngInfo(file).text.parameters, undefined);
-  assert.equal(writeCivitaiParameters(outputs, body), 1);
+  assert.equal(await writeCivitaiParameters(outputs, body), 1);
   const info = readPngInfo(file);
   assert.match(info.text.parameters, /Size: 8x6/, "the file's own size, not the one asked for");
   assert.equal((await sharp(file).metadata()).width, 8);
