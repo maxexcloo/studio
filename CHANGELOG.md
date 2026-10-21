@@ -11,13 +11,24 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Details name the profile and LoRAs; Copy gives LoRA files
+> A steadier desktop gallery, one progress pattern, consolidated stylesheets with 44 px phone targets, recovered long video runs keeping their outputs, and Details naming the profile and LoRAs
 
 ### Changed
+- **Desktop gallery:** tiles appear in place on first load, Images/Videos, search and clearing a search instead of gliding in; returning to Images or Videos restores the scroll before the first paint; scrolled tiles keep their place when an activity pill or the filter row appears; tiles follow a resize at once while the column count holds.
+- **Selection actions fit narrow windows:** Auto-Grouping and Hide Failed step aside while selecting.
+- **One progress pattern:** imports, downloads, model, family, starter and upscale setup and the activity pills share one progress bar and words (Queued, Downloading 45%, Checking…, Paused, Done, Failed, Cancelled). A model download or upscale that fails out of sight reports in the status pill with Try Again, Show or Set Up.
+- **Consistency:** status pill text drops a closing full stop; one busy spinner and alert icon; Title Case for Sign In, Signed In and No Model Yet; presets say model rather than workflow; Workflows say Star.
+- **Inpainting:** its shortcuts ignore focused buttons, sliders and controls outside it, and focus moves in when it opens and back when it closes.
+- **Stylesheets:** 47 numbered files become 19 component files in an explicit order, with dead selectors and overridden declarations removed, stage layers as tokens and two named breakpoints (Small 640 px, Tablet 1050 px).
+- **Phone targets:** prompt actions, Clear Search, the status light, viewer zoom, Details Copy and footer buttons, LoRA stars, list clears, reference menu buttons, Advanced row controls and the Size resolution tabs take 44 px.
+- **Server:** the production server no longer moves to another port when its port is taken; warnings and errors also go to stderr; bare error responses include `ok: false`.
+- **Grid autoplay and the inpaint intro** are remembered per account.
 - **Details:** the Model group shows the Profile only; there is no Weights row. LoRAs show by name with their information, and Copy lists their files and strengths.
 - **Gallery:** a desktop tile's hover caption names the profile, as Details does.
 
 ### Fixed
+- **Tooltips never take a click:** an open tooltip no longer blocks the control under it (the phone Model row after Escape).
+- **Gallery first load:** captions share one cached time formatter.
 - **Long video runs:** a worker too busy to answer in time (decoding and saving a long video) keeps its run waiting instead of being given up after a minute; only 20 minutes without any answer or progress ends it. A run given up on while still in ComfyUI's queue is followed again and delivered from its history as soon as it finishes, rather than five minutes later.
 - **Recovered results:** an output restored from ComfyUI's history keeps its tile's place in the job, request time, settings, references and owner, and takes its elapsed and run time from the run's own start and end. MCP Status and Result list its outputs again, and its result links open.
 - **Job recovery:** while every unfinished job is one Studio is following, recovery no longer asks each worker for its queue and 500 history entries every five seconds or compares the whole gallery; a recovered job with a known prompt is looked up on its own.
