@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { X } from 'lucide-react';
@@ -9,34 +10,59 @@ import { usePageHidden, usePausableTimeout } from '@/hooks/use-pausable-timeout'
 
 /*
  * Messages show in the Studio status pill (docs/guides/UI-PATTERNS.md ›
- * Messages), never as a floating toast. The pill lives where the status lives:
- * the phone's top bar, the desktop dock. A surface that covers it (a sheet,
- * the viewer, a dialog) hosts the same pill at its own top edge while open.
- * Hosts register in mount order; only the newest shows the message, so one
+ * Messages), never as a floating toast. On the desktop the pill lives in the
+ * gallery's top bar, and a surface that covers it (the viewer, a dialog)
+ * hosts the same pill at its own top edge while open. The phone has one host
+ * for the whole app (PhoneStatus): the top of the screen, above every sheet
+ * and pop-up. Hosts register in mount order; only the newest shows the
+ * message, and an exclusive host (the phone's) wins over every other, so one
  * message is never on screen twice.
  */
 
-let hosts: number[] = [];
+type Host = { id: number; exclusive: boolean };
+let hosts: Host[] = [];
 let nextHost = 1;
 const hostListeners = new Set<() => void>();
 const emitHosts = () => hostListeners.forEach((listener) => listener());
 const subscribeHosts = (listener: () => void) => { hostListeners.add(listener); return () => { hostListeners.delete(listener); }; };
 const hostSnapshot = () => hosts;
 
-/** The message this host shows: the front one while it is the newest open host, otherwise null. */
-export function useStatusHost(active = true): ToastRecord | null {
+/**
+ * The message this host shows: the front one while it is the newest open host
+ * (or the newest exclusive one, which every other gives way to), otherwise null.
+ */
+export function useStatusHost(active = true, exclusive = false): ToastRecord | null {
   const id = useRef(0);
   if (!id.current) id.current = nextHost++;
   useLayoutEffect(() => {
     if (!active) return;
     const own = id.current;
-    hosts = [...hosts, own];
+    hosts = [...hosts, { id: own, exclusive }];
     emitHosts();
-    return () => { hosts = hosts.filter((host) => host !== own); emitHosts(); };
-  }, [active]);
+    return () => { hosts = hosts.filter((host) => host.id !== own); emitHosts(); };
+  }, [active, exclusive]);
   const live = useSyncExternalStore(subscribeHosts, hostSnapshot, hostSnapshot);
   const messages = useSyncExternalStore(subscribeToasts, toastSnapshot, toastSnapshot);
-  return active && live[live.length - 1] === id.current ? messages[0] || null : null;
+  const exclusives = live.filter((host) => host.exclusive);
+  const winner = (exclusives.length ? exclusives : live)[(exclusives.length ? exclusives : live).length - 1];
+  return active && winner?.id === id.current ? messages[0] || null : null;
+}
+
+/**
+ * The phone's one status pill (UI-PATTERNS › Messages): at the top of the
+ * screen, centred on the top bar's line, outside every box and header, as
+ * wide as the screen allows, and above every sheet and pop-up (--z-phone-status).
+ * A question's panel hangs under it. It is kept out of a dialog's aria-hidden
+ * (aria-live="off": the announcer speaks the words), so a question stays
+ * reachable while Settings is open.
+ */
+export function PhoneStatus({ message }: { message: ToastRecord | null }) {
+  return createPortal(
+    <div className={cn('phone-status', message?.confirm && 'is-question')} aria-live="off">
+      <AnimatePresence>{message ? <StatusPill key="phone" message={message} className="is-phone" /> : null}</AnimatePresence>
+    </div>,
+    document.body
+  );
 }
 
 /** Every message for screen readers, wherever the pill is: polite, errors assertive. Mount once. */

@@ -160,19 +160,23 @@ test('Recreate is an exact rerun: same prompts and the same seed', async ({ page
   expect(body!.steps).toBe(4);
 });
 
-test('a message over the viewer shows in the status pill at its top edge, clear of every control', async ({ page }) => {
+test('a message over the viewer shows in the status pill at its top edge, clear of every control', async ({ page, isMobile }) => {
   await page.route('**/api/gallery/favorite', (route) => route.fulfill({ status: 403, json: { ok: false, error: 'Refused for the test.' } }));
   await page.goto('/');
   const { viewer } = await open(page);
   await viewer.getByRole('button', { name: /^(Star|Unstar)$/ }).filter({ visible: true }).first().click();
-  const pill = viewer.locator('.status-message');
+  // The desktop viewer hosts it at its own top edge; the phone has one pill for the whole app, at the top of the screen.
+  const pill = (isMobile ? page.locator('.phone-status') : viewer).locator('.status-message');
   await expect(pill).toBeVisible();
   // One message, one place: the dock's or bar's copy steps aside while the viewer covers it.
   await expect(page.locator('.status-message')).toHaveCount(1);
+  if (isMobile) await expect(viewer.getByRole('button', { name: /^(Star|Unstar)$/ })).toBeHidden();
   const box = (await pill.boundingBox())!;
   expect(box.y).toBeLessThan(80);
   for (const button of await viewer.locator('button:visible').all()) {
     if (await pill.locator('button').evaluateAll((own, target) => own.includes(target as HTMLElement), await button.elementHandle())) continue;
+    // Star and Info step aside on the phone while a message shows; Close stays in reach.
+    if (!await button.isVisible()) continue;
     const other = await button.boundingBox();
     if (!other) continue;
     const overlaps = box.x < other.x + other.width && other.x < box.x + box.width && box.y < other.y + other.height && other.y < box.y + box.height;

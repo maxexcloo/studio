@@ -235,9 +235,10 @@ button.activity-main { cursor: pointer; }
 
 /* ------------------------------------------------------- Status messages
    Messages show in the Studio status pill (src/app/StatusMessage.tsx), never
-   as floating toasts: the phone's top bar, the desktop gallery's top bar, or in the
-   header of a sheet, dialog or the viewer that covers them. The light takes
-   the message's tone; the words never wrap. */
+   as floating toasts: on the desktop the gallery's top bar, or the header of a
+   dialog or the viewer that covers it; on the phone one pill at the top of the
+   screen, over everything (42-phone-pop.css). The light takes the message's
+   tone; on the desktop the words never wrap. */
 
 .status-pill {
   --tone: rgb(255 255 255 / .88);
@@ -293,7 +294,7 @@ button.activity-main { cursor: pointer; }
    ellipsise) rather than push them. Zen mode, without a top bar: above the dock. */
 .status-pill.is-surface.is-toolbar { flex: 0 1 auto; min-width: 120px; max-width: 420px; height: var(--control-h); margin: 0; }
 .status-pill.is-dock { max-width: min(420px, calc(100vw - 48px)); }
-/* In a header (sheet, dialog, picker sheet): in the row, where the title or hint was. */
+/* In a dialog's header on the desktop: in the row, where the title or hint was. */
 .status-pill.is-surface { height: 34px; margin: 0 auto 0 4px; }
 .modal-head .status-pill.is-surface { margin: 0 4px 0 auto; }
 /* Over the viewer: its top edge, between the corner buttons. */

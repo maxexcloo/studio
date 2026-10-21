@@ -237,7 +237,6 @@
 html.is-size-scrubbing,
 html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !important; }
 
-.size-custom-note,
 .size-menu-note {
   display: flex;
   justify-content: space-between;
@@ -250,95 +249,12 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
 }
-.size-custom-note { align-items: center; min-height: 20px; }
-.size-custom-note .is-limit { color: var(--ember); }
-/* "Save size": a quiet link on the readout's right; "Saved" once this size is kept. */
-.size-save {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  margin-right: -6px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
-}
-.size-save > span { display: inline-flex; align-items: center; gap: var(--space-2); animation: saveSwap var(--motion-fast) var(--motion-ease) both; }
-.size-save:not(:disabled):hover { color: var(--ember); background: rgb(255 154 82 / .08); }
-.size-save:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.size-save.is-saved { color: hsl(var(--muted-foreground) / .75); cursor: default; }
-@keyframes saveSwap {
+.size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
+
+@keyframes sizeLabelIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
-/* A saved size: a row like the others. Hovered or focused, its size steps
-   left for Rename and Remove; on touch they simply stay out. */
-.size-saved { overflow: hidden; }
-.size-saved-row { position: relative; }
-.size-saved-row .aspect-option { width: 100%; }
-/* Room for Rename and Remove comes from the row's own padding, so the size moves left and the
-   name, which can be long, shortens with "…" instead of running under it. */
-.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option { padding-right: 76px; }
-.aspect-option > .size-saved-label { display: flex; align-items: baseline; min-width: 0; overflow: hidden; }
-.size-saved-label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.size-saved-label > small { flex: none; }
-.size-saved-actions {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  display: flex;
-  gap: var(--space-1);
-  opacity: 0;
-  translate: 0 -50%;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--motion-ease);
-}
-.size-saved-row:is(:hover, :focus-within) .size-saved-actions { opacity: 1; pointer-events: auto; }
-.size-saved-actions button {
-  display: grid;
-  place-items: center;
-  width: var(--control-h-sm);
-  height: var(--control-h-sm);
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.size-saved-actions button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.size-saved-actions button.is-remove:hover { color: #ff8a80; }
-.size-saved-actions button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-/* Renaming: the name becomes a small field in the row, the rest stays where it was. */
-.size-saved-name {
-  min-width: 0;
-  height: 24px;
-  margin-left: -8px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 7px;
-  outline: 0;
-  background: var(--well);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .12);
-  color: hsl(var(--foreground));
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-}
-.size-saved-name:focus, .size-saved-name:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px var(--line-strong); outline: 0; }
-.size-saved-name::selection { background: rgb(255 154 82 / .32); color: #fff; }
-@media (hover: none) {
-  .size-saved-row .aspect-option em { transform: translateX(-72px); }
-  .size-saved-actions { opacity: 1; pointer-events: auto; }
-}
-.size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
 
 /* Every composer menu leaves the way it came. */
 @keyframes surfaceOut {
@@ -352,13 +268,8 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 
 @media (prefers-reduced-motion: reduce) {
   .size-frame, .size-field, .size-link, .size-peek { transition: none; }
-  .size-save > span, .size-mp-label small { animation: none; }
-  .size-saved-actions { transition: none; }
+  .size-mp-label small { animation: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
-}
-/* Where the rows keep their shapes, the name's column may shrink too. */
-@media (hover: none), (max-width: 760px) {
-  .size-menu .size-saved-row .aspect-option { grid-template-columns: 30px minmax(0, 1fr) auto; }
 }
 
 /* Megapixels (Settings › Studio), under the shapes: what it is on the left, the count on
@@ -372,7 +283,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   box-shadow: inset 0 1px 0 var(--glass-border);
 }
 .size-mp-label { flex: 1; display: grid; justify-items: start; gap: var(--space-1); min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
-.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: saveSwap var(--motion-fast) var(--motion-ease) both; }
+.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: sizeLabelIn var(--motion-fast) var(--motion-ease) both; }
 .size-mp-reset-slot { flex: none; display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); margin-left: calc(-1 * var(--space-2)); }
 .size-mp-reset {
   display: grid;

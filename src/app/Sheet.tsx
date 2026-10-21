@@ -8,7 +8,6 @@ import { useFocusTrap } from './useFocusTrap';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { usePhoneLayer } from './phoneLayers';
 import { useSettling } from './composerSurface';
-import { StatusPill, useStatusHost } from './StatusMessage';
 
 /**
  * A bottom sheet: grab handle, swipe down (or Back, or Escape, or a tap on the
@@ -32,8 +31,6 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   const drag = useDragControls();
   const reduced = useReducedMotion();
   const { covered, hidden, overlaid, nested } = usePhoneLayer(open);
-  // Under a pop-up the sheet stays in view, so its title row keeps the messages (UI-PATTERNS › Messages).
-  const message = useStatusHost(open && !hidden);
   const settling = useSettling();
   useFocusTrap(panelRef, open);
   useHistoryDismiss(open, onClose);
@@ -103,9 +100,8 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
               <div className="phone-sheet-handle" aria-hidden="true" />
               <header className="phone-sheet-head">
                 {nested ? <button type="button" className="phone-icon phone-sheet-back" aria-label="Back" onClick={onClose}><ArrowLeft size={20} /></button> : null}
-                {/* A message takes the title's place for a moment, short of Back and Close (UI-PATTERNS › Messages). */}
-                <h2 id={titleId} className={cn(message && 'sr-only')}>{title}</h2>
-                {message ? <StatusPill message={message} className="is-surface" /> : null}
+                {/* Messages show in the phone's one status pill, over the top of the screen (UI-PATTERNS › Messages). */}
+                <h2 id={titleId}>{title}</h2>
                 {headerAction}
                 {nested ? null : <button type="button" className="phone-icon" aria-label="Close" onClick={onClose}><X size={20} /></button>}
               </header>

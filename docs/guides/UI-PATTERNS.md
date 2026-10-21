@@ -106,11 +106,19 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
   screen's width less a margin, on the solid panel glass. What is under it
   stays in view, dimmed and inert, and Escape, Close or a tap outside closes
   it.
-- Messages and status never cover controls (see [Messages](#messages)).
-  In the phone viewer, a confirmation takes Star and Info’s space so both
-  answers fit; Close remains available.
+- **A tap outside only closes.** On the phone a tap outside any pop-up,
+  popover or dropdown (Size, Advanced, the `Dropdown` menus, the top bar's
+  menu, the gallery filters) closes it and does nothing else: the click that
+  ends the tap never reaches what was under the finger (the next Create row, a
+  tile), so one tap never closes one surface and opens another
+  (`useDismiss.ts`).
+- Messages and status never cover the controls they are about (see
+  [Messages](#messages)). On the phone the pill keeps both top corners clear
+  over a sheet, pop-up, dialog or the viewer, so Close and Back stay in reach.
 - Stacking uses the `--z-*` tokens, never raw numbers. The phone's order is
-  `--z-phone-bar` < `--z-phone-scrim` < `--z-phone-sheet` < `--z-phone-pop`.
+  `--z-phone-bar` < `--z-phone-scrim` < `--z-phone-sheet` < `--z-phone-pop` <
+  `--z-phone-status`, the status pill above every sheet, pop-up, dialog and
+  dropdown menu.
 
 ## Surfaces
 
@@ -168,8 +176,8 @@ own colours. `--ember` is an older name for the same colour.
 
 There are no floating toasts, banners or alert dialogs. Every message,
 question and failure shows in the **Studio status pill**
-(`src/app/StatusMessage.tsx`, fed by `toast.ts`), one at a time, the same on
-both devices:
+(`src/app/StatusMessage.tsx`, fed by `toast.ts`), one at a time, with the same
+words and actions on both devices:
 
 | Kind | Shows | Stays |
 | --- | --- | --- |
@@ -178,11 +186,19 @@ both devices:
 | A failure that needs action | The error tone, the words and one action (Try Again, Set Up) | 3 s |
 | A question (confirmations) | The question, **Cancel** and the answer ("Delete 6"); under the pill, its whole text and, for several items, a scrolling list of their thumbnails and short names | Until it is answered; Escape or Cancel answers no |
 
-- **Where:** the phone's top bar, in its centre slot (empty otherwise, or
-  "n Selected" while selecting); the desktop gallery's
-  top bar, before its tools. A surface that covers the bar (a sheet, a pop-up
-  list, a dialog, the viewer) shows the pill at its own top edge while open,
-  in its title's place. Only the newest open host shows it.
+- **Where, phone:** one host for the whole app (`PhoneStatus`): the top of
+  the screen, centred on the top bar's line, outside every box and surface
+  header, as wide as the screen less a margin, on the solid panel glass. A
+  long message wraps onto more lines and is never cut short. On the main
+  screen the bar's own row steps aside while it shows; over a sheet, pop-up,
+  dialog or the viewer the pill keeps both top corners clear (Close and Back
+  stay in reach) and the title it covers (a sheet's, a dialog's, the viewer's
+  with Star and Info) steps aside. It sits above every sheet and pop-up
+  (`--z-phone-status`), and every other host gives way to it, so no surface
+  shows a pill of its own.
+- **Where, desktop:** the gallery's top bar, before its tools. A surface that
+  covers the bar (a dialog, the viewer) shows the pill at its own top edge
+  while open, in its title's place. Only the newest open host shows it.
 - **Timeout:** finite notifications last three visible, unpaused seconds. A
   circular ring around Dismiss shows the remaining time; hover, focus and a
   background tab pause both. A repeated or merged notification resets the
@@ -200,13 +216,16 @@ both devices:
 - **Confirmations ask inline** in the pill, never in a dialog (`useConfirmation`), with
   the question once and one line on what happens under it.
   Cancel takes the focus first. The pill is an `alertdialog` named by the
-  question. Deleting several items lists them under the question, with the
+  question. On the phone the question's text hangs under the pill, the
+  screen's width, clear of the control that asked. Deleting several items lists them under the question, with the
   count in it ("Delete 6 Items?"), and Undo follows in the same pill.
 - **Status, not messages:** status messages always go to the pill, never
   inline under a field or row. Field validation (a JSON editor's error) and
   empty or failed lists (`EmptyState`, with Try Again) stay where they are.
-- **Never over controls:** the pill takes the place of a title or hint, never
-  floats over fields, and touching it never dismisses the surface under it.
+- **Never over controls:** on the desktop the pill takes the place of a title
+  or hint and never floats over fields; on the phone it covers only the top
+  bar's line and a surface's title, never the controls a question is about.
+  Touching it never dismisses the surface under it.
 - **Words:** Title Case for questions and actions; sentence case for news,
   without a full stop; "Couldn’t …" for failures.
 - Screen readers hear every message through one announcer (polite, failures
@@ -220,7 +239,8 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
 
 - **Rows** are full width and one line: the label on the left, the value
   muted on the right (cut short with an ellipsis), then a chevron when the row
-  opens a step or a check when it is the selected option. 48 px high on a
+  opens a step or the shared amber tick (`SelectedTick`, `end="check"`) when
+  it is the selected option. 48 px high on a
   phone (44 px on short screens), 38 px in desktop popovers, hairlines between
   them. No row sits in a card, and no card sits in a card.
 - **Controls stay in the row:** a `NumberPicker` for numbers (Steps, CFG,
@@ -250,12 +270,14 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
   its tick. **All** picks everything at once, even values that wait for
   another one (References need Generation): pass `onAll`. A short list
   (a group's Models) has no search box.
-- **Size** shows the resolutions and then the shapes as full-width toggles with
-  no label, with **Custom** as the last option and Width and Height always at
-  the bottom. The fields are enabled only while Custom is the pick; choosing a
-  shape locks them again. There is no Custom Size toggle and no megapixel or
-  ratio caption under the fields (the preview names the size). No preview
-  stage on the phone.
+- **Size** shows the resolutions as one full-width toggle with no label, then
+  the shapes as one vertical list, as on the desktop: the shared rows
+  (`ListButton`), each with its shape, its name and the size it makes, and the
+  amber tick on the pick; **Custom** is the last row, and Width and Height are
+  always at the bottom. The fields are enabled only while Custom is the pick;
+  choosing a shape locks them again. There is no grid of shape tiles, no
+  Custom Size toggle, no saved sizes and no megapixel or ratio caption under
+  the fields (the preview names the size). No preview stage on the phone.
 
 ## Dropdowns
 
@@ -434,8 +456,10 @@ A picker, tab or list with nothing to show uses `EmptyState`
   Create.
 - **Size** stays open while choosing: the resolution is a segmented toggle of
   the model's native options (Default · 2K · 4K), beside the shapes, so both
-  can be picked in one go. Custom is the last row of the list and unlocks
-  Width and Height under it.
+  can be picked in one go. The menu holds only the model's presets and
+  Custom, on the desktop and the phone: Custom is the last row of the list and
+  unlocks Width and Height under it. There are no saved sizes; any kept from
+  before stay where they were, unread.
 
 ## Settings
 
@@ -629,7 +653,8 @@ kind of element:
 - **Viewer, phone:** a solid backdrop that hides the gallery's top bar
   completely. One top row: the title on the left (the profile's friendly name,
   then a short muted line: its place in the gallery "2 / 40", the time and the
-  size · steps; a message takes its place for a moment), Star · Info · Close
+  size · steps; it steps aside, with Star and Info, while the status pill
+  shows), Star · Info · Close
   on the right, all on one centre line. The bottom bar Copy · Share | Animate ·
   Recreate · Reference · Upscale | Delete, centred with even sides in a
   bar-height row above the home indicator.
@@ -733,8 +758,8 @@ and no boxes in the bars.
   tap checks again) and "Studio", centred on one line. While jobs run, a
   spinner and count replace the light in the same space; a tap opens Show
   Running and Stop All. On narrow phones (under 380 px) the name hides.
-- **Centre:** empty and flexible; a message takes it while it shows (see
-  [Messages](#messages)).
+- **Centre:** empty and flexible. While a message shows, the whole row steps
+  aside for the status pill (see [Messages](#messages)).
 - **Right,** in this order: **Search**, **Filter** and **Menu**, all 44 px
   icon buttons. There is no Select button: selecting starts with a long press
   on a tile, or Menu › Select. Menu's pop-up list, anchored at the right edge,
@@ -805,12 +830,15 @@ padding, and the page returns to where it rested once the keyboard closes.
 
 **Focused text:** while a long text field (Prompt, Negative Prompt, the
 profile JSON in Settings) has the focus and the on-screen keyboard is up, it
-is the only thing on screen (`useTextFocus.ts`): it fills the visible height
-above the keyboard with no box or border, just the text at its normal
-padding; the other Create rows, the footer, the handle and the page's bars
-hide, and nothing scrolls under it. Its actions (Select All, History, Clear)
-keep the same row at the top right, centred on the first line, with a small
-**Done** at the end, and a tap on one keeps the keyboard up. Done, a blur, Back or hiding the
+is the only thing on screen (`useTextFocus.ts`). Prompt and Negative keep the
+normal prompt box (its border, corners and fill): its top lines up with the
+Create sheet's top, and it fills the visible width less a margin and the
+height down to just above the keyboard, on the solid panel. The other Create
+rows, the footer, the handle and the page's bars hide, and nothing scrolls
+under it. Its actions (Select All, History, Clear) sit in a row along the
+box's top right with a small **Done** at the end, and the text runs the box's
+full width under them, never squeezed beside them; a tap on one keeps the
+keyboard up. Done, a blur, Back or hiding the
 keyboard puts the sheet back; a hardware keyboard leaves the layout alone.
 The caret stays in view.
 

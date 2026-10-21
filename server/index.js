@@ -9,7 +9,6 @@ import { createJobRecovery } from "./job-recovery.js";
 import "./crash-log-install.js";
 import { addProbe, logWarning } from "./crash-log.js";
 import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
-import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
 import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
@@ -827,20 +826,6 @@ app.put("/api/workflows/preferences", (req, res) => {
     };
     saveWorkflowPreferences(preferences);
     res.json({ ok: true, preferences });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-// Saved sizes (saved-sizes.js): every device's size menu shows the same list.
-app.get("/api/sizes", (req, res) => {
-  res.json({ ok: true, sizes: loadSavedSizes() });
-});
-
-app.put("/api/sizes", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    res.json({ ok: true, sizes: saveSavedSizes(req.body?.sizes, req.body?.base) });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }

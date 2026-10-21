@@ -34,7 +34,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   ]) assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
     ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
-    ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"], ["PUT", "/api/sizes"],
+    ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"],
     ["PUT", "/api/workflows/preferences"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
     ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"],
     ["GET", "/api/workers"], ["PUT", "/api/workers"], ["POST", "/api/workers/test"], ["POST", "/api/comfy/restart"]

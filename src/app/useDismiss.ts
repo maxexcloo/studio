@@ -2,6 +2,31 @@ import { useEffect, type RefObject } from 'react';
 
 type Refs = RefObject<HTMLElement | null> | Array<RefObject<HTMLElement | null>>;
 
+let releaseClick: (() => void) | null = null;
+
+/**
+ * Stops the click that ends this tap. It lets go after that click, at the next
+ * tap (this one became a scroll and sent none) or after a moment, so a later
+ * tap is never lost.
+ */
+function swallowNextClick() {
+  releaseClick?.();
+  const stop = (event: MouseEvent) => { event.preventDefault(); event.stopImmediatePropagation(); release(); };
+  const nextTap = () => release();
+  const timer = window.setTimeout(() => release(), 800);
+  // The next tap's pointerdown, not this one's (still being dispatched).
+  const arm = window.setTimeout(() => window.addEventListener('pointerdown', nextTap, true), 0);
+  function release() {
+    window.clearTimeout(timer);
+    window.clearTimeout(arm);
+    window.removeEventListener('click', stop, true);
+    window.removeEventListener('pointerdown', nextTap, true);
+    if (releaseClick === release) releaseClick = null;
+  }
+  window.addEventListener('click', stop, true);
+  releaseClick = release;
+}
+
 /**
  * Shared dismiss behaviour for inline menus and popovers: a pointer down outside
  * `ref` (or any of several refs, for a surface portaled elsewhere) or Escape
@@ -27,7 +52,12 @@ export function useDismiss(refs: Refs, open: boolean, onDismiss: () => void) {
       if (event.target instanceof Element && event.target.closest('[data-status-message]')) return;
       // A dropdown's menu (Dropdown.tsx) floats on the page but belongs to the surface its trigger is in.
       if (event.target instanceof Element && event.target.closest('.dropdown-menu')) return;
-      if (!inside(event.target as Node)) onDismiss();
+      if (inside(event.target as Node)) return;
+      onDismiss();
+      // On a touch screen the tap that closes a pop-up only closes it: the click iOS sends after it
+      // would land on whatever is under the finger once the surface is gone (a Create row that
+      // opens the next pop-up, a tile that opens the viewer), so it looks as if nothing closed.
+      if (event.pointerType !== 'mouse') swallowNextClick();
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || dialogOpen()) return;

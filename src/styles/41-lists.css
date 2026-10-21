@@ -40,7 +40,7 @@
 }
 .list-row.is-static { cursor: default; }
 button.list-row:hover { background: transparent; }
-@media (hover: hover) { button.list-row:hover .list-row-value, button.list-row:hover .list-row-end { color: hsl(var(--foreground)); } }
+@media (hover: hover) { button.list-row:hover .list-row-value, button.list-row:hover .list-row-end:not(.selected-tick) { color: hsl(var(--foreground)); } }
 /* Hover, the keyboard cursor and a press draw one rounded fill on ::before, inset from the
    hairlines and reaching a little past the text, so it never squares off a row or bleeds
    past a rounded popover. Selection is the amber check or lead, never a row fill. */
@@ -288,7 +288,6 @@ button.list-row { isolation: isolate; }
 .phone-size .list-row-value { font-variant-numeric: tabular-nums; }
 .phone-size .phone-size-fields { overflow: hidden; }
 .phone-size .phone-size-fields > * { padding: 4px 0 10px; }
-.phone-size-saved-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
 
 /* -------------------------------------------------------------- Older phone groups, flat too */
 

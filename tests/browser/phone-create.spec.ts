@@ -88,3 +88,63 @@ test('the prompt actions are one alike row at the top right, centred on the firs
   const images = await sheet.getByRole('button', { name: 'Decrease Images', exact: true }).boundingBox();
   if (steps && images) expect(steps.x + steps.y * 1000).toBeLessThan(images.x + images.y * 1000);
 });
+
+// A tap outside a phone pop-up or dropdown only closes it (UI-PATTERNS › Layering): the click that
+// follows never lands on what was under it (the next Create row, a tile).
+test('a tap outside a phone pop-up, dropdown or menu closes it and does nothing else', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Phone pop-ups.');
+  const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: new URL(route.request().url()).searchParams.get('type') === 'video' ? [] : Array.from({ length: 6 }, (_, index) => ({ id: `tap-${index}`, url: `${picture}#${index}`, filename: `tap-${index}.png`, type: 'image', status: 'done', prompt: `Tap ${index}`, width: 512, height: 512 })), revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  const tapOn = async (locator: import('@playwright/test').Locator) => { const box = (await locator.boundingBox())!; await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2); };
+  const pops = page.locator('.reference-popover.is-pop');
+
+  // Size, then a tap on the dimmed Advanced row under it: Size closes and Advanced stays shut.
+  const sheet = await ui.openComposer();
+  // Create is inert under a pop-up, so its row is found by its label, not its role.
+  const advanced = sheet.locator('[aria-label="Advanced Settings"]');
+  await sheet.getByRole('button', { name: /^Size:/ }).click();
+  await expect(pops).toHaveCount(1);
+  await tapOn(advanced);
+  await expect(pops).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(pops).toHaveCount(0);
+  await expect(sheet).toBeVisible();
+
+  // Advanced, a dropdown in it, then a tap on Create: the dropdown and Advanced close, nothing opens.
+  await sheet.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
+  await pops.getByRole('combobox').first().click();
+  await expect(page.locator('.dropdown-menu')).toHaveCount(1);
+  await page.touchscreen.tap(195, 30);
+  await expect(page.locator('.dropdown-menu')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page.locator('.dropdown-menu')).toHaveCount(0);
+  await ui.closeComposer();
+
+  // The top bar's menu, then a tap on a tile: the menu closes and the viewer stays shut.
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.locator('.phone-menu')).toBeVisible();
+  await tapOn(page.locator('[data-tile-id="tap-2"] .tile'));
+  await expect(page.locator('.phone-menu')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page.locator('.viewer-phone-bar')).toHaveCount(0);
+
+  // A gallery filter, then a tap on a tile: the filter's menu closes, nothing opens.
+  await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).click();
+  await page.getByRole('button', { name: 'Filter By Size', exact: true }).click();
+  await expect(page.locator('.gallery-filter-menu')).toBeVisible();
+  // A tile clear of the menu (the filter row moves the gallery's columns).
+  const below = (await page.locator('.gallery-filter-menu').boundingBox())!;
+  const tileId = await page.locator('[data-tile-id]').evaluateAll((nodes, bottom) => nodes.find((node) => node.getBoundingClientRect().top > bottom + 8 && node.getBoundingClientRect().bottom < innerHeight - 80)?.getAttribute('data-tile-id'), below.y + below.height);
+  const clear = page.locator(`[data-tile-id="${tileId}"] .tile`);
+  await tapOn(clear);
+  await expect(page.locator('.gallery-filter-menu')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page.locator('.viewer-phone-bar')).toHaveCount(0);
+  // The next tap works as usual.
+  await page.waitForTimeout(500);
+  await tapOn(clear);
+  await expect(page.locator('.viewer-phone-bar')).toBeVisible();
+});

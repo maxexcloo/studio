@@ -15,6 +15,16 @@ version opens with a `> ` summary line.
 - **Groups:** access profiles are now called groups and have their own administrator page, Settings › Groups, with the group editor and New Accounts (Default Group and Require Approval). Users keeps Accounts and Chat Gateway. Server data, routes and field names are unchanged, so nothing migrates.
 - **Workers:** Add Worker sits on the Workers heading like New Account; a new or Studio-owned worker is edited in place with Name and Address fields, Capabilities as a multi-select and a quiet Remove, under one Save & Discard row. The separate Upscale Status group is gone (each worker's Capabilities shows Upscale), so Workers is for administrators only again.
 - **Settings copy:** page and row descriptions are shorter and read in one plain voice, without internal names such as `STUDIO_WORKERS` or "deployment lock" wording.
+- **Phone messages:** every message, question and failure shows in one status pill at the top of the screen, centred, outside any box or header and as wide as the screen allows, so long messages wrap whole instead of being cut short. It sits above sheets, pop-ups and dialogs; over them it keeps the top corners clear so Close and Back stay in reach, and a question's text hangs under it, clear of the control that asked. Sheets, pop-ups and the viewer no longer show a pill of their own. The desktop is unchanged.
+- **Phone focused prompt:** Prompt and Negative with the keyboard up keep the normal prompt box (border, corners and fill), start where the Create sheet's top is and fill the screen's width and the height down to just above the keyboard; the text runs the full width under Select All, History, Clear and Done instead of being squeezed beside them.
+- **Phone Size:** the shapes are one vertical list like the desktop's, each row with its shape, name and size and the amber tick on the pick, with Custom last unlocking Width and Height; the grid of shape tiles is gone.
+- **Phone pop-ups:** a tap outside a pop-up, popover or dropdown (Size, Advanced, dropdown menus, the top bar's menu, gallery filters) only closes it; it no longer goes on to open the Create row, tile or filter under the finger.
+
+### Removed
+- **Saved sizes:** Save Size, the saved rows with Rename and Remove, and the `/api/sizes` route are gone; the Size menu holds the model's presets and Custom on both devices. Sizes saved before stay in `saved-sizes.json` and browser storage, unread.
+
+### Fixed
+- **Reset All Settings** asks again: its button in Settings › Maintenance did nothing because the action never reached Settings.
 
 ## [0.41.0] - 2026-10-21
 
