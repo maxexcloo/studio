@@ -17,7 +17,7 @@ import type { ShowToast } from './toast';
  */
 export type ModelFolderStage = 'scanning' | 'found' | 'none' | 'remote' | 'offline' | 'adding' | 'restarting' | 'waiting' | 'done' | 'error';
 
-const dismissKey = 'heiss-ui:model-folders-dismissed';
+const dismissKey = 'studio:model-folders-dismissed';
 const signature = (folders: StrayModelFolder[]) => folders.map((folder) => `${folder.path}:${folder.count}`).sort().join('|');
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 

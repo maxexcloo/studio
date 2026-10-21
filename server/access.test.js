@@ -45,21 +45,40 @@ test("a device session lives in an HttpOnly cookie, a week at most, and only its
   const res = response();
   const session = access.startDeviceSession(request("192.168.1.40"), res);
   const cookie = [].concat(res.headers["Set-Cookie"]).join("\n");
-  assert.match(cookie, /heiss_device=/);
+  assert.match(cookie, /studio_device=/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Strict/);
   assert.match(cookie, /Max-Age=604800/);
   assert.doesNotMatch(cookie, /Secure/, "plain http has no Secure");
-  const token = cookie.match(/heiss_device=([^;]+)/)[1];
+  const token = cookie.match(/studio_device=([^;]+)/)[1];
   const saved = fs.readFileSync(path.join(temporary, "data", "access.json"), "utf8");
   assert.ok(!saved.includes(token), "the token itself is never stored");
   assert.equal(session.label, "iPhone · Safari");
   assert.equal(access.deviceSession(request("192.168.1.40", res))?.id, session.id);
-  assert.equal(access.deviceSession(request("192.168.1.40", null, "heiss_device=forged")), null);
+  assert.equal(access.deviceSession(request("192.168.1.40", null, "studio_device=forged")), null);
 
   const secure = response();
   access.startDeviceSession({ ...request("192.168.1.41"), socket: { remoteAddress: "192.168.1.41", encrypted: true } }, secure);
   assert.match([].concat(secure.headers["Set-Cookie"]).join("\n"), /Secure/);
+});
+
+test("a device signed in under the old HEISS UI cookie stays signed in and moves to the new cookie", () => {
+  const res = response();
+  const session = access.startDeviceSession(request("192.168.1.42"), res);
+  const token = [].concat(res.headers["Set-Cookie"]).join("\n").match(/studio_device=([^;]+)/)[1];
+  const old = request("192.168.1.42", null, `heiss_device=${token}`);
+  assert.equal(access.deviceSession(old)?.id, session.id, "the old cookie still signs in");
+  const moved = response();
+  assert.equal(access.migrateDeviceCookie(old, moved), true);
+  const cookies = [].concat(moved.headers["Set-Cookie"]);
+  assert.ok(cookies.some((line) => line.startsWith(`studio_device=${token};`) && /HttpOnly/.test(line) && !/Max-Age=0\b/.test(line)), "the same session under the new name");
+  assert.ok(cookies.some((line) => line.startsWith("heiss_device=;") && /Max-Age=0\b/.test(line)), "the old name cleared");
+  // With the new cookie there is nothing left to move.
+  const fresh = request("192.168.1.42", null, `studio_device=${token}`);
+  assert.equal(access.deviceSession(fresh)?.id, session.id);
+  assert.equal(access.migrateDeviceCookie(fresh, response()), false);
+  // A forged old cookie gets nothing.
+  assert.equal(access.migrateDeviceCookie(request("192.168.1.42", null, "heiss_device=forged"), response()), false);
 });
 
 test("sign out all devices ends every session, and nothing brings them back", () => {

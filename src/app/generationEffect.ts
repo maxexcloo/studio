@@ -42,8 +42,8 @@ export function createRevealBitmap(image: HTMLImageElement, width: number, heigh
  * page load that still finds it means the browser went down mid-mosaic, so
  * this browser keeps to the 2D reveal (delete MOSAIC_CRASH_KEY to retry).
  */
-export const MOSAIC_CRASH_KEY = 'heiss.generationMosaic.crashed';
-const MOSAIC_RUNNING_KEY = 'heiss.generationMosaic.running';
+export const MOSAIC_CRASH_KEY = 'studio.generationMosaic.crashed';
+const MOSAIC_RUNNING_KEY = 'studio.generationMosaic.running';
 
 export function webglMosaicAllowed() {
   if (typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)) return false;

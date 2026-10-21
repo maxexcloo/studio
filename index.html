@@ -19,7 +19,7 @@
       (function () {
         var boot = window.__studioBoot = {};
         ['/api/accounts/status', '/api/access/status', '/api/models', '/api/comfy/status'].forEach(function (url) {
-          try { boot[url] = { at: Date.now(), response: fetch(url, { cache: 'no-store', credentials: 'same-origin', headers: { 'X-HEISS': '1' } }) }; } catch (error) { /* The app asks again. */ }
+          try { boot[url] = { at: Date.now(), response: fetch(url, { cache: 'no-store', credentials: 'same-origin', headers: { 'X-Studio': '1' } }) }; } catch (error) { /* The app asks again. */ }
         });
       })();
     </script>

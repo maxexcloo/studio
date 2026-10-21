@@ -71,8 +71,8 @@ export function classifyClient(req, { lanActions = false, devToken = "", hostOnl
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
   // Vite in `npm run dev`, vouched for by the token scripts/dev.mjs made.
-  const viaDevProxy = isLoopbackAddress(address) && tokenMatches(headers["x-heiss-dev-token"], devToken);
-  if (viaDevProxy) address = plainAddress(headers["x-heiss-dev-client"] || "");
+  const viaDevProxy = isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
+  if (viaDevProxy) address = plainAddress(headers["x-studio-dev-client"] || "");
   const proxied = hasProxyHeaders(headers);
   // hostOnly: a container whose port is published on the host's 127.0.0.1 only
   // (STUDIO_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker

@@ -91,11 +91,11 @@ function noteServerClock(response: Response, sentAt: number) {
 }
 
 /** Fired when the server says this device has to sign in again (its session ended or was revoked). */
-export const signedOutEvent = "heiss:signed-out";
+export const signedOutEvent = "studio:signed-out";
 
 /**
  * Every request the studio makes to its own server goes through here. The
- * X-HEISS header tells the server it came from the studio's page: other
+ * X-Studio header tells the server it came from the studio's page: other
  * websites cannot send it (server/request-guard.js), so they cannot make it
  * delete, install or change anything. A signed-out device hears about it here.
  */
@@ -120,9 +120,9 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
   const early = await takeBoot(url, options);
   if (early) return early;
   const headers = new Headers(options.headers);
-  headers.set("X-HEISS", "1");
+  headers.set("X-Studio", "1");
   const response = await fetch(url, { ...options, headers });
-  if (response.status === 401 && response.headers.get("X-HEISS-Sign-In")) window.dispatchEvent(new Event(signedOutEvent));
+  if (response.status === 401 && (response.headers.get("X-Studio-Sign-In") || response.headers.get("X-HEISS-Sign-In"))) window.dispatchEvent(new Event(signedOutEvent));
   return response;
 }
 
@@ -169,7 +169,7 @@ export function uploadReferenceAsset(file: File, onProgress?: (progress: number)
     const form = new FormData();
     form.append("image", file);
     request.open("POST", "/api/reference-assets/upload");
-    request.setRequestHeader("X-HEISS", "1");
+    request.setRequestHeader("X-Studio", "1");
     request.responseType = "json";
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
@@ -199,12 +199,12 @@ export function deleteReferenceAsset(assetId: string) {
   return apiJson<{ ok?: boolean }>(`/api/reference-assets/${encodeURIComponent(assetId)}`, { method: "DELETE" });
 }
 
-const prefsKey = "heiss-ui-prefs";
-const draftKey = "heiss-ui-draft";
+const prefsKey = "studio-prefs";
+const draftKey = "studio-draft";
 const legacyPrefsKey = "j-ai-studio-prefs";
 const legacyDraftKey = "j-ai-studio-draft";
 let accountStorageScope = "";
-export const accountStorageScopeChangeEvent = "heiss:account-storage-scope-changed";
+export const accountStorageScopeChangeEvent = "studio:account-storage-scope-changed";
 
 /** Keep browser-held studio content separate when people share a browser. */
 export function setAccountStorageScope(accountId?: string) {

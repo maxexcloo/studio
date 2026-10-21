@@ -66,7 +66,7 @@ test("Sign Out ends the browser's session behind a proxy, with single sign-on co
   assert.equal((await status()).signedIn, false);
   const gallery = await browser("/api/gallery?limit=1");
   assert.equal(gallery.status, 401);
-  assert.equal(gallery.headers.get("x-heiss-sign-in"), "1");
+  assert.equal(gallery.headers.get("x-studio-sign-in"), "1");
   // Another site still can't sign anyone out.
   const crossSite = await browser("/api/accounts/sign-out", { method: "POST", headers: { "sec-fetch-site": "cross-site" } });
   assert.equal(crossSite.status, 403);

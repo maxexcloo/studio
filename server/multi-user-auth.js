@@ -37,14 +37,14 @@ export function mcpBearerRouteAllowed(method, routePath) {
 // MCP's own loopback calls for gateway-linked accounts carry this per-process credential, never a stored token.
 const internalSecret = crypto.randomBytes(32).toString("base64url");
 export function internalMcpHeaders(accountId) {
-  return { "X-Heiss-Mcp-Internal": internalSecret, "X-Heiss-Mcp-Account": String(accountId || "") };
+  return { "X-Studio-Mcp-Internal": internalSecret, "X-Studio-Mcp-Account": String(accountId || "") };
 }
 
 function internalMcpAccount(req, method, routePath) {
-  const given = String(req?.headers?.["x-heiss-mcp-internal"] || "");
+  const given = String(req?.headers?.["x-studio-mcp-internal"] || "");
   if (!given || Buffer.byteLength(given) !== Buffer.byteLength(internalSecret) || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(internalSecret))) return null;
   if (!clientOf(req).thisComputer || !mcpBearerRouteAllowed(method, routePath)) return null;
-  const access = accountAccessForId(String(req.headers["x-heiss-mcp-account"] || ""));
+  const access = accountAccessForId(String(req.headers["x-studio-mcp-account"] || ""));
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 

@@ -1,4 +1,5 @@
 import { gatedPath } from "./gated-path.js";
+import { signInHeader } from "./request-guard.js";
 // Sign-in, plus the liveness and readiness probes a container platform calls without an account.
 const publicAccountPaths = new Set([
   "/api/ping",
@@ -53,7 +54,7 @@ export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
   if (publicAccountPaths.has(req.path)) return next();
   const account = accountForRequest(req);
   if (!account) {
-    res.setHeader("X-HEISS-Sign-In", "1");
+    res.setHeader(signInHeader, "1");
     res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with an approved account to continue." });
     return;
   }

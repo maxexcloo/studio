@@ -32,9 +32,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { printBanner } from './banner.js';
 import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
-import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.js';
+import { canAdmin, clientOf, deviceSession, migrateDeviceCookie, studioPasswordSet } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
-import { hostAllowed, requestGuard } from './request-guard.js';
+import { hostAllowed, requestGuard, signInHeader } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
@@ -265,10 +265,11 @@ function requireSignedIn(req, res, next) {
   }
   if (req.path.toLowerCase().startsWith("/api/access/")) return next();
   if (!deviceSession(req)) {
-    res.setHeader("X-HEISS-Sign-In", "1");
+    res.setHeader(signInHeader, "1");
     res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with the studio password to continue." });
     return;
   }
+  migrateDeviceCookie(req, res);
   next();
 }
 

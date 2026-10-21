@@ -10,11 +10,11 @@ test('date headers are off until chosen in Settings › Studio › Gallery', asy
   await expect(page.locator('[data-tile-id="date-0"]')).toBeVisible();
   await expect(page.locator('.virtual-gallery-moment')).toHaveCount(0);
   // Saved preferences from before (with the old hidden switch on) don't turn them on.
-  await page.evaluate(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ showMoments: true })));
+  await page.evaluate(() => localStorage.setItem('studio-prefs', JSON.stringify({ showMoments: true })));
   await page.reload();
   await expect(page.locator('[data-tile-id="date-0"]')).toBeVisible();
   await expect(page.locator('.virtual-gallery-moment')).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ dateHeaders: true })));
+  await page.evaluate(() => localStorage.setItem('studio-prefs', JSON.stringify({ dateHeaders: true })));
   await page.reload();
   await expect(page.locator('.virtual-gallery-moment').first()).toBeVisible();
 });

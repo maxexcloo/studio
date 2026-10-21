@@ -59,9 +59,9 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     return request.continue();
   };
   await page.addInitScript((text) => {
-    localStorage.setItem('heiss-ui-draft', JSON.stringify({ prompt: text }));
-    localStorage.setItem('heiss-ui-lora-pending', JSON.stringify([{ op: 'favorite', name: text, on: true }]));
-    localStorage.setItem('heiss-ui-unstacked-runs', JSON.stringify(['private-run-from-another-account']));
+    localStorage.setItem('studio-draft', JSON.stringify({ prompt: text }));
+    localStorage.setItem('studio-lora-pending', JSON.stringify([{ op: 'favorite', name: text, on: true }]));
+    localStorage.setItem('studio-unstacked-runs', JSON.stringify(['private-run-from-another-account']));
   }, otherAccountText);
   await page.route('**/api/loras/**', async (request) => {
     const url = new URL(request.request().url());
@@ -74,10 +74,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   });
   await page.route('**/api/accounts/**', route);
   await page.goto('/');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('heiss-ui-draft:account:admin-id'))).not.toBeNull();
-  expect(await page.evaluate(() => localStorage.getItem('heiss-ui-draft:account:admin-id'))).not.toContain(otherAccountText);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('studio-draft:account:admin-id'))).not.toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('studio-draft:account:admin-id'))).not.toContain(otherAccountText);
   expect(loraOps.join('\n')).not.toContain(otherAccountText);
-  expect(await page.evaluate(() => localStorage.getItem('heiss-ui-lora-pending:account:admin-id'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('studio-lora-pending:account:admin-id'))).toBeNull();
   await studioUi(page).openSettings();
   // Account first, then the pages alphabetically.
   await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'About', 'Maintenance', 'Models', 'Profiles', 'Studio', 'Users', 'Workers']);

@@ -101,7 +101,7 @@ test('phone tiles show nothing over the picture until Tile Captions is on', asyn
   await expect(wrap.locator('.tile')).toBeVisible();
   await expect(wrap.locator('.tile-caption')).toHaveCount(0);
   await expect(wrap.locator('.tile-overlay').locator('button:visible, a:visible')).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ phoneTileCaptions: true })));
+  await page.evaluate(() => localStorage.setItem('studio-prefs', JSON.stringify({ phoneTileCaptions: true })));
   await page.reload();
   const caption = page.locator('[data-tile-id="tile-done"] .tile-caption');
   await expect(caption.locator('strong')).toHaveText(/lighthouse at dusk/i);

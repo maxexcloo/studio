@@ -50,7 +50,7 @@ test('image and video default to two, retaining independent choices and reloads'
   await expect(ui.composer.getByRole('button', { name: 'Images: 6', exact: true })).toBeVisible();
   await mode(ui, 'Video');
   await expect(ui.composer.getByRole('button', { name: 'Videos: 3', exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-draft') || '{}').count)).toBe(3);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-draft') || '{}').count)).toBe(3);
   await page.reload();
   await ui.openComposer();
   await expect(ui.composer.getByRole('button', { name: 'Videos: 3', exact: true })).toBeVisible();
@@ -150,7 +150,7 @@ test('Stop All prevents further video submissions and cancels an in-flight accep
 for (const count of [1, 4]) {
   test(`an explicitly saved image default of ${count} survives preference migration`, async ({ page }) => {
     await page.addInitScript(count => {
-      localStorage.setItem('heiss-ui-prefs', JSON.stringify({ defaultImageCount: count }));
+      localStorage.setItem('studio-prefs', JSON.stringify({ defaultImageCount: count }));
     }, count);
     const ui = await prepare(page);
     await expect(ui.composer.getByRole('button', { name: `Images: ${count}`, exact: true })).toBeVisible();

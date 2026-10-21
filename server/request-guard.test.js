@@ -23,7 +23,7 @@ const guard = requestGuard({ lan: () => false });
 const lanGuard = requestGuard({ lan: () => true, extraHosts: () => ["studio.tail1234.ts.net"] });
 
 test("the studio's own page gets through: same origin plus the header or JSON", () => {
-  assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-heiss": "1" } }).passed);
+  assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-studio": "1" } }).passed);
   assert.ok(run(guard, { headers: { origin: "http://localhost:8787", "content-type": "application/json" } }).passed);
   assert.ok(run(guard, { method: "GET", path: "/api/gallery" }).passed);
 });
@@ -34,10 +34,10 @@ test("a bodyless POST from another website is refused (the old gallery wipe)", (
   assert.equal(result.status, 403);
   assert.equal(result.body.reason, "origin");
   // Old browsers without Sec-Fetch-Site still send an Origin that does not match.
-  assert.equal(run(guard, { headers: { origin: "https://evil.example", "x-heiss": "1" } }).passed, false);
-  assert.equal(run(guard, { headers: { origin: "null", "x-heiss": "1" } }).passed, false);
+  assert.equal(run(guard, { headers: { origin: "https://evil.example", "x-studio": "1" } }).passed, false);
+  assert.equal(run(guard, { headers: { origin: "null", "x-studio": "1" } }).passed, false);
   // Another app on localhost is same-site, not same-origin.
-  assert.equal(run(guard, { headers: { "sec-fetch-site": "same-site", "x-heiss": "1" } }).passed, false);
+  assert.equal(run(guard, { headers: { "sec-fetch-site": "same-site", "x-studio": "1" } }).passed, false);
 });
 
 test("a same-origin request still needs the header or JSON, which only the studio sends", () => {
@@ -45,7 +45,10 @@ test("a same-origin request still needs the header or JSON, which only the studi
   assert.equal(result.passed, false);
   assert.equal(result.body.reason, "header");
   // curl and scripts: no browser headers at all, the studio header is enough.
+  assert.ok(run(guard, { headers: { "x-studio": "1" } }).passed);
+  // The header's name before the hard fork still counts, for pages and scripts made before it.
   assert.ok(run(guard, { headers: { "x-heiss": "1" } }).passed);
+  assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-heiss": "1" } }).passed);
 });
 
 test("other sites cannot read or embed /api and /comfy either", () => {
@@ -102,14 +105,14 @@ test("devices on the network are only let in with LAN mode on, and never from a 
 });
 
 test("only the dev proxy with the right token may say who is behind it", () => {
-  const viaVite = (token, client = "192.168.1.40") => classifyClient({ socket: { remoteAddress: "127.0.0.1" }, headers: { "x-heiss-dev-token": token, "x-heiss-dev-client": client } }, { lanActions: true, devToken: "secret-token" });
+  const viaVite = (token, client = "192.168.1.40") => classifyClient({ socket: { remoteAddress: "127.0.0.1" }, headers: { "x-studio-dev-token": token, "x-studio-dev-client": client } }, { lanActions: true, devToken: "secret-token" });
   assert.equal(viaVite("secret-token").thisComputer, false);
   assert.equal(viaVite("secret-token").address, "192.168.1.40");
   assert.equal(viaVite("secret-token", "127.0.0.1").thisComputer, true);
   // A wrong token changes nothing: still just the socket.
   assert.equal(viaVite("guess").address, "127.0.0.1");
   // A token sent from elsewhere is not believed at all.
-  assert.equal(classifyClient({ socket: { remoteAddress: "192.168.1.40" }, headers: { "x-heiss-dev-token": "secret-token", "x-heiss-dev-client": "127.0.0.1" } }, { devToken: "secret-token" }).thisComputer, false);
+  assert.equal(classifyClient({ socket: { remoteAddress: "192.168.1.40" }, headers: { "x-studio-dev-token": "secret-token", "x-studio-dev-client": "127.0.0.1" } }, { devToken: "secret-token" }).thisComputer, false);
 });
 
 test("a host-only Docker port counts the host's Docker address as this computer, and nothing else", () => {

@@ -223,7 +223,7 @@ test('custom gallery filters support keyboard selection and dismiss only their o
 
 test('grouping uses the same glass shell and inset action states as Search and Select', async ({ page, isMobile }, testInfo) => {
   test.skip(isMobile, 'Full studio action shells.');
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ stackRuns: false })));
+  await page.addInitScript(() => localStorage.setItem('studio-prefs', JSON.stringify({ stackRuns: false })));
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.goto('/');
   const toolbar = page.locator('.gallery-toolbar');
@@ -394,9 +394,9 @@ test('video gallery actions run from playback through grouping to Select', async
   // Status hides queued or failed outputs, remembered like the other view controls.
   await status.click();
   await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Failed', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').showFailedItems)).toBe(false);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-prefs') || '{}').showFailedItems)).toBe(false);
   await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Queued', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').hideQueuedItems)).toBe(true);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-prefs') || '{}').hideQueuedItems)).toBe(true);
   await page.keyboard.press('Escape');
 });
 

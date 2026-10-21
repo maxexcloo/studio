@@ -6,7 +6,7 @@ const item = { id: 'viewer-actions-0', url: picture, filename: 'viewer-actions.p
 
 test.beforeEach(async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.addInitScript(() => localStorage.setItem('heiss-ui-prefs', JSON.stringify({ smartUpscale: true })));
+  await page.addInitScript(() => localStorage.setItem('studio-prefs', JSON.stringify({ smartUpscale: true })));
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
 });

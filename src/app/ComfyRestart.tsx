@@ -167,7 +167,7 @@ export function restartResultLine(result: RestartResult | null) {
 /** Tells the app a restart just started, so it asks the server at once and polls faster. */
 export function announceComfyRestart() {
   setComfyRestarting(true);
-  window.dispatchEvent(new CustomEvent('heiss:comfy-restart'));
+  window.dispatchEvent(new CustomEvent('studio:comfy-restart'));
 }
 
 /**

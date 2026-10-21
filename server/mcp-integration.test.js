@@ -55,7 +55,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
   let defaults = { image: imageProfile.id, video: videoProfile.id };
   let visibleTo = null;
   let backends;
-  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-heiss-mcp-internal'], account: req.headers['x-heiss-mcp-account'] }); next(); });
+  app.use('/api', (req, _res, next) => { requests.push({ path: req.path, method: req.method, body: req.body, authorization: req.headers.authorization, internal: req.headers['x-studio-mcp-internal'], account: req.headers['x-studio-mcp-account'] }); next(); });
   app.get('/api/access/status', (_req, res) => res.json({ signedIn: true }));
   app.get('/api/loras/info', (_req, res) => res.json({ ok: true, loras: loraInfo }));
   app.post('/api/generate', (req, res) => {
@@ -173,7 +173,7 @@ test('account mode trusts the gateway key only for linked forwarded users and ke
     environment: adminEnvironment,
     authenticateGatewayIdentity: (user, email) => { emails.push([user, email]); return user === 'librechat-linked' ? linked : null; },
     noteGatewayIdentity: user => noted.push(user),
-    internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId })
+    internalCredential: accountId => ({ 'X-Studio-Mcp-Internal': 'fixture-internal', 'X-Studio-Mcp-Account': accountId })
   });
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   const headers = (user) => ({ authorization: `Bearer ${mediaKey}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(user ? { 'x-ai-user-id': user } : {}) });
@@ -1229,7 +1229,7 @@ test('written prompts carry LoRA triggers and tags, and a guide’s recommended 
 test('account watch pages read as the signed owner through the loopback credential, not a stored bearer', async t => {
   const token = 'account-mcp-token-for-watch-page-fixture';
   const account = { userId: 'stable-account-watch', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
-  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null, internalCredential: accountId => ({ 'X-Heiss-Mcp-Internal': 'fixture-internal', 'X-Heiss-Mcp-Account': accountId }) });
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null, internalCredential: accountId => ({ 'X-Studio-Mcp-Internal': 'fixture-internal', 'X-Studio-Mcp-Account': accountId }) });
   const client = await f.client('', token);
   const [queued] = (await generate(client)).jobs;
   assert.equal(f.requests.find(request => request.path === '/loras/info')?.authorization, `Bearer ${token}`, 'LoRA metadata is read with the account’s own credential');

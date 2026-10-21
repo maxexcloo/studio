@@ -117,7 +117,7 @@ export class McpMedia {
     let response;
     const credential = override || this.credentials.get(owner);
     // An account's credential is a header set: its personal bearer, or MCP's internal loopback credential.
-    const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Heiss': '1', ...(credential || {}) };
+    const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Studio': '1', ...(credential || {}) };
     try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000) }); } catch {
       if (signal?.aborted) throw aborted(signal);
       const error = new Error('The studio connection was interrupted. Check the returned job before retrying.');

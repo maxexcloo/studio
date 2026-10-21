@@ -203,3 +203,14 @@ Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STU
 | `HEISS_TLS_KEY` | `STUDIO_TLS_KEY` |
 | `HEISS_TRASH_DAYS` | `STUDIO_TRASH_DAYS` |
 | `HEISS_VIDEO_PREVIEW_CACHE_MB` | `STUDIO_VIDEO_PREVIEW_CACHE_MB` |
+
+The same goes for the names browsers and scripts see. Studio writes only the new ones and reads the old ones until a later release:
+
+| What | Old | New | Compatibility |
+| --- | --- | --- | --- |
+| Request header for changes from scripts | `X-HEISS` | `X-Studio` | Both accepted |
+| Sign-in needed (401 response) | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both |
+| Device sign-in cookie (single-user LAN mode) | `heiss_device` | `studio_device` | The old cookie still signs in and is moved to the new name on the next request |
+| Browser storage (preferences, drafts, LoRA favourites and the rest) | `heiss-ui-*`, `heiss-ui:*`, `heiss.*`, `heiss-grid-autoplay` | `studio-*`, `studio:*`, `studio.*`, `studio-grid-autoplay` | Moved to the new names when the page starts |
+
+Accounts already use `studio_account`, so account sessions are unaffected.

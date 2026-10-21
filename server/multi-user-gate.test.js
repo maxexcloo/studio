@@ -17,7 +17,7 @@ function call(path, account = null, method = "GET") {
 test("account mode requires identity on loopback and exposes only sign-in/bootstrap routes", () => {
   const anonymous = call("/api/gallery");
   assert.equal(anonymous.res.statusCode, 401);
-  assert.equal(anonymous.res.headers["X-HEISS-Sign-In"], "1");
+  assert.equal(anonymous.res.headers["X-Studio-Sign-In"], "1");
   assert.equal(call("/api/accounts/status").continued, true);
   assert.equal(call("/api/accounts/bootstrap").continued, true);
   // Container liveness and readiness probes carry no account.

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { GalleryGroups, Run } from './runs';
 import { scopedStorageKey } from './api';
 
-const storageKey = "heiss-ui-unstacked-runs";
+const storageKey = "studio-unstacked-runs";
 /** Enough to remember every run anyone unstacks, without growing forever. */
 const limit = 500;
 

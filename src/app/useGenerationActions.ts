@@ -411,7 +411,7 @@ export function useGenerationActions(view: any) {
   async function resetAllSettings() {
     if (!await confirmAction({"title": "Reset All Settings?", "description": "Preferences, prompt drafts and saved LoRA stacks are deleted here and on the server. The page reloads. This can’t be undone.", "action": "Reset", "destructive": true, "irreversible": true})) return;
     // The signed-in account's own copies, and the unscoped single-user ones.
-    for (const key of ["heiss-ui-draft", "heiss-ui-prefs"]) {
+    for (const key of ["studio-draft", "studio-prefs"]) {
       localStorage.removeItem(key);
       localStorage.removeItem(scopedStorageKey(key));
     }

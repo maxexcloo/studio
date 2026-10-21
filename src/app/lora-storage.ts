@@ -3,10 +3,10 @@ import { accountStorageScopeChangeEvent, apiFetch, hasAccountStorageScope, scope
 import { clientJobUuid } from './format';
 import type { LoraSelection } from './types';
 
-const storageKey = 'heiss-ui-lora-library';
+const storageKey = 'studio-lora-library';
 const legacyStorageKey = 'j-ai-studio-lora-library';
-const pendingKey = 'heiss-ui-lora-pending';
-const mergedKey = 'heiss-ui-lora-merged-v2';
+const pendingKey = 'studio-lora-pending';
+const mergedKey = 'studio-lora-merged-v2';
 const maxRecents = 12;
 
 export type LoraSnapshot = {

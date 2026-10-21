@@ -28,8 +28,8 @@ const api: ProxyOptions = {
   configure(proxy) {
     if (!devProxyToken) return;
     proxy.on("proxyReq", (proxyReq, req) => {
-      proxyReq.setHeader("x-heiss-dev-client", req.socket.remoteAddress || "");
-      proxyReq.setHeader("x-heiss-dev-token", devProxyToken);
+      proxyReq.setHeader("x-studio-dev-client", req.socket.remoteAddress || "");
+      proxyReq.setHeader("x-studio-dev-token", devProxyToken);
     });
   }
 };

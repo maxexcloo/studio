@@ -401,7 +401,7 @@ export function referenceName(name: string) {
 // leaves, so passing over the chip or wobbling off its edge never flickers it.
 const hoverOpenDelay = 70;
 const hoverCloseDelay = 260;
-const inpaintIntroKey = "heiss-ui-inpaint-introduced";
+const inpaintIntroKey = "studio-inpaint-introduced";
 const inpaintIntroduced = () => { try { return localStorage.getItem(inpaintIntroKey) === "1"; } catch { return true; } };
 const coarsePointer = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 const noHoverQuery = "(hover: none)";

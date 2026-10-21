@@ -61,7 +61,7 @@ test('optional LoRAs show unverified variants and expose full published strength
 
 test('LoRA library offers direct list selection with inline strengths and accessible dismissal', async ({ page }) => {
   await page.route('**/api/loras/library/ops', async route => {
-    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-lora-library') || '{}'));
+    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('studio-lora-library') || '{}'));
     await route.fulfill({ json: { library } });
   });
   const models = await (await page.request.get('/api/models')).json();
@@ -256,7 +256,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
 
 test('LoRA stacks apply, update, rename and delete from the Stacks menu with Undo, and edit in Settings', async ({ page }) => {
   await page.route('**/api/loras/library/ops', async route => {
-    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-lora-library') || '{}'));
+    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('studio-lora-library') || '{}'));
     await route.fulfill({ json: { library } });
   });
   const models = await (await page.request.get('/api/models')).json();
@@ -338,6 +338,6 @@ test('LoRA stacks apply, update, rename and delete from the Stacks menu with Und
   await editor.getByRole('button', { name: 'Remove Grain From Yak', exact: true }).click();
   await editor.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(group.getByRole('button', { name: /^Yak/ })).toContainText('1 LoRA');
-  const saved = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((key) => key.includes('heiss-ui-lora-library'))!) || '{}').snapshots || {}).flat() as any[]);
+  const saved = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((key) => key.includes('studio-lora-library'))!) || '{}').snapshots || {}).flat() as any[]);
   expect(saved.find((stack: any) => stack.name === 'Yak').loras).toEqual([expect.objectContaining({ name: 'ink.safetensors', strength: 0.5 })]);
 });

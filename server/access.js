@@ -26,7 +26,9 @@ import { accountSession } from "./account-store.js";
 
 const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
-export const deviceCookieName = "heiss_device";
+export const deviceCookieName = "studio_device";
+/** The cookie's name before Studio's hard fork: still read, then moved to the new name (migrateDeviceCookie). */
+export const legacyDeviceCookieName = "heiss_device";
 const kdf = "scrypt-n32768-r8-p1";
 const maxSessions = 50;
 const seenFlushMs = 60 * 1000;
@@ -157,8 +159,9 @@ export function deviceLabel(userAgent = "") {
 
 /** The session this request's cookie names, while it lasts; null otherwise. */
 export function deviceSession(req) {
-  if (req && req.heissSession !== undefined) return req.heissSession;
-  const token = parseCookies(req)[deviceCookieName];
+  if (req && req.studioSession !== undefined) return req.studioSession;
+  const cookies = parseCookies(req);
+  const token = cookies[deviceCookieName] || cookies[legacyDeviceCookieName];
   let found = null;
   if (token) {
     const id = hashToken(token);
@@ -172,12 +175,32 @@ export function deviceSession(req) {
       }
     }
   }
-  if (req) req.heissSession = found;
+  if (req) {
+    req.studioSession = found;
+    // Signed in under the old name: the next response moves the same session to the new one.
+    req.studioLegacyDeviceToken = found && !cookies[deviceCookieName] ? token : "";
+  }
   return found;
 }
 
-function cookie(req, value, maxAge) {
-  return [`${deviceCookieName}=${value}`, "Path=/", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Strict", ...(secureRequest(req) ? ["Secure"] : [])].join("; ");
+/**
+ * A device signed in before the rename keeps its session: the same token is
+ * set under the new cookie name for the time it has left, and the old one
+ * cleared, so nobody is signed out and only the new name is written.
+ */
+export function migrateDeviceCookie(req, res) {
+  const session = deviceSession(req);
+  const token = req?.studioLegacyDeviceToken;
+  if (!session || !token) return false;
+  const left = Math.max(1, Math.floor((Number(session.expiresAt) - Date.now()) / 1000));
+  appendSetCookie(res, cookie(req, token, left));
+  appendSetCookie(res, cookie(req, "", 0, legacyDeviceCookieName));
+  req.studioLegacyDeviceToken = "";
+  return true;
+}
+
+function cookie(req, value, maxAge, name = deviceCookieName) {
+  return [`${name}=${value}`, "Path=/", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Strict", ...(secureRequest(req) ? ["Secure"] : [])].join("; ");
 }
 
 /** Adds a Set-Cookie without dropping one another part of the response already set. */
@@ -203,7 +226,7 @@ export function startDeviceSession(req, res) {
   config.sessions.push(session);
   save();
   appendSetCookie(res, cookie(req, token, deviceSessionSeconds));
-  if (req) req.heissSession = session;
+  if (req) req.studioSession = session;
   return session;
 }
 
@@ -216,7 +239,8 @@ export function endDeviceSession(req, res) {
     save({ twice: true });
   }
   appendSetCookie(res, cookie(req, "", 0));
-  if (req) req.heissSession = null;
+  if (parseCookies(req)[legacyDeviceCookieName]) appendSetCookie(res, cookie(req, "", 0, legacyDeviceCookieName));
+  if (req) req.studioSession = null;
 }
 
 /** "Sign out all devices": every session ends now. */

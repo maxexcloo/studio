@@ -45,8 +45,8 @@ test('unavailable and software WebGL use the lightweight generation preview', ()
 
 test('Windows and a previous mosaic crash retain their fallback without probing WebGL', () => {
   assert.equal(probe({ windows: true }).requested, false);
-  const storage = new Map([['heiss.generationMosaic.running', '1']]);
+  const storage = new Map([['studio.generationMosaic.running', '1']]);
   assert.deepEqual(probe({ storage }), { allowed: false, released: false, requested: false });
-  assert.equal(storage.has('heiss.generationMosaic.running'), false);
-  assert.ok(storage.has('heiss.generationMosaic.crashed'));
+  assert.equal(storage.has('studio.generationMosaic.running'), false);
+  assert.ok(storage.has('studio.generationMosaic.crashed'));
 });

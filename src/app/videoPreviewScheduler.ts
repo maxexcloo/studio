@@ -10,7 +10,7 @@ let suspended = 0;
 const SMALL_QUERY = `${NARROW_QUERY}, (pointer: coarse)`;
 let autoplay = typeof window === 'undefined' || !window.matchMedia(SMALL_QUERY).matches;
 try {
-  const saved = localStorage.getItem('heiss-grid-autoplay');
+  const saved = localStorage.getItem('studio-grid-autoplay');
   if (saved !== null) autoplay = saved !== 'off';
 } catch { /* Storage may be disabled. */ }
 const autoplayListeners = new Set<() => void>();
@@ -18,7 +18,7 @@ export const gridAutoplayEnabled = () => autoplay;
 export function subscribeGridAutoplay(listener: () => void) { autoplayListeners.add(listener); return () => { autoplayListeners.delete(listener); }; }
 export function toggleGridAutoplay() {
   autoplay = !autoplay;
-  try { localStorage.setItem('heiss-grid-autoplay', autoplay ? 'on' : 'off'); } catch { /* Keep the current session setting. */ }
+  try { localStorage.setItem('studio-grid-autoplay', autoplay ? 'on' : 'off'); } catch { /* Keep the current session setting. */ }
   reconcile();
   autoplayListeners.forEach((listener) => listener());
 }

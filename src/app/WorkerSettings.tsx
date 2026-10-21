@@ -98,7 +98,7 @@ function useWorkerRestart(worker: Draft, live: WorkerState | undefined, showToas
       const { ok, data } = await sendJson('/api/comfy/restart', 'POST', { worker: worker.id });
       if (!ok) { showToast(data.error || `Couldn’t restart ${worker.name}`, 'error'); setPhase(''); return; }
       setPhase('restarting');
-      window.dispatchEvent(new CustomEvent('heiss:comfy-restart'));
+      window.dispatchEvent(new CustomEvent('studio:comfy-restart'));
     } catch {
       showToast('Can’t reach Studio. Make sure it’s running.', 'error');
       setPhase('');

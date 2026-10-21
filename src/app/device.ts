@@ -82,8 +82,8 @@ export function forcedPhone() {
   if (typeof window === 'undefined') return false;
   try {
     const flag = new URLSearchParams(window.location.search).get('phone');
-    if (flag !== null) window.sessionStorage.setItem('heiss-force-phone', flag === '1' ? '1' : '');
-    return window.sessionStorage.getItem('heiss-force-phone') === '1';
+    if (flag !== null) window.sessionStorage.setItem('studio-force-phone', flag === '1' ? '1' : '');
+    return window.sessionStorage.getItem('studio-force-phone') === '1';
   } catch {
     return false;
   }

@@ -162,7 +162,7 @@ test("gateway identities map to accounts only through administrator links, and t
   assert.equal(accountForRequest(internal("GET", "/api/accounts/admin")), null);
   // Behind a proxy the request is not this computer, so the credential is refused.
   assert.equal(accountForRequest(internal("POST", "/api/generate", { "x-forwarded-for": "203.0.113.9" })), null);
-  assert.equal(accountForRequest({ ...internal("POST", "/api/generate"), headers: { ...internal("POST", "/api/generate").headers, "x-heiss-mcp-internal": "guessed" } }), null);
+  assert.equal(accountForRequest({ ...internal("POST", "/api/generate"), headers: { ...internal("POST", "/api/generate").headers, "x-studio-mcp-internal": "guessed" } }), null);
 
   await call(routes["PATCH /api/accounts/users/:id"], { ...admin, params: { id: artist.id }, body: { disabled: true } });
   assert.equal(gatewayAccountAccess("librechat-user-1"), null);
