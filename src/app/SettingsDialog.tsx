@@ -300,7 +300,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
             <AdapterLibraryGroup />
-            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} /> : null}
+            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} showToast={showToast} onSaved={() => void deployment.refresh()} /> : null}
           </>
         ) : null}
 

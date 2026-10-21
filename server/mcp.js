@@ -9,7 +9,7 @@ import { hostAllowed } from './request-guard.js';
 import { closest, listedControls, mcpControls, mcpGenerationCount, mcpLoras, mcpSize } from './mcp-controls.js';
 import { McpMedia, assertJobCount, maxJobsPerCall, mcpJson, mcpOutputPath } from './mcp-media.js';
 import { exactPromptInstructions, fullBodyPerson } from './mcp-prompt-checks.js';
-import { loadMcpPrompting } from './mcp-prompting.js';
+import { livePrompting } from './profile-store.js';
 import { asksForCloud, familyMatches, fastestFirst, findProfile, isCloudProfile, localUnlessAsked, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
 import { createControlClient } from './ai-control.js';
@@ -73,7 +73,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const foregroundWait = foregroundWaitSeconds;
   // Only a notification delivery, which collects a queued job, may hold a request open for long.
   const capWait = (seconds, delivery) => delivery === 'notification' ? seconds : Math.min(seconds, foregroundWait);
-  const prompting = loadMcpPrompting(environment.MCP_PROMPTING_PATH);
+  // Studio's guide store (guides/prompting.json) first, the deployment's MCP_PROMPTING_PATH as seed, reloaded on change.
+  const prompting = livePrompting({ dataDir, seedFile: environment.MCP_PROMPTING_PATH });
   // Optional: with a writer, Studio writes each prompt from the request; a partial setting fails at start.
   const writer = createPromptWriter(environment, { fetchImpl });
   const instructions = mediaInstructions(Boolean(writer));

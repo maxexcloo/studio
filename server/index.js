@@ -15,7 +15,9 @@ import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
-import { registerProfileEditorRoutes } from './profile-editor.js';
+import { readEditableProfile, registerProfileEditorRoutes, validateProfileText } from './profile-editor.js';
+import { assistantIntegration, assistantSettingKeys, assistantSettingValue, registerAssistantRoutes } from './assistant-routes.js';
+import { guideStore, livePrompting, profileStore } from './profile-store.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
@@ -61,7 +63,7 @@ import { startMediaWarmup } from './media-warmup.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
 import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
-import { loraInfos } from './lora-info.js';
+import { loraCatalogue, loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
@@ -126,6 +128,11 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     const mime = ({ '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.m4v': 'video/mp4', '.mkv': 'video/x-matroska', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.png': 'image/png', '.webm': 'video/webm', '.webp': 'image/webp' })[extension];
     return mime ? { content: Buffer.from(bytes), mime } : null;
   } catch { return null; }
+}
+// Once per start and safe to repeat: the catalogue, guide and profile stores take in what the older
+// files hold, which stay where they are (library-catalogue.js, profile-store.js). Before MCP reads guides.
+for (const [name, migrate] of [["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
+  try { migrate(); } catch (error) { console.warn(`[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`); }
 }
 registerMcpRoutes(app, {
   dataDir,
@@ -880,6 +887,38 @@ registerProfileEditorRoutes(app, {
   accountName: (req) => req.studioAccount?.userId || ""
 });
 
+// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
+const assistantGuides = (() => {
+  try { return livePrompting({ negatives: true }); } catch (error) { console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`); return () => null; }
+})();
+const assistantProfiles = async (req) => {
+  try { return modelsForAccount((await mediaModels(false)).models, req).profiles || []; } catch { return []; }
+};
+const assistantLoras = async (req) => {
+  if (!accountMayUseLoras(req) || !lorasEnabled) return [];
+  try {
+    const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
+    const infos = await loraInfos(names);
+    return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
+  } catch { return []; }
+};
+const assistantEngine = registerAssistantRoutes(app, {
+  profiles: assistantProfiles,
+  guide: (profile) => { try { return assistantGuides(profile, true); } catch { return null; } },
+  loras: assistantLoras,
+  // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
+  starred: async (req, profile) => {
+    const families = new Map((await assistantProfiles(req)).map((item) => [item.id, item.family]));
+    const same = (item) => item.settings?.profileId === profile.id || (profile.family && families.get(item.settings?.profileId) === profile.family);
+    const items = gallery.filter((item) => item.favorite && item.status === "done" && item.prompt && recordBelongsToRequest(item, req) && same(item)).slice(0, 6);
+    return { examples: items.map((item) => item.prompt), loras: [...new Set(items.flatMap((item) => (item.settings?.loras || []).map((lora) => lora?.name).filter(Boolean)))] };
+  },
+  template: async (id) => { try { return JSON.parse(readEditableProfile(id).text); } catch { return null; } },
+  checkProfile: async (id, text) => validateProfileText(id, text, { info: await loadComfyContext().then((context) => context.info).catch(() => null) }),
+  pack: (id) => { try { return guideStore().pack(id).pack; } catch { return null; } },
+  requireAdmin
+});
+
 registerGalleryBundleRoutes(app);
 
 
@@ -1202,7 +1241,8 @@ app.get("/api/settings/deployment", async (req, res) => {
     catalogue: catalogueFlags.map(describeFlag),
     integrations: {
       civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
-      huggingFace: { token: hfTokenStatus() }
+      huggingFace: { token: hfTokenStatus() },
+      assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource })
     },
     storage: { outputs: mediaStorageEnabled ? "studio" : "comfy", ...settingSource("STUDIO_OUTPUT_STORAGE"), workerToken: Boolean(process.env.STUDIO_WORKER_TOKEN), multiUser: multiUserEnabled }
   });
@@ -1219,6 +1259,10 @@ app.post("/api/settings/deployment", (req, res) => {
       const item = catalogueFlags.find((entry) => entry.key === key);
       // Back to the default is no line at all, so a later default change still applies.
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"), key, applies: item.applies } });
+      return;
+    }
+    if (assistantSettingKeys.includes(key)) {
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, assistantSettingValue(key, value)), key, applies: "now" } });
       return;
     }
     if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {

@@ -5,6 +5,7 @@ import { metadataFromJson, userWorkflowsDir, validateGraph, workflowMissingFiles
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { requireAdmin } from "./route-access.js";
+import { profileStore } from "./profile-store.js";
 
 /**
  * Settings › Profiles: an administrator edits Studio's own copy of one model
@@ -89,8 +90,12 @@ export function validateProfileText(id, text, { info = null } = {}) {
   return { ok: !errors.length, errors, warnings, raw: errors.length ? undefined : raw };
 }
 
-/** Saves a checked edit: the old file goes to backups, the edit is recorded, and a stale base is refused. */
-export function saveEditableProfile(id, text, { baseHash = "", by = "", info = null } = {}) {
+/**
+ * Saves a checked edit: the old file goes to backups, the edit is recorded, and a stale base is refused.
+ * Every save is also a version (profile-store.js); an AI draft (`origin` "ai", `aiDrafted`) is marked
+ * so, and any other save clears the marker.
+ */
+export function saveEditableProfile(id, text, { baseHash = "", by = "", info = null, origin = "studio", aiDrafted = false } = {}) {
   const current = readEditableProfile(id);
   if (baseHash && baseHash !== current.hash) throw Object.assign(new Error("This profile changed since you opened it. Reload it, then make your edit again."), { status: 409 });
   const checked = validateProfileText(id, text, { info });
@@ -106,7 +111,17 @@ export function saveEditableProfile(id, text, { baseHash = "", by = "", info = n
   const edits = readEdits();
   edits[id] = { editedAt: at.toISOString(), by: String(by || ""), baseHash: edits[id]?.baseHash || current.hash };
   writeJsonFile(editsFile(), edits);
-  return { ...readEditableProfile(id), warnings: checked.warnings };
+  const store = profileStore({ workflowsDir: userWorkflowsDir });
+  // Profiles saved before versioning start their history with the text they replace.
+  if (!store.meta(id)) store.record(id, current.text, { origin: edits[id].baseHash === current.hash ? "seed" : "studio", by: "seed" });
+  store.record(id, next, { by, origin, aiDrafted });
+  return { ...readEditableProfile(id), warnings: checked.warnings, version: store.meta(id) };
+}
+
+/** Restores an earlier version as a new version, checked like any edit. */
+export function revertEditableProfile(id, version, { by = "", baseHash = "", info = null } = {}) {
+  const old = profileStore({ workflowsDir: userWorkflowsDir }).version(id, version);
+  return saveEditableProfile(id, old.text, { baseHash, by, info, origin: "studio" });
 }
 
 export function registerProfileEditorRoutes(app, { objectInfo = async () => null, onSaved = () => {}, accountName = () => "" } = {}) {

@@ -156,6 +156,28 @@ Open **Image & Model Library** from the desktop toolbar or phone gallery. **Imag
 
 Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server environment for resources your account can access. Tokens are kept on the server and are never returned to the browser or forwarded to the image/file CDN. Imports, image deletion and model downloads are available at the server or from a signed-in device. Provider credential changes retain the existing admin boundary; the library does not expose credential controls.
 
+## Prompt Assistant
+
+The prompt assistant uses the MCP prompt writer's LiteLLM gateway: `STUDIO_PROMPT_WRITER_URL`, `STUDIO_PROMPT_WRITER_KEY` and `STUDIO_PROMPT_WRITER_MODEL` (see the README's MCP section). It adds no provider key, and LiteLLM budgets are its only limit. Without the gateway, the assistant is off.
+
+- `STUDIO_ASSISTANT_MODEL`: the model that rewrites prompts, writes negatives, suggests LoRAs and describes images. Unset, it is `STUDIO_PROMPT_WRITER_MODEL`. MCP Generate keeps `STUDIO_PROMPT_WRITER_MODEL` either way.
+- `STUDIO_ASSISTANT_SPICY_MODEL`: an uncensored model for the Spicy preset. Unset, Spicy is hidden and refused.
+
+Administrators choose both in **Settings › Models › Integrations**, which lists the gateway's models (`GET /v1/models`) and shows whether each one reads reference images (`supports_vision` from LiteLLM's `GET /model/info`; unknown counts as text-only). A deployment that sets either variable locks its row. Choices apply at once.
+
+The **Prompt Assistant** access-profile feature gates every assistant route. It is on for the built-in profiles and for access profiles stored before it existed; turn it off per profile. Spicy also needs **NSFW Models**. LoRA suggestions need **LoRAs**, and drafting guides and profiles is for administrators. Replies are never logged; logs carry only the operation, profile, timing and a short failure reason. Each call times out (30 s, 90 s for a streamed rewrite) and falls back: a rewrite returns the original prompt, a negative the guide's default, LoRA suggestions the word-matched candidates.
+
+`mise run eval:assistant` replays the recorded cases in `server/fixtures/assistant-evals/` against the live gateway, using the variables above, and scores them; `--record` writes the live replies back for review. CI only scores the recorded replies.
+
+## Studio-Owned Catalogue, Profiles & Guides
+
+These files live in the data folder (`STUDIO_DATA_DIR`, `/data` in Kubelab). Each one is written atomically by a single module. The first start of a new version snapshots the small state files first (`.backups/`), and every migration below is safe to run again.
+
+- **`library/catalogue.json`:** one entry per model file, keyed by `folder/file`, with hash, size, title, triggers, strength, licence, links and provenance (`origin`, `source`, `by`, the last 20 changes). It takes in `config/lora-catalogue.json` (seed), `lora-catalogue.json` (installed by hand, wins over the seed), `model-download-sources.json` (provider links and hashes), `model-hashes.json` (hashes of unchanged files) and the restore manifest. Those files are never written or removed: a changed file refreshes its layer, and a removed one keeps its last copy. Studio's own catalogue edits sit above all of them.
+- **`guides/prompting.json`:** the prompting guides, in `prompting.json`'s schema plus `meta.<packId>` (version, origin, AI-Drafted). The first start copies `MCP_PROMPTING_PATH` in as version 1. Later seed changes still flow into packs Studio hasn't changed, and the guide loader reads this file first, falling back to `MCP_PROMPTING_PATH`.
+- **`history/profiles/<id>/<n>.json` and `history/guides/<packId>/<n>.json`:** immutable versions, recording who saved each one (an account, `assistant`, `chat` or `seed`). The first start records each profile's `backups/profile-edits` copies and current file as versions: the oldest is `seed`, and later ones are `studio` when `.studio-edits.json` lists the profile. A revert saves an earlier version as a new one.
+- **`workflows/.studio-meta.json`:** each profile's current version, origin, AI-Drafted marker, editor and seed hash. `workflows/.studio-edits.json` is still written for every profile changed in Studio, so the seed deploy never overwrites one.
+
 ## Hidden Removal
 
 Studio no longer has Hidden. The first start of a version without it backs up and converts what an older Hidden left in the data folder, once, and deletes nothing:

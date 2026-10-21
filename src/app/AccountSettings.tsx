@@ -7,7 +7,7 @@ import { MultiSelect, type MultiSelectOption } from './MultiSelect';
 import { Group, GroupAction, Row, SaveRow, SwitchRow } from './SettingsControls';
 import type { ShowToast } from './toast';
 
-type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
+type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptAssistant' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; allModels?: boolean; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
 type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
@@ -19,7 +19,7 @@ const featureLabels: [Feature, string][] = [
   ['cloudModels', 'Cloud Models'], ['gallery', 'Gallery'],
   ['imageGeneration', 'Image Generation'], ['imageReferences', 'Image References'],
   ['loras', 'LoRAs'], ['nsfwModels', 'NSFW Models'], ['presets', 'Presets & Civitai Imports'],
-  ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
+  ['promptAssistant', 'Prompt Assistant'], ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
 ];
 const anyGeneration = { needs: ['imageGeneration', 'videoGeneration'] as Feature[], reason: 'Needs Image or Video Generation' };
 // A feature that only means something while another one is on.
@@ -28,6 +28,7 @@ const featureNeeds: Partial<Record<Feature, { needs: Feature[]; reason: string }
   imageReferences: { needs: ['imageGeneration'], reason: 'Needs Image Generation' },
   loras: anyGeneration,
   nsfwModels: anyGeneration,
+  promptAssistant: anyGeneration,
   videoReferences: { needs: ['videoGeneration'], reason: 'Needs Video Generation' }
 };
 const featureApplies = (feature: Feature, on: Set<Feature>) => !featureNeeds[feature] || featureNeeds[feature]!.needs.some((need) => on.has(need));
@@ -254,7 +255,7 @@ function AccessProfileEditor({ admin, profiles, showToast, onSaved }: { admin: A
   const sorted = byProfileName(admin.accessProfiles);
   const [choice, setChoice] = React.useState(sorted[0]?.id || NEW);
   const saved = admin.accessProfiles.find((profile) => profile.id === choice) || null;
-  const blank: Draft = { name: '', models: [], allModels: false, features: ['gallery', 'imageGeneration', 'imageReferences', 'promptHistory'] };
+  const blank: Draft = { name: '', models: [], allModels: false, features: ['gallery', 'imageGeneration', 'imageReferences', 'promptAssistant', 'promptHistory'] };
   const fromSaved = (profile: AccessProfile | null): Draft => profile ? { name: profile.name, models: profile.generationProfiles, allModels: profile.allModels === true, features: featureLabels.map(([key]) => key).filter((key) => profile.features?.[key]) } : blank;
   const [draft, setDraft] = React.useState(() => fromSaved(saved));
   const [busy, setBusy] = React.useState(false);

@@ -41,6 +41,28 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.locator('.set-row').filter({ hasText: 'Civitai' })).toContainText('On');
 });
 
+test('Integrations choose the assistant and Spicy models from the gateway, with vision status', async ({ page }) => {
+  const row = (key: string, configured: string, effective: string, vision: boolean) => ({ key, configured, effective, vision, source: configured ? 'studio' : 'default', locked: false });
+  const assistant = { available: true, writerModel: 'ai/text-quick', models: ['ai/text-quick', 'ai/vision', 'ai/uncensored'], model: row('STUDIO_ASSISTANT_MODEL', '', 'ai/text-quick', false), spicy: row('STUDIO_ASSISTANT_SPICY_MODEL', '', '', false) };
+  const posts: unknown[] = [];
+  await page.route('**/api/settings/deployment', (route) => {
+    if (route.request().method() === 'POST') { posts.push(route.request().postDataJSON()); return route.fulfill({ json: { ok: true, setting: { source: 'studio', locked: false } } }); }
+    return route.fulfill({ json: { ...settings, integrations: { ...settings.integrations, assistant } } });
+  });
+  await page.goto('/');
+  await studioUi(page).openSettings();
+  const dialog = page.locator('.settings-modal');
+  await dialog.getByRole('button', { name: 'Models', exact: true }).click();
+  const model = dialog.locator('.set-row').filter({ hasText: 'Assistant Model' });
+  await expect(model).toContainText('Prompt Writer Model (ai/text-quick)');
+  await expect(model).toContainText('Text only: reference images aren’t read.');
+  const spicy = dialog.locator('.set-row').filter({ hasText: 'Assistant Spicy Model' });
+  await expect(spicy).toContainText('Spicy is hidden until one is chosen.');
+  await spicy.getByLabel('Assistant Spicy Model').click();
+  await page.getByRole('option', { name: 'ai/uncensored', exact: true }).click();
+  await expect.poll(() => posts).toEqual([{ key: 'STUDIO_ASSISTANT_SPICY_MODEL', value: 'ai/uncensored' }]);
+});
+
 test('rows that only leave Studio show plain links, sorted where a list has no other order', async ({ page }) => {
   await page.goto('/');
   await studioUi(page).openSettings();
