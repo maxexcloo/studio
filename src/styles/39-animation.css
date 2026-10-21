@@ -1,9 +1,9 @@
-.animate-photos .animation-model { display: grid; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+.animate-photos .animation-model { display: grid; gap: var(--space-4); margin-bottom: 16px; font-size: 13px; }
 .animate-photos select, .animate-photos textarea { width: 100%; padding: 10px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--well); color: hsl(var(--foreground)); font: inherit; }
-.animation-photo { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 12px; padding: 14px 0; border-top: 1px solid var(--surface-border); }
+.animation-photo { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: var(--space-5); padding: 14px 0; border-top: 1px solid var(--surface-border); }
 .animation-photo img, .animation-photo-fallback { width: 64px; height: 64px; border-radius: var(--r-item); object-fit: cover; }
 .animation-photo-fallback { display: grid; place-items: center; background: var(--control-fill); color: hsl(var(--muted-foreground)); }
-.animation-photo label { display: grid; min-width: 0; gap: 6px; font-size: 13px; }
+.animation-photo label { display: grid; min-width: 0; gap: var(--space-3); font-size: 13px; }
 .animation-photo textarea { font-size: 16px; resize: vertical; min-height: 110px; }
 .animation-photo p { grid-column: 2; margin: 0; font-size: 13px; }
 .animation-photo [role="alert"] { color: var(--danger-ink); }

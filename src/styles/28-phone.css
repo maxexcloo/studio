@@ -45,12 +45,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
 }
-.phone-bar-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: var(--bar-h); }
+.phone-bar-row { display: flex; align-items: center; gap: var(--space-1); min-width: 0; height: var(--bar-h); }
 .phone-bar-row .phone-title { font-size: 16px; }
 .phone-bar-row .phone-scroll-top { min-height: 40px; }
-/* Search and Filter: tinted with a count while something is applied, filled while their row is open. */
+/* Search and Filter: tinted with a count while something is applied, and while their row is open. */
 .phone-tool.is-active { color: var(--accent-amber); }
-.phone-tool.is-open { background: rgb(255 255 255 / .1); }
+.phone-tool.is-open { color: var(--selected-ink); }
 .phone-tool-count {
   position: absolute;
   top: 4px;
@@ -70,12 +70,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 }
 /* The shared row under the bar: the search field or the filters, full width, as tall as the icons. */
 .phone-tools-row { overflow: hidden; }
-.phone-tools-inner { display: flex; align-items: center; gap: 4px; padding-bottom: 6px; }
+.phone-tools-inner { display: flex; align-items: center; gap: var(--space-2); padding-bottom: 6px; }
 .phone-tools-field {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   min-width: 0;
   height: 44px;
   padding: 0 12px;
@@ -91,7 +91,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-filter-row.gallery-filter-controls {
   flex: 1;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: var(--space-2);
   width: auto;
   max-width: none;
   min-width: 0;
@@ -106,13 +106,13 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-filter-row .gallery-filter-icon { flex: none; height: 44px; min-height: 44px; max-width: 200px; padding: 0 12px; background: rgb(255 255 255 / .06); font-size: 14px; }
 .phone-filter-row .gallery-filter-icon { width: 44px; padding: 0; }
 .phone-filter-row .gallery-filter-select.is-on,
-.phone-filter-row .gallery-filter-icon.is-on { background: var(--accent-amber-subtle); color: var(--accent-amber); }
+.phone-filter-row .gallery-filter-icon.is-on { background-color: var(--selected-bg); color: var(--selected-ink); }
 .phone-title {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   padding-left: 4px;
   font-size: 18px;
   font-weight: 650;
@@ -122,7 +122,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-scroll-top {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-width: 0;
   min-height: 44px;
   padding: 0;
@@ -134,22 +134,25 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 }
 .phone-scroll-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phone-ember { color: var(--accent-amber); }
-.phone-title-inline { display: inline-flex; align-items: center; gap: 8px; }
+.phone-title-inline { display: inline-flex; align-items: center; gap: var(--space-4); }
 
 .phone-icon {
   position: relative;
   flex: none;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
+  width: var(--control-h-touch);
+  height: var(--control-h-touch);
+  /* A glass-bar icon button: its press fill is a 36px circle inside the 44px target. */
+  padding: 4px;
   border: 0;
-  border-radius: 50%;
-  background: transparent;
+  border-radius: var(--r-pill);
+  background-color: transparent;
+  background-clip: content-box;
   color: hsl(var(--foreground));
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.phone-icon:active { background: rgb(255 255 255 / .08); }
+.phone-icon:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; box-shadow: none; }
 .phone-icon.is-on { color: var(--accent-amber); }
 .phone-icon.has-dot::after {
   content: "";
@@ -166,11 +169,11 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-height: 40px;
   padding: 0 14px;
   border: 0;
-  border-radius: 20px;
+  border-radius: var(--r-pill);
   background: rgb(255 255 255 / .08);
   color: hsl(var(--foreground));
   font-size: 14px;
@@ -229,7 +232,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   max-height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(20px, env(safe-area-inset-top)));
   padding-bottom: max(10px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--glass-border);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
   background: var(--surface-grain), var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
   backdrop-filter: var(--glass-panel-blur);
@@ -249,13 +252,13 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 40px;
   height: 5px;
   margin: 8px auto 2px;
-  border-radius: 3px;
+  border-radius: var(--r-pill);
   background: rgb(255 255 255 / .22);
 }
 .phone-sheet-head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   min-height: 52px;
   padding: 0 8px 0 20px;
 }
@@ -281,7 +284,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-sheet-foot {
   flex: none;
   padding: 10px 16px 4px;
-  border-top: 1px solid rgb(255 255 255 / .06);
+  border-top: 1px solid var(--line);
 }
 
 /* Tile actions use two compact columns instead of a screen of oversized rows. */
@@ -289,7 +292,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* Rows, groups, sections */
 .phone-group {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
   margin-bottom: 14px;
   padding: 4px;
   border-radius: 18px;
@@ -307,26 +310,25 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-5);
   width: 100%;
   min-height: 56px;
   padding: 8px 14px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-item);
   background: transparent;
   color: hsl(var(--foreground));
   font-size: 16px;
   font-weight: 500;
   text-align: left;
 }
-.phone-row:active { background: rgb(255 255 255 / .07); }
 .phone-row:disabled { opacity: .45; }
 .phone-row > svg { flex: none; color: hsl(var(--muted-foreground)); }
 .phone-row > span:not(.aspect-shape, .aspect-shape-slot, .phone-size-shape, .phone-size-remove-slot) {
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
 }
 .phone-row small {
   overflow: hidden;
@@ -344,7 +346,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   z-index: 2;
   margin: -4px -16px 8px;
   padding: 4px 16px 0;
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: 1px solid var(--line);
   background: #141414;
 }
 .phone-model-tools .phone-search { margin: 0 0 6px; }
@@ -375,7 +377,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-create .ref-menu > .ref-menu-role,
 .phone-create .ref-menu-paint-slot > .ref-menu-divider { display: none; }
 .phone-create .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
-.phone-ref-role { order: -1; display: flex; align-items: center; gap: 12px; overflow: hidden; }
+.phone-ref-role { order: -1; display: flex; align-items: center; gap: var(--space-5); overflow: hidden; }
 .phone-ref-role .ref-menu-role { flex: none; padding: 4px; }
 .phone-ref-role .ref-menu-role > i { top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); }
 .phone-ref-role .ref-menu-role button { min-width: 64px; height: 36px; font-size: 14px; }
@@ -385,9 +387,9 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   font-size: 12.5px;
   line-height: 1.35;
   text-wrap: pretty;
-  animation: phoneRoleNote 260ms var(--motion-ease) both;
+  animation: phoneRoleNote var(--motion-base) var(--motion-ease) both;
 }
-@keyframes phoneRoleNote { from { opacity: 0; transform: translateY(3px); } }
+@keyframes phoneRoleNote { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .phone-ref-role small { animation: none; } }
 .phone-create .ref-menu { max-width: calc(100vw - 72px); }
 /* The footer has room for the thumbnail; its paint action sits on the lower corner. */
@@ -427,7 +429,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-4);
   width: 100%;
   min-height: 58px;
   border: 0;
@@ -437,7 +439,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   font-size: 17px;
   font-weight: 650;
 }
-.phone-generate:active { scale: .98; }
 .phone-generate[aria-disabled="true"] { opacity: .4; }
 .phone-generate.is-restarting { background: rgb(255 190 110 / .12); color: rgb(255 214 160); opacity: 1; }
 .phone-generate.is-offline { background: rgb(255 120 100 / .14); color: #ffc4b9; }
@@ -452,16 +453,16 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: auto;
   height: min(600px, 82dvh, calc(var(--vv-height, 100dvh) - max(20px, env(safe-area-inset-top))));
   padding-bottom: env(safe-area-inset-bottom);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
   transform-origin: 50% 100%;
 }
 .kb-open .reference-popover.is-sheet { padding-bottom: 0; }
-.reference-popover.is-sheet .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.reference-popover.is-sheet .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 
 /* ---------------------------------------------------------------- Size */
 
 /* The size menu's preview window as a stage at the top of the sheet. It
-   stays put while the shapes scroll under it; the frame glides as you go. */
+   stays put while the shapes scroll under it; the frame follows the pick. */
 .phone-size-stage {
   position: sticky;
   top: -4px; /* the sheet body's top padding: nothing scrolls past above it */
@@ -493,13 +494,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-size .size-peek-caption span { font-size: 12.5px; }
 
 .phone-size-top { display: grid; margin-bottom: 14px; }
-.phone-size .aspect-upscale-tabs { padding: 4px; }
-.phone-size .aspect-upscale-tabs > i { top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--tab-count)); }
+.phone-size .aspect-upscale-tabs { padding: var(--seg-pad); }
 .phone-size .aspect-upscale-tabs button { min-height: 44px; font-size: 15px; }
 .phone-size .phone-control-note { padding: 10px 8px 0; font-size: 13px; }
 
 /* Custom: the linked fields at thumb size, 16px digits so iOS doesn't zoom. */
-.phone-size .size-custom-body { gap: 4px; padding-top: 10px; }
+.phone-size .size-custom-body { gap: var(--space-2); padding-top: 10px; }
 .phone-size .size-fields { --pill: 24px; --reach: -22px; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); height: 48px; }
 .phone-size .size-fields:not(.is-linked) { --reach: 0px; }
 .phone-size .size-field-key { width: 42px; font-size: 12px; }
@@ -510,16 +510,16 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   height: 36px;
   margin-right: 0;
   padding: 0 14px;
-  border-radius: 18px;
+  border-radius: var(--r-pill);
   background: rgb(255 154 82 / .1);
   color: var(--ember);
   font-size: 14px;
 }
-.phone-size .size-save:active:not(:disabled) { scale: .96; }
 .phone-size .size-save.is-saved { background: transparent; color: hsl(var(--muted-foreground)); }
 
-/* The shapes and the saved sizes: rows with the shape drawn, the size in one mono column. */
-.phone-size-row { gap: 10px; min-height: 52px; padding: 6px 14px 6px 4px; }
+/* The shapes and the saved sizes: rows with the shape drawn, the size in one mono column.
+   The current one has no row fill: its shape and size take the amber. */
+.phone-size-row { gap: var(--space-4); min-height: 52px; padding: 6px 14px 6px 4px; }
 .phone-size-shape {
   flex: none;
   display: grid;
@@ -540,9 +540,8 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   min-width: 9ch;
   text-align: right;
 }
-.phone-size-row.is-current { background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
 .phone-size-row.is-current .phone-size-shape,
-.phone-size-row.is-current em { color: hsl(var(--foreground)); }
+.phone-size-row.is-current em { color: var(--selected-ink); }
 
 .phone-size-saved-head { display: flex; align-items: center; justify-content: space-between; }
 .phone-size-saved-head .phone-section { margin: 4px 6px 8px; }
@@ -551,22 +550,20 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   margin: -4px -2px 4px 0;
   padding: 0 14px;
   border: 0;
-  border-radius: 20px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--muted-foreground));
   font-size: 15px;
   font-weight: 600;
 }
-.phone-size-edit:active { background: rgb(255 255 255 / .07); }
 .phone-size-edit.is-on { color: var(--ember); }
 
 /* A saved row is one row in and out of Edit: a see-through button under it
-   picks it; under Edit the name's field fills in and Remove slides in. */
+   picks it; under Edit the name's field fills in and Remove fades in. */
 .phone-size-saved { overflow: hidden; }
-.phone-size-row.is-saved { position: relative; isolation: isolate; transition: padding var(--motion-slow) var(--motion-ease); }
+.phone-size-row.is-saved { position: relative; isolation: isolate; }
 .phone-size-row.is-saved.is-editing { padding-right: 4px; }
 .phone-size-row.is-saved:not(.is-editing) > :not(.phone-size-hit) { pointer-events: none; }
-.phone-size-row.is-saved:has(.phone-size-hit:active) { background: rgb(255 255 255 / .07); }
 .phone-size-hit {
   position: absolute;
   inset: 0;
@@ -585,7 +582,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   margin: 0 0 0 -8px;
   padding: 0 8px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-field);
   outline: 0;
   background: transparent;
   box-shadow: none;
@@ -597,7 +594,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   transition: background-color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
 }
 .phone-size-row.is-editing .phone-size-name { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
-.phone-size-row.is-editing .phone-size-name:focus { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 154 82 / .45); }
+.phone-size-row.is-editing .phone-size-name:focus { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px var(--line-strong); }
 .phone-size-name::selection { background: rgb(255 154 82 / .32); color: #fff; }
 .phone-size-remove-slot {
   flex: none;
@@ -606,7 +603,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 0;
   margin-left: -10px;
   overflow: hidden;
-  transition: width var(--motion-slow) var(--motion-ease), margin var(--motion-slow) var(--motion-ease);
 }
 .phone-size-row.is-editing .phone-size-remove-slot { width: 44px; margin-left: 0; }
 .phone-size-remove {
@@ -616,18 +612,17 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--danger-ink);
   opacity: 0;
-  scale: .7;
-  transition: opacity var(--motion-base) var(--motion-ease), scale var(--motion-slow) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
+  transition: opacity var(--motion-base) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
-.phone-size-row.is-editing .phone-size-remove { opacity: 1; scale: 1; }
-.phone-size-remove:active { background: rgb(255 120 100 / .14); }
+.phone-size-row.is-editing .phone-size-remove { opacity: 1; }
+.phone-size-remove:active { background-color: var(--danger-fill); }
 
 @media (prefers-reduced-motion: reduce) {
-  .phone-size-remove-slot, .phone-size-remove, .phone-size-name, .phone-size-shape, .phone-size-row.is-saved { transition: none; }
+  .phone-size-remove, .phone-size-name, .phone-size-shape { transition: none; }
 }
 
 /* -------------------------------------------------------------- Viewer */
@@ -664,12 +659,12 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   flex: 1 1 0;
   justify-items: center;
   align-content: center;
-  gap: 4px;
+  gap: var(--space-2);
   min-width: 0;
   min-height: 56px;
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-item);
   background: transparent;
   color: hsl(var(--foreground));
   font-size: 11px;
@@ -686,22 +681,21 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   position: absolute;
   inset: 3px 2px;
   z-index: -1;
-  border-radius: 14px;
+  border-radius: var(--r-item);
   background: transparent;
   transition: background-color var(--motion-fast) var(--motion-ease);
 }
 .viewer-phone-bar button:not(.viewer-phone-star, .viewer-phone-info):active:not(:disabled)::before { background: var(--control-press); transition-duration: var(--motion-instant); }
 .viewer-phone-bar button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -3px; }
 .viewer-phone-bar button:disabled { opacity: .45; }
-.viewer-phone-bar button.is-on { color: #0b0b0b; }
-.viewer-phone-bar button.is-on:not(.viewer-phone-star, .viewer-phone-info)::before { background: #f2f2f2; }
-.viewer-phone-bar button.is-on:is(.viewer-phone-star, .viewer-phone-info) { background: #f2f2f2; }
+.viewer-phone-bar button.is-on { color: var(--selected-ink); }
 @media (max-width: 339px) {
   .viewer-phone-bar:has(.viewer-reuse) { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
   .viewer-phone-bar .viewer-reuse { grid-column: span 1; }
   .scrim .viewer-stage:has(.viewer-reuse.is-compact) .viewer-canvas { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
   .scrim .viewer-stage:has(.viewer-reuse.is-compact) .viewer-side { bottom: calc(156px + env(safe-area-inset-bottom)); }
 }
+/* Pressed toggles in the bar take the amber icon and no disc (UI-PATTERNS › Selected & Focus States). */
 /* Upscale: the icon in a 30px circle that carries the progress ring while it runs, as on desktop tiles. */
 /* As tall as the other bar icons (19 px), so its label lines up with theirs;
    the progress ring spills around it without taking room. */
@@ -748,7 +742,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   align-content: center;
   padding: 6px 12px;
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
+  border-radius: var(--r-item);
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
@@ -778,14 +772,14 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   cursor: pointer;
   appearance: none;
 }
-.phone-select:focus-within { box-shadow: inset 0 0 0 2px rgb(255 255 255 / .25); }
+.phone-select:has(select:focus-visible) { outline: 2px solid var(--icon-ring); outline-offset: -2px; border-radius: var(--r-item); }
 
 .phone-seed-field input {
   width: 7.5em;
   min-height: 44px;
   padding: 0 12px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-field);
   background: rgb(255 255 255 / .06);
   box-shadow: none;
   color: hsl(var(--foreground));
@@ -804,7 +798,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   z-index: var(--z-phone-bar);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   padding: 6px;
   border: 1px solid var(--glass-border);
   border-radius: 28px;
@@ -819,22 +813,23 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   min-width: 0;
   justify-items: center;
   align-content: center;
-  gap: 4px;
+  gap: var(--space-2);
   min-height: 58px;
   border: 0;
-  border-radius: 22px;
+  border-radius: var(--r-menu);
   background: transparent;
   color: hsl(var(--foreground));
   font-size: 12px;
   font-weight: 600;
 }
-.phone-select-bar button:active { background: rgb(255 255 255 / .08); }
+.phone-select-bar button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .phone-select-bar button:disabled { opacity: .35; }
 .phone-select-bar button.is-danger { color: var(--danger-ink); }
 
 .tile { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color var(--motion-fast) var(--motion-ease); }
 
-.tile.is-selected { outline-color: #f2f2f2; }
+/* A selected tile: the amber outline and the amber check (UI-PATTERNS › Selected & Focus States). */
+.tile.is-selected { outline-color: var(--accent-amber); }
 .tile-check {
   position: absolute;
   top: 8px;
@@ -844,13 +839,13 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: rgb(0 0 0 / .45);
   box-shadow: inset 0 0 0 2px rgb(255 255 255 / .85);
-  color: #0b0b0b;
+  color: var(--accent-amber-ink);
   pointer-events: none;
 }
-.tile-check.is-on { background: #f2f2f2; box-shadow: none; }
+.tile-check.is-on { background: var(--accent-amber); box-shadow: none; }
 
 /* ------------------------------------------------ Progress while browsing */
 
@@ -874,12 +869,13 @@ body:has(.phone-shell) .modal:not(.modal-sheet, .modal-wide) {
   margin-bottom: var(--kb-inset, 0px);
   padding-bottom: env(safe-area-inset-bottom);
   border-width: 1px 0 0;
-  border-radius: 24px 24px 0 0;
-  animation: phone-sheet-up 280ms var(--motion-ease);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  animation: phone-sheet-up var(--motion-slow) var(--ease-soft);
 }
-@keyframes phone-sheet-up { from { translate: 0 40px; opacity: 0; } }
+/* A sheet slides up from the bottom edge, as every phone sheet does. */
+@keyframes phone-sheet-up { from { translate: 0 100%; } }
 body:has(.phone-shell) .modal-close { width: 44px; height: 44px; }
-body:has(.phone-shell) .modal-foot { gap: 8px; }
+body:has(.phone-shell) .modal-foot { gap: var(--space-4); }
 body:has(.phone-shell) .modal-foot .btn { flex: 1; min-height: 52px; font-size: 16px; }
 body:has(.phone-shell) .modal.has-hero .modal-hero { max-height: 180px; }
 
@@ -909,6 +905,8 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   backdrop-filter: var(--glass-bar-blur);
   box-shadow: var(--glass-bar-shadow);
 }
+/* Their own glass circles: a press darkens the circle (the bar's other buttons press on ::before). */
+.viewer-phone-bar :is(.viewer-phone-info, .viewer-phone-star):active:not(:disabled) { background-image: linear-gradient(var(--control-press), var(--control-press)); }
 .viewer-phone-bar .viewer-phone-star {
   right: calc(max(10px, env(safe-area-inset-right)) + 2 * (var(--dock-h) + 8px));
 }
@@ -929,9 +927,8 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   padding: 0 14px;
   background: rgb(255 255 255 / .06);
   font-size: 13px;
-  transition: scale var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.scrim .viewer-stage:has(.viewer-phone-bar) .detail-copy:active { scale: .95; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-copy.is-copied { color: var(--ember); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora { min-height: 40px; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora-name { font-size: 14px; }

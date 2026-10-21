@@ -6,16 +6,16 @@
 
 .aspect-menu.size-menu {
   width: min(300px, calc(100vw - 24px));
-  gap: 4px;
+  gap: var(--space-2);
   padding: 7px;
 }
-.size-menu-side { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.size-menu-side { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
 /* The top block spaces its rows with padding, not a grid gap: a gap would stay
    behind Custom's fold until it's gone, and the menu would drop 6px at the end. */
 .aspect-menu.size-menu .aspect-upscale { gap: 0; }
 .aspect-menu.size-menu .aspect-upscale-head { padding-bottom: 6px; }
 .aspect-menu.size-menu .size-menu-note { padding-top: 6px; }
-.size-menu .aspect-list { gap: 2px; }
+.size-menu .aspect-list { gap: var(--space-1); }
 .size-menu .aspect-option { min-height: 32px; align-items: center; }
 /* The sizes: one mono column, right-aligned, so their digits line up row to row. */
 .size-menu .aspect-option em {
@@ -33,7 +33,7 @@
 .aspect-picker > button.aspect-trigger {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 0 11px 0 12px;
 }
 .aspect-trigger .aspect-shape-slot { position: relative; flex: none; display: grid; place-items: center; width: 18px; height: 18px; }
@@ -88,7 +88,7 @@
   background: var(--surface-grain), rgb(22 22 22 / .96);
   box-shadow: var(--shadow-float);
   opacity: 0;
-  transform: translateX(10px) scale(.98);
+  transform: scale(.96);
   transform-origin: right center;
   pointer-events: none;
   transition: opacity var(--motion-fast) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
@@ -99,7 +99,6 @@
 .size-guide {
   position: absolute;
   background: rgb(255 255 255 / .07);
-  transition: top var(--motion-slow) var(--motion-ease), left var(--motion-slow) var(--motion-ease);
 }
 .size-guide.is-x { left: 0; right: 0; height: 1px; }
 .size-guide.is-y { top: 0; bottom: 0; width: 1px; }
@@ -108,7 +107,7 @@
   border: 1.5px solid rgb(255 255 255 / .92);
   border-radius: 5px;
   background: rgb(255 255 255 / .03);
-  transition: left var(--motion-slow) var(--motion-ease), top var(--motion-slow) var(--motion-ease), width var(--motion-slow) var(--motion-ease), height var(--motion-slow) var(--motion-ease), border-color var(--motion-base) var(--motion-ease);
+  transition: border-color var(--motion-base) var(--motion-ease);
 }
 /* 2K or Custom: the frame takes the ember, like the tag on the trigger. */
 .size-peek.is-accent .size-frame { border-color: var(--ember); }
@@ -120,7 +119,7 @@
   display: flex;
   justify-content: center;
   align-items: baseline;
-  gap: 7px;
+  gap: var(--space-4);
   margin: 0;
   white-space: nowrap;
 }
@@ -133,7 +132,7 @@
 
 /* With the window there, the rows don't draw their shapes: the window does. */
 @media (hover: hover) and (min-width: 761px) {
-  .size-menu .aspect-option { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-left: 12px; }
+  .size-menu .aspect-option { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-5); padding-left: 12px; }
   .size-menu .aspect-option > .aspect-shape { display: none; }
 }
 /* Touch, or a narrow window: no room beside the menu, so no window; the rows keep their shapes. */
@@ -146,10 +145,11 @@
    there, so they read as one pill with no seam. Hovering the link draws
    them back a little and shows the link's own middle cell between them,
    a preview of the split. Apart, two pills with the link floating free;
-   hovering it draws them in, and linking slides them together under it.
+   hovering it draws them in, and linking joins them under it (no layout
+   animation: the pills change shape in place).
    The link itself never grows a shape of its own. */
 .size-custom { overflow: hidden; }
-.size-custom-body { display: grid; gap: 6px; min-inline-size: 0; margin: 0; padding: 8px 0 0; border: 0; }
+.size-custom-body { display: grid; gap: var(--space-3); min-inline-size: 0; margin: 0; padding: 8px 0 0; border: 0; }
 .size-custom-body:disabled { opacity: .5; }
 .size-custom-body:disabled .size-field-key { pointer-events: none; }
 .size-fields {
@@ -162,7 +162,6 @@
   align-items: stretch;
   column-gap: var(--seam);
   height: 36px;
-  transition: column-gap var(--motion-slow) var(--motion-ease);
 }
 /* The hover previews are for a pointer: a tap leaves :hover stuck on touch, which would hold a split preview open. */
 @media (hover: hover) { .size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; } }
@@ -174,9 +173,9 @@
   min-width: 0;
   background: var(--well);
   box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
-  transition: border-radius var(--motion-slow) var(--motion-ease), margin var(--motion-slow) var(--motion-ease), padding var(--motion-slow) var(--motion-ease), background-color var(--motion-base) var(--motion-ease);
+  transition: background-color var(--motion-base) var(--motion-ease);
 }
-/* Each pill pads by as much as it reaches, so its W/H and digits stay put while it slides. */
+/* Each pill pads by as much as it reaches, so its W/H and digits stay put. */
 .size-field:first-child { margin-right: var(--reach); padding-right: calc(var(--reach) * -1); border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
 .size-field:last-child { margin-left: var(--reach); padding-left: calc(var(--reach) * -1); border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
 /* Focus lifts the cell a shade; no ring around a borderless field. */
@@ -236,12 +235,7 @@
 /* The middle cell shows only in the hover preview of a split, between the drawn-back pills. */
 @media (hover: hover) { .size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); } }
 .size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.size-link-icon { display: grid; place-items: center; animation: linkTurn 420ms var(--motion-ease) both; }
-.size-link:active .size-link-icon { scale: .86; transition: scale var(--motion-instant); }
-@keyframes linkTurn {
-  from { opacity: 0; transform: rotate(-80deg) scale(.5); }
-  to { opacity: 1; transform: none; }
-}
+.size-link-icon { display: grid; place-items: center; }
 html.is-size-scrubbing,
 html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !important; }
 
@@ -249,7 +243,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .size-menu-note {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-4);
   margin: 0;
   padding: 0 6px;
   color: hsl(var(--muted-foreground));
@@ -277,13 +271,13 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   cursor: pointer;
   transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
-.size-save > span { display: inline-flex; align-items: center; gap: 4px; animation: saveSwap 260ms var(--motion-ease) both; }
+.size-save > span { display: inline-flex; align-items: center; gap: var(--space-2); animation: saveSwap var(--motion-fast) var(--motion-ease) both; }
 .size-save:not(:disabled):hover { color: var(--ember); background: rgb(255 154 82 / .08); }
 .size-save:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .size-save.is-saved { color: hsl(var(--muted-foreground) / .75); cursor: default; }
 @keyframes saveSwap {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* A saved size: a row like the others. Hovered or focused, its size steps
@@ -293,8 +287,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .size-saved-row .aspect-option { width: 100%; }
 /* Room for Rename and Remove comes from the row's own padding, so the size moves left and the
    name, which can be long, shortens with "…" instead of running under it. */
-.size-saved-row .aspect-option { transition: padding-right var(--motion-slow) var(--motion-ease); }
-.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option { padding-right: 70px; }
+.size-saved-row:is(:hover, :focus-within):not(.is-renaming) .aspect-option { padding-right: 76px; }
 .aspect-option > .size-saved-label { display: flex; align-items: baseline; min-width: 0; overflow: hidden; }
 .size-saved-label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .size-saved-label > small { flex: none; }
@@ -303,28 +296,27 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   top: 50%;
   right: 6px;
   display: flex;
-  gap: 2px;
+  gap: var(--space-1);
   opacity: 0;
-  translate: 10px -50%;
+  translate: 0 -50%;
   pointer-events: none;
-  transition: opacity var(--motion-fast) var(--motion-ease), translate var(--motion-slow) var(--motion-ease);
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
-.size-saved-row:is(:hover, :focus-within) .size-saved-actions { opacity: 1; translate: 0 -50%; pointer-events: auto; }
+.size-saved-row:is(:hover, :focus-within) .size-saved-actions { opacity: 1; pointer-events: auto; }
 .size-saved-actions button {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .size-saved-actions button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .size-saved-actions button.is-remove:hover { color: #ff8a80; }
-.size-saved-actions button:active { transform: scale(.9); }
 .size-saved-actions button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* Renaming: the name becomes a small field in the row, the rest stays where it was. */
 .size-saved-name {
@@ -342,28 +334,28 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   font-size: 13px;
   font-weight: 600;
 }
-.size-saved-name:focus, .size-saved-name:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 154 82 / .45); outline: 0; }
+.size-saved-name:focus, .size-saved-name:focus-visible { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px var(--line-strong); outline: 0; }
 .size-saved-name::selection { background: rgb(255 154 82 / .32); color: #fff; }
 @media (hover: none) {
-  .size-saved-row .aspect-option em { transform: translateX(-58px); }
-  .size-saved-actions { opacity: 1; translate: 0 -50%; pointer-events: auto; }
+  .size-saved-row .aspect-option em { transform: translateX(-72px); }
+  .size-saved-actions { opacity: 1; pointer-events: auto; }
 }
 .size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
 
 /* Every composer menu leaves the way it came. */
 @keyframes surfaceOut {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 0; transform: scale(.96); }
 }
 [data-open-surface]:is(.aspect-menu, .model-menu).is-closing {
-  animation: surfaceOut 150ms var(--motion-ease) both;
+  animation: surfaceOut var(--motion-fast) var(--motion-ease) both;
   pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .size-guide, .size-frame, .size-fields, .size-field, .size-link, .size-peek { transition: none; }
-  .size-link-icon, .size-save > span { animation: none; }
-  .size-saved-row .aspect-option, .size-saved-actions { transition: none; }
+  .size-frame, .size-field, .size-link, .size-peek { transition: none; }
+  .size-save > span, .size-mp-label small, .size-mp-reset { animation: none; }
+  .size-saved-actions { transition: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
 }
 /* Where the rows keep their shapes, the name's column may shrink too. */
@@ -377,13 +369,13 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-4);
   margin-top: 6px;
   padding: 10px 4px 2px 6px;
   box-shadow: inset 0 1px 0 var(--surface-border);
 }
-.size-mp-label { display: grid; justify-items: start; gap: 2px; min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
-.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: saveSwap 260ms var(--motion-ease) both; }
+.size-mp-label { display: grid; justify-items: start; gap: var(--space-1); min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
+.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: saveSwap var(--motion-fast) var(--motion-ease) both; }
 .size-mp-reset {
   height: 16px;
   margin-left: -4px;
@@ -396,7 +388,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  animation: saveSwap 260ms var(--motion-ease) both;
+  animation: saveSwap var(--motion-fast) var(--motion-ease) both;
   transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
 .size-mp-reset:hover { color: var(--ember); background: rgb(255 154 82 / .08); }
@@ -407,7 +399,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   height: 32px;
   margin: 0;
   padding: 0 0 0 12px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .size-mp .size-mp-field input,
 .size-mp .size-mp-field input:focus,
@@ -428,7 +420,8 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .phone-size-mp .size-mp-reset { position: relative; }
 .phone-size-mp .size-mp-reset::after { content: ""; position: absolute; inset: -11px -8px; }
 
-.size-tier-controls, .size-resolution { display: grid; gap: 6px; min-width: 0; }
-.size-custom-action { min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; }
-.size-custom-action:hover, .size-custom-action.is-active { background: var(--selected); color: hsl(var(--foreground)); }
+.size-tier-controls, .size-resolution { display: grid; gap: var(--space-3); min-width: 0; }
+.size-custom-action { min-height: var(--control-h-sm); padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+.size-custom-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.size-custom-action.is-active { background: var(--selected-bg); color: var(--selected-ink); }
 .phone-size .size-custom-action { min-height: 44px; }

@@ -3,9 +3,9 @@
   position: fixed; bottom: 18px; left: 18px; z-index: 13;
   display: grid; place-items: center;
   cursor: pointer;
-  transition: border-color var(--motion-base) var(--motion-ease), background var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
-.zen-control-button:hover { border-color: hsl(var(--border-strong)); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
+.zen-control-button:hover { border-color: var(--line-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 
 .sidebar-dismiss {
   position: fixed;
@@ -21,7 +21,7 @@
   width: min(960px, calc(100vw - 64px));
   min-width: min(540px, calc(100vw - 32px));
   transform: translateX(-50%);
-  display: grid; gap: 6px;
+  display: grid; gap: var(--space-3);
   padding: 8px 8px 8px 14px;
   transition: border-color var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease);
 }
@@ -44,8 +44,7 @@
   box-shadow:
     0 8px 32px rgb(0 0 0 / 0.35),
     0 2px 8px rgb(0 0 0 / 0.2),
-    0 0 0 1px hsl(0 0% 100% / 0.06) inset,
-    0 0 24px -4px hsl(220 60% 72% / 0.06);
+    0 0 0 1px hsl(0 0% 100% / 0.06) inset;
 }
 
 .prompt-count {
@@ -63,21 +62,21 @@
 
 .negative-drawer {
   display: grid;
-  gap: 4px;
+  gap: var(--space-2);
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height var(--motion-base) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), margin var(--motion-base) var(--motion-ease), padding var(--motion-base) var(--motion-ease);
+  transition: opacity var(--motion-base) var(--motion-ease);
   padding: 0 4px;
   margin-top: 0;
-  border-top: 1px solid hsl(var(--border) / 0);
+  border-top: 1px solid transparent;
 }
 .negative-drawer.open {
   max-height: 140px;
   opacity: 1;
   padding: 6px var(--prompt-text-inset, 10px) 0;
   margin-top: 4px;
-  border-top-color: hsl(var(--border));
+  border-top-color: var(--line);
 }
 .negative-drawer-label {
   font-size: 11px;
@@ -108,7 +107,6 @@
   height: 1lh;
   max-height: none;
   padding: 0;
-  transition: height var(--motion-fast) var(--motion-ease);
 }
 .negative-drawer .negative-unavailable-frame textarea:focus { height: 2lh; }
 .negative-drawer.open:focus-within { max-height: 140px; }
@@ -121,14 +119,14 @@
   font-size: 11px;
 }
 .negative-drawer.is-unavailable {
-  border-top-color: hsl(var(--border));
+  border-top-color: var(--line);
 }
 .negative-drawer.is-unavailable .negative-drawer-label {
   color: hsl(var(--foreground));
 }
 .negative-drawer.is-unavailable textarea {
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-field);
   background:
     linear-gradient(135deg, hsl(var(--input) / 0.96), hsl(var(--secondary) / 0.54)),
     hsl(var(--input));
@@ -142,7 +140,7 @@
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: calc(var(--radius) - 1px);
+  border-radius: calc(var(--r-field) - 1px);
   pointer-events: none;
   background:
     repeating-linear-gradient(
@@ -162,7 +160,7 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   color: hsl(var(--muted-foreground));
   font-weight: 600;
 }
@@ -170,7 +168,7 @@
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: hsl(var(--muted-foreground));
   opacity: 0.72;
 }
@@ -179,7 +177,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 0;
   border-top: 0;
 }
@@ -196,7 +194,7 @@
 .prompt-left-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -205,7 +203,7 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-3);
   min-width: 0;
   overflow: visible;
   scrollbar-width: none;
@@ -219,11 +217,11 @@
   grid-template-columns: 18px minmax(0, 1fr) 12px;
   padding: 0 10px;
   font-size: 12px;
-  gap: 7px;
+  gap: var(--space-4);
   background: hsl(var(--input));
-  border-color: hsl(var(--border));
+  border-color: var(--glass-border);
 }
-.zen-inline-settings .aspect-picker > button:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); }
+.zen-inline-settings .aspect-picker > button:hover { border-color: var(--line-strong); background: var(--control-hover); }
 .zen-inline-settings .aspect-shape { transform: scale(0.7); }
 
 .negative-toggle {
@@ -231,10 +229,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-3);
   padding: 0 11px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
   background: hsl(var(--input));
   color: hsl(var(--muted-foreground));
   font-size: 12px;
@@ -243,14 +241,13 @@
   transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .negative-toggle:hover {
-  background: hsl(var(--accent));
+  background: var(--control-hover);
   color: hsl(var(--foreground));
-  border-color: hsl(var(--border-strong));
 }
 .negative-toggle.active {
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border-color: hsl(var(--border-strong));
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+  border-color: transparent;
 }
 .negative-toggle.is-unavailable {
   border-style: dashed;
@@ -265,7 +262,7 @@
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: hsl(var(--muted-foreground));
   opacity: 0.8;
 }
@@ -295,8 +292,8 @@
   align-items: center;
   justify-content: center;
   padding: 0 10px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
   background: hsl(var(--input));
   color: hsl(var(--foreground));
   font-size: 12px;
@@ -307,18 +304,18 @@
 .number-picker {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   height: 34px;
   padding: 2px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
   background: hsl(var(--input));
   user-select: none;
   touch-action: none;
   transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
-.number-picker:hover { border-color: hsl(var(--border-strong)); }
-.number-picker:focus-within { border-color: hsl(var(--ring)); }
+.number-picker:hover { border-color: var(--line-strong); }
+.number-picker:has(:focus-visible) { border-color: var(--line-strong); }
 .number-picker.is-fill { display: flex; width: 100%; justify-content: space-between; }
 .number-picker.is-fill .number-picker-value,
 .number-picker.is-fill .number-picker-input { flex: 1 1 auto; }
@@ -344,17 +341,16 @@
   width: 28px; height: 28px;
   padding: 0;
   border: 0;
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-instant) var(--motion-ease);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .number-picker-btn:hover:not(:disabled) {
-  background: hsl(var(--accent));
+  background: var(--control-hover);
   color: hsl(var(--foreground));
 }
-.number-picker-btn:active:not(:disabled) { transform: scale(0.92); }
 .number-picker-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .number-picker-value {
   display: inline-flex;
@@ -364,7 +360,7 @@
   height: 28px;
   padding: 0 6px;
   border: 0;
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--foreground));
   font-size: 14px;
@@ -373,7 +369,7 @@
   cursor: text;
   transition: background var(--motion-fast) var(--motion-ease);
 }
-.number-picker-value:hover { background: hsl(var(--accent) / 0.6); }
+.number-picker-value:hover { background: var(--control-hover); }
 .number-picker-input {
   width: 100%;
   min-width: 44px;
@@ -381,7 +377,7 @@
   height: 28px;
   padding: 0 4px;
   border: 0;
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--r-pill);
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-size: 14px;
@@ -392,17 +388,18 @@
 }
 .number-picker-input::-webkit-outer-spin-button,
 .number-picker-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.number-picker-input:focus { outline: 1px solid hsl(var(--ring)); outline-offset: -1px; }
+.number-picker-input:focus { outline: 1px solid var(--line-strong); outline-offset: -1px; }
 
 .number-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--space-4);
   margin-bottom: 12px;
 }
 
 .zen-prompt .aspect-menu,
 .zen-prompt .model-menu {
   top: auto; bottom: calc(100% + 6px);
-  animation: popUp 180ms var(--motion-ease);
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: bottom center;
 }

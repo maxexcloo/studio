@@ -1,14 +1,9 @@
-@keyframes popUp {
-  from { opacity: 0; transform: translateY(4px) scale(0.98); filter: blur(3px); }
-  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-}
-
 .icon-button, .text-button {
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--glass-border);
   background: hsl(var(--card));
-  border-radius: var(--radius);
+  border-radius: var(--r-pill);
   min-height: 34px;
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; gap: var(--space-4);
   padding: 0 10px;
   color: hsl(var(--muted-foreground));
   font-size: 12px;
@@ -17,28 +12,27 @@
 }
 .icon-button { width: 34px; padding: 0; justify-content: center; text-decoration: none; }
 .text-button { color: hsl(var(--foreground)); font-size: 12px; text-decoration: none; white-space: nowrap; font-weight: 500; }
-.icon-button:hover, .text-button:hover { background: hsl(var(--accent)); border-color: hsl(var(--border-strong)); color: hsl(var(--foreground)); }
+.icon-button:hover, .text-button:hover { background: var(--control-hover); border-color: var(--line-strong); color: hsl(var(--foreground)); }
 .comfy-status-dot {
   width: 34px;
   min-height: 34px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
   background: hsl(var(--card));
   display: grid;
   place-items: center;
   padding: 0;
   cursor: pointer;
-  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
+  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
 }
 .comfy-status-dot:hover {
-  background: hsl(var(--accent));
-  border-color: hsl(var(--border-strong));
-  transform: translateY(-1px);
+  background: var(--control-hover);
+  border-color: var(--line-strong);
 }
 .comfy-status-dot span {
   width: 9px;
   height: 9px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: hsl(45 90% 58%);
   box-shadow: 0 0 0 4px hsl(45 90% 58% / 0.12), 0 0 14px hsl(45 90% 58% / 0.2);
   transition: background var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
@@ -61,7 +55,7 @@
 
 .skeleton {
   display: block;
-  border-radius: var(--radius);
+  border-radius: var(--r-item);
   background:
     linear-gradient(110deg, hsl(var(--input)) 8%, hsl(216 10% 14% / 0.5) 44%, hsl(var(--input)) 80%),
     hsl(var(--input));
@@ -72,26 +66,26 @@
   0% { background-position: 200% 0; }
   100% { background-position: -60% 0; }
 }
-.skeleton-control { width: 100%; height: 58px; border: 1px solid hsl(var(--border)); }
+.skeleton-control { width: 100%; height: 58px; border: 1px solid var(--glass-border); }
 .skeleton-text { display: inline-block; width: 112px; height: 14px; vertical-align: middle; }
 .skeleton-text.short { width: 82px; }
 .skeleton-text.tiny { width: 34px; }
 .skeleton-text.path { width: min(260px, 52vw); }
-.skeleton-media { width: 100%; aspect-ratio: var(--tile-ratio, 1); border-radius: var(--radius); }
-.skeleton-tile { cursor: default; box-shadow: none; transform-origin: center; animation: skeletonTileIn 620ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.skeleton-media { width: 100%; aspect-ratio: var(--tile-ratio, 1); border-radius: var(--r-media); }
+.skeleton-tile { cursor: default; box-shadow: none; transform-origin: center; animation: skeletonTileIn var(--motion-slow) var(--motion-ease) both; }
 @keyframes skeletonTileIn {
-  from { opacity: 0; transform: scale(0.955); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .skeleton-tile:hover { transform: none; box-shadow: none; }
 .skeleton-stage { background: hsl(var(--background)); }
-.skeleton-logo { width: 56px; height: 56px; border-radius: 18px; opacity: 0.6; animation: logoPulse 2.4s var(--ease-soft) infinite alternate; }
+.skeleton-logo { width: 56px; height: 56px; border-radius: var(--r-item); opacity: 0.6; animation: logoPulse 2.4s var(--ease-soft) infinite alternate; }
 @keyframes logoPulse {
-  0% { opacity: 0.35; transform: scale(0.97); }
-  100% { opacity: 0.65; transform: scale(1); }
+  0% { opacity: 0.35; }
+  100% { opacity: 0.65; }
 }
 @keyframes tileIn {
-  from { opacity: 0; transform: translateY(6px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 

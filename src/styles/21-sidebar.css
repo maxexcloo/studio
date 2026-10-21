@@ -6,7 +6,7 @@
    tab while you choose, so nothing floats or clips inside the panel.
 --------------------------------------------------------------------------- */
 
-.sidebar-scroll { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.sidebar-scroll { display: flex; flex: 1; flex-direction: column; gap: var(--space-5); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .sidebar-scroll > * { flex-shrink: 0; }
 .sidebar-scroll .sidebar-body { flex: none; overflow: visible; }
 
@@ -15,7 +15,7 @@
 .workflow-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-5);
   width: 100%;
   min-height: 64px;
   padding: 10px 12px 10px 10px;
@@ -28,7 +28,7 @@
   cursor: pointer;
   transition: background var(--motion-fast);
 }
-.workflow-card:hover { background: rgb(255 255 255 / .06); }
+.workflow-card:hover { background: var(--control-hover); }
 .workflow-card:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .workflow-card.has-issues { box-shadow: inset 0 0 0 1px rgb(255 154 82 / .22); }
 .workflow-card-thumb {
@@ -43,47 +43,39 @@
   color: hsl(var(--muted-foreground));
 }
 .workflow-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.workflow-card-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.workflow-card-info { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
 .workflow-card-info strong { font-size: 13.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .workflow-card-info > span { font-size: 12px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.workflow-card-arrow { flex: none; color: hsl(var(--muted-foreground)); transition: transform var(--motion-fast); }
-.workflow-card:hover .workflow-card-arrow { transform: translateX(2px); color: hsl(var(--foreground)); }
+.workflow-card-arrow { flex: none; color: hsl(var(--muted-foreground)); transition: color var(--motion-fast) var(--motion-ease); }
+.workflow-card:hover .workflow-card-arrow { color: hsl(var(--foreground)); }
 
 /* ------------------------------------------------------------------ Tabs */
 
 .sidebar-subtabs {
   display: flex;
-  gap: 18px;
-  padding: 0 4px;
-  box-shadow: inset 0 -1px 0 var(--surface-border);
+  gap: var(--space-1);
+  padding: 0 0 var(--space-3);
+  box-shadow: inset 0 -1px 0 var(--line);
 }
 .sidebar-subtab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 38px;
-  padding: 0;
+  gap: var(--space-4);
+  height: var(--control-h-sm);
+  padding: 0 12px;
   border: 0;
+  border-radius: var(--r-item);
   background: transparent;
   color: hsl(var(--muted-foreground));
   font-size: 13px;
   font-weight: 550;
   cursor: pointer;
-  transition: color var(--motion-fast);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.sidebar-subtab:hover { color: hsl(var(--foreground)); }
-.sidebar-subtab.active { color: #fff; }
-.sidebar-subtab.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: hsl(var(--foreground));
-}
-.sidebar-subtab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 6px; }
+.sidebar-subtab:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.sidebar-subtab.active { background: var(--selected-bg); color: var(--selected-ink); }
+.sidebar-subtab:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .sidebar-subtab-count {
   min-width: 18px;
   height: 18px;
@@ -100,10 +92,10 @@
 
 /* ------------------------------------------------------------ LoRA panel */
 
-.lora-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.lora-panel { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
 
 /* Header: count on the left, quiet bulk actions on the right. */
-.lora-head { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 2px; }
+.lora-head { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; padding: 0 2px; }
 .lora-count { flex: 1; font-size: 12px; font-weight: 550; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
 .lora-count em { font-style: normal; font-weight: 500; color: hsl(var(--muted-foreground)); }
 .lora-head-action {
@@ -121,8 +113,8 @@
 .lora-head-action:hover { background: var(--control-hover); color: #fff; }
 
 /* Stacks: saved sets as chips, loaded with one click. */
-.lora-stacks { display: grid; gap: 8px; }
-.lora-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lora-stacks { display: grid; gap: var(--space-4); }
+.lora-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .lora-chip {
   position: relative;
   display: inline-flex;
@@ -134,11 +126,11 @@
   transition: background var(--motion-fast), box-shadow var(--motion-fast);
 }
 .lora-chip:hover { background: var(--control-hover); }
-.lora-chip.is-active { background: var(--action); box-shadow: none; }
+.lora-chip.is-active { background: var(--selected-bg); box-shadow: none; }
 .lora-chip-load {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-4);
   min-width: 0;
   height: 30px;
   padding: 0 12px;
@@ -151,8 +143,8 @@
 }
 .lora-chip-name { min-width: 0; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lora-chip-load em { min-width: 12px; text-align: center; transition: opacity var(--motion-fast); font-style: normal; font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.lora-chip.is-active .lora-chip-load { color: var(--action-ink); }
-.lora-chip.is-active .lora-chip-load em { color: rgb(10 10 10 / .5); }
+.lora-chip.is-active .lora-chip-load { color: var(--selected-ink); }
+.lora-chip.is-active .lora-chip-load em { color: var(--selected-ink); opacity: .7; }
 /* Modified: a small ember square, the same status marker used everywhere. */
 .lora-chip.is-modified .lora-chip-load::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--ember); }
 /* The x takes the count's place on hover, so chips never reserve room for it. */
@@ -166,7 +158,7 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--muted-foreground));
   opacity: 0;
@@ -174,19 +166,18 @@
   transition: opacity var(--motion-fast), background var(--motion-fast);
 }
 .lora-chip:hover .lora-chip-load em,
-.lora-chip:focus-within .lora-chip-load em { opacity: 0; }
+.lora-chip:has(:focus-visible) .lora-chip-load em { opacity: 0; }
 .lora-chip:hover .lora-chip-remove,
-.lora-chip:focus-within .lora-chip-remove { opacity: 1; }
+.lora-chip:has(:focus-visible) .lora-chip-remove { opacity: 1; }
 .lora-chip-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
-.lora-chip.is-active .lora-chip-remove { color: rgb(10 10 10 / .55); }
-.lora-chip.is-active .lora-chip-remove:hover { background: rgb(10 10 10 / .1); color: var(--action-ink); }
+.lora-chip.is-active .lora-chip-remove { color: var(--selected-ink); }
 .lora-tip-hint { color: hsl(var(--muted-foreground)); font-size: 11px; }
 
 .lora-save-chip {
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   height: 30px;
   padding: 0 12px;
   border: 1px dashed rgb(255 255 255 / .18);
@@ -201,8 +192,8 @@
 .lora-save-chip span { font-weight: 500; color: hsl(var(--muted-foreground)); }
 .lora-save-chip:hover { background: var(--control-fill); border-color: rgb(255 255 255 / .3); }
 
-.lora-stack-changes { display: flex; align-items: center; gap: 2px; min-height: 26px; font-size: 12px; color: hsl(var(--muted-foreground)); }
-.lora-stack-changes > span { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.lora-stack-changes { display: flex; align-items: center; gap: var(--space-1); min-height: 26px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.lora-stack-changes > span { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
 .lora-stack-changes > span i { width: 6px; height: 6px; flex: none; background: var(--ember); }
 .lora-text-action {
   height: 26px;
@@ -222,7 +213,7 @@
 .lora-name-field {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   height: 34px;
   padding: 0 3px 0 12px;
   border-radius: var(--r-pill);
@@ -253,11 +244,11 @@
 
 /* Cards: one left edge for name, slider and warnings. The grip lives in the
    card's left margin and, like remove, only shows on hover or focus. */
-.lora-list { display: grid; gap: 6px; }
+.lora-list { display: grid; gap: var(--space-3); }
 .lora-card {
   position: relative;
   display: grid;
-  gap: 6px;
+  gap: var(--space-3);
   padding: 10px 12px 12px 16px;
   border-radius: calc(var(--r-item) + 2px);
   /* Each card is its own frosted pane, so cards passing over each other while
@@ -284,7 +275,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-check);
   background: transparent;
   color: hsl(var(--muted-foreground) / .7);
   opacity: 0;
@@ -297,14 +288,14 @@
 .lora-grip:hover { color: hsl(var(--foreground)); }
 .lora-grip:active { cursor: grabbing; }
 
-.lora-card-top { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 26px; }
+.lora-card-top { display: flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 26px; }
 .lora-name {
   flex: 1;
   min-width: 0;
   margin-left: -6px;
   padding: 3px 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-check);
   background: transparent;
   color: hsl(var(--foreground));
   font-size: 13px;
@@ -324,7 +315,7 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: transparent;
   color: hsl(var(--muted-foreground));
   opacity: 0;
@@ -335,13 +326,13 @@
 .lora-remove:focus-visible { opacity: 1; }
 .lora-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
 .lora-card-top .switch { margin-left: 4px; }
-.lora-warning { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 11.5px; color: var(--ember); }
+.lora-warning { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: 11.5px; color: var(--ember); }
 /* Made for another model: worth knowing, not an error. */
 .lora-warning.is-soft { color: hsl(var(--muted-foreground)); }
 .lora-warning.is-soft svg { color: var(--ember); opacity: .8; }
 
 /* Trigger words, each a quiet chip that copies itself. */
-.lora-triggers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.lora-triggers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: 11px; color: hsl(var(--muted-foreground)); }
 .lora-triggers > span { margin-right: 2px; }
 .lora-trigger {
   max-width: 100%;
@@ -362,7 +353,7 @@
 .lora-trigger.is-copied { color: hsl(var(--foreground)); background: rgb(255 255 255 / .12); }
 
 /* Strength: a slim slider and a value that reads as text until you edit it. */
-.lora-strength { display: flex; align-items: center; gap: 8px; transition: opacity var(--motion-fast); }
+.lora-strength { display: flex; align-items: center; gap: var(--space-4); transition: opacity var(--motion-fast); }
 .lora-strength input[type="range"] {
   flex: 1;
   min-width: 0;
@@ -389,14 +380,12 @@
   width: 12px;
   height: 12px;
   margin-top: -4.5px;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / .5);
-  transition: scale var(--motion-fast);
 }
-.lora-strength input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }
+.lora-strength input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: var(--r-pill); background: #fff; }
 .lora-strength input[type="range"]:hover::-webkit-slider-thumb,
-.lora-strength input[type="range"]:active::-webkit-slider-thumb { scale: 1.2; }
 .lora-strength input[type="range"]:focus-visible { outline: none; }
 .lora-strength input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
 .lora-strength-value {
@@ -406,7 +395,7 @@
   margin-right: -6px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-check);
   background: transparent;
   color: hsl(var(--foreground) / .85);
   font: 500 12px/1 var(--font-mono);
@@ -422,7 +411,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-4);
   padding: 6px 6px 6px 14px;
   border-radius: var(--r-pill);
   background: var(--glass-bar-bg);
@@ -432,37 +421,37 @@
   animation: set-page-in var(--motion-base) var(--motion-ease);
 }
 .lora-undo span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lora-undo button { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--foreground)); font-size: 12px; font-weight: 550; cursor: pointer; }
+.lora-undo button { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); height: 28px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--foreground)); font-size: 12px; font-weight: 550; cursor: pointer; }
 .lora-undo button:hover { background: var(--control-hover); }
 
 .lora-add { width: 100%; }
 
 /* ---------------------------------------------------------------- Picker */
 
-.lora-picker { display: flex; flex-direction: column; gap: 10px; min-height: 0; max-height: min(62dvh, 560px); }
-.lora-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.lora-picker { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; max-height: min(62dvh, 560px); }
+.lora-picker-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); font-size: 12px; color: hsl(var(--muted-foreground)); }
 .lora-picker-head strong { color: hsl(var(--foreground)); font-weight: 550; }
 .lora-picker-back { height: 32px; min-height: 32px; padding: 0 10px 0 6px; font-size: 12.5px; }
 .lora-picker-search {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: var(--control-h);
   padding: 0 6px 0 14px;
   border-radius: var(--r-pill);
   background: var(--well);
   color: hsl(var(--muted-foreground));
 }
-.lora-picker-search:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); }
+.lora-picker-search:focus-within { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .lora-picker-search input { flex: 1; min-width: 0; height: 100%; color: hsl(var(--foreground)); font-size: 13px; }
 .lora-picker-search button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--r-pill); background: transparent; color: inherit; cursor: pointer; }
 .lora-picker-list { flex: 1; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
-.lora-picker-section { display: grid; gap: 1px; padding-bottom: 8px; }
+.lora-picker-section { display: grid; gap: var(--space-1); padding-bottom: 8px; }
 .lora-picker-heading {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   width: 100%;
   height: 28px;
   padding: 0 8px;
@@ -484,14 +473,14 @@
 .lora-option {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-4);
   min-height: 40px;
   padding: 4px 4px 4px 10px;
   border-radius: var(--r-item);
   cursor: pointer;
 }
-.lora-option.is-highlight { background: var(--control-fill); }
-.lora-option.is-selected { background: rgb(255 255 255 / .09); }
+/* The keyboard cursor and hover take the neutral fill; a pick shows only its amber check. */
+.lora-option.is-highlight { background: var(--cursor-bg); }
 .lora-option[aria-disabled="true"] { cursor: default; }
 .lora-option.is-added { opacity: .5; }
 .lora-option-check {
@@ -500,13 +489,13 @@
   height: 16px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
+  border-radius: var(--r-check);
   box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .22);
-  color: var(--action-ink);
+  color: var(--accent-amber-ink);
 }
-.lora-option.is-selected .lora-option-check { background: var(--action); box-shadow: none; }
+.lora-option.is-selected .lora-option-check { background: var(--accent-amber); box-shadow: none; }
 .lora-option.is-added .lora-option-check { background: rgb(255 255 255 / .2); box-shadow: none; color: hsl(var(--foreground)); }
-.lora-option-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.lora-option-copy { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
 .lora-option-copy strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lora-option-copy span { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lora-option > em { flex: none; font-size: 11px; font-style: normal; color: hsl(var(--muted-foreground)); }
@@ -515,8 +504,8 @@
 .lora-option:has(> em.lora-fit) .lora-option-copy strong { color: hsl(var(--foreground) / .7); }
 .lora-option-star {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   display: grid;
   place-items: center;
   border: 0;
@@ -533,7 +522,7 @@
 .lora-option-star:hover { background: var(--control-hover); color: #fff; }
 .lora-option-star.active { color: var(--ember); }
 
-.lora-picker-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; box-shadow: inset 0 1px 0 var(--surface-border); }
+.lora-picker-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-top: 10px; box-shadow: inset 0 1px 0 var(--surface-border); }
 .lora-picker-foot > span { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
 
 @media (hover: none) {
@@ -545,7 +534,7 @@
 
 /* The composer's LoRA count opens the LoRA tab. */
 button.lora-pill { cursor: pointer; transition: background var(--motion-fast); }
-button.lora-pill:hover { background: #151515; }
+button.lora-pill:hover { background: #161616; }
 button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* ---------------------------------------------------------- Model setup
@@ -554,7 +543,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup {
   position: relative;
   display: grid;
-  gap: 12px;
+  gap: var(--space-5);
   padding: 14px 12px 12px;
   overflow: hidden;
   border-radius: calc(var(--r-item) + 4px);
@@ -570,15 +559,15 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   pointer-events: none;
 }
 .model-setup > * { position: relative; }
-.model-setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.model-setup-head > div { display: grid; gap: 3px; min-width: 0; }
+.model-setup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.model-setup-head > div { display: grid; gap: var(--space-2); min-width: 0; }
 .model-setup-head strong { font-size: 13px; font-weight: 600; letter-spacing: -.01em; color: var(--ember); }
 .model-setup-head span { font-size: 12px; line-height: 1.4; color: hsl(var(--muted-foreground)); }
 .model-setup-head .btn { flex: none; }
-.model-setup-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.model-setup-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
 .model-setup-item {
   display: grid;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 10px;
   border-radius: var(--r-item);
   background: rgb(0 0 0 / .26);
@@ -593,7 +582,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup.is-ready .model-setup-dot.is-landed { background: #a9e2b8; }
 @keyframes model-setup-ready { from { opacity: .6; } }
 @media (prefers-reduced-motion: reduce) { .model-setup.is-ready { animation: none; } }
-.model-setup-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.model-setup-row { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .model-setup-dot {
   flex: none;
   display: grid;
@@ -611,13 +600,13 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup-dot.is-error { box-shadow: inset 0 0 0 1.5px rgb(255 110 90 / .8); }
 .model-setup-dot.is-landed { background: #f4f4f4; box-shadow: none; }
 @keyframes model-setup-pulse { 50% { box-shadow: inset 0 0 0 1.5px var(--ember), 0 0 0 4px rgb(255 154 82 / .12); } }
-.model-setup-copy { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.model-setup-copy { display: grid; flex: 1; gap: var(--space-1); min-width: 0; }
 .model-setup-copy small { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .model-setup-copy strong { overflow: hidden; font-size: 12.5px; font-weight: 550; white-space: nowrap; text-overflow: ellipsis; }
-.model-setup-actions { display: flex; flex: none; align-items: center; gap: 4px; }
-.model-setup .btn { height: 30px; min-height: 30px; padding: 0 11px; gap: 6px; font-size: 12px; }
+.model-setup-actions { display: flex; flex: none; align-items: center; gap: var(--space-2); }
+.model-setup .btn { height: 30px; min-height: 30px; padding: 0 11px; gap: var(--space-3); font-size: 12px; }
 .model-setup .btn.is-icon { width: 30px; padding: 0; flex: none; }
-.model-setup-progress { display: grid; gap: 6px; overflow: hidden; }
+.model-setup-progress { display: grid; gap: var(--space-3); overflow: hidden; }
 .model-setup-progress .cell-bar { height: 5px; }
 .model-setup-item.is-paused .cell-bar > div { background: rgb(255 154 82 / .45); }
 .model-setup-progress small { font-size: 11px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
@@ -626,37 +615,38 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup-meta { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
 /* Other builds of a part: one quiet line until opened, then each with its size and publisher. */
 .model-setup-versions { margin: -2px 0 0 26px; min-width: 0; }
-.model-setup-versions-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: none; font: inherit; font-size: 11.5px; color: hsl(var(--muted-foreground)); cursor: pointer; transition: color var(--motion-fast); }
+.model-setup-versions-toggle { display: inline-flex; align-items: center; gap: var(--space-2); padding: 2px 0; border: 0; background: none; font: inherit; font-size: 11.5px; color: hsl(var(--muted-foreground)); cursor: pointer; transition: color var(--motion-fast); }
 .model-setup-versions-toggle:hover { color: hsl(var(--foreground)); }
-.model-setup-versions-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.model-setup-versions-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-check); }
 .model-setup-versions-toggle em { font-style: normal; font-variant-numeric: tabular-nums; opacity: .7; }
 .model-setup-versions-toggle svg { transition: transform var(--motion-fast); }
 .model-setup-versions.is-open .model-setup-versions-toggle svg { transform: rotate(180deg); }
-.model-setup-versions ul { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
-.model-setup-versions li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 4px 6px 8px; border-radius: var(--r-item); background: rgb(255 255 255 / .03); }
-.model-setup-versions li > span { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.model-setup-versions ul { display: grid; gap: var(--space-2); margin: 6px 0 0; padding: 0; list-style: none; }
+.model-setup-versions li { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 6px 4px 6px 8px; border-radius: var(--r-item); background: rgb(255 255 255 / .03); }
+.model-setup-versions li > span { display: grid; flex: 1; gap: var(--space-1); min-width: 0; }
 .model-setup-versions li strong { font-size: 11.5px; font-weight: 500; overflow-wrap: anywhere; }
 .model-setup-versions li small { font-size: 10.5px; color: hsl(var(--muted-foreground)); }
 .model-setup-versions li > em { flex: none; padding-right: 6px; font-size: 11px; font-style: normal; color: hsl(var(--muted-foreground)); }
-.model-setup-versions li.is-current { background: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); }
+.model-setup-versions li.is-current { background: none; }
+.model-setup-versions li.is-current strong { color: var(--selected-ink); }
 .model-setup-note { margin: 0; font-size: 11.5px; line-height: 1.4; color: hsl(var(--muted-foreground)); }
 /* A missing node pack or an outside download: the shared install steps, indented under their row. */
-.model-setup-item .node-install, .model-setup-command { display: grid; gap: 10px; margin: 10px 0 0 26px; min-width: 0; }
-.model-setup-item .upscale-steps { gap: 12px; font-size: 12px; }
+.model-setup-item .node-install, .model-setup-command { display: grid; gap: var(--space-4); margin: 10px 0 0 26px; min-width: 0; }
+.model-setup-item .upscale-steps { gap: var(--space-5); font-size: 12px; }
 .model-setup-item .upscale-routes { width: 100%; margin: 0; }
 .model-setup-item .upscale-routes:not(.is-small) button { flex: 1; }
 /* While ComfyUI itself is what's missing, the panel watches for it and says when it last looked. */
 .model-setup-watch .upscale-watcher { margin-top: 10px; padding: 9px 12px; font-size: 12px; }
 .model-setup-recheck { justify-self: start; }
 /* One-click node pack install, used by the sidebar, the library and the upscale dialog. */
-.node-quick { display: grid; gap: 8px; justify-items: start; }
+.node-quick { display: grid; gap: var(--space-4); justify-items: start; }
 .node-quick .upscale-fine { margin: 0; }
 /* The tick beside one sentence (a flex row of text runs broke it into fragments). */
-.node-quick.is-done p { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 12px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
+.node-quick.is-done p { display: flex; align-items: flex-start; gap: var(--space-3); margin: 0; font-size: 12px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
 .node-quick.is-done p svg { flex: none; margin-top: 2px; color: #a9e2b8; }
 .node-install-manual { justify-self: start; font-size: 12px; color: hsl(var(--muted-foreground)); }
 .node-quick .is-spinning { animation: spin .9s linear infinite; }
-.model-setup-restart { display: grid; gap: 8px; padding: 10px; border-radius: var(--r-item); background: rgb(0 0 0 / .2); }
+.model-setup-restart { display: grid; gap: var(--space-4); padding: 10px; border-radius: var(--r-item); background: rgb(0 0 0 / .2); }
 .model-setup-restart p { margin: 0; font-size: 11.5px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
 /* In the gallery the health box already frames it: no second card, and the
    narrow column wraps a part's name instead of cutting it off. */
@@ -667,7 +657,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
    wide button leaves the name too little room; its name wraps at dots and dashes. */
 .model-setup.is-gallery .model-setup-head { flex-direction: column; align-items: stretch; }
 .model-setup.is-gallery .model-setup-head .btn { align-self: flex-start; }
-.model-setup.is-gallery .model-setup-row { flex-wrap: wrap; row-gap: 8px; }
+.model-setup.is-gallery .model-setup-row { flex-wrap: wrap; row-gap: var(--space-4); }
 .model-setup.is-gallery .model-setup-copy { flex: 1 1 140px; }
 .model-setup.is-gallery .model-setup-copy strong { white-space: normal; overflow-wrap: break-word; }
 .model-setup.is-gallery .model-setup-actions { margin-left: auto; }

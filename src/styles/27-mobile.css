@@ -136,8 +136,8 @@
     left: auto;
     z-index: 6;
     width: min(380px, calc(100% - 16px));
-    border: 1px solid hsl(var(--border));
-    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-menu);
   }
   .viewer-arrow.prev { left: max(12px, env(safe-area-inset-left)); }
   .viewer-arrow.next { right: max(12px, env(safe-area-inset-right)); }

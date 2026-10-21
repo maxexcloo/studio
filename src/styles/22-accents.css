@@ -2,8 +2,8 @@
    Website accents, kept quiet
 
    Two things carried over from the Studio site: the warm ember and square
-   markers instead of round dots. Focus and selection stay neutral white;
-   ember only marks status and heat.
+   markers instead of round dots. Keyboard focus stays neutral white; the
+   ember marks selection (--selected-bg, --selected-ink), status and heat.
 --------------------------------------------------------------------------- */
 
 /* ------------------------------------------------------------ Selection */
@@ -13,7 +13,7 @@
 /* Keyboard focus: one neutral ring everywhere. :where keeps it at zero
    specificity so components with their own focus style still win. */
 :where(button, a, summary, [role="button"], [role="tab"], [role="switch"], [tabindex]):focus-visible {
-  outline: 2px solid rgb(255 255 255 / .55);
+  outline: 2px solid var(--icon-ring);
   outline-offset: 2px;
 }
 
@@ -109,7 +109,7 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   max-width: min(640px, calc(100vw - 32px));
   padding: 6px 6px 6px 12px;
   border-radius: var(--r-pill);
@@ -128,12 +128,12 @@
 .lora-mismatch-action:hover { background: var(--control-hover); }
 .lora-mismatch-action.is-quiet { background: none; color: hsl(var(--foreground) / .7); }
 .lora-mismatch-action.is-quiet:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
-.lora-mismatch-close { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; color: hsl(var(--foreground) / .6); cursor: pointer; }
+.lora-mismatch-close { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: var(--r-pill); background: none; color: hsl(var(--foreground) / .6); cursor: pointer; }
 .lora-mismatch-close:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 /* At 760px and below the docks rise to sit on the prompt box (17-deck.css); the note goes above them. */
 @media (max-width: 760px) {
   .lora-mismatch { bottom: calc(100% + var(--deck-gap, 18px) + var(--deck-h, 44px) + 10px); }
 }
 @media (max-width: 640px) {
-  .lora-mismatch { white-space: normal; border-radius: 16px; width: max-content; }
+  .lora-mismatch { white-space: normal; border-radius: var(--r-item); width: max-content; }
 }

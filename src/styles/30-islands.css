@@ -29,7 +29,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   width: min(420px, calc(100vw - 24px));
   translate: -50% 0;
   pointer-events: none;
@@ -60,7 +60,7 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-5);
   min-width: 0;
   padding: 9px 12px;
   border: 0;
@@ -74,13 +74,13 @@ button.activity-main { cursor: pointer; }
 .activity-main:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .activity-glyph { flex: none; display: grid; place-items: center; min-width: 38px; }
 .activity.is-compact { width: min(300px, calc(100vw - 24px)); touch-action: pan-y; }
-.activity.is-compact .activity-main { min-height: 44px; gap: 9px; padding: 6px 10px; }
+.activity.is-compact .activity-main { min-height: 44px; gap: var(--space-4); padding: 6px 10px; }
 .activity.is-compact .activity-glyph { min-width: 26px; }
 .activity.is-compact .activity-frame { width: 26px; height: 26px; }
 /* Positioned, so the words leaving on a new phase lie over the ones arriving. */
 .activity-text { position: relative; display: grid; flex: 1; min-width: 0; }
-.activity-copy { display: grid; gap: 5px; min-width: 0; }
-.activity-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.activity-copy { display: grid; gap: var(--space-3); min-width: 0; }
+.activity-title { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); min-width: 0; }
 .activity-title strong { overflow: hidden; font-size: 13px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
 .activity-title em { flex: none; font: 600 12px var(--font-mono); font-style: normal; font-variant-numeric: tabular-nums; color: var(--ember); }
 .activity-copy small { overflow: hidden; font-size: 11.5px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); white-space: nowrap; text-overflow: ellipsis; }
@@ -101,10 +101,9 @@ button.activity-main { cursor: pointer; }
   color: hsl(var(--muted-foreground));
 }
 
-/* Expanded, Dynamic Island style: the glass widens a little on a spring and
-   grows a row of round buttons under the words, which stay where they are.
-   The height follows by itself (Activities.tsx measures the body). */
-.activity { transition: width 520ms var(--motion-ease); }
+/* Expanded, Dynamic Island style: the glass widens a little (at once: width
+   never animates) and grows a row of round buttons under the words, which stay
+   where they are. The height follows by itself (Activities.tsx measures the body). */
 .activity.is-expanded { width: min(400px, calc(100vw - 12px)); }
 .activity.is-wide.is-expanded { width: min(440px, calc(100vw - 12px)); }
 .activity-body { flex-wrap: wrap; }
@@ -112,7 +111,7 @@ button.activity-main { cursor: pointer; }
   display: flex;
   flex-basis: 100%;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   /* Under the words, past the glyph: the main row's padding, the glyph and the gap. */
   padding: 0 12px 11px 62px;
   transform-origin: 50% 0;
@@ -125,13 +124,12 @@ button.activity-main { cursor: pointer; }
   height: 32px;
   border: 0;
   border-radius: var(--r-pill);
-  background: rgb(255 255 255 / .09);
+  background: var(--control-fill);
   color: #f2f2f2;
   cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast), transform var(--motion-fast) var(--motion-ease);
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
-.activity-control:hover { background: rgb(255 255 255 / .16); color: #fff; }
-.activity-control:active { transform: scale(.92); }
+.activity-control:hover { background: var(--control-hover); color: #fff; }
 .activity-control:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .activity-control.is-danger:hover { background: rgb(255 110 90 / .2); color: #ff8b78; }
 .activity-control-hint {
@@ -147,7 +145,7 @@ button.activity-main { cursor: pointer; }
   transition: color var(--motion-fast);
 }
 .activity-control-hint:hover { color: #fff; }
-.activity-control-hint:focus-visible { outline: none; border-radius: 6px; box-shadow: var(--focus-ring); }
+.activity-control-hint:focus-visible { outline: none; border-radius: var(--r-pill); box-shadow: var(--focus-ring); }
 @media (pointer: coarse) {
   .activity-control { width: 40px; height: 40px; }
   .activity-control-hint { padding: 11px 4px; }
@@ -160,7 +158,7 @@ button.activity-main { cursor: pointer; }
 .model-dl-glyph.is-canceled { opacity: .45; filter: grayscale(1); }
 .model-dl-glyph.is-canceled :is(.udw-twinkle, .udw-spark) { animation: none; }
 
-.activity-thumb { flex: none; width: 34px; height: 34px; object-fit: cover; border-radius: 9px; outline: 1px solid rgb(255 255 255 / .1); outline-offset: -1px; }
+.activity-thumb { flex: none; width: 34px; height: 34px; object-fit: cover; border-radius: var(--r-media); outline: 1px solid rgb(255 255 255 / .1); outline-offset: -1px; }
 .activity-thumb.is-waiting { opacity: .75; filter: saturate(.7); }
 
 /* A generation's live preview, in a frame the size of the arrow's box, with
@@ -172,7 +170,7 @@ button.activity-main { cursor: pointer; }
   width: 38px;
   height: 38px;
   overflow: hidden;
-  border-radius: 11px;
+  border-radius: var(--r-media);
   background: var(--well);
   outline: 1px solid rgb(255 255 255 / .1);
   outline-offset: -1px;
@@ -193,7 +191,7 @@ button.activity-main { cursor: pointer; }
 .activity-frame.is-done .activity-heat rect { fill: #f4f4f4; opacity: .6; animation: none; }
 
 /* The results, dealt like prints: one, or the first few of a batch, newest on top. */
-@keyframes activity-deal { from { opacity: 0; transform: translateY(6px) scale(.8); } }
+@keyframes activity-deal { from { opacity: 0; transform: scale(.96); } }
 
 /* One quiet capsule, the only bright thing on an island. */
 .island-action {
@@ -212,10 +210,9 @@ button.activity-main { cursor: pointer; }
   letter-spacing: -.01em;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--motion-fast), transform var(--motion-fast) var(--motion-ease);
+  transition: background var(--motion-fast);
 }
 .island-action:hover { background: #fff; }
-.island-action:active { transform: scale(.96); }
 .island-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .island-close {
@@ -267,14 +264,14 @@ button.activity-main { cursor: pointer; }
 .status-pill.is-warning { --tone: var(--accent-amber); --tone-soft: var(--accent-amber-subtle); }
 .status-pill.is-error { --tone: hsl(0 74% 58%); --tone-soft: hsl(0 74% 58% / .16); }
 .status-pill.is-removed { --tone: rgb(255 255 255 / .5); --tone-soft: rgb(255 255 255 / .06); }
-.status-pill-body { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.status-pill-light { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 4px var(--tone-soft); }
+.status-pill-body { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.status-pill-light { flex: none; width: 10px; height: 10px; border-radius: var(--r-pill); background: var(--tone); box-shadow: 0 0 0 4px var(--tone-soft); }
 .status-pill-text { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; text-overflow: ellipsis; }
 .status-pill-action,
 .status-pill-close {
   position: relative;
   flex: none;
-  height: 30px;
+  height: var(--control-h-sm);
   border: 0;
   border-radius: var(--r-pill);
   font: inherit;
@@ -283,14 +280,14 @@ button.activity-main { cursor: pointer; }
 }
 .status-pill-action { margin-left: 2px; padding: 0 11px; background: rgb(255 255 255 / .12); color: hsl(var(--foreground)); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .status-pill-action:hover { background: rgb(255 255 255 / .2); }
-.status-pill-close { display: grid; place-items: center; width: 30px; background: transparent; color: hsl(var(--muted-foreground)); }
+.status-pill-close { display: grid; place-items: center; width: var(--control-h-sm); background: transparent; color: hsl(var(--muted-foreground)); }
 .status-pill-close:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .status-pill-action:focus-visible,
 .status-pill-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* 44 px to a finger without growing the pill. */
 @media (pointer: coarse) {
   .status-pill-action::after,
-  .status-pill-close::after { content: ""; position: absolute; inset: -7px -3px; }
+  .status-pill-close::after { content: ""; position: absolute; inset: -6px -3px; }
 }
 /* Desktop: in the gallery's top bar, before its tools; it narrows (the words
    ellipsise) rather than push them. Zen mode, without a top bar: above the dock. */
@@ -323,7 +320,6 @@ button.activity-main { cursor: pointer; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .activity,
   .activity-control,
   .model-dl-glyph { transition: none; }
   .activity.is-expanded { width: min(380px, calc(100vw - 24px)); }
@@ -352,7 +348,7 @@ button.activity-main { cursor: pointer; }
   left: 50%;
   z-index: var(--z-popover);
   display: grid;
-  gap: 6px;
+  gap: var(--space-3);
   width: min(340px, calc(100vw - 16px));
   padding: 12px 8px 8px;
   border: 1px solid var(--glass-border);
@@ -363,15 +359,15 @@ button.activity-main { cursor: pointer; }
 }
 .status-pill-panel > strong { padding: 0 6px; font-size: 14px; font-weight: 650; }
 .status-pill-panel > p { margin: 0; padding: 0 6px; color: hsl(var(--muted-foreground)); font-size: 12.5px; line-height: 1.4; }
-.status-pill-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; max-height: min(300px, 45dvh); margin: 2px 0 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
-.status-pill-list li { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 4px 6px; border-radius: var(--r-item); font-size: 13px; }
+.status-pill-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); max-height: min(300px, 45dvh); margin: 2px 0 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
+.status-pill-list li { display: flex; align-items: center; gap: var(--space-4); min-width: 0; min-height: 44px; padding: 4px 6px; border-radius: var(--r-item); font-size: 13px; }
 .status-pill-list li > span:last-child { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.status-pill-list img, .status-pill-list-blank { flex: none; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--well); }
+.status-pill-list img, .status-pill-list-blank { flex: none; width: 36px; height: 36px; border-radius: var(--r-media); object-fit: cover; background: var(--well); }
 /* A question keeps its words and both answers on the desktop toolbar rather than squeezing under its neighbours. */
 .status-pill.is-toolbar:has(.is-question) { flex: none; max-width: none; }
 
 /* The dismiss ring uses the same paused time and reset key as the message timer. */
-.status-pill-countdown { position: absolute; inset: 1px; width: 28px; height: 28px; pointer-events: none; overflow: visible; animation-name: status-pill-countdown; animation-timing-function: linear; animation-fill-mode: forwards; }
+.status-pill-countdown { position: absolute; inset: 1px; width: calc(var(--control-h-sm) - 2px); height: calc(var(--control-h-sm) - 2px); pointer-events: none; overflow: visible; animation-name: status-pill-countdown; animation-timing-function: linear; animation-fill-mode: forwards; }
 .status-pill-countdown circle { fill: none; stroke: var(--tone); stroke-width: 1.5; stroke-dasharray: 1; transform: rotate(-90deg); transform-origin: center; }
 @keyframes status-pill-countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
 @media (prefers-reduced-motion: reduce) { .status-pill-countdown { animation-name: none; } }

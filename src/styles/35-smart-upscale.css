@@ -1,22 +1,22 @@
 /* ---------------------------------------------------------------------------
-   Smart upscale: three tabs on top of the size menu. A dark well with one
-   sliding thumb, like Segmented in Settings; a tier that is on carries the
+   Smart upscale: three tabs on top of the size menu. A dark well whose chosen
+   tab takes the selected fill, like Segmented in Settings; a tier that is on carries the
    ember note, here and as a small tag on the closed trigger.
 --------------------------------------------------------------------------- */
 
-.aspect-list { display: grid; gap: 3px; }
+.aspect-list { display: grid; gap: var(--space-2); }
 
 .aspect-upscale {
   display: grid;
-  gap: 7px;
+  gap: var(--space-4);
   padding: 4px 4px 10px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: 1px solid var(--line);
 }
 .aspect-upscale-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   padding: 0 6px;
   color: hsl(var(--muted-foreground));
   font-size: 11.5px;
@@ -29,28 +29,16 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(var(--tab-count), 1fr);
-  padding: 3px;
+  padding: var(--seg-pad);
   border-radius: var(--r-pill);
   background: var(--well);
   box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
 }
-/* The thumb slides under the chosen tab instead of each tab lighting up on its own. */
-.aspect-upscale-tabs > i {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc((100% - 6px) / var(--tab-count));
-  border-radius: var(--r-pill);
-  background: var(--selected);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1), 0 1px 3px rgb(0 0 0 / .4);
-  transform: translateX(calc(var(--tab-index, 0) * 100%));
-  transition: transform var(--motion-base) var(--motion-ease);
-  pointer-events: none;
-}
+/* The chosen tab takes the selected fill in place; nothing slides. */
+.aspect-upscale-tabs > i { display: none; }
 .aspect-upscale-tabs button {
   position: relative;
-  min-height: 30px;
+  min-height: calc(var(--control-h-sm) - 2 * var(--seg-pad));
   border: 0;
   border-radius: var(--r-pill);
   background: transparent;
@@ -59,12 +47,10 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: color var(--motion-fast) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
+  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
-.aspect-upscale-tabs button:hover { color: hsl(var(--foreground)); }
-.aspect-upscale-tabs button:active { transform: scale(.96); transition-duration: var(--motion-instant); }
-.aspect-upscale-tabs button.is-active { color: hsl(var(--foreground)); }
-.aspect-upscale-tabs button.is-active:not([data-tier="none"]) { color: var(--ember); }
+.aspect-upscale-tabs button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.aspect-upscale-tabs button.is-active { background-color: var(--selected-bg); color: var(--selected-ink); }
 .aspect-upscale-tabs button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* On the closed trigger: a tag pinned to the ratio icon's corner. It is out
@@ -93,10 +79,6 @@
   .aspect-upscale-tabs button { min-height: 38px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .aspect-upscale-tabs > i { transition: none; }
-}
-
 /* Phone studio: the same three tiers as a segmented row in the create sheet. */
 .phone-control-note {
   margin: 0;
@@ -108,7 +90,7 @@
 
 /* An upscaled tab: a small arrow on a tag of its own, right after the size. */
 .aspect-upscale-tabs button,
-.phone-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+.phone-seg button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
 .aspect-upscale-arrow {
   flex: none;
   box-sizing: content-box;
@@ -118,7 +100,7 @@
   color: hsl(var(--muted-foreground));
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.aspect-upscale-tabs button.is-active .aspect-upscale-arrow { background: color-mix(in srgb, var(--ember) 18%, transparent); color: var(--ember); }
+.aspect-upscale-tabs button.is-active .aspect-upscale-arrow { background: var(--selected-bg); color: var(--selected-ink); }
 /* The phone's chosen segment is white: the arrow takes the beta tag's darker ember. */
 .phone-seg button.active .aspect-upscale-arrow { background: rgb(214 104 30 / .14); color: #b0500f; }
 
@@ -137,5 +119,5 @@
 .aspect-option > span:nth-child(2) small { margin-left: 7px; font-weight: 500; color: rgb(255 255 255 / .45); }
 @media (pointer: fine) {
   .aspect-menu .aspect-option { min-height: 34px; box-shadow: none; }
-  .aspect-menu .aspect-upscale { gap: 6px; padding-bottom: 8px; }
+  .aspect-menu .aspect-upscale { gap: var(--space-3); padding-bottom: 8px; }
 }

@@ -1,11 +1,11 @@
 /* A single creation surface: fields above one consistent toolbar. */
 .zen-prompt { display: block; padding: 0; max-height: none; }
-.composer-inner { display: grid; gap: 6px; padding: 8px; }
-.zen-prompt .composer-prompt-row { display: flex; align-items: center; gap: 8px; }
+.composer-inner { display: grid; gap: var(--space-3); padding: 8px; }
+.zen-prompt .composer-prompt-row { display: flex; align-items: center; gap: var(--space-4); }
 .composer-prompt-field { position: relative; flex: 1; min-width: 0; }
 .zen-prompt .composer-prompt-field textarea { display: block; box-sizing: border-box; width: 100%; min-height: 60px; max-height: min(18dvh, 160px) !important; padding: 8px 72px 8px 10px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .composer-prompt-field.is-negative textarea { max-height: min(16dvh, 140px) !important; }
-.composer-field-tools { position: absolute; top: 5px; right: 6px; display: flex; align-items: center; gap: 2px; }
+.composer-field-tools { position: absolute; top: 5px; right: 6px; display: flex; align-items: center; gap: var(--space-1); }
 .composer-field-tools .prompt-action { width: 28px; height: 28px; }
 .composer-prompt-preview { display: none; }
 .composer-primary-actions { display: flex; flex: none; align-items: center; }
@@ -13,13 +13,13 @@
 .zen-prompt .generate { width: var(--control-h); min-width: var(--control-h); height: var(--control-h); padding: 0; border-radius: var(--r-pill); }
 .zen-prompt .generate span { display: none; }
 .zen-prompt .composer-secondary-row { align-items: flex-start; padding: 6px 0 0; }
-.zen-prompt .zen-prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 2px 0; border-top: 1px solid var(--surface-border); }
+.zen-prompt .zen-prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: 6px 2px 0; border-top: 1px solid var(--line); }
 .zen-prompt .zen-inline-settings { flex: 1; min-width: 0; flex-wrap: wrap; }
 .zen-prompt .composer-reference-tools { flex: none; max-width: min(340px, 100%); padding: 0; }
 .zen-prompt .composer-reference-slots { align-items: flex-start; }
-.zen-prompt .reference-slot-list { justify-content: flex-start; gap: 8px; }
+.zen-prompt .reference-slot-list { justify-content: flex-start; gap: var(--space-4); }
 .zen-prompt .reference-count { display: none; }
-.zen-prompt .ref-add { width: auto; height: var(--control-h); min-height: var(--control-h); padding: 6px 10px; flex-direction: row; gap: 6px; border-style: solid; border-radius: var(--r-pill); }
+.zen-prompt .ref-add { width: auto; height: var(--control-h); min-height: var(--control-h); padding: 6px 10px; flex-direction: row; gap: var(--space-3); border-style: solid; border-radius: var(--r-pill); }
 .zen-prompt .ref-add-label { font-size: 12px; white-space: nowrap; }
 .zen-prompt .ref-selected, .zen-prompt .ref-chip.is-busy { width: var(--control-h); height: var(--control-h); }
 .zen-prompt .composer-advanced-trigger, .zen-prompt .composer-reset { flex: none; width: var(--control-h); height: var(--control-h); padding: 0; border-radius: var(--r-pill); background: var(--well); }
@@ -31,7 +31,7 @@
 .zen-prompt:not(.is-expanded) .zen-prompt-actions,
 .zen-prompt:not(.is-expanded) .prompt-count,
 .zen-prompt:not(.is-expanded) .lora-mismatch { display: none; }
-.composer-advanced-body { display: grid; gap: 12px; max-height: min(65dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
+.composer-advanced-body { display: grid; gap: var(--space-5); max-height: min(65dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
 .composer-loras .model-loras { padding: 0; }
 .composer-loras .model-loras > h3 { display: none; }
 .phone-model-browse span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -39,8 +39,8 @@
 @media (min-width: 761px) { .zen-prompt { width: min(920px, calc(100vw - 176px)); min-width: 0; } }
 /* Resources form the third row; shared generation controls stay below. */
 .composer-field-tools { top: 50%; transform: translateY(-50%); }
-.composer-resource-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }
-.composer-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
+.composer-resource-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); padding: 4px 2px 0; }
+.composer-resource-left { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-4); }
 .composer-resource-left .composer-reference-tools { flex: 0 1 auto; min-width: 0; }
 .composer-resource-left .lora-pill { flex: none; }
 .composer-resource-model { flex: none; max-width: 220px; margin-left: auto; }
@@ -48,20 +48,20 @@
 .zen-prompt:not(.is-expanded) .composer-resource-row { display: none; }
 /* Phone creation buttons: one 44px pill in a dark well. */
 .composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
-.composer-resource-left .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
+.composer-resource-left .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
 .composer-resource-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .composer-resource-add svg { flex: none; }
 .composer-resource-model .model-menu { width: min(460px, calc(100vw - 32px)); }
 .model-menu .model-option .model-copy em { display: block; font-size: 12px; line-height: 1.45; white-space: normal; }
 .model-menu .model-menu-list { scrollbar-gutter: auto; }
-.model-menu .model-menu-browse { display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; min-height: 58px; margin: 6px 0 0; padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); text-align: left; }
+.model-menu .model-menu-browse { display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: var(--space-4); width: 100%; min-height: 58px; margin: 6px 0 0; padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); text-align: left; }
 .model-menu-browse > .model-copy { grid-column: 2; grid-row: 1; }
 .model-menu-browse > svg { grid-column: 1; grid-row: 1; justify-self: center; }
 .model-menu .model-menu-browse:hover { background: var(--control-hover); }
 .model-menu-browse .model-copy strong { max-width: none; font-size: 13px; }
 .model-menu-browse .model-copy em { margin-top: 2px; color: hsl(var(--muted-foreground)); }
 /* Advanced Settings: the composer popover (LoraPopover.tsx), scrolling inside itself. */
-.composer-advanced .composer-advanced-body { max-height: none; gap: 10px; padding: 12px 14px 14px; overflow-y: auto; }
+.composer-advanced .composer-advanced-body { max-height: none; gap: var(--space-4); padding: 12px 14px 14px; overflow-y: auto; }
 
 /* LoRA browsing shares the reference picker's anchored glass surface. */
 .composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
@@ -71,14 +71,14 @@
 .composer-loras .lora-picker-list { min-height: 60px; }
 .composer-loras .lora-filter { flex-wrap: wrap; }
 .composer-loras .lora-filter small { font-size: 11px; }
-.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
-.composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 8px; border: 0; background: transparent; }
-.composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--control-hover); }
+.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+.composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: var(--space-4); min-height: 54px; padding: 8px; border: 0; background: transparent; }
+.composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--cursor-bg); }
 .composer-loras .lora-option-check { flex: none; }
 .composer-loras .lora-option-star { flex: none; opacity: 1; }
 .composer-loras .lora-option-copy span { white-space: normal; overflow-wrap: anywhere; }
 .composer-loras .lora-option > em { max-width: 28%; }
-.composer-loras .lora-picker-foot { gap: 8px; }
+.composer-loras .lora-picker-foot { gap: var(--space-4); }
 .composer-loras .lora-picker-foot .btn { flex-shrink: 0; }
 .composer-loras .model-loras { display: flex; flex-direction: column; margin: 0; }
 .composer-loras .lora-picker { flex: 1; height: auto; }
@@ -89,19 +89,19 @@
 .model-menu .model-option.active:hover { background: var(--control-hover); }
 
 /* Direct LoRA selection keeps weights beside each selected file. */
-.composer-loras .lora-library-row { position: relative; min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--surface-border); }
-.composer-loras .lora-library-select { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 34px 4px 2px; border: 0; border-radius: 0; background: transparent; color: hsl(var(--foreground)); text-align: left; cursor: pointer; }
+.composer-loras .lora-library-row { position: relative; min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.composer-loras .lora-library-select { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: 44px; padding: 4px 34px 4px 2px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--foreground)); text-align: left; cursor: pointer; }
 .composer-loras .lora-library-select:hover { color: hsl(var(--foreground)); }
-.composer-loras .lora-library-select:focus-visible { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
+.composer-loras .lora-library-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .composer-loras .lora-library-select:disabled { opacity: .45; cursor: default; }
-.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: calc(var(--r-media) / 2); color: hsl(var(--background)); }
-.composer-loras .lora-library-select[aria-checked="true"] .lora-library-check { background: hsl(var(--foreground)); border-color: hsl(var(--foreground)); }
+.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: var(--r-check); color: var(--accent-amber-ink); }
+.composer-loras .lora-library-select[aria-checked="true"] .lora-library-check { background: var(--accent-amber); border-color: var(--accent-amber); }
 .composer-loras .lora-library-select .lora-option-copy { flex: 1; min-width: 0; }
 .composer-loras .lora-library-select .lora-option-copy strong { font-size: 12px; }
 .composer-loras .lora-library-select .lora-option-copy span { display: block; overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); font-size: 10.5px; }
 .composer-loras .lora-library-row > .lora-option-star { position: absolute; top: 12px; right: 0; }
 .composer-loras .lora-library-note { margin: 2px 30px 4px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
-.composer-loras .lora-library-settings { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 6px 2px 4px 30px; }
+.composer-loras .lora-library-settings { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); margin: 6px 2px 4px 30px; }
 .composer-loras .lora-library-settings .lora-strength { flex: 1; min-width: 150px; }
 .composer-loras .lora-library-settings .lora-triggers { flex-basis: 100%; margin: 0; }
 .composer-loras .lora-picker:not(.is-list) .lora-option { display: flex; min-height: 52px; }
@@ -122,36 +122,35 @@
 .composer-loras .lora-popover-body { padding: 0; overflow: hidden; }
 .composer-loras .lora-panel { display: flex; flex-direction: column; overflow-y: auto; }
 .composer-loras .lora-picker { gap: 0; }
-.composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--surface-border); }
+.composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--line); }
 .composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: var(--control-fill); }
-.composer-loras .lora-filter { order: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 10px; }
+.composer-loras .lora-filter { order: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 0 12px 10px; }
 .composer-loras .lora-filter small { max-width: 260px; text-align: right; }
 .composer-loras .lora-picker-list { order: 2; margin: 0; padding: 0 12px 10px; }
 .composer-loras .lora-library-row:last-child { border-bottom: 0; }
-.composer-loras .lora-library-select { border-radius: var(--r-item); }
-.composer-loras .lora-library-select:hover { background: var(--control-hover); }
+.composer-loras .lora-library-select:hover { background: var(--cursor-bg); }
 .composer-loras .lora-panel > :not(.lora-picker) { margin-left: 12px; margin-right: 12px; }
 .composer-field-tools .prompt-clear { color: hsl(var(--muted-foreground) / .7); }
 @media (max-width: 760px) { .composer-loras .lora-filter small { display: none; } }
 
 /* Selection and stack editing stay together in the same resource picker. */
 .composer-loras .lora-selection-count { color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; }
-.composer-loras .lora-library-footer { order: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--surface-border); }
+.composer-loras .lora-library-footer { order: 3; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding: 8px 12px; border-top: 1px solid var(--line); }
 .composer-loras .lora-library-footer:empty { display: none; }
 .composer-loras .lora-library-footer .lora-stacks { flex: 1 1 260px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .composer-loras .lora-library-footer .lora-save-chip span { display: none; }
-.composer-loras .lora-library-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.composer-loras .lora-library-actions { display: flex; align-items: center; gap: var(--space-4); margin-left: auto; }
 .composer-loras .lora-library-expansion { overflow: hidden; }
 .composer-loras .lora-library-order { display: inline-flex; align-items: center; }
-.composer-loras .lora-library-order .prompt-action { width: 28px; height: 28px; }
+.composer-loras .lora-library-order .prompt-action { width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); }
 .composer-loras .lora-library-settings .lora-strength { min-width: 100px; }
 .composer-loras .lora-library-footer .lora-undo { flex-basis: 100%; margin: 0; }
 
 .composer-loras .lora-library-grip { position: absolute; top: 7px; left: 0; display: grid; place-items: center; width: 28px; height: 44px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
 .composer-loras .lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 30px; }
-.composer-loras .lora-library-grip:focus-visible { outline: 1px solid hsl(var(--foreground)); }
+.composer-loras .lora-library-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .composer-loras .lora-details { margin: 0 2px 0 30px; color: hsl(var(--muted-foreground)); font-size: 12px; }
-.composer-loras .lora-details summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 44px; cursor: pointer; }
+.composer-loras .lora-details summary { display: flex; align-items: center; gap: var(--space-3); width: fit-content; min-height: 44px; cursor: pointer; }
 .composer-loras .lora-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .composer-loras .lora-details a { display: inline-flex; align-items: center; min-height: 44px; color: hsl(var(--foreground)); }
 
@@ -161,14 +160,14 @@
 /* Info sits beside the star as an icon, so a closed row is one line; its details still open below. */
 .composer-loras .lora-library-select { padding-right: 72px; }
 .composer-loras .lora-library-row > .lora-details { margin: 0 2px 0 30px; }
-.composer-loras .lora-library-row > .lora-details > summary { position: absolute; top: 12px; right: 36px; justify-content: center; width: 32px; min-height: 32px; border-radius: var(--r-item); }
+.composer-loras .lora-library-row > .lora-details > summary { position: absolute; top: 12px; right: 36px; justify-content: center; width: var(--control-h-sm); min-height: var(--control-h-sm); border-radius: var(--r-pill); }
 .composer-loras .lora-library-row > .lora-details > summary::-webkit-details-marker { display: none; }
 .composer-loras .lora-library-row > .lora-details > summary:hover { color: hsl(var(--foreground)); }
 /* On touch the Info target reaches 44px without changing the row; it stops short of the star. */
 @media (hover: none) { .composer-loras .lora-library-row > .lora-details > summary::after { content: ""; position: absolute; inset: -6px; } }
 .composer-loras .lora-library-row > .lora-details[open] > div { padding-top: 2px; }
 /* The keyboard's place in the list is always visible. */
-.composer-loras .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .055); }
+.composer-loras .lora-library-select[data-highlight="true"] { background: var(--cursor-bg); }
 
 /* The on/off switch beside a strength is small to look at but a full finger's width to tap. */
 .composer-loras .lora-library-settings .switch { position: relative; }
@@ -178,7 +177,7 @@
 .lora-pill-summary { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Image/Video: one icon pair everywhere (ComposerModeSelect.tsx, docs/guides/UI-PATTERNS.md). */
-.media-mode-toggle { display: inline-flex; flex: none; width: auto; gap: 2px; }
+.media-mode-toggle { display: inline-flex; flex: none; width: auto; gap: var(--space-1); }
 .media-mode-toggle button { display: grid; place-items: center; width: var(--control-h); min-width: var(--control-h); padding: 0; }
 .gallery-toolbar .gallery-generation-mode.media-mode-toggle { width: auto; }
 .media-mode-toggle.is-labelled button { width: auto; min-width: 76px; padding: 0 14px; font-size: 13px; font-weight: 550; }

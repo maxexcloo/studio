@@ -94,7 +94,7 @@
   height: var(--dock-h);
   min-height: var(--dock-h);
   padding: 3px;
-  gap: 2px;
+  gap: var(--space-1);
   border-radius: var(--r-pill);
 }
 .zen-control-button,
@@ -136,26 +136,25 @@
 
 /* Glass icon buttons: the fill is an --icon-fill circle inside the 40px target
    (background clipped to the content box), so a 48px bar keeps 8px of glass
-   around it on every side. Hover and press change only the fill and colour,
-   at --motion-fast; a press shrinks the icon a touch at --motion-instant. The
-   keyboard ring traces the fill circle, inside the bar. */
+   around it on every side. Hover changes only the fill and colour at
+   --motion-fast; a press darkens the circle (the shared press overlay in
+   09-motion.css) at --motion-instant, and nothing moves. The keyboard ring
+   traces the fill circle, inside the bar. */
 .studio-dock .icon-button,
 .viewer-dock .icon-button {
   padding: var(--icon-fill-inset);
   background-clip: content-box;
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), scale var(--motion-instant) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.studio-dock .icon-button:active:not(:disabled),
-.viewer-dock .icon-button:active:not(:disabled) { background-color: var(--control-press); scale: .94; }
 .viewer-dock .icon-button.danger-tone:active:not(:disabled) { background-color: var(--danger-ring); }
 .studio-dock .icon-button:focus-visible,
 .viewer-dock .icon-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 /* The countdown widens the button; the fill stays a pill around it. */
 .viewer-dock .icon-button.has-count { padding-inline: calc(var(--icon-fill-inset) + 6px); }
-.zen-control-button:hover { background: rgb(36 36 36 / .94); transform: none; }
+.zen-control-button:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
 /* The viewer arrows are centred with translateY(-50%), so resetting the
    transform on hover made them jump half their height. Tint only. */
-.viewer-arrow:hover { background: rgb(36 36 36 / .94); box-shadow: var(--shadow-float-sm); }
+.viewer-arrow:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); box-shadow: var(--shadow-float-sm); }
 
 /* --------------------------------------------------------------- 3. Modals
    Solid sheets for things you open on purpose. Dialogs are <Modal>, styled in
@@ -178,8 +177,8 @@
 .settings-modal input:not(.is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) { padding: 0 16px; }
 .settings-modal input:not(.is-framed):focus-visible,
 .fluid-select-trigger:focus-visible {
-  border-color: rgb(255 255 255 / .22);
-  box-shadow: 0 0 0 3px rgb(255 255 255 / .06);
+  border-color: var(--line-strong);
+  box-shadow: none;
 }
 .settings-modal .number-picker .number-picker-btn { height: calc(var(--control-h) - 2px); border-radius: var(--r-pill); }
 .settings-modal .number-picker-value,
@@ -214,7 +213,7 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-4);
   padding: 0 14px 0 12px;
   border-radius: var(--r-pill);
   background: var(--danger-fill);
@@ -237,7 +236,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-2);
   min-height: 160px;
   margin: 0;
   padding: 24px 20px;
@@ -274,7 +273,7 @@
    The small buttons on a gallery tile's corners: the upscale arrow top left,
    download, copy and delete top right. The only rules for them live here:
    true circles, one size per breakpoint, glass that reads on any image, and
-   solid white when the upscale is showing. */
+   solid amber when the upscale is showing. */
 
 .tile-upscale,
 .tile-hover-actions .tile-icon,
@@ -289,7 +288,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
@@ -309,20 +308,19 @@
 .tile-hover-actions .tile-delete svg { display: block; width: 14px; height: 14px; }
 
 /* One set of states for every tile corner control: hover darkens the glass at
-   --motion-fast, a press shrinks the circle at --motion-instant (a tap on a
-   phone shows the same), and the keyboard ring follows the circle. */
+   --motion-fast, a press darkens it further (the shared press overlay) without
+   moving, and the keyboard ring follows the circle. */
 .tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more) {
-  transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), scale var(--motion-instant) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), opacity var(--motion-base) var(--motion-ease);
 }
-.tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more):active:not([aria-disabled="true"]) { scale: .92; }
 .tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more):focus-visible { outline: 2px solid var(--icon-ring); outline-offset: 2px; }
 
 /* Upscale: top left, hidden until the tile is hovered unless it is doing or showing something. */
 .tile-upscale { position: absolute; top: 8px; left: 8px; opacity: 0; }
 .tile-upscale.is-active,
 .tile-upscale.is-running { opacity: 1; }
-.tile-upscale.is-active { background: var(--action); box-shadow: 0 2px 10px rgb(0 0 0 / .32); color: var(--action-ink); }
-.tile-upscale.is-active:hover { background: #fff; }
+.tile-upscale.is-active { background: var(--accent-amber); box-shadow: 0 2px 10px rgb(0 0 0 / .32); color: var(--accent-amber-ink); }
+.tile-upscale.is-active:hover { background: var(--accent-amber-hover); }
 .tile-upscale.is-busy { cursor: progress; }
 @media (hover: hover) {
   .tile-motion-wrap:hover .tile-upscale,
@@ -384,7 +382,7 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-4);
   padding: 0 14px 0 12px;
   border-radius: var(--r-pill);
   background: rgb(255 190 110 / .1);
@@ -401,6 +399,6 @@
 }
 
 /* The viewer's upscale button while it counts down: the time beside the stop square. */
-.icon-button.has-count { width: auto; min-width: 34px; padding-inline: 9px; gap: 5px; }
+.icon-button.has-count { width: auto; min-width: 34px; padding-inline: 9px; gap: var(--space-3); }
 .viewer-upscale-left { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .viewer-phone-bar span.is-count { font-variant-numeric: tabular-nums; }

@@ -21,7 +21,7 @@
   -webkit-backdrop-filter: var(--scrim-blur);
   backdrop-filter: var(--scrim-blur);
   /* The blur joins when the fade ends (stepped), so the fade never re-blurs the page per frame. */
-  animation: modal-fade var(--motion-fast) ease-out, modal-glass var(--motion-fast) step-end;
+  animation: modal-fade var(--motion-fast) var(--motion-ease), modal-glass var(--motion-fast) step-end;
 }
 @keyframes modal-glass { from { -webkit-backdrop-filter: none; backdrop-filter: none; } }
 
@@ -48,7 +48,7 @@
 .modal-sheet { width: min(1200px, 100%); height: min(800px, calc(100dvh - 48px)); }
 
 @keyframes modal-fade { from { opacity: 0; } }
-@keyframes modal-in { from { opacity: 0; transform: translateY(6px) scale(.985); } }
+@keyframes modal-in { from { opacity: 0; transform: scale(.96); } }
 
 /* ------------------------------------------------------------------ Head */
 
@@ -56,7 +56,7 @@
   flex: none;
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: var(--space-5);
   padding: 22px 16px 0 24px;
 }
 .modal-titles { flex: 1; min-width: 0; padding-top: 2px; }
@@ -75,7 +75,7 @@
   line-height: 1.55;
   color: hsl(var(--muted-foreground));
 }
-.modal-head-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.modal-head-actions { flex: none; display: flex; align-items: center; gap: var(--space-4); }
 .modal-icon {
   flex: none;
   width: 40px;
@@ -105,7 +105,7 @@
 .modal-close:disabled { opacity: .4; cursor: default; }
 
 /* Alerts stack the icon above the title, like a note rather than a form. */
-.modal-alert > .modal-head { flex-direction: column; gap: 16px; padding-right: 24px; }
+.modal-alert > .modal-head { flex-direction: column; gap: var(--space-6); padding-right: 24px; }
 
 /* Libraries and settings: a toolbar head over a full-bleed body. */
 .modal-wide > .modal-head,
@@ -161,7 +161,7 @@
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 24px;
 }
 
@@ -174,7 +174,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: var(--space-4);
   height: var(--control-h);
   min-height: var(--control-h);
   padding: 0 18px;
@@ -186,10 +186,9 @@
   font-weight: 550;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast), scale var(--motion-instant);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .btn:hover:not(:disabled) { background: var(--control-hover); }
-.btn:active:not(:disabled) { scale: .97; }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn.is-primary { background: var(--action); color: var(--action-ink); }
 .btn.is-primary:hover:not(:disabled) { background: #fff; }
@@ -211,7 +210,7 @@
   color: hsl(var(--foreground));
   font-size: 13px;
 }
-.modal-input:focus-visible { border-color: rgb(255 255 255 / .16); }
+.modal-input:focus-visible { border-color: var(--line-strong); }
 
 /* ------------------------------------------------------------ Copied
    A copy button confirms in place (src/app/CopyFeedback.tsx): its icon turns
@@ -231,7 +230,7 @@
       max(8px, env(safe-area-inset-bottom))
       max(8px, env(safe-area-inset-left));
   }
-  .modal { max-height: calc(100dvh - 16px); border-radius: 24px; }
+  .modal { max-height: calc(100dvh - 16px); border-radius: var(--r-panel); }
   .modal-wide,
   .modal-sheet { height: calc(100dvh - 16px); }
   .modal-wide > .modal-head,

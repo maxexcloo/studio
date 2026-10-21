@@ -4,7 +4,7 @@
    then a chevron (opens a step) or a check (the selected option).
 --------------------------------------------------------------------------- */
 
-:root { --list-hairline: rgb(255 255 255 / .08); --list-row-h: 48px; }
+:root { --list-hairline: var(--line); --list-row-h: 48px; }
 @media (max-height: 700px) { :root { --list-row-h: 44px; } }
 
 .list-section { margin-top: 22px; }
@@ -21,7 +21,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-5);
   width: 100%;
   min-width: 0;
   min-height: var(--list-row-h);
@@ -41,8 +41,25 @@
 .list-row.is-static { cursor: default; }
 button.list-row:hover { background: transparent; }
 @media (hover: hover) { button.list-row:hover .list-row-value, button.list-row:hover .list-row-end { color: hsl(var(--foreground)); } }
-button.list-row:active { background: rgb(255 255 255 / .04); }
-button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: -2px; border-radius: 8px; }
+/* Hover, the keyboard cursor and a press draw one rounded fill on ::before, inset from the
+   hairlines and reaching a little past the text, so it never squares off a row or bleeds
+   past a rounded popover. Selection is the amber check or lead, never a row fill. */
+button.list-row { isolation: isolate; }
+.phone-sheet button.phone-row { position: relative; isolation: isolate; }
+:is(button.list-row, .phone-sheet button.phone-row)::before {
+  content: "";
+  position: absolute;
+  inset: 2px -6px;
+  z-index: -1;
+  border-radius: var(--r-item);
+  background-color: transparent;
+  pointer-events: none;
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+@media (hover: hover) { :is(button.list-row, .phone-sheet button.phone-row):hover:not(:disabled)::before { background-color: var(--cursor-bg); } }
+:is(button.list-row, .phone-sheet button.phone-row):active:not(:disabled)::before { background-color: var(--control-press); transition-duration: var(--motion-instant); }
+:is(button.list-row, .phone-sheet button.phone-row):focus-visible { outline: none; }
+:is(button.list-row, .phone-sheet button.phone-row):focus-visible::before { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .list-row:disabled { opacity: .45; cursor: default; }
 .list-row-lead { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; color: hsl(var(--muted-foreground)); }
 .list-row-label { flex: none; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -58,11 +75,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .list-row-end { flex: none; margin-left: -4px; color: hsl(var(--muted-foreground) / .7); transition: color var(--motion-fast) var(--motion-ease); }
 .list-row-check.is-off { visibility: hidden; }
 .list-row.is-selected .list-row-check { color: var(--accent-amber); }
-.list-row-control { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.list-row-control { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
 .list-row-control .number-picker-label { display: none; }
 .list-row-control .number-picker { flex: none; }
 /* A native select laid over the row's value, so the tap opens the phone's own picker. */
-.list-select { position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; color: hsl(var(--muted-foreground)); }
+.list-select { position: relative; display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; max-width: 100%; color: hsl(var(--muted-foreground)); }
 .list-select-value { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .list-select > svg { flex: none; opacity: .7; }
 .list-select select { position: absolute; inset: -8px; width: calc(100% + 16px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
@@ -73,7 +90,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-field);
   background: var(--control-fill);
   color: hsl(var(--foreground));
   font: inherit;
@@ -90,18 +107,18 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
    up there is little of it, so the body scrolls instead of the field shrinking away. */
 .phone-create > .phone-sheet-body { display: flex; flex-direction: column; padding: 0 16px 6px; overflow-y: auto; }
 .create-flow { display: flex; flex-direction: column; flex: 1 0 auto; min-height: 100%; }
-.create-prompts { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 172px; }
+.create-prompts { display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 auto; min-height: 172px; }
 .create-prompts .composer-prompt-field {
   position: relative;
   display: flex;
   flex: none;
   min-width: 0;
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: var(--r-item);
   background: var(--control-fill);
   transition: border-color var(--motion-fast) var(--motion-ease);
 }
-.create-prompts .composer-prompt-field:focus-within { border-color: rgb(255 255 255 / .16); }
+.create-prompts .composer-prompt-field:focus-within { border-color: var(--line-strong); }
 /* The prompt: its text above, its actions in a small toolbar along the bottom edge, never over the text. */
 .create-prompts .composer-prompt-field.is-fill { flex: 1 1 0; flex-direction: column; min-height: 118px; }
 .create-prompts textarea {
@@ -126,7 +143,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .create-prompts .is-negative textarea { padding: 11px 4px 11px 14px !important; font-size: 15px; }
 .create-prompts .composer-field-tools { position: static; flex: none; align-self: flex-end; transform: none; gap: 0; padding: 2px 4px 4px; }
 .create-prompts .is-negative .composer-field-tools { align-self: center; padding: 0 4px 0 0; }
-.create-prompts .composer-field-tools .prompt-action { width: 40px; height: 40px; border-radius: 12px; }
+.create-prompts .composer-field-tools .prompt-action { width: var(--control-h); height: var(--control-h); border-radius: var(--r-pill); }
 .create-prompts .composer-field-tools .prompt-action > svg { width: 17px; height: 17px; }
 
 .create-options { flex: none; margin-top: 8px; }
@@ -137,7 +154,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 
 /* References: the chooser's button is the whole row; the label underneath shows through. */
 .create-references .composer-reference-tools { flex: 1; min-width: 0; display: flex; justify-content: flex-end; max-width: none; padding: 0; }
-.create-references .composer-reference-slots, .create-references .reference-slot-list { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.create-references .composer-reference-slots, .create-references .reference-slot-list { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); min-width: 0; }
 .create-references .reference-count { display: none; }
 .phone-create .create-references .ref-chip.ref-add:only-child {
   position: absolute;
@@ -145,7 +162,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   z-index: 1;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-4);
   width: 100%;
   height: auto;
   min-width: 0;
@@ -174,18 +191,18 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .phone-create .create-references .ref-chip:only-child .ref-add-label { display: none; }
 .phone-create .create-references .ref-chip.ref-add:only-child:not(.has-items)::before { content: "Add"; }
 /* Several separate slots (a video's start and end frames): compact chips side by side, each with its name. */
-.phone-create .create-references .ref-chip.ref-add:not(:only-child) { height: 36px; padding: 0 10px; border-radius: 999px; font-size: 13px; }
+.phone-create .create-references .ref-chip.ref-add:not(:only-child) { height: 36px; padding: 0 10px; border-radius: var(--r-pill); font-size: 13px; }
 .phone-create .create-references .ref-group-thumbs img { width: 28px; height: 28px; }
 .phone-create .create-references .ref-group-count { color: hsl(var(--muted-foreground)); font-size: 15px; }
 .phone-create .create-references .ref-selected { width: 36px; height: 36px; margin-right: 0; }
 
 .phone-create .phone-sheet-head .composer-mode-select { margin-right: 2px; }
 
-.create-footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.create-footer { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .create-footer .create-count { flex: none; }
 .create-footer .create-count .number-picker-icon { display: none; }
 .create-footer .create-reset { flex: none; }
-.phone-create .create-footer .create-generate { flex: 1; width: auto; min-width: 0; min-height: 48px; border-radius: 999px; font-size: 16px; }
+.phone-create .create-footer .create-generate { flex: 1; width: auto; min-width: 0; min-height: 48px; border-radius: var(--r-pill); font-size: 16px; }
 
 /* -------------------------------------------------------------- Account menu (desktop dock) */
 
@@ -199,7 +216,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   min-width: 190px;
   padding: 6px;
   border: 1px solid var(--glass-border);
-  border-radius: 14px;
+  border-radius: var(--r-menu);
   background: var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
   backdrop-filter: var(--glass-panel-blur);
@@ -210,11 +227,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .account-menu-list button {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 36px;
+  gap: var(--space-4);
+  height: var(--row-h-menu);
   padding: 0 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--r-item);
   background: transparent;
   color: hsl(var(--foreground));
   font: inherit;
@@ -223,7 +240,8 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   cursor: pointer;
 }
 .account-menu-list button > svg { color: hsl(var(--muted-foreground)); }
-.account-menu-list button:hover { background-color: var(--control-hover); }
+.account-menu-list button:hover { background-color: var(--cursor-bg); }
+.account-menu-list button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; box-shadow: none; }
 .account-menu-list button.is-danger, .account-menu-list button.is-danger > svg { color: var(--danger-ink); }
 
 /* -------------------------------------------------------------- List controls */
@@ -232,11 +250,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  height: 32px;
+  gap: var(--space-3);
+  height: var(--control-h-sm);
   padding: 0 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--control-fill);
   color: hsl(var(--muted-foreground));
   font: inherit;
@@ -246,25 +264,26 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .list-toggle:hover, .list-segments button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-.list-toggle.is-on, .list-segments button[aria-pressed="true"] { background-color: var(--accent-amber-subtle); color: var(--accent-amber); }
-.list-segments { display: inline-flex; gap: 4px; }
+.list-toggle.is-on, .list-segments button[aria-pressed="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
+.list-segments { display: inline-flex; gap: var(--space-2); }
 .list-row-unit { min-width: 38px; color: hsl(var(--muted-foreground)); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
-.list-row-control .number-picker.is-sm { height: 34px; }
-.list-row-control input.list-field { max-width: 120px; height: 32px; }
+.list-row-control .number-picker.is-sm { height: var(--control-h-sm); }
+.list-row-control input.list-field { max-width: 120px; height: var(--control-h-sm); }
 
 /* Advanced Settings: the phone sheet and the desktop popover show the same list. */
 .advanced-list { display: flex; flex-direction: column; }
 .advanced-list > .list-section:first-of-type { margin-top: 0; }
 .phone-advanced .phone-sheet-body { padding-top: 0; }
-/* The desktop is denser: 36px rows, 13px type, two columns where the popover is wide. */
-.composer-advanced .list-row { --list-row-h: 38px; padding: 2px 0; font-size: 13px; }
+/* The desktop is denser: menu-height rows, 13px type, every control at --control-h-sm,
+   two columns where the popover is wide. */
+.composer-advanced .list-row { --list-row-h: var(--row-h-menu); padding: 2px 0; font-size: 13px; }
 .composer-advanced .list-section { margin-top: 10px; }
 .composer-advanced .list-section-title { font-size: 11.5px; }
-.composer-advanced .list-row-control .fluid-select-trigger { height: 30px; min-height: 30px; max-width: 220px; font-size: 13px; }
-.composer-advanced .list-row-control .number-picker.is-sm { height: 30px; }
-.composer-advanced .list-toggle, .composer-advanced .list-segments button { height: 28px; font-size: 12px; }
+.composer-advanced .list-row-control :is(.fluid-select-trigger, .number-picker, .number-picker.is-sm, .list-field, .set-type-picker) { height: var(--control-h-sm); min-height: var(--control-h-sm); }
+.composer-advanced .list-row-control .fluid-select-trigger { max-width: 220px; font-size: 13px; }
+.composer-advanced .list-toggle, .composer-advanced .list-segments button { height: var(--control-h-sm); font-size: 12px; }
 @media (min-width: 900px) {
-  .composer-advanced .advanced-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; align-items: start; }
+  .composer-advanced .advanced-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-7); align-items: start; }
   .composer-advanced .advanced-list > :not(.list-section) { grid-column: 1 / -1; }
   .composer-advanced .advanced-list > .list-section { margin-top: 0; }
 }
@@ -298,24 +317,24 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 
 /* One pattern (UI-PATTERNS › Pickers): a title bar with Close, the tab pills with Clear
    Selection beside them, a search field, then the list or grid. */
-.picker-title { flex: 1; display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 550; white-space: nowrap; }
+.picker-title { flex: 1; display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; font-size: 13px; font-weight: 550; white-space: nowrap; }
 .picker-title > svg { flex: none; color: hsl(var(--muted-foreground)); }
 .is-sheet .picker-title { font-size: 16px; }
-.picker-toolbar { flex: none; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 12px 0; }
+.picker-toolbar { flex: none; display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 10px 12px 0; }
 .picker-toolbar .reference-tabs { flex: none; }
 /* PickerTools: tabs or filters, then Clear Selection on the right, then the search icon; search opens
    as its own row under them only when asked for (or while a query is active). */
 .picker-tools { flex: none; display: grid; min-width: 0; }
 .picker-tools .picker-toolbar { padding: 8px 12px 0; }
-.picker-tools .picker-toolbar { flex-wrap: wrap; row-gap: 6px; }
+.picker-tools .picker-toolbar { flex-wrap: wrap; row-gap: var(--space-3); }
 /* The tabs never hide behind Clear or search: when a narrow picker has no room, those two wrap to the right of a second line. */
-.picker-controls { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.picker-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-3); max-width: 100%; }
 .picker-tools .picker-clear-all + .picker-search-toggle { margin-inline-start: 0; }
-.picker-search-toggle { flex: none; display: grid; place-items: center; width: 36px; height: 36px; margin-inline-start: auto; border: 0; border-radius: 50%; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+.picker-search-toggle { flex: none; display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); margin-inline-start: auto; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
 .picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.picker-search-toggle[aria-expanded="true"] { color: var(--accent-amber); }
-.picker-search-toggle:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: 1px; }
-@media (pointer: coarse) { .picker-search-toggle { width: 44px; height: 44px; } }
+.picker-search-toggle[aria-expanded="true"] { color: var(--selected-ink); }
+.picker-search-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) { .picker-search-toggle { width: var(--control-h-touch); height: var(--control-h-touch); } }
 .picker-search-row { padding: 8px 12px 0; }
 .picker-search-row > .picker-search, .picker-search-row > .lora-picker-search, .picker-search-row > .reference-search, .picker-search-row > .model-menu-search { margin: 0; }
 .picker-clear-short { display: none; }
@@ -330,14 +349,14 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   .picker-toolbar .reference-tabs button, .lora-filter .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
 }
 .reference-popover .reference-popover-hint { flex: 0 1 auto; }
-/* The picked order, the same mark in every chooser: an empty ring, then the number on white. */
-.picker-order { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1.5px solid hsl(var(--foreground) / .3); border-radius: 50%; color: #0b0b0b; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.picker-order.is-on { border-color: #fff; background: #fff; }
+/* The picked order, the same mark in every chooser: an empty ring, then the number on amber. */
+.picker-order { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1.5px solid hsl(var(--foreground) / .3); border-radius: var(--r-pill); color: var(--accent-amber-ink); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.picker-order.is-on { border-color: var(--accent-amber); background: var(--accent-amber); }
 .picker-grip { display: grid; place-items: center; flex: none; width: 28px; height: 40px; padding: 0; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
 .picker-grip:active { cursor: grabbing; }
-.picker-grip:focus-visible { outline: 1px solid hsl(var(--foreground)); }
+.picker-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .reference-selected-row.is-dragging, .lora-library-row.is-dragging { opacity: .55; }
-.reference-selected-row.is-drop-target { box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
+.reference-selected-row.is-drop-target { border-radius: var(--r-item); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
 /* Rows are flat: hairlines between them, no card behind the picked one. */
 .reference-selected-list { display: flex; flex-direction: column; gap: 0; }
 .reference-selected-row { min-height: 52px; border-radius: 0; background: transparent; }
@@ -347,15 +366,18 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .composer-loras .lora-filter { order: 0; padding: 10px 12px 0; justify-content: flex-start; }
 .composer-loras .lora-picker-search { order: 1; }
 .composer-loras .lora-library-select[data-highlight="true"] { background: transparent; }
-.composer-loras .lora-library-select[data-highlight="true"]:focus-visible, .composer-loras .lora-picker-list:focus-within .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .04); }
+/* The keyboard cursor shows while the list has keyboard focus, never after a click. */
+.composer-loras .lora-library-select[data-highlight="true"]:focus-visible, .composer-loras .lora-picker-list:has(:focus-visible) .lora-library-select[data-highlight="true"] { background: var(--cursor-bg); }
 .composer-loras .lora-library-row { border-bottom-color: var(--list-hairline); }
 .composer-loras .lora-library-row:has(> .lora-sources) > .lora-library-select { padding-right: 136px; }
 .composer-loras .lora-library-row > .lora-sources { position: absolute; top: 6px; right: 40px; }
 .lora-sources { display: inline-flex; flex: none; align-items: center; gap: 0; }
-.lora-source { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; gap: 1px; border-radius: var(--r-item); color: hsl(var(--muted-foreground)); text-decoration: none; }
+.lora-source { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: var(--control-h-sm); height: var(--control-h-sm); gap: var(--space-1); border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); text-decoration: none; }
 .lora-source small { font-size: 9px; line-height: 1; }
 .lora-source:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
-.lora-info-panel { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--glass-border); border-radius: var(--r-item); background: var(--glass-panel-solid); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.lora-source:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) { .lora-source { width: var(--control-h-touch); height: var(--control-h-touch); } }
+.lora-info-panel { display: grid; gap: var(--space-4); min-width: 0; padding: 12px; border: 1px solid var(--glass-border); border-radius: var(--r-item); background: var(--glass-panel-solid); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .lora-info-panel p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .lora-info-panel strong { color: hsl(var(--foreground)); font-weight: 600; }
 .composer-loras .lora-library-row > .lora-info-panel { margin: 0 12px 12px 30px; }
@@ -364,7 +386,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 /* Models on the phone: the same chooser as a Create step: search and filter pills on the sheet itself, no boxed header. */
 .phone-model-sheet .phone-model-tools { margin: 0 -16px 4px; padding: 0 16px 6px; border-bottom: 1px solid var(--list-hairline); background: var(--glass-panel-solid, #161616); }
 .phone-model-sheet .phone-model-tools .model-filters { padding: 4px 0 6px; }
-.phone-model-sheet .phone-model-option { gap: 10px; }
+.phone-model-sheet .phone-model-option { gap: var(--space-4); }
 .phone-model-sheet .phone-model-option .model-selection-tick { color: var(--accent-amber); }
 
 /* -------------------------------------------------------------- Phone header & Create button */
@@ -381,9 +403,8 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
 .phone-bar .phone-gallery-mode.media-mode-toggle { display: flex; gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .phone-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
-.phone-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: 10px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
-.phone-bar .phone-gallery-mode button.active, .phone-bar .phone-gallery-mode button[aria-pressed="true"] { background: transparent; box-shadow: none; color: hsl(var(--foreground)); font-weight: 650; }
-.phone-bar .phone-gallery-mode button:active { background: rgb(255 255 255 / .06); }
+.phone-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.phone-bar .phone-gallery-mode button.active, .phone-bar .phone-gallery-mode button[aria-pressed="true"] { box-shadow: none; font-weight: 650; }
 .phone-bar .phone-running-inline { margin-left: 2px; }
 .phone-bar .phone-tools-row { margin: 0 calc(-1 * max(8px, env(safe-area-inset-right))) 0 calc(-1 * max(8px, env(safe-area-inset-left))); padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
 .phone-bar .phone-tools-inner { padding: 2px 0 8px; }
@@ -397,7 +418,7 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   z-index: var(--z-phone-bar);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: calc(var(--bar-h) + 12px + env(safe-area-inset-bottom));
   padding: 6px max(10px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   border-top: 1px solid var(--glass-border);
@@ -433,12 +454,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
   height: 44px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--r-pill);
   background: #f2f2f2;
   color: #0b0b0b;
-  transition: scale var(--motion-instant) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease);
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
-.phone-prompt-go:active:not(:disabled) { scale: .94; }
 .phone-prompt-go:disabled { opacity: .4; }
 .phone-gallery { padding-bottom: calc(var(--bar-h) + 28px + env(safe-area-inset-bottom)); }
 
@@ -449,24 +469,20 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
    on the right. Denser than a phone sheet: 44 px rows, desktop type. */
 .set-panel { gap: 18px; }
 .set-panel .list-section { margin-top: 0; }
-.set-panel .list-row { min-height: 44px; padding: 6px 2px; gap: 14px; font-size: 13.5px; font-weight: 550; }
-.list-row-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.set-panel .list-row { min-height: var(--row-h-settings); padding: 6px 2px; gap: var(--space-5); font-size: 13.5px; font-weight: 550; }
+.list-row-text { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
 .list-row-text > .list-row-label { max-width: none; overflow-wrap: anywhere; white-space: normal; }
 .list-row-text > .list-row-label .beta-tag { margin-left: 8px; }
 .list-row-detail { font-size: 12px; font-weight: 400; line-height: 1.45; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
 .list-row-text + .list-row-control { flex: none; }
 .set-panel .list-note { margin: 4px 2px 0; font-size: 11.5px; line-height: 1.5; }
 .set-panel .list-row.is-disabled .list-row-label { color: hsl(var(--muted-foreground)); }
-.set-panel .list-row.is-stacked { flex-direction: column; align-items: stretch; gap: 10px; padding-block: 10px; }
+.set-panel .list-row.is-stacked { flex-direction: column; align-items: stretch; gap: var(--space-4); padding-block: 10px; }
 .set-panel .list-row.is-stacked .list-row-control { flex-direction: column; align-items: stretch; justify-content: flex-start; }
 .set-panel .list-row.is-stacked .list-row-control > .btn { align-self: flex-start; }
 .list-section.is-danger .list-row-label { color: var(--danger-ink); }
 .list-row-control > .set-status { font-size: 12.5px; font-weight: 550; }
-/* A switch row is one target: hover lights the line, a press dims it. */
-.list-switch { transition: background-color var(--motion-fast) var(--motion-ease); }
-@media (hover: hover) { .list-switch:hover:not(:disabled) { background-color: var(--control-hover); } }
-.list-switch:active:not(:disabled) { background-color: var(--control-press, rgb(255 255 255 / .06)); }
-.list-switch:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: -2px; border-radius: 8px; }
+/* A switch row is one target: it hovers and presses like every button row (its ::before). */
 .list-switch:disabled { opacity: 1; cursor: default; }
 .list-switch:disabled .switch { opacity: .4; }
 .list-switch:disabled .list-row-label { color: hsl(var(--muted-foreground)); }
@@ -487,11 +503,11 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 
 /* Model filters in PickerTools: one row that scrolls sideways beside the search icon, on both layouts. */
 .picker-controls:has(.model-filters) { flex: 1 1 auto; min-width: 0; }
-.picker-controls .model-filters { display: flex; flex: 1 1 auto; gap: 6px; min-width: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
+.picker-controls .model-filters { display: flex; flex: 1 1 auto; gap: var(--space-3); min-width: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
 .picker-controls .model-filter-group { flex: none; flex-wrap: nowrap; }
 .picker-controls .model-filter-label { display: none; }
-.picker-controls .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--surface-border); }
-.picker-controls .model-filter-group button { flex: none; height: 32px; padding: 0 10px; }
+.picker-controls .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--line); }
+.picker-controls .model-filter-group button { flex: none; height: var(--control-h-sm); padding: 0 10px; }
 .phone-model-tools .picker-tools .picker-toolbar { padding: 4px 0 6px; }
 .phone-model-tools .picker-search-row { padding: 0 0 6px; }
 .phone-model-tools .picker-controls .model-filter-group button { padding: 0 10px; font-size: inherit; }
