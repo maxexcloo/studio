@@ -1,7 +1,6 @@
 import { Resolver } from 'node:dns/promises';
 import https from 'node:https';
 import { Readable } from 'node:stream';
-import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
 
 export function isCivitaiHost(host) {
   return host === 'civitai.com' || host === 'civitai.red';
@@ -35,19 +34,9 @@ export async function civitaiRequest(url, init = {}, { servers = process.env.CIV
   });
 }
 
+/** Whether the deployment set a Civitai API token, never the token itself. */
 export function civitaiTokenStatus() {
-  return { set: Boolean(process.env.CIVITAI_API_TOKEN), editable: !process.env.CIVITAI_API_TOKEN || envFileKeys.has('CIVITAI_API_TOKEN') };
-}
-
-export function saveCivitaiToken(value) {
-  if (!civitaiTokenStatus().editable) throw new Error('The Civitai token is managed by the environment.');
-  const token = String(value || '').trim();
-  if (token && !/^[A-Za-z0-9_-]{16,256}$/.test(token)) throw new Error('Enter a valid Civitai API token.');
-  if (token) {
-    writeLocalEnvValue('CIVITAI_API_TOKEN', token);
-    envFileKeys.add('CIVITAI_API_TOKEN');
-  } else removeLocalEnvValue('CIVITAI_API_TOKEN');
-  return civitaiTokenStatus();
+  return { set: Boolean(process.env.CIVITAI_API_TOKEN) };
 }
 
 export function civitaiAssetUrl(value) {

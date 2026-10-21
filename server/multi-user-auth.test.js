@@ -93,7 +93,7 @@ test("only an authenticated administrator can create profiles and approve ordina
   // A personal MCP token is not a general API or administrator credential.
   assert.equal(accountForRequest(bearer("GET", "/api/accounts/admin")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
-  assert.equal(accountForRequest(bearer("POST", "/api/shutdown")), null);
+  assert.equal(accountForRequest(bearer("POST", "/api/comfy/restart")), null);
   const { canAdmin } = await import("./access.js");
   assert.equal(canAdmin(bearer("GET", "/comfy/view")), false);
   const revoked = await call(routes["POST /api/accounts/mcp-token/revoke"], admin);
@@ -241,7 +241,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
   // Nothing that deletes or replaces files, and no account or GPU administration.
-  for (const [method, routePath] of [["POST", "/api/models/downloads/replace"], ["DELETE", "/api/loras"], ["POST", "/api/models/manifest/restore"], ["GET", "/api/accounts/admin"], ["POST", "/api/library/imports/x/folder"]]) assert.equal(mcpAdminRouteAllowed(method, routePath), false, `${method} ${routePath}`);
+  for (const [method, routePath] of [["POST", "/api/models/downloads/replace"], ["DELETE", "/api/loras"], ["DELETE", "/api/models/downloads"], ["GET", "/api/accounts/admin"], ["POST", "/api/library/imports/x/folder"]]) assert.equal(mcpAdminRouteAllowed(method, routePath), false, `${method} ${routePath}`);
 
   const adminToken = (await call(routes["POST /api/accounts/mcp-token"], admin)).body.token;
   const asAdmin = accountForRequest(bearer(adminToken, "POST", "/api/library/imports"));

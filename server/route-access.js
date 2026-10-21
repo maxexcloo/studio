@@ -17,26 +17,14 @@ export function requireLocal(req, res) {
 
 /**
  * Looking after the computer (model folders and downloads, node installs,
- * ComfyUI's address and restarts, the output folder, updates, workflow files,
- * clearing the gallery) happens at that computer. A signed-in device may too
+ * ComfyUI's address and restarts, the output folder, updates and workflow
+ * files) happens at that computer. A signed-in device may too
  * when the owner turned on "Trust other devices with admin" (access.js).
  * Anywhere else the server refuses them and the app hides them.
  */
 export function requireAdmin(req, res) {
   if (canAdmin(req)) return true;
   res.status(403).json({ ok: false, reason: "computer-only", error: "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection." });
-  return false;
-}
-
-/** Settings that only the computer running Studio may change, never from the network. */
-export function requireThisComputer(req, res) {
-  if (multiUserEnabled) {
-    if (clientOf(req).thisComputer && canAdmin(req)) return true;
-    res.status(403).json({ ok: false, reason: "this-computer", error: "Only an administrator on the computer running Studio can do this." });
-    return false;
-  }
-  if (clientOf(req).thisComputer) return true;
-  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can do this." });
   return false;
 }
 

@@ -9,7 +9,7 @@ import { createJobRecovery } from "./job-recovery.js";
 import "./crash-log-install.js";
 import { addProbe, logWarning } from "./crash-log.js";
 import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
-import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
+import { registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryErrorRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
 import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
@@ -25,7 +25,7 @@ import { familyFromName } from './family-catalog.js';
 import { assistantIntegration, assistantSettingKeys, assistantSettingValue, registerAssistantRoutes } from './assistant-routes.js';
 import { guideStore, livePrompting, profileStore } from './profile-store.js';
 
-import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
+import { requireAdmin, requireLocal } from "./route-access.js";
 import express from "express";
 import { configuredBackends, currentComfyBackend, forgetWorkerState, isDefaultBackend, mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob, workerAvailability, withComfyBackend } from "./comfy-backends.js";
 import { capabilityForProfile, defaultWorker, defaultWorkerId, listWorkers, noWorkerMessage, workerById } from "./workers.js";
@@ -63,7 +63,7 @@ import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { dedupeGallery, filterVisibleGallery, flushGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
 import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
 import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, recordPrompt, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
-import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
+import { fillVideoSizes, libraryFile, libraryFolders, rescanLibraryFolders } from './library.js';
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
 import { derivedMediaCache, immutableMediaCache } from './media-response.js';
 import { startMediaWarmup } from './media-warmup.js';
@@ -1020,11 +1020,6 @@ const assistantEngine = registerAssistantRoutes(app, {
   requireAdmin
 });
 
-registerGalleryBundleRoutes(app);
-
-
-registerGalleryBundleActions(app);
-
 app.delete("/api/workflows/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
@@ -1108,7 +1103,7 @@ app.put("/api/loras/:workflowId", (req, res) => {
   }
 });
 
-registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory });
+registerGalleryHistoryRoutes(app);
 
 
 app.get("/api/prompts", (req, res) => {
@@ -1147,54 +1142,6 @@ app.post("/api/prompts/forget", (req, res) => {
 app.post("/api/prompts/clear", (req, res) => {
   if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind, ownerIdForRequest(req)) });
-});
-
-// Adding folders of earlier images happens at the computer: it reads that computer's disks.
-app.get("/api/library/folders", (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  res.json({ folders: libraryFolders() });
-});
-
-app.post("/api/library/folders", async (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  try {
-    let dir = String(req.body?.path || "");
-    if (!dir) {
-      dir = await pickFolder(req.body?.start || "", "Choose a folder of earlier images");
-      if (!dir) { res.json({ ok: true, canceled: true, folders: libraryFolders() }); return; }
-    }
-    // Which folder is ComfyUI's output decides how a folder is read (library.js), so find it first.
-    await autoDetectOutputDir();
-    const result = await addLibraryFolder(dir);
-    res.json({ ok: true, ...result, folders: libraryFolders(), revision: galleryRevisionValue() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message, folders: libraryFolders() });
-  }
-});
-
-app.post("/api/library/folders/:id/scan", async (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  try {
-    await autoDetectOutputDir();
-    res.json({ ok: true, ...(await scanLibraryFolder(req.params.id)), folders: libraryFolders(), revision: galleryRevisionValue() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message, folders: libraryFolders() });
-  }
-});
-
-app.delete("/api/library/folders/:id", (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  res.json({ ok: true, ...removeLibraryFolder(req.params.id), folders: libraryFolders(), revision: galleryRevisionValue() });
-});
-
-app.post("/api/library/output", async (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  try {
-    await autoDetectOutputDir();
-    res.json({ ok: true, output: true, ...(await importOutputFolder()), revision: galleryRevisionValue() });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
 });
 
 app.get("/api/library/file", (req, res) => {
@@ -1612,7 +1559,7 @@ app.post("/api/queue/cancel", async (req, res) => {
   res.json({ ok: true });
 });
 
-registerGalleryTrashRoutes(app);
+registerGalleryErrorRoutes(app);
 
 // Unloads models and frees what ComfyUI caches, without touching any run: ComfyUI does it between prompts.
 app.post("/api/comfy/free", async (req, res) => {
@@ -1786,12 +1733,6 @@ app.post("/api/comfy/restart", async (req, res) => {
 });
 
 registerGalleryDeleteRoute(app);
-
-app.post("/api/shutdown", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true });
-  setTimeout(() => process.exit(0), 250);
-});
 
 app.get('/comfy/video-preview', async (req, res) => {
   const filename = String(req.query.filename || '');

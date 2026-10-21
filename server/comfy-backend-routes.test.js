@@ -168,9 +168,12 @@ test("completed secondary work recovers after a Studio restart with prompt and b
   await stop();
   video.finish(prompt.id, { outputs: { saved: { videos: [{ filename: "after-restart.mp4", type: "output" }] } } });
   await start();
-  await api("/api/gallery/recover", {});
-  const gallery = (await api("/api/gallery?limit=200")).body.items;
-  const result = gallery.find((item) => item.jobId === accepted.body.jobId && item.status === "done");
+  // Studio recovers ComfyUI's history on its own shortly after it starts.
+  let result;
+  for (let tries = 0; !result && tries < 80; tries += 1) {
+    if (tries) await new Promise((resolve) => setTimeout(resolve, 100));
+    result = (await api("/api/gallery?limit=200")).body.items.find((item) => item.jobId === accepted.body.jobId && item.status === "done");
+  }
   assert.ok(result);
   assert.equal(result.prompt, "a red ceramic teapot");
   assert.equal(result.settings.comfyBackend, "video");

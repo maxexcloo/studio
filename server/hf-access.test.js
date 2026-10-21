@@ -64,11 +64,10 @@ test("a CONNECT tunnel carries bytes through the proxy, with its credentials", a
   }
 });
 
-test("Settings sees whether a token is set and where from, never the token", () => {
+test("the status says whether a token is set and where from, never the token", () => {
   const status = hfTokenStatus({ HF_TOKEN: token });
   assert.equal(status.set, true);
   assert.equal(status.source, "environment");
-  assert.equal(status.editable, false);
   assert.ok(!JSON.stringify(status).includes(token));
-  assert.deepEqual(hfTokenStatus({}), { set: false, source: "", editable: true });
+  assert.deepEqual(hfTokenStatus({}), { set: false, source: "" });
 });

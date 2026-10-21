@@ -5,7 +5,7 @@ import { classifyClient, isPrivateAddress } from "./client-trust.js";
 import { hostAllowed, hostnameOf, requestGuard } from "./request-guard.js";
 
 /** Just enough of an Express request and response for the middleware. */
-function run(guard, { method = "POST", path = "/api/gallery/clear", headers = {} } = {}) {
+function run(guard, { method = "POST", path = "/api/gallery/favorite", headers = {} } = {}) {
   const lower = Object.fromEntries(Object.entries({ host: "localhost:8787", ...headers }).map(([key, value]) => [key.toLowerCase(), value]));
   const req = {
     method,
