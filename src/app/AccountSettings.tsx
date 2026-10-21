@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ban, Check, Copy, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
-import { cachedMe, emailFieldProps, knownAccountStatus, loadMe, looksLikeEmail, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
+import { knownAccountStatus } from './access';
+import { cachedMe, emailFieldProps, loadMe, looksLikeEmail, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
 import { apiJson } from './api';
 import { Skeleton, StudioSelect } from './components';
 import { MultiSelect, type MultiSelectOption } from './MultiSelect';

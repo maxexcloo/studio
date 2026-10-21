@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiJson } from './api';
 import { announceComfyRestart, fetchManager } from './ComfyRestart';
 import type { ModelFolderReport, StrayModelFolder } from './types';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import type { ShowToast } from './toast';
 
 /**
@@ -41,7 +41,7 @@ export function useModelFolders({ connected, emptyModels, onModelsChanged, showT
   onStopHints?: () => void;
 }) {
   // Model folders belong to the computer running Studio; other devices never scan or ask.
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   const [report, setReport] = useState<ModelFolderReport | null>(null);
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<ModelFolderStage>('scanning');
@@ -87,7 +87,7 @@ export function useModelFolders({ connected, emptyModels, onModelsChanged, showT
 
   // No runnable model at all, and there are models right there: that is the moment to say so.
   useEffect(() => {
-    if (autoOpened.current || !hints || !thisComputer || !emptyModels || !report?.folders.length) return;
+    if (autoOpened.current || !hints || !administrator || !emptyModels || !report?.folders.length) return;
     autoOpened.current = true;
     setOpen(true);
   }, [emptyModels, hints, report]);
@@ -190,7 +190,7 @@ export function useModelFolders({ connected, emptyModels, onModelsChanged, showT
   }, [scan, showToast]);
 
   const folders = report?.folders || [];
-  const noticeVisible = hints && thisComputer && folders.length > 0 && dismissed !== signature(folders) && stage !== 'done';
+  const noticeVisible = hints && administrator && folders.length > 0 && dismissed !== signature(folders) && stage !== 'done';
   // What the studio points out; Settings still lists every folder it found.
   const strayCount = hints ? folders.reduce((sum, folder) => sum + folder.count, 0) : 0;
   return {

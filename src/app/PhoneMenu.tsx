@@ -8,7 +8,7 @@ import { useDismiss } from './useDismiss';
 import { popoverMotion, useSettling } from './composerSurface';
 import { cn } from './format';
 import { signOutAccount } from './accounts';
-import { hasAccountStorageScope } from './api';
+import { useAccess } from './access';
 import type { PhoneView } from './PhoneStudio';
 
 export type PhoneMenuItem = { id: string; Icon: LucideIcon; label: string; run: () => void; danger?: boolean; disabled?: boolean; /** A count after the label, as on the desktop's Stop All. */ count?: number } | 'divider';
@@ -52,12 +52,13 @@ export function PhoneMenu({ open, onClose, trigger, label, items, align = 'right
 /** The top bar's menu: Select, Library, Settings, then Account and Sign Out. Gallery switches live in Settings; Stop All is in what's running. */
 export function MoreMenu({ view, open, onClose, onSelect }: { view: Pick<PhoneView, 'models' | 'setLibraryOpen' | 'openSettings' | 'showToast'>; open: boolean; onClose: () => void; onSelect?: () => void }) {
   const [signingOut, setSigningOut] = React.useState(false);
+  const { signedIn } = useAccess();
   const items: PhoneMenuItem[] = [];
   if (onSelect) items.push({ id: 'select', Icon: CheckSquare, label: 'Select', run: () => { onClose(); onSelect(); } });
   // Update Available shows as the Library's count, as the desktop dock's dot.
   if (view.models?.features?.library === true) items.push({ id: 'library', Icon: Library, label: 'Library', count: view.models.features.libraryUpdates || undefined, run: () => { onClose(); view.setLibraryOpen(true); } });
   items.push({ id: 'settings', Icon: Settings, label: 'Settings', run: () => { onClose(); view.openSettings('studio'); } });
-  if (hasAccountStorageScope()) items.push('divider',
+  if (signedIn) items.push('divider',
     { id: 'account', Icon: UserRound, label: 'Account', run: () => { onClose(); view.openSettings('account'); } },
     { id: 'sign-out', Icon: LogOut, label: signingOut ? 'Signing Out…' : 'Sign Out', danger: true, disabled: signingOut, run: () => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); } });
   return <PhoneMenu open={open} onClose={onClose} trigger=".phone-menu-trigger" label="Menu" items={items} />;

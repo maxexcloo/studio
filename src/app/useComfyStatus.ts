@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { apiFetch, apiJson } from './api';
 import { tellPreviousExit } from './clipboardNotices';
-import { setAtComputer, setThisComputer } from './device';
+import { setDeviceAdmin } from './access';
 import { showToastTone as showToast } from './toast';
 import type { ComfyStatus, Health } from './types';
 
@@ -25,8 +25,8 @@ export function useComfyStatus({ refreshModels }: { refreshModels: () => unknown
         const data = await response.json().catch(() => null) as Health | null;
         if (!data) throw new Error(response.statusText || "Connection failed");
         setHealth(data);
-        if (typeof data.thisComputer === "boolean") setThisComputer(data.thisComputer);
-        if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
+        // Single-user mode's administration (access.ts); with accounts the role decides.
+        if (typeof data.thisComputer === "boolean") setDeviceAdmin(data.thisComputer);
         if (data.previousExit) tellPreviousExit(data.previousExit);
       })
       .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Couldn’t reach Studio. Make sure it’s running" }));

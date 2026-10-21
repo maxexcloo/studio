@@ -8,7 +8,7 @@ import { ProgressBar } from './Progress';
 import { formatEta } from './UpscaleDownloadActivity';
 import { apiJson } from './api';
 import { cn, formatDownloadSize } from './format';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import { downloadFor, useModelDownloads } from './useModelDownloads';
 import type { MissingPart, ModelDownload } from './types';
 import type { ShowToast } from './toast';
@@ -120,7 +120,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
 }) {
   const { plan, checkedAt, reload } = useFamilySetupPlan(family, profileId, open);
   const { state: downloads, landed, start, pause } = useModelDownloads();
-  const admin = useThisComputer();
+  const admin = useAdministrator();
   const [step, setStep] = React.useState<Step>('comfy');
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => { if (open) setStep('comfy'); }, [open]);

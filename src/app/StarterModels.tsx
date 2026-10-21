@@ -7,7 +7,7 @@ import { ProgressBar } from './Progress';
 import { formatEta } from './UpscaleDownloadActivity';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
 import { formatDownload, formatGB, hardwareSentence, memoryWord, type Hardware } from './hardware';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import type { ModelDownload } from './types';
 import type { ShowToast } from './toast';
 
@@ -94,7 +94,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
 }) {
   const { plan, reload } = useStarterPlan();
   const { state, landed, start, pause } = useModelDownloads({ onDone: () => reload() });
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   const [chosen, setChosen] = React.useState<Record<string, string>>({});
   // Opened from the download island: that family's card shows the version downloading, lit up. Only in the sheet, which the island opens.
   const reveal = useDownloadReveal('starter');
@@ -109,7 +109,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
   }, [revealing, plan]);
   if (!plan) return <div className={cn('starter-models', 'is-loading', compact && 'is-compact')} aria-busy="true" />;
   const hardware = plan.hardware;
-  const canDownload = plan.local !== false && thisComputer;
+  const canDownload = plan.local !== false && administrator;
   const sentence = hardwareSentence(hardware);
 
   const get = async (family: StarterFamily, version: StarterVersion) => {
@@ -178,7 +178,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                 {ready ? (
                   <button type="button" className="btn" onClick={() => onUse(version.file)}><Check size={14} /> Use {family.title}</button>
                 ) : !canDownload ? (
-                  <p className="starter-remote">{thisComputer ? 'ComfyUI runs on another computer. Download it there.' : 'Get it on the computer running Studio.'}</p>
+                  <p className="starter-remote">{administrator ? 'ComfyUI runs on another computer. Download it there.' : 'Get it on the computer running Studio.'}</p>
                 ) : progress.state === 'moving' || progress.state === 'paused' ? (
                   <div className="starter-progress">
                     <ProgressBar value={progress.total ? progress.received / progress.total : 0} tone={progress.state === 'paused' ? 'paused' : 'live'} label={`${family.title} Progress`} />

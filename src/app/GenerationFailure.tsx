@@ -3,7 +3,7 @@ import { AlertTriangle, Bug, ChevronDown, ChevronRight, Download, LifeBuoy, Mini
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl, withDiagnostics } from './diagnostics';
 import { NodeInstall } from './NodeInstall';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import { cn } from './format';
 import type { RetryOptions } from './retry';
 import type { ShowToast } from './toast';
@@ -98,7 +98,7 @@ export function FailurePanel({ item, onCopy, onReuse, fixes, showToast, onNodesI
   React.useEffect(() => { void loadDiagnostics(); }, []);
   const copyReport = async () => onCopy(withDiagnostics(reportFor(item, failure), knownDiagnostics() || await loadDiagnostics()));
   const [busy, setBusy] = React.useState(false);
-  const admin = useThisComputer();
+  const admin = useAdministrator();
   const buttons = fixButtons(item, failure, fixes, admin);
   const run = async (action: () => unknown) => {
     setBusy(true);

@@ -588,6 +588,15 @@ is an editor's last row, an editor's fields follow the order they are filled
 in, Version leads About, Reset (destructive) stays its own group, and Workers
 lists the deployment's workers before Studio's own.
 
+**Who is an administrator** comes from one access model (`src/app/access.ts`,
+`useAccess`): with accounts, the signed-in account's role, wherever Studio is
+open; without them, the device (the computer Studio runs on, or a signed-in
+device its owner trusts). Every surface that hides administration (Settings'
+rail, the Library, model folders and downloads, installs, restarts, workflow
+files) asks it; none checks the device or the account on its own. The account
+status is fetched once by the sign-in gate and shared; Settings asks again
+only when that answer is over a minute old.
+
 **Groups** (access profiles on the server) grant features and local models. Cloud models are never
 listed: the Cloud Models feature grants them. NSFW Models gates any model
 profile marked `nsfw`. A feature the deployment switched off (LoRAs, Cloud

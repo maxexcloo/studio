@@ -11,7 +11,7 @@ import { formatEta } from './UpscaleDownloadActivity';
 import { cn, formatDownloadSize } from './format';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
 import type { MissingPart, ModelDownload, PartDownload, Profile } from './types';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import type { ShowToast } from './toast';
 import { openFamilySetup } from './FamilySetupDialog';
 import { apiJson } from './api';
@@ -71,9 +71,9 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const revealing = variant === 'gallery' && reveal ? reveal.file : '';
   const [remoteAnswer, setRemote] = React.useState(false);
   // Known before anyone clicks: a ComfyUI elsewhere cannot receive downloads from here.
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   // Downloads land on the computer running Studio; from another device they are its job.
-  const remote = remoteAnswer || state?.local === false || !thisComputer;
+  const remote = remoteAnswer || state?.local === false || !administrator;
   const blocking = profile.missing || [];
   // "Don't show again" hides it at once; the server keeps the answer for good (server/dismissals.js).
   const [dismissedNow, setDismissedNow] = React.useState(false);
@@ -327,7 +327,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
       {manual && !moving && !waitingOnComfy ? (
         <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={14} /> Check Again</button>
       ) : null}
-      {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running Studio.'}</p> : null}
+      {remote ? <p className="model-setup-note">{administrator ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running Studio.'}</p> : null}
     </section>
   );
 }

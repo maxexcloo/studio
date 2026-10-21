@@ -2,7 +2,8 @@ import React from 'react';
 import { LoraStackSettings } from './LoraStackSettings';
 import { ExternalLink, Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
-import { usePhone, useThisComputer } from './device';
+import { usePhone } from './device';
+import { loadAccountStatus, useAccess } from './access';
 import { Boxes, FileJson, Info, Plug, ShieldCheck, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
 import { githubUrl } from './constants';
 import { Skeleton } from './components';
@@ -11,7 +12,6 @@ import { HeatMark } from './HeatMark';
 import { apiFetch, apiJson } from './api';
 import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
-import { knownAccountStatus } from './accounts';
 import { ProfilesSettings } from './ProfilesSettings';
 import { PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
@@ -151,22 +151,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
 
   const modelList = models;
   const profileInfo = React.useMemo<Record<string, ProfileInfo>>(() => Object.fromEntries((modelList?.profiles || []).map((profile) => [profile.id, { label: profile.displayName || profile.label, kind: profile.kind, cloud: profile.family === 'grok' || /^grok/i.test(profile.id), nsfw: profile.nsfw === true }])), [modelList]);
-  // What the sign-in gate already knew, so Account and Users draw at once; checked again on each open.
-  const known = knownAccountStatus();
-  const [accountMode, setAccountMode] = React.useState(known?.mode === 'multi-user');
-  const [accountRole, setAccountRole] = React.useState(known?.account?.role || '');
+  // One access model (access.ts): the sign-in gate's account status draws Account and Users at once.
+  // Opening Settings asks again only when that answer is over a minute old, and joins a request in flight.
+  const { accounts: accountMode, administrator } = useAccess();
   React.useEffect(() => {
-    if (!open) return;
-    let live = true;
-    apiJson<{ mode: string; account?: { role: string } | null }>('/api/accounts/status', { cache: 'no-store' }).then((status) => {
-      if (!live) return;
-      setAccountMode(status.mode === 'multi-user');
-      setAccountRole(status.account?.role || '');
-      if (status.mode !== 'multi-user' && ACCOUNT_SECTIONS.has(section)) onSectionChange('studio');
-      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('studio');
-    }).catch(() => { if (live && !known) setAccountMode(false); });
-    return () => { live = false; };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (open) void loadAccountStatus({ maxAge: 60_000 }).catch(() => undefined);
+  }, [open]);
 
   // About's stats, kept between opens and fetched as soon as Settings opens, so About draws filled in.
   const [about, setAbout] = React.useState<AboutData | null>(aboutCache);
@@ -187,12 +177,13 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       || stats.topWorkflow.replace(/^custom:/, '')
     : '';
 
-  const thisComputer = useThisComputer();
   const phoneDevice = usePhone();
-  const deployment = useDeploymentSettings(open && thisComputer);
+  const deployment = useDeploymentSettings(open && administrator);
   // One rule for the rail and the page: account sections need accounts, administration needs an administrator.
-  const administrator = accountMode ? accountRole === 'administrator' : thisComputer;
   const sectionShown = (id: SettingsSection) => (!ACCOUNT_SECTIONS.has(id) || accountMode) && (!ADMINISTRATION_SECTIONS.has(id) || administrator);
+  // A section that stops being offered (no accounts after all, or no longer an administrator) gives way to Studio.
+  const shown = sectionShown(section);
+  React.useEffect(() => { if (open && !shown) onSectionChange('studio'); }, [open, shown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Inpainting is the deployment's catalogue switch; administrators turn it here, everyone sees it.
   const inpaintFlag = deployment.settings?.catalogue.find((item) => item.key === inpaintFlagKey);

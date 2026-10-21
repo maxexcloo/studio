@@ -1,59 +1,11 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Two facts about the device in front of the studio, shared app-wide:
- *
- *   thisComputer  the page may look after the computer Studio runs on
- *                 (folders, downloads, installs, restarts, updates): it is
- *                 open on that computer, or on a signed-in device its owner
- *                 trusts with that (Settings › Workers). Elsewhere the
- *                 server refuses those, and the app hides them.
- *   atComputer    the page is open on that computer itself. Only there can
- *                 the passwords, the admin switch and sign-ins be changed.
- *   phone         a touch phone, which gets the simplified phone studio
- *                 unless someone chose the full one.
+ * The device in front of the studio. Who may administer it is access.ts's
+ * (one model with accounts or without); this file only says whether it is a
+ * phone, which gets the simplified phone studio unless someone chose the full
+ * one.
  */
-
-const localNames = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-const onLoopback = typeof window === 'undefined' ? true : localNames.has(window.location.hostname);
-
-/** A value the server confirms later, shared by every component that asks. */
-function sharedFlag(initial: boolean) {
-  let current = initial;
-  const listeners = new Set<(value: boolean) => void>();
-  return {
-    set(value: boolean) {
-      if (value === current) return;
-      current = value;
-      listeners.forEach((listener) => listener(value));
-    },
-    use() {
-      const [value, setValue] = useState(current);
-      useEffect(() => {
-        listeners.add(setValue);
-        setValue(current);
-        return () => { listeners.delete(setValue); };
-      }, []);
-      return value;
-    }
-  };
-}
-
-const admin = sharedFlag(onLoopback);
-const atComputer = sharedFlag(onLoopback);
-
-/** The server's answer (from /api/health) replaces the guess from the address. */
-export function setThisComputer(value: boolean) {
-  admin.set(value);
-}
-
-export function setAtComputer(value: boolean) {
-  atComputer.set(value);
-}
-
-export function useThisComputer() {
-  return admin.use();
-}
 
 /** The phone layout's width breakpoint, shared with the CSS (max-width: 760px). */
 export const NARROW_QUERY = '(max-width: 760px)';

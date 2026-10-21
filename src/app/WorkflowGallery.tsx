@@ -12,7 +12,7 @@ import { peekDownloadReveal } from './useModelDownloads';
 import { ComfyRestart, useComfyRestarting } from './ComfyRestart';
 import { scrollSideways, useWheelRef } from './wheel';
 import type { Mode, Profile, WorkflowImportPreview, WorkflowPreferences, WorkflowRisk, WorkflowSummary } from './types';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import type { StudioViewModel } from './useStudio';
 import type { ShowToast } from './toast';
 import { CopyIcon, useCopyFeedback } from "./CopyFeedback";
@@ -176,7 +176,7 @@ function StatusBadge({ validation }: { validation: WorkflowSummary["validation"]
 export function WorkflowGallery({ view }: { view: StudioViewModel & { onClose: () => void } }) {
   const comfyRestarting = useComfyRestarting();
   // Importing and deleting workflow files happens at the computer running Studio.
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   const {
     mode, onClose, refreshModels, refreshWorkflows, selectWorkflow, setWorkflowPreferences,
     showToast, workflowPreferences, workflows, setWorkflows, model, chooseModel, models
@@ -408,7 +408,7 @@ export function WorkflowGallery({ view }: { view: StudioViewModel & { onClose: (
       bodyClassName="wf-layout"
       title="Workflows"
       description="Choose a model or import a workflow."
-      headerActions={thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={16} /><span>Import</span></button> : undefined}
+      headerActions={administrator ? <button className="btn is-primary" onClick={openImport}><Upload size={16} /><span>Import</span></button> : undefined}
       contentProps={{
         onDragEnter: (event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } },
         onDragOver: (event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); },
@@ -459,9 +459,9 @@ export function WorkflowGallery({ view }: { view: StudioViewModel & { onClose: (
         ) : (
           <EmptyState
             title={query ? "No Matching Workflows" : filter === "favorites" ? "No Favourites Yet" : `No ${kind === "video" ? "Video" : "Image"} Workflows Yet`}
-            action={query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
+            action={query ? <button className="btn" onClick={() => setQuery("")}>Clear Search</button> : filter === "favorites" ? <button className="btn" onClick={() => setFilter("all")}>Show All</button> : administrator ? <button className="btn is-primary" onClick={openImport}><Upload size={14} /> Import Workflow</button> : null}
           >
-            {query ? "Try another name." : filter === "favorites" ? "Star a workflow to add it here." : thisComputer ? "Import one to start." : ""}
+            {query ? "Try another name." : filter === "favorites" ? "Star a workflow to add it here." : administrator ? "Import one to start." : ""}
           </EmptyState>
         )}
       </section>
@@ -502,7 +502,7 @@ export function WorkflowGallery({ view }: { view: StudioViewModel & { onClose: (
               <button className="btn is-primary" onClick={() => useWorkflow(selected)} disabled={busy || (!selected.validation.ok && !selectedProfile?.missing?.length) || selected.profileId === model}>
                 {selected.profileId === model ? <><Check size={16} /> In Use</> : "Use workflow"}
               </button>
-              {selected.deleteId && thisComputer ? <button className="btn is-ghost is-danger-text" disabled={busy} onClick={() => deleteWorkflow(selected)}><Trash2 size={14} /> Delete</button> : null}
+              {selected.deleteId && administrator ? <button className="btn is-ghost is-danger-text" disabled={busy} onClick={() => deleteWorkflow(selected)}><Trash2 size={14} /> Delete</button> : null}
             </div>
 
             <dl className="wf-facts">

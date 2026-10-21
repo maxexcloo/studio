@@ -48,14 +48,14 @@ import { coverMedia } from './mediaCover';
 import { PhoneViewerBar, ViewerDockActions } from './ItemActionSurfaces';
 import { ItemActionsContext, type ItemActionHandlers } from './itemActions';
 import { GallerySelectionContext, useGallerySelection } from './gallerySelection';
-import { usePhone, useThisComputer } from './device';
+import { usePhone } from './device';
+import { useAccess } from './access';
 import { ConnectedCard } from './ConnectedCard';
 import { StatusAnnouncer, SurfaceStatus } from './StatusMessage';
 import { EmptyStage } from './EmptyStage';
 import type { SettingsSection } from './SettingsDialog';
 import { Modal } from './Modal';
 import { AccountMenu } from './AccountMenu';
-import { hasAccountStorageScope } from './api';
 import { GetModelsSheet, StarterModels } from './StarterModels';
 import { FamilySetupDialog, useFamilySetupRequests } from './FamilySetupDialog';
 import { NoComfySheet } from './NoComfySheet';
@@ -335,7 +335,8 @@ export function StudioView({ view }: { view: StudioViewModel }) {
     // To the download itself: its starter card, or the setup panel of the workflow that needs it.
     onOpen: (where) => (where === "starter" ? setGetModelsOpen(true) : setWorkflowGalleryOpen(true))
   });
-  const thisComputer = useThisComputer();
+  // One access model (access.ts): the account's role with accounts, the device without.
+  const { administrator, signedIn: accountSignedIn } = useAccess();
   // A generation stands in for itself only where its tile can't be seen: the
   // viewer on another image, or the gallery scrolled away.
   const pendingIds = React.useMemo(() => visibleGallery.filter((item) => item.status === "pending").map((item) => item.id), [visibleGallery]);
@@ -435,7 +436,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
       {models?.features?.library === true ? <Tip content={models.features.libraryUpdates ? `Library · ${models.features.libraryUpdates === 1 ? 'Update Available' : `${models.features.libraryUpdates} Updates Available`}` : 'Library'}><button className="icon-button library-dock-button" aria-label="Library" aria-description={models.features.libraryUpdates ? 'Update Available' : undefined} aria-haspopup="dialog" aria-expanded={Boolean(view.libraryOpen)} onClick={() => view.setLibraryOpen(true)}><LibraryIcon size={16} />{models.features.libraryUpdates ? <span className="library-update-dot" aria-hidden="true" /> : null}</button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
-      {hasAccountStorageScope() ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
+      {accountSignedIn ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
     </div>
   );
   // The gallery, its empty and offline stages and the lock: the same in every layout.
@@ -530,8 +531,8 @@ export function StudioView({ view }: { view: StudioViewModel }) {
               currentProfile={currentProfile}
               comfyOffline={Boolean(comfyOffline)}
               comfyRestarting={Boolean(comfyStatus?.restarting)}
-              onFindModels={thisComputer ? modelFolders?.openDialog : undefined}
-              onGetModels={thisComputer ? openGetModels : undefined}
+              onFindModels={administrator ? modelFolders?.openDialog : undefined}
+              onGetModels={administrator ? openGetModels : undefined}
               strayModelCount={strayModelCount}
               mode={mode}
               onModeChange={view.changeMode}
@@ -621,9 +622,9 @@ export function StudioView({ view }: { view: StudioViewModel }) {
           {composer}
         </>
       )}
-      {settings ? <React.Suspense fallback={<Modal open size="sheet" className="settings-modal" title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={thisComputer ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
-      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={thisComputer ? () => openSettings("workers") : undefined} />
-      <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={thisComputer ? modelFolders?.openDialog : undefined} />
+      {settings ? <React.Suspense fallback={<Modal open size="sheet" className="settings-modal" title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={administrator ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
+      <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={administrator ? () => openSettings("workers") : undefined} />
+      <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={administrator ? modelFolders?.openDialog : undefined} />
       {familySetup.family ? (
         <FamilySetupDialog
           family={familySetup.family}
