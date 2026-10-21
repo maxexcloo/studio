@@ -173,3 +173,87 @@ test('an untracked job reported lost can still accept a late backend result', as
   assert.equal(s.gallery[0].url, 'late.mp4');
   assert.equal(s.jobs.get('late').status, 'done');
 });
+
+test('a running job its runner follows costs the worker nothing: no queue or history scans', async () => {
+  const s = fixture();
+  const asked = [];
+  s.gallery = [{ ...tile('long', 'pending'), progress: { value: 3, max: 20 } }];
+  s.jobs.set('long', { status: 'running', comfyBackend: 'video', promptId: 'long-prompt', progress: { value: 3, max: 20 } });
+  s.snapshots.video.queue = { queue_running: [queued('long')] };
+  // Count what recovery asks ComfyUI for over a long run's many ticks.
+  const recover = createJobRecovery({
+    backends: () => ['video'], finishJob: () => assert.fail('a live job is not finished by recovery'), getGallery: () => s.gallery, jobs: s.jobs,
+    recordsFromHistory: () => [], request: async (path) => { asked.push(path); return {}; },
+    setGallery: () => assert.fail('a live job’s tiles are the runner’s to write'), visible: (items) => items, withBackend: async (_backend, run) => run(),
+  });
+  for (let tick = 0; tick < 5; tick++) await recover();
+  assert.deepEqual(asked, []);
+  assert.equal(s.jobs.get('long').progress.value, 3);
+});
+
+test('a restored long video keeps its index, request time, settings and elapsed time from ComfyUI history', async () => {
+  const s = fixture();
+  const createdAt = '2026-10-22T10:00:00.000Z';
+  const start = Date.parse(createdAt) + 5_000;
+  const end = start + 19 * 60_000;
+  s.gallery = [{ ...tile('fl20', 'pending'), index: 0, createdAt, ownerId: 'account-a', settings: { profileId: 'h3-fl-stock20', frames: 192 }, startImageId: 'ref-1' }];
+  s.jobs.set('fl20', { recovered: true, status: 'running', comfyBackend: 'video', promptId: 'fl20-prompt' });
+  // As recordsFromComfyHistory builds them: no index, no times, the graph's guess at settings.
+  const history = { prompt: [0, 'fl20-prompt', {}, { heiss_generation: { jobId: 'fl20' } }], outputs: [{ id: 'fl20.mp4', jobId: 'fl20', url: '/comfy/view?filename=fl20.mp4', type: 'video', status: 'done', createdAt: new Date(start - 60_000).toISOString(), settings: {} }], status: { status_str: 'success', messages: [['execution_start', { prompt_id: 'fl20-prompt', timestamp: start }], ['execution_cached', { nodes: [] }], ['execution_success', { prompt_id: 'fl20-prompt', timestamp: end }]] } };
+  s.snapshots.video.history = { 'fl20-prompt': history };
+  await s.recover();
+  const [record] = s.gallery;
+  assert.equal(record.url, '/comfy/view?filename=fl20.mp4');
+  assert.equal(record.index, 0, 'MCP results and signed links find outputs by index');
+  assert.equal(record.createdAt, createdAt);
+  assert.equal(record.ownerId, 'account-a');
+  assert.equal(record.startImageId, 'ref-1');
+  assert.deepEqual(record.settings, { profileId: 'h3-fl-stock20', frames: 192 });
+  assert.equal(record.durationMs, end - Date.parse(createdAt));
+  assert.deepEqual(record.timing, { runMs: 19 * 60_000, queueMs: 5_000 });
+  assert.equal(record.promptId, 'fl20-prompt');
+  assert.equal(s.jobs.get('fl20').status, 'done');
+  assert.equal(s.jobs.get('fl20').outputs[0].index, 0);
+});
+
+test('a run its runner gave up on (busy worker) is followed again and delivered from history at once', async () => {
+  const s = fixture();
+  s.gallery = [{ ...tile('busy', 'error'), index: 0 }];
+  s.jobs.set('busy', { status: 'error', error: 'ComfyUI stopped answering for over a minute, so this run was given up.', terminalAt: 1, comfyBackend: 'video', promptId: 'busy-prompt' });
+  s.snapshots.video.queue = { queue_running: [queued('busy')] };
+  await s.recover();
+  assert.equal(s.jobs.get('busy').status, 'running');
+  assert.equal(s.jobs.get('busy').recovered, true);
+  assert.equal(s.jobs.get('busy').terminalAt, undefined, 'its earlier end no longer expires the live job');
+  assert.equal(s.gallery[0].status, 'pending');
+  s.snapshots.video.queue = {};
+  s.snapshots.video.history = { 'busy-prompt': result('busy') };
+  await s.recover();
+  assert.equal(s.jobs.get('busy').status, 'done');
+  assert.equal(s.gallery[0].url, 'busy.mp4');
+});
+
+test('a failure its runner recorded keeps its reason when ComfyUI has no output either', async () => {
+  const s = fixture();
+  s.gallery = [{ ...tile('failed', 'error'), failure: { summary: 'Out of memory' } }];
+  s.jobs.set('failed', { status: 'error', error: 'Out of memory', terminalAt: 1, comfyBackend: 'video' });
+  s.snapshots.video.history = { 'failed-prompt': { prompt: [0, 'failed-prompt', {}, { heiss_generation: { jobId: 'failed' } }], outputs: [], status: { status_str: 'error' } } };
+  await s.recover();
+  assert.equal(s.jobs.get('failed').error, 'Out of memory');
+  assert.deepEqual(s.gallery[0].failure, { summary: 'Out of memory' });
+});
+
+test('recovered jobs with known prompts are looked up one by one, not through the whole history', async () => {
+  const asked = [];
+  const jobs = new Map([['one', { recovered: true, status: 'running', comfyBackend: 'video', promptId: 'one-prompt' }]]);
+  let gallery = [tile('one', 'pending')];
+  const recover = createJobRecovery({
+    backends: () => ['video'], finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch }), getGallery: () => gallery, jobs,
+    recordsFromHistory: (history) => Object.values(history).flatMap((entry) => entry.outputs || []),
+    request: async (path) => { asked.push(path); return path === '/queue' ? {} : path === '/history/one-prompt' ? { 'one-prompt': result('one') } : assert.fail(`unexpected ${path}`); },
+    setGallery: (items) => { gallery = items; }, visible: (items) => items, withBackend: async (_backend, run) => run(),
+  });
+  await recover();
+  assert.deepEqual(asked.sort(), ['/history/one-prompt', '/queue']);
+  assert.equal(jobs.get('one').status, 'done');
+});
