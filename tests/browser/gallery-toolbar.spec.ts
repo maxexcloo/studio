@@ -135,11 +135,11 @@ test('empty search dismisses outside while active queries and filters stay open'
 });
 
 
-test('search closes without resizing in steps and retains its input while it fades', async ({ page, isMobile }) => {
+test('search opens and closes smoothly and retains its input while it fades', async ({ page, isMobile }) => {
   test.skip(isMobile, 'The phone’s shared search row is checked in phone-dock.spec.ts.');
   await page.goto('/');
   // The phone's search overlay fades from its close button; the full studio's field folds into its trigger
-  // at once (widths never animate, UI-PATTERNS › Motion) while the field fades.
+  // at --motion-base (the one width that animates, UI-PATTERNS › Motion) while the field fades.
   const phone = await studioUi(page).isPhone();
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
   await opener.click();
@@ -163,7 +163,9 @@ test('search closes without resizing in steps and retains its input while it fad
     expect(frames.some(n => n.opacity > 0 && n.opacity < 1)).toBe(true);
     await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   } else {
-    expect(frames.some(n => n.width > 50 && n.width < frames[0].width - 2)).toBe(false);
+    // It folds through the widths in between, never growing on the way.
+    expect(frames.some(n => n.width > 60 && n.width < frames[0].width - 10)).toBe(true);
+    expect(frames.every((n, index) => index === 0 || n.width <= frames[index - 1].width + 0.5)).toBe(true);
     expect(Math.max(...frames.map(n => n.height)) - Math.min(...frames.map(n => n.height))).toBeLessThanOrEqual(0.5);
     await expect(field).toBeDisabled();
   }
@@ -334,10 +336,16 @@ test('filter options scroll independently and have a compact local search', asyn
   const menu = page.locator('.gallery-filter-menu');
   const list = page.getByRole('listbox', { name: 'Model Filter', exact: true });
   const search = page.getByRole('textbox', { name: 'Search Models', exact: true });
-  // Search waits behind its icon beside the title until asked for.
+  // Search waits behind its icon, right after the title, until asked for.
   await expect(search).toHaveCount(0);
-  await menu.getByRole('button', { name: 'Search Models', exact: true }).click();
+  const toggle = menu.getByRole('button', { name: 'Search Models', exact: true });
+  const title = (await menu.locator('.gallery-filter-menu-head > strong').boundingBox())!;
+  expect((await toggle.boundingBox())!.x - (title.x + title.width)).toBeLessThan(12);
+  const opened = (await menu.boundingBox())!;
+  await toggle.click();
   await expect(search).toBeFocused();
+  // The icon stays, pressed, while the field is open.
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(list.getByRole('option')).toHaveCount(45);
   await page.waitForTimeout(250);
   const before = await menu.boundingBox();
@@ -351,12 +359,15 @@ test('filter options scroll independently and have a compact local search', asyn
   await expect(list.getByRole('option')).toHaveCount(1);
   await expect(list.getByRole('option', { name: 'Model 32', exact: true })).toBeVisible();
   await expect(search).toBeFocused();
+  // The menu never shrinks to the matches: it keeps the full list's height.
+  expect((await menu.boundingBox())!.height).toBeGreaterThanOrEqual(opened.height - 1);
   await search.fill('not in this list');
   await expect(menu.getByRole('status')).toHaveText('No Matches');
-  // The open field carries its own Close Search: it clears the query and folds the field away.
-  await menu.getByRole('button', { name: 'Close Search', exact: true }).click();
+  // Pressing the icon again clears the query and folds the field away.
+  await toggle.click();
   await expect(list.getByRole('option')).toHaveCount(45);
   await expect(search).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await menu.getByRole('button', { name: /^Search / }).click();
   await search.fill('model 32');
   await search.press('Enter');
@@ -444,4 +455,52 @@ test.describe('tooltips with a mouse', () => {
     const [dock, dockLabel] = [await settings.boundingBox(), await settingsLabel.boundingBox()];
     expect(dockLabel!.y + dockLabel!.height).toBeLessThanOrEqual(dock!.y);
   });
+});
+
+// UI-PATTERNS › Motion: the gallery's fade is for a first load and Images | Videos only. A search, a
+// filter or Hide Failed & Queued keeps the list on screen until the new one arrives, then swaps it in place.
+test('searching, filtering and Hide Failed & Queued never replay the gallery’s entrance', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The phone shares the store and gallery; its search row is checked in phone-dock.spec.ts.');
+  const many = Array.from({ length: 12 }, (_, index) => ({ ...items[0], id: `entrance-${index}`, prompt: index % 2 ? 'Odd picture' : 'Even picture', model: index % 3 ? 'Flux' : 'Krea' }));
+  await page.route('**/api/gallery?*', async (route) => {
+    const url = new URL(route.request().url());
+    const q = (url.searchParams.get('q') || '').toLowerCase();
+    const models = url.searchParams.getAll('model');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await route.fulfill({ json: { items: many.filter((item) => item.prompt.toLowerCase().includes(q) && (!models.length || models.includes(item.model))), revision: 1, hasMore: false } });
+  });
+  await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.goto('/');
+  await expect(page.locator('[data-tile-id]')).toHaveCount(12);
+  await page.waitForTimeout(400);
+  // Every frame from here on: the gallery stays the same element with tiles in it, and no fade runs.
+  await page.evaluate(() => {
+    const gallery = document.querySelector<HTMLElement>('.gallery.virtual-gallery')!;
+    gallery.dataset.watched = '1';
+    const seen = { blank: 0, swapped: 0, fades: 0 };
+    (window as any).__entrance = seen;
+    const sample = () => {
+      const now = document.querySelector<HTMLElement>('.gallery.virtual-gallery');
+      if (now?.dataset.watched !== '1') seen.swapped += 1;
+      if (!document.querySelector('[data-tile-id]')) seen.blank += 1;
+      // A finished fade with fill `both` stays listed; only a running one counts.
+      if (document.getAnimations().some((animation) => (animation as CSSAnimation).animationName === 'gallery-mode-in' && animation.playState === 'running')) seen.fades += 1;
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search Gallery', exact: true }).fill('odd');
+  await expect(page.locator('[data-tile-id]')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Clear Search', exact: true }).click();
+  await expect(page.locator('[data-tile-id]')).toHaveCount(12);
+  await studioUi(page).openFilters();
+  await page.getByRole('button', { name: 'Filter By Model', exact: true }).click();
+  await page.getByRole('option', { name: 'Krea', exact: true }).click();
+  await expect(page.locator('[data-tile-id]')).toHaveCount(4);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Hide Failed & Queued', exact: true }).click();
+  await expect(page.locator('[data-tile-id]')).toHaveCount(4);
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => (window as any).__entrance)).toEqual({ blank: 0, swapped: 0, fades: 0 });
 });

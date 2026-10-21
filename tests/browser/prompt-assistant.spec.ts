@@ -151,17 +151,16 @@ test('suggested LoRAs add with their trigger words, and taking one off offers Re
   await pill(page, 'Added 2 LoRAs with trigger words').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(ui.prompt).toHaveValue('a cabin at dusk');
   await expect(chips.getByRole('button', { name: /^Add (Glow|Mist),/ })).toHaveCount(2);
-  // The LoRAs picker leads This Model with the same suggestions.
+  // The LoRAs picker has no Suggested section: This Model lists the model family's LoRAs, and a pick there is plain.
   await composer.getByRole('button', { name: /^LoRAs/ }).first().click();
   const picker = page.getByRole('dialog', { name: 'LoRAs', exact: true });
-  await expect(picker.getByText('Suggested', { exact: true })).toBeVisible();
+  await expect(picker.getByText('Suggested', { exact: true })).toHaveCount(0);
   const mist = picker.getByRole('checkbox', { name: 'Select Mist', exact: true });
   await mist.click();
   await expect(mist).toHaveAttribute('aria-checked', 'true');
-  // The picker covers Create on a phone; closed, the prompt shows the trigger added with it.
   await page.keyboard.press('Escape');
   await expect(picker).toHaveCount(0);
-  await expect(ui.prompt).toHaveValue('mistyx, a cabin at dusk');
+  await expect(ui.prompt).toHaveValue('a cabin at dusk');
 });
 
 test('the negative writer sits beside Negative and is absent where the model takes none', async ({ page }) => {

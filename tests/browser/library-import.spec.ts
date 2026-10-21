@@ -172,7 +172,7 @@ test('LoRAs and Models list what is installed and catalogued, with provenance, l
   await dialog.getByRole('button', { name: 'Search LoRAs', exact: true }).click();
   await dialog.getByRole('textbox', { name: 'Search LoRAs' }).fill('water');
   await expect(rows).toHaveCount(1);
-  await dialog.getByRole('button', { name: 'Close Search', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Search LoRAs', exact: true }).click();
   await dialog.getByRole('group', { name: 'LoRAs View' }).getByRole('button', { name: 'Catalogue', exact: true }).click();
   await expect(rows).toHaveCount(3);
   await expect(rows.filter({ hasText: 'Later' })).toContainText('Not Installed');

@@ -421,7 +421,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.locator('[data-reference-index]')).toHaveCount(1);
   await page.getByRole('searchbox', { name: 'Search Library' }).fill('No Such Reference');
   await expect(page.getByText('No Matching Images')).toBeVisible();
-  await page.getByRole('button', { name: 'Close Search', exact: true }).click();
+  await page.locator('.reference-popover').getByRole('button', { name: 'Search Library', exact: true }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   await expect(page.locator('[data-reference-index][tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
@@ -836,7 +836,9 @@ test('gallery toolbar keeps selection stable and phone search opens on demand', 
   await expect(search).toHaveCount(0);
   await page.getByRole('button', { name: 'Search Gallery', exact: true }).click();
   await expect(search).toBeVisible();
-  await search.fill('Image');
+  // The list on screen stays until the search's own arrives, then swaps in place.
+  await Promise.all([page.waitForResponse((response) => /\/api\/gallery\?.*q=Image/.test(response.url())), search.fill('Image')]);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const tile = page.locator('[data-tile-id="image-0"] .tile');
   const image = await tile.locator('img').elementHandle();
   await expect.poll(() => image!.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);

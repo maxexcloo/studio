@@ -91,19 +91,16 @@ test('the model chooser heading keeps its filters, search and Close on one centr
   await menu.getByRole('button', { name: 'Search Models', exact: true }).click();
   const field = menu.getByRole('combobox', { name: 'Search Models' }).or(menu.getByRole('textbox', { name: 'Search Models' })).first();
   await expect(field).toBeFocused();
-  // The search icon gives way to the field's own Close Search; everything else stays on the line.
+  // The search icon stays where it is, pressed; everything stays on the line.
+  const toggle = menu.getByRole('button', { name: 'Search Models', exact: true });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(async () => (await centres()).spread).toBeLessThanOrEqual(1);
-  expect((await centres()).count).toBe(before.count - 1);
+  expect((await centres()).count).toBe(before.count);
   expect(Math.abs((await settled()) - height)).toBeLessThanOrEqual(1);
-  // The field sits under the heading, with Close Search inside it on its centre line.
+  // The field drops down under the heading.
   const head = (await heading.boundingBox())!;
-  // The whole field (its icon, input and Close Search), not only the text box.
-  const box = (await menu.locator('.picker-search-row > .picker-search').boundingBox())!;
-  const close = (await menu.getByRole('button', { name: 'Close Search', exact: true }).boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(head.y + head.height - 1);
-  expect(close.x + close.width).toBeLessThanOrEqual(box.x + box.width + 1);
-  expect(Math.abs((box.y + box.height / 2) - (close.y + close.height / 2))).toBeLessThanOrEqual(1);
-  await menu.getByRole('button', { name: 'Close Search', exact: true }).click();
+  await expect.poll(async () => (await menu.locator('.picker-search-row > .picker-search').boundingBox())!.y).toBeGreaterThanOrEqual(head.y + head.height - 1);
+  await toggle.click();
   await expect(field).toHaveCount(0);
-  await expect(menu.getByRole('button', { name: 'Search Models', exact: true })).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
 });

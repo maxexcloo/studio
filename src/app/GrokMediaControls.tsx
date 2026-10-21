@@ -14,9 +14,8 @@ export function GrokMediaControls({ view }: { view: SidebarView; phone?: boolean
     {profile.capabilities.duration ? <ListItem label="Duration (Seconds)"><NumberPicker label="Duration (Seconds)" value={duration} onChange={setDuration} min={range.min ?? 1} max={range.max ?? 15} step={range.step || 1} size="sm" density="compact" /></ListItem> : null}
     {profile.capabilities.resolution && resolutions.length > 1 ? (
       <ListItem label="Resolution">
-        {resolutions.length > 2
-          ? <ListSelect label="Resolution" value={resolution} options={resolutions.map((value) => ({ value, label: value }))} onChange={setResolution} />
-          : <div className="list-segments" role="group" aria-label="Resolution">{resolutions.map((value) => <button key={value} type="button" aria-pressed={resolution === value} onClick={() => setResolution(value)}>{value}</button>)}</div>}
+        {/* The one dropdown, as every choice in Advanced Settings (Upscale, Sampler, Duration). */}
+        <ListSelect search={false} label="Resolution" value={resolution} options={resolutions.map((value) => ({ value, label: value }))} onChange={setResolution} />
       </ListItem>
     ) : null}
   </ListSection>;

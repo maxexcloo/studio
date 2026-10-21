@@ -40,6 +40,13 @@ type VirtualMasonryGalleryProps = {
   /** Scroll this run into view once it is laid out (opened from zen or the sheet). */
   focusRun?: string;
   onFocused?: () => void;
+  /**
+   * Which list this is (a search, a filter, Hide Failed & Queued): a new one
+   * mounts its tiles where they belong, with no glide from the last list's
+   * places and without the grid's fade, which is only for a first load and
+   * Images | Videos (the gallery is keyed by mode).
+   */
+  listKey?: string;
   /** Called once the grid has its first real layout, before that frame paints (a mode's saved place goes back then). */
   onLaidOut?: () => void;
   /** The item open in the viewer: its tile is scrolled into view whenever the viewer moves to another one. */
@@ -92,6 +99,7 @@ export function VirtualMasonryGallery({
   formatElapsed,
   groups = null,
   items,
+  listKey = "",
   moments = false,
   onFocused,
   onLaidOut,
@@ -198,7 +206,7 @@ export function VirtualMasonryGallery({
   const freshItem = (item: GalleryItem) => itemById.get(item.id) || item;
   const freshRun = (run: Run) => runById.get(run.id) || run;
   const layout = useMemo(() => {
-    const signature = `${safeColumns}:${containerWidth}:${spanWide}:${moments}:${stackRuns}:${stackStyle}`;
+    const signature = `${listKey}:${safeColumns}:${containerWidth}:${spanWide}:${moments}:${stackRuns}:${stackStyle}`;
     const previous = placement.current.signature === signature ? placement.current.slots : new Map();
     // What you just started here lands top left at once, hold or not: you
     // pressed Generate, so the grid moving now is expected. Results from
@@ -208,7 +216,7 @@ export function VirtualMasonryGallery({
     const next = layoutFor(openRuns, previous, holding && !ownLanding);
     placement.current = { signature, slots: next.placements };
     return next;
-  }, [containerWidth, gutter, layoutKey, holding, moments, openRuns, safeColumns, stackStyle, spacing, spanWide, stackRuns]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [containerWidth, gutter, layoutKey, listKey, holding, moments, openRuns, safeColumns, stackStyle, spacing, spanWide, stackRuns]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A run opening deals its tiles out where they land, one after another in
   // the order they were made, while everything below glides down to make room.
@@ -398,6 +406,13 @@ export function VirtualMasonryGallery({
   const geometry = useRef({ columns: safeColumns, width: containerWidth });
   const resizedInPlace = geometry.current.width !== containerWidth && geometry.current.columns === safeColumns;
   useEffect(() => { geometry.current = { columns: safeColumns, width: containerWidth }; });
+  // A new list in the same mode (a search, a filter) starts from its top, as a fresh one would.
+  const shownList = useRef(listKey);
+  React.useLayoutEffect(() => {
+    if (shownList.current === listKey) return;
+    shownList.current = listKey;
+    if (scrollElement) scrollElement.scrollTop = 0;
+  }, [listKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const laidOut = useRef(false);
   React.useLayoutEffect(() => {
     if (!measured || laidOut.current) return;
@@ -447,7 +462,7 @@ export function VirtualMasonryGallery({
         {visible.map((entry) => {
           if (entry.kind === "moment") {
             return (
-              <div key={entry.key} className={entry.first ? "virtual-gallery-moment is-first" : "virtual-gallery-moment"} style={{ width: entry.w, height: entry.h, transform: `translateY(${entry.y}px)` }}>
+              <div key={`${listKey}|${entry.key}`} className={entry.first ? "virtual-gallery-moment is-first" : "virtual-gallery-moment"} style={{ width: entry.w, height: entry.h, transform: `translateY(${entry.y}px)` }}>
                 <MomentHeading moment={entry.moment} />
               </div>
             );
@@ -455,7 +470,7 @@ export function VirtualMasonryGallery({
           if (entry.kind === "shelf") {
             return (
               <RunShelf
-                key={entry.key}
+                key={`${listKey}|${entry.key}`}
                 run={freshRun(entry.run)}
                 y={entry.y}
                 width={entry.w}
@@ -472,7 +487,7 @@ export function VirtualMasonryGallery({
           const dealing = Boolean(ofRun && flying && ofRun.id === flying.runId);
           return (
             <motion.div
-              key={entry.key}
+              key={`${listKey}|${entry.key}`}
               className={cn(
                 "virtual-gallery-cell",
                 entry.kind === "stack" && "is-stack",

@@ -444,6 +444,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
           {galleryCrossing ? <section className="gallery" /> : !galleryLoaded ? <section className="gallery virtual-gallery" style={{ "--gallery-columns": galleryColumnCount } as React.CSSProperties}><GallerySkeleton columns={galleryColumnCount} /></section> : renderedGallery.length ? (
             <StableGallery
               key={mode}
+              listKey={view.galleryListKey}
               cancelJob={cancelJob}
               groups={galleryGroups}
               moments={Boolean(prefs.dateHeaders)}

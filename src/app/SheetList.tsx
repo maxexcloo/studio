@@ -66,10 +66,10 @@ type SelectOption = { value: string; label: string; detail?: string };
  * phone's own picker). The row shows the friendly name and the menu adds each
  * option's detail (a file name); a value no longer offered still shows as itself.
  */
-export function ListSelect({ label, value, options, onChange }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void }) {
+export function ListSelect({ label, value, options, onChange, search = true }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void; /** Off in Advanced Settings: its menus are short enough to scan (UI-PATTERNS › Composer). */ search?: boolean }) {
   const known = options.some((option) => option.value === value);
   const all = known || !value ? options : [{ value, label: value }, ...options];
-  return <Dropdown label={label} value={value} options={all} onChange={onChange} variant="row" />;
+  return <Dropdown label={label} value={value} options={all} onChange={onChange} variant="row" searchFrom={search ? undefined : Infinity} />;
 }
 
 /** The chooser's Clear Selection, beside its tabs (UI-PATTERNS › Pickers); a phone shows "Clear", as the tabs need the room. */

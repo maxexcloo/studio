@@ -44,9 +44,6 @@ export type PromptAssistant = {
   /** Takes a suggested LoRA off the stack again (its trigger words are offered for removal). */
   removeSuggestion: (name: string) => void;
   isAdded: (name: string) => boolean;
-  /** The LoRAs picker's Suggested section, for the current prompt (cached per prompt). */
-  pickerSuggestions: LoraSuggestion[];
-  loadPickerSuggestions: () => void;
   /** For the generation request: what the assistant did, while the prompt is still its own. */
   record: () => AssistantRecord | null;
   /** Recreate: a result's record comes along with its prompt, so the rerun says how it was written too. */
@@ -136,13 +133,12 @@ export function usePromptAssistant(options: Options): PromptAssistant {
   const [preset, setPresetState] = useState(() => { try { return localStorage.getItem(scopedStorageKey(presetKey)) || ''; } catch { return ''; } });
   const [busy, setBusy] = useState<AssistantBusy>(null);
   const [chips, setChips] = useState<{ profileId: string; list: LoraSuggestion[] }>({ profileId: '', list: [] });
-  const [picker, setPicker] = useState<{ key: string; list: LoraSuggestion[] }>({ key: '', list: [] });
   const abort = useRef<AbortController | null>(null);
   const stopped = useRef(false);
-  const pickerCache = useRef(new Map<string, LoraSuggestion[]>());
+  const suggestionCache = useRef(new Map<string, LoraSuggestion[]>());
   /** The last rewrite: its text, preset and model, for the generation record. */
   const written = useRef<{ prompt: string; preset: string; model?: string; source?: 'ui' | 'chat' } | null>(null);
-  /** Suggested LoRAs added from chips or the picker, and the trigger words each one inserted. */
+  /** Suggested LoRAs added from the chips, and the trigger words each one inserted. */
   const chosen = useRef(new Set<string>());
   const triggerWords = useRef(new Map<string, string[]>());
 
@@ -196,13 +192,13 @@ export function usePromptAssistant(options: Options): PromptAssistant {
 
   const fetchSuggestions = useCallback(async (text: string, signal?: AbortSignal) => {
     const key = `${latest.current.profile?.id}\n${text.trim()}`;
-    const cached = pickerCache.current.get(key);
+    const cached = suggestionCache.current.get(key);
     if (cached) return cached;
     const { loras: list = [] } = await post<{ loras: LoraSuggestion[] }>('loras', { profileId: latest.current.profile?.id, prompt: text }, signal);
     const offered = new Set(latest.current.loraOptions);
     const usable = list.filter((item) => offered.has(item.name));
-    pickerCache.current.set(key, usable);
-    if (pickerCache.current.size > 50) pickerCache.current.delete(pickerCache.current.keys().next().value!);
+    suggestionCache.current.set(key, usable);
+    if (suggestionCache.current.size > 50) suggestionCache.current.delete(suggestionCache.current.keys().next().value!);
     return usable;
   }, [post]);
 
@@ -350,14 +346,6 @@ export function usePromptAssistant(options: Options): PromptAssistant {
     });
   }, []);
 
-  const loadPickerSuggestions = useCallback(() => {
-    const text = latest.current.prompt.trim();
-    if (!lorasOffered || !text) { setPicker({ key: '', list: [] }); return; }
-    const key = `${latest.current.profile?.id}\n${text}`;
-    if (picker.key === key) return;
-    fetchSuggestions(text).then((list) => setPicker({ key, list })).catch(() => setPicker({ key, list: [] }));
-  }, [fetchSuggestions, lorasOffered, picker.key]);
-
   const record = useCallback((): AssistantRecord | null => {
     const last = written.current;
     if (!last || !stillWritten(latest.current.prompt, last.prompt)) return null;
@@ -373,8 +361,6 @@ export function usePromptAssistant(options: Options): PromptAssistant {
   }, []);
 
   const suggestions = chips.profileId === profileId ? chips.list : [];
-  // Kept while the picker is open, even as added triggers change the prompt, so its rows stay put.
-  const pickerList = picker.key.startsWith(`${profileId}\n`) ? picker.list : [];
   return useMemo(() => ({
     available, presets: info.presets, preset: chosenPreset?.id || '', presetLabel: chosenPreset?.label || '', busy,
     rewrite: (id?: string) => { void rewrite(id); }, stop, referencesNote,
@@ -384,6 +370,6 @@ export function usePromptAssistant(options: Options): PromptAssistant {
     addSuggestion: (item: LoraSuggestion) => add([item]), addAllSuggestions: () => add(suggestions),
     removeSuggestion: (name: string) => latest.current.setLoras(latest.current.loras.filter((item) => item.name !== name)),
     isAdded: (name: string) => loras.some((item) => item.name === name),
-    pickerSuggestions: pickerList, loadPickerSuggestions, record, adopt
-  }), [available, info.presets, chosenPreset, busy, rewrite, stop, referencesNote, negativeOffered, writeNegative, lorasOffered, suggestLoras, suggestions, add, loras, pickerList, loadPickerSuggestions, record, adopt]);
+    record, adopt
+  }), [available, info.presets, chosenPreset, busy, rewrite, stop, referencesNote, negativeOffered, writeNegative, lorasOffered, suggestLoras, suggestions, add, loras, record, adopt]);
 }
