@@ -1,4 +1,4 @@
-import { comfy } from './comfy.js';
+import { comfy, isComfyTimeout } from './comfy.js';
 
 /**
  * Studio's side of ComfyUI's queue: stopping only its own runs, and following a
@@ -76,7 +76,11 @@ export function isTransientComfyError(error) {
 // How long ComfyUI may stay silent before a run is given up on (shorter in tests).
 const defaultLostAfterMs = Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) : 60_000;
 
+// A worker that takes the connection but answers slowly is busy (decoding and saving a long video), not gone.
+const defaultBusyLostAfterMs = 20 * 60_000;
+
 export const lostConnectionMessage = "ComfyUI stopped answering for over a minute, so this run was given up.";
+export const busyLostMessage = "ComfyUI stayed too busy to answer for over 20 minutes, so this run was given up.";
 export const droppedRunMessage = "ComfyUI no longer has this run. It may have restarted, or the run was removed from its queue.";
 
 /**
@@ -85,12 +89,14 @@ export const droppedRunMessage = "ComfyUI no longer has this run. It may have re
  *   { state: "done", entry }          - the history entry is there
  *   { state: "waiting", reconnected } - still queued or running
  *   { state: "reconnecting", delayMs, sinceMs } - ComfyUI is out of reach; ask again after delayMs
- * and throws once ComfyUI has been silent for `lostAfterMs`, or when the
+ *   { state: "waiting", busy: true }  - ComfyUI took the request but did not answer in time (busy)
+ * and throws once ComfyUI has been out of reach for `lostAfterMs` (busy and
+ * silent for `busyLostAfterMs`), or when the
  * prompt is neither queued, running nor in the history (dropped by a restart
  * or removed from ComfyUI's own queue). Any sign of life (a request that
  * answered, a progress message on the socket via `alive()`) resets the clock.
  */
-export function promptTracker(promptId, { request = comfy, now = Date.now, lostAfterMs = defaultLostAfterMs, verifyEvery = 10, pollTimeoutMs = 15_000 } = {}) {
+export function promptTracker(promptId, { request = comfy, now = Date.now, lostAfterMs = defaultLostAfterMs, busyLostAfterMs = defaultBusyLostAfterMs, verifyEvery = 10, pollTimeoutMs = 15_000 } = {}) {
   let lastAlive = now();
   let downSince = null;
   let failures = 0;
@@ -115,6 +121,14 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
       return { answer };
     } catch (error) {
       if (!isTransientComfyError(error)) throw error;
+      // Timed out: ComfyUI took the request but is too busy to answer yet. Its run goes on, so this is
+      // waiting, not reconnecting; only a long silence (no answer, no socket message) gives the run up.
+      if (isComfyTimeout(error)) {
+        downSince = null;
+        failures = 0;
+        if (now() - lastAlive >= busyLostAfterMs) throw Object.assign(new Error(busyLostMessage), { lostConnection: true });
+        return { down: { state: "waiting", busy: true, reconnected: false } };
+      }
       return { down: reconnecting() };
     }
   };
