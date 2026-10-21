@@ -11,6 +11,31 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Batch 5: a reworked phone Create, inline confirmations in the status pill, Settings as flat lists, a manual AI Control switch, and MCP that owns its chat rules
+
+### Added
+- **AI Control in Settings › Workers:** administrators choose what each GPU runs, with a preview of what stops, starts and keeps, a confirmation only when something stops, and progress in the status pill; a change to both GPUs runs as one job through AI Control's board routes. Everyone else reads the status. Manual only.
+- **Self-service account:** name, email and password in Settings › Account. Administrators edit model profiles as JSON (Settings › Users › Profiles), pick access profiles with multi-selects and Save & Discard.
+- **Gallery view controls on both devices:** Auto-Grouping, Grid Autoplay and Failed in the desktop toolbar and at the end of the phone's filter row. Stop All shows its count.
+- **Confirmations in the status pill:** questions ask inline with Cancel and the answer, never in a dialog; deleting several items lists their thumbnails and names under the question, then offers Undo in the same pill.
+- **Phone focused editing:** with the keyboard up, Prompt, Negative and the profile JSON editor fill the visible height on their own, with Done.
+- **LoRA prompt styles in MCP:** Studio adds a stacked LoRA's triggers (first when its note says so) and, for tag-style LoRAs, a short line of relevant tags to prompts it writes; a profile guide's recommended negative fills in when the caller gives none.
+- The LoRA picker notes a model's own limit (Radiance video: "Up to rank 64 in total").
+
+### Changed
+- **Phone Create:** Model, References, LoRAs, Size and Advanced open as pop-up lists over Create; the prompt's actions sit at its right edge; a two-line footer holds Steps and the count, then Image/Video · Clear · Generate. The collapsed prompt bar is back at the bottom of the gallery.
+- **Phone top bar:** the status light and "Studio" on the left, Images and Videos as centred icons, Search, Filter and a menu (Select, Library, Settings, Account, Sign Out). Selecting swaps the bar's contents; its actions sit in a bottom bar.
+- **Phone viewer:** the desktop's title top left, Star · Info · Close top right, and a centred action bar. Phone tiles no longer show generation times.
+- **Edit and Rerun** replace Reuse and Recreate everywhere; Details has one footer (Copy Prompts · Copy Settings above Edit · Rerun) and friendly profile, weight and LoRA names. Bulk Animate is gone.
+- **Messages:** one pill at a time, repeats fold into the one on screen, and upscale failures and "Image Ready" say so in the pill on both devices.
+- **Settings** are flat lists with one group per worker; Upscale and Face Detail are chosen per generation in Advanced Settings. About has its full page again.
+- **Civitai-ready PNGs** are always written; the switch is gone.
+- **MCP:** Studio's server instructions carry the chat rules, so clients need no prompt prefix. MCP never picks Grok or another cloud profile unless asked, and no longer falls back to the cloud when the local video worker is down. Distilled profiles take no CFG, in Studio or MCP.
+- Size always shows Width and Height; every composer control stays in the desktop bar; favourite workflows use the star.
+
+### Removed
+- Zen mode and Follow the Latest Output, Simple Phone Studio, the desktop More Settings drawer, and the local-install Settings (model folders, Hugging Face token, Tessera, model types, manifest, rescan, other devices).
+
 ## [0.34.3] - 2026-10-20
 
 > Phone scrolling works again
