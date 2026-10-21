@@ -90,7 +90,7 @@
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
-  box-shadow: inset 0 0 0 1px var(--surface-border);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
   color: hsl(var(--foreground));
   font-size: 12.5px;
   font-weight: 550;
@@ -116,7 +116,7 @@
   background: var(--surface-grain), var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
-  box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
   translate: -50% 0;
 }
 .inpaint-tool {
@@ -141,7 +141,7 @@
 .inpaint-tool:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 .inpaint-zoom-reset:focus-visible,
 .inpaint-size:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.inpaint-divider { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--surface-border); }
+.inpaint-divider { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--glass-border); }
 
 /* Fit-to-view appears only once zoomed, as the zoom level (mounted only then). */
 .inpaint-zoom { flex: none; overflow: hidden; }
@@ -178,7 +178,7 @@
   background: var(--surface-grain), var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
-  box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
   translate: 0 -50%;
   cursor: ns-resize;
   touch-action: none;
@@ -262,7 +262,7 @@
   background: var(--surface-grain), var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
-  box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
   color: hsl(var(--foreground) / .85);
   cursor: pointer;
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);

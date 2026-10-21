@@ -79,11 +79,6 @@ button.list-row { isolation: isolate; }
 .list-row-control .number-picker-label { display: none; }
 .list-row-control .number-picker { flex: none; }
 /* A native select laid over the row's value, so the tap opens the phone's own picker. */
-.list-select { position: relative; display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; max-width: 100%; color: hsl(var(--muted-foreground)); }
-.list-select-value { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.list-select > svg { flex: none; opacity: .7; }
-.list-select select { position: absolute; inset: -8px; width: calc(100% + 16px); opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.list-select:focus-within { color: hsl(var(--foreground)); }
 .list-row-control input.list-field {
   width: 100%;
   max-width: 150px;
@@ -206,7 +201,7 @@ button.list-row { isolation: isolate; }
 .account-menu-list {
   position: absolute;
   right: -6px;
-  bottom: calc(100% + 14px);
+  bottom: calc(100% + 8px);
   z-index: var(--z-popover, 50);
   display: grid;
   min-width: 190px;
@@ -265,14 +260,12 @@ button.list-row { isolation: isolate; }
    options that fill it, the chosen one in the selected fill. */
 .list-segments { display: inline-flex; gap: var(--space-1); height: var(--control-h-sm); padding: var(--seg-pad); border-radius: var(--r-pill); background: var(--well); }
 .list-segments button { height: 100%; background: transparent; }
-.list-row-unit { min-width: 38px; color: hsl(var(--muted-foreground)); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
 .list-row-control .number-picker.is-sm { height: var(--control-h-sm); }
 .list-row-control input.list-field { max-width: 120px; height: var(--control-h-sm); }
 
 /* Advanced Settings: the phone sheet and the desktop popover show the same list. */
 .advanced-list { display: flex; flex-direction: column; }
 .advanced-list > .list-section:first-of-type { margin-top: 0; }
-.phone-advanced .phone-sheet-body { padding-top: 0; }
 /* The desktop is denser: one column, menu-height rows, 13px type, labels on the
    left and every control on the right at --control-h-sm. */
 .composer-advanced .list-row { --list-row-h: var(--row-h-menu); padding: 2px 0; font-size: 13px; }
@@ -294,7 +287,7 @@ button.list-row { isolation: isolate; }
 .phone-size .list-row.is-selected .list-row-lead { color: var(--accent-amber); }
 .phone-size .list-row-value { font-variant-numeric: tabular-nums; }
 .phone-size .phone-size-fields { overflow: hidden; }
-.phone-size .phone-size-fields .size-custom-fields, .phone-size .phone-size-fields > * { padding: 4px 0 10px; }
+.phone-size .phone-size-fields > * { padding: 4px 0 10px; }
 .phone-size-saved-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
 
 /* -------------------------------------------------------------- Older phone groups, flat too */
@@ -336,12 +329,12 @@ button.list-row { isolation: isolate; }
 @media (max-width: 480px) {
   .picker-clear-long { display: none; }
   .picker-clear-short { display: inline; }
-  .picker-toolbar .reference-tabs button, .lora-filter .reference-tabs button { padding: 0 10px; font-size: 13px; }
+  .picker-toolbar .reference-tabs button { padding: 0 10px; font-size: 13px; }
 }
 /* Tab names stay on one line; at 320 px the pills give up padding first. */
 .reference-tabs button { white-space: nowrap; }
 @media (max-width: 359px) {
-  .picker-toolbar .reference-tabs button, .lora-filter .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
+  .picker-toolbar .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
 }
 .reference-popover .reference-popover-hint { flex: 0 1 auto; }
 /* The picked order, the same mark in every chooser: an empty ring, then the number on amber. */
@@ -358,7 +351,6 @@ button.list-row { isolation: isolate; }
 .reference-selected-row + .reference-selected-row { border-top: 1px solid var(--list-hairline); }
 
 /* LoRAs: the order mark leads; View Source, Info and Star sit on the right, in that order. */
-.composer-loras .lora-filter { order: 0; padding: 10px 12px 0; justify-content: flex-start; }
 .composer-loras .lora-picker-search { order: 1; }
 .composer-loras .lora-library-select[data-highlight="true"] { background: transparent; }
 /* The keyboard cursor shows while the list has keyboard focus, never after a click. */
@@ -379,10 +371,6 @@ button.list-row { isolation: isolate; }
 @media (hover: none) { .composer-loras .lora-library-select:hover { background: transparent; } }
 
 /* Models on the phone: the same chooser as a Create step: search and filter pills on the sheet itself, no boxed header. */
-.phone-model-sheet .phone-model-tools { margin: 0 -16px 4px; padding: 0 16px 6px; border-bottom: 1px solid var(--list-hairline); background: var(--glass-panel-solid, #161616); }
-.phone-model-sheet .phone-model-tools .model-filters { padding: 4px 0 6px; }
-.phone-model-sheet .phone-model-option { gap: var(--space-4); }
-.phone-model-sheet .phone-model-option .model-selection-tick { color: var(--accent-amber); }
 
 /* -------------------------------------------------------------- Phone header & Create button */
 

@@ -1,6 +1,6 @@
 @media (max-width: 620px) {
   body { overflow: hidden; }
-  .split, .advanced-grid, .number-row { grid-template-columns: 1fr; }
+  .split { grid-template-columns: 1fr; }
   .stage-gallery {
     padding: 8px 8px calc(var(--zen-prompt-h, 160px) + 26px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;

@@ -106,14 +106,6 @@
 }
 .run-stack-cover > img.media-loading { opacity: 0; }
 .run-stack-skim-frame { position: absolute; inset: 0; }
-.run-stack-shade {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(to top, rgb(0 0 0 / .74), rgb(0 0 0 / .32) 36%, transparent 64%),
-    radial-gradient(120% 60% at 100% 0%, rgb(0 0 0 / .28), transparent 50%);
-  pointer-events: none;
-}
 .run-stack-count {
   position: absolute;
   top: 9px;

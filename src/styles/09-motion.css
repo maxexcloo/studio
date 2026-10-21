@@ -19,9 +19,6 @@ button:not(:disabled) {
   background-image: var(--press-overlay) !important;
   transition-duration: var(--motion-instant);
 }
-:is(.btn.is-primary, .island-action, .phone-prompt-go, .lora-chip-action.is-primary, .tile-upscale.is-active, .list-toggle.is-on, .list-switch.is-on):active:not(:disabled) {
-  background-image: var(--press-overlay-dark) !important;
-}
 :is(.generate, .phone-generate):active:not(:disabled) {
   filter: brightness(.92);
   transition-duration: var(--motion-instant);
@@ -38,7 +35,6 @@ button:not(:disabled) {
 .zen-prompt-actions .model-trigger,
 .zen-prompt-actions .aspect-picker > button,
 .zen-prompt-actions .number-picker,
-.zen-prompt-actions .negative-toggle,
 .lora-pill {
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: var(--motion-fast);
@@ -49,7 +45,6 @@ button:not(:disabled) {
 @media (hover: hover) and (pointer: fine) {
   .zen-prompt-actions .model-trigger:hover,
   .zen-prompt-actions .aspect-picker > button:hover,
-  .zen-prompt-actions .negative-toggle:hover,
   .zen-prompt-actions .number-picker:hover {
     background: linear-gradient(var(--control-hover), var(--control-hover)), var(--well);
     border-color: transparent;
@@ -58,16 +53,8 @@ button:not(:disabled) {
   }
 }
 /* A pressed toggle in the bar: the selected chip (amber subtle, amber ink). */
-.zen-prompt-actions .negative-toggle.active,
-.zen-prompt-actions .negative-toggle.active:hover {
-  background: var(--selected-bg);
-  border-color: transparent;
-  box-shadow: none;
-  color: var(--selected-ink);
-}
 
 /* Icons in the bar rotate/settle on the same curve. */
-.negative-toggle svg,
 .model-trigger svg,
 .aspect-picker > button svg {
   transition: transform var(--motion-base) var(--motion-ease), opacity var(--motion-fast) linear;

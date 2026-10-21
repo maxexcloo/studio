@@ -88,7 +88,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .app-shell {
   position: fixed; inset: 0; overflow: hidden;
   background: hsl(var(--background)); color: hsl(var(--foreground));
-  animation: appIn 600ms var(--ease-soft) both;
+  animation: appIn var(--motion-app-in) var(--ease-soft) both;
 }
 @keyframes appIn {
   from { opacity: 0; }
@@ -121,9 +121,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     transparent 100%
   );
 }
-.brand { display: flex; align-items: center; gap: var(--space-4); margin-bottom: 18px; }
-.brand img { width: 22px; height: 22px; display: block; filter: invert(1); opacity: 0.92; }
-.brand h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); }
 
 .mode-tabs {
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1);
@@ -398,31 +395,13 @@ input.is-framed:focus-visible {
 .aspect-shape.default { width: 18px; height: 18px; }
 .aspect-shape.custom { width: 22px; height: 22px; border-style: dashed; }
 
-.split, .advanced-grid {
+.split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
-.advanced-grid { margin-top: 10px; }
 .flip { transform: rotate(180deg); }
-
-.sidebar-body {
-  flex: 1;
-  overflow: auto;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding: 2px 1px;
-}
-
-.sidebar-hint {
-  margin: -4px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  opacity: 0.6;
-}
 
 .generate {
   position: relative;

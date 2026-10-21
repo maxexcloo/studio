@@ -13,7 +13,7 @@
   flex: none;
   aspect-ratio: 2.15;
   overflow: hidden;
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: 1px solid var(--glass-border);
   background: radial-gradient(ellipse 70% 90% at 50% 50%, #191919 0%, #0c0c0c 100%);
 }
 .upscale-hero { position: absolute; inset: 0; }

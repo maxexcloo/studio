@@ -203,16 +203,6 @@
    :where() position is zero-specificity: it only applies to buttons that are
    not already positioned, so absolutely placed ones stay where they are. */
 @media (pointer: coarse) {
-  :where(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch) { position: relative; }
-  :is(.model-menu-clear, .lora-chip-remove, .mf-notice-close, .lora-remove, .run-shelf-action, .lora-head-action, .lora-text-action, .lora-chip-action, .ref-thumb-remove, .reference-tile-delete, .model-star, .readout-copy, .island-close, .wf-search button, .wf-filters button, .model-setup .btn, .tile-action, .switch)::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, 44px);
-    height: max(100%, 44px);
-    translate: -50% -50%;
-  }
 
   /* Sliders: a thumb you can find with a finger. */
   .lora-strength input[type="range"] { height: 32px; }
@@ -289,5 +279,3 @@
 /* ------------------------------------------------------------ The composer */
 
 /* A negative prompt the workflow cannot take: the toggle is inert, no dot. */
-.negative-toggle.is-unavailable { opacity: .45; cursor: not-allowed; }
-.negative-toggle.is-unavailable::after { display: none !important; }

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Tip } from './components';
 import { AnimatePresence, motion } from 'framer-motion';
-import { popoverMotion, useSettling } from './composerSurface';
+import { createPortal } from 'react-dom';
+import { popoverMotion, useAnchoredBox, useSettling } from './composerSurface';
 import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './Sheet';
@@ -75,12 +76,20 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
   onError: (message: string) => void;
 }) {
   const settling = useSettling();
-  return (
+  // Above the clock button that opened it (anchoredPlacement, UI-PATTERNS › Surfaces), in the page's
+  // own layer so the composer's edges never clip it. The button says it is open once this renders.
+  const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
+  React.useLayoutEffect(() => {
+    setTrigger(open ? document.querySelector<HTMLElement>('[data-history-trigger][aria-expanded="true"]') : null);
+  }, [open, kind]);
+  const box = useAnchoredBox(trigger, HISTORY_SIZE, open);
+  return createPortal(
     <AnimatePresence>
-      {open ? (
+      {open && box ? (
         <motion.div
           key={`history-${kind}`}
-          className="prompt-history"
+          className="prompt-history is-anchored"
+          style={box}
           data-open-surface
           {...popoverMotion}
           {...settling}
@@ -88,9 +97,13 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
           <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} onError={onError} />
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
+
+/** As wide as the composer's other pickers, and only as tall as its list. */
+const HISTORY_SIZE = { width: 560, minWidth: 360, maxWidth: 560, minHeight: 240, maxHeight: 480, fit: true };
 
 function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'escape' | 'outside') => void; onPick: (text: string) => void; kind: PromptKind; onError: (message: string) => void }) {
   const { prompts, ready } = usePromptHistory(true, kind);

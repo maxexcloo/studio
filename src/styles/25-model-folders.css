@@ -130,121 +130,22 @@
 
 /* ------------------------------------------------------- Sidebar notice */
 
-.mf-notice-wrap { overflow: hidden; }
-.mf-notice {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  margin-bottom: 10px;
-  border-radius: var(--r-item);
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgb(255 154 82 / .12), transparent 55%),
-    var(--control-fill);
-  box-shadow: inset 0 0 0 1px rgb(255 154 82 / .14);
-}
-.mf-notice-main {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: var(--space-5);
-  min-width: 0;
-  padding: 12px 6px 12px 12px;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--motion-fast);
-}
-.mf-notice-main:hover { background: var(--control-hover); }
-.mf-notice-main:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.mf-notice-text { display: grid; flex: 1; gap: var(--space-1); min-width: 0; }
-.mf-notice-text strong { font-size: 12.5px; font-weight: 600; color: hsl(var(--foreground)); }
-.mf-notice-text span { overflow: hidden; font-size: 11.5px; line-height: 1.35; color: hsl(var(--muted-foreground)); text-overflow: ellipsis; }
-.mf-notice-cta {
-  flex: none;
-  padding: 4px 10px;
-  border-radius: var(--r-pill);
-  background: var(--action);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--action-ink);
-}
-.mf-notice-close {
-  display: grid;
-  flex: none;
-  align-self: center;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  margin: 0 8px 0 2px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: hsl(var(--muted-foreground) / .6);
-  cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast);
-}
-.mf-notice-close:hover { background: var(--control-hover); color: #fff; }
-.mf-notice-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-
 /* The folder glyph: cells that fill with heat from the base, a quiet loop. */
-.mf-glyph {
-  display: grid;
-  flex: none;
-  grid-template-columns: repeat(7, 3px);
-  grid-template-rows: repeat(6, 3px);
-  gap: var(--space-1);
-}
-.mf-glyph i { border-radius: .5px; }
-.mf-glyph i.is-tab { background: rgb(255 255 255 / .45); }
-.mf-glyph i.is-on {
-  background: rgb(255 255 255 / .22);
-}
 
 /* The model menu's last row: always one tap to look for missing models. */
-.model-menu-find {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  width: 100%;
-  margin-top: 4px;
-  padding: 9px 12px;
-  border: 0;
-  border-top: 1px solid var(--surface-border);
-  border-radius: 0 0 var(--r-item) var(--r-item);
-  background: transparent;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast);
-}
-.model-menu-find:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.model-menu-find em { font-style: normal; font-weight: 600; color: hsl(var(--foreground)); }
-.model-menu-find.has-found span { color: hsl(var(--foreground)); }
-.model-menu-find.has-found em { color: var(--ember); }
 .model-menu-find-cta { justify-self: start; margin-top: 8px; }
 
 /* Settings: folders Studio added, with a way back out. */
-.set-folder-path { overflow: hidden; font: 500 11.5px var(--font-mono); white-space: nowrap; text-overflow: ellipsis; }
 
 /* Long paths lose their start, not their end, so the folder name stays
    visible ("…\ComfyUI\models\checkpoints"). rtl only moves the ellipsis;
    the LRMs keep a leading "/" or "C:" and a trailing "\" in place. */
-.set-folder-path,
 .mf-folder-copy code,
 .mf-linked code,
 .upscale-files code { direction: rtl; text-align: left; }
-.set-folder-path::before, .set-folder-path::after,
-.mf-folder-copy code::before, .mf-folder-copy code::after,
-.mf-linked code::before, .mf-linked code::after,
-.upscale-files code::before, .upscale-files code::after { content: "\200E"; }
+.mf-folder-copy code::before, .mf-folder-copy code::after, .mf-linked code::before, .mf-linked code::after, .upscale-files code::before, .upscale-files code::after { content: "\200E"; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mf-glyph i.is-on,
   .mf-spinner { animation: none; }
 }
 
@@ -270,13 +171,13 @@
   align-content: start;
   /* Room for the scrollbar without it touching the rows. */
   scrollbar-gutter: stable;
-  border-top: 1px solid var(--surface-border);
+  border-top: 1px solid var(--glass-border);
   padding-top: 4px;
 }
 .model-menu .model-filters { display: flex; gap: var(--space-3); padding: 8px 2px 12px; overflow-x: auto; }
 .model-menu .model-filter-group { flex: none; flex-wrap: nowrap; }
 .model-menu .model-filter-label { display: none; }
-.model-menu .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--surface-border); }
+.model-menu .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--glass-border); }
 .model-menu .model-filter-group button { flex: none; padding: 0 10px; height: 32px; }
 .model-menu-section { display: grid; gap: var(--space-1); }
 .model-menu-label {
@@ -287,7 +188,6 @@
   color: rgb(255 255 255 / .6);
 }
 .model-menu-search { margin-bottom: 4px; }
-.model-menu .model-menu-find { flex: none; margin-top: 6px; }
 
 .model-row { position: relative; }
 .model-menu .model-option { min-height: 58px; }

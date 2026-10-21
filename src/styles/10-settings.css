@@ -3,31 +3,6 @@
 
 /* -------------------------------------------------------------- Disclosures */
 
-.settings-disclosure {
-  border: 0;
-  border-radius: 18px;
-  background: #141414;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-}
-.settings-disclosure summary {
-  min-height: 48px;
-  padding: 0 16px;
-  color: hsl(var(--muted-foreground));
-  font-size: 13px;
-  font-weight: 550;
-  transition: color var(--motion-base) var(--motion-ease);
-}
-.settings-disclosure summary:hover,
-.settings-disclosure[open] summary { color: hsl(var(--foreground)); }
-.settings-disclosure summary::after {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  line-height: 1;
-}
-
 /* ---------------------------------------------------------------- Responsive */
 
 /* Smart upscale readiness and model download progress. */

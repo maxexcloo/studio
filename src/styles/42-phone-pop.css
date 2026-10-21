@@ -323,9 +323,6 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .phone-heading-name { line-height: 1; }
 .phone-heading .phone-running-inline { width: 32px; min-width: 32px; margin-left: -4px; padding: 0; gap: var(--space-1); font-size: 10px; }
 @media (max-width: 379px) { .phone-heading-name { display: none; } }
-.details-copy-actions { margin-left: auto; min-width: 0; }
-.details-copy-actions .details-footer-row { display: flex; gap: var(--space-2); }
-.details-copy-actions .details-footer-btn { min-height: 36px; padding: 6px 8px; font-size: 12px; }
 
 .compare-variants .phone-sheet-body { display: flex; flex-direction: column; gap: var(--space-6); }
 .comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--space-6); }

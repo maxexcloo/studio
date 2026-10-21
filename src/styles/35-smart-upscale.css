@@ -61,59 +61,18 @@
   display: grid;
   place-items: center;
 }
-.aspect-upscale-badge {
-  position: absolute;
-  right: -9px;
-  bottom: -6px;
-  padding: 0 3px;
-  border-radius: 4px;
-  background: var(--ember);
-  color: #1a0d03;
-  font: 700 8.5px/1.35 var(--font-mono);
-  letter-spacing: .02em;
-  box-shadow: 0 0 0 1.5px var(--well), var(--ember-glow);
-  pointer-events: none;
-}
 
 @media (max-width: 760px) {
   .aspect-upscale-tabs button { min-height: 38px; }
 }
 
 /* Phone studio: the same three tiers as a segmented row in the create sheet. */
-.phone-control-note {
-  margin: 0;
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-  line-height: 1.4;
-  text-wrap: pretty;
-}
 
 /* An upscaled tab: a small arrow on a tag of its own, right after the size. */
-.aspect-upscale-tabs button,
-.phone-seg button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
-.aspect-upscale-arrow {
-  flex: none;
-  box-sizing: content-box;
-  padding: 1px;
-  border-radius: 4px;
-  background: rgb(255 255 255 / .08);
-  color: hsl(var(--muted-foreground));
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.aspect-upscale-tabs button.is-active .aspect-upscale-arrow { background: var(--selected-bg); color: var(--selected-ink); }
+.aspect-upscale-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
 /* The phone's chosen segment is white: the arrow takes the beta tag's darker ember. */
-.phone-seg button.active .aspect-upscale-arrow { background: rgb(214 104 30 / .14); color: #b0500f; }
 
 /* How the chosen size is made, and what it ends at. */
-.aspect-upscale-line {
-  margin: 0;
-  padding: 0 6px;
-  color: hsl(var(--muted-foreground) / .85);
-  font-size: 11.5px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.35;
-}
 
 /* The size list: compact rows; "Default" carries its own ratio in a quieter white. */
 .aspect-option > span:nth-child(2) small { margin-left: 7px; font-weight: 500; color: rgb(255 255 255 / .45); }

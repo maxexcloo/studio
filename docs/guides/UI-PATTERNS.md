@@ -12,8 +12,12 @@ the pattern occurs in the same piece of work.
   focus and small state changes, `--motion-base` (200 ms) for surfaces
   entering or leaving, `--motion-slow` (320 ms) for height changes such as a
   row's details expanding. `--motion-ease` for interactive state changes;
-  `--ease-soft` for staged sequences and sheets. No raw milliseconds or
-  `cubic-bezier()` in transitions.
+  `--ease-soft` for staged sequences and sheets. Beyond those four:
+  `--motion-tick` (1 s, linear) for progress that follows the once-a-second
+  clock, `--motion-emphasis` (420 ms) for a one-off "look here" (ready, wrong
+  password), `--motion-app-in` for the app fading in and `--motion-stagger`
+  between a menu's items. No raw milliseconds or `cubic-bezier()` in
+  transitions; looping spinners and shimmers keep their own cycle lengths.
 - **Framer motion** uses `src/lib/springs.ts` only: `tweens.*` match the CSS
   tokens, `springs.*` have no bounce, and `springs.sheet` (`stiffness: 420,
   damping: 40`) is only for sheets that follow a finger. Nothing overshoots.

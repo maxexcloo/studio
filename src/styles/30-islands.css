@@ -306,7 +306,6 @@ button.activity-main { cursor: pointer; }
   translate: -50% 0;
 }
 .reference-popover-head:has(.status-pill) .reference-popover-hint { display: none; }
-.phone-title.is-yielding .phone-scroll-top { display: none; }
 
 /* ------------------------------------------- Where a download island leads
    Opened from the island, the setup row or starter card for that download

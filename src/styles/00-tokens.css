@@ -22,12 +22,6 @@
   --glass-panel-shadow: 0 24px 80px rgb(0 0 0 / .5), 0 2px 10px rgb(0 0 0 / .38), inset 0 1px 0 rgb(255 255 255 / .045);
   /* A faint grain over the glass. */
   --surface-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  /* Older names for the panel level, kept for upstream-owned rules. */
-  --surface-float: var(--glass-panel-bg);
-  --surface-float-blur: var(--glass-panel-blur);
-  --surface-border: var(--glass-border);
-  --shadow-float: var(--glass-panel-shadow);
-  --shadow-float-sm: var(--glass-bar-shadow);
   /* Solid modal sheets. */
   --surface-modal: #161616;
 
@@ -144,6 +138,13 @@
   --motion-base: 200ms;
   --motion-slow: 320ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  /* Beyond the four steps: a progress fill that follows the once-a-second clock, a one-off
+     "look here" (ready, wrong password), the app fading in at load and a menu's stagger.
+     Looping spinners and shimmers keep their own cycle lengths; 0 and 0.01ms switch motion off. */
+  --motion-tick: 1s;
+  --motion-emphasis: 420ms;
+  --motion-app-in: 600ms;
+  --motion-stagger: 70ms;
   /* Staged sequences and sheets. */
   --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
 }

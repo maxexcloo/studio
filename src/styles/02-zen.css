@@ -7,15 +7,6 @@
 }
 .zen-control-button:hover { border-color: var(--line-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 
-.sidebar-dismiss {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  border: 0;
-  background: transparent;
-  cursor: default;
-}
-
 .zen-prompt {
   position: fixed; left: 50%; bottom: 18px; z-index: 10;
   width: min(960px, calc(100vw - 64px));
@@ -78,12 +69,6 @@
   margin-top: 4px;
   border-top-color: var(--line);
 }
-.negative-drawer-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: hsl(var(--muted-foreground));
-  letter-spacing: -0.005em;
-}
 .negative-drawer textarea {
   min-height: 0;
   height: 36px;
@@ -94,21 +79,6 @@
   color: hsl(var(--foreground));
   line-height: 1.45;
 }
-.negative-unavailable-frame {
-  position: relative;
-  min-width: 0;
-}
-.negative-unavailable-frame textarea {
-  display: block;
-  width: 100%;
-}
-.negative-drawer .negative-unavailable-frame textarea {
-  min-height: 0;
-  height: 1lh;
-  max-height: none;
-  padding: 0;
-}
-.negative-drawer .negative-unavailable-frame textarea:focus { height: 2lh; }
 .negative-drawer.open:focus-within { max-height: 140px; }
 .negative-drawer.open.is-unused { opacity: .55; }
 .negative-drawer textarea::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
@@ -121,9 +91,6 @@
 .negative-drawer.is-unavailable {
   border-top-color: var(--line);
 }
-.negative-drawer.is-unavailable .negative-drawer-label {
-  color: hsl(var(--foreground));
-}
 .negative-drawer.is-unavailable textarea {
   border: 1px solid var(--glass-border);
   border-radius: var(--r-field);
@@ -135,23 +102,6 @@
   opacity: 1;
   cursor: not-allowed;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
-}
-.negative-drawer.is-unavailable .negative-unavailable-frame::after {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: calc(var(--r-field) - 1px);
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      transparent 0 9px,
-      hsl(var(--foreground) / 0.035) 9px 10px,
-      transparent 10px 18px
-    ),
-    linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.035), transparent);
-  mask-image: linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%);
-  opacity: 0.95;
 }
 .negative-drawer.is-unavailable textarea::placeholder {
   color: hsl(var(--muted-foreground) / 0.86);
@@ -224,56 +174,10 @@
 .zen-inline-settings .aspect-picker > button:hover { border-color: var(--line-strong); background: var(--control-hover); }
 .zen-inline-settings .aspect-shape { transform: scale(0.7); }
 
-.negative-toggle {
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: 0 11px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-pill);
-  background: hsl(var(--input));
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.negative-toggle:hover {
-  background: var(--control-hover);
-  color: hsl(var(--foreground));
-}
-.negative-toggle.active {
-  background: var(--selected-bg);
-  color: var(--selected-ink);
-  border-color: transparent;
-}
-.negative-toggle.is-unavailable {
-  border-style: dashed;
-  background: hsl(var(--input) / 0.7);
-  color: hsl(var(--muted-foreground));
-}
-.negative-toggle.is-unavailable.active {
-  background: hsl(var(--secondary) / 0.7);
-  color: hsl(var(--foreground));
-}
-.negative-toggle.is-unavailable::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-pill);
-  background: hsl(var(--muted-foreground));
-  opacity: 0.8;
-}
-.negative-toggle svg { transition: transform var(--motion-fast) var(--motion-ease); }
-.negative-toggle svg.flip { transform: rotate(180deg); }
-
 .zen-inline-settings .number-picker { height: 40px; }
 .zen-prompt-actions .model-trigger,
 .zen-prompt-actions .aspect-picker > button,
 .zen-prompt-actions .number-picker,
-.zen-prompt-actions .negative-toggle,
 .zen-prompt-actions .generate {
   height: 40px;
   min-height: 40px;
@@ -389,13 +293,6 @@
 .number-picker-input::-webkit-outer-spin-button,
 .number-picker-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .number-picker-input:focus { outline: 1px solid var(--line-strong); outline-offset: -1px; }
-
-.number-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-4);
-  margin-bottom: 12px;
-}
 
 .zen-prompt .aspect-menu,
 .zen-prompt .model-menu {

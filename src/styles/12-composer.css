@@ -13,19 +13,16 @@
 .composer-prompt-field { min-width: 0; }
 .composer-prompt-field textarea { display: block; width: 100%; }
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
-.zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 15px; line-height: 1.4; }
-.composer-prompt-tools { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-height: 28px; padding: 0 var(--prompt-text-inset, 4px); }
-.composer-secondary-row { display: flex; align-items: center; gap: var(--space-4); border-top: 1px solid var(--surface-border); padding-top: 4px; }
+.composer-secondary-row { display: flex; align-items: center; gap: var(--space-4); border-top: 1px solid var(--glass-border); padding-top: 4px; }
 .composer-secondary-row .negative-drawer.open { max-height: none; overflow: visible; flex: 1; min-width: 0; border: 0; margin: 0; padding: 0 var(--prompt-text-inset, 10px); }
 .composer-secondary-row .phone-negative { flex: 1; min-width: 0; border: 0; padding: 0; }
-.composer-secondary-row .composer-prompt-tools { flex: none; padding-left: 0; }
 .composer-reference-tools:empty { display: none; }
 .prompt-action { display: inline-flex; align-items: center; justify-content: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .prompt-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .prompt-action.active { background: var(--selected-bg); color: var(--selected-ink); }
 .prompt-action:disabled { opacity: .4; cursor: default; }
 .prompt-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-@media (pointer: coarse) { .zen-prompt .composer-prompt-field textarea, .zen-prompt .negative-drawer .negative-unavailable-frame textarea { font-size: 16px; } }
+@media (pointer: coarse) { .zen-prompt .composer-prompt-field textarea { font-size: 16px; } }
 
 /* The row never wraps any more: the ladder is what makes it fit. */
 .zen-inline-settings { flex-wrap: nowrap; }
@@ -215,25 +212,9 @@
 .zen-prompt-actions:not([data-density-level="0"]) .composer-estimate { display: none; }
 
 /* "2 LoRAs": the count, then the word. */
-.lora-pill-word { margin-left: 4px; }
 .model-loras { min-width: 0; margin: 12px 0; }
 .model-loras > h3 { margin: 0 0 8px; font-size: 13px; }
-.lora-filter { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 8px 0; }
-.lora-filter label { display: grid; gap: var(--space-3); font-size: 12px; }
-.lora-filter select { min-height: 44px; max-width: 100%; }
-.lora-filter small { color: hsl(var(--muted-foreground)); font-size: 11px; }
 .lora-option-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-@media (pointer: coarse) {
-  .composer-prompt-tools { min-height: 40px; }
-  .composer-prompt-tools .prompt-action, .composer-prompt-tools .ref-add { min-height: 40px; }
-  .composer-prompt-tools .prompt-action { width: 40px; }
-}
-
-@media (max-width: 620px) {
-  .composer-prompt-tools .ref-add { width: 40px; padding: 0; }
-  .composer-prompt-tools .ref-add-label, .composer-prompt-tools .ref-add-label > span { gap: 0; font-size: 0; }
-}
 
 /* One stepper everywhere (count, steps, Advanced): minus/value/plus stays when
    labels compact, and on touch each part is its own 44 px target. */

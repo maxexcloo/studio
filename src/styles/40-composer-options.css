@@ -48,18 +48,12 @@
 .zen-prompt:not(.is-expanded) .composer-resource-row { display: none; }
 /* Phone creation buttons: one 44px pill in a dark well. */
 .composer-resource-model .model-menu { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
-.composer-resource-left .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); height: var(--control-h); padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
+.composer-resource-left .composer-resource-add { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); height: var(--control-h); padding: 6px 10px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; }
 .composer-resource-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .composer-resource-add svg { flex: none; }
 .composer-resource-model .model-menu { width: min(460px, calc(100vw - 32px)); }
 .model-menu .model-option .model-copy em { display: block; font-size: 12px; line-height: 1.45; white-space: normal; }
 .model-menu .model-menu-list { scrollbar-gutter: auto; }
-.model-menu .model-menu-browse { display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: var(--space-4); width: 100%; min-height: 58px; margin: 6px 0 0; padding: 6px 10px; border: 1px solid var(--surface-border); border-radius: var(--r-item); background: var(--control-fill); color: hsl(var(--foreground)); text-align: left; }
-.model-menu-browse > .model-copy { grid-column: 2; grid-row: 1; }
-.model-menu-browse > svg { grid-column: 1; grid-row: 1; justify-self: center; }
-.model-menu .model-menu-browse:hover { background: var(--control-hover); }
-.model-menu-browse .model-copy strong { max-width: none; font-size: 13px; }
-.model-menu-browse .model-copy em { margin-top: 2px; color: hsl(var(--muted-foreground)); }
 /* Advanced Settings: the composer popover (LoraPopover.tsx), one column above its
    button, as tall as its rows and scrolling inside itself past the room above. */
 .composer-advanced:not(.is-pop) { height: auto; }
@@ -71,8 +65,6 @@
 .composer-loras .model-loras, .composer-loras .lora-panel { flex: 1; min-height: 0; }
 .composer-loras .lora-picker { max-height: none; height: 100%; }
 .composer-loras .lora-picker-list { min-height: 60px; }
-.composer-loras .lora-filter { flex-wrap: wrap; }
-.composer-loras .lora-filter small { font-size: 11px; }
 .composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
 .composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: var(--space-4); min-height: 54px; padding: 8px; border: 0; background: transparent; }
 .composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--cursor-bg); }
@@ -84,7 +76,7 @@
 .composer-loras .lora-picker-foot .btn { flex-shrink: 0; }
 .composer-loras .model-loras { display: flex; flex-direction: column; margin: 0; }
 .composer-loras .lora-picker { flex: 1; height: auto; }
-.composer-loras .lora-picker-head, .composer-loras .lora-picker-search, .composer-loras .lora-filter { flex-shrink: 0; }
+.composer-loras .lora-picker-head, .composer-loras .lora-picker-search { flex-shrink: 0; }
 
 /* A tick identifies the chosen model without a persistent selected surface. */
 .model-menu .model-option.active { background: transparent; box-shadow: none; }
@@ -96,8 +88,6 @@
 .composer-loras .lora-library-select:hover { color: hsl(var(--foreground)); }
 .composer-loras .lora-library-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .composer-loras .lora-library-select:disabled { opacity: .45; cursor: default; }
-.composer-loras .lora-library-check { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 1px solid hsl(var(--foreground) / .3); border-radius: var(--r-check); color: var(--accent-amber-ink); }
-.composer-loras .lora-library-select[aria-checked="true"] .lora-library-check { background: var(--accent-amber); border-color: var(--accent-amber); }
 .composer-loras .lora-library-select .lora-option-copy { flex: 1; min-width: 0; }
 .composer-loras .lora-library-select .lora-option-copy strong { font-size: 12px; }
 .composer-loras .lora-library-select .lora-option-copy span { display: block; overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); font-size: 10.5px; }
@@ -126,16 +116,12 @@
 .composer-loras .lora-picker { gap: 0; }
 .composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--line); }
 .composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: var(--control-fill); }
-.composer-loras .lora-filter { order: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 0 12px 10px; }
-.composer-loras .lora-filter small { max-width: 260px; text-align: right; }
 .composer-loras .lora-picker-list { order: 2; margin: 0; padding: 0 12px 10px; }
 .composer-loras .lora-library-row:last-child { border-bottom: 0; }
 .composer-loras .lora-library-select:hover { background: var(--cursor-bg); }
 .composer-loras .lora-panel > :not(.lora-picker) { margin-left: 12px; margin-right: 12px; }
-@media (max-width: 760px) { .composer-loras .lora-filter small { display: none; } }
 
 /* Selection counts in the resource picker; stacks live in its heading (PickerTools). */
-.composer-loras .lora-selection-count { color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; }
 .composer-loras .lora-library-expansion { overflow: hidden; }
 .composer-loras .lora-library-order { display: inline-flex; align-items: center; }
 .composer-loras .lora-library-order .prompt-action { width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); }
@@ -144,23 +130,13 @@
 .composer-loras .lora-library-grip { position: absolute; top: 7px; left: 0; display: grid; place-items: center; width: 28px; height: 44px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
 .composer-loras .lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 30px; }
 .composer-loras .lora-library-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
-.composer-loras .lora-details { margin: 0 2px 0 30px; color: hsl(var(--muted-foreground)); font-size: 12px; }
-.composer-loras .lora-details summary { display: flex; align-items: center; gap: var(--space-3); width: fit-content; min-height: 44px; cursor: pointer; }
-.composer-loras .lora-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.composer-loras .lora-details a { display: inline-flex; align-items: center; min-height: 44px; color: hsl(var(--foreground)); }
 
 .composer-loras .lora-library-row.is-dragging { opacity: .6; }
 .composer-loras .lora-library-row.is-drop-target { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
 
 /* Info sits beside the star as an icon, so a closed row is one line; its details still open below. */
 .composer-loras .lora-library-select { padding-right: 72px; }
-.composer-loras .lora-library-row > .lora-details { margin: 0 2px 0 30px; }
-.composer-loras .lora-library-row > .lora-details > summary { position: absolute; top: 12px; right: 36px; justify-content: center; width: var(--control-h-sm); min-height: var(--control-h-sm); border-radius: var(--r-pill); }
-.composer-loras .lora-library-row > .lora-details > summary::-webkit-details-marker { display: none; }
-.composer-loras .lora-library-row > .lora-details > summary:hover { color: hsl(var(--foreground)); }
 /* On touch the Info target reaches 44px without changing the row; it stops short of the star. */
-@media (hover: none) { .composer-loras .lora-library-row > .lora-details > summary::after { content: ""; position: absolute; inset: -6px; } }
-.composer-loras .lora-library-row > .lora-details[open] > div { padding-top: 2px; }
 /* The keyboard's place in the list is always visible. */
 .composer-loras .lora-library-select[data-highlight="true"] { background: var(--cursor-bg); }
 

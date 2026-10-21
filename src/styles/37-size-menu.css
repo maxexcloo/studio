@@ -80,11 +80,11 @@
   right: calc(100% + 8px);
   width: 216px;
   overflow: hidden;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-menu);
   /* Nearly opaque: inside the menu's own blur its backdrop would read as empty. */
   background: var(--surface-grain), rgb(22 22 22 / .96);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--glass-panel-shadow);
   opacity: 0;
   transform: scale(.96);
   transform-origin: right center;
@@ -369,7 +369,7 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
   gap: var(--space-4);
   margin-top: 6px;
   padding: 10px 4px 2px 6px;
-  box-shadow: inset 0 1px 0 var(--surface-border);
+  box-shadow: inset 0 1px 0 var(--glass-border);
 }
 .size-mp-label { flex: 1; display: grid; justify-items: start; gap: var(--space-1); min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
 .size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: saveSwap var(--motion-fast) var(--motion-ease) both; }
@@ -414,7 +414,3 @@ html.is-size-scrubbing * { cursor: ew-resize !important; user-select: none !impo
 .phone-size-mp .size-mp .size-mp-field .size-field-key { width: 42px; }
 
 .size-tier-controls, .size-resolution { display: grid; gap: var(--space-3); min-width: 0; }
-.size-custom-action { min-height: var(--control-h-sm); padding: 6px 12px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
-.size-custom-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.size-custom-action.is-active { background: var(--selected-bg); color: var(--selected-ink); }
-.phone-size .size-custom-action { min-height: 44px; }

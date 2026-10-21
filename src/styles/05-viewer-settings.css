@@ -12,12 +12,6 @@
   margin: 0 6px;
   display: inline-block;
 }
-.viewer-zoom {
-  min-width: 56px; padding: 0 10px;
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px; font-weight: 500;
-}
 
 .viewer-dock {
   position: absolute;
@@ -28,13 +22,11 @@
   display: flex; align-items: center;
 }
 .viewer-stage.with-side .viewer-dock { left: calc(50% - 190px); }
-.viewer-dock .icon-button:hover,
-.viewer-dock .text-button:hover { background-color: var(--control-hover); border-color: transparent; color: hsl(var(--foreground)); }
+.viewer-dock .icon-button:hover { background-color: var(--control-hover); border-color: transparent; color: hsl(var(--foreground)); }
 .viewer-dock .icon-button.active { color: var(--selected-ink); }
 .viewer-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; color: hsl(var(--muted-foreground)); }
 .viewer-dock .icon-button:disabled:hover { background-color: transparent; color: hsl(var(--muted-foreground)); }
 .viewer-dock .danger-tone:hover { background-color: hsl(var(--destructive) / 0.22); color: hsl(var(--destructive-foreground)); }
-.viewer-dock .viewer-zoom { color: hsl(var(--foreground)); padding: 0 8px; min-width: 52px; }
 
 .viewer-stage {
   position: relative;
@@ -134,41 +126,6 @@
    .btn loads later, so the overrides carry its class too. */
 .viewer-actions { display: grid; gap: var(--space-4); min-width: 0; }
 /* Two to a row in name order; Use Settings, the main move, takes a row to itself when it would sit alone. */
-.viewer-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); min-width: 0; }
-.viewer-action-grid > .viewer-reuse:nth-child(odd) { grid-column: 1 / -1; }
-.viewer-action-grid .btn.viewer-action { width: 100%; }
-.viewer-action-main { width: 100%; }
-.viewer-reuse { width: 100%; }
-.viewer-action-row { display: flex; gap: var(--space-3); min-width: 0; }
-.btn.viewer-action {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  height: 34px; min-height: 34px;
-  padding: 0 10px;
-  gap: var(--space-3);
-  color: hsl(var(--muted-foreground));
-  font-size: 12.5px;
-}
-.btn.viewer-action:hover:not(:disabled),
-.btn.viewer-action.is-copied { color: hsl(var(--foreground)); }
-.viewer-action svg { flex: none; }
-.viewer-action-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.viewer-action-count {
-  display: inline-grid; place-items: center;
-  flex: none;
-  min-width: 17px; height: 17px;
-  padding: 0 5px;
-  border-radius: var(--r-pill);
-  /* A step above the hover fill, so the badge stays visible on hover. */
-  background: rgb(255 255 255 / .14);
-  color: hsl(var(--foreground));
-  font-size: 10.5px; font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-@media (pointer: coarse) {
-  .btn.viewer-action { height: 40px; min-height: 40px; }
-}
 
 /* Details: each prompt unboxed under its label, its Copy and Use beside the label. */
 .prompt-readout { display: grid; gap: var(--space-3); min-width: 0; }
@@ -229,68 +186,12 @@
 }
 /* Generation Settings sit on the panel like Prompt and Negative: a quiet label, no box. */
 .detail-settings { display: grid; gap: var(--space-5); min-width: 0; }
-.detail-settings-title { margin: 0; color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 500; letter-spacing: -0.005em; }
 .detail-settings .detail-section { display: grid; gap: var(--space-4); }
 .detail-settings .detail-grid { margin-top: 0; grid-template-columns: 72px minmax(0, 1fr); }
-.settings-disclosure {
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-item);
-  background: hsl(var(--input));
-  overflow: hidden;
-  min-width: 0;
-  max-width: 100%;
-}
 /* The viewer shows its settings outright, so the heading stands where the
    old expander's summary did. */
-.settings-disclosure > h3,
-.settings-disclosure > .detail-heading > h3 {
-  margin: 0;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  color: hsl(var(--foreground));
-  font-size: 12px;
-  font-weight: 600;
-}
-.settings-disclosure summary {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  cursor: pointer;
-  color: hsl(var(--foreground));
-  font-size: 12px;
-  font-weight: 600;
-  list-style: none;
-}
-.settings-disclosure summary::-webkit-details-marker { display: none; }
-.settings-disclosure summary { gap: var(--space-4); }
-.settings-disclosure summary > span:first-child { flex: 1; }
 /* "Copy as text" in the header: a quiet pill that copies without opening or closing it. */
 .detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.detail-copy {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 26px;
-  margin-right: -4px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.detail-copy:hover,
-.detail-copy.is-copied { background: rgb(255 255 255 / .06); color: hsl(var(--foreground)); }
-.detail-copy:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* Each LoRA as a card: its name, a hairline, its strength. */
 .detail-loras { display: grid; gap: var(--space-3); margin: 2px 0 0; padding: 0; list-style: none; }
@@ -321,27 +222,11 @@
   font: 500 12px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-.settings-disclosure summary::after {
-  content: "+";
-  color: hsl(var(--muted-foreground));
-  font-size: 14px;
-  flex: 0 0 auto;
-}
-.settings-disclosure[open] summary::after { content: "-"; }
-.settings-disclosure .detail-section {
-  display: grid; gap: var(--space-4);
-  padding: 12px;
-  border-top: 1px solid var(--line);
-}
 .detail-section h4 {
   margin: 0;
   color: hsl(var(--muted-foreground));
   font-size: 11px; font-weight: 600;
   letter-spacing: -0.005em;
-}
-.settings-disclosure .detail-grid {
-  margin-top: 0;
-  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .viewer-arrow {

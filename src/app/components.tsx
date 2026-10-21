@@ -355,6 +355,30 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const previewLabel = captionFor(previewRow);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Above its button, start-aligned and kept 8px inside the screen (anchoredPlacement, UI-PATTERNS › Surfaces), like the Model menu.
+  React.useLayoutEffect(() => {
+    if (!open || !presence.mounted) return;
+    const position = () => {
+      const anchor = pickerRef.current?.getBoundingClientRect();
+      const surface = menuRef.current;
+      if (!anchor || !surface) return;
+      const at = anchoredPlacement(anchor, { width: 300, minHeight: 320 });
+      Object.assign(surface.style, {
+        position: 'absolute',
+        width: `${at.width}px`,
+        minWidth: '0',
+        left: `${at.left - anchor.left}px`,
+        right: 'auto',
+        top: at.upward ? 'auto' : 'calc(100% + 8px)',
+        bottom: at.upward ? 'calc(100% + 8px)' : 'auto',
+        transformOrigin: at.transformOrigin,
+      });
+    };
+    position();
+    window.addEventListener('resize', position);
+    return () => window.removeEventListener('resize', position);
+  }, [open, presence.mounted]);
   // While the menu is open the trigger never narrows below the width it opened at: its label
   // changes as you type a size ("1:1" → "1.6:1"), and a narrower button would shift the bar, and
   // the menu with it. It may grow (it never cuts its label short); its face is held too, below.
@@ -402,6 +426,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
         </button></Tip>
       {presence.mounted ? (
         <div
+          ref={menuRef}
           className={cn("aspect-menu size-menu", presence.closing && "is-closing")}
           data-open-surface
           {...settling}

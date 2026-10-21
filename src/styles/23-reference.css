@@ -15,20 +15,20 @@
 .reference-slot-list { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-4); }
 .reference-count { color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
 .ref-chip { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: var(--r-item); color: hsl(var(--foreground)); }
-.ref-add { flex-direction: column; gap: var(--space-2); padding: 6px; border: 1px dashed var(--surface-border); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast); }
+.ref-add { flex-direction: column; gap: var(--space-2); padding: 6px; border: 1px dashed var(--glass-border); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast); }
 .ref-add > svg { flex: none; }
 .ref-add:hover, .ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
 .ref-add-label { max-width: 100%; font-size: 10px; line-height: 1.2; text-align: center; white-space: normal; }
 .ref-add-label em { color: var(--ember); font-style: normal; }
 .ref-selected { display: block; }
-.ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--surface-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--glass-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
 .ref-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ref-remove, .ref-paint { position: absolute; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); color: hsl(var(--foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
+.ref-remove, .ref-paint { position: absolute; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--glass-panel-bg); -webkit-backdrop-filter: var(--glass-panel-blur); backdrop-filter: var(--glass-panel-blur); color: hsl(var(--foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
 .ref-remove { top: -5px; right: -5px; }
 .ref-paint { bottom: -5px; left: -5px; }
 .ref-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
-.ref-paint:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--surface-grain), var(--surface-float); }
-.ref-paint.is-active { background: linear-gradient(var(--selected-bg), var(--selected-bg)), var(--surface-float); color: var(--selected-ink); }
+.ref-paint:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--surface-grain), var(--glass-panel-bg); }
+.ref-paint.is-active { background: linear-gradient(var(--selected-bg), var(--selected-bg)), var(--glass-panel-bg); color: var(--selected-ink); }
 .ref-paint.is-masked { color: var(--ember); }
 .ref-add:focus-visible, .ref-thumb:focus-visible, .ref-remove:focus-visible, .ref-paint:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .ref-chip.is-busy { flex-direction: column; gap: var(--space-3); background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -76,7 +76,7 @@
   background: var(--surface-grain), var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
   backdrop-filter: var(--glass-panel-blur);
-  box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -94,7 +94,7 @@
 .ref-selected.is-hover .ref-menu > *,
 .ref-selected.is-intro .ref-menu > *,
 .ref-selected:focus-within .ref-menu > *,
-.ref-selected.is-open .ref-menu > * { opacity: 1; transition-delay: 70ms; }
+.ref-selected.is-open .ref-menu > * { opacity: 1; transition-delay: var(--motion-stagger); }
 /* Remove sits on the thumbnail's corner: shown on hover or focus (always on
    touch), away from Edit | Ref, and red only under the pointer. */
 .ref-thumb-remove {
@@ -130,7 +130,7 @@
 .ref-selected.is-edit.is-hover .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .7), 0 6px 16px rgb(0 0 0 / .4); }
 
 /* Inpaint: the brush sits right next to the thumbnail. */
-.ref-menu-divider { flex: none; width: 1px; height: 22px; margin: 0 4px; background: var(--surface-border); }
+.ref-menu-divider { flex: none; width: 1px; height: 22px; margin: 0 4px; background: var(--glass-border); }
 .ref-menu-paint {
   flex: none;
   display: inline-flex;
@@ -194,7 +194,7 @@
   gap: var(--space-4);
   padding: 0 12px;
   background: var(--control-fill);
-  box-shadow: inset 0 0 0 1px var(--surface-border);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
   color: hsl(var(--muted-foreground));
   font-variant-numeric: tabular-nums;
 }
@@ -227,7 +227,7 @@
   box-shadow: var(--glass-panel-shadow);
   transform-origin: 94% 100%;
 }
-.reference-popover-head { flex: none; display: flex; align-items: center; gap: var(--space-4); padding: 10px 10px 10px 12px; box-shadow: inset 0 -1px 0 var(--surface-border); }
+.reference-popover-head { flex: none; display: flex; align-items: center; gap: var(--space-4); padding: 10px 10px 10px 12px; box-shadow: inset 0 -1px 0 var(--glass-border); }
 .reference-tabs { display: inline-flex; gap: var(--space-1); padding: var(--seg-pad); border-radius: var(--r-pill); background: var(--well); }
 .reference-tabs button {
   display: inline-flex;
@@ -435,28 +435,6 @@
 
 /* The first reference at the top of the sidebar's Basics: what the composer's
    chip holds, with how much it may change right under it. */
-.sidebar-reference { display: grid; gap: var(--space-4); }
-.sidebar-reference-row {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 6px 6px 6px 6px;
-  border-radius: var(--r-field);
-  background: var(--well);
-}
-.sidebar-reference-thumb {
-  width: 40px;
-  height: 40px;
-  overflow: hidden;
-  border-radius: var(--r-media);
-  background: rgb(255 255 255 / .06);
-}
-.sidebar-reference-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.sidebar-reference-copy { display: grid; gap: var(--space-1); min-width: 0; }
-.sidebar-reference-copy strong { font-size: 12.5px; font-weight: 550; }
-.sidebar-reference-copy small { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sidebar-reference-remove { color: hsl(var(--muted-foreground)); }
 
 /* Edit or Ref on the framing reference: what decides the output's size. The
    chosen half takes the selected fill; it does not slide. */
@@ -537,8 +515,6 @@
    Several references (a model that reads more than one): the first stays the
    chip in the corner, the others are a deck behind it that fans out into its
    strip on hover, followed by a + for the next (greyed once all are used). */
-
-.ref-selected.has-deck { padding-left: 16px; }
 .ref-deck-card {
   position: absolute;
   z-index: 1;
@@ -632,7 +608,6 @@
   .ref-deck-card { transition: none; }
 }
 /* The deck's room sits left of the thumbnail: EDIT stays on the thumbnail's corner. */
-.ref-selected.has-deck .ref-role-badge { left: 12px; }
 /* In Edit only the first picture changes: the others, which it only draws from, are greyed
    (colour back under the pointer, to see what you'd change). Ref leaves them all as they are. */
 .ref-selected.is-edit .ref-stack-thumb img,
@@ -692,8 +667,7 @@
 /* One References button for a model that reads several (FLUX.3 [klein] takes
    ten): the picked pictures overlap at its start, then References and n/max.
    It opens the chooser; the slots never get a control each. */
-.ref-chip.ref-group,
-:is(.zen-prompt, .composer-prompt-tools) .ref-chip.ref-group { width: auto; min-width: 0; flex-direction: row; gap: var(--space-4); padding: 0 12px 0 10px; border-style: solid; border-radius: var(--r-pill); white-space: nowrap; }
+.ref-chip.ref-group { width: auto; min-width: 0; flex-direction: row; gap: var(--space-4); padding: 0 12px 0 10px; border-style: solid; border-radius: var(--r-pill); white-space: nowrap; }
 .ref-chip.ref-group { height: var(--control-h); }
 .phone-create .ref-chip.ref-group { height: 44px; }
 .ref-group.has-items { padding-left: 5px; color: hsl(var(--foreground)); }
@@ -704,7 +678,7 @@
 .ref-group-label em { color: var(--accent-amber); font-style: normal; }
 .ref-group-count { font-size: 11.5px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .ref-group:focus-visible, .ref-brush:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.ref-chip.ref-brush { width: var(--control-h); height: var(--control-h); padding: 0; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
+.ref-chip.ref-brush { width: var(--control-h); height: var(--control-h); padding: 0; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
 .phone-create .ref-chip.ref-brush { width: 44px; height: 44px; }
 .ref-brush:hover, .ref-brush.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
 .ref-brush.is-masked { color: var(--accent-amber); }
