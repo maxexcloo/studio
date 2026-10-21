@@ -13,14 +13,14 @@ import { normalizeFolderInput } from "./comfy.js";
  *   mkcert <name>                               (a local CA you install)
  *   a certificate for a domain you own
  *
- * HEISS_TLS_CERT and HEISS_TLS_KEY name the two PEM files (Settings ›
+ * STUDIO_TLS_CERT and STUDIO_TLS_KEY name the two PEM files (Settings ›
  * Connection writes them to .env). With both set and LAN mode on, other
- * devices get HTTPS on HEISS_HTTPS_PORT (8788 unless set) and plain HTTP
+ * devices get HTTPS on STUDIO_HTTPS_PORT (8788 unless set) and plain HTTP
  * answers this computer only, on localhost. Without LAN mode nothing changes.
  */
 
 export const httpsPort = (() => {
-  const value = Number(process.env.HEISS_HTTPS_PORT || 0);
+  const value = Number(process.env.STUDIO_HTTPS_PORT || 0);
   return Number.isInteger(value) && value > 0 && value < 65536 ? value : Number(process.env.PORT || 8787) + 1;
 })();
 
@@ -74,7 +74,7 @@ export function inspectTls(certPath = "", keyPath = "") {
 }
 
 /** The pair from the environment, as it was when HEISS UI started. */
-export const startupTls = inspectTls(process.env.HEISS_TLS_CERT || "", process.env.HEISS_TLS_KEY || "");
+export const startupTls = inspectTls(process.env.STUDIO_TLS_CERT || "", process.env.STUDIO_TLS_KEY || "");
 
 /** Names the certificate is for: the request guard accepts them as Host. */
 export function tlsHostNames() {

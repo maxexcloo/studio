@@ -9,9 +9,9 @@ import express from 'express';
 import sharp from 'sharp';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-routes-'));
-process.env.HEISS_DATA_DIR = dir;
-process.env.HEISS_ENV_FILE = path.join(dir, '.env');
-process.env.HEISS_LAN = '0';
+process.env.STUDIO_DATA_DIR = dir;
+process.env.STUDIO_ENV_FILE = path.join(dir, '.env');
+process.env.STUDIO_LAN = '0';
 process.env.STUDIO_ENABLE_PRESETS = '1';
 delete process.env.CIVITAI_API_TOKEN;
 fs.writeFileSync(path.join(dir, 'presets.json'), JSON.stringify([{ id: '43', name: 'Legacy Landscape', previewUrl: 'https://image.civitai.com/legacy.png', sourceUrl: 'https://civitai.com/images/43', prompt: 'an older saved landscape', negative: '', settings: { seed: '0' }, resources: [], warnings: [], savedAt: '2025-01-01T00:00:00Z' }]));

@@ -6,8 +6,8 @@ import test from "node:test";
 
 // Point ComfyUI and the data folder at a scratch tree before the modules read them.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-model-types-"));
-process.env.HEISS_COMFY_ROOT = path.join(scratch, "ComfyUI");
-process.env.HEISS_DATA_DIR = path.join(scratch, "data");
+process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
+process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const dirs = Object.fromEntries(["diffusion_models", "checkpoints", "text_encoders", "vae"].map((name) => {
   const dir = path.join(scratch, "ComfyUI", "models", name);
   fs.mkdirSync(dir, { recursive: true });
@@ -403,7 +403,7 @@ test("the known Tessera W8A8 model restores its persisted Krea 2 Turbo profile",
   assert.deepEqual([base.family, base.variant.id], ["krea2", "raw"]);
   assert.deepEqual([classifyModel("unet", "tessera-unknown.safetensors").family, classifyModel("unet", "tessera-unknown.safetensors").variant.id], ["krea2", "raw"]);
   const id = `image:krea2:${name}`;
-  const file = path.join(process.env.HEISS_DATA_DIR, "per-model-workflows.json");
+  const file = path.join(process.env.STUDIO_DATA_DIR, "per-model-workflows.json");
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify([{ id, model: name, name: "Tessera Saved Profile" }]));
   try {

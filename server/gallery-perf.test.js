@@ -7,7 +7,7 @@ import test from "node:test";
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
 const store = await import("./gallery-store.js");
 const { filterVisibleGallery, flushGallery, galleryDelta, galleryPath, galleryRevisionValue, markGalleryReset, pageGallery, saveGallery, setGallery, updateGalleryJob } = await import("./gallery-store.js");
 const { getThumbnail } = await import("./thumbnails.js");
@@ -189,7 +189,7 @@ test("a save still waiting when the server stops is written before it exits", as
     "store.setGallery([{ id: 'kept', status: 'done', type: 'image', createdAt: new Date().toISOString() }]);",
     "process.exit(0);"
   ].join("\n");
-  child.execFileSync(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, HEISS_DATA_DIR: dataDir, HEISS_GALLERY_SAVE_MS: "60000" } });
+  child.execFileSync(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, STUDIO_DATA_DIR: dataDir, STUDIO_GALLERY_SAVE_MS: "60000" } });
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8")).map((item) => item.id), ["kept"]);
   fs.rmSync(dataDir, { recursive: true, force: true });
 });

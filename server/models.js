@@ -350,7 +350,7 @@ export function offlineModelResult(comfyUrl = "") {
   return { ...inferModels({}, {}), reason: `Can’t reach ComfyUI${comfyUrl ? ` at ${comfyUrl}` : ""}.` };
 }
 
-/** Fake models for HEISS_DEMO=1 (agent and UI testing without ComfyUI). */
+/** Fake models for STUDIO_DEMO=1 (agent and UI testing without ComfyUI). */
 export function mockModelResult() {
   const imageProfiles = [
     buildProfile({

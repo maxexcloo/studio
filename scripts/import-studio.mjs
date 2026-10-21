@@ -5,10 +5,10 @@
 //   node scripts/import-studio.mjs --source-data <dir> --source-outputs <comfy output dir> --account <username> [--label X] [--apply]
 //   node scripts/import-studio.mjs --undo <batch>
 //
-// The target is this studio: HEISS_DATA_DIR (and STUDIO_MEDIA_DIR). Stop Studio first.
+// The target is this studio: STUDIO_DATA_DIR (and STUDIO_MEDIA_DIR). Stop Studio first.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-// The studio's own settings first: HEISS_DATA_DIR, STUDIO_MEDIA_DIR and PORT may live in its .env (HEISS_ENV_FILE).
+// The studio's own settings first: STUDIO_DATA_DIR, STUDIO_MEDIA_DIR and PORT may live in its .env (STUDIO_ENV_FILE).
 await import("../server/env.js");
 const { applyStudioImport, findAccount, planStudioImport, summarizePlan, undoStudioImport } = await import("../server/studio-import.js");
 
@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(`--${name}`); return index >= 0 ? args[index + 1] : undefined; };
 const flag = (name) => args.includes(`--${name}`);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const targetData = path.resolve(option("target-data") || process.env.HEISS_DATA_DIR || path.join(root, "data"));
+const targetData = path.resolve(option("target-data") || process.env.STUDIO_DATA_DIR || path.join(root, "data"));
 const mediaRoot = path.resolve(option("media-dir") || process.env.STUDIO_MEDIA_DIR || path.join(targetData, "media"));
 const port = Number(option("port") || process.env.PORT || 8787);
 
@@ -40,7 +40,7 @@ function fail(message) {
 }
 
 if (flag("help") || !args.length) {
-  console.log("Usage: node scripts/import-studio.mjs --source-data <dir> --source-outputs <dir> --account <username> [--label <name>] [--apply]\n       node scripts/import-studio.mjs --undo <batch>\nTarget: HEISS_DATA_DIR / STUDIO_MEDIA_DIR (or --target-data, --media-dir). Stop Studio before --apply or --undo.");
+  console.log("Usage: node scripts/import-studio.mjs --source-data <dir> --source-outputs <dir> --account <username> [--label <name>] [--apply]\n       node scripts/import-studio.mjs --undo <batch>\nTarget: STUDIO_DATA_DIR / STUDIO_MEDIA_DIR (or --target-data, --media-dir). Stop Studio before --apply or --undo.");
   process.exit(0);
 }
 const writes = flag("apply") || option("undo");
@@ -61,7 +61,7 @@ if (!account) fail(`No account named ${username} exists in ${targetData}. Create
 const plan = planStudioImport({
   sourceData: path.resolve(sourceData), sourceOutputs: path.resolve(sourceOutputs), targetData, mediaRoot,
   account, label: option("label") || path.basename(path.resolve(sourceData)),
-  galleryLimit: Number(process.env.HEISS_GALLERY_LIMIT || 50_000)
+  galleryLimit: Number(process.env.STUDIO_GALLERY_LIMIT || 50_000)
 });
 const summary = summarizePlan(plan);
 console.log(JSON.stringify({ mode: flag("apply") ? "apply" : "dry run", from: { data: plan.sourceData, outputs: plan.sourceOutputs }, to: { data: targetData, media: path.join(mediaRoot, plan.subfolder) }, ...summary }, null, 2));

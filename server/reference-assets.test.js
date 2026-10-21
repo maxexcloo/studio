@@ -6,7 +6,7 @@ import test from "node:test";
 import sharp from "sharp";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-reference-assets-"));
-process.env.HEISS_DATA_DIR = temporary;
+process.env.STUDIO_DATA_DIR = temporary;
 process.env.COMFY_INPUT_DIR = temporary;
 const referenceAssets = await import(`./reference-assets.js?test=${Date.now()}`);
 

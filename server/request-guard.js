@@ -10,7 +10,7 @@ import os from "node:os";
  *
  * - The Host header must name this server: localhost, a loopback address, or
  *   (in LAN mode) this machine's own network addresses and names, plus any
- *   HEISS_ALLOWED_HOSTS and the names on a configured HTTPS certificate. A
+ *   STUDIO_ALLOWED_HOSTS and the names on a configured HTTPS certificate. A
  *   page that rebinds its own domain to 127.0.0.1 (DNS rebinding) still sends
  *   its own name, so it gets nothing.
  * - Anything that changes state (not GET, HEAD or OPTIONS) must come from the
@@ -58,8 +58,8 @@ function machineNames() {
   return names;
 }
 
-/** HEISS_ALLOWED_HOSTS: names a person put in front of the studio themselves (a home DNS name, a tailnet name). */
-export function configuredHosts(value = process.env.HEISS_ALLOWED_HOSTS || "") {
+/** STUDIO_ALLOWED_HOSTS: names a person put in front of the studio themselves (a home DNS name, a tailnet name). */
+export function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
   return String(value || "").split(/[\s,]+/).map((name) => hostnameOf(name.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""))).filter(Boolean);
 }
 
@@ -103,7 +103,7 @@ export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) 
   return (req, res, next) => {
     if (!gatedPath(req.path)) return next();
     if (!hostAllowed(req.headers.host, { lan: lan(), extra: extraHosts() })) {
-      refuse(res, "host", `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to HEISS_ALLOWED_HOSTS.`);
+      refuse(res, "host", `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to STUDIO_ALLOWED_HOSTS.`);
       return;
     }
     const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();

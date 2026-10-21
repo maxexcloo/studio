@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-cloud-jobs-'));
-process.env.HEISS_DATA_DIR = dataDir;
+process.env.STUDIO_DATA_DIR = dataDir;
 const { cloudJobExpiryMs, cloudJobFailedMessage, cloudJobLostMessage, createCloudJobStore, isCloudGraph } = await import('./cloud-jobs.js');
 const { createJobRecovery } = await import('./job-recovery.js');
 const { recordsFromComfyHistory } = await import('./gallery-store.js');

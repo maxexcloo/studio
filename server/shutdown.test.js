@@ -27,7 +27,7 @@ for (const signal of ['SIGINT', 'SIGTERM', ...(process.platform === 'win32' ? []
     const child = fork(new URL('../server/index.js', import.meta.url), [], {
       cwd: new URL('..', import.meta.url),
       execArgv: ['--input-type=module', '--eval', source],
-      env: { ...process.env, HEISS_DATA_DIR: data, HEISS_ENV_FILE: path.join(data, '.env') },
+      env: { ...process.env, STUDIO_DATA_DIR: data, STUDIO_ENV_FILE: path.join(data, '.env') },
       stdio: ['ignore', 'ignore', 'ignore', 'ipc']
     });
     const exited = new Promise(resolve => child.once('exit', (code, receivedSignal) => resolve({ code, signal: receivedSignal })));

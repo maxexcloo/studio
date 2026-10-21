@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-setup-token-"));
-process.env.HEISS_DATA_DIR = path.join(temporary, "data");
+process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MULTI_USER = "1";
 process.env.STUDIO_SETUP_TOKEN = "a-deployment-setup-token-of-sufficient-length";
 process.env.COMFY_URL = "http://127.0.0.1:9";

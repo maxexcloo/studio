@@ -142,7 +142,7 @@ The text-only completion is short and self-contained: one instruction line, then
 
 Studio's own server instructions and tool descriptions carry every workflow rule, so any MCP client behaves the same: pass the request with kind and tier, Reuse for follow-ups, reply as each result says and never poll. Each reply carries its own collection steps. They also say to use the tools for every image or video asked for, follow the user's instructions and keep replies short, so clients need no prompt prefix. Enable `serverInstructions: true` in LibreChat. The instructions and every tool schema stay within a small budget that a test checks, since chat hosts resend them on every model step. AI Control connections only get the GPU approval rule. MCP catalogue reads reuse the existing backend metadata cache, and studio rescans still refresh it. Completed-result visibility checks target the exact job and keep Hidden/deletion revocation.
 
-Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/studio`, and result links keep that prefix. Without it, links use the studio's local loopback address. Result links are short opaque IDs under `/mcp/results/`, mapped in `mcp-ownership.json` to their owner and output. Adding `.jpg` serves a JPEG preview at most 1024 pixels on its long side. Sealed links issued by earlier versions keep working. Original links open inline in the browser and don't expire, but stop working when outputs are deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid. Set and preserve `MCP_SIGNING_KEY`, and keep `mcp-ownership.json` in `HEISS_DATA_DIR` across updates.
+Set `MCP_PUBLIC_URL` to the configured browser-reachable HTTP(S) base URL for result downloads. It can include a gateway base path, such as `/studio`, and result links keep that prefix. Without it, links use the studio's local loopback address. Result links are short opaque IDs under `/mcp/results/`, mapped in `mcp-ownership.json` to their owner and output. Adding `.jpg` serves a JPEG preview at most 1024 pixels on its long side. Sealed links issued by earlier versions keep working. Original links open inline in the browser and don't expire, but stop working when outputs are deleted. In multi-user mode, rotating or revoking a personal MCP token leaves existing links valid. Set and preserve `MCP_SIGNING_KEY`, and keep `mcp-ownership.json` in `STUDIO_DATA_DIR` across updates.
 
 Keep shared provider credentials at the trusted gateway, which sets `x-ai-user-id` to partition job and reference ownership. In multi-user mode the gateway can also forward the user's email in `x-ai-user-email`, such as LibreChat's `{{LIBRECHAT_USER_EMAIL}}` passed through LiteLLM's `extra_headers`. An unlinked ID whose email is an enabled account's username is then linked to that account automatically. Other unlinked IDs get tools that only ask for an administrator's link (see [Configuration](docs/guides/CONFIGURATION.md)). Direct provider calls use a separate fallback owner, and the forwarded header alone grants no access.
 
@@ -301,7 +301,7 @@ Copy `.env.example` to `.env` when you need different ports or paths.
 COMFY_URL=http://127.0.0.1:8188
 HOST=127.0.0.1
 PORT=8787
-HEISS_DATA_DIR=./data
+STUDIO_DATA_DIR=./data
 COMFY_OUTPUT_DIR=
 ```
 

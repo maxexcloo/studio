@@ -14,7 +14,7 @@ export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 // A live binding: importers see the new address as soon as the workers change.
 // It is the default worker's (workers.js), or "" with no workers at all;
-// HEISS_DEFAULT_COMFY_URL seeds a fresh install (the Docker image's host.docker.internal).
+// STUDIO_DEFAULT_COMFY_URL seeds a fresh install (the Docker image's host.docker.internal).
 export let comfyUrl = defaultWorker()?.url || "";
 onWorkersChanged(() => { comfyUrl = defaultWorker()?.url || ""; });
 
@@ -43,7 +43,7 @@ export function setComfyUrl(value = "") {
 export const lan = resolveLan({ argv: process.argv, env: process.env, fileKeys: envFileKeys });
 export const host = lan.host;
 /** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
-export const dockerHostOnly = process.env.HEISS_DOCKER_HOST_ONLY === "1";
+export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
 // Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
 export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
@@ -52,7 +52,7 @@ export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
  * line in .env that would contradict it is rewritten to match.
  */
 export function saveLanSetting(enabled) {
-  writeLocalEnvValue("HEISS_LAN", enabled ? "1" : "0");
+  writeLocalEnvValue("STUDIO_LAN", enabled ? "1" : "0");
   if (envFileKeys.has("HOST")) writeLocalEnvValue("HOST", enabled ? "0.0.0.0" : "127.0.0.1");
   return enabled;
 }
@@ -125,11 +125,11 @@ export function setComfyOutputDir(value = "") {
 }
 /**
  * ComfyUI's models folder on this machine, or "" when ComfyUI runs elsewhere.
- * HEISS_COMFY_ROOT wins; otherwise walk up from the output folder, which is not
+ * STUDIO_COMFY_ROOT wins; otherwise walk up from the output folder, which is not
  * always a direct child of the ComfyUI root, until a real models/ turns up.
  */
 export function comfyModelsDir() {
-  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || "").trim();
+  const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
   if (comfyRoot) return path.join(path.resolve(comfyRoot), "models");
   if (!comfyOutputDir) return "";
   let current = path.resolve(comfyOutputDir);
@@ -179,9 +179,9 @@ export function modelFolders(kind, subfolders = [kind]) {
 // Whether other devices may use the studio at all. Who a request comes from
 // (this computer, a device, a proxy) is decided in client-trust.js, never
 // from the socket address alone.
-export const allowLanActions = process.env.HEISS_ALLOW_LAN === "1" || lanListening;
+export const allowLanActions = process.env.STUDIO_ALLOW_LAN === "1" || lanListening;
 /** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
-export const demoMode = process.env.HEISS_DEMO === "1";
+export const demoMode = process.env.STUDIO_DEMO === "1";
 
 /*
  * Whether ComfyUI just failed to answer. On Windows a refused localhost
@@ -209,7 +209,7 @@ export function noteComfyReachable() {
  * that timed out reads as busy, for as long as a run would wait for it
  * (comfy-queue.js), and only then as stopped.
  */
-export const comfyBusyGraceMs = Number(process.env.HEISS_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.HEISS_COMFY_LOST_AFTER_MS) : 60_000;
+export const comfyBusyGraceMs = Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) : 60_000;
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
 export function isComfyTimeout(error) {
   return error?.name === "AbortError" || error?.name === "TimeoutError";
@@ -346,7 +346,7 @@ export function textRange(info, node, key) {
 export function comfyInputDir() {
   const explicit = String(process.env.COMFY_INPUT_DIR || "").trim();
   if (explicit) return path.resolve(explicit);
-  const comfyRoot = String(process.env.HEISS_COMFY_ROOT || "").trim();
+  const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
   const candidates = [
     comfyRoot ? path.join(path.resolve(comfyRoot), "input") : "",
     comfyOutputDir ? path.join(path.dirname(path.resolve(comfyOutputDir)), "input") : ""

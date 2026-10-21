@@ -70,12 +70,12 @@ test("hosts: loopback always, the machine's own addresses only in LAN mode, extr
   }
   assert.equal(hostAllowed("192.0.2.77:8787", { lan: true }), false);
   assert.ok(run(lanGuard, { method: "GET", path: "/api/gallery", headers: { host: "studio.tail1234.ts.net:8788" } }).passed);
-  process.env.HEISS_ALLOWED_HOSTS = "studio.home.arpa, https://other.lan/";
+  process.env.STUDIO_ALLOWED_HOSTS = "studio.home.arpa, https://other.lan/";
   try {
     assert.ok(hostAllowed("studio.home.arpa"));
     assert.ok(hostAllowed("other.lan:8787"));
   } finally {
-    delete process.env.HEISS_ALLOWED_HOSTS;
+    delete process.env.STUDIO_ALLOWED_HOSTS;
   }
   assert.equal(hostnameOf("[fe80::1]:8787"), "fe80::1");
 });

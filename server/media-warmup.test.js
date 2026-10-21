@@ -8,7 +8,7 @@ import test from 'node:test';
 import sharp from 'sharp';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-warmup-'));
-process.env.HEISS_DATA_DIR = dataDir;
+process.env.STUDIO_DATA_DIR = dataDir;
 const media = path.join(dataDir, 'media', 'heiss-ui');
 fs.mkdirSync(media, { recursive: true });
 let encoder;

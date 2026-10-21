@@ -10,7 +10,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 const file = path.join(dataDir, "dismissed.json");
 const keyPattern = /^[a-z0-9_]{1,40}:[a-z0-9_]{1,40}$/;
 

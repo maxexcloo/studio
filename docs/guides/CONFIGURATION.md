@@ -8,13 +8,13 @@ Set `STUDIO_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hide
 COMFY_URL=http://127.0.0.1:8188
 HOST=127.0.0.1
 PORT=8787
-HEISS_DATA_DIR=./data
+STUDIO_DATA_DIR=./data
 COMFY_OUTPUT_DIR=
 ```
 
-`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. Settings only accepts a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). **Delete all finished images** moves them to `.heiss-trash` in that folder, where they wait 30 days (`HEISS_TRASH_DAYS`) in case you want them back.
+`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. Settings only accepts a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). **Delete all finished images** moves them to `.heiss-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
 
-For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `HEISS_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `HEISS_TLS_CERT`, `HEISS_TLS_KEY` and `HEISS_HTTPS_PORT` for HTTPS. See [Other devices](./SECURITY.md#other-devices-signing-in-admin-https-and-proxies) and [Phones and other devices](./TROUBLESHOOTING.md#phones-and-other-devices).
+For other devices: `STUDIO_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `STUDIO_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `STUDIO_TLS_CERT`, `STUDIO_TLS_KEY` and `STUDIO_HTTPS_PORT` for HTTPS. See [Other devices](./SECURITY.md#other-devices-signing-in-admin-https-and-proxies) and [Phones and other devices](./TROUBLESHOOTING.md#phones-and-other-devices).
 
 With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) workers need no shared storage; with ComfyUI's output folder, they must share input and output storage for local gallery access. See [Workers](#workers) for one or many ComfyUI workers.
 
@@ -87,7 +87,7 @@ An administrator can import another manifest or export the one in use. The deplo
 
 With media storage, Studio keeps every finished output in its own folder and treats ComfyUI as a stateless worker:
 
-- Studio fetches each output over ComfyUI's HTTP API into `STUDIO_MEDIA_DIR` (`<HEISS_DATA_DIR>/media` by default), with a folder per account.
+- Studio fetches each output over ComfyUI's HTTP API into `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default), with a folder per account.
 - The [Studio worker node](../../comfyui/studio_worker/README.md) then removes ComfyUI's copy, the run's staged inputs and its history entry.
 - Studio and ComfyUI no longer need to share a folder, so they can run on different servers.
 
@@ -112,7 +112,7 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 
 ### Importing an Existing Studio
 
-`scripts/import-studio.mjs` moves a whole single-user studio into one existing account of this studio. It runs against this studio's `HEISS_DATA_DIR` and `STUDIO_MEDIA_DIR`; stop Studio first.
+`scripts/import-studio.mjs` moves a whole single-user studio into one existing account of this studio. It runs against this studio's `STUDIO_DATA_DIR` and `STUDIO_MEDIA_DIR`; stop Studio first.
 
 ```bash
 node scripts/import-studio.mjs --source-data /old/heiss/data --source-outputs /old/comfy/output --account studio --label normal         # dry run
@@ -123,8 +123,8 @@ node scripts/import-studio.mjs --undo <batch>
 - **What moves:** finished gallery outputs and their upscales (copied into the account's media folder), prompt and negative-prompt history, LoRA stacks and library, uploaded references, and MCP job and reference ownership.
 - **What doesn't:** Hidden items from an older studio (they are encrypted), presets and workflow preferences (studio-wide), pending or failed records, and library-folder items. Each of these is counted in the dry run.
 - **Without `--apply`,** nothing is written; the dry run lists every count and conflict.
-- **The source is never changed.** Every target file that changes is backed up under `<HEISS_DATA_DIR>/imports/<batch>/`, and `--undo` removes exactly what that import added.
-- **Refused:** an import whose jobs are already in the gallery, an account that already has its own history files, or a result above `HEISS_GALLERY_LIMIT`.
+- **The source is never changed.** Every target file that changes is backed up under `<STUDIO_DATA_DIR>/imports/<batch>/`, and `--undo` removes exactly what that import added.
+- **Refused:** an import whose jobs are already in the gallery, an account that already has its own history files, or a result above `STUDIO_GALLERY_LIMIT`.
 
 MCP clients connect in one of three ways in multi-user mode:
 
@@ -140,7 +140,7 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
-Also optional: `HEISS_COMFY_SEARCH=0` keeps Studio on the default worker's address (by default, when that doesn't answer, Studio looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
+Also optional: `STUDIO_COMFY_SEARCH=0` keeps Studio on the default worker's address (by default, when that doesn't answer, Studio looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `STUDIO_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
 
 Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a token saved in **Settings › Models**) opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy.
 
@@ -160,8 +160,46 @@ Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server env
 
 Studio no longer has Hidden. The first start of a version without it backs up and converts what an older Hidden left in the data folder, once, and deletes nothing:
 
-- **The backup** goes to `<HEISS_DATA_DIR>/backups/hidden-removal-<time>/` (readable by the server's user only). It holds copies of `gallery.json`, `gallery-hidden.json`, `privacy.json` and `hidden-runs.json` where they existed, the encrypted `.private-vault` folder moved in whole, and a `summary.json` and `README.txt` saying what changed. The backup is written even on a studio that never used Hidden, so a deployment can confirm the step ran.
+- **The backup** goes to `<STUDIO_DATA_DIR>/backups/hidden-removal-<time>/` (readable by the server's user only). It holds copies of `gallery.json`, `gallery-hidden.json`, `privacy.json` and `hidden-runs.json` where they existed, the encrypted `.private-vault` folder moved in whole, and a `summary.json` and `README.txt` saying what changed. The backup is written even on a studio that never used Hidden, so a deployment can confirm the step ran.
 - **Into the gallery:** gallery records still flagged as Hidden become ordinary gallery items, and records that a delete marker in `gallery-hidden.json` kept out of view come back. Markers for deleted and cleared outputs stay, so those don't return from ComfyUI's history.
 - **Still encrypted:** images inside the vault can't be opened without the owner's Hidden password, so they stay as ciphertext in the backup. `summary.json` counts them, and the server log warns once. Prompts sealed by the older scheme are cleared from the gallery records; the backup's copy of `gallery.json` keeps them.
 
-`<HEISS_DATA_DIR>/.hidden-removed-v1` records that the step finished. Remove it only to run the step again.
+`<STUDIO_DATA_DIR>/.hidden-removed-v1` records that the step finished. Remove it only to run the step again.
+
+## Renamed Settings
+
+Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STUDIO_*`. The old names still work as deprecated aliases: Studio reads the new name first and falls back to the old one, and the log gets one line naming the old ones still in use. Saving a setting from Settings writes the new name to Studio's settings file and drops the old line. Compose also still reads `HEISS_DOCKER_COMFY_URL` when `STUDIO_DOCKER_COMFY_URL` is unset. Rename them in your deployment when convenient; a later release removes the aliases.
+
+| Old | New |
+| --- | --- |
+| `HEISS_ALLOW_LAN` | `STUDIO_ALLOW_LAN` |
+| `HEISS_ALLOWED_HOSTS` | `STUDIO_ALLOWED_HOSTS` |
+| `HEISS_COMFY_LOST_AFTER_MS` | `STUDIO_COMFY_LOST_AFTER_MS` |
+| `HEISS_COMFY_ROOT` | `STUDIO_COMFY_ROOT` |
+| `HEISS_COMFY_SEARCH` | `STUDIO_COMFY_SEARCH` |
+| `HEISS_DATA_DIR` | `STUDIO_DATA_DIR` |
+| `HEISS_DEFAULT_COMFY_URL` | `STUDIO_DEFAULT_COMFY_URL` |
+| `HEISS_DEMO` | `STUDIO_DEMO` |
+| `HEISS_DEV_PROXY_TOKEN` | `STUDIO_DEV_PROXY_TOKEN` |
+| `HEISS_DEVICE_SESSION_DAYS` | `STUDIO_DEVICE_SESSION_DAYS` |
+| `HEISS_DOCKER_HOST_ONLY` | `STUDIO_DOCKER_HOST_ONLY` |
+| `HEISS_ENABLE_INPAINT` | `STUDIO_ENABLE_INPAINT` |
+| `HEISS_ENV_FILE` | `STUDIO_ENV_FILE` |
+| `HEISS_FFMPEG_PATH` | `STUDIO_FFMPEG_PATH` |
+| `HEISS_GALLERY_CHANGELOG_LIMIT` | `STUDIO_GALLERY_CHANGELOG_LIMIT` |
+| `HEISS_GALLERY_LIMIT` | `STUDIO_GALLERY_LIMIT` |
+| `HEISS_GALLERY_SAVE_MS` | `STUDIO_GALLERY_SAVE_MS` |
+| `HEISS_HTTPS_PORT` | `STUDIO_HTTPS_PORT` |
+| `HEISS_LAN` | `STUDIO_LAN` |
+| `HEISS_NO_BROWSER` | `STUDIO_NO_BROWSER` |
+| `HEISS_PREVIEW_INTERVAL_MS` | `STUDIO_PREVIEW_INTERVAL_MS` |
+| `HEISS_REFERENCE_MAX_BYTES` | `STUDIO_REFERENCE_MAX_BYTES` |
+| `HEISS_REFERENCE_MAX_PIXELS` | `STUDIO_REFERENCE_MAX_PIXELS` |
+| `HEISS_SEEDVR2_HF_REPO` | `STUDIO_SEEDVR2_HF_REPO` |
+| `HEISS_SEEDVR2_MODEL_DIR` | `STUDIO_SEEDVR2_MODEL_DIR` |
+| `HEISS_TERMINAL_JOB_TTL_MS` | `STUDIO_TERMINAL_JOB_TTL_MS` |
+| `HEISS_THUMBNAIL_CACHE_MB` | `STUDIO_THUMBNAIL_CACHE_MB` |
+| `HEISS_TLS_CERT` | `STUDIO_TLS_CERT` |
+| `HEISS_TLS_KEY` | `STUDIO_TLS_KEY` |
+| `HEISS_TRASH_DAYS` | `STUDIO_TRASH_DAYS` |
+| `HEISS_VIDEO_PREVIEW_CACHE_MB` | `STUDIO_VIDEO_PREVIEW_CACHE_MB` |

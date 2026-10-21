@@ -5,8 +5,8 @@ import path from "node:path";
 import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-lora-info-"));
-process.env.HEISS_COMFY_ROOT = path.join(scratch, "ComfyUI");
-process.env.HEISS_DATA_DIR = path.join(scratch, "data");
+process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
+process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const loraDir = path.join(scratch, "ComfyUI", "models", "loras");
 fs.mkdirSync(path.join(loraDir, "sdxl"), { recursive: true });
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
@@ -121,7 +121,7 @@ test('FLUX.3 Klein provider and training metadata do not fall back to FLUX.1', (
 });
 
 test("the LoRA catalogue is read from data/config as well, the synced copy winning", () => {
-  const data = process.env.HEISS_DATA_DIR;
+  const data = process.env.STUDIO_DATA_DIR;
   fs.mkdirSync(path.join(data, "config"), { recursive: true });
   fs.writeFileSync(path.join(data, "lora-catalogue.json"), JSON.stringify({ "a.safetensors": { title: "By Hand" }, "b.safetensors": { title: "Only By Hand" } }));
   fs.writeFileSync(path.join(data, "config", "lora-catalogue.json"), JSON.stringify({ "a.safetensors": { title: "Synced" } }));

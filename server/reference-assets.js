@@ -20,8 +20,8 @@ const assetsDir = path.join(dataDir, "reference-assets");
 const filesDir = path.join(assetsDir, "files");
 const thumbsDir = path.join(assetsDir, "thumbnails");
 const manifestPath = path.join(assetsDir, "index.json");
-const maxUploadBytes = Math.max(1024, Number(process.env.HEISS_REFERENCE_MAX_BYTES || 25 * 1024 * 1024));
-const maxPixels = Math.max(1_000_000, Number(process.env.HEISS_REFERENCE_MAX_PIXELS || 80_000_000));
+const maxUploadBytes = Math.max(1024, Number(process.env.STUDIO_REFERENCE_MAX_BYTES || 25 * 1024 * 1024));
+const maxPixels = Math.max(1_000_000, Number(process.env.STUDIO_REFERENCE_MAX_PIXELS || 80_000_000));
 const acceptedMimes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 function safeName(value = "reference-image") {

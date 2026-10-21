@@ -23,7 +23,7 @@ import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 export const logDir = path.join(dataDir, "logs");
 const keepDays = 7;
 const recent = [];

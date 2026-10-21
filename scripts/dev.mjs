@@ -1,4 +1,4 @@
-// `npm run dev`: Vite serves the page, the HEISS server answers the API.
+// `npm run dev`: Vite serves the page, the Studio server answers the API.
 //
 // `npm run dev -- --lan` (or `npm run dev:lan`, or the switch in Settings ›
 // Connection, from the next start) opens both to the network.
@@ -8,14 +8,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listensBeyondThisComputer, readEnvFile, resolveLan } from "../server/lan.js";
 import { recordExit, tailKeeper } from "../server/exit-record.js";
+import { applyLegacyEnvNames } from "../server/env-names.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const shell = { ...process.env };
+applyLegacyEnvNames(shell);
 // Vite proxies the API, so to the server every request comes from 127.0.0.1.
 // This token lets Vite say who is really asking (vite.config.ts), so a phone
 // in dev LAN mode is another device, not this computer.
-process.env.HEISS_DEV_PROXY_TOKEN = crypto.randomBytes(32).toString("base64url");
+process.env.STUDIO_DEV_PROXY_TOKEN = crypto.randomBytes(32).toString("base64url");
 
 function viteHost() {
   const file = readEnvFile(root);

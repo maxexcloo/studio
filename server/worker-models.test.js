@@ -7,9 +7,9 @@ import path from 'node:path';
 import test from 'node:test';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-worker-models-'));
-process.env.HEISS_ENV_FILE = path.join(scratch, '.env');
-process.env.HEISS_DATA_DIR = scratch;
-process.env.HEISS_COMFY_ROOT = path.join(scratch, 'mirror');
+process.env.STUDIO_ENV_FILE = path.join(scratch, '.env');
+process.env.STUDIO_DATA_DIR = scratch;
+process.env.STUDIO_COMFY_ROOT = path.join(scratch, 'mirror');
 process.env.STUDIO_MODEL_STORAGE = 'worker';
 process.env.STUDIO_WORKER_TOKEN = 'worker-test-fixture';
 for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) delete process.env[key];

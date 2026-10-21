@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-thumbs-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-thumbs-"));
 const { getFileThumbnail, sweepThumbnails } = await import("./thumbnails.js");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-thumb-cache-"));

@@ -16,7 +16,7 @@ import { trustedLocalOutput } from './thumbnails.js';
 import { mediaType } from './media-paths.js';
 
 const require = createRequire(import.meta.url);
-let encoder = process.env.HEISS_FFMPEG_PATH;
+let encoder = process.env.STUDIO_FFMPEG_PATH;
 if (!encoder) { try { const bundled = require('ffmpeg-static'); if (bundled && fs.existsSync(bundled)) encoder = bundled; } catch { /* System ffmpeg remains usable. */ } }
 encoder ||= 'ffmpeg';
 const dir = path.join(dataDir, '.video-previews');
@@ -25,7 +25,7 @@ const version = 'v2-720-24-8';
 const previewEdge = 720;
 const posterEdge = 768;
 const maxSourceBytes = 512 * 1024 * 1024;
-export const maxCacheBytes = Math.max(16, Number(process.env.HEISS_VIDEO_PREVIEW_CACHE_MB) || 512) * 1024 * 1024;
+export const maxCacheBytes = Math.max(16, Number(process.env.STUDIO_VIDEO_PREVIEW_CACHE_MB) || 512) * 1024 * 1024;
 const pending = new Map();
 const remoteVersions = new Map();
 const queue = [];

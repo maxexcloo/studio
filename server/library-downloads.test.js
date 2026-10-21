@@ -5,8 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-library-downloads-'));
-process.env.HEISS_DATA_DIR = path.join(dir, 'data');
-process.env.HEISS_COMFY_ROOT = dir;
+process.env.STUDIO_DATA_DIR = path.join(dir, 'data');
+process.env.STUDIO_COMFY_ROOT = dir;
 process.env.STUDIO_ENABLE_PRESETS = '1';
 fs.mkdirSync(path.join(dir, 'models', 'loras'), { recursive: true });
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });

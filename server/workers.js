@@ -29,7 +29,7 @@ export const workerCapabilities = [
 const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = () => (process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data"));
+const dataDir = () => (process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data"));
 export const workersFile = () => path.join(dataDir(), "workers.json");
 
 const LEGACY_IMAGE_ID = "primary";
@@ -134,7 +134,7 @@ export function seedWorkers(environment = process.env, deployment = deploymentWo
   if (deployment.variable === "STUDIO_WORKERS") return [];
   const has = new Set(deployment.workers.map((worker) => worker.id));
   const videoUrl = has.has(LEGACY_VIDEO_ID) ? "" : environment.COMFY_VIDEO_URL || "";
-  const fallback = deployment.workers.length ? "" : environment.HEISS_DEFAULT_COMFY_URL || "http://127.0.0.1:8188";
+  const fallback = deployment.workers.length ? "" : environment.STUDIO_DEFAULT_COMFY_URL || "http://127.0.0.1:8188";
   const imageUrl = has.has(LEGACY_IMAGE_ID) ? "" : environment.COMFY_URL || fallback;
   return legacyWorkers({ imageUrl, videoUrl, videoElsewhere: has.has(LEGACY_VIDEO_ID) })
     .map((worker) => ({ ...worker, source: (worker.id === LEGACY_IMAGE_ID ? environment.COMFY_URL : environment.COMFY_VIDEO_URL) ? "studio" : "default" }));

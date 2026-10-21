@@ -75,7 +75,7 @@ export function classifyClient(req, { lanActions = false, devToken = "", hostOnl
   if (viaDevProxy) address = plainAddress(headers["x-heiss-dev-client"] || "");
   const proxied = hasProxyHeaders(headers);
   // hostOnly: a container whose port is published on the host's 127.0.0.1 only
-  // (HEISS_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker
+  // (STUDIO_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker
   // address (the bridge gateway, 192.168.65.1 on Docker Desktop), never loopback.
   const thisComputer = !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
   // Behind a proxy the real address is unknown (its header can be forged), so

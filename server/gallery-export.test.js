@@ -7,7 +7,7 @@ import test from 'node:test';
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-account-export-'));
 const output = path.join(temporary, 'output');
-process.env.HEISS_DATA_DIR = path.join(temporary, 'data');
+process.env.STUDIO_DATA_DIR = path.join(temporary, 'data');
 process.env.COMFY_OUTPUT_DIR = output;
 process.env.STUDIO_MULTI_USER = '1';
 const { setGallery } = await import('./gallery-store.js');

@@ -7,7 +7,7 @@ import test from "node:test";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-deployment-settings-"));
 const envFile = path.join(temporary, ".env");
 fs.writeFileSync(envFile, "STUDIO_ENABLE_LORAS=0\n");
-process.env.HEISS_ENV_FILE = envFile;
+process.env.STUDIO_ENV_FILE = envFile;
 process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "deployment-profile";
 delete process.env.STUDIO_ENABLE_LORAS;
 delete process.env.STUDIO_ENABLE_GROK;
@@ -19,7 +19,7 @@ test("values report their source and only deployment values are locked", () => {
   assert.deepEqual(settings.settingSource("STUDIO_ENABLE_LORAS"), { source: "studio", locked: false });
   assert.deepEqual(settings.settingSource("STUDIO_ENABLE_GROK"), { source: "default", locked: false });
   // Settings no longer switches built-in profiles or Tessera, and LoRAs, Cloud Models and presets are access-profile features.
-  assert.deepEqual(settings.catalogueFlags.map((item) => item.key), ["HEISS_ENABLE_INPAINT"]);
+  assert.deepEqual(settings.catalogueFlags.map((item) => item.key), ["STUDIO_ENABLE_INPAINT"]);
   assert.equal(settings.isCatalogueFlag("STUDIO_ENABLE_LORAS"), false);
   assert.equal(settings.describeFlag(settings.catalogueFlags[0]).applies, "restart");
 });

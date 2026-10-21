@@ -2,14 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyLegacyEnvNames, legacyEnvName } from "./env-names.js";
 
 // Keep local setup plug-and-play without adding a runtime dependency. Explicit
 // shell environment variables always win over values in .env.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// HEISS_ENV_FILE points at another file (tests use one of their own). Under
+/** Old HEISS_* names that filled an unset STUDIO_* one (env-names.js), for the start-up notice. */
+export const legacyEnvInUse = applyLegacyEnvNames(process.env);
+// STUDIO_ENV_FILE points at another file (tests use one of their own). Under
 // `node --test` (NODE_TEST_CONTEXT) the developer's own .env is never read or
 // written: a test would otherwise see their ComfyUI, or save over their settings.
-const envPath = process.env.HEISS_ENV_FILE ? path.resolve(process.env.HEISS_ENV_FILE)
+const envPath = process.env.STUDIO_ENV_FILE ? path.resolve(process.env.STUDIO_ENV_FILE)
   : process.env.NODE_TEST_CONTEXT ? path.join(os.tmpdir(), `heiss-test-env-${process.pid}`)
   : path.join(root, ".env");
 
@@ -27,9 +30,26 @@ try {
 } catch {
   // .env is optional.
 }
+// An old name in .env counts as saved from Settings, like the new one would.
+for (const legacy of applyLegacyEnvNames(process.env, envFileKeys)) {
+  envFileKeys.add(`STUDIO_${legacy.slice(6)}`);
+  legacyEnvInUse.push(legacy);
+}
 
 function keyMatcher(key) {
   return new RegExp(`^\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=`);
+}
+
+/** The key's own line and, for a renamed setting, its old name's line: saving the new name retires the old one. */
+function matchers(key) {
+  const legacy = legacyEnvName(key);
+  return legacy ? [keyMatcher(key), keyMatcher(legacy)] : [keyMatcher(key)];
+}
+
+function forgetFileValue(key) {
+  if (!envFileKeys.has(key)) return;
+  delete process.env[key];
+  envFileKeys.delete(key);
 }
 
 function writeLines(lines) {
@@ -45,13 +65,11 @@ export function removeLocalEnvValue(key) {
   if (!/^[A-Z_][A-Z0-9_]*$/.test(safeKey)) throw new Error("Invalid local setting.");
   let lines = [];
   try { lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/); } catch { return false; }
-  const matcher = keyMatcher(safeKey);
-  const kept = lines.filter((line) => !matcher.test(line));
+  const keyMatchers = matchers(safeKey);
+  const kept = lines.filter((line) => !keyMatchers.some((matcher) => matcher.test(line)));
   if (kept.length !== lines.length) writeLines(kept);
-  if (envFileKeys.has(safeKey)) {
-    delete process.env[safeKey];
-    envFileKeys.delete(safeKey);
-  }
+  forgetFileValue(safeKey);
+  if (legacyEnvName(safeKey)) forgetFileValue(legacyEnvName(safeKey));
   return kept.length !== lines.length;
 }
 
@@ -62,13 +80,20 @@ export function writeLocalEnvValue(key, value) {
   let lines = [];
   try { lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/); } catch {}
   const matcher = keyMatcher(safeKey);
+  const legacy = legacyEnvName(safeKey);
+  const legacyMatcher = legacy ? keyMatcher(legacy) : null;
+  // The old name's line becomes the new one in place, unless the new name has a line already.
   let replaced = false;
-  lines = lines.map((line) => {
-    if (!matcher.test(line)) return line;
+  const hasCurrent = lines.some((line) => matcher.test(line));
+  lines = lines.flatMap((line) => {
+    const current = matcher.test(line);
+    if (!current && !legacyMatcher?.test(line)) return [line];
+    if (!current && (hasCurrent || replaced)) return [];
     replaced = true;
-    return `${safeKey}=${safeValue}`;
+    return [`${safeKey}=${safeValue}`];
   });
   if (!replaced) lines.push(`${safeKey}=${safeValue}`);
+  if (legacy) forgetFileValue(legacy);
   writeLines(lines);
   // Saved here, it now comes from .env, unless the environment set it first (that still wins at the next start).
   const fromEnvironment = safeKey in process.env && !envFileKeys.has(safeKey);

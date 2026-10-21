@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-backend-queue-'));
-process.env.HEISS_DATA_DIR = temporary;
+process.env.STUDIO_DATA_DIR = temporary;
 const { jobs, queueClearsAt, trackUpscale } = await import('./jobs.js');
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 

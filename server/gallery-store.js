@@ -10,12 +10,12 @@ import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync
 import { isInside } from './paths.js';
 import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from './gallery-order.js';
 
-export const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+export const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 export const galleryPath = path.join(dataDir, "gallery.json");
 export const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
-export const galleryLimit = Number(process.env.HEISS_GALLERY_LIMIT || 50000);
+export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
-const changeLogLimit = Number(process.env.HEISS_GALLERY_CHANGELOG_LIMIT || 10000);
+const changeLogLimit = Number(process.env.STUDIO_GALLERY_CHANGELOG_LIMIT || 10000);
 let galleryRevision = Date.now();
 const galleryChanges = [];
 // Bumped whenever the hide markers change, so a cached page list knows to rebuild.
@@ -639,7 +639,7 @@ export function hasExistingOutputFile(item) {
  * still replaced whole, with the previous copy kept as .bak, and a save that
  * is due when the server stops is written before it exits.
  */
-const saveDelayMs = Math.max(0, Number(process.env.HEISS_GALLERY_SAVE_MS ?? 1000));
+const saveDelayMs = Math.max(0, Number(process.env.STUDIO_GALLERY_SAVE_MS ?? 1000));
 let saveTimer = null;
 let dirty = false;
 let writing = null;

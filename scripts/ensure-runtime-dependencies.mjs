@@ -72,7 +72,7 @@ if (wrongPlatform) {
 const encoderBinary = path.join(projectRoot, "node_modules", "ffmpeg-static", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
 const encoderWanted = Boolean(packageJson.optionalDependencies?.["ffmpeg-static"] || packageJson.dependencies?.["ffmpeg-static"]);
 const systemEncoder = () => {
-  if (process.env.HEISS_FFMPEG_PATH) return true;
+  if (process.env.STUDIO_FFMPEG_PATH) return true;
   try { return spawnSync("ffmpeg", ["-version"], { stdio: "ignore", timeout: 5000, windowsHide: true }).status === 0; } catch { return false; }
 };
 const encoderStamp = path.join(projectRoot, "node_modules", ".heiss-encoder-attempt");

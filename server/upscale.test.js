@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-seedvr2-"));
-process.env.HEISS_SEEDVR2_MODEL_DIR = dir;
+process.env.STUDIO_SEEDVR2_MODEL_DIR = dir;
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const { faceDetailSource, installState, modelFiles, startModelInstall, upscaleGraph, upscalePlan, upscaleStatus } = await import("./upscale.js");
 

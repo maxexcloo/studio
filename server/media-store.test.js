@@ -31,7 +31,7 @@ const comfy = http.createServer((req, res) => {
 await new Promise((resolve) => comfy.listen(0, "127.0.0.1", resolve));
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-media-"));
-process.env.HEISS_DATA_DIR = temporary;
+process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_OUTPUT_STORAGE = "studio";
 process.env.COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
 process.env.STUDIO_WORKER_TOKEN = "worker-secret";

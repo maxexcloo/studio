@@ -913,7 +913,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   const here = path.dirname(fileURLToPath(import.meta.url));
   const child = fork(path.join(here, 'index.js'), [], {
     cwd: path.dirname(here),
-    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: envFile, HEISS_DEMO: '1', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: 'http://127.0.0.1:1' },
+    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', STUDIO_DATA_DIR: dir, STUDIO_ENV_FILE: envFile, STUDIO_DEMO: '1', STUDIO_LAN: '0', STUDIO_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: 'http://127.0.0.1:1' },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc']
   });
   const client = new Client({ name: 'heiss-real-server-fixture', version: '1.0.0' }, { capabilities: {} });
@@ -992,7 +992,7 @@ test('maintained profile guidance reaches the real model API and native MCP with
   });
   await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
   const child = fork(path.join(path.dirname(fileURLToPath(import.meta.url)), 'index.js'), [], {
-    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', HEISS_DATA_DIR: dir, HEISS_ENV_FILE: path.join(dir, '.env'), STUDIO_ENABLE_BUILTIN_PROFILES: '0', HEISS_LAN: '0', HEISS_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: `http://127.0.0.1:${backend.address().port}` },
+    env: { PATH: process.env.PATH, PORT: '0', HOST: '127.0.0.1', STUDIO_DATA_DIR: dir, STUDIO_ENV_FILE: path.join(dir, '.env'), STUDIO_ENABLE_BUILTIN_PROFILES: '0', STUDIO_LAN: '0', STUDIO_NO_BROWSER: '1', STUDIO_MCP_API_KEY: mediaKey, COMFY_URL: `http://127.0.0.1:${backend.address().port}` },
     stdio: ['ignore', 'ignore', 'ignore', 'ipc']
   });
   const client = new Client({ name: 'owned-profile-fixture', version: '1.0.0' }, { capabilities: {} });

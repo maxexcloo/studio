@@ -15,7 +15,7 @@ import { accountSession } from "./account-store.js";
  *   It is set in Settings › Connection on this computer.
  * - Signing in makes a device session: a random token in an HttpOnly cookie,
  *   with only its hash kept here, so "Sign out all devices" ends every one
- *   of them at once. Sessions last a week (HEISS_DEVICE_SESSION_DAYS).
+ *   of them at once. Sessions last a week (STUDIO_DEVICE_SESSION_DAYS).
  * - Looking after the computer (updates, installs, the output folder,
  *   clearing the gallery) stays with this computer unless its owner turns on
  *   "Trust other devices with admin". That switch, the passwords and signing
@@ -24,7 +24,7 @@ import { accountSession } from "./account-store.js";
  * Everything lives in data/access.json (0600).
  */
 
-const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
 export const deviceCookieName = "heiss_device";
 const kdf = "scrypt-n32768-r8-p1";
@@ -32,14 +32,14 @@ const maxSessions = 50;
 const seenFlushMs = 60 * 1000;
 
 export const deviceSessionSeconds = (() => {
-  const days = Number(process.env.HEISS_DEVICE_SESSION_DAYS || 7);
+  const days = Number(process.env.STUDIO_DEVICE_SESSION_DAYS || 7);
   return Math.round(Math.max(1 / 24, Math.min(30, Number.isFinite(days) && days > 0 ? days : 7)) * 24 * 60 * 60);
 })();
 
 /** Who is asking, worked out once per request. */
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false, network: false };
-  if (!req.heissClient) req.heissClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.HEISS_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
+  if (!req.heissClient) req.heissClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
   return req.heissClient;
 }
 

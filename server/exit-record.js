@@ -27,8 +27,8 @@ export const PORT_IN_USE_CODE = 78;
 
 function dataDir() {
   // The launchers don't load .env (the server does), so its data folder is read from it here.
-  const configured = process.env.HEISS_DATA_DIR || (() => {
-    try { const values = readEnvFile(root).values; return values.HEISS_DATA_DIR || ""; } catch { return ""; }
+  const configured = process.env.STUDIO_DATA_DIR || process.env.HEISS_DATA_DIR || (() => {
+    try { const values = readEnvFile(root).values; return values.STUDIO_DATA_DIR || ""; } catch { return ""; }
   })();
   return configured ? path.resolve(configured) : path.join(root, "data");
 }

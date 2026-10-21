@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-snapshot-"));
-process.env.HEISS_DATA_DIR = dataDir;
+process.env.STUDIO_DATA_DIR = dataDir;
 const { pruneSnapshots, snapshotIfNewVersion } = await import("./data-snapshot.js");
 const backups = path.join(dataDir, ".backups");
 const day = 86_400_000;

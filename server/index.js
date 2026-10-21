@@ -1,4 +1,6 @@
-// First: keeps a copy of data/ before a new version's stores load and migrate it.
+// First: the settings (.env and old HEISS_* names, env-names.js), so every module below reads them.
+import "./env.js";
+// Then: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
 import "./hidden-migration.js";
@@ -38,7 +40,8 @@ import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
-import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
+import { envFileKeys, legacyEnvInUse, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
+import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from './env-names.js';
 import { retireFeatureSwitches } from './feature-options.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
 import { lorasEnabled, presetsEnabled } from './features.js';
@@ -310,12 +313,12 @@ app.get("/api/network", (req, res) => {
 });
 
 // HTTPS set in the shell outranks Settings, like HOST does.
-const tlsFromShell = ["HEISS_TLS_CERT", "HEISS_TLS_KEY"].some((name) => process.env[name] && !envFileKeys.has(name));
+const tlsFromShell = ["STUDIO_TLS_CERT", "STUDIO_TLS_KEY"].some((name) => process.env[name] && !envFileKeys.has(name));
 
 /** HTTPS as it runs, and as .env has it for the next start. File paths only for this computer. */
 function networkTls(thisComputer) {
   const hidePaths = (summary) => (thisComputer ? summary : { ...summary, certPath: "", keyPath: "" });
-  const next = inspectTls(process.env.HEISS_TLS_CERT || "", process.env.HEISS_TLS_KEY || "");
+  const next = inspectTls(process.env.STUDIO_TLS_CERT || "", process.env.STUDIO_TLS_KEY || "");
   return { ...hidePaths(tlsSummary(startupTls, { active: httpsListening })), problem: httpsProblem, next: hidePaths(tlsSummary(next)), fromShell: tlsFromShell };
 }
 
@@ -327,7 +330,7 @@ function networkTls(thisComputer) {
 app.post("/api/network/tls", (req, res) => {
   if (!requireThisComputer(req, res)) return;
   if (tlsFromShell) {
-    res.status(409).json({ ok: false, error: "HTTPS is set with HEISS_TLS_CERT and HEISS_TLS_KEY where Studio starts. Change it there." });
+    res.status(409).json({ ok: false, error: "HTTPS is set with STUDIO_TLS_CERT and STUDIO_TLS_KEY where Studio starts. Change it there." });
     return;
   }
   const off = !req.body?.cert && !req.body?.key;
@@ -337,8 +340,8 @@ app.post("/api/network/tls", (req, res) => {
     return;
   }
   try {
-    writeLocalEnvValue("HEISS_TLS_CERT", report ? report.certPath : "");
-    writeLocalEnvValue("HEISS_TLS_KEY", report ? report.keyPath : "");
+    writeLocalEnvValue("STUDIO_TLS_CERT", report ? report.certPath : "");
+    writeLocalEnvValue("STUDIO_TLS_KEY", report ? report.keyPath : "");
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
     return;
@@ -484,6 +487,9 @@ const serverStartedAt = Date.now();
 // Read once listening: a second copy that finds this one running must not take over its record.
 let previousExit = null;
 function beginSession() {
+  // One line for old HEISS_* names still in use; they keep working until the deployment renames them.
+  const legacyNotice = legacyEnvNotice(legacyEnvInUse, shadowedLegacyEnvNames(process.env));
+  if (legacyNotice) console.warn(logWarning(legacyNotice));
   previousExit = startSession({ now: serverStartedAt });
   if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
   setInterval(() => noteAlive(), 60_000).unref();
@@ -1353,7 +1359,8 @@ app.get("/api/settings/deployment", async (req, res) => {
 
 app.post("/api/settings/deployment", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const key = String(req.body?.key || "");
+  // An old HEISS_* key from a page loaded before the rename names the same setting.
+  const key = currentEnvName(String(req.body?.key || ""));
   const value = req.body?.value;
   try {
     if (isCatalogueFlag(key)) {
@@ -1379,7 +1386,7 @@ app.post("/api/settings/deployment", (req, res) => {
 app.post("/api/comfy-search", (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    writeLocalEnvValue("HEISS_COMFY_SEARCH", req.body?.enabled === false ? "0" : "1");
+    writeLocalEnvValue("STUDIO_COMFY_SEARCH", req.body?.enabled === false ? "0" : "1");
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
     return;

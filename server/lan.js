@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { applyLegacyEnvNames } from "./env-names.js";
 
 /**
  * Opening the studio on other devices (LAN mode). Three ways in, strongest first:
  * - `--lan` on the command line (npm start -- --lan, npm run dev -- --lan): on for that run.
  * - HOST from the shell: whatever it says.
- * - The Settings switch, saved as HEISS_LAN in .env (an older HOST=0.0.0.0 there counts too).
+ * - The Settings switch, saved as STUDIO_LAN in .env (an older HOST=0.0.0.0 there counts too).
  *
  * No side effects, so the dev launcher can ask before anything else has read .env.
  */
@@ -14,7 +15,7 @@ export function resolveLan({ argv = [], env = {}, fileKeys = new Set() } = {}) {
   const flag = argv.includes("--lan");
   const shellHost = env.HOST && !fileKeys.has("HOST") ? env.HOST : "";
   const fileHost = fileKeys.has("HOST") ? env.HOST || "" : "";
-  const saved = env.HEISS_LAN === "1" || (env.HEISS_LAN !== "0" && wildcard(fileHost));
+  const saved = env.STUDIO_LAN === "1" || (env.STUDIO_LAN !== "0" && wildcard(fileHost));
   if (flag) return { host: "0.0.0.0", source: "flag", saved };
   if (shellHost) return { host: shellHost, source: "shell", saved };
   if (saved) return { host: "0.0.0.0", source: "setting", saved };
@@ -37,5 +38,7 @@ export function readEnvFile(root) {
   } catch {
     // .env is optional.
   }
+  // Old HEISS_* names fill their unset STUDIO_* ones, as the server reads them (env-names.js).
+  applyLegacyEnvNames(values);
   return { values, keys: new Set(Object.keys(values)) };
 }

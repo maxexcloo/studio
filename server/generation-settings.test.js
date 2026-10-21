@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 process.env.COMFY_OUTPUT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
 const { generationSettings } = await import("./gallery-store.js");
 
 test("a reference that only guided is kept with the run, so a retry runs it the same way", () => {

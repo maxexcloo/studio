@@ -25,7 +25,7 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
  * deployment variables that switch one off for everyone (feature-options.js).
  */
 export const catalogueFlags = [
-  flag("HEISS_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" })
+  flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" })
 ];
 
 const flagOn = (item) => (item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1");

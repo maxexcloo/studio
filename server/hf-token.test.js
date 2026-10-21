@@ -10,7 +10,7 @@ const envFile = path.join(folder, ".env");
 const saved = "hf_savedsavedsavedsaved1234";
 const older = "hf_olderolderolderolder5678";
 fs.writeFileSync(envFile, `COMFY_URL=http://127.0.0.1:8188\nHF_TOKEN=${saved}\nHUGGING_FACE_HUB_TOKEN=${older}\n`);
-process.env.HEISS_ENV_FILE = envFile;
+process.env.STUDIO_ENV_FILE = envFile;
 delete process.env.HF_TOKEN;
 delete process.env.HUGGING_FACE_HUB_TOKEN;
 const { hfTokenStatus, saveHfToken } = await import("./hf-access.js");

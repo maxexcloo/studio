@@ -22,16 +22,16 @@ services:
     restart: unless-stopped
     ports:
       # This computer only. Docker hands the container the browser's requests
-      # from an address of its own, so HEISS_DOCKER_HOST_ONLY tells the studio
+      # from an address of its own, so STUDIO_DOCKER_HOST_ONLY tells the studio
       # they all come from this computer, which is only true with 127.0.0.1 here.
       - "127.0.0.1:8787:8787"
     environment:
-      HEISS_DOCKER_HOST_ONLY: "1"
+      STUDIO_DOCKER_HOST_ONLY: "1"
       # Where to look for ComfyUI until Settings › Connection saves an address.
       # host.docker.internal names the machine Docker runs on (extra_hosts below
       # adds that name on plain Linux; Docker Desktop has it already).
       # ComfyUI must be listening beyond 127.0.0.1 (--listen) to accept this.
-      HEISS_DEFAULT_COMFY_URL: ${HEISS_DOCKER_COMFY_URL:-http://host.docker.internal:8188}
+      STUDIO_DEFAULT_COMFY_URL: ${STUDIO_DOCKER_COMFY_URL:-${HEISS_DOCKER_COMFY_URL:-http://host.docker.internal:8188}}
       # Studio reads the images ComfyUI writes straight from ComfyUI's output
       # folder, so that folder is mounted into the container at a path of our
       # own and set as the output folder.

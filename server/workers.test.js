@@ -5,8 +5,8 @@ import path from "node:path";
 import test from "node:test";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-workers-"));
-process.env.HEISS_DATA_DIR = dataDir;
-for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "HEISS_DEFAULT_COMFY_URL"]) delete process.env[key];
+process.env.STUDIO_DATA_DIR = dataDir;
+for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_DEFAULT_COMFY_URL"]) delete process.env[key];
 const workers = await import("./workers.js");
 const { envFileKeys } = await import("./env.js");
 const { deploymentWorkers, seedWorkers, normalizeWorker, normalizeWorkerUrl, pickWorker, listWorkers, reloadWorkers, saveWorkers, defaultWorkerId, modelLibraryWorker, noWorkerMessage, WorkerConfigError } = workers;
@@ -14,7 +14,7 @@ const { deploymentWorkers, seedWorkers, normalizeWorker, normalizeWorkerUrl, pic
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 const reset = (environment = {}) => {
-  for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "HEISS_DEFAULT_COMFY_URL"]) delete process.env[key];
+  for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_DEFAULT_COMFY_URL"]) delete process.env[key];
   Object.assign(process.env, environment);
   fs.rmSync(workers.workersFile(), { force: true });
   fs.rmSync(`${workers.workersFile()}.bak`, { force: true });
@@ -79,7 +79,7 @@ test("locked environment workers come first and can't be changed, removed or reu
 });
 
 test("a fresh install seeds the local address; the first save is kept as is, never overwritten by the seed", () => {
-  reset({ HEISS_DEFAULT_COMFY_URL: "http://host.docker.internal:8188" });
+  reset({ STUDIO_DEFAULT_COMFY_URL: "http://host.docker.internal:8188" });
   assert.deepEqual(listWorkers().map((worker) => [worker.id, worker.url, worker.source, worker.locked]), [["primary", "http://host.docker.internal:8188", "default", false]]);
   assert.equal(fs.existsSync(workers.workersFile()), false, "seeding writes nothing");
   saveWorkers([
@@ -101,7 +101,7 @@ test("zero workers is a valid setup with a plain message", () => {
   assert.deepEqual(listWorkers(), []);
   assert.equal(defaultWorkerId(), "");
   assert.match(noWorkerMessage("image"), /No workers are set up/);
-  reset({ HEISS_DEFAULT_COMFY_URL: "http://x:1" });
+  reset({ STUDIO_DEFAULT_COMFY_URL: "http://x:1" });
   saveWorkers([]);
   assert.deepEqual(reloadWorkers(), []);
 });

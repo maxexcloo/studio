@@ -8,7 +8,7 @@ import sharp from "sharp";
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
 const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
 const { parseA1111Parameters, readPngInfo } = await import("./png-text.js");
 

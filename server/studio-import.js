@@ -108,7 +108,7 @@ export function planStudioImport({ sourceData, sourceOutputs, targetData, mediaR
     }
     plan.records.push(record);
   }
-  if (targetGallery.length + plan.records.length > galleryLimit) plan.conflicts.push(`The target gallery would hold ${targetGallery.length + plan.records.length} records, above HEISS_GALLERY_LIMIT (${galleryLimit}).`);
+  if (targetGallery.length + plan.records.length > galleryLimit) plan.conflicts.push(`The target gallery would hold ${targetGallery.length + plan.records.length} records, above STUDIO_GALLERY_LIMIT (${galleryLimit}).`);
 
   const targetAccountDir = accountDataDir(targetData, account.id);
   for (const name of perAccountFiles) {

@@ -7,7 +7,7 @@ import { compareGalleryItems, galleryBucket, sortGalleryItems } from "./gallery-
 import { groupGallery } from "../src/app/runs.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-gallery-order-"));
-process.env.HEISS_DATA_DIR = scratch;
+process.env.STUDIO_DATA_DIR = scratch;
 process.env.COMFY_OUTPUT_DIR = "";
 const { pageGallery, setGallery, sortGallery } = await import("./gallery-store.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));

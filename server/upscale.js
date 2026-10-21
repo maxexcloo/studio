@@ -83,7 +83,7 @@ const presets = {
 export const upscaleNodeClasses = nodePacks.seedvr2.nodes;
 export const faceDetailNodeClasses = ["FaceDetailer", "UltralyticsDetectorProvider", "SAMLoader"];
 
-const repoOverride = process.env.HEISS_SEEDVR2_HF_REPO || "";
+const repoOverride = process.env.STUDIO_SEEDVR2_HF_REPO || "";
 
 export function normalizeQuality(value = "") {
   const quality = String(value || "").toLowerCase();
@@ -101,7 +101,7 @@ function downloadUrl(file) {
  * it unless an explicit override is set.
  */
 export function seedvr2ModelDir() {
-  const override = String(process.env.HEISS_SEEDVR2_MODEL_DIR || "").trim();
+  const override = String(process.env.STUDIO_SEEDVR2_MODEL_DIR || "").trim();
   if (override) return path.resolve(override);
   const models = comfyModelsDir();
   if (models) return path.join(models, "SEEDVR2");

@@ -9,8 +9,8 @@ RUN npm run build && npm prune --no-audit --no-fund --omit=dev
 
 FROM node:26.11.1-bookworm-slim AS runtime
 
-ENV HEISS_DATA_DIR=/data \
-    HEISS_ENV_FILE=/data/.env \
+ENV STUDIO_DATA_DIR=/data \
+    STUDIO_ENV_FILE=/data/.env \
     HOST=0.0.0.0 \
     NODE_ENV=production \
     PORT=8787

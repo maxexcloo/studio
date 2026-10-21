@@ -9,10 +9,10 @@ const parent = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-libr
 const outputDir = path.join(parent, "output");
 fs.mkdirSync(outputDir);
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
 test.after(() => {
   fs.rmSync(parent, { recursive: true, force: true });
-  fs.rmSync(process.env.HEISS_DATA_DIR, { recursive: true, force: true });
+  fs.rmSync(process.env.STUDIO_DATA_DIR, { recursive: true, force: true });
 });
 
 const store = await import("./gallery-store.js");

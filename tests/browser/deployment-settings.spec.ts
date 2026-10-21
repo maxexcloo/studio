@@ -9,7 +9,7 @@ const settings = {
     profiles: [{ id: 'mock-flux-schnell', label: 'FLUX.1 Schnell', kind: 'image', ready: true }, { id: 'mock-wan-video', label: 'Wan Video', kind: 'video', ready: true }]
   },
   catalogue: [
-    { key: 'HEISS_ENABLE_INPAINT', label: 'Inpainting', description: 'Painting over part of a reference image.', value: true, defaultOn: true, applies: 'restart', source: 'default', locked: false }
+    { key: 'STUDIO_ENABLE_INPAINT', label: 'Inpainting', description: 'Painting over part of a reference image.', value: true, defaultOn: true, applies: 'restart', source: 'default', locked: false }
   ],
   integrations: { civitai: { token: { set: true, editable: false }, presets: true }, huggingFace: { token: { set: false, editable: true } } },
   storage: { outputs: 'studio', source: 'default', locked: false, workerToken: true, multiUser: true }

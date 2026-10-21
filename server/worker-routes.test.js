@@ -28,7 +28,7 @@ let dataDir;
 
 async function start(environment) {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-worker-routes-"));
-  const env = { ...process.env, PORT: "0", HOST: "127.0.0.1", HEISS_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", HEISS_NO_BROWSER: "1", HEISS_LAN: "0", HEISS_COMFY_SEARCH: "0", STUDIO_ENABLE_GROK: "0", npm_lifecycle_event: "", ...environment };
+  const env = { ...process.env, PORT: "0", HOST: "127.0.0.1", STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_NO_BROWSER: "1", STUDIO_LAN: "0", STUDIO_COMFY_SEARCH: "0", STUDIO_ENABLE_GROK: "0", npm_lifecycle_event: "", ...environment };
   for (const key of ["COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_WORKERS"]) if (!(key in environment)) delete env[key];
   server = fork(path.join(here, "index.js"), [], { cwd: path.join(here, ".."), env, stdio: ["ignore", "ignore", "pipe", "ipc"] });
   let errors = "";

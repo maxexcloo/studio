@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultDataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+const defaultDataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 
 export const flagName = ".hidden-removed-v1";
 export const backupsName = "backups";

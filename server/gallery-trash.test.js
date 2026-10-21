@@ -7,7 +7,7 @@ import test from "node:test";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-trash-"));
 const outputDir = path.join(temporary, "ComfyUI", "output");
 fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
-process.env.HEISS_DATA_DIR = path.join(temporary, "data");
+process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.COMFY_URL = "http://127.0.0.1:9";
 

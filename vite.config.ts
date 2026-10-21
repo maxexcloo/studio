@@ -22,7 +22,7 @@ function precompress(): Plugin {
 // `npm run dev` (scripts/dev.mjs) hands Vite and the server one token, so the
 // server can tell a phone on the network from this computer even though every
 // proxied request reaches it from 127.0.0.1 (see server/client-trust.js).
-const devProxyToken = process.env.HEISS_DEV_PROXY_TOKEN || "";
+const devProxyToken = process.env.STUDIO_DEV_PROXY_TOKEN || "";
 const api: ProxyOptions = {
   target: "http://127.0.0.1:8787",
   configure(proxy) {

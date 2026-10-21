@@ -230,12 +230,12 @@ export async function pickFolder(start = "", pickPrompt = defaultPickPrompt) {
       "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog",
       `$dialog.Description = '${pickPrompt}'`,
       "$dialog.ShowNewFolderButton = $false",
-      "if ($env:HEISS_PICK_START) { $dialog.SelectedPath = $env:HEISS_PICK_START }",
+      "if ($env:STUDIO_PICK_START) { $dialog.SelectedPath = $env:STUDIO_PICK_START }",
       "if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.SelectedPath) }",
       "$owner.Dispose()"
     ].join("; ");
     try {
-      return (await run("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, HEISS_PICK_START: startDir } })).trim();
+      return (await run("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, STUDIO_PICK_START: startDir } })).trim();
     } catch {
       throw new Error("The folder picker didn’t open. Paste the path instead.");
     }

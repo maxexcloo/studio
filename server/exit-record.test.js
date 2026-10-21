@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-process.env.HEISS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-exit-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-exit-"));
 const { recordExit, startSession, tailKeeper } = await import("./exit-record.js");
-const logs = path.join(process.env.HEISS_DATA_DIR, "logs");
+const logs = path.join(process.env.STUDIO_DATA_DIR, "logs");
 const reset = () => fs.rmSync(logs, { recursive: true, force: true });
 
 test("a first start has nothing to tell", () => {

@@ -5,8 +5,8 @@ import path from "node:path";
 import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-video-i2v-"));
-process.env.HEISS_COMFY_ROOT = path.join(scratch, "ComfyUI");
-process.env.HEISS_DATA_DIR = path.join(scratch, "data");
+process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
+process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const dirs = Object.fromEntries(["diffusion_models", "text_encoders", "vae", "clip_vision"].map((name) => {
   const dir = path.join(scratch, "ComfyUI", "models", name);
   fs.mkdirSync(dir, { recursive: true });

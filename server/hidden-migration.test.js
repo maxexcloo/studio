@@ -7,7 +7,7 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-hidden-removal-"));
 // The import itself runs the removal once, on this empty folder.
-process.env.HEISS_DATA_DIR = path.join(temporary, "imported");
+process.env.STUDIO_DATA_DIR = path.join(temporary, "imported");
 const { flagName, removeHidden } = await import("./hidden-migration.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
@@ -26,7 +26,7 @@ function dataDir(files = {}) {
 }
 
 test("importing it runs it once for the configured data folder", () => {
-  assert.ok(fs.existsSync(path.join(process.env.HEISS_DATA_DIR, flagName)));
+  assert.ok(fs.existsSync(path.join(process.env.STUDIO_DATA_DIR, flagName)));
 });
 
 test("an install that never used Hidden gets a backup and the flag, and nothing else changes", () => {
@@ -88,7 +88,7 @@ test("records a marker kept out of view come back; markers for deleted outputs s
   assert.equal(Object.keys(readJson(path.join(dir, summary.backup, "gallery-hidden.json"))).length, 3);
 
   // The digest is the gallery store's own, so the store now shows the record.
-  process.env.HEISS_DATA_DIR = dir;
+  process.env.STUDIO_DATA_DIR = dir;
   const store = await import("./gallery-store.js");
   assert.equal(store.markerOf(view("kept.png")), marker(view("kept.png")));
   assert.equal(store.isGalleryHidden(store.gallery[0]), false);

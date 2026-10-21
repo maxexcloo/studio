@@ -14,7 +14,7 @@ import { forgetItemVideoPreviews } from './video-previews.js';
  * them: one folder per clear, `.heiss-trash/<batch>/` inside ComfyUI's output
  * folder (same disk, so moving is instant and never runs out of space), with
  * a batch.json listing the gallery records and where each file came from.
- * A batch can be put back until it is purged, after HEISS_TRASH_DAYS (30).
+ * A batch can be put back until it is purged, after STUDIO_TRASH_DAYS (30).
  *
  * Only what the gallery cleared goes in. Folders starting with a dot are not
  * served as outputs (comfy.js), so the trash is not visible as one either.
@@ -22,7 +22,7 @@ import { forgetItemVideoPreviews } from './video-previews.js';
 
 export const trashFolderName = ".heiss-trash";
 export const trashDays = (() => {
-  const days = Number(process.env.HEISS_TRASH_DAYS || 30);
+  const days = Number(process.env.STUDIO_TRASH_DAYS || 30);
   return Number.isFinite(days) && days >= 1 ? Math.min(365, days) : 30;
 })();
 const dayMs = 24 * 60 * 60 * 1000;

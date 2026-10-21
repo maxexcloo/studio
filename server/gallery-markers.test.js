@@ -8,7 +8,7 @@ import test from "node:test";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-markers-"));
 const dataDir = path.join(temporary, "data");
 fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
-process.env.HEISS_DATA_DIR = dataDir;
+process.env.STUDIO_DATA_DIR = dataDir;
 process.env.COMFY_URL = "http://127.0.0.1:9";
 
 const view = (filename) => `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`;

@@ -14,7 +14,7 @@ import { isInside } from "./paths.js";
  * single-user studio in and `=comfy` keeps ComfyUI's output folder.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const dataDir = process.env.HEISS_DATA_DIR ? path.resolve(process.env.HEISS_DATA_DIR) : path.join(root, "data");
+export const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 
 export const mediaType = "media";
 /** Whether outputs live in Studio media; any value other than `studio` or `comfy` is refused. */

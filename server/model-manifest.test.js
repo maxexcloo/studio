@@ -6,8 +6,8 @@ import path from "node:path";
 import test from "node:test";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-manifest-"));
-process.env.HEISS_DATA_DIR = path.join(root, "data");
-process.env.HEISS_COMFY_ROOT = path.join(root, "comfy");
+process.env.STUDIO_DATA_DIR = path.join(root, "data");
+process.env.STUDIO_COMFY_ROOT = path.join(root, "comfy");
 process.env.STUDIO_MODEL_MANIFEST_PREFIX = "models/comfyui/";
 const models = path.join(root, "comfy", "models");
 const write = (relative, content) => { const file = path.join(models, relative); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content); return file; };

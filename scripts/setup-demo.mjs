@@ -39,9 +39,9 @@ if (!process.argv.includes("--keep")) fs.rmSync(base, { recursive: true, force: 
 // Before any server module loads: they read these once.
 Object.assign(process.env, {
   COMFY_URL: `http://127.0.0.1:${comfyPort}`,
-  HEISS_COMFY_ROOT: comfyRoot,
+  STUDIO_COMFY_ROOT: comfyRoot,
   COMFY_OUTPUT_DIR: path.join(comfyRoot, "output"),
-  HEISS_DATA_DIR: path.join(base, "heiss-data")
+  STUDIO_DATA_DIR: path.join(base, "heiss-data")
 });
 
 const { nodePacks } = await import("../server/node-packs.js");

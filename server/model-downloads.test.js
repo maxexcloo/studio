@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-downloads-"));
-process.env.HEISS_COMFY_ROOT = path.join(scratch, "ComfyUI");
+process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 fs.mkdirSync(path.join(scratch, "ComfyUI", "models", "vae"), { recursive: true });
 
 const { downloadState, isNetworkError, repositoryPage, setDownloadTransport, startDownload } = await import("./model-downloads.js");
