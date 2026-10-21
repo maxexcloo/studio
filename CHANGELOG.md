@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-10-21
+
 > Details read alike for images and videos and name the profile, Copy and Recreate close Details, desktop tiles star top left, typed view models with one access model, and orphan server routes removed
 
 ### Changed
@@ -1755,7 +1757,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.43.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.44.0...HEAD
+[0.44.0]: https://github.com/maxexcloo/studio/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/maxexcloo/studio/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/maxexcloo/studio/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/maxexcloo/studio/compare/v0.40.1...v0.41.0
