@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir, localOutputFile, root } from './comfy.js';
+import { defaultWorkerId } from './workers.js';
 
 import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from './json-store.js';
 import { isInside } from './paths.js';
@@ -942,7 +943,7 @@ export function generationSettings(body) {
   const providerModel = String(body.modelName || body.model || "");
   const grok = providerModel.startsWith("grok-imagine-");
   const settings = {
-    comfyBackend: body.comfyBackend || "primary",
+    comfyBackend: body.comfyBackend || defaultWorkerId(),
     workflow: body.workflow || "",
     profileId: body.profileId || "",
     // The profile's name when it ran, for Details once the profile is renamed or removed.

@@ -306,14 +306,14 @@ holds:
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery, General, Generation and Sharing | Everyone |
 | Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
-| Workers | ComfyUI connections, restart, AI Control (what each GPU runs), then Upscale's status as its own group | Administrators; everyone reads AI Control's and Upscale's status |
+| Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
 
 **Order:** Account comes first, then the pages alphabetically; groups, rows,
 option lists and pills inside them read alphabetically too. The exceptions are
 logical ones: a master switch comes before what depends on it, Save & Discard
 is an editor's last row, an editor's fields follow the order they are filled
 in, Version leads About, Reset (destructive) stays its own group, and Workers
-lists its workers before AI Control and Upscale.
+lists its workers before Upscale.
 
 **Access profiles** grant features and local models. Cloud models are never
 listed: the Cloud Models feature grants them. NSFW Models gates any model
@@ -336,13 +336,17 @@ switch, off by default. Auto-Grouping, Grid Autoplay and Failed are not
 settings: they are gallery view controls (see [Gallery View
 Controls](#gallery-view-controls)).
 
-**Workers** has one heading per backend (Image Worker, Video Worker): its
-locked address, status with Test, Open and Restart. **AI Control** is manual
-only: a select per GPU, a preview of what stops, starts and keeps in the Save
-& Discard row, a confirmation only when something stops, and progress in the
-status pill. A change to both GPUs runs as one job through AI Control's board
-routes (`/api/board/plan`, then `/api/board`). Studio never switches a GPU by
-itself, and non-administrators see the status read-only.
+**Workers** (`WorkerSettings.tsx`) shows every worker the same way: one
+group headed by its name, then the same rows in the same order with the same
+words: Address (with its source tag and Edit), Capabilities, Status with Test,
+Open, Restart. Only the capabilities differ. An action that doesn't apply stays
+in its place, off, with a short reason before it ("Locked", "Offline", "Save
+first"). The deployment's workers come first and are locked; Studio's own are
+edited in place (Name, Address, Capabilities as pressed toggles, Remove) as one
+draft with one Save & Discard row under Add Worker. With no workers the page
+is an `EmptyState` ("No Workers Yet") with Add Worker. Restart acts at once.
+GPU allocation is not in Studio: it stays in AI Control's own UI and Mise.
+Other Workers groups (such as upscale status) follow the worker list.
 
 ## Library
 

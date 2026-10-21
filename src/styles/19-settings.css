@@ -101,10 +101,11 @@
 .set-suggest { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .set-model-name { display: block; overflow-wrap: anywhere; }
 .set-type-picker { width: 200px; }
-/* Settings › Workers › AI Control: a GPU's workload, named in full where there is room. */
-.set-gpu-picker { display: flex; justify-content: flex-end; width: 280px; min-width: 0; }
-.set-gpu-picker > * { min-width: 0; max-width: 100%; }
-@media (max-width: 760px) { .set-gpu-picker { width: auto; max-width: 52vw; } }
+/* Settings › Workers: a worker's capabilities as pressed toggles while it is being edited,
+   and an action that doesn't apply, off, with its reason in its place. */
+.set-capabilities { flex-wrap: wrap; justify-content: flex-start; }
+.set-worker-field { width: min(320px, 52vw); }
+.set-action-reason { font-size: 12px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
 
 .set-inline-form { display: flex; gap: 8px; }
 .set-inline-form .modal-input { flex: 1; min-width: 0; }

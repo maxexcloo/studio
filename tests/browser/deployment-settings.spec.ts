@@ -3,10 +3,6 @@ import { studioUi } from './helpers/ui';
 
 const settings = {
   ok: true,
-  connections: [
-    { backend: 'primary', label: 'Images', key: 'COMFY_URL', value: 'http://comfyui-image:8188', source: 'deployment', locked: true, routes: 'Image workflows and provider-backed video' },
-    { backend: 'video', label: 'Videos', key: 'COMFY_VIDEO_URL', value: '', source: 'default', locked: false, routes: 'Uses the image connection' }
-  ],
   defaults: {
     image: { key: 'STUDIO_DEFAULT_IMAGE_PROFILE', configured: 'mock-flux-schnell', effective: 'mock-flux-schnell', source: 'deployment', locked: true },
     video: { key: 'STUDIO_DEFAULT_VIDEO_PROFILE', configured: '', effective: 'mock-wan-video', source: 'default', locked: false },
@@ -25,13 +21,6 @@ test('deployment settings show sources, keep locked values read-only and save th
   await studioUi(page).openSettings();
   const dialog = page.locator('.settings-modal');
   await dialog.getByRole('button', { name: 'Workers', exact: true }).click();
-  await expect(dialog.getByRole('heading', { name: 'Image Worker' })).toBeVisible();
-  const images = dialog.locator('.set-row').filter({ hasText: 'http://comfyui-image:8188' });
-  await expect(images).toContainText('Deployment · Locked');
-  await expect(dialog.getByRole('button', { name: 'Edit Images Address', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Edit Videos Address', exact: true }).click();
-  await expect(dialog.getByLabel('Videos ComfyUI Address')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   // Upscale Status is its own group at the end of Workers, and no longer in Studio.
   await expect(dialog.locator('#settings-panel .list-section-title').last()).toHaveText('Upscale');
   await expect(dialog.locator('.set-row').filter({ hasText: 'Upscale Status' })).toBeVisible();

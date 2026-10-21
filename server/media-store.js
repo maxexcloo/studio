@@ -93,24 +93,20 @@ export async function ingestOutput(output, ownerId = "") {
  * has the new addresses (removeComfyFiles).
  */
 export async function ingestRunResults(results, ownerId = "") {
-  const comfyFiles = [];
   const move = async (output) => {
-    if (!output?.url) return output;
+    if (!output?.url) return { output, comfyFile: null };
     try {
       const moved = await ingestOutput(output, ownerId);
-      if (!moved) return output;
-      comfyFiles.push(moved.comfyFile);
-      return moved.output;
+      return moved || { output, comfyFile: null };
     } catch (error) {
       console.warn(`[Studio] Keeping an output in ComfyUI: ${error.message}`);
-      return output;
+      return { output, comfyFile: null };
     }
   };
-  // Every picture and upscale comes across at once rather than one after another.
-  const moved = await Promise.all(results.map(async (result) => {
-    const [output, upscale] = await Promise.all([move(result.output), result.upscale ? move(result.upscale) : null]);
-    return { ...result, output, ...(result.upscale ? { upscale } : {}) };
-  }));
+  // Every picture and upscale comes across at once; the order of what ComfyUI removes stays the run's order.
+  const pairs = await Promise.all(results.map((result) => Promise.all([move(result.output), result.upscale ? move(result.upscale) : null])));
+  const comfyFiles = pairs.flatMap(([output, upscale]) => [output.comfyFile, upscale?.comfyFile]).filter(Boolean);
+  const moved = results.map((result, index) => ({ ...result, output: pairs[index][0].output, ...(result.upscale ? { upscale: pairs[index][1].output } : {}) }));
   return { results: moved, comfyFiles };
 }
 

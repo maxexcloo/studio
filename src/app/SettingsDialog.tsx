@@ -1,6 +1,5 @@
 import React from 'react';
 import { ExternalLink, Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
-import { ComfyRestart } from './ComfyRestart';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { usePhone, useThisComputer } from './device';
 import { Boxes, FileJson, Info, Plug, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
@@ -18,8 +17,8 @@ import { ProfilesSettings } from './ProfilesSettings';
 import { AdapterLibraryGroup, PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { AccountSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
-import { AiControlGroup, useAiControlAvailability } from './AiControlSettings';
-import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings, VideoWorkerRestart, WorkerGroups } from './DeploymentSettings';
+import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
+import { WorkerSettings } from './WorkerSettings';
 
 /** Account first, then alphabetical (UI-PATTERNS › Settings). */
 export const SETTINGS_SECTIONS = [
@@ -30,7 +29,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'One model profile’s JSON at a time, checked and reviewed before it is saved.' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: features, the gallery, generation and sharing.' },
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Access profiles, accounts and chat gateway users.' },
-  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker, what each GPU runs and whether Upscale is ready.' }
+  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, what it runs, its status and whether Upscale is ready.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
@@ -164,8 +163,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       setAccountMode(status.mode === 'multi-user');
       setAccountRole(status.account?.role || '');
       if (status.mode !== 'multi-user' && ACCOUNT_SECTIONS.has(section)) onSectionChange('studio');
-      // Workers stays while AI Control can show ordinary accounts what the GPUs run (checked below).
-      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section) && section !== 'workers') onSectionChange('studio');
+      if (status.mode === 'multi-user' && status.account?.role !== 'administrator' && ADMINISTRATION_SECTIONS.has(section)) onSectionChange('studio');
     }).catch(() => { if (live && !known) setAccountMode(false); });
     return () => { live = false; };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -194,18 +192,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
   const deployment = useDeploymentSettings(open && thisComputer);
   // One rule for the rail and the page: account sections need accounts, administration needs an administrator.
   const administrator = accountMode ? accountRole === 'administrator' : thisComputer;
-  const aiControl = useAiControlAvailability(open);
-  // Everyone may read what the GPUs run; the rest of Workers is administration.
-  const sectionShown = (id: SettingsSection) => (!ACCOUNT_SECTIONS.has(id) || accountMode) && (!ADMINISTRATION_SECTIONS.has(id) || administrator || (id === 'workers' && Boolean(aiControl?.configured)));
-  React.useEffect(() => {
-    if (open && section === 'workers' && aiControl && !sectionShown('workers')) onSectionChange('studio');
-  }, [open, section, aiControl, administrator]); // eslint-disable-line react-hooks/exhaustive-deps
-  const connected = Boolean(view.comfyStatus?.backends?.primary?.connected ?? health?.ok);
-  const backendStatus = (backend: 'primary' | 'video') => {
-    const reported = view.comfyStatus?.backends?.[backend] as { connected: boolean; device?: string; url?: string } | undefined;
-    if (reported) return reported;
-    return backend === 'primary' && health ? { connected, device: '', url: health.comfyUrl } : null;
-  };
+  const sectionShown = (id: SettingsSection) => (!ACCOUNT_SECTIONS.has(id) || accountMode) && (!ADMINISTRATION_SECTIONS.has(id) || administrator);
 
   // Inpainting is the deployment's catalogue switch; administrators turn it here, everyone sees it.
   const inpaintFlag = deployment.settings?.catalogue.find((item) => item.key === inpaintFlagKey);
@@ -253,7 +240,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       <div className="set-panel" key={section} id="settings-panel" role="region" aria-labelledby="settings-panel-title">
         <header className="set-page-head">
           <h3 id="settings-panel-title">{current.label}</h3>
-          <p>{section === 'workers' && !administrator ? 'What each GPU runs right now and whether Upscale is ready.' : current.description}</p>
+          <p>{current.description}</p>
         </header>
 
         {section === 'account' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} /> : null}
@@ -313,18 +300,14 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
           </>
         ) : null}
 
+        {/* Workers: the worker list (WorkerSettings.tsx); further Workers groups follow it here. */}
         {section === 'workers' && sectionShown('workers') ? <>
-          {!administrator ? null : deployment.settings ? <WorkerGroups
-            settings={deployment.settings}
-            status={backendStatus}
+          <WorkerSettings
+            status={view.comfyStatus || null}
             showToast={showToast}
-            onCheck={refreshHealth}
-            onSaved={() => { void deployment.refresh(); refreshHealth(); refreshModels(false); refreshWorkflows(); }}
-            restart={(backend) => backend === 'primary'
-              ? <ComfyRestart compact className="is-end" onBack={() => { refreshModels(false); refreshWorkflows(); }} confirm={() => confirmAction({ title: 'Restart the Image Worker?', description: 'Running and queued generations stop. It takes a few seconds.', action: 'Restart', destructive: true })} />
-              : <VideoWorkerRestart showToast={showToast} confirm={() => confirmAction({ title: 'Restart the Video Worker?', description: 'Running and queued videos stop. It takes a few seconds.', action: 'Restart', destructive: true })} />}
-          /> : deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : <Group title="Image Worker"><Row label={<Skeleton className="skeleton-text short" />} /></Group>}
-          {aiControl ? <AiControlGroup admin={administrator} phone={phoneDevice} showToast={showToast} confirmAction={confirmAction} /> : null}
+            onCheck={() => { view.refreshComfyStatus?.(); refreshHealth(); }}
+            onChanged={() => { void deployment.refresh(); refreshHealth(); view.refreshComfyStatus?.(); refreshModels(false); refreshWorkflows(); }}
+          />
           <UpscaleStatusGroup status={upscaleStatus} reason={upscaleUnavailableReason} install={upscaleInstall} />
         </> : null}
 

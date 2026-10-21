@@ -1,6 +1,7 @@
 import { loraInfos } from './lora-info.js';
 import { optionalLoraIssue } from './lora-catalogue.js';
-import { configuredBackends, currentComfyBackend, isLocalVideoProfile, withComfyBackend } from "./comfy-backends.js";
+import { currentComfyBackend, isDefaultBackend, routeProfile, withComfyBackend } from "./comfy-backends.js";
+import { listWorkers, noWorkerMessage, workerHas } from "./workers.js";
 import crypto from "node:crypto";
 import { demoMode } from './comfy.js';
 import { families } from './family-catalog.js';
@@ -50,15 +51,28 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
   });
 
+  /**
+   * Which worker runs this generation (workers.js): one that has the
+   * capability its profile needs, preferring an online one with the model, and
+   * one with Upscale when Smart upscale is asked for. Nothing runs on a worker
+   * without the capability, and nothing falls back to the cloud.
+   */
   async function dispatchGenerate(req, res) {
     const accountUser = req.heissAccount?.role === "user";
-
-    if (!accountUser && configuredBackends().length === 1) return generateOnBackend(req, res);
+    const workers = listWorkers();
+    const kindCapability = req.body?.kind === "video" ? "video" : "image";
+    if (!workers.length && !demoMode) return res.status(503).json({ ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) });
+    // One worker that runs this kind needs no catalogue lookup (upstream's single ComfyUI).
+    if (!accountUser && (workers.length === 0 || (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))) return generateOnBackend(req, res);
     try {
       const available = await mediaModels();
       const profile = available.models.profiles.find((item) => item.id === req.body?.profileId)
         || available.models.profiles.find((item) => item.workflow === req.body?.workflow && item.model === req.body?.model);
-      if (!profile) return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
+      if (!profile) {
+        // A local video request with no video worker at all says so, rather than blaming the profile.
+        if (kindCapability === "video" && !workers.some((worker) => worker.capabilities.includes("video"))) return res.status(503).json({ ok: false, reason: "no-worker", error: noWorkerMessage("video") });
+        return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
+      }
       if (accountUser) {
         const feature = (req.body?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
         if (!mayUseGenerationProfile(req.heissAccount, profile) || !mayUseFeature(req.heissAccount, feature)) {
@@ -73,11 +87,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           return res.status(403).json({ ok: false, error: "References are not enabled for this account." });
         }
       }
-      if (configuredBackends().length === 1) return generateOnBackend(req, res);
-      const backend = isLocalVideoProfile(profile) ? "video" : "primary";
-      return await withComfyBackend(backend, () => generateOnBackend(req, res));
+      const worker = routeProfile(profile, { prefers: req.body?.autoUpscale ? ["upscale"] : [] });
+      return await withComfyBackend(worker.id, () => generateOnBackend(req, res));
     } catch (error) {
-      if (!res.headersSent) res.status(503).json({ ok: false, error: error.message });
+      if (!res.headersSent) res.status(503).json({ ok: false, ...(error?.noWorker ? { reason: "no-worker" } : {}), error: error.message });
     }
   }
 
@@ -103,7 +116,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     } catch (error) {
       // Placeholder generations are only for agent and UI testing without a GPU.
       if (!demoMode) {
-        res.status(503).json({ ok: false, restarting: comfyRestarting(), error: comfyDownMessage(error?.message) });
+        res.status(503).json({ ok: false, restarting: isDefaultBackend() && comfyRestarting(), error: comfyDownMessage(error?.message) });
         return;
       }
     }
@@ -153,7 +166,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     body.ownerId = ownerIdForRequest(req);
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
-    body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality)
+    // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.
+    body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality) && (demoMode || workerHas(body.comfyBackend, "upscale"))
       ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
       : null;
     if ((!req.heissAccount || mayUseFeature(req.heissAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }

@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
-import { backendUrl, currentComfyBackend, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
+import { backendUrl, currentComfyBackend, mergeWorkerModels, withComfyBackend } from "./comfy-backends.js";
+import { reloadWorkers } from "./workers.js";
 
 const primary = await startFakeComfy();
 const video = await startFakeComfy();
@@ -109,6 +110,11 @@ test("video failure stays a video failure and is never retried on primary", asyn
   assert.equal(primary.prompts.length, before);
 });
 
+// The legacy pair as workers: COMFY_URL runs images, COMFY_VIDEO_URL local video.
+const imageWorker = { id: "primary", capabilities: ["image", "upscale", "models"] };
+const videoWorker = { id: "video", capabilities: ["video"] };
+const mergeBackendModels = (primaryModels, videoModels) => mergeWorkerModels([{ worker: imageWorker, models: primaryModels }, { worker: videoWorker, models: videoModels }]);
+
 test("catalogue selects local video models from secondary and keeps Grok on primary", () => {
   const image = { id: "image", kind: "image", family: "sdxl" };
   const h3 = { id: "h3", kind: "video", family: "minimax_h3" };
@@ -130,7 +136,10 @@ test("catalogue selects local video models from secondary and keeps Grok on prim
 test("lost secondary configuration never silently falls back to primary", () => {
   const configured = process.env.COMFY_VIDEO_URL;
   delete process.env.COMFY_VIDEO_URL;
-  assert.throws(() => withComfyBackend("video", () => backendUrl(primary.url)), /no longer configured/);
+  reloadWorkers();
+  assert.throws(() => withComfyBackend("video", () => backendUrl()), /no longer configured/);
   process.env.COMFY_VIDEO_URL = configured;
+  reloadWorkers();
   assert.equal(currentComfyBackend(), "primary");
+  assert.equal(withComfyBackend("video", () => backendUrl()), video.url);
 });

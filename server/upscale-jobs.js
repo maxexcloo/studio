@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import { comfy, comfyUrl, normalizeComfyError } from "./comfy.js";
+import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy.js";
+import { currentComfyBackend } from "./comfy-backends.js";
 import { cancelPrompt, promptTracker } from "./comfy-queue.js";
 import { flushGallery, gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
@@ -51,7 +52,7 @@ function galleryTarget(itemId) {
 function watchUpscaleProgress(clientId, target, run) {
   let socket;
   try {
-    socket = new WebSocket(`${comfyUrl.replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`);
+    socket = new WebSocket(`${activeComfyUrl().replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`);
   } catch {
     return null;
   }
@@ -196,7 +197,7 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
     ...faceDetailSource(item, customWorkflow)
   };
   const plan = upscalePlan(body);
-  jobs.set(jobId, { status: "queued", kind: "upscale", ...(item.ownerId ? { ownerId: item.ownerId } : {}), galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
+  jobs.set(jobId, { status: "queued", kind: "upscale", comfyBackend: currentComfyBackend(), ...(item.ownerId ? { ownerId: item.ownerId } : {}), galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
   setTimeout(() => runUpscaleJob(jobId, body, info), 0);
   return { jobId, plan };
 }

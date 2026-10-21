@@ -79,10 +79,10 @@ test("health keeps the studio connected while either configured backend is avail
 test("the catalogue reports whether the local video worker answered, keeping Grok while it is off", async () => {
   try {
     let models = (await api("/api/models")).body;
-    assert.deepEqual(models.backends, { video: { available: true } });
+    assert.deepEqual(models.backends.video, { configured: true, available: true });
     video.setDown(true);
     models = (await api("/api/models")).body;
-    assert.deepEqual(models.backends, { video: { available: false } });
+    assert.deepEqual(models.backends.video, { configured: true, available: false });
     assert.equal(models.profiles.some((profile) => profile.family === "minimax_h3"), false);
     assert.ok(models.profiles.some((profile) => profile.id === "custom:grok-video"));
   } finally {
@@ -96,18 +96,18 @@ test("a video worker that did not answer is not asked again on every catalogue l
   const probes = () => video.requests.filter((entry) => entry.pathname === "/object_info").length;
   try {
     video.setDown(true);
-    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
+    assert.deepEqual((await api("/api/models")).body.backends.video, { configured: true, available: false });
     const before = probes();
-    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
-    assert.deepEqual((await api("/api/models?cached=1")).body.backends, { video: { available: false } });
+    assert.deepEqual((await api("/api/models")).body.backends.video, { configured: true, available: false });
+    assert.deepEqual((await api("/api/models?cached=1")).body.backends.video, { configured: true, available: false });
     assert.equal((await api("/api/generate", generation(h3))).status, 400);
     assert.equal(probes(), before);
     video.setDown(false);
     // Still remembered until something reaches the worker.
-    assert.deepEqual((await api("/api/models")).body.backends, { video: { available: false } });
+    assert.deepEqual((await api("/api/models")).body.backends.video, { configured: true, available: false });
     assert.equal((await api("/api/comfy/status")).body.backends.video.connected, true);
     const models = (await api("/api/models")).body;
-    assert.deepEqual(models.backends, { video: { available: true } });
+    assert.deepEqual(models.backends.video, { configured: true, available: true });
     assert.ok(models.profiles.some((profile) => profile.family === "minimax_h3"));
     assert.ok(probes() > before);
   } finally {
