@@ -15,10 +15,10 @@ import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { knownAccountStatus } from './accounts';
 import { ProfilesSettings } from './ProfilesSettings';
-import { AdapterLibraryGroup, PromptHistoryRow } from './LibrarySettings';
+import { PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { AccountSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
-import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
+import { DefaultsGroup, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
 import { WorkerSettings } from './WorkerSettings';
 
 /** Account first, then alphabetical (UI-PATTERNS › Settings). */
@@ -26,7 +26,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'account', label: 'Account', icon: UserRound, description: 'Your MCP connection and your profile.' },
   { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, help and reset.' },
-  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, LoRAs and integrations.' },
+  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models and integrations. LoRAs, models and downloads are in the Library.' },
   { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'One model profile’s JSON at a time, checked and reviewed before it is saved.' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: features, the gallery, generation and sharing.' },
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Access profiles, accounts and chat gateway users.' },
@@ -297,9 +297,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
 
         {section === 'models' && sectionShown('models') ? (
           <>
-            {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
+            {deployment.settings ? <DefaultsGroup settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
-            <AdapterLibraryGroup />
             {deployment.settings ? <IntegrationsOverview settings={deployment.settings} showToast={showToast} onSaved={() => void deployment.refresh()} /> : null}
           </>
         ) : null}

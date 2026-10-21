@@ -200,7 +200,7 @@ export type Models = {
   modelFiles?: ModelFile[];
   modelTypeChoices?: Record<ModelSource, SelectOption[]>;
   /** Release switches for features that are built but not yet public (server/features.js). */
-  features?: { inpainting?: boolean; presets?: boolean };
+  features?: { inpainting?: boolean; presets?: boolean; /** The Library: administrators only (server/index.js withLibrary). */ library?: boolean };
   textEncoders: string[];
   vaes: string[];
   clipTypes?: string[];

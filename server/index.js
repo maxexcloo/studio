@@ -15,6 +15,7 @@ import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
+import { registerLibraryRoutes } from './library-routes.js';
 import { readEditableProfile, registerProfileEditorRoutes, validateProfileText } from './profile-editor.js';
 import { assistantIntegration, assistantSettingKeys, assistantSettingValue, registerAssistantRoutes } from './assistant-routes.js';
 import { guideStore, livePrompting, profileStore } from './profile-store.js';
@@ -728,9 +729,15 @@ function modelsForAccount(models, req) {
     if (mayUseFeature(req.studioAccount, "loras")) return profile;
     return { ...profile, capabilities: { ...profile.capabilities, lora: false }, options: { ...profile.options, loras: [] } };
   });
-  // The Image & Model Library stays administration for now: its saved images are shared across Studio.
+  // Saved images stay administration: they are shared across Studio (the Library itself is withLibrary below).
   const features = models.features ? { ...models.features, presets: Boolean(models.features.presets) && req.studioAccount.role === "administrator" } : models.features;
   return { ...models, loras: mayUseFeature(req.studioAccount, "loras") ? models.loras : [], profiles, ...(features ? { features } : {}) };
+}
+
+/** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
+function withLibrary(models, req) {
+  if (!models?.features) return models;
+  return { ...models, features: { ...models.features, library: canAdmin(req) } };
 }
 
 function accountMayUseLoras(req) {
@@ -743,9 +750,9 @@ app.get("/api/models", async (req, res) => {
     const { models } = await mediaModels(req.query.cached !== "1");
     // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
     if (req.studioAccount) try { migrateCloudModelAccess((models.profiles || []).filter(isCloudProfile).map((profile) => profile.id)); } catch { /* Tried again on the next load. */ }
-    res.json(modelsForAccount(models, req));
+    res.json(withLibrary(modelsForAccount(models, req), req));
   } catch {
-    res.json(modelsForAccount(unavailableModels(), req));
+    res.json(withLibrary(modelsForAccount(unavailableModels(), req), req));
   }
 });
 
@@ -790,10 +797,28 @@ app.put("/api/models/recommendations/:key", (req, res) => {
   }
 });
 
-registerPresetRoutes(app, { models: async () => {
+const presetRoutes = registerPresetRoutes(app, { models: async () => {
   const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
   return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
 } });
+// The Library (library-routes.js): imports, their records and grades, and what is installed with its provenance.
+const unique = (...lists) => [...new Set(lists.flat().filter((name) => typeof name === "string" && name))];
+registerLibraryRoutes(app, {
+  presets: presetRoutes,
+  catalogue: loraCatalogue,
+  loraInfo: (names) => lorasEnabled ? loraInfos(names) : Promise.resolve({}),
+  installed: async () => {
+    const { info } = await loadComfyContext();
+    return {
+      loras: lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [],
+      checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
+      diffusion_models: unique(optionsFor(info, "UNETLoader", "unet_name"), optionsFor(info, "UnetLoaderGGUF", "unet_name")),
+      text_encoders: unique(optionsFor(info, "CLIPLoader", "clip_name"), optionsFor(info, "CLIPLoaderGGUF", "clip_name")),
+      vae: optionsFor(info, "VAELoader", "vae_name"),
+      clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name")
+    };
+  }
+});
 
 app.get("/api/paths", async (req, res) => {
   if (req.studioAccount && req.studioAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });

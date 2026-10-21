@@ -41,6 +41,6 @@ test('disabled instances cannot resume previously resolved provider downloads', 
   try {
     delete process.env.STUDIO_ENABLE_PRESETS;
     assert.equal(libraryDownload('civitai:17:3'), null);
-    await assert.rejects(startLibraryDownload(spec), /disabled on this instance/);
+    await assert.rejects(startLibraryDownload(spec), /off for this deployment/);
   } finally { process.env.STUDIO_ENABLE_PRESETS = '1'; }
 });
