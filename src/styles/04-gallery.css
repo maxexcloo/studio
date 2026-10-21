@@ -197,7 +197,6 @@
 
 /* Box styling is shared with .tile-hover-actions above; only placement here. */
 /* --primary is near-white here, so an active state must flip the ink too. */
-/* A running upscale stays visible without a hover, so progress is never hidden. */
 
 /* The controls sit in .tile-overlay, a sibling of the tile's button, so the
    reveal keys off the wrapper that holds both. */

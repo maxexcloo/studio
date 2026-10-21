@@ -61,13 +61,6 @@
   }
   .tile-motion-wrap:hover .tile-overlay .tile-hover-actions,
   .tile-motion-wrap:focus-within .tile-overlay .tile-hover-actions { pointer-events: auto; }
-  /* The upscale arrow gets the same forgiving edge. */
-  .tile-upscale::before {
-    content: "";
-    position: absolute;
-    inset: -6px;
-    border-radius: 50%;
-  }
 }
 
 /* Touch tablets in the full studio: the tile row shows without a hover. */

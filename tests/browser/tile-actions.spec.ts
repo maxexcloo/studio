@@ -43,9 +43,10 @@ test('desktop tile actions follow the viewer bar, Retry stands in on failures, a
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('/');
     const { wrap, row, names } = await rowNames(page, 'tile-done');
-    const full = ['Download', 'Recreate With the Same Seed', 'Star', 'Delete'];
+    // Upscale joins the make group in the row; there is no corner button.
+    const full = ['Download', 'Recreate With the Same Seed', 'Upscale', 'Star', 'Delete'];
     const tileWidth = (await wrap.boundingBox())!.width;
-    const slots = Math.max(1, Math.floor((tileWidth - 64) / 40));
+    const slots = Math.max(1, Math.floor((tileWidth - 24) / 40));
     if (slots >= full.length) expect(names).toEqual(full);
     else {
       // Make goes first, then keep; Star and Delete stay, More takes the last slot.
@@ -64,6 +65,19 @@ test('desktop tile actions follow the viewer bar, Retry stands in on failures, a
     expect(failedRow.names).toContain('Retry as a New Job');
     expect(failedRow.names).not.toContain('Recreate With the Same Seed');
   }
+});
+
+test('a showing upscale stays pressed in the desktop tile row', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phone tiles show no actions.');
+  await serve(page, [{ ...done, upscaleActive: true, upscale: { status: 'done', url: picture } }]);
+  await page.goto('/');
+  const wrap = page.locator('[data-tile-id="tile-done"]');
+  await expect(wrap.locator('.tile')).toBeVisible();
+  await page.mouse.move(2, 2);
+  const upscale = wrap.getByRole('group', { name: 'Item Actions' }).getByRole('button', { name: /^Showing the upscale/ });
+  await expect(upscale).toHaveAttribute('aria-pressed', 'true');
+  await expect(upscale).toHaveCSS('opacity', '1');
+  await expect(wrap.locator('.tile-overlay > .tile-upscale')).toHaveCount(0);
 });
 
 test('a set Star stays in view on a desktop tile without a hover', async ({ page, isMobile }) => {

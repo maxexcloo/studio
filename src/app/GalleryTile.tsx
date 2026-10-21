@@ -8,7 +8,7 @@ import { GenerationMedia } from './GenerationPreview';
 import { GenerationModel, GenerationProfiles, GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
 import type { GalleryItem, Profile } from './types';
-import { canUpscaleItem, upscaleTooltip, useUpscaleClock } from './useUpscale';
+import { upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
 import { GallerySelectionContext } from './gallerySelection';
 import { downloadName } from './share';
@@ -36,17 +36,19 @@ function tileCaptionDetail(item: GalleryItem, profiles: Profile[]) {
   return [time, itemProfileTitle(item, profiles), duration].filter(Boolean).join(' · ');
 }
 
-/* A tile's top row: 32px glass circles on a 40px pitch, right-aligned, clear of
-   the upscale corner on the left. When the tile is too narrow for every action,
-   the make group goes first, then keep; Star and Delete stay longest, and More
+/* A tile's top row: 32px glass circles on a 40px pitch, right-aligned, Upscale
+   among them in the make group. When the tile is too narrow for every action,
+   the make group goes first, then keep; Star and Delete stay longest (and an
+   upscale that is running or showing, so its state stays in view), and More
    (the right-click menu) takes the last slot. */
 const TILE_SLOT = 40;
-const TILE_ROW_RESERVE = 16 + 40 + 8;
+const TILE_ROW_RESERVE = 16 + 8;
 const rowRank = { organise: 3, keep: 2, make: 1 } as const;
-export function tileRow(actions: ItemAction[], width: number) {
+const rankOf = (action: ItemAction, item?: GalleryItem) => action.id === 'upscale' && (action.pressed || item?.upscale?.status === 'running') ? 3 : rowRank[action.group];
+export function tileRow(actions: ItemAction[], width: number, item?: GalleryItem) {
   const slots = Math.max(1, Math.floor((width - TILE_ROW_RESERVE) / TILE_SLOT));
   if (actions.length <= slots) return { shown: actions, more: false };
-  const keep = new Set([...actions.keys()].sort((a, b) => rowRank[actions[b].group] - rowRank[actions[a].group] || a - b).slice(0, Math.max(0, slots - 1)));
+  const keep = new Set([...actions.keys()].sort((a, b) => rankOf(actions[b], item) - rankOf(actions[a], item) || a - b).slice(0, Math.max(0, slots - 1)));
   return { shown: actions.filter((_, index) => keep.has(index)), more: true };
 }
 
@@ -64,7 +66,8 @@ type GalleryTileProps = {
   onCancelUpscale?: (item: GalleryItem) => void;
 };
 
-function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: GalleryItem; busy: boolean; onUpscale: (item: GalleryItem) => void; onCancelUpscale: (item: GalleryItem) => void }) {
+/** Upscale in the tile's row (itemActions.ts › tile): pressed while the upscale shows, a progress ring while it runs. */
+function UpscaleButton({ item, busy, onUpscale, onCancelUpscale, className }: { item: GalleryItem; busy: boolean; onUpscale: (item: GalleryItem) => void; onCancelUpscale: (item: GalleryItem) => void; className?: string }) {
   const state = item.upscale;
   const running = state?.status === "running";
   // The ring follows the learned time when there is one; SeedVR2's own count jumps in a few big steps.
@@ -77,7 +80,7 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: Galle
     <Tip content={tooltip}>
       <button
         type="button"
-        className={cn("tile-upscale", active && "is-active", running && "is-running", running && !ratio && "is-indeterminate", running && clock.ratio !== null && "is-timed", busy && "is-busy")}
+        className={cn("tile-icon tile-upscale", className, active && "is-active", running && "is-running", running && !ratio && "is-indeterminate", running && clock.ratio !== null && "is-timed", busy && "is-busy")}
         aria-label={tooltip}
         aria-pressed={state?.url ? active : undefined}
         aria-disabled={busy}
@@ -95,13 +98,13 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: Galle
   );
 }
 
-function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, width }: GalleryTileProps) {
+function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, titleFromPrompt, upscaleBusy = false, width }: GalleryTileProps) {
   const mountedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
   useEffect(() => { mountedRef.current = true; }, []);
   const actions = useItemActions(item, "tile");
-  const row = tileRow(actions, width);
+  const row = tileRow(actions, width, item);
   const profiles = React.useContext(GenerationProfiles);
   const phoneTiles = React.useContext(TileLongPressContext);
   const captionDetail = phoneTiles ? "" : tileCaptionDetail(item, profiles);
@@ -174,7 +177,8 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
           inside a button is invalid and unreachable by keyboard. */}
       <div className={cn("tile-overlay", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={2.5} /> : null}</span> : null}
-        {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} /> : null}
+        {/* The phone has no row: a running upscale shows only its progress ring in the corner. */}
+        {phoneTiles && item.upscale?.status === "running" ? <UpscaleButton item={item} busy={false} onUpscale={() => {}} onCancelUpscale={() => {}} className="is-corner" /> : null}
         {/* Beside Stop, in the overlay, so it holds still while the tile is hovered. Phones show only the progress. */}
         {item.status === "pending" && !phoneTiles ? <GenerationModel item={item} className="tile-action" /> : null}
         {item.status === "pending" && !phoneTiles ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
@@ -184,6 +188,7 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
             {row.shown.map((action, index) => {
               const name = action.tip || action.label;
               const className = cn(action.danger ? "tile-delete" : "tile-icon", action.id === "star" && "is-star", action.pressed && "is-on", startsGroup(row.shown, index) && "starts-group");
+              if (action.id === "upscale" && onUpscale) return <UpscaleButton key={action.id} item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} className={cn(startsGroup(row.shown, index) && "starts-group")} />;
               const body = <ActionIcon action={action} size={14} />;
               return (
                 <Tip key={action.id} content={name}>

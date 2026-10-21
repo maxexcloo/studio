@@ -87,9 +87,9 @@ export type ItemActionExtras = {
 };
 
 // Where each action appears. A desktop tile's top row follows the desktop
-// viewer bar's order (Download | Animate or Extend · Recreate or Retry | Star ·
-// Delete); its upscale arrow keeps its own corner (GalleryTile.tsx), and what
-// a narrow tile has no room for waits behind More, the context menu.
+// viewer bar's order (Download | Animate or Extend · Recreate or Retry ·
+// Upscale | Star · Delete), Upscale pressed while the upscale shows; what a
+// narrow tile has no room for waits behind More, the context menu.
 // The phone viewer's bar shares where it can and
 // downloads only where the share sheet can't take the file; it keeps Star and
 // Info in the top corners. The desktop downloads and never shares.
@@ -103,7 +103,7 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   promptsOnly: [],
   reference: ['bar', 'dock', 'menu'],
   retry: ['bar', 'dock', 'tile', 'menu'],
-  upscale: ['bar', 'dock', 'menu'],
+  upscale: ['bar', 'dock', 'tile', 'menu'],
   compare: ['bar', 'dock'],
   compareVariants: [],
   star: ['dock', 'tile', 'menu'],
