@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-21
+
 > Compact pickers, clearer generation Details and a Custom size option
 
 ### Changed
@@ -1581,7 +1583,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.38.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/maxexcloo/studio/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/maxexcloo/studio/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/maxexcloo/studio/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/maxexcloo/studio/compare/v0.35.0...v0.36.0
