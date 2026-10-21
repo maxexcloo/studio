@@ -322,7 +322,10 @@ test('filter options scroll independently and have a compact local search', asyn
   const menu = page.locator('.gallery-filter-menu');
   const list = page.getByRole('listbox', { name: 'Model Filter', exact: true });
   const search = page.getByRole('textbox', { name: 'Search Models', exact: true });
-  await expect(search).toBeVisible();
+  // Search waits behind its icon beside the title until asked for.
+  await expect(search).toHaveCount(0);
+  await menu.getByRole('button', { name: 'Search Models', exact: true }).click();
+  await expect(search).toBeFocused();
   await expect(list.getByRole('option')).toHaveCount(45);
   await page.waitForTimeout(250);
   const before = await menu.boundingBox();
@@ -385,19 +388,17 @@ test('video gallery actions run from playback through grouping to Select', async
   const play = toolbar.getByRole('button', { name: /^Grid Autoplay:/ });
   const group = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
-  const status = toolbar.getByRole('button', { name: 'Filter By Status', exact: true });
+  const status = toolbar.getByRole('button', { name: 'Hide Failed & Queued', exact: true });
   await expect(play).toBeVisible();
   // The view controls in their one order (UI-PATTERNS): Status, Auto-Grouping, Grid Autoplay, then Select.
   expect((await status.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
   expect((await group.boundingBox())!.x).toBeLessThan((await play.boundingBox())!.x);
   expect((await play.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
-  // Status hides queued or failed outputs, remembered like the other view controls.
+  // One toggle hides failed and queued outputs, remembered like the other view controls.
+  await expect(status).toHaveAttribute('aria-pressed', 'false');
   await status.click();
-  await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Failed', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-prefs') || '{}').showFailedItems)).toBe(false);
-  await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Queued', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-prefs') || '{}').hideQueuedItems)).toBe(true);
-  await page.keyboard.press('Escape');
+  await expect(status).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('studio-prefs') || '{}'))).toMatchObject({ showFailedItems: false, hideQueuedItems: true });
 });
 
 // UI-PATTERNS › Buttons & Icon Bars: tooltips open away from their bar's edge.

@@ -80,7 +80,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(await page.evaluate(() => localStorage.getItem('studio-lora-pending:account:admin-id'))).toBeNull();
   await studioUi(page).openSettings();
   // Account first, then the pages alphabetically.
-  await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'About', 'Maintenance', 'Models', 'Profiles', 'Studio', 'Users', 'Workers']);
+  await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'Models', 'Profiles', 'Studio', 'Users', 'Workers', 'Maintenance', 'About']);
   await page.getByRole('button', { name: 'Users', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
   // Groups read alphabetically, and the model profile editor is its own page now.

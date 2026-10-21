@@ -2,6 +2,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Boxes, Eraser, ChevronDown, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { galleryAspects, gallerySizeBands, otherAspect } from '../../server/gallery-filters.js';
+import { loraName } from './catalogueNames';
+import { partName } from './partNames';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
 import type { GalleryItem } from './types';
@@ -25,6 +27,8 @@ export const filterLabel = (key: 'size' | 'aspect', value?: string) => (value ? 
 export function GalleryFilterPicker({ name, label = name, values: picked, options: values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; label?: string; values: string[]; options: string[]; icon: typeof Boxes; onChange: (values: string[]) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const searchInput = React.useRef<HTMLInputElement>(null);
   const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 280 });
   const anchor = React.useRef<HTMLButtonElement>(null);
   const menu = React.useRef<HTMLDivElement>(null);
@@ -63,10 +67,11 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
   const toggle = (value: string) => onChange(picked.includes(value) ? picked.filter((item) => item !== value) : [...picked, value]);
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = values.filter(option => terms.every(term => labelFor(option).toLocaleLowerCase().includes(term)));
-  const short = (value: string) => searchable ? value : labelFor(value).replace(/ \(.*\)$/, '');
+  // The trigger shows the option's friendly name, never a raw file name (UI-PATTERNS › Lists).
+  const short = (value: string) => labelFor(value).replace(/ \(.*\)$/, '');
   const summary = picked.length === 1 ? short(picked[0]) : label;
   return <>
-    <Tip content={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`}><button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button></Tip>
+    <Tip content={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`}><button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) { setQuery(''); setSearchOpen(false); } setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button></Tip>
     {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={position} data-own-escape onKeyDown={event => {
       const options = [...list.current!.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const index = options.indexOf(document.activeElement as HTMLButtonElement);
@@ -76,10 +81,14 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
         focusOption(options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : index < 0 ? (event.key === 'ArrowDown' ? 0 : options.length - 1) : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length]);
       }
       if (typing && event.key === 'Enter' && matches.length) { event.preventDefault(); toggle(matches[0]); }
+      if (searchable && !typing && event.key.length === 1 && event.key !== ' ' && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setSearchOpen(true); setQuery((value) => (value + event.key).slice(0, 100)); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); }
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
-      <div className="gallery-filter-menu-head"><strong>{label}</strong>{picked.length ? <span>{picked.length} Selected</span> : null}<button type="button" className="gallery-filter-clear" disabled={!picked.length} onClick={() => onChange([])}>Clear</button></div>
-      {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
+      <div className="gallery-filter-menu-head"><strong>{label}</strong>{picked.length ? <span>{picked.length} Selected</span> : null}
+        {/* Search waits behind its icon beside the title (PickerTools pattern); typing in the menu opens it too. */}
+        {searchable ? <button type="button" className={cn('gallery-filter-search-toggle', (searchOpen || query) && 'is-on')} aria-label={searchOpen || query ? 'Close Search' : `Search ${label}`} aria-expanded={searchOpen || Boolean(query)} onClick={() => { if (searchOpen || query) { setSearchOpen(false); setQuery(''); } else { setSearchOpen(true); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); } }}>{searchOpen || query ? <X size={14} /> : <Search size={14} />}</button> : null}
+        <button type="button" className="gallery-filter-clear" disabled={!picked.length} onClick={() => onChange([])}>Clear</button></div>
+      {searchable && (searchOpen || query) ? <div className="gallery-filter-search"><Search size={14} /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
       <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
         const on = picked.includes(option);
         return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-name">{labelFor(option)}</span><SelectedTick on={on} /></button>;
@@ -108,7 +117,7 @@ function FilterControls({ search, setSearch, items, floatingRef, clearable }: { 
     {(['model', 'lora'] as const).map((key) => {
       const name = key === 'lora' ? 'LoRA' : 'Model';
       const Icon = key === 'model' ? Boxes : Layers;
-      return <GalleryFilterPicker key={key} name={name} label={key === 'lora' ? 'LoRAs' : 'Models'} values={search[key] || []} options={suggestions([...(search[key] || []), ...options[key]])} icon={Icon} onChange={values => setSearch({ ...search, [key]: values })} floatingRef={floatingRef} />;
+      return <GalleryFilterPicker key={key} name={name} label={key === 'lora' ? 'LoRAs' : 'Models'} labelFor={(value) => (/\.[a-z0-9]{2,12}$/i.test(value) || value.includes('/') ? (key === 'lora' ? loraName(value) : partName(value.replace(/^custom:/, ''))) : value)} values={search[key] || []} options={suggestions([...(search[key] || []), ...options[key]])} icon={Icon} onChange={values => setSearch({ ...search, [key]: values })} floatingRef={floatingRef} />;
     })}
     <GalleryFilterPicker name="Size" values={search.size || []} options={gallerySizeBands.map((band) => band.id)} icon={Ruler} labelFor={(value) => filterLabel('size', value)} searchable={false} onChange={values => setSearch({ ...search, size: values })} floatingRef={floatingRef} />
     <GalleryFilterPicker name="Aspect Ratio" values={search.aspect || []} options={[...galleryAspects.map((aspect) => aspect.id), otherAspect]} icon={Ratio} labelFor={(value) => filterLabel('aspect', value)} searchable={false} onChange={values => setSearch({ ...search, aspect: values })} floatingRef={floatingRef} />

@@ -85,6 +85,11 @@ export function Dropdown(props: DropdownProps) {
     ? !props.value.length ? props.noneLabel || 'None' : enabled.length > 1 && enabled.every((option) => props.value.includes(option.value)) ? props.allLabel || 'All' : props.value.length === 1 ? labelOf(props.value[0]) : `${props.value.length} Selected`
     : props.value ? labelOf(props.value) : placeholder);
   const searchable = options.length >= searchFrom;
+  // Search waits behind its icon beside the title (PickerTools pattern); typing in the menu opens it.
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const searchInput = React.useRef<HTMLInputElement>(null);
+  const showSearch = searchable && (searchOpen || Boolean(query));
+  const openSearch = (text = '') => { setSearchOpen(true); if (text) setQuery((value) => (value + text).slice(0, 100)); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); };
   const head = props.multiple && props.head !== false;
   const shownPanel = open && panel ? panel(close) ?? null : null;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -111,6 +116,7 @@ export function Dropdown(props: DropdownProps) {
     }
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
     if (event.key === 'Tab') { setOpen(false); return; }
+    if (!inField && searchable && event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey && event.key !== ' ') { event.preventDefault(); openSearch(event.key); return; }
     if (!inField && event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey && event.key !== ' ') {
       const now = performance.now();
       typed.current = { text: (now - typed.current.at < 600 ? typed.current.text : '') + event.key.toLocaleLowerCase(), at: now };
@@ -133,24 +139,25 @@ export function Dropdown(props: DropdownProps) {
       data-open-trigger
       // While open, Escape on the trigger closes the menu only, not the surface around it.
       data-own-escape={open ? '' : undefined}
-      onClick={() => { if (!open) setQuery(''); setOpen((value) => !value); }}
+      onClick={() => { if (!open) { setQuery(''); setSearchOpen(false); } setOpen((value) => !value); }}
       onKeyDown={(event) => {
         if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
-        if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setQuery(''); setOpen(true); }
+        if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setQuery(''); setSearchOpen(false); setOpen(true); }
       }}
     >
       <span className="dropdown-value">{shown}</span>
       <ChevronDown size={14} aria-hidden="true" />
     </button>
     <AnimatePresence>
-      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} rows={shownPanel ? 3 : matches.length + (searchable ? 1 : 0) + (head ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
+      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
         {shownPanel ?? <>
-        {head ? <div className="dropdown-head">
+        {head || searchable ? <div className="dropdown-head">
           <strong>{label}</strong>
-          <button type="button" className="dropdown-head-action" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
-          <button type="button" className="dropdown-head-action" disabled={!picked.length} onClick={() => { if (props.multiple) props.onChange([]); }}>Clear</button>
+          {searchable ? <button type="button" className={cn('dropdown-search-toggle', showSearch && 'is-on')} aria-label={showSearch ? 'Close Search' : `Search ${label}`} aria-expanded={showSearch} onClick={() => { if (showSearch) { setSearchOpen(false); setQuery(''); } else openSearch(); }}>{showSearch ? <X size={14} /> : <Search size={14} />}</button> : null}
+          {head ? <><button type="button" className="dropdown-head-action" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
+          <button type="button" className="dropdown-head-action" disabled={!picked.length} onClick={() => { if (props.multiple) props.onChange([]); }}>Clear</button></> : null}
         </div> : null}
-        {searchable ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
+        {showSearch ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
         <div id={id} ref={list} className="dropdown-options" role="listbox" aria-label={label} aria-multiselectable={props.multiple || undefined}>
           {matches.map((option) => {
             const on = isPicked(option.value);

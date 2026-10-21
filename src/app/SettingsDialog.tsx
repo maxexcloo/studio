@@ -24,13 +24,13 @@ import { WorkerSettings } from './WorkerSettings';
 /** Account first, then alphabetical (UI-PATTERNS › Settings). */
 export const SETTINGS_SECTIONS = [
   { id: 'account', label: 'Account', icon: UserRound, description: 'Your MCP connection and your profile.' },
-  { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' },
-  { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, help and reset.' },
   { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, LoRAs and integrations.' },
   { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'One model profile’s JSON at a time, checked and reviewed before it is saved.' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: features, the gallery, generation and sharing.' },
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Access profiles, accounts and chat gateway users.' },
-  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, what it runs, its status and whether Upscale is ready.' }
+  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, what it runs, its status and whether Upscale is ready.' },
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, help and reset.' },
+  { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. Workers is
@@ -251,6 +251,11 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
 
         {section === 'studio' ? (
           <>
+            {/* General always leads its page; the other groups follow alphabetically. */}
+            <Group title="General">
+              <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
+              {phoneDevice ? null : <ShortcutsDrawer />}
+            </Group>
             <Group title="Features">
               {administrator && inpaintFlag
                 ? <SwitchRow label="Inpainting" description={`A brush on a reference image: paint over part of it and only that part changes. For everyone on this Studio${inpaintFlag.locked ? '; set by the deployment' : ''}. Applies after a restart.`} checked={inpaintOn} disabled={inpaintFlag.locked || inpaintBusy} onChange={(next) => void setInpainting(next)} />
@@ -272,10 +277,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
               </Row>
               <SwitchRow label="Tile Captions" description="On a phone, each tile shows its prompt and name under the picture." checked={Boolean(prefs.phoneTileCaptions)} onChange={(next) => setPrefs({ phoneTileCaptions: next })} />
               <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
-            </Group>
-            <Group title="General">
-              <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
-              {phoneDevice ? null : <ShortcutsDrawer />}
             </Group>
             <Group title="Generation">
               <SwitchRow label="Auto-Resize Input Images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />

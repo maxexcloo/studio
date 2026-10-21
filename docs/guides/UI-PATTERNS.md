@@ -428,7 +428,7 @@ holds:
 | Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
 | Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
 
-**Order:** Account comes first, then the pages alphabetically; groups, rows,
+**Order:** the rail reads Account, Models, Profiles, Studio, Users, Workers, Maintenance, About; a General group always leads its page; groups, rows,
 option lists and pills inside them read alphabetically too. The exceptions are
 logical ones: a master switch comes before what depends on it, Save & Discard
 is an editor's last row, an editor's fields follow the order they are filled

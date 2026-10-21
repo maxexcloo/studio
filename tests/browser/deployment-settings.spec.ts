@@ -25,7 +25,7 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.locator('#settings-panel .list-section-title').last()).toHaveText('Upscale');
   await expect(dialog.locator('.set-row').filter({ hasText: 'Upscale Status' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Studio', exact: true }).click();
-  await expect(dialog.locator('#settings-panel .list-section-title')).toHaveText(['Features', 'Gallery', 'General', 'Generation', 'LoRA Stacks', 'Sharing']);
+  await expect(dialog.locator('#settings-panel .list-section-title')).toHaveText(['General', 'Features', 'Gallery', 'Generation', 'LoRA Stacks', 'Sharing']);
   await expect(dialog.getByText('Upscale Status', { exact: true })).toHaveCount(0);
 
   await dialog.getByRole('button', { name: 'Models', exact: true }).click();

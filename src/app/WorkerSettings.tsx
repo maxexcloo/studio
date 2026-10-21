@@ -153,7 +153,7 @@ export function WorkerGroup({ worker, source, locked, saved, live, editing, capa
           ? <input className="modal-input set-worker-field" value={worker.url} onChange={(event) => onChange({ ...worker, url: event.target.value })} aria-label={`${name} Address`} spellCheck={false} autoComplete="off" placeholder="http://127.0.0.1:8188" />
           : <Action reason={locked ? 'Locked' : ''}><button type="button" className="btn is-ghost" disabled={locked} aria-label={`Edit ${name}`} onClick={onEdit}><Pencil size={14} /> Edit</button></Action>}
       </Row>
-      <Row label="Capabilities" stacked={editing} description={editing ? undefined : labels.join(' · ') || 'None'}>
+      <Row label="Capabilities" stacked={editing} description={editing ? undefined : [...labels].sort((x, y) => x.localeCompare(y)).join(' · ') || 'None'}>
         {editing ? <div className="list-segments set-capabilities" role="group" aria-label={`${name} Capabilities`}>
           {capabilities.map((item) => <button key={item.id} type="button" aria-pressed={worker.capabilities.includes(item.id)} title={item.description || undefined} onClick={() => toggle(item.id)}>{item.label}</button>)}
         </div> : null}
