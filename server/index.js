@@ -16,7 +16,13 @@ import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
 import { registerLibraryRoutes } from './library-routes.js';
-import { readEditableProfile, registerProfileEditorRoutes, validateProfileText } from './profile-editor.js';
+import { createEditableProfile, listEditableProfiles, profileIdTaken, readEditableProfile, registerProfileEditorRoutes, validateProfileText } from './profile-editor.js';
+import { registerProfileRoutes } from './profile-routes.js';
+import { draftProfileFromImport } from './profile-drafts.js';
+import { seedDirectory, seedMissing } from './profile-seed.js';
+import { draftedProfile } from './assistant.js';
+import { catalogDownloadsForFile } from './family-profiles.js';
+import { familyFromName } from './family-catalog.js';
 import { assistantIntegration, assistantSettingKeys, assistantSettingValue, registerAssistantRoutes } from './assistant-routes.js';
 import { guideStore, livePrompting, profileStore } from './profile-store.js';
 
@@ -64,7 +70,7 @@ import { startMediaWarmup } from './media-warmup.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
 import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
-import { loraCatalogue, loraInfos } from './lora-info.js';
+import { familiesFromMetadata, loraCatalogue, loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
@@ -130,9 +136,10 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     return mime ? { content: Buffer.from(bytes), mime } : null;
   } catch { return null; }
 }
-// Once per start and safe to repeat: the catalogue, guide and profile stores take in what the older
-// files hold, which stay where they are (library-catalogue.js, profile-store.js). Before MCP reads guides.
-for (const [name, migrate] of [["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
+// Once per start and safe to repeat: the seed (STUDIO_SEED_DIR) fills only what is missing, then the
+// catalogue, guide and profile stores take in what the older files hold, which stay where they are
+// (profile-seed.js, library-catalogue.js, profile-store.js). Before MCP reads guides.
+for (const [name, migrate] of [["seed", () => seedMissing({ seedDir: seedDirectory(), dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })], ["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
   try { migrate(); } catch (error) { console.warn(`[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`); }
 }
 registerMcpRoutes(app, {
@@ -806,6 +813,7 @@ const unique = (...lists) => [...new Set(lists.flat().filter((name) => typeof na
 registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
+  draftProfile: (record, options) => draftCheckpointProfile(record, options),
   loraInfo: (names) => lorasEnabled ? loraInfos(names) : Promise.resolve({}),
   installed: async () => {
     const { info } = await loadComfyContext();
@@ -830,7 +838,7 @@ app.get("/api/paths", async (req, res) => {
 function workflowsForRequest(req, workflows) {
   if (!req.studioAccount || canAdmin(req)) return workflows;
   return workflows
-    .filter((item) => mayUseGenerationProfile(req.studioAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw }))
+    .filter((item) => mayUseGenerationProfile(req.studioAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw, aiDrafted: item.aiDrafted }))
     .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
 }
 
@@ -907,10 +915,47 @@ app.post("/api/workflows/import", async (req, res) => {
   }
 });
 
+const profileObjectInfo = async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info;
+// A saved, drafted, reverted or approved profile is seen on the next models read.
+const profilesChanged = () => { inferredModels.clear(); };
 registerProfileEditorRoutes(app, {
-  objectInfo: async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info,
+  objectInfo: profileObjectInfo,
+  onSaved: profilesChanged,
   accountName: (req) => req.studioAccount?.userId || ""
 });
+// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile-routes.js).
+registerProfileRoutes(app, {
+  profiles: () => profileStore(),
+  guides: () => guideStore(),
+  objectInfo: profileObjectInfo,
+  onSaved: profilesChanged,
+  accountName: (req) => req.studioAccount?.userId || "",
+  exportOptions: () => ({ dataDir, workflowsDir: userWorkflowsDir, catalogue: loraCatalogue(), manifestFile: loraCatalogue().manifestFile?.() || "", studioVersion: appVersion })
+});
+
+/**
+ * A checkpoint or diffusion model import's AI-drafted profile and guide (profile-drafts.js): the
+ * nearest same-family profile as template, parts through Download Missing, checked against
+ * ComfyUI's object_info before it is written. Administrators only until approved.
+ */
+async function draftCheckpointProfile(record, options) {
+  return draftProfileFromImport(record, options, {
+    templates: () => listEditableProfiles().filter((item) => item.readable).map((item) => {
+      try { return { ...item, raw: JSON.parse(readEditableProfile(item.id).text) }; } catch { return null; }
+    }).filter(Boolean),
+    info: () => profileObjectInfo("image"),
+    families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
+    familyFromName: (file) => familyFromName(file),
+    taken: profileIdTaken,
+    downloadsFor: catalogDownloadsForFile,
+    engine: assistantEngine,
+    draftedProfile,
+    validate: validateProfileText,
+    create: (id, text, { by }) => createEditableProfile(id, text, { by, origin: "ai", aiDrafted: true, info: null, note: `Drafted from import ${record.id}` }),
+    guides: guideStore(),
+    onSaved: profilesChanged
+  });
+}
 
 // The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
 const assistantGuides = (() => {

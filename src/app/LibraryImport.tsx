@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Boxes, Download, Image, Import, Layers, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Boxes, Download, Image, Import, Layers, RefreshCw, Sparkles } from 'lucide-react';
 import { apiJson } from './api';
 import { EmptyState } from './EmptyState';
 import { ListSelect } from './SheetList';
@@ -30,7 +30,7 @@ export type ImportRecord = {
   id: string; createdAt: string; state: 'resolving' | 'needs-files' | 'downloading' | 'ready' | 'failed' | 'cancelled';
   input: { kind: 'civitai-image' | 'civitai-model' | 'hf-file' | 'hf-repo' | 'image-file' | 'described'; url?: string; presetId?: string };
   title: string; version?: string; baseModel?: string; modelType?: string; links?: Links;
-  resources: ImportResource[]; grade: Grade; results: { catalogueKeys?: string[]; galleryItemId?: string }; error?: string; warnings?: string[];
+  resources: ImportResource[]; grade: Grade; results: { catalogueKeys?: string[]; galleryItemId?: string; profileId?: string; guideId?: string }; error?: string; warnings?: string[];
 };
 
 const kindWords: Record<ImportRecord['input']['kind'], string> = { 'civitai-image': 'Civitai Image', 'civitai-model': 'Civitai Model', 'hf-file': 'Hugging Face File', 'hf-repo': 'Hugging Face Repository', 'image-file': 'Image File', described: 'Described Image' };
@@ -110,7 +110,8 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
         return;
       }
       setRecord(data.import);
-      showToast(data.import.results.catalogueKeys?.length ? 'Imported. Its catalogue entry is written' : 'Imported', 'success');
+      showToast(data.import.results.profileId ? 'Imported. Its profile is drafted for review' : data.import.results.catalogueKeys?.length ? 'Imported. Its catalogue entry is written' : 'Imported', 'success');
+      if (data.import.results.profileId) void refreshModels(false);
     } finally { if (mounted.current) setImporting(false); }
   });
   const drop = (event: React.DragEvent) => {
@@ -131,12 +132,23 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
     remember(data.import);
   });
 
+  // A checkpoint import drafts its profile on import; this tries again (after a failure).
+  const draft = (target: ImportRecord) => run(async () => {
+    const data = await post<{ import: ImportRecord }>(`/api/library/imports/${encodeURIComponent(target.id)}/draft-profile`, {});
+    remember(data.import);
+    showToast('Profile drafted. Review it in Settings › Profiles', 'success');
+    void refreshModels(false);
+  });
+
   if (record) {
     const missing = missingOf(record);
+    const canDraft = !record.results.profileId && record.state !== 'failed' && ['civitai-model', 'hf-file'].includes(record.input.kind)
+      && record.resources.filter((resource) => ['checkpoint', 'diffusion_model'].includes(resource.role) && !resource.optional).length === 1;
     const live = (resource: ImportResource) => resource.downloadId ? downloads.find((item) => item.id === resource.downloadId) : undefined;
     return <div className="library-page">
-      {missing.length ? <LibraryFooter>
-        <button className="btn is-primary" disabled={busy} onClick={() => queue(record)}><Download size={16} />Download Missing{missing.length > 1 ? ` (${missing.length})` : ''}</button>
+      {missing.length || canDraft ? <LibraryFooter>
+        {canDraft ? <button className={cn('btn', !missing.length && 'is-primary')} disabled={busy} onClick={() => draft(record)}><Sparkles size={16} />Draft Profile</button> : null}
+        {missing.length ? <button className="btn is-primary" disabled={busy} onClick={() => queue(record)}><Download size={16} />Download Missing{missing.length > 1 ? ` (${missing.length})` : ''}</button> : null}
       </LibraryFooter> : null}
       <div className="library-review-bar">
         <button type="button" className="btn is-ghost library-back" disabled={busy} onClick={() => setRecord(null)}><ArrowLeft size={16} />Import</button>
@@ -151,7 +163,8 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
         <ul className="set-note library-notes">{(record.state === 'failed' ? [record.error || 'Couldn’t import that link'] : record.grade.reasons).map((reason) => <li key={reason}>{reason}</li>)}</ul>
       </section>
       {record.results.catalogueKeys?.length ? <p className="set-note">{record.results.catalogueKeys.length === 1 ? 'Its catalogue entry is written: title, version, family, trigger words, strength, description, links, NSFW and checksum.' : `${record.results.catalogueKeys.length} catalogue entries are written.`}</p> : null}
-      {record.resources.some((resource) => ['checkpoint', 'diffusion_model'].includes(resource.role)) ? <p className="set-note">Recorded in the Library. Studio doesn’t draft a profile for a model yet.</p> : null}
+      {record.results.profileId ? <p className="set-note">Its profile is drafted{record.results.guideId ? ', with a guide' : ''}: AI-Drafted, so only administrators see it until you approve it in Settings › Profiles.</p>
+        : record.resources.some((resource) => ['checkpoint', 'diffusion_model'].includes(resource.role)) && record.state !== 'failed' ? <p className="set-note">No profile is drafted for this model yet.</p> : null}
       {record.warnings?.length ? <ul className="set-note library-notes is-blocking">{record.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
       {record.resources.length ? <Group title="Files" action={<GroupAction disabled={busy} onClick={() => run(async () => { await refreshModels(false); await reopen(record.id); })}>Check Again</GroupAction>}
         note={record.resources.some((resource) => resource.folderGuessed && resource.status !== 'installed') ? 'Hugging Face doesn’t say where a file goes. Check each Destination before downloading.' : undefined}>

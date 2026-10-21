@@ -7,6 +7,7 @@
  *   GET  /api/library/imports/:id             one import, its files checked in full
  *   POST /api/library/imports/:id/download    Download Missing ({indices} for chosen files)
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
+ *   POST /api/library/imports/:id/draft-profile  {index?}: draft a checkpoint's profile and guide (again, after a failure)
  *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance
  *
  * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do.
@@ -95,9 +96,9 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
  * files ComfyUI lists per folder; `loraInfo(names)` the LoRA metadata (lora-info.js);
  * `catalogue()` the catalogue store.
  */
-export function registerLibraryRoutes(app, { presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore() }) {
+export function registerLibraryRoutes(app, { presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore(), draftProfile = null }) {
   const engine = createImportEngine({
-    store, detect: detectLink, inspect, downloads, startDownload, catalogue: { edit: (...args) => catalogue().edit(...args) },
+    store, detect: detectLink, inspect, downloads, startDownload, catalogue: { edit: (...args) => catalogue().edit(...args) }, draftProfile,
     resolveCivitai: (url) => resolveCivitaiModel(url, { json }),
     resolveHf: (url) => resolveHuggingFace(url, { request: hfRequest }),
     importImage: (url) => presets.importImage(url),
@@ -132,6 +133,10 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
   }));
   app.post('/api/library/imports/:id/folder', route(async (req, res) => {
     res.json({ ok: true, import: publicImport(await engine.setFolder(req.params.id, Number(req.body?.index), String(req.body?.folder || ''))) });
+  }));
+  app.post('/api/library/imports/:id/draft-profile', route(async (req, res) => {
+    const index = Number.isSafeInteger(req.body?.index) && req.body.index >= 0 ? req.body.index : null;
+    res.json({ ok: true, import: publicImport(await engine.draft(req.params.id, { by: by(req), index })) });
   }));
   app.get('/api/library/items', route(async (_req, res) => {
     const files = await installed().catch(() => ({}));

@@ -14,8 +14,9 @@
  *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent and seed updates keep flowing until the
- * ownership cutover. Studio's own edits are a layer above all of them. On a conflict the more
+ * when the file goes, so the migration is idempotent. Since the ownership cutover nothing deploys
+ * over the seed file (profile-seed.js copies it only into a data folder without one), and Studio's
+ * own edits are a layer above all of them either way. On a conflict the more
  * specific source wins: edits over the admin file over the seed over provider details over the
  * manifest, except that provider metadata wins for links and hashes.
  *
@@ -402,7 +403,7 @@ export function createCatalogueStore({ dataDir = currentDataDir(), environment =
     return { sources: current.layers.provider, catalogue };
   }
 
-  return { file, sync, migrate, entries, entry, byHash, edit, undo, approve, loraView, plan: () => sync({ dryRun: true }) };
+  return { file, sync, migrate, entries, entry, byHash, edit, undo, approve, loraView, manifestFile: () => sources.manifest(), plan: () => sync({ dryRun: true }) };
 }
 
 const stores = new Map();

@@ -469,7 +469,7 @@ holds:
 | About | The banner, Version, Changelog, Licence, Source, credits (HEISS UI, J-AI Studio, ComfyUI, Radiance) and stats | Everyone |
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
 | Models | Defaults and Integrations (the assistant models, Civitai and output storage). LoRAs, the catalogue and downloads are in the [Library](#library) | Administrators |
-| Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
+| Profiles | One model profile at a time: Profile and Source (AI-Drafted with Approve, From the Seed, Edited in Studio), then JSON, Guide or Versions (a segmented Show row). JSON and Guide edit with Review Changes and Save & Discard; Versions is a flat list whose rows open in place to their diff and Revert. Export on the heading downloads the bundle for the profiles repository | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
 | Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
 | Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
@@ -553,6 +553,11 @@ without it the Library holds LoRAs, Models and Downloads.
 - **Footer:** the review's actions: **Download Missing** (one tap queues every
   missing file; unavailable files never download), Use Prompt and Use
   Settings. A repository's files are optional: each has its own Download.
+- **Drafted profiles:** a checkpoint or diffusion model import drafts its
+  profile on import; the review says so in one note (AI-Drafted, for
+  administrators until approved in Settings › Profiles). The parts it needs
+  join the Files group. When a draft failed, its reason is among the notes and
+  **Draft Profile** (Sparkles) sits in the footer before Download Missing.
 - **LoRAs and Models:** compact `PickerTools` search, the Installed |
   Catalogue views and family (LoRAs) or kind (Models) pills on one row, then a
   flat list: the title, then what it is, version, base model and size, its

@@ -120,6 +120,8 @@ export function mayUseGenerationProfile(access, profile) {
   if (access.role === accountRoles.administrator) return true;
   const id = typeof profile === "string" ? profile : profile?.id;
   if (typeof profile === "object" && profile?.nsfw === true && access.features.nsfwModels !== true) return false;
+  // An AI-drafted profile is live for administrators only until one approves it.
+  if (typeof profile === "object" && profile?.aiDrafted === true) return false;
   if (isCloudProfile(typeof profile === "string" ? { id: profile } : profile)) {
     return access.legacyCloudGrants ? access.generationProfiles.includes(id) : access.features.cloudModels === true;
   }

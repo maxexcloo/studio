@@ -99,6 +99,8 @@ export async function resolveCivitaiModel(value, { json = civitaiJson, now = Dat
     type: resource.type,
     nsfw,
     links: civitaiLinks(id, version.id),
+    // A checkpoint's page, for its drafted profile and guide (profile-drafts.js).
+    sourceText: folder === 'loras' ? '' : [plainDescription(model.description), plainDescription(version.description), resource.trainedWords?.length ? `Trigger words: ${resource.trainedWords.join(', ')}` : ''].filter(Boolean).join('\n\n').slice(0, 12000),
     resources: [{
       role: roleOf(folder), name: String(model.name || resource.name), version: resource.version,
       want: { file: resource.file, folder, sha256: resource.sha256, bytes: resource.bytes, source: { provider: 'civitai', modelId: id, versionId: version.id, ...(file?.id ? { fileId: file.id } : {}), url: civitaiLinks(id, version.id).civitaiCom } },
@@ -180,6 +182,7 @@ export async function resolveHuggingFace(value, { request = hfFetch } = {}) {
   const instance = typeof card.instance_prompt === 'string' ? card.instance_prompt.split(',').map((word) => word.trim()).filter(Boolean).slice(0, 6) : [];
   return {
     title: `${owner}/${repo}`, version: metadata.sha.slice(0, 7), baseModel, type: resources.length === 1 ? resources[0].role : 'repository', nsfw,
+    sourceText: [typeof card.description === 'string' ? plainDescription(card.description) : '', baseModel ? `Base model: ${baseModel}` : '', tags.length ? `Tags: ${tags.slice(0, 30).join(', ')}` : ''].filter(Boolean).join('\n\n').slice(0, 12000),
     links: { hf: link.filePath ? `${repoUrl}/blob/${metadata.sha}/${link.filePath}` : repoUrl },
     gated: Boolean(metadata.gated),
     resources,
