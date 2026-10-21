@@ -172,7 +172,7 @@ export function LibraryImages({ models, refreshModels, onApply, onPrompt, onClos
     </div>
 
     <Group title="Use With">
-      <Row label="Model" description="The source model is picked when it is installed. Another model may change the result.">
+      <Row label="Model" description="The source model is picked when it’s installed; another model may change the result">
         <span className="library-model-choice">
           <ListSelect label="Use With Model" value={profileId || NO_MODEL} onChange={(value) => setProfileId(value === NO_MODEL ? '' : value)}
             options={[{ value: NO_MODEL, label: 'Choose a Model' }, ...profiles.map((candidate) => ({ value: candidate.id, label: `${candidate.displayName || candidate.label}${candidate.ready === false ? ' · Setup Required' : ''}` }))]} />

@@ -386,7 +386,8 @@ export function registerLibraryRoutes(app, {
   }, { imports: false }));
   app.post('/api/library/updates/apply', route(async (req, res) => {
     const applied = await updates.apply(String(req.body?.key || ''), { alternative: req.body?.alternative === true, by: by(req) });
-    res.json({ ok: true, applied, ...updates.summary() });
+    // `applied` is this key's record; the summary's map of every applied update would hide it.
+    res.json({ ok: true, ...updates.summary(), applied });
   }));
   return { engine, updates };
 }

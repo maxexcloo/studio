@@ -90,7 +90,7 @@ const NO_MODEL = 'none';
 /** Use With: the model the prompt and settings go to, the source model first when it runs here. */
 export function UseWith({ profiles, value, onChange }: { profiles: Profile[]; value: string; onChange: (id: string) => void }) {
   return <Group title="Use With">
-    <Row label="Model" description="The source model is picked when it is installed. Another model may change the result.">
+    <Row label="Model" description="The source model is picked when it’s installed; another model may change the result">
       <span className="library-model-choice">
         <ListSelect label="Use With Model" value={value || NO_MODEL} onChange={(next) => onChange(next === NO_MODEL ? '' : next)}
           options={[{ value: NO_MODEL, label: 'Choose a Model' }, ...profiles.map((candidate) => ({ value: candidate.id, label: `${candidate.displayName || candidate.label}${candidate.ready === false ? ' · Setup Required' : ''}` }))]} />
@@ -102,7 +102,7 @@ export function UseWith({ profiles, value, onChange }: { profiles: Profile[]; va
 /** Other versions and variants that fit: each downloads on its own Download, never automatically. */
 export function OffersGroup({ offers, busy, onTake }: { offers: Offer[]; busy: boolean; onTake: (index: number) => void }) {
   if (!offers.length) return null;
-  return <Group title="Other Versions" note="Only versions that fit this model’s family and the worker are offered. Nothing downloads until you choose it.">
+  return <Group title="Other Versions" note="Only versions that fit this model’s family and the worker; nothing downloads until you choose it">
     {offers.map((offer, index) => <Row key={offer.key} className="library-resource library-offer" label={offer.file} description={<>
       <span className="library-line">{[relationWords[offer.relation], offer.label, offer.variant, offer.baseModel, size(offer.bytes)].filter(Boolean).join(' · ')}</span>
       {offer.unavailable ? <span className="library-line">{offer.unavailable.note}{offer.unavailable.freeAlternative ? <> <a className="set-link" href={offer.unavailable.freeAlternative.url} target="_blank" rel="noreferrer">Free version: {offer.unavailable.freeAlternative.name}</a></> : null}</span> : null}

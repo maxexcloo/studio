@@ -647,7 +647,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         quality={upscaleSetup.quality}
         comfyUrl={health?.comfyUrl}
         onQualityChange={(upscaleQuality) => setPrefs({ upscaleQuality })}
-        onOpenLibrary={() => { upscaleSetup.closeSetup(); openSettings("models"); }}
+        onOpenWorkers={() => { upscaleSetup.closeSetup(); openSettings("workers"); }}
         showToast={showToast}
       />
       <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />

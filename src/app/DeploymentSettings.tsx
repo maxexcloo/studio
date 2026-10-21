@@ -24,7 +24,7 @@ export type DeploymentSettings = {
 const FIRST_READY = '__first-ready__';
 // Inpainting is switched in Studio › Features, beside Upscale.
 export const inpaintFlagKey = 'STUDIO_ENABLE_INPAINT';
-// LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features (Settings › Users); an older server may still list them.
+// LoRAs, Cloud Models and Presets & Civitai Imports are group features (Settings › Groups); an older server may still list them.
 const hiddenCatalogueKeys = new Set([inpaintFlagKey, 'STUDIO_ENABLE_LORAS', 'STUDIO_ENABLE_GROK', 'STUDIO_ENABLE_PRESETS']);
 const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment', studio: 'This Studio', default: 'Default' };
 

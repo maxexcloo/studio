@@ -54,7 +54,7 @@ test('an import from chat goes through the same pipeline, records chat as its or
   registerLibraryRoutes(app, {
     presets: {}, installed: async () => ({}), loraInfo: async () => ({}), catalogue: () => catalogue, json,
     inspect: async () => ({ status: 'missing' }), downloads: () => ({ active: null, queued: [], recent: [] }), startDownload: async () => ({}),
-    store: createImportStore({ dataDir, log: {} }), schedule: false
+    store: createImportStore({ dataDir, log: {} }), schedule: false, pictures: { file: () => '', save: async () => false, copy: async () => false }
   });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
@@ -68,8 +68,11 @@ test('an import from chat goes through the same pipeline, records chat as its or
   assert.equal(catalogue.entry('loras/watercolour-v2.safetensors').origin, 'chat', 'its catalogue entry is from chat too');
   const ui = await call('POST', '/api/library/imports', { url: 'https://civitai.com/models/9?modelVersionId=20' }, false);
   assert.equal(ui.import.origin, 'ui');
+  const png = fs.readFileSync(new URL('./fixtures/images/a1111.png', import.meta.url));
+  const picture = await call('POST', '/api/library/imports/image', { image: `data:image/png;base64,${png.toString('base64')}`, name: 'fox.png' });
+  assert.deepEqual([picture.import.origin, picture.import.input.kind], ['chat', 'image-file'], 'an image from chat records chat too');
   const history = (await call('GET', '/api/library/imports', undefined, false)).imports;
-  assert.deepEqual(history.map((item) => item.origin).sort(), ['chat', 'ui'], 'both show in Library › Import');
+  assert.deepEqual(history.map((item) => item.origin).sort(), ['chat', 'chat', 'ui'], 'all show in Library › Import');
 
   const edited = await call('PATCH', '/api/library/catalogue', { key: 'loras/watercolour-v2.safetensors', patch: { title: 'Watercolour FX', notes: 'Soft edges.' } });
   assert.equal(edited.ok, true, JSON.stringify(edited));
