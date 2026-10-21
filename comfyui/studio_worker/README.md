@@ -30,8 +30,7 @@ Allowed folders are checkpoints, clip_vision, diffusion_models, loras,
 text_encoders and vae. Only `.safetensors` and `.gguf` files are accepted.
 
 Local model storage remains the default. In worker mode, a local mirror mount
-is never used for downloads, and manifest import, verification and restore are
-explicitly unavailable; use Downloads for the active worker library.
+is never used for downloads; use Downloads for the active worker library.
 
 ## Token
 

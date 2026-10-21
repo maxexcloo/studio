@@ -33,8 +33,8 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["GET", "/api/loras/library"], ["GET", "/api/comfy/status"], ["GET", "/comfy/view"], ["HEAD", "/comfy/thumb"], ["POST", "/api/accounts/mcp-token/revoke"]
   ]) assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
-    ["POST", "/api/gallery/clear"], ["GET", "/api/gallery/trash"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
-    ["POST", "/api/shutdown"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"],
+    ["POST", "/api/comfy/free"], ["GET", "/api/model-folders"], ["GET", "/api/presets"], ["GET", "/api/library/file"],
+    ["POST", "/api/models/downloads"], ["GET", "/api/accounts/admin"], ["POST", "/api/accounts/users"],
     ["PUT", "/api/workflows/preferences"], ["POST", "/comfy/prompt"], ["GET", "/comfy/history"],
     ["DELETE", "/api/loras"], ["POST", "/api/start-image"], ["GET", "/api/logs"],
     ["GET", "/api/workers"], ["PUT", "/api/workers"], ["POST", "/api/workers/test"], ["POST", "/api/comfy/restart"]
@@ -43,6 +43,6 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     assert.equal(denied.continued, false, `${method} ${path}`);
     assert.equal(denied.res.statusCode, 403, `${method} ${path}`);
   }
-  assert.equal(call("/api/gallery/clear", { userId: "admin", role: "administrator" }, "POST").continued, true);
+  assert.equal(call("/api/comfy/free", { userId: "admin", role: "administrator" }, "POST").continued, true);
   assert.equal(call("/comfy/prompt", { userId: "admin", role: "administrator" }, "POST").continued, true);
 });

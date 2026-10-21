@@ -88,10 +88,9 @@ test('worker model transport pins the backend, streams Unicode-labelled weights 
   await new Promise(resolve => api.once('listening', resolve));
   t.after(() => { api.closeAllConnections(); api.close(); });
   const apiUrl = `http://127.0.0.1:${api.address().port}`;
-  for (const route of ['manifest', 'manifest/export', 'manifest/verify', 'manifest/restore']) {
-    const response = await nativeFetch(`${apiUrl}/api/models/${route}`, { method: route.endsWith('verify') || route.endsWith('restore') ? 'POST' : 'GET' });
-    assert.equal(response.status, 409);
-    assert.match((await response.json()).error, /local model storage/);
+  // The manifest and token routes are gone: models come through Downloads, tokens from the environment.
+  for (const route of ['/api/models/manifest', '/api/models/manifest/restore', '/api/settings/hf-token']) {
+    assert.equal((await nativeFetch(`${apiUrl}${route}`, { method: 'POST' })).status, 404, route);
   }
 
   holdInventory = true;

@@ -167,17 +167,6 @@ test('write routes refuse unsigned remote devices', async () => {
   assert.equal(response.status, 403);
 });
 
-test('tokens are stored server-side and the status response contains no token material', async () => {
-  const token = 'test-only-token-123456789';
-  const saved = await api('/api/settings/civitai-token', { token });
-  assert.equal(saved.status, 200);
-  assert.equal(saved.body.set, true);
-  assert.equal(JSON.stringify(saved.body).includes(token), false);
-  assert.equal(fs.readFileSync(path.join(dir, '.env'), 'utf8').includes(token), true);
-  const cleared = await api('/api/settings/civitai-token', { token: '' });
-  assert.equal(cleared.body.set, false);
-});
-
 test('browser-supplied downloads and paths cannot bypass preview resolution', async () => {
   const response = await api('/api/library/downloads', { id: 'unknown', url: 'http://127.0.0.1/secret', folder: '../' });
   assert.equal(response.status, 400);
@@ -185,7 +174,7 @@ test('browser-supplied downloads and paths cannot bypass preview resolution', as
   assert.equal(thumbnail.status, 400);
 });
 
-test('disabled instances refuse every preset, provider download and token route', async () => {
+test('disabled instances refuse every preset and provider download route', async () => {
   try {
     for (const enabled of [undefined, '0']) {
       if (enabled === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
@@ -196,8 +185,7 @@ test('disabled instances refuse every preset, provider download and token route'
       for (const [method, url] of [
         ['GET', '/api/presets'], ['POST', '/api/presets'], ['POST', '/api/presets/import'],
         ['POST', '/api/presets/resolve'], ['DELETE', '/api/presets/42'], ['GET', '/api/presets/42/thumbnail'], ['GET', '/api/presets/42/media'],
-        ['GET', '/api/library/downloads'], ['POST', '/api/library/downloads'], ['POST', '/api/library/downloads/preview'],
-        ['GET', '/api/settings/civitai-token'], ['POST', '/api/settings/civitai-token']
+        ['GET', '/api/library/downloads'], ['POST', '/api/library/downloads'], ['POST', '/api/library/downloads/preview']
       ]) {
         const response = await fetch(base + url, { method });
         assert.equal(response.status, 404, `${method} ${url} with flag ${enabled}`);

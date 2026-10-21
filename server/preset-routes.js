@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { civitaiFetch, civitaiJson, civitaiTokenStatus, limitedBody, saveCivitaiToken } from './civitai-access.js';
+import { civitaiFetch, civitaiJson, limitedBody } from './civitai-access.js';
 import { importCivitaiImage, matchResources, useModelHashCache, versionResource } from './civitai-import.js';
 import { dataDir, deleteGalleryFiles, filterVisibleGallery, gallery, importedImageFile, setGallery } from './gallery-store.js';
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from './civitai-library.js';
@@ -10,7 +10,7 @@ import { presetsEnabled } from './features.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
 import { libraryDownload, libraryDownloadAccess, libraryDownloads, resolveModelLink, startLibraryDownload } from './library-downloads.js';
 import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from './video-previews.js';
-import { requireAdmin, requireLocal } from './route-access.js';
+import { requireLocal } from './route-access.js';
 import { refreshWorkerModels } from './worker-models.js';
 import { presetGrade } from './library-grade.js';
 
@@ -186,7 +186,5 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     if (!preset) throw new Error('That saved image is gone.');
     return matched(preset, undefined, { verify });
   };
-  app.get('/api/settings/civitai-token', route(async (_req, res) => res.json({ ok: true, ...civitaiTokenStatus() })));
-  app.post('/api/settings/civitai-token', route(async (req, res) => { if (!requireAdmin(req, res)) return; res.json({ ok: true, ...saveCivitaiToken(req.body?.token) }); }));
   return { importImage, resolvePreset };
 }
