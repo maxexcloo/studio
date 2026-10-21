@@ -14,7 +14,7 @@ import { GallerySelectionContext } from './gallerySelection';
 import { downloadName } from './share';
 import { useItemActions, type ItemAction } from './itemActions';
 import { ActionIcon, startsGroup } from './ItemActionSurfaces';
-import { itemProfileTitle } from './itemProfile';
+import { itemProfileTitle, itemProfileName } from './itemProfile';
 
 /**
  * The phone studio's tiles: nothing over the picture but its state (progress,
@@ -33,7 +33,8 @@ function tileCaptionDetail(item: GalleryItem, profiles: Profile[]) {
   const made = item.createdAt ? new Date(item.createdAt) : null;
   const time = made && !Number.isNaN(made.getTime()) ? made.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
   const duration = item.type === 'video' && item.settings?.duration ? `${item.settings.duration} s` : '';
-  return [time, itemProfileTitle(item, profiles), duration].filter(Boolean).join(' · ');
+  // The profile's own name, as Details' Profile row reads it (falling back to the model part).
+  return [time, itemProfileName(item, profiles) || itemProfileTitle(item, profiles), duration].filter(Boolean).join(' · ');
 }
 
 /* A tile's top row: 32px glass circles on a 40px pitch, right-aligned, Upscale
