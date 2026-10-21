@@ -65,7 +65,7 @@ jobs:
         run: npm run test:browser -- --shard=${{ matrix.shard }}/4
       - if: failure()
         name: Save Browser Failure Traces
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-failure-traces-${{ matrix.shard }}
           path: test-results
