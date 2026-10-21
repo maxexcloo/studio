@@ -34,7 +34,7 @@ import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch
 import { GalleryViewControls } from './GalleryViewControls';
 import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
-import { signOutChecked } from './accounts';
+import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
 import { StatusPill, useStatusHost } from './StatusMessage';
 import { EmptyState } from './EmptyState';
@@ -287,7 +287,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const {
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
-    referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, confirmAction, showToast,
+    referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
     customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
   } = view;
@@ -418,7 +418,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           selected={referenceAssets || []}
           onSelect={selectReferenceAsset}
           onRemove={removeReferenceAsset}
-          confirmDelete={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: 'It’s removed from uploads.', action: 'Delete', destructive: true })}
           onError={(message) => showToast(message, 'error')}
         />
       </div>
@@ -666,6 +665,6 @@ function MoreMenu({ view, open, onClose, onSelect }: { view: Record<string, any>
   items.push({ id: 'settings', Icon: Settings, label: 'Settings', run: () => { onClose(); view.openSettings('studio'); } });
   if (hasAccountStorageScope()) items.push('divider',
     { id: 'account', Icon: UserRound, label: 'Account', run: () => { onClose(); view.openSettings('account'); } },
-    { id: 'sign-out', Icon: LogOut, label: signingOut ? 'Signing Out…' : 'Sign Out', danger: true, disabled: signingOut, run: () => { setSigningOut(true); signOutChecked(view.runningCount || 0, view.confirmAction).then((done) => { if (!done) setSigningOut(false); }).catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); } });
+    { id: 'sign-out', Icon: LogOut, label: signingOut ? 'Signing Out…' : 'Sign Out', danger: true, disabled: signingOut, run: () => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); } });
   return <PhoneMenu open={open} onClose={onClose} trigger=".phone-menu-trigger" label="Menu" items={items} />;
 }

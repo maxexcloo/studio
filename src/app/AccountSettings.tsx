@@ -5,7 +5,6 @@ import { apiJson } from './api';
 import { Skeleton, StudioSelect } from './components';
 import { MultiSelect, type MultiSelectOption } from './MultiSelect';
 import { Group, GroupAction, Row, SaveRow, SwitchRow } from './SettingsControls';
-import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
 type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
@@ -48,7 +47,7 @@ const profileIdFrom = (name: string) => name.trim().toLocaleLowerCase('en-AU').r
 if (typeof window !== 'undefined' && knownAccountStatus()?.signedIn && !cachedMe()) void loadMe().catch(() => undefined);
 
 /** Settings › Account: your MCP connection, then who you are and your password (alphabetical groups). */
-export function AccountSettings({ showToast, copyToClipboard, confirmAction }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction }) {
+export function AccountSettings({ showToast, copyToClipboard }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean> }) {
   // Drawn at once from what the sign-in gate and the last visit knew; a fresh copy fills in behind.
   const [me, setMe] = React.useState<Me | null>(cachedMe());
   const [loadError, setLoadError] = React.useState('');
@@ -76,7 +75,6 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction }: {
     if (await copyToClipboard(text)) showToast(`${what} copied`, 'success');
   };
   const issueToken = async () => {
-    if (me?.mcp.enabled && !await confirmAction({ title: 'Rotate Your MCP Token?', description: 'Clients using the current token stop connecting until they receive the new one. Existing result links keep working.', action: 'Rotate Token', destructive: true })) return;
     await run(async () => {
       const result = await apiJson<McpTokenStatus & { token: string }>('/api/accounts/mcp-token', { method: 'POST' });
       setIssuedToken(result.token);
@@ -84,7 +82,6 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction }: {
     }, 'Couldn’t create the MCP token');
   };
   const revokeToken = async () => {
-    if (!await confirmAction({ title: 'Revoke Your MCP Token?', description: 'Clients using it stop connecting. Your jobs, outputs and existing result links are kept.', action: 'Revoke Token', destructive: true })) return;
     await run(async () => {
       const result = await apiJson<McpTokenStatus>('/api/accounts/mcp-token/revoke', { method: 'POST' });
       setToken({ ...(me?.mcp || { endpoint: '' }), ...result });
@@ -188,7 +185,7 @@ function PasswordRows({ account, showToast }: { account: OwnAccount | null; show
 }
 
 /** Settings › Users (administrators): access profiles, accounts and chat gateway users, alphabetically. */
-export function UsersSettings({ showToast, confirmAction, profiles }: { showToast: ShowToast; confirmAction: ConfirmAction; profiles?: Record<string, ProfileInfo> }) {
+export function UsersSettings({ showToast, profiles }: { showToast: ShowToast; profiles?: Record<string, ProfileInfo> }) {
   const [admin, setAdmin] = React.useState<AdminData | null>(null);
   const [loadError, setLoadError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -207,14 +204,12 @@ export function UsersSettings({ showToast, confirmAction, profiles }: { showToas
   };
   const setGatewayLink = async (identity: string, accountId: string) => {
     const account = admin?.accounts.find((item) => item.id === accountId);
-    if (!accountId && !await confirmAction({ title: 'Unlink This Chat User?', description: 'Their chat stops reaching Studio until it is linked again, which happens automatically if the gateway forwards an email matching an enabled account. Their outputs stay with the account.', action: 'Unlink', destructive: true })) return;
     if (await run(() => apiJson('/api/accounts/gateway-links', jsonPost('POST', { identity, ...(accountId ? { accountId } : {}) })), 'Couldn’t update the chat user')) {
       if (account) showToast(`Linked to ${account.displayName}`, 'success');
       await refresh();
     }
   };
   const dismissGatewayIdentity = async (identity: string) => {
-    if (!await confirmAction({ title: 'Dismiss This Chat User?', description: 'They leave this list. If the gateway sends them again, they return here waiting to be linked.', action: 'Dismiss Chat User', destructive: true })) return;
     if (await run(() => apiJson('/api/accounts/gateway-pending/dismiss', jsonPost('POST', { identity })), 'Couldn’t dismiss the chat user')) await refresh();
   };
   const accountOptions = (list: Account[]) => byName(list).map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
@@ -227,7 +222,7 @@ export function UsersSettings({ showToast, confirmAction, profiles }: { showToas
   const gatewayPending = [...(admin.gateway?.pending || [])].sort((a, b) => a.identity.localeCompare(b.identity));
   return <div className="set-sections">
     <AccessProfileEditor admin={admin} profiles={profiles} showToast={showToast} onSaved={refresh} />
-    <AccountsGroup admin={admin} showToast={showToast} confirmAction={confirmAction} onSaved={refresh} />
+    <AccountsGroup admin={admin} showToast={showToast} onSaved={refresh} />
     <Group title="Chat Gateway" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, here or automatically when the gateway forwards an enabled account's email. With a default access profile, an email no account has becomes a new account.">
       {gatewayLinks.map((link) => {
         const account = admin.accounts.find((item) => item.id === link.accountId);
@@ -337,7 +332,7 @@ function AccessProfileEditor({ admin, profiles, showToast, onSaved }: { admin: A
  * after the default access profile for new accounts. New Account, on the heading's line,
  * opens its form in place.
  */
-function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: AdminData; showToast: ShowToast; confirmAction: ConfirmAction; onSaved: () => Promise<void> }) {
+function AccountsGroup({ admin, showToast, onSaved }: { admin: AdminData; showToast: ShowToast; onSaved: () => Promise<void> }) {
   const [busy, setBusy] = React.useState('');
   const [creating, setCreating] = React.useState(false);
   const [username, setUsername] = React.useState('');
@@ -357,7 +352,6 @@ function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: Ad
     if (await run(account.id, () => patch(account, { accessProfileId: value }), 'Couldn’t update the account')) showToast(account.pending ? `${account.displayName} approved` : `${account.displayName} updated`, 'success');
   };
   const toggleDisabled = async (account: Account) => {
-    if (!account.disabled && !await confirmAction({ title: `Disable ${account.displayName}?`, description: 'Their browser sessions end and their MCP token stops working. Their outputs are kept.', action: 'Disable Account', destructive: true })) return;
     await run(account.id, () => patch(account, { disabled: !account.disabled }), 'Couldn’t update the account');
   };
   const setDefault = async (value: string) => {

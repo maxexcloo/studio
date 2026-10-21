@@ -10,7 +10,6 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { presetFit, type ImagePreset, type PresetResource } from './presets';
 import type { ModelDownload, Models, Profile } from './types';
 import type { ShowToast } from './toast';
-import type { ConfirmAction } from './useConfirmation';
 import { EmptyState } from './EmptyState';
 
 /*
@@ -38,10 +37,10 @@ const missingCount = (preset: ImagePreset) => preset.resources.filter((item) => 
 let lastPresets: ImagePreset[] | null = null;
 let lastAccess: Access | null = null;
 
-export function PresetLibrary({ onClose, models, refreshModels, onApply, onPrompt, showToast, confirmAction }: {
+export function PresetLibrary({ onClose, models, refreshModels, onApply, onPrompt, showToast }: {
   onClose: () => void; models: Models | null; refreshModels: (notify?: boolean) => Promise<unknown>;
   onApply: (preset: ImagePreset, profile: Profile) => void; onPrompt: (preset: ImagePreset) => void;
-  showToast: ShowToast; confirmAction: ConfirmAction;
+  showToast: ShowToast;
 }) {
   const phone = usePhone();
   const [section, setSection] = React.useState<Section>('images');
@@ -164,7 +163,6 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
     } finally { if (mounted.current) setImporting(false); }
   };
   const remove = (preset: ImagePreset) => void run(async () => {
-    if (!await confirmAction({ title: 'Delete Image?', description: 'It leaves your gallery too. Its downloaded models stay in the library.', action: 'Delete', destructive: true })) return;
     await apiJson(`/api/presets/${preset.id}`, { method: 'DELETE' });
     setSaved((current) => keep(current.filter((item) => item.id !== preset.id)));
     setSelected(null);

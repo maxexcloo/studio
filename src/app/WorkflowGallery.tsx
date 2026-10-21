@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Bot, Check, ClipboardPaste, FileJson, Minus, RefreshCw, Search, ShieldAlert, Star, Trash2, Upload, Wand2, X } from 'lucide-react';
 import { Modal } from './Modal';
-import type { ConfirmAction } from './useConfirmation';
 import { apiJson, copyText } from './api';
 import { cn } from './format';
 import { Field, StudioSelect as Select } from './components';
@@ -178,10 +177,9 @@ export function WorkflowGallery({ view }: { view: any }) {
   // Importing and deleting workflow files happens at the computer running Studio.
   const thisComputer = useThisComputer();
   const {
-    confirmAction, mode, onClose, refreshModels, refreshWorkflows, selectWorkflow, setWorkflowPreferences,
+    mode, onClose, refreshModels, refreshWorkflows, selectWorkflow, setWorkflowPreferences,
     showToast, workflowPreferences, workflows, setWorkflows, model, chooseModel, models
   } = view as {
-    confirmAction: ConfirmAction;
     mode: Mode;
     onClose: () => void;
     refreshModels: (notify?: boolean) => void;
@@ -292,7 +290,6 @@ export function WorkflowGallery({ view }: { view: any }) {
 
   const deleteWorkflow = async (workflow: WorkflowSummary) => {
     if (!workflow.deleteId) return;
-    if (!await confirmAction({ title: `Delete ${workflow.name}?`, description: "To get it back, import its JSON again.", action: "Delete", destructive: true })) return;
     setBusy(true);
     try {
       await apiJson(`/api/workflows/${encodeURIComponent(workflow.deleteId)}`, { method: "DELETE" });

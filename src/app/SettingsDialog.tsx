@@ -145,7 +145,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
     prefs, setPrefs,
     upscaleStatus, upscaleUnavailableReason, upscaleInstall,
     copyToClipboard, showToast,
-    clearFailedItems, resetAllSettings, confirmAction,
+    clearFailedItems, resetAllSettings,
     health, refreshHealth, models, refreshModels, refreshWorkflows,
     workflows, modelProfiles
   } = view;
@@ -245,8 +245,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
           <p>{current.description}</p>
         </header>
 
-        {section === 'account' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} /> : null}
-        {section === 'users' && sectionShown('users') ? <UsersSettings showToast={showToast} confirmAction={confirmAction} profiles={profileInfo} /> : null}
+        {section === 'account' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} /> : null}
+        {section === 'users' && sectionShown('users') ? <UsersSettings showToast={showToast} profiles={profileInfo} /> : null}
         {section === 'profiles' && sectionShown('profiles') ? <ProfilesSettings showToast={showToast} onSaved={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
 
         {section === 'studio' ? (
@@ -279,7 +279,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             </Group>
             <Group title="Generation">
               <SwitchRow label="Auto-Resize Input Images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
-              <PromptHistoryRow showToast={showToast} confirmAction={confirmAction} />
+              <PromptHistoryRow showToast={showToast} />
               <Row label="Run Several Images As" description={prefs.variationQueueMode === 'separate' ? 'One job per image. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
                 <Segmented label="Run Several Images As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
               </Row>

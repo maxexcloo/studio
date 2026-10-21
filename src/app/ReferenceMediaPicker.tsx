@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { tweens } from "@/lib/springs";
-import { ArrowDown, ArrowUp, Brush, Check, GripVertical, Image as ImageIcon, ImagePlus, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Brush, GripVertical, Image as ImageIcon, ImagePlus, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { cn } from "./format";
 import { SurfaceStatus } from "./StatusMessage";
 import { Tip } from "./components";
@@ -56,7 +56,7 @@ function assetImage(asset: ReferenceAsset) {
  * picked image takes it off again, and Selected n/max reviews, reorders and
  * removes what is picked.
  */
-function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onClearAll, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, confirmDelete, onError, upload }: {
+function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect, onClearAll, onMove, anchor, popRef, dropActive, dropped, onClose, onSelect, onDeleted, onError, upload }: {
   memory: PickerMemory;
   input: MediaInput;
   anchor: HTMLElement | null;
@@ -76,7 +76,6 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   onSelect: (asset: ReferenceAsset) => void;
   /** An upload was deleted for good: whichever slots hold it let it go. */
   onDeleted: (asset: ReferenceAsset) => void;
-  confirmDelete?: (asset: ReferenceAsset) => Promise<boolean>;
   onError?: (message: string) => void;
   upload: { busy: boolean; progress: number; multiple: boolean; start: (files: File[]) => Promise<ReferenceAsset | null> };
 }) {
@@ -230,7 +229,6 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     event.preventDefault();
     event.stopPropagation();
     try {
-      if (confirmDelete && !await confirmDelete(asset)) return;
       await deleteReferenceAsset(asset.id);
       setPages((current) => ({ ...current, upload: { ...current.upload, items: current.upload.items.filter((item) => item.id !== asset.id) } }));
       onDeleted(asset);
@@ -603,7 +601,7 @@ export function RoleSwitch({ role, many, className }: { role: ReferenceRoleContr
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError, openRequest = 0 }: {
+export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, onError, openRequest = 0 }: {
   scope?: string;
   /** With no slot of its own: the models that take a reference, offered in the Reference button's place. */
   /** Bumped to open the first slot's picker. */
@@ -614,7 +612,6 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
   selected: SelectedReferenceAsset[];
   onSelect: (slot: string, asset: ReferenceAsset) => void;
   onRemove: (slots: string | string[]) => void;
-  confirmDelete?: (asset: ReferenceAsset) => Promise<boolean>;
   onError?: (message: string) => void;
 }) {
   // An upload may finish after changing models or closing the phone composer.
@@ -958,7 +955,6 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
               const holding = selected.filter((item) => item.asset.id === asset.id).map((item) => item.slot);
               if (holding.length) onRemove(holding);
             }}
-            confirmDelete={confirmDelete}
             onError={onError}
             upload={{ busy: Boolean(uploadSlot), progress, multiple: inputs.length > 1, start: (files) => uploadFiles(files, openInput.id) }}
           />

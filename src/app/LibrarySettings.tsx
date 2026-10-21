@@ -5,7 +5,6 @@ import type { LoraInfo } from './useLoraInfo';
 import { apiJson } from './api';
 import { Group, Row, SwitchRow } from './SettingsControls';
 import { clearPrompts, setPromptHistoryEnabled, usePromptHistory } from './recentPrompts';
-import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
 /* ---------------------------------------------------------------------------
@@ -15,13 +14,12 @@ import type { ShowToast } from './toast';
 const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
 
 /** Recent prompts: whether to keep them, what the list holds, and the way to empty it. */
-export function PromptHistoryRow({ showToast, confirmAction }: { showToast: ShowToast; confirmAction: ConfirmAction }) {
+export function PromptHistoryRow({ showToast }: { showToast: ShowToast }) {
   const { prompts, enabled } = usePromptHistory(true);
   const starred = prompts.filter((entry) => entry.pinned).length;
   const recent = prompts.length - starred;
   const fail = (error: unknown) => showToast(error instanceof Error ? error.message : 'Couldn’t change recent prompts', 'error');
   const toggle = async (next: boolean) => {
-    if (!next && recent && !await confirmAction({ title: 'Turn Off Recent Prompts?', description: `${plural(recent, 'recent prompt')} ${recent === 1 ? 'is' : 'are'} forgotten.${starred ? ' Starred prompts stay.' : ''}`, action: 'Turn off' })) return;
     setPromptHistoryEnabled(next).catch(fail);
   };
   return (
@@ -35,7 +33,6 @@ export function PromptHistoryRow({ showToast, confirmAction }: { showToast: Show
       {enabled && recent ? (
         <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
           <button className="btn" onClick={async () => {
-            if (!await confirmAction({ title: 'Forget Recent Prompts?', description: starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.', action: 'Forget' })) return;
             clearPrompts().catch(fail);
           }}>Forget</button>
         </Row>

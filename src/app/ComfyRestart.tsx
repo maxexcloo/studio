@@ -170,13 +170,6 @@ export function announceComfyRestart() {
   window.dispatchEvent(new CustomEvent('studio:comfy-restart'));
 }
 
-/**
- * The app registers one confirmation (it knows what is running), so every
- * restart button asks before stopping work, not only the one in Settings.
- */
-let defaultConfirm: (() => Promise<boolean>) | null = null;
-export function registerRestartConfirm(confirm: (() => Promise<boolean>) | null) { defaultConfirm = confirm; }
-
 /** Manager 4 dropped "Install via Git URL" from its main UI. */
 export function managerMajor(info: ManagerInfo | null) {
   const match = String(info?.version || '').match(/(\d+)/);
@@ -201,7 +194,7 @@ type Phase = 'idle' | 'restarting' | 'back' | 'error';
  * Restarts ComfyUI through Manager and waits until it answers again, then
  * calls onBack so the caller can rescan. Shared by every restart control.
  */
-export function useComfyRestart({ onBack, confirm }: { onBack?: () => void; confirm?: () => Promise<boolean> } = {}) {
+export function useComfyRestart({ onBack }: { onBack?: () => void } = {}) {
   const { info, refresh } = useComfyManager();
   const [phase, setPhase] = React.useState<Phase>('idle');
   const [error, setError] = React.useState('');
@@ -209,8 +202,6 @@ export function useComfyRestart({ onBack, confirm }: { onBack?: () => void; conf
   React.useEffect(() => () => { alive.current = false; }, []);
 
   const restart = async () => {
-    const ask = confirm || defaultConfirm;
-    if (ask && !await ask()) return;
     setPhase('restarting');
     setError('');
     try {
@@ -279,13 +270,12 @@ export function ComfyManagerNote({ info, refresh, className }: { info: ManagerIn
  * The restart button with its notes. Without Manager it stays visible but
  * off, saying what would turn it on.
  */
-export function ComfyRestart({ onBack, confirm, compact = false, className }: {
+export function ComfyRestart({ onBack, compact = false, className }: {
   onBack?: () => void;
-  confirm?: () => Promise<boolean>;
   compact?: boolean;
   className?: string;
 }) {
-  const { info, refresh, phase, error, busy, off, restart, eta, result } = useComfyRestart({ onBack, confirm });
+  const { info, refresh, phase, error, busy, off, restart, eta, result } = useComfyRestart({ onBack });
   const thisComputer = useThisComputer();
   // Restarting is looked after at the computer; elsewhere only its progress shows.
   if (!thisComputer && !busy) return <p className={cn('comfy-restart-note', className)}>Restart ComfyUI from the computer running Studio.</p>;

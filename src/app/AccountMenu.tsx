@@ -2,16 +2,15 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LogOut, Settings, UserRound } from 'lucide-react';
 import { Tip } from './components';
-import { signOutChecked } from './accounts';
+import { signOutAccount } from './accounts';
 import { useDismiss } from './useDismiss';
 import { popoverMotion, useSettling } from './composerSurface';
-import type { ConfirmAction } from './useConfirmation';
 
 /**
  * The desktop dock's Account button: a small menu above it with Account
  * Settings and Sign Out, so signing out never means hunting through Settings.
  */
-export function AccountMenu({ running, confirmAction, openAccount, onError }: { running: number; confirmAction: ConfirmAction; openAccount: () => void; onError: (message: string) => void }) {
+export function AccountMenu({ openAccount, onError }: { openAccount: () => void; onError: (message: string) => void }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const root = React.useRef<HTMLDivElement>(null);
@@ -21,7 +20,7 @@ export function AccountMenu({ running, confirmAction, openAccount, onError }: { 
   const signOut = async () => {
     setBusy(true);
     try {
-      if (!await signOutChecked(running, confirmAction)) setBusy(false);
+      await signOutAccount();
     } catch {
       setBusy(false);
       onError('Couldn’t sign out');

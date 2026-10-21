@@ -9,7 +9,7 @@ import { downloadActions } from './useModelDownloads';
 import { referenceRoleFor } from './referenceSlots';
 import { sizePlan, tiledDecodeFor } from './useUpscale';
 import { generationPlan } from './generationOptions';
-import { deleteConfirmation, itemNoun } from './itemWording';
+import { itemNoun } from './itemWording';
 import type { GalleryItem, Job } from './types';
 
 type GalleryPayload = { items?: GalleryItem[]; outputs?: GalleryItem[] };
@@ -321,20 +321,9 @@ export function useGenerationActions(view: any) {
     const many = runSize > 1;
     // Its pictures are done and only Smart upscale is left: stopping keeps them.
     if (runItems.some((item) => item.progress?.upscaling)) {
-      if (!await confirmAction({
-        title: "Stop the Upscale?",
-        description: many ? "The pictures are done and stay, at the size they were generated." : "The picture is done and stays, at the size it was generated.",
-        action: "Stop Upscale"
-      })) return;
       await stopJob(jobId, { keep: true });
       return;
     }
-    if (!await confirmAction({
-      title: many ? `Stop All ${runSize} Variants?` : "Stop Generation?",
-      description: many ? "They’re one run, so they stop together. Nothing is saved." : "It won’t be saved.",
-      action: many ? "Stop all" : "Stop",
-      destructive: true
-    })) return;
     await stopJob(jobId);
   }
 
@@ -351,7 +340,6 @@ export function useGenerationActions(view: any) {
   }
 
   async function cancelQueue() {
-    if (!await confirmAction({"title": "Stop All Generations?", "description": "Running and queued generations and upscales stop.", "action": "Stop All", "destructive": true})) return;
     await stopQueue();
   }
 
@@ -369,7 +357,6 @@ export function useGenerationActions(view: any) {
   }
 
   async function clearFailedItems() {
-    if (!await confirmAction({"title": "Clear Failed Generations?", "description": "Removes failed and interrupted items from the gallery.", "action": "Clear", "destructive": true})) return;
     const data = await apiJson<GalleryPayload>("/api/gallery/errors/clear", { method: "POST" }).catch(() => null);
     if (!data) { showToast("Couldn’t clear failed generations", "error"); return; }
     setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));
@@ -421,7 +408,6 @@ export function useGenerationActions(view: any) {
   }, []);
 
   async function deleteItem(item: GalleryItem, confirmed = false) {
-    if (!confirmed && !await confirmAction(deleteConfirmation(item))) return;
     // In the viewer, step to the next image rather than closing, so culling a batch stays in place.
     if (active?.id === item.id) {
       const items = ((visibleGallery || []) as GalleryItem[]).filter((entry) => entry.status === "pending" || entry.status === "done" || entry.status === "error");
@@ -472,16 +458,6 @@ export function useGenerationActions(view: any) {
     if (targets.length === 1) return deleteItem(targets[0]);
     const libraryOnly = targets.every((item) => item.library);
     const includesLibrary = targets.some((item) => item.library);
-    if (!await confirmAction({
-      title: `${libraryOnly ? "Remove" : "Delete"} ${targets.length} Items?`,
-      description: libraryOnly ? "The files stay in their folders."
-          : includesLibrary ? "Generated files are deleted from disk. Files linked from library folders stay in their folders."
-            : "Their files are deleted from disk.",
-      action: `${libraryOnly ? "Remove" : "Delete"} ${targets.length}`,
-      destructive: !libraryOnly,
-      // What goes, as a list under the question: each one's picture and a short name.
-      items: targets.map((item) => ({ id: item.id, thumb: item.type === "video" ? item.thumbnailUrl : item.thumbnailUrl || item.url, name: shortName(item) }))
-    })) return;
     if (active && targets.some((item) => item.id === active.id)) setActive(null);
     galleryRemove(targets.flatMap((item) => [item.id, item.url]).filter(Boolean));
     offerUndo(targets);

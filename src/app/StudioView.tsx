@@ -111,7 +111,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
-  const { confirmAction, referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -426,7 +426,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
       {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" aria-haspopup="dialog" aria-expanded={Boolean(view.presetLibraryOpen)} onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
-      {hasAccountStorageScope() ? <AccountMenu running={runningCount} confirmAction={view.confirmAction} openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
+      {hasAccountStorageScope() ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
     </div>
   );
   // The gallery, its empty and offline stages and the lock: the same in every layout.
@@ -575,7 +575,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               referenceAssets={referenceAssets}
               onReferenceSelect={selectReferenceAsset}
               onReferenceRemove={removeReferenceAsset}
-              onReferenceDeleteRequest={(asset) => confirmAction({ title: `Delete ${asset.name}?`, description: "It’s removed from uploads.", action: "Delete", destructive: true })}
               onReferenceError={(message) => showToast(message, "error")}
               pinnedSeed={view.seed}
               onRandomSeed={() => view.setSeed("")}
@@ -804,7 +803,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </div>
         );
       })() : null}
-      {models?.features?.presets === true && view.presetLibraryOpen ? <React.Suspense fallback={<Modal open title="Image & Model Library" onOpenChange={() => view.setPresetLibraryOpen(false)}><p role="status">Opening presets…</p></Modal>}><PresetLibrary onClose={() => view.setPresetLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} confirmAction={confirmAction} /></React.Suspense> : null}
+      {models?.features?.presets === true && view.presetLibraryOpen ? <React.Suspense fallback={<Modal open title="Image & Model Library" onOpenChange={() => view.setPresetLibraryOpen(false)}><p role="status">Opening presets…</p></Modal>}><PresetLibrary onClose={() => view.setPresetLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} /></React.Suspense> : null}
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>

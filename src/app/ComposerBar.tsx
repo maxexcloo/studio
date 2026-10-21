@@ -247,7 +247,6 @@ export type ComposerBarProps = {
   referenceAssets?: SelectedReferenceAsset[];
   onReferenceSelect: (slot: string, asset: ReferenceAsset) => void;
   onReferenceRemove: (slots: string | string[]) => void;
-  onReferenceDeleteRequest: (asset: ReferenceAsset) => Promise<boolean>;
   onReferenceError: (message: string) => void;
   /** A fixed seed makes every run the same picture, so it is always on show. */
   pinnedSeed?: string;
@@ -269,7 +268,7 @@ export function ComposerBar(props: ComposerBarProps) {
     lorasOpen = false, onOpenLoras,
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
-    referenceInputs = [], referenceOpenRequest = 0, referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
+    referenceInputs = [], referenceOpenRequest = 0, referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceError,
     pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange, primaryTarget = null
   } = props;
 
@@ -359,7 +358,7 @@ export function ComposerBar(props: ComposerBarProps) {
     <>
       {primaryTarget ? createPortal(submitActions, primaryTarget) : null}
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
-      <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
+      <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} onError={onReferenceError} />
       <div className="composer-resource-row">
         <div className="composer-resource-left"><div className="composer-reference-tools" />{loraPill("compact")}</div>
         <div className="composer-resource-model">{workflowPicker("compact")}</div>
