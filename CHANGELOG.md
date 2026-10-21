@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-10-21
+
 > A steadier desktop gallery, one progress pattern, consolidated stylesheets with 44 px phone targets, recovered long video runs keeping their outputs, and Details naming the profile and LoRAs
 
 ### Changed
@@ -1727,7 +1729,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.42.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/maxexcloo/studio/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/maxexcloo/studio/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/maxexcloo/studio/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/maxexcloo/studio/compare/v0.40.0...v0.40.1
