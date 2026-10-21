@@ -22,7 +22,7 @@ let base = "";
 test.before(async () => {
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: fake.url, STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_NO_BROWSER: "1", STUDIO_LAN: "0", npm_lifecycle_event: "" },
+    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: fake.url, STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_LAN: "0", npm_lifecycle_event: "" },
     stdio: ["ignore", "ignore", "pipe", "ipc"]
   });
   let errors = "";

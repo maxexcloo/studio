@@ -15,7 +15,6 @@ const child = fork('server/index.js', [], {
     STUDIO_ENV_FILE: path.join(data, '.env'),
     STUDIO_ENABLE_PRESETS: '1',
     STUDIO_LAN: '0',
-    STUDIO_NO_BROWSER: '1',
     HOST: '127.0.0.1',
   },
   stdio: ['ignore', 'inherit', 'inherit', 'ipc'],

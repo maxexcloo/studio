@@ -55,17 +55,3 @@ export function useGalleryGroups(items: GalleryItem[], { runs }: { runs: boolean
 
 /** A run standing in for its outputs in a flat list (zen's strip): its cover, marked as the run. */
 export type RunItem = GalleryItem & { run: Run };
-
-/** The list with each stacked run in its newest output's place and its other outputs left out. */
-export function collapseRuns(items: GalleryItem[], groups: GalleryGroups, open: Set<string>): GalleryItem[] {
-  const out: GalleryItem[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    const run = groups.runOf.get(item.id);
-    if (!run || run.live || open.has(run.id) || item.status === "pending") { out.push(item); continue; }
-    if (seen.has(run.id)) continue;
-    seen.add(run.id);
-    out.push({ ...run.cover, id: run.id, run } as RunItem);
-  }
-  return out;
-}

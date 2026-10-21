@@ -81,12 +81,6 @@ export function tlsHostNames() {
   return startupTls.ok ? startupTls.names : [];
 }
 
-/** Public part of a report, for Settings (never the PEM itself). */
-export function tlsSummary(report = startupTls, { active = false } = {}) {
-  const { pem, ...rest } = report;
-  return { ...rest, port: httpsPort, active };
-}
-
 /**
  * Keeps a running HTTPS server on the newest certificate: `tailscale cert`
  * and certbot renew the files in place, so reload them when they change.

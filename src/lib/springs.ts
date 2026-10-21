@@ -39,8 +39,6 @@ export const tweens = {
   slow: { duration: 0.32, ease },
 } as const;
 
-export const motionEase = ease;
-
 /** Smooth scrolling becomes an instant jump with reduced motion. */
 export function scrollBehavior(): ScrollBehavior {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";

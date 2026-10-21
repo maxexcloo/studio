@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { releaseChanges, validateReleaseTag } from './release-plan.mjs';
-import { releaseIdentity, releasesUrl } from '../server/release-identity.js';
+import { releaseIdentity } from '../server/release-identity.js';
 
 test('only local task notes are exempt from release cleanliness', () => {
   assert.deepEqual(releaseChanges('?? todo.md\n?? questions.md\n M package.json\n?? other.md'), [' M package.json', '?? other.md']);
@@ -17,5 +17,4 @@ test('immutable fork release tags must match the numeric package version', () =>
 test('release links belong to the fork, with upstream recorded separately', () => {
   assert.equal(releaseIdentity.repository, 'maxexcloo/studio');
   assert.equal(releaseIdentity.upstream.repository, 'tristmeister/HEISS-UI');
-  assert.equal(releasesUrl, 'https://github.com/maxexcloo/studio/releases');
 });

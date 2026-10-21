@@ -55,10 +55,6 @@ export function useThisComputer() {
   return admin.use();
 }
 
-export function useAtComputer() {
-  return atComputer.use();
-}
-
 /** The phone layout's width breakpoint, shared with the CSS (max-width: 760px). */
 export const NARROW_QUERY = '(max-width: 760px)';
 // Narrow, or short (a phone held sideways is wide but only ~400px tall).

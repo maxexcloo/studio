@@ -24,7 +24,7 @@ export function useGenerationActions(view: any) {
     frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loras, missingRequiredReference, mode,
     model, negative, prefs, prompt, sampler, scheduler, seed, setActive, setGallery,
     upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, showToast, startImage, startImageId, startImageName, steps, cfg,
-    referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, outputDir, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
+    referenceAssets, inpaint, sizeTier, sizeMax, sizeArea = 0, sizeStep = 16, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, generateDisabledReason, comfyOffline, comfyRestarting, openModelSetup, retryComfyStatus, refreshModels
   } = view;
   // Callbacks must follow the studio as it changes under a run: a generation
   // started in one mode finishes while another is on screen (see the delta sync
@@ -368,38 +368,6 @@ export function useGenerationActions(view: any) {
     setStatus("Ready");
   }
 
-  async function clearGallery() {
-    const where = outputDir ? ` in ${outputDir}` : " in ComfyUI’s output folder";
-    if (!await confirmAction({
-      title: "Delete All Finished Images?",
-      description: `Their files${where} move to Studio’s trash there for 30 days.`,
-      action: "Delete All",
-      destructive: true
-    })) return;
-    const data = await apiJson<GalleryPayload & { files?: { deleted: number; skipped: number }; trash?: { batch: string; moved: number; days: number } }>("/api/gallery/clear", { method: "POST" }).catch(() => null);
-    if (!data) {
-      showToast("Couldn’t clear the gallery. Nothing was deleted.", "error");
-      return;
-    }
-    const items = payloadItems(data);
-    setGallery(items.filter((item: GalleryItem) => item.status !== "canceled"));
-    const moved = data.trash?.moved ?? data.files?.deleted ?? 0;
-    const batch = data.trash?.batch || "";
-    showToast(moved ? `Moved ${moved} file${moved === 1 ? "" : "s"} to the trash` : "Gallery cleared", "removed", batch ? { action: { label: "Undo", onClick: () => restoreCleared(batch) } } : undefined);
-    setStatus("Ready");
-  }
-
-  /** Undo for "Delete all": the batch comes back out of the trash, into the gallery. */
-  async function restoreCleared(batch: string) {
-    const data = await apiJson<GalleryPayload & { restored: number; missing: number }>("/api/gallery/trash/restore", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ batch }) }).catch(() => null);
-    if (!data) {
-      showToast("Couldn’t restore them. They’re still in the trash. Try again from Settings › Maintenance.", "error");
-      return;
-    }
-    setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));
-    showToast(data.missing ? `${data.restored} back in the gallery. ${data.missing} file${data.missing === 1 ? "" : "s"} stayed in the trash because newer files have the same name.` : `${data.restored} back in the gallery`, data.missing ? "warning" : "success");
-  }
-
   async function clearFailedItems() {
     if (!await confirmAction({"title": "Clear Failed Generations?", "description": "Removes failed and interrupted items from the gallery.", "action": "Clear", "destructive": true})) return;
     const data = await apiJson<GalleryPayload>("/api/gallery/errors/clear", { method: "POST" }).catch(() => null);
@@ -425,27 +393,6 @@ export function useGenerationActions(view: any) {
       await caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => null);
     }
     window.location.reload();
-  }
-
-  async function clearAllCache() {
-    if (!await confirmAction({"title": "Clear Cache?", "description": "Clears cached previews and frees ComfyUI’s memory. The gallery isn’t affected.", "action": "Clear", "destructive": false})) return;
-    await clearCaches();
-  }
-
-  async function clearCaches() {
-    if ("caches" in window) {
-      await caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => null);
-    }
-    const data = await apiFetch("/api/cache/clear", { method: "POST" }).then((res) => res.ok ? res.json() : null).catch(() => null);
-    if (!data) { showToast("Couldn’t clear ComfyUI’s cache", "error", { action: { label: "Try Again", onClick: clearCaches } }); return; }
-    setGallery(payloadItems(data).filter((item: GalleryItem) => item.status !== "canceled"));
-    showToast("Cache cleared", "removed");
-    setStatus("Ready");
-  }
-
-  async function openOutputFolder() {
-    const response = await apiFetch("/api/open-output-folder", { method: "POST" }).catch(() => null);
-    if (!response?.ok) showToast("Couldn’t open the folder", "error");
   }
 
   // Deletes wait out the undo toast before the file is actually removed: they
@@ -578,5 +525,5 @@ export function useGenerationActions(view: any) {
 
   const failureFixes = { retry: retryFailed, freeMemoryAndRetry, redownload: redownloadDamaged, rescan: rescanModels };
 
-  return { generate, cancelJob, cancelQueue, clearGallery, clearFailedItems, resetAllSettings, clearAllCache, openOutputFolder, deleteItem, deleteItems, failureFixes };
+  return { generate, cancelJob, cancelQueue, clearFailedItems, resetAllSettings, deleteItem, deleteItems, failureFixes };
 }

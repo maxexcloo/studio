@@ -143,12 +143,6 @@ export const builtInAccessProfiles = Object.freeze([
 ]);
 
 /**
- * Access features a deployment can switch off entirely (features.js): while off, nobody has
- * them, administrators included, and the access-profile option shows as locked.
- */
-export const deploymentFeatureKeys = Object.freeze({ loras: "STUDIO_ENABLE_LORAS", cloudModels: "STUDIO_ENABLE_GROK", presets: "STUDIO_ENABLE_PRESETS" });
-
-/**
  * Carries the old global LoRAs and Cloud Models switches into each access profile once:
  * a profile keeps a feature only where the switch had it on too, so nobody gains or loses
  * access when the switch goes. `globals` holds the switches' values at the time.

@@ -202,8 +202,6 @@ function detectedSeedVR2Nodes(info) {
 
 /* ------------------------------------------------------------ node install */
 
-export const seedvr2Repository = nodePacks.seedvr2.repository;
-
 export { comfyPython, comfyRootDir };
 
 /** The SeedVR2 pack's terminal install; see node-install.js. */
@@ -759,18 +757,6 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
     pairs.push({ base: saveId, upscale: `${prefix}9` });
   });
   return { graph: next, pairs, plan };
-}
-
-export async function uploadUpscaleSource({ buffer, mime = "image/png", name = "upscale-source.png" }) {
-  const hash = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32);
-  const extension = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : "png";
-  const filename = `heiss-ui-upscale-${hash}.${extension}`;
-  const form = new FormData();
-  form.append("image", new Blob([buffer], { type: mime }), filename);
-  form.append("type", "input");
-  form.append("overwrite", "false");
-  const uploaded = await comfy("/upload/image", { method: "POST", body: form });
-  return uploaded.name || filename || name;
 }
 
 /** Stage the original local video; the gallery keeps its audio and frame rate. */

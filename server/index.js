@@ -7,7 +7,7 @@ import "./hidden-migration.js";
 import { createJobRecovery } from "./job-recovery.js";
 // Next, so a crash anywhere below, even while starting, is written down (data/logs).
 import "./crash-log-install.js";
-import { addProbe, logDir, logWarning } from "./crash-log.js";
+import { addProbe, logWarning } from "./crash-log.js";
 import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
 import { loadSavedSizes, saveSavedSizes } from "./saved-sizes.js";
 import { registerGalleryBundleRoutes, registerGalleryBundleActions, registerGalleryReadRoutes, registerGalleryHistoryRoutes, registerGalleryTrashRoutes, registerGalleryDeleteRoute } from "./gallery-routes.js";
@@ -19,7 +19,7 @@ import { registerProfileEditorRoutes } from './profile-editor.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
-import { configuredBackends, currentComfyBackend, forgetWorkerState, isDefaultBackend, mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob, routeProfile, workerAvailability, withComfyBackend } from "./comfy-backends.js";
+import { configuredBackends, currentComfyBackend, forgetWorkerState, isDefaultBackend, mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob, workerAvailability, withComfyBackend } from "./comfy-backends.js";
 import { capabilityForProfile, defaultWorker, defaultWorkerId, listWorkers, noWorkerMessage, workerById } from "./workers.js";
 import { registerWorkerRoutes } from "./worker-routes.js";
 import crypto from "node:crypto";
@@ -31,16 +31,16 @@ import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { printBanner } from './banner.js';
-import { allowLanActions, lan, lanListening, saveLanSetting, demoMode, activeComfyUrl, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, normalizeComfyUrl, optionsFor, port, root, setComfyFolderPaths, setComfyOutputDir, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
+import { allowLanActions, lan, lanListening, demoMode, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, optionsFor, port, root, setComfyFolderPaths, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
 import { canAdmin, clientOf, deviceSession, migrateDeviceCookie, studioPasswordSet } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard, signInHeader } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
-import { httpsListening, httpsProblem, startServers } from './listen.js';
-import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
-import { envFileKeys, legacyEnvInUse, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
+import { startServers } from './listen.js';
+import { httpsPort, startupTls, tlsHostNames } from './tls.js';
+import { legacyEnvInUse, removeLocalEnvValue } from './env.js';
 import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from './env-names.js';
 import { retireFeatureSwitches } from './feature-options.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
@@ -63,11 +63,10 @@ import { loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
-import { starterPlan } from './starter-models.js';
 import { familySetupPlan, guidedSetups } from './family-setup.js';
 import { setDismissed } from './dismissals.js';
 import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from './comfy-finder.js';
-import { loadWorkflowPreferences, markWorkflowUsed, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
+import { loadWorkflowPreferences, previewWorkflowImport, saveWorkflowPreferences, workflowSummaries } from './workflow-catalog.js';
 import { saveStartImage } from './start-images.js';
 
 import { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary, saveLoraStack } from './lora-stacks.js';
@@ -80,9 +79,9 @@ import { upscaleWork } from './upscale-timing.js';
 import { comfyRootDir, packInstallPlan } from './node-install.js';
 import { linkModelFolders, modelFolderReport, unlinkModelFolder } from './model-folders.js';
 import { packInstallRoutes, packInstallState, startPackInstall } from './pack-installer.js';
-import { cancelModelInstall, downloadPlan, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, upscaleTargets, uploadUpscaleVideoSource } from './upscale.js';
+import { cancelModelInstall, installState, managerAvailable, managerInfo, nodeInstallPlan, normalizeQuality, startModelInstall, upscalePlan, upscaleQualities, upscaleStatus, uploadUpscaleVideoSource } from './upscale.js';
 import { findUpscaleTarget, startUpscale, toggleUpscaleView } from './upscale-jobs.js';
-import { autoDetectOutputDir, detectOutputDirs, inspectOutputDir, outputDirChoice, pickFolder } from './output-folder.js';
+import { autoDetectOutputDir, pickFolder } from './output-folder.js';
 import { compressJson, serveApp } from './http-assets.js';
 import { diagnostics, diagnosticsText } from './diagnostics.js';
 import { isMediaUrl, mediaStorageEnabled, mediaType } from './media-paths.js';
@@ -289,81 +288,6 @@ registerMultiUserAuthRoutes(app, {
   cloudProfiles: async () => (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id)
 });
 
-function openFolder(folder) {
-  if (process.platform === "win32") return execFile("explorer.exe", [folder]);
-  if (process.platform === "darwin") return execFile("open", [folder]);
-  return execFile("xdg-open", [folder]);
-}
-
-
-app.get("/api/network", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  // Named, so a VPN or Docker adapter is not mistaken for the Wi-Fi address.
-  const interfaces = Object.entries(os.networkInterfaces()).flatMap(([name, entries]) => (entries || [])
-    .filter((entry) => entry.family === "IPv4" && !entry.internal)
-    .map((entry) => ({ name, address: entry.address, likelyVirtual: /^(docker|br-|veth|vbox|vmnet|utun|tun|tap|wg|zt|tailscale)/i.test(name) })));
-  interfaces.sort((a, b) => Number(a.likelyVirtual) - Number(b.likelyVirtual));
-  // Only a server listening beyond this computer can be opened from a phone.
-  res.json({
-    addresses: interfaces.map((item) => item.address), interfaces, port, listening: lanListening,
-    // saved: what the next start does. source: who decides it now (flag and shell outrank the switch).
-    lan: { saved: lan.saved, source: lan.source },
-    // HTTPS for other devices (tls.js). `next`: what .env says now, used from the next start.
-    tls: networkTls(clientOf(req).thisComputer)
-  });
-});
-
-// HTTPS set in the shell outranks Settings, like HOST does.
-const tlsFromShell = ["STUDIO_TLS_CERT", "STUDIO_TLS_KEY"].some((name) => process.env[name] && !envFileKeys.has(name));
-
-/** HTTPS as it runs, and as .env has it for the next start. File paths only for this computer. */
-function networkTls(thisComputer) {
-  const hidePaths = (summary) => (thisComputer ? summary : { ...summary, certPath: "", keyPath: "" });
-  const next = inspectTls(process.env.STUDIO_TLS_CERT || "", process.env.STUDIO_TLS_KEY || "");
-  return { ...hidePaths(tlsSummary(startupTls, { active: httpsListening })), problem: httpsProblem, next: hidePaths(tlsSummary(next)), fromShell: tlsFromShell };
-}
-
-/**
- * Settings › Connection › HTTPS: check a certificate and key and keep them in
- * .env, or clear them. Used from the next start. Only this computer can,
- * since it decides how every other device connects.
- */
-app.post("/api/network/tls", (req, res) => {
-  if (!requireThisComputer(req, res)) return;
-  if (tlsFromShell) {
-    res.status(409).json({ ok: false, error: "HTTPS is set with STUDIO_TLS_CERT and STUDIO_TLS_KEY where Studio starts. Change it there." });
-    return;
-  }
-  const off = !req.body?.cert && !req.body?.key;
-  const report = off ? null : inspectTls(String(req.body?.cert || ""), String(req.body?.key || ""));
-  if (report && !report.ok) {
-    res.status(400).json({ ok: false, error: report.error, tls: tlsSummary(report) });
-    return;
-  }
-  try {
-    writeLocalEnvValue("STUDIO_TLS_CERT", report ? report.certPath : "");
-    writeLocalEnvValue("STUDIO_TLS_KEY", report ? report.keyPath : "");
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-    return;
-  }
-  res.json({ ok: true, tls: report ? tlsSummary(report) : null, restartNeeded: true });
-});
-
-// The Settings switch for other devices. It takes effect when Studio starts again.
-app.post("/api/network/lan", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const enabled = Boolean(req.body?.enabled);
-  try {
-    saveLanSetting(enabled);
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-    return;
-  }
-  res.json({ ok: true, saved: enabled, restartNeeded: lan.source === "setting" && enabled !== lanListening });
-});
-
-
 const appVersion = (() => {
   try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
 })();
@@ -495,18 +419,6 @@ function beginSession() {
   if (previousExit) logWarning("The last run stopped unexpectedly", { who: previousExit.who, reason: previousExit.reason, code: previousExit.code, signal: previousExit.signal });
   setInterval(() => noteAlive(), 60_000).unref();
 }
-
-// The latest lines of today's log (crash-log.js), for the crash kit and bug reports. This computer only.
-app.get("/api/logs", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  const lines = Math.max(1, Math.min(500, Number(req.query.lines || 100)));
-  try {
-    const text = fs.readFileSync(path.join(logDir, `studio-${new Date().toISOString().slice(0, 10)}.log`), "utf8");
-    res.type("text/plain").send(text.trimEnd().split("\n").slice(-lines).join("\n"));
-  } catch {
-    res.type("text/plain").send("");
-  }
-});
 
 app.get("/api/health", async (req, res) => {
   // No workers at all is a setup Studio runs in: it says so plainly instead of naming an address.
@@ -865,52 +777,6 @@ app.get("/api/paths", async (req, res) => {
   if (req.studioAccount && req.studioAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });
   await autoDetectOutputDir();
   res.json({ outputDir: comfyOutputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir });
-});
-
-app.post("/api/config/output-dir", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    // Only a folder ComfyUI writes to: Studio serves and clears what is in it.
-    const choice = await outputDirChoice(req.body?.outputDir || "");
-    if (!choice.ok) {
-      res.status(400).json({ ok: false, error: choice.error, report: choice.report });
-      return;
-    }
-    const outputDir = setComfyOutputDir(choice.dir);
-    res.json({ ok: true, outputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir, report: await inspectOutputDir(outputDir) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.get("/api/output-dir", async (req, res) => {
-  if (!requireLocal(req, res)) return;
-  await autoDetectOutputDir();
-  res.json({ outputDir: comfyOutputDir, report: await inspectOutputDir(comfyOutputDir), canBrowse: clientOf(req).thisComputer });
-});
-
-app.post("/api/output-dir/check", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json(await inspectOutputDir(req.body?.outputDir || ""));
-});
-
-app.get("/api/output-dir/detect", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ candidates: await detectOutputDirs() });
-});
-
-app.post("/api/output-dir/browse", async (req, res) => {
-  // The picker opens on this machine's screen, so only its own browser may ask.
-  if (!clientOf(req).thisComputer) {
-    res.status(403).json({ ok: false, error: "The folder picker only opens on the computer running Studio." });
-    return;
-  }
-  try {
-    const picked = await pickFolder(req.body?.start || comfyOutputDir);
-    res.json(picked ? { ok: true, path: picked, report: await inspectOutputDir(picked) } : { ok: true, canceled: true });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
 });
 
 /** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
@@ -1298,37 +1164,6 @@ async function probeComfy(candidate) {
   }
 }
 
-/**
- * Where Studio looks for ComfyUI (the default worker). Testing tries an
- * address without saving; saving keeps it with Studio's workers and takes
- * effect at once. Other workers are edited in Settings › Workers.
- */
-app.post("/api/comfy-url", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  // A deployment-owned address would come back at the next start; it is changed there, not here.
-  if (req.body?.save && defaultWorker()?.locked) {
-    res.status(409).json({ ok: false, reason: "locked", error: "This address comes from the deployment configuration. Change it there." });
-    return;
-  }
-  const candidate = normalizeComfyUrl(req.body?.url);
-  if (!candidate) {
-    res.status(400).json({ ok: false, error: "That doesn’t look like an address. Try something like 127.0.0.1:8188." });
-    return;
-  }
-  const { reachable, detail } = await probeComfy(candidate);
-  if (req.body?.save && reachable) {
-    try {
-      const before = defaultWorkerId();
-      setComfyUrl(candidate);
-      forgetWorker(before);
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-      return;
-    }
-  }
-  res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: comfyUrl });
-});
-
 // Settings › Workers: the list, saving it and testing an address (worker-routes.js).
 registerWorkerRoutes(app, { probe: probeComfy, forget: forgetWorker, refresh: refreshComfyContextSoon });
 
@@ -1381,18 +1216,6 @@ app.post("/api/settings/deployment", (req, res) => {
   } catch (error) {
     res.status(error.message.includes("deployment configuration") ? 409 : 400).json({ ok: false, error: error.message });
   }
-});
-
-/** The Settings switch for looking on the usual ports when the saved address doesn't answer. */
-app.post("/api/comfy-search", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    writeLocalEnvValue("STUDIO_COMFY_SEARCH", req.body?.enabled === false ? "0" : "1");
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-    return;
-  }
-  res.json({ ok: true, enabled: comfySearchEnabled() });
 });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
@@ -1452,18 +1275,6 @@ app.get("/api/upscale/status", onUpscaleWorker(async (req, res) => {
 app.get("/api/upscale/install", (_req, res) => {
   res.json({ ok: true, install: installState() });
 });
-
-app.post("/api/upscale/install/preview", onUpscaleWorker(async (req, res) => {
-  const info = await upscaleContext(res);
-  if (!info) return;
-  const quality = normalizeQuality(req.body?.quality);
-  const status = upscaleStatus(info, quality);
-  if (!status.nodesInstalled) {
-    res.status(400).json({ ok: false, error: `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}. Install the SeedVR2 VideoUpscaler custom nodes first.` });
-    return;
-  }
-  res.json({ ok: true, ...downloadPlan(quality, info) });
-}));
 
 app.post("/api/upscale/install", onUpscaleWorker(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -1627,19 +1438,6 @@ app.post("/api/queue/cancel", async (req, res) => {
 });
 
 registerGalleryTrashRoutes(app);
-
-app.post("/api/cache/clear", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const ownerId = ownerIdForRequest(req);
-  const promptIds = cancelOwnJobs(ownerId);
-  const kept = gallery.filter((item) => !recordBelongsToRequest(item, req) || item.status === "done").map(({ preview, progress, ...item }) => item);
-  const retainedOwn = new Set(kept.filter((item) => recordBelongsToRequest(item, req)).slice(0, galleryLimit));
-  setGallery(kept.filter((item) => !recordBelongsToRequest(item, req) || retainedOwn.has(item)));
-  saveGallery();
-  await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
-  await freeComfyMemory().catch(() => null);
-  res.json({ ok: true, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
-});
 
 // Unloads models and frees what ComfyUI caches, without touching any run: ComfyUI does it between prompts.
 app.post("/api/comfy/free", async (req, res) => {
@@ -1813,16 +1611,6 @@ app.post("/api/comfy/restart", async (req, res) => {
 });
 
 registerGalleryDeleteRoute(app);
-
-app.post("/api/open-output-folder", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  if (!comfyOutputDir || !fs.existsSync(comfyOutputDir)) {
-    res.status(404).json({ ok: false, error: "Set ComfyUI’s output folder first (Settings › Library)." });
-    return;
-  }
-  openFolder(comfyOutputDir);
-  res.json({ ok: true, outputDir: comfyOutputDir });
-});
 
 app.post("/api/shutdown", (req, res) => {
   if (!requireAdmin(req, res)) return;

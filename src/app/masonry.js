@@ -243,16 +243,3 @@ function levelPair(bottoms, columnCount, sizes, tolerance, maxDrop) {
   }
   return { column: best.target, pulls };
 }
-
-/** Index of the first tile in a column's list whose bottom reaches `y`. */
-export function firstReaching(list, top, height, y) {
-  let low = 0;
-  let high = list.length;
-  while (low < high) {
-    const middle = (low + high) >> 1;
-    const index = list[middle];
-    if (top[index] + height[index] < y) low = middle + 1;
-    else high = middle;
-  }
-  return low;
-}

@@ -37,5 +37,3 @@ export function packMasonry(options: {
   previous?: Map<string, MasonrySlot> | null;
   holding?: boolean;
 }): MasonryLayout;
-
-export function firstReaching(list: number[], top: Float64Array, height: Float64Array, y: number): number;

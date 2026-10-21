@@ -76,7 +76,7 @@ test("existing-image upscale probes zero gallery dimensions and the active sourc
   const comfyUrl = "http://127.0.0.1:" + proxy.address().port;
   let server;
   try {
-    server = fork(path.join(here, "index.js"), [], { cwd: path.join(here, ".."), env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: comfyUrl, STUDIO_DATA_DIR: dataDir, STUDIO_SEEDVR2_MODEL_DIR: modelDir, COMFY_OUTPUT_DIR: "", COMFY_INPUT_DIR: "", STUDIO_NO_BROWSER: "1", STUDIO_LAN: "0", npm_lifecycle_event: "" }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+    server = fork(path.join(here, "index.js"), [], { cwd: path.join(here, ".."), env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: comfyUrl, STUDIO_DATA_DIR: dataDir, STUDIO_SEEDVR2_MODEL_DIR: modelDir, COMFY_OUTPUT_DIR: "", COMFY_INPUT_DIR: "", STUDIO_LAN: "0", npm_lifecycle_event: "" }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
     let errors = ""; server.stderr.on("data", chunk => { errors += chunk; });
     const message = await new Promise((resolve,reject) => { server.once("message", resolve); server.once("exit", code => reject(new Error("Server exited " + code + ": " + errors))); });
     const base = message.url.replace("localhost", "127.0.0.1");

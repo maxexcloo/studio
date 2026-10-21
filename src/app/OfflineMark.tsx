@@ -199,7 +199,7 @@ export function OfflineMark({ className, connectedAt = null }: { className?: str
     },
   });
 
-  if (failed) return <img className="offline-mark-fallback" src="/heiss-mark-black.svg" alt="" aria-hidden="true" />;
+  if (failed) return <img className="offline-mark-fallback" src="/studio-mark-black.svg" alt="" aria-hidden="true" />;
   return (
     <div className={className} style={{ aspectRatio: `${OFFLINE_GRID.width} / ${OFFLINE_GRID.height}` }} aria-hidden="true">
       <canvas ref={canvasRef} />

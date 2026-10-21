@@ -43,10 +43,6 @@ export function wasIngested(jobId) {
 const workerTokenHeader = () => (process.env.STUDIO_WORKER_TOKEN ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN } : {});
 const missingWorker = new Set();
 
-export function comfyFileRef(url) {
-  return comfyRef(url);
-}
-
 function comfyRef(url) {
   const value = String(url || "");
   if (!value.startsWith("/comfy/view?")) return null;

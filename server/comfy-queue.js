@@ -12,11 +12,6 @@ const json = { "content-type": "application/json" };
 /** A queue entry is [number, prompt_id, prompt, extra_data, outputs]; only the id matters here. */
 const idsIn = (list) => (Array.isArray(list) ? list.map((item) => (Array.isArray(item) ? item[1] : item?.prompt_id)).filter(Boolean) : []);
 
-/** Every prompt id in ComfyUI's queue, running or waiting. */
-export function queuedIds(queue) {
-  return [...idsIn(queue?.queue_running), ...idsIn(queue?.queue_pending)];
-}
-
 /** Where a prompt stands in ComfyUI's queue: "running", "pending" or "" when it is in neither. */
 export function queuePlace(queue, promptId) {
   if (idsIn(queue?.queue_running).includes(promptId)) return "running";

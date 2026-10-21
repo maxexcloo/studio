@@ -881,14 +881,6 @@ export function makePendingItems(id, body) {
   }));
 }
 
-export function removeGalleryJob(id, options = {}) {
-  const before = gallery;
-  gallery = gallery.filter((item) => item.jobId !== id);
-  const changes = diffGallery(before, gallery);
-  if (changes.upserts.length || changes.removes.length) bumpRevision(changes);
-  if (options.persist !== false) saveGallery();
-}
-
 export function dedupeGallery(items) {
   const seen = new Set();
   return items.filter((item) => {

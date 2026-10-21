@@ -27,7 +27,7 @@ test("Sign Out ends the browser's session behind a proxy, with single sign-on co
   const child = spawn(process.execPath, ["server/index.js"], {
     env: {
       ...process.env, NODE_TEST_CONTEXT: "", COMFY_URL: "http://127.0.0.1:1", COMFY_VIDEO_URL: "", STUDIO_DATA_DIR: data, STUDIO_ENV_FILE: path.join(data, "env"),
-      STUDIO_DEMO: "1", STUDIO_LAN: "0", STUDIO_NO_BROWSER: "1", HOST: "127.0.0.1", PORT: String(port), STUDIO_ALLOWED_HOSTS: "studio.example",
+      STUDIO_DEMO: "1", STUDIO_LAN: "0", HOST: "127.0.0.1", PORT: String(port), STUDIO_ALLOWED_HOSTS: "studio.example",
       STUDIO_MULTI_USER: "1", STUDIO_SETUP_TOKEN: setupToken,
       STUDIO_OIDC_ISSUER: "https://identity.example", STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example/api/accounts/oidc/callback", STUDIO_OIDC_LABEL: "Pocket ID"
     },

@@ -369,14 +369,6 @@ export type UpscaleStatus = {
   /** Only while the nodes are missing: whether Manager is on, and the terminal route otherwise. */
   nodeSetup?: NodeInstallPlan & { manager: boolean; pack?: NodePackInfo; autoInstall?: PackAutoInstall };
 };
-export type UpscaleDownloadPreview = {
-  quality: UpscaleQuality;
-  modelDir: string;
-  totalBytes: number;
-  remainingBytes: number;
-  freeBytes: number | null;
-  files: Array<{ key: string; file: string; label: string; detail?: string; bytes: number; partialBytes: number }>;
-};
 
 /** A models folder ComfyUI is not reading (server/model-folders.js). */
 export type StrayModelFolder = {

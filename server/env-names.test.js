@@ -34,9 +34,9 @@ test("an old name fills the new one only when the new one is unset", () => {
 
 test("the deprecation notice is one line naming each old and new name", () => {
   assert.equal(legacyEnvNotice([]), "");
-  const notice = legacyEnvNotice(["HEISS_NO_BROWSER", "HEISS_DATA_DIR", "HEISS_DATA_DIR"]);
+  const notice = legacyEnvNotice(["HEISS_TRASH_DAYS", "HEISS_DATA_DIR", "HEISS_DATA_DIR"]);
   assert.doesNotMatch(notice, /\n/);
-  assert.match(notice, /HEISS_DATA_DIR → STUDIO_DATA_DIR, HEISS_NO_BROWSER → STUDIO_NO_BROWSER\.$/);
+  assert.match(notice, /HEISS_DATA_DIR → STUDIO_DATA_DIR, HEISS_TRASH_DAYS → STUDIO_TRASH_DAYS\.$/);
   // An old name beside a different new value (the image's own default, say) is called out, not silently lost.
   const shadowed = shadowedLegacyEnvNames({ HEISS_DATA_DIR: "/elsewhere", STUDIO_DATA_DIR: "/data", HEISS_LAN: "1", STUDIO_LAN: "1" });
   assert.deepEqual(shadowed, ["HEISS_DATA_DIR"]);

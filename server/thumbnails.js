@@ -430,20 +430,3 @@ export async function forgetItemThumbnails(item) {
   }
   return removed;
 }
-
-// Vault assets are decrypted per request and must never leave a plaintext
-// derivative on disk, so this resizes in memory only — nothing is cached.
-export async function resizeInMemory(buffer, mime) {
-  if (!mime?.startsWith("image/") || mime === "image/svg+xml") return null;
-  const sharp = await loadSharp();
-  if (!sharp) return null;
-  try {
-    return await sharp(buffer)
-      .rotate()
-      .resize({ width: longestEdge, height: longestEdge, fit: "inside", withoutEnlargement: true })
-      .webp({ quality })
-      .toBuffer();
-  } catch {
-    return null;
-  }
-}

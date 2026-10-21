@@ -28,7 +28,7 @@ let server;
 let base;
 
 async function start(useVideo = true, enableGrok = true, restrictModels = false) {
-  server = fork(path.join(here, "index.js"), [], { cwd: path.join(here, ".."), env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: primary.url, COMFY_VIDEO_URL: useVideo ? video.url : "", STUDIO_ENABLE_GROK: enableGrok ? "1" : "0", STUDIO_ENABLE_TESSERA: restrictModels ? "0" : "1", STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1", STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_NO_BROWSER: "1", STUDIO_LAN: "0", npm_lifecycle_event: "" }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+  server = fork(path.join(here, "index.js"), [], { cwd: path.join(here, ".."), env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: primary.url, COMFY_VIDEO_URL: useVideo ? video.url : "", STUDIO_ENABLE_GROK: enableGrok ? "1" : "0", STUDIO_ENABLE_TESSERA: restrictModels ? "0" : "1", STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1", STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_LAN: "0", npm_lifecycle_event: "" }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
   let errors = "";
   server.stderr.on("data", (chunk) => { errors += chunk; });
   const message = await new Promise((resolve, reject) => { server.once("message", resolve); server.once("exit", (code) => reject(new Error(`Server exited ${code}: ${errors}`))); });

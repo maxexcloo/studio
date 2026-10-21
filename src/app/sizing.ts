@@ -100,15 +100,6 @@ export function closestPreset(presets: AspectPreset[], size: Size) {
   return best;
 }
 
-/**
- * The shape a preset stands for: its label's ratio where it has one ("16:9"
- * for a 1344×768 preset, which is really 7:4), else its own size's.
- */
-export function presetRatio(preset: AspectPreset) {
-  const match = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(String(preset.label || "").trim());
-  return match && Number(match[2]) > 0 ? Number(match[1]) / Number(match[2]) : preset.w / preset.h;
-}
-
 /** "1344x768" → { width: 1344, height: 768 }. */
 export function parseSize(value: string): Size {
   const [width, height] = String(value || "").split("x").map(Number);

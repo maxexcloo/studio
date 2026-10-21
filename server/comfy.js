@@ -47,15 +47,6 @@ export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
 // Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
 export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
-/**
- * The Settings switch: remembered in .env, used from the next start. A HOST
- * line in .env that would contradict it is rewritten to match.
- */
-export function saveLanSetting(enabled) {
-  writeLocalEnvValue("STUDIO_LAN", enabled ? "1" : "0");
-  if (envFileKeys.has("HOST")) writeLocalEnvValue("HOST", enabled ? "0.0.0.0" : "127.0.0.1");
-  return enabled;
-}
 /** The port asked for (PORT, else 8787). */
 export const requestedPort = Number(process.env.PORT || 8787);
 // A live binding: the server may move to the next free port when this one is taken (see launch.js).

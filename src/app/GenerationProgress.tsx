@@ -74,12 +74,6 @@ export function useRunClock(progress?: Progress | null) {
   return { leftMs, ratio };
 }
 
-/** "12 s left" for a running item, ticking by itself, or nothing without an estimate. */
-export function RunLeft({ progress }: { progress?: Progress | null }) {
-  const { leftMs } = useRunClock(progress);
-  return leftMs === null ? null : <>{formatLeft(leftMs)}</>;
-}
-
 /** The catalogue's profiles, so a running item can name the profile it runs through. */
 export const GenerationProfiles = React.createContext<Profile[]>([]);
 
