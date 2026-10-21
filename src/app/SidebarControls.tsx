@@ -108,10 +108,10 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
         </ListSection>
       ) : null}
       <ListSection title="Sampling">
-        {sampling ? select("Sampler", sampler, samplers, setSampler) : null}
-        {sampling ? select("Scheduler", scheduler, schedulers, setScheduler) : null}
         {/* Distilled profiles run at their own guidance (capabilities.cfg false): no CFG to set. */}
         {currentProfile?.capabilities?.cfg !== false ? stepper("Prompt Strength (CFG)", cfg, setCfg, cfgMeta.min ?? 0, Math.min(cfgMeta.max ?? 30, 30), cfgMeta.step || 0.5, 1) : null}
+        {sampling ? select("Sampler", sampler, samplers, setSampler) : null}
+        {sampling ? select("Scheduler", scheduler, schedulers, setScheduler) : null}
         <ListItem label="Seed">
           {/* Random until a seed is kept: then the number shows, to edit or copy. */}
           {fixedSeed ? <input className="list-field" inputMode="numeric" pattern="[0-9]*" value={seed} aria-label="Seed" onChange={(event) => setSeed(event.target.value.replace(/[^0-9]/g, ""))} /> : null}

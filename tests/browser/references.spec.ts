@@ -207,8 +207,10 @@ test('reference selection stays open, keeps picks in place across searches and t
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'Selected: second.png', exact: true }).click();
   await expectPicked(page, 1, 2);
-  // The query follows the tab; its field takes the tab's name.
-  await picker.getByRole('searchbox', { name: 'Search Uploads', exact: true }).clear();
+  // On the phone the query follows the tab and its field takes the tab's name; on the desktop the
+  // search covers the tabs, so choosing a tab closed it (and cleared the query) first.
+  const uploads = picker.getByRole('searchbox', { name: 'Search Uploads', exact: true });
+  if (await uploads.count()) await uploads.clear();
   await picker.getByRole('button', { name: 'third.png', exact: true }).click();
   await expectPicked(page, 2, 2);
   await page.keyboard.press('Escape');

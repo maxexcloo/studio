@@ -105,7 +105,8 @@ test('phone filter tools stay on screen and yield to create and reference sheets
   const composer = await ui.openComposer();
   await reachable(ui.prompt, true);
   await composer.locator('.ref-add').click();
-  await reachable(await pickerSearch(page.locator('.reference-popover'), 'Search Library', 'searchbox'));
+  // The open field carries its own Close Search at its end.
+  await reachable(await pickerSearch(page.locator('.reference-popover'), 'Search Library', 'searchbox'), true);
   await page.locator('.reference-popover').getByRole('button', { name: 'Close References', exact: true }).click();
   await reachable(composer.getByRole('button', { name: 'Close', exact: true }));
 });
