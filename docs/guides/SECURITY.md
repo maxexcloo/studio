@@ -26,7 +26,7 @@ Studio is built to run on your own machine, for you. By default it answers only 
 - **Node packs** installed with one click come from a reviewed commit of each pack, and their Python requirements can't replace the PyTorch or NumPy ComfyUI runs on. When ComfyUI-Manager refuses an install because of its security level, Studio stops and asks.
 - **Model downloads** only come from Studio's own catalog on Hugging Face, resume only while the remote file is unchanged, and are checked against their published SHA-256.
 - **Workflows** you import can contain custom nodes that run code, read or write any file, or go online; the import review names them. A workflow runs every node in it with ComfyUI's access to your computer, so only import workflows from people you trust.
-- **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or GitHub when you ask it to download or install something, and to upstream HEISS UI’s [feedback board](https://heiss-ui.vercel.app/board/) when you press Send in its dialog (only what the dialog shows). Nothing else.
+- **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or GitHub when you ask it to download or install something and to the Civitai or LiteLLM services an administrator configures. Nothing else.
 
 ## Reporting a vulnerability
 

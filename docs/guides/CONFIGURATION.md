@@ -63,7 +63,7 @@ that answered, in list order (Smart upscale also prefers one with `upscale`).
 It never sends work to a worker without the capability, never falls back to
 the cloud and never changes GPU allocation; switching what a GPU runs stays in
 AI Control's own UI and Mise. The first worker with `image` is the default
-worker: upstream conveniences (the output folder, finding ComfyUI on its own,
+worker: single-worker conveniences (the output folder, finding ComfyUI on its own,
 restart progress) belong to it.
 
 ## Model Manifest

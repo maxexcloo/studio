@@ -416,7 +416,7 @@ holds:
 | Section | Holds | Who |
 | --- | --- | --- |
 | Account | MCP and Profile (name, email, password) | Every account |
-| About | The banner, Version, Changelog, Licence, Source, credits to the upstream projects and stats | Everyone |
+| About | The banner, Version, Changelog, Licence, Source, credits (HEISS UI, J-AI Studio, ComfyUI, Radiance) and stats | Everyone |
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
 | Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
@@ -442,8 +442,8 @@ A new setting goes in the section that matches who changes it and why;
 destructive actions live in Maintenance, never beside everyday switches.
 Every row does something in the running deployment: rows for a local install
 (output folders, finding ComfyUI on its own, the studio password for other
-devices) hide in account mode, and there are no upstream community, feedback
-or donation links. Settings use the flat list (see [Lists](#lists)), dense:
+devices) hide in account mode, and there are no community, feedback or
+donation links. Settings use the flat list (see [Lists](#lists)), dense:
 44 px rows, a one-line description, one heading per group. **Sign Out** is in
 the desktop dock's Account menu and at the top of the phone's More (not in
 Settings); it never asks first, even while something is generating (the runs

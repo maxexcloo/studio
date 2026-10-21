@@ -88,11 +88,11 @@ Between releases a source checkout shows how far it is past its tag in **Setting
 
 ## Found a bug?
 
-[Open an issue](https://github.com/maxexcloo/studio/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot. The in-app feedback links go to upstream's board.
+[Open an issue](https://github.com/maxexcloo/studio/issues). Say what you did, what you expected and what happened. Your ComfyUI version and the model or workflow you used help a lot.
 
-### Fork Integration & Release Gates
+### Ownership & Release Gates
 
-Keep `origin` pointed at `maxexcloo/studio` and `upstream` at `tristmeister/HEISS-UI`. Merge new upstream releases on a dedicated branch from current fork `main`, using a merge for published history. Preserve published commits and tags. Keep the core (model and family detection, graphs, composer, gallery, viewer) close to upstream so merges stay small; fork features (accounts, media storage, MCP, deployment settings) live in separate modules. Upstream's website in `docs/`, desktop launchers, packaged downloads, self-updater and release signing are not carried by this fork: drop those paths when they arrive in a merge. Review external profiles, image/video routing, MCP and picker behaviour before merging; record intentional differences here and update the upstream base in `server/release-identity.json`. Keep each dependency/upstream pass bounded.
+Studio is a hard fork: it no longer merges HEISS UI and owns all of its code, so restructure any part of it when that removes real debt. Keep `origin` pointed at `maxexcloo/studio`; there is no `upstream` remote to follow. Preserve published commits and tags. Keep runtime names on disk (output and media folders, the profile `heissUi` block, job records) until an explicit, reversible migration replaces them, and keep the HEISS UI and J-AI Studio credits and licence notices.
 
 Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, the lockfile and previous tag, an unused numeric tag and the Unreleased notes and their summary line, without fetching, running the test suites, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 

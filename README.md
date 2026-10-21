@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/maxexcloo/studio/releases/latest"><img src="https://img.shields.io/github/v/release/maxexcloo/studio?style=for-the-badge&label=release&labelColor=1a1a1a&color=ff7a3d" alt="The latest release" /></a>
-  <a href="https://github.com/tristmeister/HEISS-UI"><img src="https://img.shields.io/badge/upstream-HEISS%20UI-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Upstream HEISS UI" /></a>
+  <a href="https://github.com/tristmeister/HEISS-UI"><img src="https://img.shields.io/badge/forked%20from-HEISS%20UI-ff7a3d?style=for-the-badge&labelColor=1a1a1a" alt="Forked from HEISS UI" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-444?style=for-the-badge&labelColor=1a1a1a" alt="MIT license" /></a>
 </p>
 
@@ -32,9 +32,9 @@
 
 ---
 
-Studio is the [maxexcloo/studio](https://github.com/maxexcloo/studio) fork of HEISS UI. It's based on upstream [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0) at commit `a0452538d14a74b23e1422e59a9f24b4781f2406`. Fork versions use their own numeric Semantic Versioning, and the upstream base is recorded separately in `server/release-identity.json`.
+Studio is a hard fork of HEISS UI, maintained at [maxexcloo/studio](https://github.com/maxexcloo/studio). It branched from [HEISS UI v0.18.0](https://github.com/tristmeister/HEISS-UI/releases/tag/v0.18.0) (commit `a0452538d14a74b23e1422e59a9f24b4781f2406`, recorded in `server/release-identity.json`) and no longer follows upstream: Studio owns its code, uses its own numeric Semantic Versioning and adds accounts, media storage, MCP and deployment settings.
 
-This fork only ships as a container image, `ghcr.io/maxexcloo/studio`. It leaves out upstream's desktop downloads, double-click launchers and in-app updater, so you update it by deploying a newer image. I merge upstream model, workflow and studio work in regularly, and keep the fork's own features (accounts, media storage, MCP, deployment settings) in separate modules.
+Studio only ships as a container image, `ghcr.io/maxexcloo/studio`. There are no desktop downloads, double-click launchers or in-app updater; you update it by deploying a newer image.
 
 Studio sits on top of the ComfyUI you already run. You get a prompt box, a gallery and the settings that matter for the model you picked. ComfyUI still runs every job and keeps your nodes, models and outputs.
 
@@ -54,8 +54,6 @@ The node graph is for building workflows. Studio is for the everyday loop of pro
 - **Civitai images & model downloads.** Open **Image & Model Library**, choose **Images** and paste an image link. The full image joins your gallery with its settings and model associations; missing supported model and LoRA files download automatically. **Models** accepts Civitai model and Hugging Face file links. The library is off by default; set `STUDIO_ENABLE_PRESETS=1` on the instances that should offer it (see [Configuration](docs/guides/CONFIGURATION.md#civitai-images--downloads)).
 
 Open **LoRAs** in the composer to select effects and adjust their strengths. Drag the selected effects by their grips to change the applied order, or use the Up/Down buttons or arrow keys on a grip. **Info** shows available descriptions, trigger words and source links without fetching extra metadata.
-
-LoRA stacks, live previews, video previews, recent prompts and gallery search are on the [HEISS UI website](https://heiss-ui.vercel.app/#features).
 
 <p align="center">
   <a href="./docs/screenshots/realtime-generation.mp4"><img src="./docs/screenshots/realtime-generation.gif" alt="Two new images resolving live in the gallery, from pixel-mosaic step previews to the finished photograph" width="100%" /></a>
@@ -316,20 +314,16 @@ Everything else (the output folder, other devices, HTTPS, the Hugging Face token
 - **No models showing up?** Make sure ComfyUI is running. On this computer it connects on port 8188 or 8000; anywhere else, set its address in Settings › Workers. New files show once ComfyUI lists them.
 - **Asking for help?** **Settings › Maintenance › Copy Diagnostics** copies versions, system and GPU, without prompts or images. Open a [GitHub issue](https://github.com/maxexcloo/studio/issues) with it.
 
-## Feedback and community
+## Feedback
 
 Found a bug in Studio or want a feature? Open a [GitHub issue](https://github.com/maxexcloo/studio/issues).
 
-For problems that also affect upstream HEISS UI, upstream has a [feedback board](https://heiss-ui.vercel.app/board/) and a [Discord](https://discord.gg/Hf7ysvDeGa).
-
 ## FAQ
-
-The [HEISS UI website FAQ](https://heiss-ui.vercel.app/#faq) answers the common questions.
 
 <details>
 <summary><b>Why "Studio"?</b></summary>
 
-It is a separately delivered fork of HEISS UI, so it has its own name. _Heiß_ is German for hot, hence the steaming cup it keeps.
+It is a hard fork of HEISS UI with its own code and releases, so it has its own name.
 
 </details>
 
@@ -353,7 +347,7 @@ Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 
 ## License
 
-The upstream application retains its [MIT licence](./LICENSE). The original J-AI Studio copyright notice is kept alongside HEISS UI’s.
+Studio keeps the [MIT licence](./LICENSE) it inherited; the HEISS UI and J-AI Studio copyright notices stay in it.
 
 The native MCP modules and importer (`server/mcp*.js`, except independently authored tests) retain the [AGPL-3.0 licence](./server/mcp.LICENSE) of the ported MCP service. Both licence texts are preserved in the source and distributed application.
 

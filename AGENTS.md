@@ -2,20 +2,20 @@
 
 ## Ownership
 
-- This is Studio, a sync-friendly fork of HEISS UI. User-facing text and documentation say Studio, and fork-owned settings use `STUDIO_*`. Upstream's `HEISS_*` settings, internal identifiers, headers, cookies and data paths keep upstream's names; rename new user-facing "HEISS UI" text that arrives in upstream merges.
-- Keep core files (server model and family detection, graphs, composer, gallery, viewer) close to upstream and avoid restructuring them, so upstream model, workflow, graph and UI work merges cleanly.
+- This is Studio, a hard fork of HEISS UI. It no longer syncs upstream: Studio owns all of its code and may restructure any of it, including the core (model and family detection, graphs, composer, gallery, viewer).
+- User-facing text, documentation, settings (`STUDIO_*`), headers, cookies, browser storage and internal identifiers say Studio. Legacy `HEISS_*` settings and the old header, cookie and storage names are read as deprecated aliases only (see `docs/guides/CONFIGURATION.md#renamed-settings`); never write them.
+- Runtime state is authoritative. On-disk names such as the `heiss-ui` output and media folders, `.heiss-trash`, the `heissUi` profile block and `heiss_generation` job records stay until an explicit migration with a backup, dry run, mapping and recovery replaces them. Read new and old names; never move or rename runtime files implicitly.
+- Keep externally used names stable unless aliased: MCP tool names, `/api` routes, the profile file format and result links.
+- Keep the credit and licence notices for HEISS UI and J-AI Studio (MIT) in Settings › About, `LICENSE` and `README.md`, and the AGPL notice for the native MCP modules.
 - Read `docs/guides/UI-PATTERNS.md` before UI work. When a better pattern appears, update it and apply it everywhere the pattern occurs.
-- Exception: Studio owns the phone UI and merges it with the standard UI into one responsive implementation (shared item actions, selection and sheets). Port upstream phone and gallery-action changes by hand instead of merging them.
-- Merge upstream on a dedicated branch from current `main`, then review the differences before merging back.
-- Fork features live in clearly separate modules: accounts, media storage, MCP and deployment settings.
-- Keep upstream documentation layout, workflow filenames and externally defined identifiers to simplify synchronisation.
+- The phone UI and the standard UI are one responsive implementation (shared item actions, selection and sheets).
 - Mise owns local task orchestration; npm installs dependencies and retains commands required by container builds.
 
 ## Delivery
 
-- The container image on GHCR, built and verified by CI, is the only delivery. Do not reintroduce the `docs/` website, desktop launchers, packaged downloads, the self-updater or release signing; drop them when they arrive in an upstream merge.
+- The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
 - A `v*` tag publishes the verified image under its version tags and a GitHub release with notes from `CHANGELOG.md`.
-- Single-user mode may keep working for local development but needs no exact upstream parity.
+- Single-user mode keeps working for local development.
 
 ## Verification
 

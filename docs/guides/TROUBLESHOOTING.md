@@ -99,7 +99,7 @@ A checkpoint that looked all-in-one has no text encoder or VAE built in. From th
 
 ### Generation failed
 
-Anything else. **Show details** on the card has ComfyUI's own message and traceback. Check that the model runs in ComfyUI itself and that the custom nodes it needs are installed. If it works there but not here, [open an issue](https://github.com/tristmeister/HEISS-UI/issues) with the copied report.
+Anything else. **Show details** on the card has ComfyUI's own message and traceback. Check that the model runs in ComfyUI itself and that the custom nodes it needs are installed. If it works there but not here, [open an issue](https://github.com/maxexcloo/studio/issues) with the copied report.
 
 ## Inpainting, upscaling and stacks
 

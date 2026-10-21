@@ -133,7 +133,7 @@ function formatDay(value: string) {
 /** Settings › About credits: the projects Studio is built from and runs on, alphabetically. */
 const credits = [
   { name: 'ComfyUI', link: 'ComfyUI', what: 'Renders every local image and video.', url: 'https://github.com/comfyanonymous/ComfyUI' },
-  { name: 'HEISS UI', link: 'HEISS UI', what: 'Studio is a fork of HEISS UI and merges its model, workflow and studio work.', url: 'https://github.com/tristmeister/HEISS-UI' },
+  { name: 'HEISS UI', link: 'HEISS UI', what: 'Studio is a hard fork of HEISS UI, which built much of its model, workflow and studio foundation.', url: 'https://github.com/tristmeister/HEISS-UI' },
   { name: 'J-AI Studio by Jasper', link: 'J-AI Studio', what: 'HEISS UI started as a fork of J-AI Studio. The prompt-first idea and much of the foundation are his work.', url: 'https://github.com/jasperdevs/J-AI-Studio' },
   { name: 'Radiance', link: 'Radiance', what: 'The fast inference runtime behind the Radiance model profiles.', url: 'https://hub.docker.com/r/stilldeadcode/radiance' }
 ];
