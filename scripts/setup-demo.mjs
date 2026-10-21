@@ -41,7 +41,7 @@ Object.assign(process.env, {
   COMFY_URL: `http://127.0.0.1:${comfyPort}`,
   STUDIO_COMFY_ROOT: comfyRoot,
   COMFY_OUTPUT_DIR: path.join(comfyRoot, "output"),
-  STUDIO_DATA_DIR: path.join(base, "heiss-data")
+  STUDIO_DATA_DIR: path.join(base, "studio-data")
 });
 
 const { nodePacks } = await import("../server/node-packs.js");

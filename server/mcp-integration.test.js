@@ -34,7 +34,7 @@ const loraInfo = {
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
 async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
-  const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
+  const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
   const requests = [];
@@ -545,7 +545,7 @@ test('forwarded identities and native token fallback cannot read, cancel or reus
 });
 
 test('ownership persists across route registration and is not stored as a forwarded user identifier', async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-persist-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-persist-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const first = await fixture(t, { dataDir: dir });
   const owner = 'forwarded-private-owner-fixture';
@@ -730,7 +730,7 @@ test('invalid uploads and unsupported waits are refused without accessing anothe
 
 
 test('deployment prompting packs retain compact discovery, profile modes and reviewed variants', async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-prompting-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-prompting-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'prompting.json');
   fs.writeFileSync(file, JSON.stringify({
@@ -822,7 +822,7 @@ test('explicit status waiting has a bounded deadline and terminal jobs return wi
 });
 
 test('signed links do not expire, preserve the configured public path and cannot cross studio audiences', async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-audience-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-audience-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const f = await fixture(t, { dataDir: dir, environment: { MCP_PUBLIC_URL: 'https://studio.example.test/nested/studio' } });
   const client = await f.client();
@@ -907,7 +907,7 @@ test('identical uploads sharing an upstream asset id preserve access for both up
 
 
 test('the real demo server exposes native MCP on its existing port and accepts immediate generation', { timeout: 15000 }, async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-server-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-server-'));
   const envFile = path.join(dir, '.env');
   fs.writeFileSync(envFile, '');
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -962,7 +962,7 @@ test('Models consumes self-contained profile guidance without a runtime promptin
 });
 
 test('profile-owned prompting overrides a stale compatibility inventory', async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-owned-guide-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-owned-guide-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'fallback.json');
   fs.writeFileSync(file, JSON.stringify({ families: { flux: { image: 'stale-pack' } }, packs: { 'stale-pack': { summary: 'Stale fallback guidance', rules: ['Old guidance'] } } }));
@@ -974,7 +974,7 @@ test('profile-owned prompting overrides a stale compatibility inventory', async 
 });
 
 test('maintained profile guidance reaches the real model API and native MCP without a pack file', { timeout: 15000 }, async t => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-profile-mcp-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-profile-mcp-'));
   const guide = { id: 'owned-api-guide', summary: 'Describe the subject before its motion', rules: ['Preserve the subject identity'], patterns: ['Subject, setting, motion'], example: 'A bird turns its head', sources: ['https://example.test/research'], reviewed_on: '2026-10-16' };
   fs.mkdirSync(path.join(dir, 'workflows'));
   fs.writeFileSync(path.join(dir, '.env'), '');
@@ -1976,7 +1976,7 @@ test('prompt writing falls back to the request when the writer fails, and stays 
 });
 
 test('partial prompt writer settings fail at start by name', () => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-native-mcp-'));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-'));
   try {
     assert.throws(() => registerMcpRoutes(express(), { dataDir, baseUrl: 'http://127.0.0.1:1', environment: { STUDIO_MCP_API_KEY: mediaKey, MCP_PUBLIC_URL: 'https://studio.example.test', STUDIO_PROMPT_WRITER_URL: 'http://fixture-writer.invalid' } }), /needs STUDIO_PROMPT_WRITER_KEY, STUDIO_PROMPT_WRITER_MODEL/);
   } finally { fs.rmSync(dataDir, { recursive: true, force: true }); }

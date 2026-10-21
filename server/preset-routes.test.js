@@ -8,7 +8,7 @@ import test from 'node:test';
 import express from 'express';
 import sharp from 'sharp';
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-routes-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-preset-routes-'));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, '.env');
 process.env.STUDIO_LAN = '0';

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-sizes-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-sizes-"));
 const { cleanSize, loadSavedSizes, saveSavedSizes } = await import("./saved-sizes.js");
 
 test("a saved size needs an id, a name and sides a model could draw", () => {

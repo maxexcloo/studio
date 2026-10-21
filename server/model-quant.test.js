@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 // Point ComfyUI and the data folder at a scratch tree before the modules read them.
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-model-quant-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-quant-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const dirs = Object.fromEntries(["diffusion_models", "checkpoints", "text_encoders", "vae"].map((name) => {

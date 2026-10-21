@@ -21,7 +21,7 @@ videoInfo.CLIPLoader.input.required.clip_name[0] = ["qwen3vl_32b_h3.safetensors"
 videoInfo.VAELoader.input.required.vae_name[0] = ["minimax_h3_video_vae.safetensors", "minimax_h3_audio_vae.safetensors"];
 const primary = await startFakeComfy({ objectInfo: imageInfo });
 const video = await startFakeComfy({ objectInfo: videoInfo });
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-backend-routes-"));
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backend-routes-"));
 fs.mkdirSync(path.join(dataDir, "workflows"));
 fs.writeFileSync(path.join(dataDir, "workflows/grok-video.json"), JSON.stringify({ heissUi: { id: "grok-video", kind: "video", family: "grok", controls: { prompt: { node: "1", input: "prompt" } } }, "1": { class_type: "GrokMedia", inputs: { prompt: "" } } }));
 let server;

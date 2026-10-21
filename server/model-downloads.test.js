@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-downloads-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-downloads-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 fs.mkdirSync(path.join(scratch, "ComfyUI", "models", "vae"), { recursive: true });
 

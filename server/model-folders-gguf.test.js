@@ -6,7 +6,7 @@ import test from "node:test";
 
 // ComfyUI with ComfyUI-GGUF: its unet_gguf kind lists diffusion_models' folders,
 // and a models/unet_gguf folder beside them holds GGUF files ComfyUI can't see.
-const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-gguf-folders-")));
+const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "studio-gguf-folders-")));
 const comfyRoot = path.join(scratch, "ComfyUI");
 const models = path.join(comfyRoot, "models");
 const mk = (...parts) => { const dir = path.join(...parts); fs.mkdirSync(dir, { recursive: true }); return dir; };

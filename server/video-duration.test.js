@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-video-duration-'));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-video-duration-'));
 process.env.STUDIO_DATA_DIR = scratch;
 const { saveCustomWorkflow } = await import('./custom-workflows.js');
 const { inferModels } = await import('./models.js');

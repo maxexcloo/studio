@@ -33,7 +33,7 @@ export function diagnostics({ version = "", install = "", stats = null, comfyBus
   const system = stats?.system || {};
   const devices = Array.isArray(stats?.devices) ? stats.devices : [];
   return {
-    heiss: { version, install },
+    studio: { version, install },
     node: process.versions.node,
     system: { name: systemName({ platform }), platform, arch, memoryBytes: os.totalmem() },
     comfy: stats
@@ -57,9 +57,9 @@ export function diagnostics({ version = "", install = "", stats = null, comfyBus
 
 /** The same facts as lines of text, ready to paste into an issue. */
 export function diagnosticsText(report) {
-  const { heiss, node, system, comfy } = report;
+  const { studio, node, system, comfy } = report;
   const lines = [
-    `Studio ${heiss.version || "(unknown version)"}${heiss.install ? ` (${heiss.install})` : ""}`,
+    `Studio ${studio.version || "(unknown version)"}${studio.install ? ` (${studio.install})` : ""}`,
     `Node.js ${node}`,
     `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`
   ];

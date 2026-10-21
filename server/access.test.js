@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-access-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-access-"));
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.COMFY_URL = "http://127.0.0.1:9";
 // Devices are only ever let in with LAN mode on.

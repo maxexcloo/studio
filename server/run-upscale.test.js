@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-run-upscale-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-upscale-"));
 process.env.STUDIO_SEEDVR2_MODEL_DIR = dir;
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const { modelFiles } = await import("./upscale.js");

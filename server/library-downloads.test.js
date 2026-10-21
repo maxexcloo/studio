@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-library-downloads-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-library-downloads-'));
 process.env.STUDIO_DATA_DIR = path.join(dir, 'data');
 process.env.STUDIO_COMFY_ROOT = dir;
 process.env.STUDIO_ENABLE_PRESETS = '1';

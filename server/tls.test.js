@@ -31,7 +31,7 @@ AwEHoUQDQgAEHp7uHp705/Mb2DwHzo40e69LIuF2ziGvN658O6eXCOX1tusq0GSZ
 -----END EC PRIVATE KEY-----
 `;
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-tls-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-tls-"));
 const write = (name, text) => { const file = path.join(dir, name); fs.writeFileSync(file, text); return file; };
 const certFile = write("studio.crt", cert);
 const keyFile = write("studio.key", key);

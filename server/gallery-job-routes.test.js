@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import express from 'express';
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-gallery-job-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-gallery-job-'));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.COMFY_OUTPUT_DIR = dir;
 const { setGallery } = await import('./gallery-store.js');

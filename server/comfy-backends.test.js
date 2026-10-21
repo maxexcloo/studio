@@ -9,7 +9,7 @@ import { reloadWorkers } from "./workers.js";
 
 const primary = await startFakeComfy();
 const video = await startFakeComfy();
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-backends-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backends-"));
 process.env.COMFY_URL = primary.url;
 process.env.COMFY_VIDEO_URL = video.url;
 process.env.STUDIO_DATA_DIR = temporary;

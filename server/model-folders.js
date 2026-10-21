@@ -191,7 +191,7 @@ export async function comfyModelSetup() {
 function canWrite(file) {
   try {
     if (fs.existsSync(file)) fs.closeSync(fs.openSync(file, "r+"));
-    const probe = path.join(path.dirname(file), `.heiss-write-test-${process.pid}`);
+    const probe = path.join(path.dirname(file), `.studio-write-test-${process.pid}`);
     fs.rmSync(probe, { force: true });
     fs.closeSync(fs.openSync(probe, "wx"));
     fs.rmSync(probe, { force: true });

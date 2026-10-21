@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-profile-editor-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-editor-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.COMFY_URL = "http://127.0.0.1:9";
 const editor = await import("./profile-editor.js");

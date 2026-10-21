@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-hidden-removal-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-hidden-removal-"));
 // The import itself runs the removal once, on this empty folder.
 process.env.STUDIO_DATA_DIR = path.join(temporary, "imported");
 const { flagName, removeHidden } = await import("./hidden-migration.js");

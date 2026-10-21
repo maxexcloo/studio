@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-snapshot-"));
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-snapshot-"));
 process.env.STUDIO_DATA_DIR = dataDir;
 const { pruneSnapshots, snapshotIfNewVersion } = await import("./data-snapshot.js");
 const backups = path.join(dataDir, ".backups");
 const day = 86_400_000;
 
 test("a fresh install has nothing to keep, and only notes its version", () => {
-  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-snapshot-empty-"));
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "studio-snapshot-empty-"));
   assert.equal(snapshotIfNewVersion({ dataDir: empty, version: "0.12.0" }), "");
   assert.equal(fs.readFileSync(path.join(empty, ".version"), "utf8").trim(), "0.12.0");
   assert.equal(fs.existsSync(path.join(empty, ".backups")), false);

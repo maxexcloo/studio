@@ -5,9 +5,9 @@ import path from "node:path";
 import test from "node:test";
 
 // Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
+const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const store = await import("./gallery-store.js");
 const { filterVisibleGallery, flushGallery, galleryDelta, galleryPath, galleryRevisionValue, markGalleryReset, pageGallery, saveGallery, setGallery, updateGalleryJob } = await import("./gallery-store.js");
 const { getThumbnail } = await import("./thumbnails.js");
@@ -183,7 +183,7 @@ test("saving a large gallery is compact, runs in the background and reads back",
 
 test("a save still waiting when the server stops is written before it exits", async () => {
   const child = await import("node:child_process");
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-exit-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-exit-"));
   const script = [
     `const store = await import(${JSON.stringify(new URL("./gallery-store.js", import.meta.url).href)});`,
     "store.setGallery([{ id: 'kept', status: 'done', type: 'image', createdAt: new Date().toISOString() }]);",

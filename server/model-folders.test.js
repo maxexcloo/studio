@@ -6,7 +6,7 @@ import test from "node:test";
 
 // A ComfyUI of our own, a home with a shared models folder in it, and ComfyUI's API answered by hand.
 // .native, like Studio: Windows temp paths can be 8.3 short names (RUNNER~1).
-const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-model-folders-")));
+const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-folders-")));
 const comfyRoot = path.join(scratch, "ComfyUI");
 const home = path.join(scratch, "home");
 const shared = path.join(home, "AI", "ComfyUI-Shared", "models");

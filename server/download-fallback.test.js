@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-download-fallback-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-download-fallback-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 fs.mkdirSync(path.join(scratch, "ComfyUI", "models", "text_encoders"), { recursive: true });
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));

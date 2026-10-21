@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-video-i2v-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-i2v-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const dirs = Object.fromEntries(["diffusion_models", "text_encoders", "vae", "clip_vision"].map((name) => {

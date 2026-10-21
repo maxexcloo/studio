@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-trash-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-trash-"));
 const outputDir = path.join(temporary, "ComfyUI", "output");
 fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");

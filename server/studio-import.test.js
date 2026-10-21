@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { accountMediaSubfolder, applyStudioImport, findAccount, planStudioImport, summarizePlan, undoStudioImport } from "./studio-import.js";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-studio-import-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-studio-import-"));
 test.after(() => fs.rmSync(root, { recursive: true, force: true }));
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value)); };
 const tree = (dir) => fs.readdirSync(dir, { recursive: true }).filter((name) => fs.statSync(path.join(dir, name)).isFile()).sort()

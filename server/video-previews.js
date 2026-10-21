@@ -227,7 +227,7 @@ export async function forgetItemVideoPreviews(item) {
   if (item?.type !== 'video' || !item.url) return 0;
   let identity;
   try {
-    const url = new URL(item.url, 'http://heiss.local');
+    const url = new URL(item.url, 'http://studio.local');
     if (url.pathname === '/comfy/view') identity = comfySource(url.searchParams.get('filename') || '', url.searchParams.get('subfolder') || '', url.searchParams.get('type') || 'output');
     if (url.pathname === '/api/library/file') identity = `library:${url.searchParams.get('folder')}:${url.searchParams.get('path')}`;
   } catch { return 0; }

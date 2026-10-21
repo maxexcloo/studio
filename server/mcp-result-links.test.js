@@ -7,7 +7,7 @@ import test from "node:test";
 import { McpMedia } from "./mcp-media.js";
 
 test("result links are sealed, reveal no account or job, and earlier signed links still open", (t) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-result-links-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-result-links-"));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const media = new McpMedia({ dataDir, baseUrl: "http://127.0.0.1:1", publicUrl: "https://studio.example.test", signingKey: "fixture-signing-key" });
   media.state.jobs["job-secret-42"] = "account-private-7";
@@ -30,7 +30,7 @@ test("result links are sealed, reveal no account or job, and earlier signed link
 });
 
 test("a failed job's result says what went wrong, a Radiance LoRA refusal word for word", async (t) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-result-failure-"));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-result-failure-"));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const media = new McpMedia({ dataDir, baseUrl: "http://127.0.0.1:1", publicUrl: "https://studio.example.test", signingKey: "fixture-signing-key" });
   media.state.jobs["job-lora-1"] = "account-7";

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 // Settings writes the token into .env; this test gives it a .env of its own.
-const folder = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-env-"));
+const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
 const envFile = path.join(folder, ".env");
 const saved = "hf_savedsavedsavedsaved1234";
 const older = "hf_olderolderolderolder5678";

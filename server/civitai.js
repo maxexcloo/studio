@@ -181,7 +181,7 @@ function hashesFor(body) {
 
 function outputFile(output) {
   try {
-    const params = new URL(String(output?.url || ""), "http://heiss.local").searchParams;
+    const params = new URL(String(output?.url || ""), "http://studio.local").searchParams;
     return localOutputFile(params.get("filename") || "", params.get("subfolder") || "", params.get("type") || "output");
   } catch {
     return null;

@@ -24,7 +24,7 @@ test("folder input tolerates quotes, file URLs and ~", () => {
 });
 
 test("inspection tells the right output folder from a merely existing one", async () => {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
   const right = path.join(base, "ComfyUI", "output");
   const wrong = path.join(base, "elsewhere");
   fs.mkdirSync(path.join(right, "video"), { recursive: true });
@@ -51,7 +51,7 @@ test("inspection tells the right output folder from a merely existing one", asyn
 
 test("only a folder ComfyUI writes to can become the output folder", async () => {
   const { outputDirChoice } = await import("./output-folder.js");
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-choice-"));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "studio-choice-"));
   const comfyOutput = path.join(base, "ComfyUI", "output");
   const empty = path.join(base, "ComfyUI", "output-empty-sibling");
   const random = path.join(base, "Documents");

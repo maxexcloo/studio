@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-deployment-settings-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-deployment-settings-"));
 const envFile = path.join(temporary, ".env");
 fs.writeFileSync(envFile, "STUDIO_ENABLE_LORAS=0\n");
 process.env.STUDIO_ENV_FILE = envFile;

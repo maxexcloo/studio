@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-account-export-'));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-account-export-'));
 const output = path.join(temporary, 'output');
 process.env.STUDIO_DATA_DIR = path.join(temporary, 'data');
 process.env.COMFY_OUTPUT_DIR = output;

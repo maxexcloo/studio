@@ -13,7 +13,7 @@ export const legacyEnvInUse = applyLegacyEnvNames(process.env);
 // `node --test` (NODE_TEST_CONTEXT) the developer's own .env is never read or
 // written: a test would otherwise see their ComfyUI, or save over their settings.
 const envPath = process.env.STUDIO_ENV_FILE ? path.resolve(process.env.STUDIO_ENV_FILE)
-  : process.env.NODE_TEST_CONTEXT ? path.join(os.tmpdir(), `heiss-test-env-${process.pid}`)
+  : process.env.NODE_TEST_CONTEXT ? path.join(os.tmpdir(), `studio-test-env-${process.pid}`)
   : path.join(root, ".env");
 
 /** Keys that came from .env rather than the shell, so a setting knows it may rewrite them. */

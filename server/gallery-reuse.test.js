@@ -7,9 +7,9 @@ import path from "node:path";
 import test from "node:test";
 
 // Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
+const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const { galleryDelta, galleryRevisionValue, hideGalleryItems, makePendingItems, pageGallery, replaceGalleryJob, setGallery } = await import("./gallery-store.js");
 
 const url = (filename) => `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "output" })}`;

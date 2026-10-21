@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 // Each test file runs in its own process, so this output folder stays here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-"));
+const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 fs.mkdirSync(path.join(outputDir, "run"), { recursive: true });
 fs.writeFileSync(path.join(outputDir, "run", "a.png"), "png");
 fs.writeFileSync(path.join(path.dirname(outputDir), "outside.png"), "secret");
@@ -33,7 +33,7 @@ test("only media, never through a symlink out of the folder or from the trash", 
   fs.mkdirSync(path.join(outputDir, ".heiss-trash", "b1"), { recursive: true });
   fs.writeFileSync(path.join(outputDir, ".heiss-trash", "b1", "gone.png"), "png");
   assert.equal(localOutputFile("gone.png", ".heiss-trash/b1", "output"), null);
-  const secretDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-secret-"));
+  const secretDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-secret-"));
   fs.writeFileSync(path.join(secretDir, "private.png"), "not yours");
   try {
     fs.symlinkSync(secretDir, path.join(outputDir, "linked"), "dir");

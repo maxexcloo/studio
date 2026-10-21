@@ -16,7 +16,7 @@ const freePort = () => new Promise((resolve) => { const server = net.createServe
 
 test("capitalised API paths reach no handler, with or without accounts", { timeout: 60_000 }, async (t) => {
   for (const multiUser of ["1", ""]) {
-    const data = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-path-case-"));
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-path-case-"));
     const port = await freePort();
     const child = spawn(process.execPath, ["server/index.js"], {
       env: { ...process.env, NODE_TEST_CONTEXT: "", COMFY_URL: "http://127.0.0.1:1", COMFY_VIDEO_URL: "", STUDIO_DATA_DIR: data, STUDIO_ENV_FILE: path.join(data, ".env"), STUDIO_DEMO: "1", STUDIO_LAN: "0", HOST: "127.0.0.1", PORT: String(port), STUDIO_MULTI_USER: multiUser },

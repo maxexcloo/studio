@@ -11,7 +11,7 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 // placeholder becomes the finished item.
 const fake = await startFakeComfy();
 process.env.COMFY_URL = fake.url;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-run-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
 process.env.COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery-store.js");

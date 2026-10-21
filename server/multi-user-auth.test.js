@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-multi-user-auth-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-multi-user-auth-"));
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MULTI_USER = "1";
 process.env.COMFY_URL = "http://127.0.0.1:9";

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { readJsonFile, removeJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from "./json-store.js";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-json-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("writes land whole and keep the previous copy as a backup", () => {

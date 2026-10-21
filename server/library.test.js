@@ -6,9 +6,9 @@ import test from "node:test";
 import sharp from "sharp";
 
 // Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-output-")));
-const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-")));
-const earlier = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-earlier-")));
+const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-")));
+const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
+const earlier = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-earlier-")));
 process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = dataDir;
 const store = await import("./gallery-store.js");

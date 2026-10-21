@@ -80,7 +80,7 @@ test('Generate LoRA names resolve without folder, extension or case and take the
 
 test('Result waits are capped below LibreChat’s 1800-second background deadline', async (t) => {
   assert.equal(maxResultWaitSeconds, 1500);
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-mcp-wait-'));
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-mcp-wait-'));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const media = new McpMedia({ dataDir, baseUrl: 'http://127.0.0.1:1', publicUrl: 'https://studio.example.test' });
   let waited;

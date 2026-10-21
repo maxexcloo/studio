@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-manifest-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-manifest-"));
 process.env.STUDIO_DATA_DIR = path.join(root, "data");
 process.env.STUDIO_COMFY_ROOT = path.join(root, "comfy");
 process.env.STUDIO_MODEL_MANIFEST_PREFIX = "models/comfyui/";

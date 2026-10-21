@@ -52,7 +52,7 @@ test('filename-only LoRAs retain strengths, deduplicate and match local files ex
   assert.equal(preset.resources[1].weight, 0.35);
   assert.equal(preset.resources[1].nameOnly, true);
   assert.equal(preset.resources[1].supported, false);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-named-lora-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-named-lora-'));
   try {
     fs.writeFileSync(path.join(dir, 'style.safetensors'), bytes);
     const matched = await matchResources(preset, { loras: ['style.safetensors'] }, { foldersFor: () => [dir] });
@@ -92,7 +92,7 @@ test('model downloads require safe formats, supported resource types and full ch
 });
 
 test('installed resources are identified by checksum, including renamed weights', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-hashes-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-preset-hashes-'));
   try {
     fs.writeFileSync(path.join(dir, 'renamed.safetensors'), bytes);
     fs.writeFileSync(path.join(dir, 'style.safetensors'), 'wrong');
@@ -110,7 +110,7 @@ test('installed resources are identified by checksum, including renamed weights'
 });
 
 test('the quick match never reads a model, and a worked-out checksum outlives a restart', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-preset-quick-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-preset-quick-'));
   try {
     fs.writeFileSync(path.join(dir, 'style.safetensors'), bytes);
     const preset = { resources: [versionResource(version)] };

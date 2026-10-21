@@ -8,7 +8,7 @@ import zlib from "node:zlib";
 import { compressJson, serveApp } from "./http-assets.js";
 import { precompressDir } from "../scripts/precompress.mjs";
 
-const dist = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-dist-"));
+const dist = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dist-"));
 const script = `console.log(${JSON.stringify("heiss ".repeat(2000))});`;
 fs.mkdirSync(path.join(dist, "assets"));
 fs.writeFileSync(path.join(dist, "index.html"), `<!doctype html><title>Studio</title>${"<!-- page -->".repeat(200)}`);

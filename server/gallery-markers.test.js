@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-markers-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-markers-"));
 const dataDir = path.join(temporary, "data");
 fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
 process.env.STUDIO_DATA_DIR = dataDir;

@@ -6,7 +6,7 @@ import test from "node:test";
 import { compareGalleryItems, galleryBucket, sortGalleryItems } from "./gallery-order.js";
 import { groupGallery } from "../src/app/runs.js";
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-gallery-order-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
 process.env.COMFY_OUTPUT_DIR = "";
 const { pageGallery, setGallery, sortGallery } = await import("./gallery-store.js");

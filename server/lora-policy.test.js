@@ -57,7 +57,7 @@ test('local and provider policy enrichment retains explicit constraints without 
 
 
 test('packaged server catalogue imports and applies policy without a source tree', async () => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-packaged-lora-policy-'));
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-packaged-lora-policy-'));
   try {
     fs.mkdirSync(path.join(scratch, 'server'));
     fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({ type: 'module' }));

@@ -6,7 +6,7 @@ import test from "node:test";
 import sharp from "sharp";
 import { parseA1111Parameters, readPngInfo, withPngText } from "./png-text.js";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-png-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-png-"));
 const png = await sharp({ create: { width: 6, height: 4, channels: 3, background: "#c33" } }).png().toBuffer();
 
 test("text chunks are written before IEND and read back, Latin-1 and not", async () => {

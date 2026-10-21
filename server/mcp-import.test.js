@@ -11,7 +11,7 @@ import { McpMedia } from './mcp-media.js';
 const environment = { STUDIO_MCP_API_KEY: 'test-provider-key', MCP_SIGNING_KEY: 'test-signing-key' };
 const options = { skip: !mcpImportSupported() };
 async function fixture(t, rows) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-mcp-import-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-mcp-import-'));
   const database = path.join(root, 'jobs.sqlite');
   const dataDir = path.join(root, 'studio');
   const { DatabaseSync } = await import('node:sqlite');

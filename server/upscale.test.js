@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-seedvr2-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-seedvr2-"));
 process.env.STUDIO_SEEDVR2_MODEL_DIR = dir;
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const { faceDetailSource, installState, modelFiles, startModelInstall, upscaleGraph, upscalePlan, upscaleStatus } = await import("./upscale.js");
@@ -141,7 +141,7 @@ test("a download that fails its checksum is thrown away, not installed", async (
 
 test("the terminal install uses ComfyUI's own folder and Python when it can see them", async () => {
   const { nodeInstallPlan } = await import("./upscale.js");
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-comfy-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-comfy-"));
   fs.mkdirSync(path.join(root, "custom_nodes"));
   fs.mkdirSync(path.join(root, ".venv", "bin"), { recursive: true });
   fs.writeFileSync(path.join(root, ".venv", "bin", "python"), "");

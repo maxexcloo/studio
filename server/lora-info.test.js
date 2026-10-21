@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-lora-info-"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-info-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const loraDir = path.join(scratch, "ComfyUI", "models", "loras");

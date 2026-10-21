@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import express from 'express';
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-video-previews-test-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-video-previews-test-'));
 process.env.STUDIO_DATA_DIR = path.join(dir, 'data');
 const previews = await import('./video-previews.js');
 let encoder;

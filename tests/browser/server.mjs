@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const data = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-browser-'));
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-browser-'));
 const child = fork('server/index.js', [], {
   // An unreachable backend and a fresh env file keep the suite independent of local ComfyUI and secrets.
   env: {

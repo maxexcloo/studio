@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-loras-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-loras-"));
 process.env.STUDIO_DATA_DIR = dir;
 const { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary } = await import("./lora-stacks.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-workflow-modes-'));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-workflow-modes-'));
 process.env.STUDIO_DATA_DIR = scratch;
 process.env.STUDIO_ENABLE_BUILTIN_PROFILES = '0';
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));

@@ -132,7 +132,7 @@ async function installLocally(state, pack) {
     state.step = "Downloading the nodes";
     // A pack inside a bigger repository is checked out outside custom_nodes (ComfyUI
     // would try to import the whole checkout), and only its own folder is copied in.
-    const checkoutDir = pack.subdir ? fs.mkdtempSync(path.join(os.tmpdir(), "heiss-pack-")) : target;
+    const checkoutDir = pack.subdir ? fs.mkdtempSync(path.join(os.tmpdir(), "studio-pack-")) : target;
     const checkoutTarget = pack.subdir ? path.join(checkoutDir, "repo") : target;
     try {
       // Exactly the reviewed commit, never whatever the branch says today.
@@ -167,7 +167,7 @@ async function installLocally(state, pack) {
     } catch {
       throw new Error("Couldn’t check ComfyUI’s PyTorch version, so the pack’s packages weren’t installed. Use the terminal steps instead.");
     }
-    const constraints = path.join(os.tmpdir(), `heiss-constraints-${crypto.randomUUID()}.txt`);
+    const constraints = path.join(os.tmpdir(), `studio-constraints-${crypto.randomUUID()}.txt`);
     fs.writeFileSync(constraints, `${constraintsFrom(freeze)}\n`);
     state.step = "Installing what they need";
     try {
@@ -190,14 +190,14 @@ function managerRefused(error) {
 const securityWords = /security|not allowed|forbidden|\b403\b|permission/i;
 
 async function installWithManager(state, pack) {
-  const uiId = `heiss-${crypto.randomUUID()}`;
+  const uiId = `studio-${crypto.randomUUID()}`;
   state.step = "Queued in ComfyUI-Manager";
   try {
     await comfy("/v2/manager/queue/task", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ui_id: uiId, client_id: "heiss-ui", kind: "install",
+        ui_id: uiId, client_id: "studio", kind: "install",
         params: { id: pack.manager, version: "latest", selected_version: "latest", mode: "remote", channel: "default" }
       })
     });
@@ -233,7 +233,7 @@ async function installWithManager3(state, pack) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ui_id: `heiss-${crypto.randomUUID()}`, id: pack.manager, version: "latest", selected_version: "latest",
+        ui_id: `studio-${crypto.randomUUID()}`, id: pack.manager, version: "latest", selected_version: "latest",
         mode: "remote", channel: "default", skip_post_install: false
       })
     });

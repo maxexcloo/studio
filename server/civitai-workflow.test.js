@@ -111,7 +111,7 @@ test('generation associations remain available when REST metadata has no resourc
 test('extensionless names match local LoRAs and split model parts retain exact hash associations', async () => {
   assert.equal(sameResourceFilename('folder\\style_slider', 'style_slider.safetensors'), true);
   assert.equal(sameResourceFilename('model.safetensors', 'model.gguf'), false);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-import-parts-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-import-parts-'));
   const bytes = Buffer.from('public fixture weights');
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
   try {

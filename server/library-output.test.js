@@ -5,11 +5,11 @@ import path from "node:path";
 import test from "node:test";
 
 // A folder of earlier images with ComfyUI's output folder inside it.
-const parent = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-library-parent-")));
+const parent = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-parent-")));
 const outputDir = path.join(parent, "output");
 fs.mkdirSync(outputDir);
 process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-data-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 test.after(() => {
   fs.rmSync(parent, { recursive: true, force: true });
   fs.rmSync(process.env.STUDIO_DATA_DIR, { recursive: true, force: true });

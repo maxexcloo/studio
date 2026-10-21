@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'heiss-provider-controls-'));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-provider-controls-'));
 process.env.STUDIO_DATA_DIR = scratch;
 const { saveCustomWorkflow } = await import('./custom-workflows.js');
 const { inferModels } = await import('./models.js');

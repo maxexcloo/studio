@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-thumbs-"));
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumbs-"));
 const { getFileThumbnail, sweepThumbnails } = await import("./thumbnails.js");
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-thumb-cache-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumb-cache-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const hour = 60 * 60 * 1000;
@@ -49,7 +49,7 @@ test("a cache under its cap, or none at all, is left alone", async () => {
 
 test("a library image's thumbnail served from the cache counts as in use", async () => {
   const sharp = (await import("sharp")).default;
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-library-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-"));
   const photo = path.join(folder, "photo.png");
   await sharp({ create: { width: 16, height: 16, channels: 3, background: "#c33" } }).png().toFile(photo);
   const built = await getFileThumbnail(photo);

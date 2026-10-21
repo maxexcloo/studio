@@ -13,7 +13,7 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 // Real native routes and staging, with PNG bytes behind a stand-in ComfyUI.
 test("existing-image upscale probes zero gallery dimensions and the active source", { timeout: 30000 }, async () => {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-upscale-source-"));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-upscale-source-"));
   const dataDir = path.join(temporary, "data");
   const modelDir = path.join(temporary, "models");
   fs.mkdirSync(dataDir); fs.mkdirSync(modelDir);

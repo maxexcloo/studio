@@ -15,7 +15,7 @@ const objectInfo = JSON.parse(fs.readFileSync(path.join(here, "fixtures", snapsh
 objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 
 const fake = await startFakeComfy({ objectInfo });
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-routes-"));
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-routes-"));
 let server;
 let base = "";
 
@@ -127,7 +127,7 @@ test("a generate request with no prompt is refused plainly", async () => {
 });
 
 test("clearing the gallery leaves images shown from another folder where they are", async () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-routes-library-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-routes-library-"));
   try {
     fs.writeFileSync(path.join(folder, "earlier.png"), "not really a png");
     const added = await api("/api/library/folders", { method: "POST", body: { path: folder } });
