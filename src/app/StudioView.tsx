@@ -69,6 +69,7 @@ import { canStar, emptySearch, FavoriteContext, searchActive, type GallerySearch
 import { refreshPrompts, usePromptHistory } from './recentPrompts';
 import type { GalleryItem } from './types';
 import { memoLatest } from '@/lib/memo-latest';
+import { useGalleryTopAnchor } from './useGalleryTopAnchor';
 
 // App rebuilds every prop on each render (a keystroke in the prompt, a poll);
 // these skip re-rendering unless their data actually changed.
@@ -359,6 +360,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     onView: (item) => openItem(item)
   });
   const [islandsHeight, setIslandsHeight] = React.useState(0);
+  // An activity pill or the filter row joining the top never shoves the tiles on screen.
+  useGalleryTopAnchor(galleryStageRef, !phone);
   const viewerCopy = useCopyFeedback();
   // The catalogue's LoRA titles, asked for once an output with LoRAs opens, so Details names them (UI-PATTERNS › Lists).
   const [loraInfos, setLoraInfos] = React.useState(() => knownLoraInfo());
@@ -455,6 +458,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               focusRun={focusRun}
               onFocused={() => setFocusRun("")}
               followItem={active?.id}
+              onLaidOut={view.restoreGalleryScroll}
               columns={galleryColumnCount}
               spanWide={Boolean(prefs.spanWideImages) && !phone}
               formatElapsed={formatElapsed}

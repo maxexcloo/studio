@@ -389,21 +389,27 @@ function App() {
     setStartImageId(next.id);
     setStartImageName(next.name);
   }, [mode]);
-  // Each mode keeps its own place in the gallery. The grid measures itself
-  // after mount, so the saved position goes back once it has a height to
-  // scroll to (two frames, the second after that measurement has landed).
+  // Each mode keeps its own place in the gallery. The grid puts it back itself
+  // the moment it has laid out (restoreGalleryScroll, before that frame
+  // paints, so the list never shows at the top and then jumps). This is the
+  // fallback for a list with no grid, two frames on.
+  const restoreGalleryScroll = useCallback(() => {
+    const key = pendingScroll.current;
+    if (!key) return;
+    pendingScroll.current = null;
+    galleryStageRef.current?.scrollTo({ top: galleryScroll.current[key] || 0, behavior: "instant" });
+  }, []);
   useEffect(() => {
     if (!galleryLoaded || !pendingScroll.current) return;
     const key = pendingScroll.current;
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
         if (pendingScroll.current !== key) return;
-        pendingScroll.current = null;
-        galleryStageRef.current?.scrollTo({ top: galleryScroll.current[key] || 0, behavior: "instant" });
+        restoreGalleryScroll();
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [galleryLoaded, mode]);
+  }, [galleryLoaded, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const draftPrompt = { current: modePromptsRef.current[mode] };
   useEffect(() => {
     const galleryReferences = savedModeReferences(modeReferencesRef.current);
@@ -1284,7 +1290,7 @@ function App() {
   const modelLoraControls = <StableModelLoraControls view={sidebarView} />;
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { fitViewer, cycleViewerSize, viewerNativeZoom, libraryOpen, setLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, clearFailedItems, resetAllSettings, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, hasMoreGallery, health, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, showDetails, showNegativePrompt, showToast, modelLoraControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, promptRef, dragViewer, endViewerTouch, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { restoreGalleryScroll, fitViewer, cycleViewerSize, viewerNativeZoom, libraryOpen, setLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, clearFailedItems, resetAllSettings, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, hasMoreGallery, health, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, showDetails, showNegativePrompt, showToast, modelLoraControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, promptRef, dragViewer, endViewerTouch, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {

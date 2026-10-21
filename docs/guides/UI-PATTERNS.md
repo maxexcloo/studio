@@ -48,6 +48,17 @@ the pattern occurs in the same piece of work.
 - Gallery column changes keep moving tiles inside the grid horizontally. Clip
   overflow on the virtual spacer without creating another scrolling container,
   so focus and selection cannot pan the gallery or move its toolbar sideways.
+  A resize that keeps the columns moves the tiles with the window at once.
+- **A new list appears in place:** after Images | Videos, a search or a filter,
+  tiles mount where they belong (the grid measures its width before it places
+  any), never gliding from a provisional place, and a mode's saved scroll
+  position is back before the list first paints.
+- **The desktop gallery stays still** while what sits above it changes height:
+  an activity pill joining the top or the filter row opening under the toolbar
+  makes room at the top of the gallery, but once scrolled the scroll moves with
+  it so the tiles on screen don't (`useGalleryTopAnchor.ts`).
+  `desktop-stability.spec.ts` samples every frame in normal, narrow, short and
+  tablet windows.
 - No decorative motion: no hover lifts or nudges, no bouncing rows, no
   staggered entrances, no reorder animation, no sliding highlights, no
   bobbing, wobble or endless glow (real progress and status indicators may
@@ -926,7 +937,8 @@ How the gallery shows, the same three on both devices
 everywhere, only where there are videos) and **Hide Failed & Queued** (one
 toggle that hides failed and not-yet-running outputs), in that order. They are pressed toggles, not settings and not filters, so
 Clear leaves them alone. The desktop gallery toolbar holds them after its
-filters; the phone's filter row ends with them, after a divider and before
+filters and they step aside while selecting (grouping is off while selecting
+anyway), so every selection action fits without being cut off; the phone's filter row ends with them, after a divider and before
 Clear. Stop All, with the running count, sits in the desktop dock and in the
 phone's running menu.
 

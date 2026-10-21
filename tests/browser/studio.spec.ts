@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { studioUi, pickerSearch, pickerView } from './helpers/ui';
 
+/**
+ * Where the gallery rests: its scroll, less the room an activity pill took at
+ * the top. On the desktop a pill joining the top (a generation out of sight)
+ * moves the scroll with it so the tiles on screen stay put (useGalleryTopAnchor.ts).
+ */
+const galleryPlace = (element: Element) => element.scrollTop - (parseFloat(getComputedStyle(document.querySelector('.app-shell, .phone-shell')!).getPropertyValue('--islands-h')) || 0);
+
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Image ${index}`, model: 'flux1-schnell.safetensors', createdAt: new Date(Date.now() - index * 60000).toISOString(), width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '0' } }));
 const videos = images.map((item, index) => ({ ...item, id: `video-${index}`, type: 'video' }));
@@ -337,7 +344,7 @@ test('generation completion stays in its mode and unsupported negatives remain s
     await ui.generate.click();
     await posted;
     expect(body).not.toHaveProperty('negative');
-    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
+    await expect.poll(() => scroller.evaluate(galleryPlace)).toBe(1200);
     await ui.switchMode(kind === 'image' ? 'video' : 'image');
     const completion = page.waitForResponse('**/api/jobs/browser-job');
     done = true;
@@ -950,7 +957,7 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
   const request = page.waitForRequest((request) => request.url().endsWith('/api/generate') && request.method() === 'POST');
   await ui.generate.click();
   await request;
-  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(1200);
+  await expect.poll(() => scroller.evaluate(galleryPlace)).toBe(1200);
   if (await ui.isPhone()) {
     // The phone names a running generation beside its title; its menu's Show Running scrolls back to it.
     const indicator = page.locator('.phone-bar .phone-running-inline');
