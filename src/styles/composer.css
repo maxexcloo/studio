@@ -103,20 +103,16 @@
   background: hsl(0 0% 24%);
 }
 .zen-control-button {
-  position: fixed; bottom: 18px; left: 18px; z-index: 13;
+  position: fixed; z-index: var(--z-dock);
   display: grid; place-items: center;
   cursor: pointer;
   transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 .zen-control-button:hover { border-color: var(--line-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 .zen-prompt {
-  position: fixed; left: 50%; bottom: 18px; z-index: 10;
-  width: min(960px, calc(100vw - 64px));
+  position: fixed; left: 50%; z-index: var(--z-composer);
   min-width: min(540px, calc(100vw - 32px));
   transform: translateX(-50%);
-  display: grid; gap: var(--space-3);
-  padding: 8px 8px 8px 14px;
-  transition: border-color var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease);
 }
 .zen-prompt textarea {
   min-height: 44px;
@@ -130,7 +126,6 @@
   overflow-y: auto;
   font-weight: 400;
 }
-.zen-prompt textarea::placeholder { color: hsl(var(--muted-foreground) / 0.5); }
 .zen-prompt textarea:focus { box-shadow: none; }
 .zen-prompt:focus-within {
   border-color: hsl(0 0% 100% / 0.14);
@@ -156,15 +151,10 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-4);
-  padding: 0;
   border-top: 0;
 }
 .zen-prompt-actions .generate {
   margin-left: 0;
-  flex: 0 0 auto;
-  min-height: 40px;
-  height: 40px;
-  padding: 0 16px;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.005em;
@@ -177,10 +167,7 @@
 }
 .zen-inline-settings {
   display: flex;
-  flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
   min-width: 0;
   overflow: visible;
   scrollbar-width: none;
@@ -205,8 +192,6 @@
 .zen-prompt-actions .aspect-picker > button,
 .zen-prompt-actions .number-picker,
 .zen-prompt-actions .generate {
-  height: 40px;
-  min-height: 40px;
   box-sizing: border-box;
 }
 .zen-inline-settings .number-picker-btn { width: 28px; height: 34px; }
@@ -215,15 +200,11 @@
 .zen-inline-settings .number-picker-input { width: 40px; min-width: 40px; }
 .zen-inline-settings .number-picker-label { padding: 0 4px 0 7px; }
 .lora-pill {
-  height: 40px;
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 10px;
   border: 1px solid var(--glass-border);
-  border-radius: var(--r-pill);
-  background: hsl(var(--input));
   color: hsl(var(--foreground));
   font-size: 12px;
   font-weight: 600;
@@ -328,34 +309,24 @@
   .model-trigger {
     min-height: 44px;
     grid-template-columns: 28px minmax(0, 1fr) auto;
-    gap: 8px;
+    gap: var(--space-4);
   }
   /* Phone placement for the deck lives in 17-deck.css, and the later
      small-screen fixes in 27-mobile.css. */
   .zen-prompt {
-    width: calc(100vw - 16px);
     max-width: none;
     min-width: 0;
     left: 8px;
     right: 8px;
     transform: none;
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    padding: 10px;
-    gap: 8px;
   }
   .zen-prompt textarea { min-height: 44px; max-height: 112px; font-size: 16px; padding-top: 7px; }
   /* The density ladder handles the narrow cases now, so the bar stays a single
      row here too - these rules only tighten the metrics it works within. */
-  .zen-prompt-actions { gap: 6px; }
+  .zen-prompt-actions { gap: var(--space-3); }
   .zen-prompt-actions .generate {
-    width: 42px;
-    min-width: 42px;
-    flex: 0 0 42px;
-    height: 42px;
     justify-content: center;
-    padding: 0;
   }
-  .zen-inline-settings { gap: 5px; }
   .zen-inline-settings .number-picker-label {
     font-size: 11px;
     overflow: hidden;
@@ -378,14 +349,13 @@
   /* Reserve a fixed lane for the bottom docks on each side. */
   width: max(340px, min(920px, calc(100vw - 480px)));
   gap: var(--space-2);
-  padding: 8px;
 }
 .zen-prompt > textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt textarea::placeholder { color: rgb(255 255 255 / .5); }
 .zen-prompt-actions { padding: 2px; }
 /* The density ladder in 12-composer.css keeps this on one line; it must not
    wrap, because a wrapped bar is exactly what the ladder exists to avoid. */
-.zen-inline-settings { justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-3); }
+.zen-inline-settings { justify-content: flex-end; gap: var(--space-3); }
 .zen-prompt-actions .model-trigger,
 .zen-prompt-actions .aspect-picker > button,
 .zen-prompt-actions .number-picker,
@@ -405,7 +375,6 @@
   box-shadow: 0 3px 8px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.65) inset;
 }
 @media (max-width: 760px) {
-  .zen-prompt { width: calc(100vw - 20px); bottom: 10px; }
   .zen-prompt > textarea { min-height: 64px; font-size: 16px; }
 }
 /* ---------------------------------------------------------------------------
@@ -478,19 +447,13 @@
 .composer-mode-select { flex: none; padding: var(--seg-pad); gap: var(--space-1); border: 0; border-radius: var(--r-pill); background: var(--well); }
 .composer-mode-select button { min-height: 34px; padding: 0 12px; border-radius: var(--r-pill); font-size: 12px; }
 .composer-submit-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
-.composer-prompt-field { min-width: 0; }
 .composer-prompt-field textarea { display: block; width: 100%; }
-.zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .composer-secondary-row { display: flex; align-items: center; gap: var(--space-4); border-top: 1px solid var(--glass-border); padding-top: 4px; }
-.composer-reference-tools:empty { display: none; }
 .prompt-action { display: inline-flex; align-items: center; justify-content: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .prompt-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .prompt-action.active { background: var(--selected-bg); color: var(--selected-ink); }
 .prompt-action:disabled { opacity: .4; cursor: default; }
 .prompt-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-@media (pointer: coarse) {
-  .zen-prompt .composer-prompt-field textarea { font-size: 16px; }
-}
 /* The row never wraps any more: the ladder is what makes it fit. */
 .zen-inline-settings { flex-wrap: nowrap; }
 /* The model button while models load: the same 40px pill on the same dark
@@ -683,11 +646,11 @@
   }
 }
 @media (max-width: 480px) {
-  .zen-prompt { --prompt-text-inset: 8px; padding: 7px; }
+  .zen-prompt { --prompt-text-inset: 8px; }
   .zen-prompt textarea { min-height: 46px; max-height: 96px; padding-inline: var(--prompt-text-inset, 8px); }
   .zen-prompt-actions { gap: 5px; }
   .prompt-left-actions,
-  .zen-inline-settings { gap: 4px; }
+  .zen-inline-settings { gap: var(--space-2); }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .zen-prompt { bottom: max(6px, env(safe-area-inset-bottom)); }
@@ -701,9 +664,6 @@
 }
 .zen-prompt {
   border: 1px solid var(--glass-border);
-  background: var(--surface-grain), var(--glass-panel-bg);
-  -webkit-backdrop-filter: var(--glass-panel-blur);
-  backdrop-filter: var(--glass-panel-blur);
 }
 /* The composer and its drawer hold menus that pop out past their edges. An
    element with backdrop-filter becomes the backdrop root for everything inside
@@ -786,14 +746,10 @@
 }
 .app-shell .zen-control-button {
   top: auto;
-  left: var(--deck-gap);
   bottom: var(--deck-gap);
 }
 @media (max-width: 760px) {
   .app-shell .zen-control-button { bottom: var(--deck-lift); }
-}
-@media (max-width: 620px) {
-  .app-shell .zen-control-button { left: max(8px, env(safe-area-inset-left)); }
 }
 /* Reserve the actual horizontal dock width, including optional library actions.
    The existing narrow-screen column and above-composer placements keep their lanes. */
@@ -835,7 +791,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-drop {
   position: absolute;
   inset: 0;
-  z-index: 25;
+  z-index: var(--z-drop);
   display: grid;
   place-items: center;
   border-radius: var(--r-panel);
@@ -909,7 +865,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .zen-prompt { contain: layout; }
 /* The composer sits under the dock (z 13). While one of its own surfaces is
    open, it rises above the dock and short-screen sidebar (15), below the viewer (20). */
-.zen-prompt:has(.model-menu, .aspect-menu, .ref-chip.is-open, .prompt-history) { z-index: 18; }
+.zen-prompt:has(.model-menu, .aspect-menu, .ref-chip.is-open, .prompt-history) { z-index: var(--z-composer-open); }
 /* ------------------------------------------------- The on-screen keyboard */
 /* iOS leaves fixed elements under the keyboard; the composer lifts by the
    covered height (use-keyboard-inset.ts), and the deck steps aside meanwhile. */
@@ -929,12 +885,12 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 --------------------------------------------------------------------------- */
 /* --------------------------------------------------------- Recent prompts */
 /* Opens above its button, like the composer's other pickers. */
-.zen-prompt:has(.prompt-history) { z-index: 14; }
+.zen-prompt:has(.prompt-history) { z-index: var(--z-toolbar); }
 .prompt-history {
   position: absolute;
   right: 0;
   bottom: calc(100% + 8px);
-  z-index: 16;
+  z-index: var(--z-history);
   width: min(560px, 100%);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-menu);
@@ -945,7 +901,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   transform-origin: 24px 100%;
 }
 /* Placed by useAnchoredBox above the button that opened it, over the composer. */
-.prompt-history.is-anchored { right: auto; bottom: auto; z-index: 90; }
+.prompt-history.is-anchored { right: auto; bottom: auto; z-index: var(--z-picker); }
 .prompt-history-panel {
   display: flex;
   flex-direction: column;
@@ -1076,7 +1032,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* A menu opened from the prompt bar (models, prompt history, aspect, the
    settings drawer) opens over the inpaint studio, not behind it. The bar
    itself never overlaps the studio, so lifting the whole bar is safe. */
-.zen-prompt:has(.model-menu, .prompt-history, .aspect-menu) { z-index: 95; }
+.zen-prompt:has(.model-menu, .prompt-history, .aspect-menu) { z-index: var(--z-composer-menus); }
 .app-shell .zen-control-button.grid-autoplay-button { left: calc(var(--deck-gap) + 2 * var(--deck-h) + 16px); }
 @media (max-width: 760px) {
   .app-shell .zen-control-button.grid-autoplay-button { left: calc(max(8px, env(safe-area-inset-left)) + 2 * var(--deck-h) + 16px); }
@@ -1110,7 +1066,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-prompt-field { position: relative; flex: 1; min-width: 0; }
 .zen-prompt .composer-prompt-field textarea { display: block; box-sizing: border-box; width: 100%; min-height: 60px; max-height: min(18dvh, 160px) !important; padding: 8px 72px 8px 10px; font-size: 15px; line-height: 1.4; }
 .zen-prompt .composer-prompt-field.is-negative textarea { max-height: min(16dvh, 140px) !important; }
-.composer-field-tools { position: absolute; top: 5px; right: 6px; display: flex; align-items: center; gap: var(--space-1); }
+.composer-field-tools { position: absolute; right: 6px; display: flex; align-items: center; gap: var(--space-1); }
 .composer-field-tools .prompt-action { width: 28px; height: 28px; }
 .composer-prompt-preview { display: none; }
 .composer-primary-actions { display: flex; flex: none; align-items: center; }

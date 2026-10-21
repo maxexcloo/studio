@@ -29,7 +29,6 @@
   border-radius: var(--r-pill);
   min-height: 34px;
   display: flex; align-items: center; gap: var(--space-4);
-  padding: 0 10px;
   color: hsl(var(--muted-foreground));
   font-size: 12px;
   cursor: pointer;
@@ -54,7 +53,7 @@
 .skeleton-text.short { width: 82px; }
 .skeleton-text.tiny { width: 34px; }
 .skeleton-text.path { width: min(260px, 52vw); }
-.skeleton-media { width: 100%; aspect-ratio: var(--tile-ratio, 1); border-radius: var(--r-media); }
+.skeleton-media { width: 100%; aspect-ratio: var(--tile-ratio, 1); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 /* ---------------------------------------------------------------------------

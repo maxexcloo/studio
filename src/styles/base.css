@@ -7,12 +7,11 @@
 @import "@fontsource-variable/geist-mono";
 @custom-variant dark (&:is(.dark *));
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100dvh; background: hsl(var(--background)); color: hsl(var(--foreground)); }
+body { margin: 0; min-width: 320px; color: hsl(var(--foreground)); }
 /* Last resort: a broken image never prints its alt text over the UI. The real handling is SafeImg. */
 img { color: transparent; }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
-button:not(:disabled) { transition-timing-function: var(--motion-ease); transition-duration: var(--motion-base); }
 /* Buttons take the neutral focus ring from 22-accents.css; fields brighten their edge. */
 input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 0;

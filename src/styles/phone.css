@@ -79,7 +79,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
 }
-.phone-bar-row { display: flex; align-items: center; gap: var(--space-1); min-width: 0; height: var(--bar-h); }
+.phone-bar-row { display: flex; align-items: center; min-width: 0; }
 /* Search and Filter: tinted with a count while something is applied, and while their row is open. */
 .phone-tool.is-active { color: var(--accent-amber); }
 .phone-tool.is-open { color: var(--selected-ink); }
@@ -401,7 +401,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-size .size-peek-caption strong { font-size: 14px; }
 .phone-size .size-peek-caption span { font-size: 12.5px; }
 .phone-size .aspect-upscale-tabs { padding: var(--seg-pad); }
-.phone-size .aspect-upscale-tabs button { min-height: 44px; font-size: 15px; }
 /* Custom: the linked fields at thumb size, 16px digits so iOS doesn't zoom. */
 .phone-size .size-custom-body { gap: var(--space-2); padding-top: 10px; }
 .phone-size .size-fields:not(.is-linked) { --reach: 0px; }
@@ -534,26 +533,17 @@ body:has(.phone-shell) .scrim { z-index: calc(var(--z-phone-bar) + 1); backgroun
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-canvas { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-arrow { display: none; }
 /* swipe steps through */
-.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side { bottom: calc(96px + env(safe-area-inset-bottom)); }
 /* ------------------------------------------------------------ Advanced */
 /* A native <select> laid invisibly over the row: the tap opens the phone's own picker. */
 /* ----------------------------------------------------------- Selecting */
 .phone-select-bar {
   position: fixed;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
   z-index: var(--z-phone-bar);
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: 28px;
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
-  box-shadow: var(--glass-bar-shadow);
 }
 .phone-select-bar button {
   display: grid;
@@ -561,13 +551,9 @@ body:has(.phone-shell) .scrim { z-index: calc(var(--z-phone-bar) + 1); backgroun
   min-width: 0;
   justify-items: center;
   align-content: center;
-  gap: var(--space-2);
-  min-height: 58px;
   border: 0;
-  border-radius: var(--r-menu);
   background: transparent;
   color: hsl(var(--foreground));
-  font-size: 12px;
   font-weight: 600;
 }
 .phone-select-bar button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
@@ -734,7 +720,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   outline: none;
 }
 .create-prompts textarea::placeholder { color: hsl(var(--muted-foreground)); }
-.create-prompts .is-fill textarea { height: auto; min-height: 0; padding-bottom: 0; }
+.create-prompts .is-fill textarea { height: auto; min-height: 0; }
 .create-prompts .is-negative textarea { padding: 11px 4px 11px 14px !important; font-size: 15px; }
 .create-options { flex: none; margin-top: 8px; }
 .phone-create .list-row.phone-model-browse,
@@ -822,9 +808,9 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .phone-heading.is-connected .phone-heading-light span { background: hsl(145 70% 48%); box-shadow: 0 0 0 4px hsl(145 70% 48% / .14); }
 .phone-heading.is-offline .phone-heading-light span { background: hsl(0 74% 58%); box-shadow: 0 0 0 4px hsl(0 74% 58% / .14); }
 .phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
-.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; gap: var(--space-1); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; padding: 0; border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
 .phone-prompt-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
-.phone-prompt-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.phone-prompt-bar .phone-gallery-mode button { min-height: 44px; border: 0; background: transparent; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .phone-prompt-bar .phone-gallery-mode button.active, .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { box-shadow: none; font-weight: 650; }
 .phone-bar .phone-running-inline { margin-left: 2px; }
 .phone-bar .phone-tools-row { margin: 0 calc(-1 * max(8px, env(safe-area-inset-right))) 0 calc(-1 * max(8px, env(safe-area-inset-left))); padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
