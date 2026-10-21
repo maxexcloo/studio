@@ -142,7 +142,7 @@ async function resolveSignedMcpResult(owner, jobId, index) {
 for (const [name, migrate] of [["seed", () => seedMissing({ seedDir: seedDirectory(), dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })], ["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
   try { migrate(); } catch (error) { console.warn(`[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`); }
 }
-// Refine in Chat's handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
+// Chat handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
 const chatHandovers = createHandoverStore({ dataDir });
 registerMcpRoutes(app, {
   dataDir,

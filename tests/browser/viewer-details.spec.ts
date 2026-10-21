@@ -27,6 +27,38 @@ test('a video offers Extend in place of Animate', async ({ page }) => {
   await expect(viewer.getByRole('button', { name: 'Animate', exact: true })).toHaveCount(0);
 });
 
+test('a video shows the image\'s Details sections and rows, plus only its own Frames, FPS and Duration', async ({ page }) => {
+  const clip = { ...item, id: 'details-video', type: 'video', url: '/details-video.mp4', thumbnailUrl: picture, outputName: 'details-video.mp4', settings: { ...item.settings, duration: 5, frames: 121, fps: 24 } };
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: new URL(route.request().url()).searchParams.get('type') === 'video' ? [clip] : [item], revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.route('**/details-video.mp4*', (route) => route.fulfill({ status: 200, contentType: 'video/mp4', body: Buffer.alloc(2048) }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  const details = async (id: string) => {
+    const viewer = await ui.openViewer(page.locator(`[data-tile-id="${id}"] .tile, [data-tile-id="${id}"]`).first());
+    await ui.showDetails();
+    const settings = viewer.locator('.viewer-side .detail-settings');
+    await expect(settings.locator('.detail-section').filter({ has: page.getByRole('heading', { name: 'Output', exact: true }) }).getByText('Size', { exact: true })).toBeVisible();
+    const sections: Record<string, string[]> = {};
+    for (const section of await settings.locator('.detail-section').all()) {
+      sections[(await section.locator('.detail-heading').innerText()).trim()] = (await section.locator('.detail-grid > :nth-child(odd)').allInnerTexts()).map((label) => label.trim());
+    }
+    const title = (await viewer.locator('.viewer-profile-summary strong').innerText()).trim();
+    await ui.closeViewer();
+    return { sections, title };
+  };
+  const image = await details('details-0');
+  await ui.switchMode('video');
+  const video = await details('details-video');
+  const videoOnly = ['Duration', 'Frames', 'FPS'];
+  expect(Object.keys(video.sections)).toEqual(Object.keys(image.sections));
+  for (const [title, labels] of Object.entries(image.sections)) expect(video.sections[title].filter((label) => !videoOnly.includes(label))).toEqual(labels);
+  expect(video.sections.Output).toEqual(expect.arrayContaining(videoOnly));
+  for (const label of videoOnly) expect(image.sections.Output).not.toContain(label);
+  // Both titled by the profile, the same way.
+  expect(video.title).toBe(image.title);
+});
+
 test('Details copies generation inputs, excludes output metadata and keeps per-prompt Copy', async ({ page }) => {
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
@@ -50,7 +82,7 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('guidance: 0');
   for (const unset of ['autoResizeInputs', 'startImageId', 'Negative:']) expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain(unset);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  for (const output of ['forbidden-output.png', 'outputWidth', 'Timing', 'Queue:', 'Active:', 'Generated:', 'Output:', '2026-01-01']) expect(copied).not.toContain(output);
+  for (const output of ['forbidden-output.png', 'outputWidth', 'Timing', 'Queue:', 'Active:', 'Generated:', 'Output:', 'Time:', 'Dimensions:', '2026-01-01']) expect(copied).not.toContain(output);
   for (const input of ['Profile ID: mock-flux-schnell', 'guidance: 0', 'workflow-input.json', 'input-reference']) expect(copied).toContain(input);
   await expect(side.getByRole('button', { name: 'Copy Settings', exact: true })).toHaveCount(0);
   await expect(side.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
@@ -75,7 +107,13 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   const output = settings.locator('.detail-section').filter({ has: page.getByRole('heading', { name: 'Output', exact: true }) });
   const labels = (await output.locator('.detail-grid > :nth-child(odd)').allInnerTexts()).map((label) => label.trim());
   expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
-  expect(labels).toEqual(expect.arrayContaining(['File', 'Generated', 'Size']));
+  // Dimensions (the picture's), File (its name), Size (on disk) and Time (when it was made).
+  expect(labels).toEqual(expect.arrayContaining(['Dimensions', 'File', 'Size', 'Time']));
+  for (const old of ['Generated']) expect(labels).not.toContain(old);
+  const outputValue = (label: string) => output.locator('.detail-grid > :nth-child(odd)').filter({ hasText: new RegExp(`^${label}$`) }).locator('xpath=following-sibling::*[1]');
+  await expect(outputValue('Dimensions')).toHaveText('512 × 512');
+  await expect(outputValue('File')).toHaveText('forbidden-output.png');
+  await expect(outputValue('Size')).toHaveText(/^\d+(\.\d)? (B|KB|MB)$/);
   // The output's type says nothing the picture doesn't.
   expect(labels).not.toContain('Type');
   expect(await side.locator('.detail-settings').evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('0px');
@@ -138,6 +176,11 @@ test('the viewer title is always shown and concise', async ({ page, isMobile }) 
   await expect(summary).toBeVisible();
   await expect(summary).toContainText('512 × 512 · 4 Steps');
   await expect(summary).not.toContainText('CFG');
+  // The profile's name, as Details' Profile row reads it, never the model family.
+  await ui.showDetails();
+  const profileRow = viewer.locator('.viewer-side .detail-grid > :nth-child(odd)').filter({ hasText: /^Profile$/ }).locator('xpath=following-sibling::*[1]');
+  await expect(summary.locator('strong')).toHaveText((await profileRow.innerText()).trim());
+  await ui.hideDetails();
   await expect(summary).not.toContainText('Seed');
   await ui.showDetails();
   await expect(viewer.getByRole('button', { name: 'Image Text', exact: true })).toHaveCount(0);

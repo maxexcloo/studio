@@ -7,6 +7,8 @@ import { Still, runKind, timeSpan } from './RunStack';
 import { fileStem } from './format';
 import { runTitle, type Run } from './runs';
 import type { GalleryItem } from './types';
+import { GenerationProfiles } from './GenerationProgress';
+import { itemProfileName, itemProfileTitle } from './itemProfile';
 
 /**
  * A run on a phone: a sheet with the run as a cover flow you swipe through,
@@ -35,6 +37,10 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
   const items = run.items.filter((item) => item.status === "done");
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  // The run's profile by name, as a tile's caption and the viewer's title read it; the weights file only without one.
+  const profiles = React.useContext(GenerationProfiles);
+  const cover = items[0] || run.cover;
+  const profileName = itemProfileName(cover, profiles) || itemProfileTitle(cover, profiles) || (run.model ? fileStem(run.model) : "");
   // Each card turns by how far it is from the middle; worked out on scroll,
   // straight onto the cards, so React isn't asked to render every frame.
   useEffect(() => {
@@ -94,7 +100,7 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
         ))}
       </div>
       <div className="cover-flow-caption">
-        <small>{index + 1} of {items.length}{run.model ? <> · {fileStem(run.model)}</> : null} · {timeSpan(run.start, run.end)}</small>
+        <small>{index + 1} of {items.length}{profileName ? <> · {profileName}</> : null} · {timeSpan(run.start, run.end)}</small>
         <strong>{runTitle(run)}</strong>
         {current?.prompt && run.variations > 1 ? <p>{current.prompt}</p> : null}
       </div>

@@ -188,7 +188,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (key && inflight.get(key) === controller) inflight.delete(key);
       }
     });
-    // A job handed over from Studio's Refine in Chat becomes this account's for the chat (chat-handover.js).
+    // A job handed over to the chat (chat-handover.js) becomes this account's for the chat (chat-handover.js).
     const resolve = (value) => {
       const id = media.resolve(owner, refs, value);
       if (typeof id === 'string' && !media.owns(owner, id) && claimHandover(owner, id, { accountMode })) media.adopt(owner, id);

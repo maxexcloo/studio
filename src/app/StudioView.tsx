@@ -34,12 +34,11 @@ import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, generationInputsText } from './ViewerActions';
-import { refineInChat, useChatAddress } from './refineInChat';
-import { itemProfile, itemProfileName } from './itemProfile';
+import { useMediaFileSize } from './mediaFileSize';
+import { itemProfileName, itemProfileTitle } from './itemProfile';
 import { LoraDetails, LoraSources } from './LoraPanel';
-import { loraName, modelName } from './catalogueNames';
+import { loraName } from './catalogueNames';
 import { fetchLoraInfo, knownLoraInfo } from './useLoraInfo';
-import { partName } from './partNames';
 
 import { TileLongPressContext } from './GalleryTile';
 import { PhoneShell } from './PhoneStudio';
@@ -118,8 +117,8 @@ export function StudioView({ view }: { view: StudioViewModel }) {
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const { assistant, gallerySearch, setGallerySearch, toggleFavorite } = view;
-  // Refine in Chat opens the deployment's chat, or copies the job reference without one.
-  const chatUrl = useChatAddress();
+  // Details › Output › Size: the shown file's size, read from the media (mediaFileSize.ts).
+  const activeFileSize = useMediaFileSize(active);
   const searchOn = searchActive(gallerySearch);
   const [searchOpen, setSearchOpen] = React.useState(false);
   // Phones get the simplified phone studio, unless someone chose the full one.
@@ -659,12 +658,12 @@ export function StudioView({ view }: { view: StudioViewModel }) {
         // What made this output, at the top of its preview: the profile it ran
         // through, then the settings worth seeing without opening Details.
         // Its profile's friendly name, also for an output from a profile renamed since (itemProfile.ts).
-        const activeProfile = itemProfile(active, models?.profiles || []);
         const activeProfileName = itemProfileName(active, models?.profiles || []);
-        const profileTitle = (activeProfile ? modelName(activeProfile).name : activeProfileName) || (active.settings?.modelName ? partName(String(active.settings.modelName)) : "") || "Generation";
+        // The profile's own name, as Details' Profile row and a tile's caption read it (never the model family).
+        const profileTitle = activeProfileName || itemProfileTitle(active, models?.profiles || []) || "Generation";
         // A LoRA's catalogue entry by its saved path, or by its file name when the folder differs.
         const loraInfoOf = (file: string) => loraInfos?.[file] || Object.entries(loraInfos || {}).find(([name]) => name.split(/[\\/]/).pop() === file)?.[1];
-        const detailNames = { profile: activeProfileName, lora: (file: string) => loraName(file, (loraInfos || knownLoraInfo())?.[file]) };
+        const detailNames = { profile: activeProfileName, fileSize: activeFileSize, lora: (file: string) => loraName(file, (loraInfos || knownLoraInfo())?.[file]) };
         const detailEntries = generationDetailEntries(active, detailNames);
         const processing: Array<[string, string]> = [];
         if (active.upscale?.status === 'done') processing.push(['Upscale', active.upscale.width && active.upscale.height ? `${active.upscale.width} × ${active.upscale.height}` : 'Applied']);
@@ -774,7 +773,6 @@ export function StudioView({ view }: { view: StudioViewModel }) {
                     <DetailsFooter
                       onCopy={() => copyToClipboard(generationInputsText(active), 'Inputs copied')}
                       onRecreate={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
-                      onRefine={active.jobId && active.status === "done" && active.prompt ? () => refineInChat(active, { chatUrl, profileName: itemProfileName(active, models?.profiles || []) }) : undefined}
                     />
                   </aside>
                 ) : null}

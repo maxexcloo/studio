@@ -101,10 +101,10 @@ export function fullGenerationText(item: GalleryItem) {
     `Prompt: ${item.prompt || ""}`,
     `Negative prompt: ${item.negative || ""}`,
     `Model: ${item.model || ""}`,
-    `Output: ${item.outputName || item.filename || ""}`,
+    `File: ${item.outputName || item.filename || ""}`,
     `Type: ${item.type}`,
-    `Aspect: ${item.width || "?"}x${item.height || "?"}`,
-    `Generated: ${formatGeneratedAt(item.createdAt)}`
+    `Dimensions: ${item.width || "?"} × ${item.height || "?"}`,
+    `Time: ${formatGeneratedAt(item.createdAt)}`
   ];
   for (const [key, value] of Object.entries(settings)) {
     if (grok && ["steps", "cfg", "sampler", "scheduler"].includes(key)) continue;
@@ -167,7 +167,7 @@ export function sortDetailRows(section: GenerationDetailSection) {
   section.rows.sort(([a], [b]) => a.localeCompare(b, "en", { sensitivity: "base" }));
 }
 
-export function generationDetailEntries(item: GalleryItem, names: { profile?: string; lora?: (file: string) => string } = {}): GenerationDetailSection[] {
+export function generationDetailEntries(item: GalleryItem, names: { profile?: string; lora?: (file: string) => string; fileSize?: number } = {}): GenerationDetailSection[] {
   const settings = item.settings || {};
   const grok = String(settings.modelName || "").startsWith("grok-imagine-");
   const sections: GenerationDetailSection[] = [];
@@ -206,27 +206,29 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
       add("Scheduler", settings.scheduler);
     }
     add("Seed", settings.seed);
+    // Denoise is how far an image redraws its reference; a video's start image is kept, so it has none.
     if (item.type === "image" && !String(settings.modelName || "").endsWith(".rad") && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
   // What came out, the picture and its file together (UI-PATTERNS › Action Placement › Details).
+  // An image and a video share every row; a video only adds Duration, Frames and FPS.
   section("Output", (add) => {
     // The size of the picture shown: an upscale's own size when that's the one on screen.
     const upscaled = item.upscaleActive && item.upscale?.status === "done" && item.upscale.width && item.upscale.height ? item.upscale : null;
-    add("Size", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
+    add("Dimensions", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
     if (settings.resolution) add("Resolution", settings.resolution);
     if (upscaled) add("Drawn At", `${item.width || "?"} × ${item.height || "?"}`);
-    if (settings.duration) add("Duration", `${settings.duration} Seconds`);
-    if (item.type === "image") {
-      const count = Number(settings.count || 0);
-      if (count > 1) add("Images", count);
-      if (item.referenceImage || settings.referenceImageName) add("Reference", settings.referenceImageName || item.referenceImageName || "Selected");
-    }
+    const count = Number(settings.count || 0);
+    if (count > 1) add("Count", count);
+    if (item.referenceImage || settings.referenceImageName) add("Reference", settings.referenceImageName || item.referenceImageName || "Selected");
     if (item.type === "video") {
+      if (settings.duration) add("Duration", `${settings.duration} Seconds`);
       add("Frames", settings.frames);
       add("FPS", settings.fps);
     }
     add("File", item.outputName || item.filename);
-    add("Generated", formatGeneratedAt(item.createdAt));
+    // The file's size on disk, once known (mediaFileSize.ts); left out until then.
+    add("Size", names.fileSize ? formatBytes(names.fileSize) : "");
+    add("Time", formatGeneratedAt(item.createdAt));
   });
   // Rows read alphabetically; Timing reads in its own order.
   for (const entry of sections) sortDetailRows(entry);
@@ -262,6 +264,19 @@ export function formatDownloadSize(bytes = 0) {
   if (!bytes) return '';
   const gb = bytes / 1e9;
   return gb >= 1 ? `${gb.toFixed(gb >= 10 ? 0 : 1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+}
+
+/** Decimal units, like the Finder and every model setup panel, so one file never shows two sizes. */
+export function formatBytes(bytes = 0) {
+  if (!bytes) return "unknown size";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
 /** "1 model", "3 models", "1,204 recent prompts". */

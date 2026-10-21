@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
-// Details › Refine in Chat (UI-PATTERNS › Action Placement) and Recreate keeping how a prompt was written.
+// Details' footer (UI-PATTERNS › Action Placement): Copy and Recreate, Recreate keeping how a prompt was written.
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
-const pill = (page: Page, text: string) => page.locator('[data-status-message] .status-pill-body').filter({ hasText: text });
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
@@ -28,32 +27,13 @@ async function openDetails(page: Page, id: string) {
   return { ui, viewer, footer: viewer.locator('.viewer-side').getByRole('group', { name: 'Details Actions', exact: true }) };
 }
 
-test('Refine in Chat opens LibreChat with the prompt, profile and job reference filled in', async ({ page }) => {
-  const { item, profile, handovers } = await mockGallery(page, { chatUrl: 'https://chat.example.test' });
+test('Details offers only Copy and Recreate, also on a finished job', async ({ page }) => {
+  const { item, handovers } = await mockGallery(page, { chatUrl: 'https://chat.example.test' });
   await page.goto('/');
   const { footer } = await openDetails(page, item.id);
-  expect((await footer.getByRole('button').allInnerTexts()).map((name) => name.trim())).toEqual(['Copy', 'Refine', 'Recreate']);
-  await footer.getByRole('button', { name: 'Refine in Chat', exact: true }).click();
-  await expect(pill(page, 'Opened in chat with this result')).toBeVisible();
-  const opened: string[] = await page.evaluate(() => (window as any).opened);
-  expect(opened).toHaveLength(1);
-  const url = new URL(opened[0]);
-  expect(`${url.origin}${url.pathname}`).toBe('https://chat.example.test/c/new');
-  const message = url.searchParams.get('prompt') || '';
-  for (const part of [`Prompt: ${item.prompt}`, profile.id, 'Written By: Assistant in Chat · Cinematic', `job_id ${item.jobId}`, 'Call Review']) expect(message).toContain(part);
-  expect(url.searchParams.get('submit')).toBeNull();
-  await expect.poll(() => handovers).toEqual([{ jobId: item.jobId }]);
-});
-
-test('without a chat address, Refine in Chat copies the job reference and says so', async ({ page }) => {
-  const { item, handovers } = await mockGallery(page);
-  await page.goto('/');
-  const { footer } = await openDetails(page, item.id);
-  await footer.getByRole('button', { name: 'Refine in Chat', exact: true }).click();
-  await expect(pill(page, 'Job reference copied: paste it in chat')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`job_id ${item.jobId}`);
-  expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
-  await expect.poll(() => handovers).toEqual([{ jobId: item.jobId }]);
+  expect((await footer.getByRole('button').allInnerTexts()).map((name) => name.trim())).toEqual(['Copy', 'Recreate']);
+  await expect(page.getByRole('button', { name: 'Refine in Chat', exact: true })).toHaveCount(0);
+  expect(handovers).toEqual([]);
 });
 
 test('Recreate carries how the prompt was written into the rerun, until the prompt changes', async ({ page }) => {

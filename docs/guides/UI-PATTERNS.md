@@ -812,21 +812,25 @@ kind of element:
 - **Recreate** ("Recreate With the Same Seed") loads the model, both prompts,
   size, LoRAs, references, every setting and the same seed into Create. The
   viewer closes and Create opens, ready to change or generate.
-- **Tiles, desktop:** one row of 32 px glass circles along the top right (a
-  40 px target each), from `itemActions.ts`'s `tile` placement in the viewer
-  bar's order: Download | Animate or Extend · Recreate · Upscale | Star ·
-  Delete, with Retry in Recreate's place on a failed item and a little more
-  room between the groups. Upscale is one of the row's circles, not a corner
-  button: solid amber and pressed while the upscale shows, with a progress ring
-  while it runs. A narrow tile drops the make group first, then Download; Star
-  and Delete stay longest (and Upscale while it runs or shows), and **More**
-  (⋯) takes the last slot and opens the same menu as a right-click. The
-  circles show on hover and keyboard focus; a set Star and a running or
-  showing Upscale stay in view. The phone has no row: only a running
+- **Tiles, desktop:** Star alone in the top left corner, and one row of 32 px
+  glass circles along the top right (a 40 px target each, on the same line),
+  from `itemActions.ts`'s `tile` placement in the viewer bar's order:
+  Download | Animate or Extend · Recreate · Upscale | Delete, with Retry in
+  Recreate's place on a failed item and a little more room between the
+  groups. Images and videos place them the same way. Upscale is one of the
+  row's circles, not a corner button: solid amber and pressed while the
+  upscale shows, with a progress ring while it runs. A narrow tile drops the
+  make group first, then Download; Delete stays longest (and Upscale while it
+  runs or shows), and **More** (⋯) takes the last slot and opens the same
+  menu as a right-click. The circles show on hover and keyboard focus; a set
+  Star and a running or showing Upscale stay in view. The phone has no row: only a running
   upscale's ring shows, top left.
 - **Tile caption, desktop:** two lines at the bottom on hover and keyboard
-  focus: the prompt on one line, then the time · the profile's friendly name
-  (· a video's length), as in "2:14 PM · FLUX.1 Schnell · 6 s". Nothing else.
+  focus: the prompt on one line, then the time · the profile's name (· a
+  video's length), as in "2:14 PM · FLUX.1 Schnell · 6 s". Nothing else. The
+  profile's name (`itemProfileName`) is the one Details' Profile row shows,
+  also on a running tile's label and the phone's run sheet; the model part
+  stands in only where no profile is known, never the model family.
 - **Viewer, desktop:** Copy · Download | Animate · Recreate · Reference ·
   Upscale | Star · Delete, then Close. Info sits alone in the top right (beside
   the corner Close on tablets); it opens Details, and the open Details panel
@@ -848,23 +852,26 @@ kind of element:
 - **Zoom:** a small `− 100% +` pill, bottom middle above the bar, faded until
   used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
 - **Details:** Prompt and Negative each keep Copy beside their label. The
-  groups are Prompt, Model, Settings and Output (the picture's size, reference,
-  upscale and its file together), then Timing, in one readable heading style;
+  groups are Prompt, Model, Settings and Output (the picture, reference,
+  upscale and its file together: Dimensions, File, Size and Time, with Size
+  the file's size on disk, left out until it is known), then Timing, in one readable heading style;
   empty groups and rows are left out, and nothing repeats (no output Type;
   Model shows the Profile, never a Weights row). Rows within a group
   read alphabetically, except Timing (measured times before the estimates).
-  The phone and the desktop show the same Details, from one component.
-  The one footer is Copy · Refine · Recreate. **Refine** ("Refine in Chat",
-  on a finished result) opens the deployment's chat with the prompt, profile
-  and job ID filled in, unsent, or copies that message where no chat is set,
-  and says which in the status pill. Copy includes generation inputs and saved
+  The phone and the desktop show the same Details, from one component, and a
+  video shows exactly an image's groups and rows under the same labels, adding
+  only Duration, Frames and FPS (Denoise, which only redraws an image, is the
+  one image-only row).
+  The one footer is Copy · Recreate, for images and videos alike; there is no
+  Refine in Chat. Copy includes generation inputs and saved
   settings, including IDs, seed and reference settings; output filenames,
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run
   after queueing) before Queue and Total (which also counts transfer and
   finishing); split-up times keep "(Est.)". No explanatory line.
 - **Viewer title:** always shown top left on both devices, as plain text with
-  no box: the profile name, then a muted line with the position ("2 / 40"),
+  no box: the profile name (as Details' Profile row reads it, never the model
+  family), then a muted line with the position ("2 / 40"),
   the time, the size and steps (a video adds its duration). The phone keeps it
   inline with Star · Info · Close. There is no Image Text button. Keep it clear
   of the Details controls and image actions.

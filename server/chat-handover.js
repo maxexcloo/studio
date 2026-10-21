@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Refine in Chat (design §6, How chat informs Studio): Details hands a result to LibreChat, the
- * deployment's chat (STUDIO_CHAT_URL), as a prefilled message carrying its stable job ID, the
- * Handover summary's way of naming results. LibreChat v0.8.8 reads `?prompt=` on /c/new and fills
- * its input without sending. Without a chat address the message is copied instead.
+ * Chat handover (design §6, How chat informs Studio): a result handed to LibreChat, the
+ * deployment's chat (STUDIO_CHAT_URL), by its stable job ID, the Handover summary's way of naming
+ * results. Details' Refine in Chat, its only caller, is gone; the routes stay for the MCP side.
  *
  * Studio's own jobs aren't MCP's, so the handover is recorded here, on disk: when that account's
  * chat names the job, MCP takes it into the account's chat jobs (mcp.js claimHandover) and Review,
