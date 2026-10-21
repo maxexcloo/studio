@@ -89,6 +89,8 @@ if PromptServer is not None and getattr(PromptServer, 'instance', None) is not N
             elif action == 'replace':
                 await asyncio.to_thread(models.preserve_replaced, *args, str(body.get('sha256', '')))
                 result = {}
+            elif action == 'remove':
+                result = {'removed': await asyncio.to_thread(models.remove, *args, str(body.get('sha256', '')))}
             elif action in {'stat', 'hash'}:
                 result = await asyncio.to_thread(models.state, *args, action == 'hash')
             else:

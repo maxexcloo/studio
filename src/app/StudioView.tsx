@@ -431,7 +431,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </AnimatePresence>
       </div>
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
-      {models?.features?.library === true ? <Tip content="Library"><button className="icon-button" aria-label="Library" aria-haspopup="dialog" aria-expanded={Boolean(view.libraryOpen)} onClick={() => view.setLibraryOpen(true)}><LibraryIcon size={16} /></button></Tip> : null}
+      {models?.features?.library === true ? <Tip content={models.features.libraryUpdates ? `Library · ${models.features.libraryUpdates === 1 ? 'Update Available' : `${models.features.libraryUpdates} Updates Available`}` : 'Library'}><button className="icon-button library-dock-button" aria-label="Library" aria-description={models.features.libraryUpdates ? 'Update Available' : undefined} aria-haspopup="dialog" aria-expanded={Boolean(view.libraryOpen)} onClick={() => view.setLibraryOpen(true)}><LibraryIcon size={16} />{models.features.libraryUpdates ? <span className="library-update-dot" aria-hidden="true" /> : null}</button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {hasAccountStorageScope() ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
     </div>
