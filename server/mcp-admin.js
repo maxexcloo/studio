@@ -94,7 +94,7 @@ const downloadView = (entry) => entry ? Object.fromEntries(downloadFields.filter
  */
 export function registerAdminTools({ tool, server, media, owner, resolve, signExport }) {
   const api = (method, route, body, signal) => media.request(method, route, body, owner, { signal });
-  /** A route a later Library release adds (image imports, update checks) answers 404 until then. */
+  /** Image imports and update checks answer 404 on a Studio without them (an older release behind the gateway). */
   const later = (what) => (error) => { throw /HTTP 404\)/.test(error.message) ? new Error(`${what} aren’t available in this Studio yet.`) : error; };
   const dataUrl = (content, mime) => `data:${mime};base64,${Buffer.from(content).toString('base64')}`;
 

@@ -71,8 +71,8 @@ export function ProfileGuide({ profileId, profileName, showToast }: { profileId:
   }, 'Couldn’t revert the guide');
 
   if (!view) return <Group title="Guide"><div className="list-row is-static set-row" aria-busy="true"><Skeleton className="skeleton-text short" /></div></Group>;
-  if (view.source === 'none') return <Group title="Guide"><Row label="No Guide" description={`No prompting guide applies to ${profileName}. Its family has none and it isn’t bound to one.`} /></Group>;
-  if (view.source === 'owned') return <Group title="Guide" note="This profile carries its own guidance in its JSON (prompting), which wins over any guide. Edit it in the JSON view.">
+  if (view.source === 'none') return <Group title="Guide"><Row label="No Guide" description={`No prompting guide applies to ${profileName}: its family has none and it isn’t bound to one`} /></Group>;
+  if (view.source === 'owned') return <Group title="Guide" note="This profile carries its own guidance in its JSON (prompting), which wins over any guide; edit it in the JSON view">
     <div className="profile-editor"><pre className="profile-editor-text is-readonly" aria-label="Profile Guidance">{pretty(view.owned)}</pre></div>
   </Group>;
   const meta = view.meta || null;
@@ -83,7 +83,7 @@ export function ProfileGuide({ profileId, profileName, showToast }: { profileId:
       </Row>
       {meta ? <Row label="Version" description={[meta.by, meta.editedAt ? new Date(meta.editedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : ''].filter(Boolean).join(' · ') || undefined}>{`Version ${meta.version}`}</Row> : null}
     </Group>
-    {view.readOnly ? <Group title="JSON"><Row label="Only in the Seed" description="Studio takes this guide in on its next start; then it can be edited here." /></Group> : <Group title="JSON">
+    {view.readOnly ? <Group title="JSON"><Row label="Only in the Seed" description="Studio takes this guide in on its next start; then you can edit it here" /></Group> : <Group title="JSON">
       <div className="profile-editor">
         <textarea className={cn('profile-editor-text', parseError && 'is-invalid')} aria-label="Guide JSON" aria-invalid={Boolean(parseError)} spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" value={text} onChange={(event) => setText(event.target.value)} />
         {parseError ? <p className="list-note is-error" role="alert">Not valid JSON: {parseError}</p> : null}

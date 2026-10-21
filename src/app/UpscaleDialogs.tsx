@@ -108,7 +108,7 @@ export function UpscaleSetupDialog({
   quality,
   comfyUrl,
   onQualityChange,
-  onOpenLibrary,
+  onOpenWorkers,
   showToast
 }: {
   setup: UpscaleSetup;
@@ -118,7 +118,7 @@ export function UpscaleSetupDialog({
   quality: UpscaleQuality;
   comfyUrl?: string;
   onQualityChange: (quality: UpscaleQuality) => void;
-  onOpenLibrary: () => void;
+  onOpenWorkers: () => void;
   showToast: ShowToast;
 }) {
   const { stage, pending } = setup;
@@ -184,8 +184,8 @@ export function UpscaleSetupDialog({
       </div>
     ) : !status?.canDownload ? (
       <div className="upscale-callout">
-        <strong>The models folder isn’t set yet.</strong>
-        <span>Set ComfyUI’s output folder in Settings › Models, and the models folder next to it is found automatically.</span>
+        <strong>Studio can’t find ComfyUI’s models folder.</strong>
+        <span>Studio looks for it beside ComfyUI on this computer; check the worker in Settings › Workers.</span>
       </div>
     ) : (
       <>
@@ -233,7 +233,7 @@ export function UpscaleSetupDialog({
         </button>
       </>
     ) : (
-      <>{later}<button className="btn is-primary" onClick={onOpenLibrary}>Open Library Settings</button></>
+      <>{later}<button className="btn is-primary" onClick={onOpenWorkers}>Open Workers</button></>
     );
   } else if (stage === "downloading" || stage === "verifying") {
     const files = install?.files || [];

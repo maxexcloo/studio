@@ -2178,6 +2178,14 @@ test('admin tools go through the Library and profile routes with the administrat
   f.app.post('/api/library/imports', (_req, res) => res.json({ ok: true, import: record }));
   f.app.get('/api/library/imports', (_req, res) => res.json({ ok: true, imports: [record] }));
   f.app.get('/api/library/imports/:id', (_req, res) => res.json({ ok: true, import: record }));
+  const imageRecord = { ...record, id: 'imp-img001', input: { kind: 'image-file', fileName: 'result.png', format: 'png' }, picture: true, resources: [] };
+  f.app.post('/api/library/imports/image', (_req, res) => res.json({ ok: true, import: imageRecord }));
+  f.app.post('/api/library/imports/:id/describe', (_req, res) => res.json({ ok: true, import: { ...imageRecord, id: 'imp-dsc001', input: { kind: 'described', fileName: 'chat-upload' } } }));
+  f.app.get('/api/reference-assets/:id/media', (_req, res) => res.type('png').send(png));
+  const updateState = { checkedAt: '2026-10-21T00:00:00.000Z', available: 1, byEntry: { 'loras/glow.safetensors': { state: 'available', latest: { name: 'V3' } }, 'loras/other.safetensors': { state: 'current' } }, applied: {} };
+  f.app.get('/api/library/updates', (_req, res) => res.json({ ok: true, ...updateState }));
+  f.app.post('/api/library/updates/check', (_req, res) => res.json({ ok: true, ...updateState }));
+  f.app.post('/api/library/updates/apply', (_req, res) => res.json({ ok: true, ...updateState, applied: { state: 'downloading' } }));
   f.app.get('/api/models/downloads', (_req, res) => res.json({ ok: true, backend: 'worker', active: { id: 'civitai:2:3', file: 'glow.safetensors', folder: 'loras', status: 'downloading', receivedBytes: 10, totalBytes: 100, url: 'https://secret.example.test' }, queued: [], recent: [] }));
   f.app.post('/api/models/downloads/cancel', (_req, res) => res.json({ ok: true, active: null, queued: [], recent: [] }));
   f.app.patch('/api/library/catalogue', (req, res) => res.json({ ok: true, key: req.body.key, entry: { title: req.body.patch.title }, previous: { title: null } }));
@@ -2196,12 +2204,27 @@ test('admin tools go through the Library and profile routes with the administrat
   assert.deepEqual([imported.import.origin, imported.import.grade, imported.import.missing], ['chat', 'partial', ['glow.safetensors']]);
   assert.deepEqual(seen.find(item => item.path === '/library/imports' && item.method === 'POST'), { method: 'POST', path: '/library/imports', body: { url: 'https://civitai.com/models/1' }, authorization: `Bearer ${adminToken}` });
   assert.deepEqual(data(await call(client, 'Imports')).imports, [{ id: 'imp-abc123', title: 'Glow', kind: 'civitai-model', origin: 'chat', state: 'needs-files', grade: 'partial', missing: 1, created_at: '2026-10-21T00:00:00.000Z' }]);
-  // Image imports come with the next Library release; until then the tool says so plainly.
+  // Image imports: a result or an upload goes to the Library's image route, and describe asks the vision model.
   const generated = await generate(client);
   finish(f);
-  const image = await call(client, 'Import', { job_id: jobId(generated) });
-  assert.equal(image.isError, true);
-  assert.match(image.content[0].text, /Image imports aren’t available in this Studio yet/);
+  const fromResult = data(await call(client, 'Import', { job_id: jobId(generated) }));
+  assert.equal(fromResult.import.id, 'imp-img001');
+  const sent = seen.find(item => item.path === '/library/imports/image');
+  assert.deepEqual([sent.authorization, sent.body.name, sent.body.image.startsWith('data:image/png;base64,')], [`Bearer ${adminToken}`, `result-${jobId(generated)}`, true]);
+  const uploaded = data(await call(client, 'Upload', { content_base64: png.toString('base64'), filename: 'reference.png' }));
+  const described = data(await call(client, 'Import', { upload_id: uploaded.asset?.id || uploaded.id || uploaded.asset_id, describe: true }));
+  assert.equal(described.import.id, 'imp-dsc001');
+  assert.deepEqual(seen.filter(item => item.method === 'POST' && item.path.startsWith('/library/imports/')).map(item => item.path), ['/library/imports/image', '/library/imports/image', '/library/imports/imp-img001/describe']);
+  assert.equal((await call(client, 'Import', { url: 'https://civitai.com/models/1', describe: true })).isError, true, 'describe is for images');
+
+  // Updates: list, check and apply go to the Library's update routes; nothing applies unasked.
+  const listed = data(await call(client, 'Updates', { action: 'list' }));
+  assert.deepEqual([listed.available, listed.updates.map(item => item.key)], [1, ['loras/glow.safetensors']]);
+  data(await call(client, 'Updates', { action: 'check', keys: ['loras/glow.safetensors'] }));
+  const applied = data(await call(client, 'Updates', { action: 'apply', keys: ['loras/glow.safetensors'] }));
+  assert.deepEqual(applied.applied, [{ key: 'loras/glow.safetensors', state: 'downloading' }]);
+  assert.deepEqual(seen.filter(item => item.path.startsWith('/library/updates')).map(item => `${item.method} ${item.path}`), ['GET /library/updates', 'POST /library/updates/check', 'POST /library/updates/apply']);
+  assert.deepEqual(seen.find(item => item.path === '/library/updates/apply').body, { key: 'loras/glow.safetensors', alternative: false });
 
   const status = data(await call(client, 'Downloads', { action: 'status', import_id: 'imp-abc123' }));
   assert.deepEqual(status.active, { id: 'civitai:2:3', file: 'glow.safetensors', folder: 'loras', status: 'downloading', receivedBytes: 10, totalBytes: 100 }, 'no download address reaches the chat');
