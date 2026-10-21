@@ -72,6 +72,7 @@ export class RunTimer {
   constructor(graph = {}, { endNodes = [] } = {}) {
     this.graph = graph;
     this.endNodes = new Set(endNodes.map(String));
+    this.executionStartedAt = null;
     this.runAt = null;
     this.endAt = null;
     // One segment per sampler run: its first and latest reported step. A
@@ -87,7 +88,10 @@ export class RunTimer {
 
   note(message, now = Date.now()) {
     const data = message?.data || {};
-    if (message?.type === "execution_start") this.runAt ??= now;
+    if (message?.type === "execution_start") {
+      this.executionStartedAt ??= now;
+      this.runAt ??= now;
+    }
     if (message?.type === "execution_success" || (message?.type === "executing" && (data.node === null || data.node === undefined) && this.runAt !== null)) this.endAt ??= now;
     if (message?.type === "executed" && this.runAt !== null && this.endNodes.has(String(data.node ?? ""))) this.endAt ??= now;
     if (message?.type !== "progress") return;
@@ -147,6 +151,22 @@ export class RunTimer {
     const tailMs = Math.max(0, this.endAt - last.lastT - Math.max(0, (last.max || last.lastV) - last.lastV) * stepMs);
     return { runMs, stepMs, steps, setupMs, tailMs };
   }
+}
+
+/** Saved timings use observed events; stage boundaries inferred from progress are estimates. */
+export function completedTiming(timer, submittedAt, result = timer?.result()) {
+  if (!result) return null;
+  const timing = { runMs: Math.round(result.runMs) };
+  if (result.stepMs) timing.stepMs = Math.round(result.stepMs);
+  if (Number.isFinite(timer.executionStartedAt)) {
+    if (Number.isFinite(submittedAt) && submittedAt <= timer.executionStartedAt) timing.queueMs = Math.round(timer.executionStartedAt - submittedAt);
+    if (Number.isFinite(result.setupMs) && Number.isFinite(result.tailMs)) {
+      timing.setupMs = Math.min(timing.runMs, Math.round(result.setupMs));
+      timing.finishMs = Math.min(timing.runMs - timing.setupMs, Math.round(result.tailMs));
+      timing.samplingMs = timing.runMs - timing.setupMs - timing.finishMs;
+    }
+  }
+  return timing;
 }
 
 /** Whether a run of `key` now would likely find its model loaded: the last run used it, recently. */

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
-const item = { id: 'details-0', url: picture, type: 'image', status: 'done', prompt: 'A lighthouse at dusk, copied whole', model: 'flux1-schnell.safetensors', createdAt: '2026-01-01T00:00:00Z', width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '123', sampler: 'euler' } };
+const item = { id: 'details-0', url: picture, type: 'image', status: 'done', prompt: 'A lighthouse at dusk, copied whole', model: 'flux1-schnell.safetensors', createdAt: '2026-01-01T00:00:00Z', width: 512, height: 512, durationMs: 30000, timing: { runMs: 14000, queueMs: 15000, setupMs: 3000, samplingMs: 10000, finishMs: 1000 }, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '123', sampler: 'euler' } };
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
@@ -51,6 +51,11 @@ test('Details shows each prompt with Copy, Settings without a box, and a footer 
     await expect(viewer.getByRole('navigation', { name: 'Image Actions', exact: true }).getByRole('button', { name: 'Rerun', exact: true })).toHaveCount(0);
   }
   await expect(side.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  const settings = side.locator('.detail-settings');
+  for (const [label, value] of [['Total', '30s'], ['Queue', '15s'], ['Active', '14s'], ['Setup (Est.)', '3s'], ['Sampling (Est.)', '10s'], ['Finishing (Est.)', '1s']]) {
+    await expect(settings.getByText(label, { exact: true })).toBeVisible();
+    await expect(settings.getByText(value, { exact: true })).toBeVisible();
+  }
   expect(await side.locator('.detail-settings').evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('0px');
   await prompt.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(item.prompt);

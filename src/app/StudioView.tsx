@@ -659,7 +659,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           active.settings?.cfg ? `CFG ${active.settings.cfg}` : "",
           [active.settings?.sampler, active.settings?.scheduler].filter(Boolean).join(" / "),
           active.settings?.seed && active.settings.seed !== "Random" ? `Seed ${active.settings.seed}` : "",
-          active.durationMs ? formatElapsed(active.durationMs) : ""
+          active.timing?.runMs ? `${formatElapsed(active.timing.runMs)} Active` : active.durationMs ? `${formatElapsed(active.durationMs)} Total` : ""
         ].filter(Boolean).join(" · ");
         return (
           <div className="scrim" role="dialog" aria-modal="true" aria-label="Image Viewer" data-focus-trap tabIndex={-1} onClick={(event) => {

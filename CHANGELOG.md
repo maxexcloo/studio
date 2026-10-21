@@ -11,6 +11,13 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Visual image review on request through MCP and a generation timing breakdown
+
+### Added
+- **Generation timing:** new runs save queue and active time plus estimated setup, sampling and finishing stages in Details and requested MCP reviews. Older results retain their recorded elapsed time.
+- **MCP Review:** a read-only tool supplies image pixels, the recorded prompt and generation settings for a chat model to assess when asked, with an optional second result for comparison. It preserves account ownership and hidden/deleted-result restrictions and never queues revisions.
+- **Controlled revisions:** Reuse accepts `preserve_seed` for same-profile follow-ups; ordinary reruns still use a new seed.
+
 ## [0.35.0] - 2026-10-21
 
 > Batch 5: a reworked phone Create, inline confirmations in the status pill, Settings as flat lists, a manual AI Control switch, and MCP that owns its chat rules

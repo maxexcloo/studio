@@ -190,10 +190,19 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
       add("FPS", settings.fps);
     }
   });
+  section("Timing", (add) => {
+    add("Total", item.durationMs ? formatElapsed(item.durationMs) : "");
+    const timing = item.timing;
+    const elapsed = (value?: number) => value !== undefined && Number.isFinite(value) && value >= 0 ? formatElapsed(value) : "";
+    add("Queue", elapsed(timing?.queueMs));
+    add("Active", elapsed(timing?.runMs));
+    add("Setup (Est.)", elapsed(timing?.setupMs));
+    add("Sampling (Est.)", elapsed(timing?.samplingMs));
+    add("Finishing (Est.)", elapsed(timing?.finishMs));
+  });
   section("File", (add) => {
     add("Output", item.outputName || item.filename);
     add("Generated", formatGeneratedAt(item.createdAt));
-    add("Time", item.durationMs ? formatElapsed(item.durationMs) : "");
     add("Type", item.type);
   });
   return sections;

@@ -16,7 +16,7 @@ import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from
 import { writeCivitaiParameters } from './civitai.js';
 import { warmNewOutputs } from './media-warmup.js';
 import { markWorkflowUsed } from './workflow-catalog.js';
-import { remainingMs, RunTimer, slowSteps } from './generation-timing.js';
+import { completedTiming, remainingMs, RunTimer, slowSteps } from './generation-timing.js';
 import { generationEstimate, generationWarm, recordGeneration, recordUpscale, upscaleEstimate } from './timings.js';
 import { upscaleLeftMs, upscaleWork } from './upscale-timing.js';
 
@@ -654,7 +654,7 @@ function recordTiming(id, body, timing) {
   if (!result) return;
   recordGeneration({ body, result, predicted: timing.estimate, warm: timing.warm });
   const slow = slowSteps(result, timing.estimate);
-  jobs.set(id, { ...jobs.get(id), timing: { runMs: Math.round(result.runMs), ...(result.stepMs ? { stepMs: Math.round(result.stepMs) } : {}), ...(slow ? { slow: true } : {}) } });
+  jobs.set(id, { ...jobs.get(id), timing: { ...completedTiming(timing.timer, body.startedAt, result), ...(slow ? { slow: true } : {}) } });
 }
 
 function hashString(str = "") {

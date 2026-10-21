@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addRun, estimateRun, isWarm, remainingMs, RunTimer, runVariant, slowSteps, timingKey, workExponent, workUnits } from "./generation-timing.js";
+import { completedTiming, addRun, estimateRun, isWarm, remainingMs, RunTimer, runVariant, slowSteps, timingKey, workExponent, workUnits } from "./generation-timing.js";
 
 const graph = { 3: { class_type: "KSampler" }, 4: { class_type: "UNETLoader" }, 8: { class_type: "VAEDecode" } };
 
@@ -225,4 +225,25 @@ test("slow steps are flagged only against a trusted estimate", () => {
   assert.equal(slowSteps({ stepMs: 900 }, { stepMs: 500, trusted: true }), false);
   assert.equal(slowSteps({ stepMs: 1500 }, { stepMs: 500, trusted: false }), false);
   assert.equal(slowSteps({ stepMs: 1500 }, null), false);
+});
+
+
+test("saved timing separates queue time and estimates stages without losing elapsed time", () => {
+  const timer = new RunTimer(graph);
+  play(timer, { at: 5000, setupMs: 3000, steps: 20, stepMs: 500, tailMs: 1200 });
+  assert.deepEqual(completedTiming(timer, 1000), { runMs: 14200, stepMs: 500, queueMs: 4000, setupMs: 3000, samplingMs: 10000, finishMs: 1200 });
+  assert.equal(completedTiming(timer, 6000).queueMs, undefined, "do not invent queue time when submission timestamps disagree");
+});
+
+test("missing execution or sampling events never fabricate stage timings", () => {
+  const timer = new RunTimer(graph);
+  assert.equal(completedTiming(timer, 0), null);
+  timer.note({ type: "execution_start" }, 1000);
+  timer.note({ type: "execution_success" }, 2000);
+  assert.deepEqual(completedTiming(timer, 0), { runMs: 1000, queueMs: 1000 });
+  const missed = new RunTimer(graph);
+  missed.note({ type: "progress", data: { node: "3", value: 1, max: 2 } }, 1000);
+  missed.note({ type: "progress", data: { node: "3", value: 2, max: 2 } }, 1500);
+  missed.note({ type: "execution_success" }, 2000);
+  assert.deepEqual(completedTiming(missed, 0), { runMs: 1000, stepMs: 500 });
 });

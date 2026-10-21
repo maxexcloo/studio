@@ -581,6 +581,32 @@ export class McpMedia {
     this.save();
     return result;
   }
+  /** Pixels and the recorded brief/settings for a requested visual review; never generates or judges. */
+  async review(owner, jobId, index = 0, { scope = '', signal } = {}) {
+    const job = await this.job(owner, jobId, 0, { signal });
+    if (!finished.has(job.status)) return this.result(owner, jobId, index, 0, 'preview', { scope, signal });
+    const output = this.available(job, index);
+    const item = await this.source(owner, jobId, index);
+    if (item.type === 'video') throw new Error('Review supports still images; review video frames separately.');
+    const image = await this.readOutput(output, owner);
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(image.mime)) throw new Error('Review supports PNG, JPEG and WebP images.');
+    const preview = await this.previewOf(image);
+    const saved = item.settings || {};
+    const fields = ['cfg', 'clipType', 'denoise', 'faceDetail', 'modelName', 'profileId', 'sampler', 'scheduler', 'seed', 'steps', 'textEncoder', 'upscaleQuality', 'vae', 'weightDtype'];
+    const settings = Object.fromEntries(fields.filter(key => saved[key] !== undefined).map(key => [key, saved[key]]));
+    if (Array.isArray(saved.loras)) settings.loras = saved.loras.map(({ name, strength, enabled }) => ({ name, strength, ...(enabled === undefined ? {} : { enabled }) }));
+    const recorded = this.promptRecord(jobId);
+    const record = {
+      job_id: jobId, output_index: index, ref: this.refOf(owner, scope, jobId), status: 'done',
+      link: this.pageUrl(owner, jobId), prompt: item.prompt, negative_prompt: item.negative || '',
+      width: item.width, height: item.height, settings,
+      ...(item.durationMs ? { elapsed_ms: item.durationMs } : {}),
+      ...(item.timing ? { timing: item.timing } : {}),
+      ...(recorded?.request ? { request: recorded.request } : {}),
+      ...(recorded?.changes?.length ? { changes: recorded.changes } : {}),
+    };
+    return { content: [text(record), { type: 'image', data: preview.content.toString('base64'), mimeType: preview.mime }], structuredContent: record };
+  }
   async result(owner, jobId, index = 0, seconds = 0, delivery = 'preview', { scope = '', signal, detail = false } = {}) {
     const wait = Math.min(seconds, maxResultWaitSeconds);
     const job = await this.job(owner, jobId, wait, { signal });
@@ -603,7 +629,7 @@ export class McpMedia {
     // A preview shows the asked-for output; a notification carries every output of the job.
     const shown = delivery === 'notification' ? job : { ...job, outputs: job.outputs.map((item, position) => position === index ? item : {}) };
     const { outputs, markdown } = await this.markdown(owner, jobId, shown, label);
-    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.`;
+    const message = `${label} is ready. Reply with the markdown below exactly, plus at most one short sentence. Stop here unless the user asked for a review.`;
     // Only the markdown re-enters the chat by default; detail restores the full record.
     if (!detail) return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { job_id: jobId, ...(ref ? { ref } : {}), status: 'done' } };
     const structured = { ...named, status: 'done', kind: job.kind, outputs, markdown, message };
@@ -678,7 +704,7 @@ export class McpMedia {
     const pendingLinks = pending.map(({ number, jobId }) => `[Result ${number}](${this.pageUrl(owner, jobId)})`);
     const markdown = [...blocks.map(block => block.markdown), [...pendingLinks, all].filter(Boolean).join(' · ')].filter(Boolean).join('\n\n');
     const message = shown.length
-      ? `${shown.length === 1 ? 'One result is' : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ''}. Reply with the markdown below exactly, plus at most one short sentence. Don't call Studio again for this request.`
+      ? `${shown.length === 1 ? 'One result is' : `${shown.length} results are`} ready${pending.length ? `, ${pending.length} still running` : ''}. Reply with the markdown below exactly, plus at most one short sentence. Stop here unless the user asked for a review.`
       : 'No result has finished yet. Share the links below and end your turn; do not poll.';
     return { content: [text(`${message}\n\n${markdown}`)], structuredContent: { status: pending.length ? 'running' : 'done', results: jobs.map(({ number, jobId, job }) => ({ ref: `result ${number}`, job_id: jobId, status: job.status })) } };
   }
