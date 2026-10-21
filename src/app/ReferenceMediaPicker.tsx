@@ -2,7 +2,6 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Check, GripVertical, Image as ImageIcon, ImagePlus, Images, ListChecks, LoaderCircle, Plus, Search, Trash2, Upload, X } from "lucide-react";
-import { ReferenceWithButton, type ReferenceWithChoice } from "./ReferenceWith";
 import { cn } from "./format";
 import { SurfaceStatus } from "./StatusMessage";
 import { Tip } from "./components";
@@ -598,11 +597,10 @@ export function RoleSwitch({ role, many, className }: { role: ReferenceRoleContr
  * Every reference input of the workflow, top right of the composer, plus the
  * picker popover and drop-and-paste uploads on the whole prompt bar.
  */
-export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError, referenceWith = null, openRequest = 0 }: {
+export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role = null, selected, onSelect, onRemove, confirmDelete, onError, openRequest = 0 }: {
   scope?: string;
   /** With no slot of its own: the models that take a reference, offered in the Reference button's place. */
-  referenceWith?: ReferenceWithChoice | null;
-  /** Bumped to open the first slot's picker (after Reference With switched models). */
+  /** Bumped to open the first slot's picker. */
   openRequest?: number;
   inputs: MediaInput[];
   inpaint?: ReferenceInpaint | null;
@@ -825,12 +823,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
     };
   }, [host, inputs.length]);
 
-  if (!inputs.length) {
-    if (!referenceWith?.profiles.length) return null;
-    const button = <div className="composer-reference-slots" role="group" aria-label="Reference Images"><div className="reference-slot-list"><ReferenceWithButton {...referenceWith} /></div></div>;
-    const target = host?.querySelector(".composer-reference-tools");
-    return <div className="composer-reference" ref={rootRef}>{target ? createPortal(button, target) : button}</div>;
-  }
+  // A model that takes no reference shows no References at all.
+  if (!inputs.length) return null;
   const count = inputs.filter((input) => assetFor(input.id)).length;
   const revision = context.current.revision;
   const openInput = inputs.find((input) => input.id === openSlot) || null;

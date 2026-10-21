@@ -564,7 +564,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               refreshComfyStatus={retryComfyStatus}
               comfyRetrying={Boolean(comfyRetrying)}
               referenceInputs={referenceInputs}
-              referenceWith={view.referenceWith}
               referenceOpenRequest={view.referenceOpenRequest}
               referenceInpaint={referenceInpaint}
               referenceRole={referenceRole}

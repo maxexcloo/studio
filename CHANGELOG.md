@@ -12,6 +12,7 @@ version opens with a `> ` summary line.
 ## [Unreleased]
 
 ### Changed
+- **References:** a model that takes no reference shows no References control; Reference With is gone.
 - **Prompt box:** growing past two lines no longer jumps; the composer resizes in the same frame as the text.
 - **Details:** groups are Prompt, Model, Settings, Output (size, reference, upscale and file together) and Timing, with rows sorted alphabetically. The Image Text button is gone: the summary follows Details. Copy includes only what was set.
 - **Timing:** an Upscale row shows the run's upscale time, which sits outside Active.

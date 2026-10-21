@@ -306,7 +306,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const sizeText = `${ratioName(size.shown.width, size.shown.height)} · ${size.shown.width}×${size.shown.height}`;
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
-  const hasReferences = Boolean((referenceInputs || []).length || view.referenceWith?.profiles?.length);
+  const hasReferences = Boolean((referenceInputs || []).length);
   const lorasOffered = mode !== 'video' || currentProfile?.capabilities?.lora;
   const fixedSeed = String(seed || '').trim();
   const stepsOffered = currentProfile?.family !== 'grok' && currentProfile?.capabilities?.steps !== false;
@@ -407,7 +407,6 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         <ReferenceSlots
           scope={`${mode}:${view.model}`}
           inputs={referenceInputs || []}
-          referenceWith={view.referenceWith}
           openRequest={view.referenceOpenRequest}
           inpaint={referenceInpaint}
           role={referenceRole}

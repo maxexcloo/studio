@@ -256,7 +256,8 @@ A picker, tab or list with nothing to show uses `EmptyState`
   control per slot. It opens the chooser, which picks several at once up to
   the model's limit (a picked image shows its order number; tapping it takes
   it off) and has a **Selected n/max** tab to review, reorder and remove. A
-  single-slot model keeps its one thumbnail chip. Edit | Reference and the
+  single-slot model keeps its one thumbnail chip. A model that takes no reference shows no
+  References control at all (no Reference With). Edit | Reference and the
   inpaint brush sit beside the button.
 - **LoRAs** use the same pattern: This Model | All Models | Selected n/max in
   the library, one tap to add or remove, no row animations.

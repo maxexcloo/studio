@@ -8,7 +8,6 @@ import { cn } from './format';
 import { recipesFor } from './modelRecipes';
 import { AspectPicker, ModelPicker, NumberPicker, Skeleton, Tip, type ControlDensity, type ModelMenuState } from './components';
 import { ReferenceSlots } from './ReferenceMediaPicker';
-import type { ReferenceWithChoice } from './ReferenceWith';
 import type { AspectPreset, MediaInput, Profile, SavedSize, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from './types';
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
 import type { MegapixelControl, SizeTier } from './SizeMenu';
@@ -247,8 +246,6 @@ export type ComposerBarProps = {
   refreshComfyStatus: () => void;
   comfyRetrying?: boolean;
   referenceInputs?: MediaInput[];
-  /** The models that take a reference, offered when this one takes none (ReferenceWith.tsx). */
-  referenceWith?: ReferenceWithChoice | null;
   referenceOpenRequest?: number;
   referenceInpaint?: ReferenceInpaint | null;
   referenceRole?: ReferenceRoleControl | null;
@@ -279,7 +276,7 @@ export function ComposerBar(props: ComposerBarProps) {
     lorasOpen = false, onOpenLoras,
     canUseNegativePrompt,
     runningCount, generateDisabled, generateDisabledReason, generate, refreshComfyStatus, comfyRetrying,
-    referenceInputs = [], referenceWith = null, referenceOpenRequest = 0, referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
+    referenceInputs = [], referenceOpenRequest = 0, referenceInpaint = null, referenceRole = null, loraMismatch = null, onDismissLoraMismatch, referenceAssets = [], onReferenceSelect, onReferenceRemove, onReferenceDeleteRequest, onReferenceError,
     pinnedSeed = "", onRandomSeed, generationEstimate = null, generateKey = "", onModeChange, primaryTarget = null
   } = props;
 
@@ -369,7 +366,7 @@ export function ComposerBar(props: ComposerBarProps) {
     <>
       {primaryTarget ? createPortal(submitActions, primaryTarget) : null}
       <LoraMismatchChip mismatch={loraMismatch} onOpenLoras={onOpenLoras} onDismiss={(key) => onDismissLoraMismatch?.(key)} />
-      <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} referenceWith={referenceWith} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
+      <ReferenceSlots scope={`${mode}:${model}`} inputs={referenceInputs} openRequest={referenceOpenRequest} inpaint={referenceInpaint} role={referenceRole} selected={referenceAssets} onSelect={onReferenceSelect} onRemove={onReferenceRemove} confirmDelete={onReferenceDeleteRequest} onError={onReferenceError} />
       <div className="composer-resource-row">
         <div className="composer-resource-left"><div className="composer-reference-tools" />{loraPill("compact")}</div>
         <div className="composer-resource-model">{workflowPicker("compact")}</div>
