@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-10-21
+
 > Access profiles with a default and approval, any number of workers, and a calmer, consistent UI: one dropdown, amber selection, no press movement, anchored popovers and LoRA stacks
 
 ### Changed
@@ -1623,7 +1625,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.39.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.40.0...HEAD
+[0.40.0]: https://github.com/maxexcloo/studio/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/maxexcloo/studio/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/maxexcloo/studio/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/maxexcloo/studio/compare/v0.36.0...v0.37.0
