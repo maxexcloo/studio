@@ -59,6 +59,9 @@ const aborted = (signal) => {
   error.aborted = true;
   return error;
 };
+// A job read answers in milliseconds; one that takes longer than this is stalled, and Status says so instead of waiting on.
+export const statusReadTimeoutMs = 15000;
+const statusStalledMessage = 'Studio did not answer this status check in time. The generation keeps running: share its link and check again later, without resubmitting.';
 const pause = (milliseconds, signal) => new Promise((resolve, reject) => {
   if (signal?.aborted) return reject(aborted(signal));
   const timer = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve(); }, milliseconds);
@@ -120,15 +123,17 @@ export class McpMedia {
     this.save();
     return true;
   }
-  async response(method, route, body, owner = "", { credential: override, signal } = {}) {
+  async response(method, route, body, owner = "", { credential: override, signal, timeoutMs = 60000, stalled = '' } = {}) {
     const base = new URL(typeof this.baseUrl === 'function' ? this.baseUrl() : this.baseUrl);
     if (!['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname) || base.protocol !== 'http:') throw new Error('MCP requires the studio’s private HTTP loopback endpoint.');
     let response;
     const credential = override || this.credentials.get(owner);
     // An account's credential is a header set: its personal bearer, or MCP's internal loopback credential.
     const headers = { ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), 'X-Studio': '1', ...(credential || {}) };
-    try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000) }); } catch {
+    try { response = await this.fetch(new URL(route, base), { method, headers, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }), redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs) }); } catch {
       if (signal?.aborted) throw aborted(signal);
+      // A status read that stalls says so in time for the chat, rather than holding it past the client's own deadline.
+      if (stalled) throw new Error(stalled);
       const error = new Error('The studio connection was interrupted. Check the returned job before retrying.');
       error.submissionUncertain = true;
       throw error;
@@ -143,7 +148,9 @@ export class McpMedia {
   }
   async request(method, route, body, owner = "", options = {}) {
     const response = await this.response(method, route, body, owner, options);
-    try { return await response.json(); } catch {
+    try { return await response.json(); } catch (failure) {
+      if (options.signal?.aborted) throw aborted(options.signal);
+      if (options.stalled && ['AbortError', 'TimeoutError'].includes(failure?.name)) throw new Error(options.stalled);
       const error = new Error('Studio returned an invalid response. Check job status before retrying.');
       error.submissionUncertain = true;
       throw error;
@@ -379,15 +386,15 @@ export class McpMedia {
     const number = entry && Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
     return number ? `result ${number}` : undefined;
   }
-  async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
+  async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000, timeoutMs = statusReadTimeoutMs } = {}) {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
       if (signal?.aborted) throw aborted(signal);
-      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner, { signal, credential });
+      let job = await this.request('GET', `/api/jobs/${safeId(jobId)}`, undefined, owner, { signal, credential, timeoutMs, stalled: statusStalledMessage });
       if (job.status === 'missing' || finished.has(job.status)) {
         // A subsequently deleted output is revoked even while its terminal job remains cached.
-        const visible = await this.galleryJob(jobId, owner, { signal, credential });
+        const visible = await this.galleryJob(jobId, owner, { signal, credential, timeoutMs, stalled: statusStalledMessage });
         job = job.status === 'missing' ? visible : { ...job, outputs: visible.outputs, kind: visible.kind || job.kind, profileId: visible.profileId };
       }
       // A cloud job refused for authorisation or quota reads as such, and pauses further cloud video.
