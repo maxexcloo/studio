@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
 test('administrators can manage access profiles, accounts and a personal MCP token', async ({ page }) => {
+  // One long end-to-end walk through Users and Account; CI runners need more than the default 30 s.
+  test.setTimeout(90_000);
   const otherAccountText = 'private-draft-from-another-account';
   const posts: { url: string; body: unknown }[] = [];
   const loraOps: string[] = [];

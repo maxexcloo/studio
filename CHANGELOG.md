@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Publishes the 0.40.0 changes, whose release check timed out; see 0.40.0 below for what changed
+
+### Fixed
+- The long administrator accounts browser test has room to finish on CI, so the 0.40 changes publish.
+
 ## [0.40.0] - 2026-10-21
 
 > Access profiles with a default and approval, any number of workers, and a calmer, consistent UI: one dropdown, amber selection, no press movement, anchored popovers and LoRA stacks
