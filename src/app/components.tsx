@@ -682,8 +682,9 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                                 <em>{modelDetails(profile)}{size ? <span className="model-size"> · {size}</span> : null}</em>
                               )}
                             </span>
-                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
+                            {/* The tick leads the row's right-hand icons: tick · abilities · star. */}
                             <SelectedTick on={profile.id === value} className="model-selection-tick" />
+                            <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
                           </button></Tip>
                         {menu ? (
                           <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from Favourites` : `Add ${profile.displayName || profile.label} to Favourites`} onClick={() => menu.toggleFavorite(profile.id)}>

@@ -494,7 +494,7 @@ button.list-row { isolation: isolate; }
 .phone-model-tools .picker-search-row { padding: 0 0 6px; }
 .phone-model-tools .picker-controls .model-filter-group button { padding: 0 10px; font-size: inherit; }
 
-/* A group heading with one action on its right (Settings › Users › Accounts: New Account). */
+/* A group heading with one action on its right (Settings › Users › Accounts: New Account; Workers: Add Worker). */
 .set-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 2px; }
 .set-group-head > .list-section-title { margin: 0; }
 .set-group-action {
@@ -506,6 +506,9 @@ button.list-row { isolation: isolate; }
 }
 .set-group-action:hover { color: var(--accent-amber-hover); }
 .set-group-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A quiet destructive text action at a row's end (Settings › Workers: Remove). */
+.set-group-action.is-danger { color: var(--danger-ink); }
+.set-group-action:disabled { opacity: .45; cursor: default; }
 
 /* A row whose only control leaves Studio: a plain link aligned like other values (UI-PATTERNS › Lists). */
 .set-link {
@@ -559,7 +562,7 @@ button.list-row { isolation: isolate; }
 .model-menu > .model-menu-head .surface-title { font-size: 13px; font-weight: 550; }
 .model-menu .model-option,
 .model-menu .model-option.active { grid-template-columns: minmax(0, 1fr) auto auto; }
-.model-menu .model-option .model-selection-tick { margin-inline-start: var(--space-2); }
+.model-menu .model-option .model-selection-tick { margin-inline: var(--space-2) 0; }
 /* With the filters and search in the heading, the phone's model tools row keeps only a Recipe row, if any. */
 .phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
 
