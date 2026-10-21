@@ -9,6 +9,8 @@ import { formatBytes, upscaleEfforts, upscaleQualityLabel } from './useUpscale';
 import type { UpscaleSetup, UpscaleSetupStage } from './useUpscale';
 import type { UpscaleInstall, UpscaleInstallFile, UpscaleQuality, UpscaleStatus } from './types';
 import { SafeImg } from './SafeImg';
+import { ProgressBar } from './Progress';
+import { formatEta } from './UpscaleDownloadActivity';
 import { mediaUrl } from './mediaUrl';
 import type { ShowToast } from './toast';
 
@@ -39,15 +41,6 @@ function SetupSteps({ stage }: { stage: UpscaleSetupStage }) {
   );
 }
 
-/** A progress bar cut into cells, so it reads as the same material as the hero. */
-export function CellBar({ value, tone = "ember" }: { value: number; tone?: "ember" | "done" }) {
-  return (
-    <div className={cn("cell-bar", tone === "done" && "is-done")} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
-      <div style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} />
-    </div>
-  );
-}
-
 /** "Checked 3s ago" that keeps counting while setup waits on ComfyUI. */
 export function Watcher({ children, lastChecked }: React.PropsWithChildren<{ lastChecked?: number }>) {
   const [, tick] = useState(0);
@@ -65,15 +58,6 @@ export function Watcher({ children, lastChecked }: React.PropsWithChildren<{ las
   );
 }
 
-function formatDuration(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "";
-  if (seconds < 60) return "under a minute";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `about ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  return `about ${hours} h ${minutes % 60} min`;
-}
-
 function fileLine(file: UpscaleInstallFile) {
   switch (file.phase) {
     case "queued": return "Waiting";
@@ -85,7 +69,7 @@ function fileLine(file: UpscaleInstallFile) {
   }
 }
 
-const copyFor = (stage: UpscaleSetupStage, quality: string, pending: boolean, fallback: string): { title: string; description: string } => {
+const copyFor = (stage: UpscaleSetupStage, quality: string, pending: boolean, fallback: string, error = ""): { title: string; description: string } => {
   switch (stage) {
     case "checking": return { title: "Setting Up Upscale", description: "Checking ComfyUI…" };
     case "offline": return { title: "Waiting for ComfyUI", description: "Start ComfyUI to continue." };
@@ -96,7 +80,7 @@ const copyFor = (stage: UpscaleSetupStage, quality: string, pending: boolean, fa
     case "ready": return fallback && !pending
       ? { title: "Ready with a Fallback Model", description: `${upscaleQualityLabel(quality)} works, but not with its own model.` }
       : { title: "Upscale Is Ready", description: pending ? "Starting the upscale." : "Every finished image has an upscale arrow in its corner." };
-    case "error": return { title: "The Download Stopped", description: "Try again to resume." };
+    case "error": return { title: "The Download Stopped", description: `${error ? `${error.replace(/\.$/, "")}. ` : ""}Try again to resume.` };
   }
 };
 
@@ -126,9 +110,10 @@ export function UpscaleSetupDialog({
   const admin = useThisComputer();
   const progress = install?.totalBytes ? (install.receivedBytes || 0) / install.totalBytes : 0;
   const fallback = status?.substituting ? status.fallbackFile || "another installed SeedVR2 weight" : "";
-  const { title, description } = copyFor(stage, quality, Boolean(pending), fallback);
+  // A stopped download says why once, in the description (UI-PATTERNS › Messages: no error box of its own).
+  const { title, description } = copyFor(stage, quality, Boolean(pending), fallback, install?.error);
   const close = setup.closeSetup;
-  const later = <button className="btn is-ghost" onClick={close}>{stage === "downloading" ? "Continue in background" : "Not now"}</button>;
+  const later = <button className="btn is-ghost" onClick={close}>{stage === "downloading" ? "Continue in Background" : "Not Now"}</button>;
   const recheck = <button className="btn" onClick={() => setup.recheck()}><RefreshCw size={14} /> Check Again</button>;
 
   const missingModels = (status?.models || []).filter((model) => !model.present);
@@ -246,7 +231,7 @@ export function UpscaleSetupDialog({
             <strong>{Math.floor(progress * 100)}<small>%</small></strong>
             <div>
               <span>{formatBytes(install?.receivedBytes)} of {formatBytes(install?.totalBytes)}</span>
-              <span>{speed > 0 ? `${formatBytes(speed)}/s · ${formatDuration(eta)} left` : "Connecting to Hugging Face"}</span>
+              <span>{speed > 0 ? [`${formatBytes(speed)}/s`, formatEta(eta)].filter(Boolean).join(" · ") : "Connecting to Hugging Face"}</span>
             </div>
           </div>
         ) : (
@@ -259,7 +244,7 @@ export function UpscaleSetupDialog({
               <li key={file.file} className={cn(done && "is-done")}>
                 <div>
                   <strong>{file.label}{file.detail ? <em>{file.detail}</em> : null}</strong>
-                  <CellBar value={done ? 1 : file.totalBytes ? file.bytes / file.totalBytes : 0} tone={done ? "done" : "ember"} />
+                  <ProgressBar value={done ? 1 : file.totalBytes ? file.bytes / file.totalBytes : 0} tone={done ? "done" : "live"} label={`${file.label} Progress`} />
                 </div>
                 <span>{done ? <><Check size={12} strokeWidth={2.5} /> Verified</> : fileLine(file)}</span>
               </li>
@@ -296,7 +281,6 @@ export function UpscaleSetupDialog({
       </>
     ) : <button className="btn is-primary" onClick={close}>Done</button>;
   } else if (stage === "error") {
-    body = <div className="upscale-callout is-danger"><strong>{install?.error || "The download failed."}</strong></div>;
     footer = admin ? <>{later}<button className="btn is-primary" onClick={setup.startDownload}>Try Again</button></> : later;
   }
 

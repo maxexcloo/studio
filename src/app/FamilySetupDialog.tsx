@@ -3,7 +3,8 @@ import { ArrowLeft, Check, Download, ExternalLink, Pause, RefreshCw } from 'luci
 import { Modal } from './Modal';
 import { NodeInstall } from './NodeInstall';
 import { FamilySetupHero, type FamilySetupHeroStage } from './FamilySetupHero';
-import { CellBar, Watcher } from './UpscaleDialogs';
+import { Watcher } from './UpscaleDialogs';
+import { ProgressBar } from './Progress';
 import { formatEta } from './UpscaleDownloadActivity';
 import { apiJson } from './api';
 import { cn, formatDownloadSize } from './format';
@@ -288,13 +289,13 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
               <li key={row.part} className={cn(done && 'is-done')}>
                 <div>
                   <strong>{row.label}<em>{row.part === 'encoder' ? 'reads your prompt' : 'draws the pixels'}</em></strong>
-                  {state === 'downloading' || state === 'paused' ? <CellBar value={value} /> : <code>{row.have || row.download?.file}</code>}
+                  {state === 'downloading' || state === 'paused' ? <ProgressBar value={value} tone={state === 'paused' ? 'paused' : 'live'} label={`${row.label} Progress`} /> : <code>{row.have || row.download?.file}</code>}
                 </div>
                 <span>
                   {done ? <><Check size={12} strokeWidth={2.5} /> {state === 'installed' ? 'In place' : 'Downloaded'}</>
                     : state === 'downloading' ? `${Math.floor(value * 100)}%`
                     : state === 'paused' ? 'Paused'
-                    : state === 'error' ? 'Stopped'
+                    : state === 'error' ? 'Failed'
                     : formatDownloadSize(row.download?.bytes)}
                 </span>
               </li>

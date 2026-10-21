@@ -657,9 +657,16 @@ without it the Library holds LoRAs, Models and Downloads.
   says whether the old file was removed or what still uses it. An update
   never downloads on its own. Update Available puts a dot on the dock's
   Library icon (its tooltip says so) and a count on the phone Menu's Library.
-- **Downloads:** the shared progress pattern: the file, its folder and size,
-  the bar while it runs, the failure under the name, the state on the right
-  with one action (Cancel, Retry or Resume).
+- **Downloads:** the shared progress pattern (`Progress.tsx`): the file, its
+  folder and size, the bar while it runs, the failure under the name, the
+  state on the right in the shared words (Queued, Downloading 45%, Checking…,
+  Paused, Done, Failed, Cancelled) with one action (Cancel, Retry or Resume).
+  The same `ProgressBar` (`set-progress`, dimmed while paused) and words
+  serve imports, saved images, model and upscale setup, starter models and
+  the activity pill for worker transfers; there is no second bar. A transfer
+  that fails out of sight says why in the status pill ("Couldn’t download
+  …", with Try Again or Set Up), never as an error box or a pill that waits;
+  the ZIP of several items says it started there too.
 - **Speed:** lists compare file names and sizes only; opening one import or
   image checks its checksums (kept on disk, so a restart never reads every
   model again). The code loads while idle (`preloadable.ts`), placeholders hold

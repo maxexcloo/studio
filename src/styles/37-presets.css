@@ -226,6 +226,9 @@
 /* Downloads: the shared bar under the name, in the row's text. */
 span.set-progress { display: block; }
 .set-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--ember); }
+/* The shared bar's two other states (src/app/Progress.tsx): a paused transfer dims, a finished one turns to the foreground. */
+.set-progress.is-paused > span { opacity: .45; }
+.set-progress.is-done > span { background: hsl(var(--foreground)); }
 .library-download .library-error { display: block; margin-top: var(--space-2); }
 
 /* ------------------------------------------------- Image imports & updates */

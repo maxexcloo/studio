@@ -4,7 +4,6 @@ import { Check } from 'lucide-react';
 import { apiJson } from './api';
 import { cn } from './format';
 import { Tip } from './components';
-import type { ModelDownload } from './types';
 
 /*
  * What the Library's pages share (UI-PATTERNS › Library): requests, folder
@@ -19,9 +18,7 @@ export const post = <T,>(url: string, body: object) => apiJson<T>(url, { method:
 export const size = (bytes?: number) => !bytes ? '' : bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 export const FOLDERS: Record<string, string> = { checkpoints: 'Checkpoints', clip_vision: 'CLIP Vision', diffusion_models: 'Diffusion Models', loras: 'LoRAs', text_encoders: 'Text Encoders', unet: 'Diffusion Models', vae: 'VAE' };
 export const folderName = (folder?: string) => folder ? FOLDERS[folder] || folder : '';
-export const percent = (item: { receivedBytes?: number; totalBytes?: number }) => item.totalBytes ? Math.min(100, Math.round((item.receivedBytes || 0) / item.totalBytes * 100)) : 0;
-export const downloadWords = (item: ModelDownload) => item.status === 'downloading' ? item.verifying ? 'Checking…' : item.totalBytes ? `${percent(item)}%` : 'Downloading…'
-  : item.status === 'done' ? 'Done' : item.status === 'error' ? 'Failed' : item.status === 'canceled' ? 'Cancelled' : item.status === 'paused' ? 'Paused' : 'Queued';
+export { percentOf as percent } from './Progress';
 export const gradeWords: Record<Grade['value'], string> = { exact: 'Exact', close: 'Close', partial: 'Partial' };
 export const errorText = (error: unknown, fallback = 'Something went wrong. Try again.') => error instanceof Error ? error.message : fallback;
 

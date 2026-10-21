@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { CellBar } from './UpscaleDialogs';
+import { ProgressBar } from './Progress';
 import { Tip } from './components';
 import { cn } from './format';
 import { usePageHidden, usePausableTimeout } from '@/hooks/use-pausable-timeout';
@@ -236,7 +236,7 @@ function ActivityIsland({ activity }: { activity: Activity }) {
                   {activity.badge !== undefined ? <span className="activity-badge">{activity.badge}</span> : null}
                   {activity.figure !== undefined ? <em>{activity.figure}</em> : null}
                 </span>
-                {activity.progress !== undefined ? <CellBar value={activity.progress} /> : null}
+                {activity.progress !== undefined ? <ProgressBar value={activity.progress} tone={activity.phase === 'paused' ? 'paused' : 'live'} label={`${typeof activity.title === 'string' ? activity.title : 'Download'} Progress`} /> : null}
                 {activity.meta ? (
                   <small className={cn(activity.metaLines === 2 && 'is-two-line')} title={activity.metaTitle}>{activity.meta}</small>
                 ) : null}

@@ -5,7 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { ComfyRestart } from './ComfyRestart';
 import { NodeInstall, ShellCommand } from './NodeInstall';
-import { CellBar, Watcher } from './UpscaleDialogs';
+import { Watcher } from './UpscaleDialogs';
+import { ProgressBar } from './Progress';
 import { formatEta } from './UpscaleDownloadActivity';
 import { cn, formatDownloadSize } from './format';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
@@ -283,7 +284,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
                   exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
                   transition={reduced ? tweens.fast : tweens.slow}
                 >
-                  <CellBar value={current.totalBytes ? current.receivedBytes / current.totalBytes : 0} />
+                  <ProgressBar value={current.totalBytes ? current.receivedBytes / current.totalBytes : 0} tone={rowState === 'paused' ? 'paused' : 'live'} label={`${item.label || current.file} Progress`} />
                   <small>{progressLine(current, rowState)}</small>
                 </motion.div>
               ) : null}

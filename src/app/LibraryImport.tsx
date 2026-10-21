@@ -10,6 +10,7 @@ import { presetFit, type ImagePreset } from './presets';
 import type { ModelDownload, Models, Profile } from './types';
 import type { ShowToast } from './toast';
 import { errorText, FileStatus, FOLDERS, folderName, GradeChip, LibraryFooter, percent, post, size, SourceLinks } from './libraryShared';
+import { ProgressBar, transferWords } from './Progress';
 import { ImageRecipe, isImageImport, OffersGroup, presetFromImport, UseWith, type Availability, type ImportRecord, type ImportResource } from './LibraryImportParts';
 
 export type { ImportRecord, ImportResource } from './LibraryImportParts';
@@ -236,7 +237,7 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
           const download = live(resource);
           const moving = resource.status === 'downloading' || Boolean(download && ['queued', 'downloading'].includes(download.status));
           const progress = download || resource.progress;
-          const words = resource.unavailable && resource.status !== 'substitute' ? `Unavailable · ${unavailableWords[resource.unavailable.reason]}` : moving ? (download?.status === 'queued' ? 'Queued' : progress?.totalBytes ? `Downloading ${percent(progress)}%` : 'Downloading…')
+          const words = resource.unavailable && resource.status !== 'substitute' ? `Unavailable · ${unavailableWords[resource.unavailable.reason]}` : moving ? transferWords({ status: download?.status === 'queued' ? 'queued' : 'downloading', receivedBytes: progress?.receivedBytes, totalBytes: progress?.totalBytes })
             : resource.status === 'installed' && resource.nameOnly ? 'Found By Filename' : resource.status === 'installed' && resource.unverified ? 'Installed · Unverified' : resource.suggested && resource.status === 'installed' ? 'Suggested' : statusWords[resource.status];
           const stand = resource.status === 'substitute' ? resource.substitute : undefined;
           const canMove = record.input.kind.startsWith('hf-') && !['installed', 'downloading'].includes(resource.status) && !moving;
@@ -245,7 +246,7 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
             {stand ? <span className="library-line library-substitute">Using {stand.file} · {substituteWords[stand.kind]}: {stand.reason}{resource.exactInstalled ? '. The exact file is installed now' : ''}</span> : null}
             {resource.unavailable ? <span className="library-line">{resource.unavailable.note}{resource.unavailable.freeAlternative ? <> <a className="set-link" href={resource.unavailable.freeAlternative.url} target="_blank" rel="noreferrer">Free version: {resource.unavailable.freeAlternative.name}</a></> : null}</span> : resource.note ? <span className="library-line">{resource.note}</span> : null}
             {resource.downloadError ? <span className="library-line library-error" role="alert">{resource.downloadError}</span> : null}
-            {moving ? <span className="set-progress" aria-hidden="true"><span style={{ width: `${progress ? percent(progress) : 0}%` }} /></span> : null}
+            {moving ? <ProgressBar value={progress ? percent(progress) / 100 : 0} label={`${resource.want.file || resource.name} Progress`} /> : null}
           </>}>
             {canMove ? <span className="library-model-choice"><ListSelect label={`Destination for ${resource.want.file}`} value={resource.want.folder} onChange={(folder) => move(record, index, folder)} options={destinations} /></span> : null}
             {resource.optional && resource.status === 'missing' && resource.supported !== false && !resource.unavailable && !resource.unsourced && !moving ? <button type="button" className="btn is-sm" disabled={busy} onClick={() => queue(record, [index])}><Download size={14} />Download</button> : null}
