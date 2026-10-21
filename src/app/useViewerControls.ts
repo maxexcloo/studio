@@ -141,8 +141,8 @@ export function useViewerControls(view: any) {
 
   function openItem(item: GalleryItem) {
     resetViewer(openingMode());
-    // The side panel squeezes the image below laptop widths, so it starts closed there.
-    setShowDetails(typeof window === "undefined" ? true : !window.matchMedia("(max-width: 1024px)").matches);
+    // At tablet widths (the CSS tablet breakpoint) the side panel overlays the image, so it starts closed there.
+    setShowDetails(typeof window === "undefined" ? true : !window.matchMedia("(max-width: 1050px)").matches);
     setActive(item);
   }
 

@@ -49,7 +49,7 @@
 html:has(.phone-shell),
 html:has(.phone-shell) body,
 html:has(.phone-shell) #root { height: auto; min-height: 100%; }
-/* The narrow-screen `body { overflow: hidden }` (06-responsive.css) passes to
+/* The narrow-screen `body { overflow: hidden }` (base.css) passes to
    the viewport while html is visible and stops touch scrolling; the phone
    shell scrolls the document, so its body stays visible and only the lock
    below (on html) stops it. */
@@ -700,7 +700,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   transition: border-color var(--motion-fast) var(--motion-ease);
 }
 .create-prompts .composer-prompt-field:focus-within { border-color: var(--line-strong); }
-/* The prompt takes the room the rows leave; its actions sit in one row at its top right (42-phone-pop.css). */
+/* The prompt takes the room the rows leave; its actions sit in one row at its top right (phone.css). */
 .create-prompts .composer-prompt-field.is-fill { flex: 1 1 0; flex-direction: column; min-height: 118px; }
 .create-prompts textarea {
   box-sizing: border-box;

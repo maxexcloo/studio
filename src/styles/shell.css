@@ -162,7 +162,7 @@
   text-decoration: none;
 }
 .stage-link:hover { color: hsl(var(--foreground)); }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .split { grid-template-columns: 1fr; }
   .stage-gallery {
     overscroll-behavior: contain;
@@ -229,7 +229,7 @@
    The surface system
 
    Final material, height and radius for every shared component, built only from
-   the tokens in 00-tokens.css. Earlier files still hold structure and layout;
+   the tokens in tokens.css. Earlier rules still hold structure and layout;
    anything about how a surface or control *looks* is decided here, so the whole
    app reads as one family with the generation composer as the baseline.
 --------------------------------------------------------------------------- */
@@ -270,7 +270,7 @@
    (background clipped to the content box), so a 48px bar keeps 8px of glass
    around it on every side. Hover changes only the fill and colour at
    --motion-fast; a press darkens the circle (the shared press overlay in
-   09-motion.css) at --motion-instant, and nothing moves. The keyboard ring
+   motion.css) at --motion-instant, and nothing moves. The keyboard ring
    traces the fill circle, inside the bar. */
 .studio-dock .icon-button {
   padding: var(--icon-fill-inset);
@@ -323,7 +323,7 @@
    itself never changes size.
 
    This file owns placement for all of it, in both layouts and at every width.
-   Material and size come from 16-system.css.
+   Material and size come from the shared glass rules above.
 --------------------------------------------------------------------------- */
 /* Scoped to the shell: the composer publishes --zen-prompt-h there. */
 .app-shell {
@@ -397,7 +397,7 @@
 /* ---------------------------------------------------------------- Stacked
    At 760px and below the composer runs edge to edge, so the deck rides just
    above it instead of beside it. From 761px to 1040px the lanes beside it are
-   too narrow for rows, so the deck stands in columns there (36-deck-columns.css). */
+   too narrow for rows, so the deck stands in columns there (shell.css). */
 @media (max-width: 760px) {
   .studio-dock { bottom: var(--deck-lift); }
   .stage-gallery { padding-bottom: calc(var(--deck-lift) + var(--deck-h) + 16px); }
@@ -406,7 +406,7 @@
     --deck-lift: calc(var(--zen-prompt-h, 160px) + 18px);
   }
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .app-shell {
     --deck-lift: calc(var(--zen-prompt-h, 160px) + max(8px, env(safe-area-inset-bottom)) + 8px);
   }
@@ -484,12 +484,12 @@
    a column standing on the composer's baseline: Controls with search, autoplay
    and stack above it on the left, the dock upright on the right. At 760px and
    below the composer runs edge to edge and the rows ride above it again
-   (17-deck.css).
+   (shell.css).
 
    Imported last so it outranks the per-button offsets in 31-habit, 11-runs and
    34-video without extra specificity.
 --------------------------------------------------------------------------- */
-@media (min-width: 761px) and (max-width: 1040px) {
+@media (min-width: 761px) and (max-width: 1050px) {
   .app-shell { --deck-step: calc(var(--deck-h) + 8px); }
   .studio-dock {
     flex-direction: column;

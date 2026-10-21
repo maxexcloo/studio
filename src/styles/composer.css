@@ -305,14 +305,14 @@
   animation: surfaceIn var(--motion-base) var(--motion-ease) both;
   transform-origin: 20px 100%;
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .model-trigger {
     min-height: 44px;
     grid-template-columns: 28px minmax(0, 1fr) auto;
     gap: var(--space-4);
   }
-  /* Phone placement for the deck lives in 17-deck.css, and the later
-     small-screen fixes in 27-mobile.css. */
+  /* Phone placement for the deck lives in shell.css, and the later
+     small-screen fixes in phone.css. */
   .zen-prompt {
     max-width: none;
     min-width: 0;
@@ -353,7 +353,7 @@
 .zen-prompt > textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .zen-prompt textarea::placeholder { color: rgb(255 255 255 / .5); }
 .zen-prompt-actions { padding: 2px; }
-/* The density ladder in 12-composer.css keeps this on one line; it must not
+/* The density ladder in composer.css keeps this on one line; it must not
    wrap, because a wrapped bar is exactly what the ladder exists to avoid. */
 .zen-inline-settings { justify-content: flex-end; gap: var(--space-3); }
 .zen-prompt-actions .model-trigger,
@@ -536,7 +536,7 @@
 .lora-pill.is-density-mini .animated-number { color: hsl(var(--foreground)); }
 /* --- The drawer trigger and panel ---------------------------------------- */
 /* The row already names the control, so the control does not repeat itself. */
-/* The narrow-screen overrides in 06-responsive.css are meant for the sidebar
+/* The narrow-screen overrides in base.css are meant for the sidebar
    picker; the composer's compact one has to stay a single 40px line. */
 .zen-prompt-actions .model-picker.is-compact .model-trigger {
   min-height: 40px;
@@ -566,7 +566,7 @@
   min-width: min(320px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   /* The menus belong to the composer, not to a 99px-wide trigger: span the
      composer instead of running off the right edge. */
   .zen-prompt-actions .model-picker.is-compact .model-menu,
@@ -753,7 +753,7 @@
 }
 /* Reserve the actual horizontal dock width, including optional library actions.
    The existing narrow-screen column and above-composer placements keep their lanes. */
-@media (min-width: 1041px) {
+@media (min-width: 1051px) {
   .app-shell:not(.has-pinned-controls) .zen-prompt {
     width: min(920px, calc(100vw - 2 * (var(--studio-dock-w, 258px) + var(--deck-gap) + 12px)));
     min-width: 0;
@@ -839,7 +839,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-reference-slots.is-inline .ref-menu-paint-slot > .ref-menu-divider { display: none; }
 .composer-reference-slots.is-inline .ref-menu:not(:has(.ref-menu-paint-slot:not(.is-hidden))) { display: none; }
 /* Narrow: the row's first chip is its leftmost, so its menu opens rightward, on screen. */
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .composer-reference-slots.is-inline .ref-menu { right: auto; left: -3px; }
 }
 /* Touch: the ×'s finger-sized hit area leans out past the corner, off the thumbnail it sits on,
@@ -909,7 +909,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   padding: 8px;
   outline: none;
 }
-/* The search field is the model menu's own (.model-menu-search, 25-model-folders.css). */
+/* The search field is the model menu's own (.model-menu-search, pickers.css). */
 .prompt-history-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -1037,7 +1037,7 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (max-width: 760px) {
   .app-shell .zen-control-button.grid-autoplay-button { left: calc(max(8px, env(safe-area-inset-left)) + 2 * var(--deck-h) + 16px); }
 }
-@media (min-width: 761px) and (max-width: 1040px) {
+@media (min-width: 761px) and (max-width: 1050px) {
   .app-shell .zen-control-button { bottom: var(--deck-gap); }
   .app-shell .zen-control-button.grid-autoplay-button,
   .app-shell .zen-control-button.stack-runs-button {

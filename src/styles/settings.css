@@ -985,7 +985,7 @@
 .upscale-pending span { font-size: 12.5px; color: hsl(var(--muted-foreground)); }
 /* ------------------------------------------------ The download arrow
    The setup hero's arrow in miniature, the glyph of the download and update
-   activities (the island itself lives in 30-islands.css). */
+   activities (the island itself lives in messages.css). */
 .udw-arrow { flex: none; width: 38px; height: 46px; margin: -4px 0 -2px; overflow: visible; }
 /* The arrow's cells: ember twinkle below the fill line, sparks lifting off it,
    a bottom-to-top scan while checking, one pop when ready. */
@@ -1216,7 +1216,7 @@
 /* ---------------------------------------------------------------------------
    Guided model setup (src/app/FamilySetupDialog.tsx)
 
-   The smart upscale setup's material (24-upscale.css) for a model you have:
+   The smart upscale setup's material (settings.css) for a model you have:
    the same hero frame, stepper, watcher, file list and meter, plus a row
    for the model file and which way it runs.
 --------------------------------------------------------------------------- */

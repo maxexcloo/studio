@@ -154,7 +154,7 @@
 .model-ability { display: grid; place-items: center; }
 .model-option:hover .model-abilities,
 .model-option.active .model-abilities { color: hsl(var(--foreground) / .8); }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .aspect-menu, .model-menu {
     position: fixed;
     left: 10px;
@@ -1131,7 +1131,7 @@
 /* Chips above the dock (Group runs, Stop) must not sit on an open sidebar. */
 /* A start image's menu opens leftward from its thumbnail, which runs off a
    phone's left edge; there it drops below the chip instead, inside the bar. */
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .ref-menu {
     top: calc(100% + 6px);
     right: -3px;
@@ -1155,7 +1155,7 @@
 }
 /* ------------------------------------------------------------- Menus: dvh */
 /* vh counts the space under Safari's toolbars; dvh is what is actually visible. */
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .aspect-menu,
   .model-menu { max-height: min(72dvh, 560px); }
 }

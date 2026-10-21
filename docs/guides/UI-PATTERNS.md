@@ -7,7 +7,7 @@ the pattern occurs in the same piece of work.
 
 ## Motion
 
-- **Tokens:** every duration and easing comes from `00-tokens.css`:
+- **Tokens:** every duration and easing comes from `tokens.css`:
   `--motion-instant` (90 ms) for presses, `--motion-fast` (140 ms) for hover,
   focus and small state changes, `--motion-base` (200 ms) for surfaces
   entering or leaving, `--motion-slow` (320 ms) for height changes such as a
@@ -23,7 +23,7 @@ the pattern occurs in the same piece of work.
   damping: 40`) is only for sheets that follow a finger. Nothing overshoots.
 - **Presses never move anything.** No control scales, shrinks, lifts or shifts
   when it is pressed or hovered. A press darkens the fill in place at
-  `--motion-instant` (one global rule in `09-motion.css`): `--press-overlay`
+  `--motion-instant` (one global rule in `motion.css`): `--press-overlay`
   on dark controls, `--press-overlay-dark` on light ones, a slight dim on
   Generate, and `--press-media` on the picture of a tile or thumbnail.
 - **Animate only `transform` and `opacity`.** Never transition `top`, `left`,
@@ -66,7 +66,7 @@ the pattern occurs in the same piece of work.
 
 ## Geometry
 
-Use the tokens in `00-tokens.css`, never raw values:
+Use the tokens in `tokens.css`, never raw values:
 
 - **Spacing:** gaps and padding step through `--space-1`…`--space-7`
   (2, 4, 6, 8, 12, 16, 24 px). No 1, 3, 5, 7, 9, 10, 11 or 14 px gaps.
@@ -91,6 +91,42 @@ Use the tokens in `00-tokens.css`, never raw values:
 - **Icons:** 16 px (`--icon`) for actions, 14 px (`--icon-sm`) in chips and
   rows, 20 px (`--icon-touch`) on phone bars; the default stroke, and check
   marks at `--check-stroke` (2.5).
+
+### Stylesheet
+
+`src/styles.css` imports one file per concern in cascade order: `tokens`,
+`base` (Tailwind, fonts, element defaults), `motion` (press feedback and
+transition defaults), `surfaces` (modals), `controls`, `lists`, `focus` (the
+neutral ring), `shell`, `pickers`, `composer`, `dropdowns`, `gallery`,
+`viewer`, `settings`, `library`, `messages`, `lockscreen`, `phone` and
+`forced-colors`. A component's rules, its responsive and reduced-motion
+variants included, live in its file; a container's file comes after the parts
+it holds, so its contextual rules win at equal specificity. Put a new rule in
+its component's file, and only reach for `!important` to beat inline styles,
+third-party markup or every component at once (the reduced-motion kill
+switch, `[data-settling]`, the press overlay, forced colours).
+
+### Breakpoints
+
+Width queries use these values only (min-width variants start one pixel up):
+
+| Name | Query | For |
+| --- | --- | --- |
+| Wide | `max-width: 1600px` | The gallery toolbar's filters stop anchoring beside search |
+| Desk | `min-width: 1051px` and `max-width: 1120px` | The viewer's zoom pill beside Details |
+| Tablet | `max-width: 1050px` | The two-row gallery toolbar, the stacked deck, Details over the image and closed at first (`useViewerControls.ts`) |
+| Side | `min-width: 901px` | The viewer's summary clears the Details column |
+| Phone | `max-width: 760px` | The phone layout (`NARROW_QUERY` in `device.ts`) |
+| Small | `max-width: 640px` | Compact docks, viewer and dialogs, the one-column gallery toolbar |
+| Compact | `max-width: 480px` | Two gallery columns, compact empty states and sheets |
+| Library | `max-width: 400px` | The Library's link and pick rows wrap |
+| Narrow | `max-width: 379px` | The phone's name hides, Create's footer stacks |
+| Tiny | `max-width: 359px` | The smallest phones' bar labels and picker tabs |
+
+Height queries: `max-height: 700px` (shorter list rows), `max-height: 520px`
+(phones held sideways), and `PHONE_QUERY`'s 500 px in `device.ts`. Input
+queries (`hover`, `pointer`), `prefers-reduced-motion` and `forced-colors`
+describe the device, not its size.
 
 ## Media
 
@@ -129,7 +165,13 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
 - Stacking uses the `--z-*` tokens, never raw numbers. The phone's order is
   `--z-phone-bar` < `--z-phone-scrim` < `--z-phone-sheet` < `--z-phone-pop` <
   `--z-phone-status`, the status pill above every sheet, pop-up, dialog and
-  dropdown menu.
+  dropdown menu. The desktop stage climbs `--z-composer` < `--z-stage-bar` <
+  `--z-dock` < `--z-toolbar` < `--z-history` < `--z-composer-open` <
+  `--z-scrim` < `--z-drop` < `--z-deck` < `--z-viewer` < `--z-picker` (the
+  reference picker and inpainting) < `--z-composer-menus` < `--z-modal` <
+  `--z-popover` < `--z-tooltip`. Small numbers (−1 to about 7, and the run
+  stacks' 20–22) only order the layers inside one component's own stacking
+  context.
 
 ## Surfaces
 
@@ -154,7 +196,7 @@ Pick the lightest surface that fits:
 
 ### Glass
 
-Every translucent surface uses one token set from `00-tokens.css`, at one of
+Every translucent surface uses one token set from `tokens.css`, at one of
 two levels:
 
 | Level | Used for | Tokens |
@@ -246,7 +288,7 @@ words and actions on both devices:
 
 Every phone sheet and step (Create, Model, References, LoRAs, Size, Advanced
 Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
-`41-lists.css`), like iOS Settings without the cards:
+`lists.css`), like iOS Settings without the cards:
 
 - **Rows** are full width and one line: the label on the left, the value
   muted on the right (cut short with an ellipsis), then a chevron when the row
