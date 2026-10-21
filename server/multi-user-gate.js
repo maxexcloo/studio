@@ -30,6 +30,8 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/gallery(\/delta|\/export|\/jobs\/[\w-]+)?$/],
   ["POST", /^\/api\/gallery\/(favorite|errors\/clear)$/],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
+  ["GET", /^\/api\/chat$/],
+  ["POST", /^\/api\/chat\/handover$/],
   ["GET", /^\/api\/prompts$/],
   ["POST", /^\/api\/prompts\/(clear|enabled|forget|pin)$/],
   ["GET", /^\/api\/loras\/[^/]+$/],

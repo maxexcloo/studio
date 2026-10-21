@@ -39,3 +39,12 @@ export function requireThisComputer(req, res) {
   res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can do this." });
   return false;
 }
+
+/**
+ * Whether an administrator's request came from chat: MCP's admin tools (mcp-admin.js) call the same
+ * routes as the UI with MCP's administrator credential, so imports, catalogue edits and profile
+ * versions record their origin as chat.
+ */
+export function fromChat(req) {
+  return req?.studioAccount?.credential === "mcp-admin";
+}

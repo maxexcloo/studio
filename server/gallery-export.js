@@ -122,6 +122,23 @@ async function measure(file) {
  * big to hold is read twice, the second time usually from the system's cache.
  */
 /** The attachment name of a download, such as `studio-gallery-2026-10-20.zip`. */
+/** A small archive held in memory (`[{name, body, date?}]`), stored without compression. */
+export function zipBuffer(entries) {
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const body = Buffer.isBuffer(entry.body) ? entry.body : Buffer.from(String(entry.body ?? ''), 'utf8');
+    if (body.length >= MAX32) throw new Error(`${entry.name} is too large for an archive.`);
+    const headers = zipHeaders(entry.name, body.length, crc32(body), offset, dosTime(entry.date || new Date()));
+    parts.push(headers.local, body);
+    central.push(headers.central);
+    offset += headers.local.length + body.length;
+  }
+  const centralSize = central.reduce((size, record) => size + record.length, 0);
+  return Buffer.concat([...parts, ...central, zipEnd(central.length, centralSize, offset)]);
+}
+
 export const exportFilename = (kind, extension, date = new Date()) => `studio-${kind}-${date.toISOString().slice(0, 10)}.${extension}`;
 
 /** `ids`: only these items (a selection), by id or address. */

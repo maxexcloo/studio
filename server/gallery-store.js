@@ -799,6 +799,14 @@ export function describeComfyGraph(graph = {}) {
   };
 }
 
+/** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */
+export function storedAssistantRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.preset !== "string" || !/^[a-z-]{1,40}$/.test(value.preset)) return null;
+  const model = typeof value.model === "string" ? value.model.slice(0, 200) : "";
+  const loras = Array.isArray(value.lorasSuggested) ? value.lorasSuggested.filter((name) => typeof name === "string" && name).slice(0, 8) : [];
+  return { preset: value.preset, ...(model ? { model } : {}), source: value.source === "chat" ? "chat" : "ui", ...(loras.length ? { lorasSuggested: loras } : {}) };
+}
+
 export function recordsFromComfyHistory(history) {
   const records = [];
   for (const [promptId, item] of Object.entries(history || {})) {
@@ -847,6 +855,8 @@ export function recordsFromComfyHistory(history) {
         height: Number(saved.height || latent.height || 0),
         model: saved.model || model,
         settings: saved.settings || (loras.length ? { loras } : {}),
+        // How the prompt was written (the prompt assistant, in Studio or chat) survives a rebuild from history.
+        ...(storedAssistantRecord(saved.assistant) ? { assistant: storedAssistantRecord(saved.assistant) } : {}),
         ...(typeof saved.ownerId === "string" && saved.ownerId ? { ownerId: saved.ownerId } : {})
       };
       if (hasExistingOutputFile(record)) records.push(record);
@@ -878,6 +888,8 @@ export function makePendingItems(id, body) {
     referenceImageName: body.startImageName || "",
     startImageId: body.startImageId || "",
     settings: generationSettings(body),
+    // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
+    ...(body.assistant ? { assistant: body.assistant } : {}),
     ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {})
   }));
 }
@@ -1034,6 +1046,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
       referenceImageName: body.startImageName || "",
       startImageId: body.startImageId || "",
       settings: generationSettings(body),
+      ...(body.assistant ? { assistant: body.assistant } : {}),
       outputName: item.filename,
       promptId: job.promptId || "",
       index

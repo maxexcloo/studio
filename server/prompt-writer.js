@@ -1,40 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Studio writes MCP prompts itself: one fresh call to an OpenAI-compatible chat model per generation,
-// carrying the user's request and the target profile's full prompting guide.
+// carrying the user's request and the target profile's full prompting guide. The call goes through
+// the prompt assistant engine (assistant.js), so MCP Generate and the Studio assistant share one adapter.
+import { AssistantError, createAssistant, gatewaySettings, maxPromptCharacters, stripThinking, writerGuide } from './assistant.js';
 
-const settingKeys = ['STUDIO_PROMPT_WRITER_URL', 'STUDIO_PROMPT_WRITER_KEY', 'STUDIO_PROMPT_WRITER_MODEL'];
-// Guide parts about settings or provenance; the writer only needs what shapes the prompt.
-const omittedGuideKeys = new Set(['reviewed_on', 'sampling', 'sources']);
-const maxPromptCharacters = 4000;
+export { writerGuide };
+
 const maxChanges = 8;
 
 /** The writer's endpoint, key and model, or null when prompt writing is off; a partial setting fails by name. */
 export function promptWriterSettings(environment = process.env) {
-  const values = Object.fromEntries(settingKeys.map(key => [key, String(environment[key] || '').trim()]));
-  if (settingKeys.every(key => !values[key])) return null;
-  const missing = settingKeys.filter(key => !values[key]);
-  if (missing.length) throw new Error(`Prompt writing needs ${missing.join(', ')}; set all three of ${settingKeys.join(', ')} or none.`);
-  let url;
-  try { url = new URL(values.STUDIO_PROMPT_WRITER_URL); } catch { url = null; }
-  if (!url || !['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('STUDIO_PROMPT_WRITER_URL must be an absolute HTTP(S) URL without credentials, query or fragment.');
-  const base = url.href.replace(/\/+$/, '');
-  const endpoint = /\/chat\/completions$/.test(base) ? base : /\/v1$/.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
-  return { endpoint, key: values.STUDIO_PROMPT_WRITER_KEY, model: values.STUDIO_PROMPT_WRITER_MODEL };
-}
-
-/** The guide without provenance or sampling notes, as compact JSON. */
-export function writerGuide(guide) {
-  const prune = (value) => Array.isArray(value) ? value.map(prune)
-    : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !omittedGuideKeys.has(key)).map(([key, item]) => [key, prune(item)]))
-      : value;
-  return guide && typeof guide === 'object' ? JSON.stringify(prune(guide)) : '';
+  const settings = gatewaySettings(environment);
+  return settings ? { endpoint: settings.endpoint, key: settings.key, model: settings.model } : null;
 }
 
 const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxPromptCharacters);
 
 /** Prompts from a reply: JSON {"prompts": [...]}, a JSON array, or plain text for a single prompt. */
 export function parseWrittenPrompts(content, count) {
-  const body = String(content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim();
+  const body = stripThinking(content).replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim();
   let prompts = null;
   const json = /[[{][\s\S]*[\]}]/.exec(body)?.[0];
   if (json) try {
@@ -69,39 +53,35 @@ function instructions({ profile, guide, count, references, role }) {
 /**
  * A prompt writer, or null when prompt writing is off. write() returns { prompts, source, ms }:
  * source "studio" for written prompts, "request" when it fell back to the given prompts.
+ * Generate keeps the prompt writer's own model (STUDIO_PROMPT_WRITER_MODEL), a fast one.
  */
 export function createPromptWriter(environment = process.env, { fetchImpl = fetch, timeoutMs = 30000, log = console } = {}) {
   const settings = promptWriterSettings(environment);
   if (!settings) return null;
+  const engine = createAssistant(environment, { fetchImpl, timeoutMs, log: {} });
   return {
     model: settings.model,
     async write({ profile, guide, request, changes = [], count = 1, references = 0, role = '', fallback, signal }) {
       const started = Date.now();
       const user = [`Request: ${clean(request)}`, ...changes.slice(-maxChanges).map(change => `Change: ${clean(change)}`)].join('\n');
-      const body = {
-        model: settings.model,
-        messages: [{ role: 'system', content: instructions({ profile, guide: writerGuide(guide), count, references, role }) }, { role: 'user', content: user }],
-        temperature: 0.7,
-        max_tokens: 400 * count + 200,
-        stream: false
-      };
-      const timeout = AbortSignal.timeout(timeoutMs);
       let reason;
       try {
-        const response = await fetchImpl(settings.endpoint, { method: 'POST', headers: { Authorization: `Bearer ${settings.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
-        if (!response.ok) reason = `HTTP ${response.status}`;
-        else {
-          const answer = await response.json();
-          const prompts = parseWrittenPrompts(answer?.choices?.[0]?.message?.content, count);
-          if (prompts) {
-            log.info?.(`MCP prompt writer: ${count} prompt${count > 1 ? 's' : ''} for ${profile.id} in ${Date.now() - started} ms`);
-            return { prompts, source: 'studio', ms: Date.now() - started };
-          }
-          reason = 'unusable reply';
+        const reply = await engine.chat({
+          model: settings.model,
+          messages: [{ role: 'system', content: instructions({ profile, guide: writerGuide(guide), count, references, role }) }, { role: 'user', content: user }],
+          temperature: 0.7,
+          maxTokens: 400 * count + 200,
+          signal
+        });
+        const prompts = parseWrittenPrompts(reply.text, count);
+        if (prompts) {
+          log.info?.(`MCP prompt writer: ${count} prompt${count > 1 ? 's' : ''} for ${profile.id} in ${Date.now() - started} ms`);
+          return { prompts, source: 'studio', ms: Date.now() - started };
         }
+        reason = 'unusable reply';
       } catch (error) {
         if (signal?.aborted) throw error;
-        reason = timeout.aborted ? 'timeout' : 'unreachable';
+        reason = error instanceof AssistantError ? error.reason : 'unreachable';
       }
       log.warn?.(`MCP prompt writer fell back to the request for ${profile.id} after ${Date.now() - started} ms: ${reason}`);
       return { prompts: fallback, source: 'request', ms: Date.now() - started };

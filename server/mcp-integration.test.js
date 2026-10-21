@@ -12,6 +12,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { generateWaitSeconds, registerMcpRoutes } from './mcp.js';
 import { McpMedia } from './mcp-media.js';
+import { adminToolNames } from './mcp-admin.js';
 
 const mediaKey = 'fixture-media-credential';
 const controlKey = 'fixture-control-credential';
@@ -33,7 +34,7 @@ const loraInfo = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
+async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, gatewayAdminTools, claimHandover, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -73,7 +74,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     const job = jobs.get(req.params.id);
     // Like the studio's gallery record: the prompt and generation settings only on request.
     const body = job?.settings || {};
-    const recorded = req.query.settings === '1' ? { prompt: body.prompt, negative: body.negative || '', width: body.width, height: body.height, settings: { profileId: body.profileId, steps: body.steps, cfg: body.cfg, sampler: body.sampler || '', scheduler: body.scheduler || '', seed: body.seed || 'Random', referenceAssets: body.referenceAssets || [], ...(body.loras?.length ? { loras: body.loras } : {}) } } : {};
+    const recorded = req.query.settings === '1' ? { prompt: body.prompt, negative: body.negative || '', width: body.width, height: body.height, settings: { profileId: body.profileId, steps: body.steps, cfg: body.cfg, sampler: body.sampler || '', scheduler: body.scheduler || '', seed: body.seed || 'Random', referenceAssets: body.referenceAssets || [], ...(body.loras?.length ? { loras: body.loras } : {}) }, ...(body.assistant ? { assistant: body.assistant } : {}) } : {};
     res.json({ items: !job ? [] : job.gallery ?? (job.status === 'done' ? job.outputs.map((output, index) => ({ jobId: job.id, index, status: 'done', type: job.kind, ...recorded, ...output })) : []) });
   });
   app.post('/api/reference-assets/upload', async (req, res) => {
@@ -98,6 +99,8 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(internalCredential ? { internalCredential } : {}),
+    ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
+    ...(claimHandover ? { claimHandover } : {}),
     resolveSignedResult,
     fetchImpl: async (url, init) => {
       if (String(url).startsWith('http://fixture-writer.invalid')) {
@@ -128,7 +131,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     if (!existingDir) fs.rmSync(dataDir, { recursive: true, force: true });
   });
   return {
-    assets, base, controlRequests, writerRequests, dataDir, downloads, environment, jobs, requests, submitted,
+    app, assets, base, controlRequests, writerRequests, dataDir, downloads, environment, jobs, requests, submitted,
     failAfter: (count, status, body) => { failAfter = count; if (status) failResponse = [status, body]; },
     dropAck: () => { dropAck = true; },
     completeOnSubmit: () => { completeOnSubmit = true; },
@@ -2124,4 +2127,139 @@ test('Handover includes only the current account and conversation and omits remo
   const empty = await call(fresh, 'Handover', { summary: 'Continue with the saved preferences.' });
   assert.match(texts(empty), /saved preferences/);
   assert.ok(!texts(empty).includes(kept));
+});
+
+const adminAccount = { userId: 'stable-admin', role: 'administrator', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+const plainAccount = { userId: 'stable-user', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+const adminToken = 'administrator-mcp-token-long-enough-for-the-fixture';
+const userToken = 'ordinary-user-mcp-token-long-enough-for-the-fixture';
+const toolNames = async (client) => (await client.listTools()).tools.map(tool => tool.name);
+
+test('admin tools register only for an administrator’s own token, and for a gateway-linked administrator only with Chat Gateway Admin Tools on', async t => {
+  let gatewayAdmin = false;
+  const f = await fixture(t, {
+    accountMode: true, environment: adminEnvironment,
+    authenticateAccountToken: value => value === adminToken ? adminAccount : value === userToken ? plainAccount : null,
+    authenticateGatewayIdentity: user => user === 'librechat-admin' ? adminAccount : user === 'librechat-user' ? plainAccount : null,
+    internalCredential: id => ({ 'X-Studio-Mcp-Internal': 'fixture-internal', 'X-Studio-Mcp-Account': id }),
+    gatewayAdminTools: () => gatewayAdmin
+  });
+  const has = (names) => adminToolNames.filter(name => names.includes(name));
+  assert.deepEqual(adminToolNames, ['Library', 'Lookup', 'Import', 'Imports', 'Downloads', 'Updates', 'CatalogueEdit', 'Profiles', 'ProfileEdit', 'Export', 'Placement']);
+  const direct = await toolNames(await f.client('', adminToken));
+  assert.deepEqual(has(direct), adminToolNames, 'a direct administrator token has every admin tool');
+  assert.ok(direct.includes('Generate'), 'on top of the media tools');
+  assert.deepEqual(has(await toolNames(await f.client('', userToken))), [], 'an ordinary account has none');
+  assert.deepEqual(has(await toolNames(await f.client('librechat-admin'))), [], 'a gateway administrator has none while the switch is off');
+  assert.deepEqual(has(await toolNames(await f.client('librechat-user'))), []);
+  assert.deepEqual(has(await toolNames(await f.client('librechat-unlinked'))), [], 'nor does an unlinked chat user');
+  assert.deepEqual(has(await toolNames(await f.client('', controlKey))), [], 'the control key keeps only its own tools');
+  gatewayAdmin = true;
+  assert.deepEqual(has(await toolNames(await f.client('librechat-admin'))), adminToolNames, 'the switch opens them to gateway-linked administrators');
+  assert.deepEqual(has(await toolNames(await f.client('librechat-user'))), [], 'never to ordinary accounts');
+  const instructions = (await f.client('', adminToken)).getInstructions();
+  assert.match(instructions, /no tool deletes files or touches GPUs/);
+  // Every admin tool is non-destructive; the read-only ones say so.
+  const tools = (await (await f.client('', adminToken)).listTools()).tools.filter(tool => adminToolNames.includes(tool.name));
+  assert.equal(tools.some(tool => tool.annotations?.destructiveHint), false);
+  assert.deepEqual(tools.filter(tool => tool.annotations?.readOnlyHint).map(tool => tool.name).sort(), ['Imports', 'Library', 'Lookup', 'Placement', 'Profiles']);
+  // The single-user shared key is never an administrator.
+  const single = await fixture(t);
+  assert.deepEqual(has(await toolNames(await single.client())), []);
+});
+
+test('admin tools go through the Library and profile routes with the administrator’s credential, keep versions and never delete', async t => {
+  const f = await fixture(t, { accountMode: true, enabled: false, authenticateAccountToken: value => value === adminToken ? adminAccount : null });
+  const seen = [];
+  const record = { id: 'imp-abc123', createdAt: '2026-10-21T00:00:00.000Z', origin: 'chat', input: { kind: 'civitai-model', url: 'https://civitai.com/models/1' }, state: 'needs-files', title: 'Glow', grade: { value: 'partial', reasons: ['A file is missing'], missingFields: [] }, resources: [{ role: 'lora', name: 'Glow', want: { file: 'glow.safetensors', folder: 'loras', bytes: 100 }, status: 'missing', downloadId: 'civitai:2:3' }], results: { catalogueKeys: ['loras/glow.safetensors'] } };
+  const profileText = `${JSON.stringify({ heissUi: { name: 'Fast', controls: { prompt: { node: 1 } } }, steps: 4 }, null, 2)}\n`;
+  const profileHash = 'a'.repeat(64);
+  f.app.use('/api', (req, _res, next) => { seen.push({ method: req.method, path: req.path, body: req.body, authorization: req.headers.authorization }); next(); });
+  f.app.post('/api/library/imports', (_req, res) => res.json({ ok: true, import: record }));
+  f.app.get('/api/library/imports', (_req, res) => res.json({ ok: true, imports: [record] }));
+  f.app.get('/api/library/imports/:id', (_req, res) => res.json({ ok: true, import: record }));
+  f.app.get('/api/models/downloads', (_req, res) => res.json({ ok: true, backend: 'worker', active: { id: 'civitai:2:3', file: 'glow.safetensors', folder: 'loras', status: 'downloading', receivedBytes: 10, totalBytes: 100, url: 'https://secret.example.test' }, queued: [], recent: [] }));
+  f.app.post('/api/models/downloads/cancel', (_req, res) => res.json({ ok: true, active: null, queued: [], recent: [] }));
+  f.app.patch('/api/library/catalogue', (req, res) => res.json({ ok: true, key: req.body.key, entry: { title: req.body.patch.title }, previous: { title: null } }));
+  f.app.get('/api/profiles/editable/:id', (req, res) => res.json({ ok: true, id: req.params.id, text: profileText, hash: profileHash, version: { version: 2 } }));
+  f.app.get('/api/profiles/editable/:id/versions', (_req, res) => res.json({ ok: true, versions: [{ version: 2, origin: 'studio', by: 'stable-admin' }, { version: 1, origin: 'seed', by: 'seed' }] }));
+  f.app.get('/api/profiles/editable/:id/versions/:n', (_req, res) => res.json({ ok: true, version: { text: profileText.replace('"steps": 4', '"steps": 8') } }));
+  f.app.put('/api/profiles/editable/:id', (req, res) => res.json({ ok: true, hash: 'b'.repeat(64), version: { version: 3, origin: 'chat', aiDrafted: req.body.draft === true }, warnings: [] }));
+  f.app.get('/api/profiles/export', (_req, res) => {
+    fs.mkdirSync(path.join(f.dataDir, 'exports'), { recursive: true });
+    fs.writeFileSync(path.join(f.dataDir, 'exports', 'studio-profiles-2026-10-21T00-00-00-000Z.zip'), 'PK fixture');
+    res.set({ 'Content-Disposition': 'attachment; filename="studio-profiles-2026-10-21T00-00-00-000Z.zip"', 'X-Studio-Export': JSON.stringify({ profiles: 2, guides: 1, unreviewed: 1 }) }).type('application/zip').send('PK fixture');
+  });
+  const client = await f.client('', adminToken);
+
+  const imported = data(await call(client, 'Import', { url: 'https://civitai.com/models/1' }));
+  assert.deepEqual([imported.import.origin, imported.import.grade, imported.import.missing], ['chat', 'partial', ['glow.safetensors']]);
+  assert.deepEqual(seen.find(item => item.path === '/library/imports' && item.method === 'POST'), { method: 'POST', path: '/library/imports', body: { url: 'https://civitai.com/models/1' }, authorization: `Bearer ${adminToken}` });
+  assert.deepEqual(data(await call(client, 'Imports')).imports, [{ id: 'imp-abc123', title: 'Glow', kind: 'civitai-model', origin: 'chat', state: 'needs-files', grade: 'partial', missing: 1, created_at: '2026-10-21T00:00:00.000Z' }]);
+  // Image imports come with the next Library release; until then the tool says so plainly.
+  const generated = await generate(client);
+  finish(f);
+  const image = await call(client, 'Import', { job_id: jobId(generated) });
+  assert.equal(image.isError, true);
+  assert.match(image.content[0].text, /Image imports aren’t available in this Studio yet/);
+
+  const status = data(await call(client, 'Downloads', { action: 'status', import_id: 'imp-abc123' }));
+  assert.deepEqual(status.active, { id: 'civitai:2:3', file: 'glow.safetensors', folder: 'loras', status: 'downloading', receivedBytes: 10, totalBytes: 100 }, 'no download address reaches the chat');
+  data(await call(client, 'Downloads', { action: 'cancel', source: 'civitai:2:3' }));
+  assert.deepEqual(seen.find(item => item.path === '/models/downloads/cancel').body, { id: 'civitai:2:3' }, 'Cancel never discards the partial file');
+
+  const edited = data(await call(client, 'CatalogueEdit', { key: 'loras/glow.safetensors', patch: { title: 'Glow FX' } }));
+  assert.deepEqual([edited.entry.title, edited.previous], ['Glow FX', { title: null }]);
+  assert.equal((await call(client, 'CatalogueEdit', { key: 'loras/glow.safetensors', patch: { sha256: 'f'.repeat(64) } })).isError, true, 'only the editable fields');
+
+  const read = data(await call(client, 'Profiles', { action: 'get', id: 'fast' }));
+  assert.equal(read.hash, profileHash);
+  const diff = data(await call(client, 'Profiles', { action: 'diff', id: 'fast' }));
+  assert.deepEqual([diff.from, diff.to, diff.added, diff.removed], [1, 2, 1, 1]);
+  assert.match(diff.diff, /- +"steps": 8\n\+ +"steps": 4/);
+  const stale = await call(client, 'ProfileEdit', { action: 'edit', id: 'fast', patch: { steps: 6 } });
+  assert.match(stale.content[0].text, /Pass base_hash/);
+  const outdated = await call(client, 'ProfileEdit', { action: 'edit', id: 'fast', patch: { steps: 6 }, base_hash: 'c'.repeat(64) });
+  assert.match(outdated.content[0].text, /changed since you read it/);
+  const drafted = data(await call(client, 'ProfileEdit', { action: 'draft', id: 'fast', patch: { steps: 6 }, base_hash: profileHash }));
+  assert.deepEqual(drafted.version, { version: 3, origin: 'chat', aiDrafted: true });
+  const put = seen.filter(item => item.method === 'PUT').at(-1);
+  assert.deepEqual([JSON.parse(put.body.text).steps, put.body.baseHash, put.body.draft], [6, profileHash, true]);
+
+  const bundle = data(await call(client, 'Export'));
+  assert.deepEqual([bundle.file, bundle.profiles, bundle.unreviewed], ['studio-profiles-2026-10-21T00-00-00-000Z.zip', 2, 1]);
+  const link = new URL(bundle.link);
+  assert.match(link.pathname, /^\/mcp\/exports\//);
+  const downloaded = await fetch(`${f.base}${link.pathname}`);
+  assert.equal(await downloaded.text(), 'PK fixture');
+  assert.equal((await fetch(`${f.base}${link.pathname.slice(0, -2)}xx`)).status, 404, 'a tampered link is refused');
+});
+
+test('a result handed over by Refine in Chat becomes the account’s for its chat, and no one else’s', async t => {
+  const account = { userId: 'stable-account-a', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const other = { userId: 'stable-account-b', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const tokens = { 'handover-account-token-long-enough-for-the-fixture-a': account, 'handover-account-token-long-enough-for-the-fixture-b': other };
+  const f = await fixture(t, { accountMode: true, enabled: false, authenticateAccountToken: value => tokens[value] || null, claimHandover: (owner, id, { accountMode }) => accountMode && owner === 'stable-account-a' && id === 'studio-made-job' });
+  f.jobs.set('studio-made-job', { id: 'studio-made-job', status: 'done', kind: 'image', outputs: [{ url: '/comfy/view?filename=studio.png' }], settings: { prompt: 'A heron', profileId: imageProfile.id } });
+  const stranger = await f.client('', 'handover-account-token-long-enough-for-the-fixture-b');
+  assert.equal((await call(stranger, 'Status', { job_id: 'studio-made-job' })).isError, true);
+  const owner = await f.client('', 'handover-account-token-long-enough-for-the-fixture-a');
+  assert.equal(data(await call(owner, 'Status', { job_id: 'studio-made-job' })).status, 'done');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8')).jobs['studio-made-job'], 'stable-account-a', 'kept on disk');
+  assert.equal((await call(stranger, 'Status', { job_id: 'studio-made-job' })).isError, true, 'still not the other account’s');
+});
+
+test('Reuse carries how a result’s prompt was written into a plain run again, and drops it for a changed prompt', async t => {
+  const f = await fixture(t);
+  const client = await f.client();
+  data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  finish(f);
+  const [job] = f.jobs.values();
+  job.settings.assistant = { preset: 'cinematic', source: 'chat' };
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image' }));
+  assert.deepEqual(f.submitted.at(-1).assistant, { preset: 'cinematic', source: 'chat' });
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', prompt: 'A heron at dusk' }));
+  assert.equal(f.submitted.at(-1).assistant, undefined);
+  data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', request: 'warmer' }));
+  assert.equal(f.submitted.at(-1).assistant, undefined);
 });

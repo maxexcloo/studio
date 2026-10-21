@@ -3,8 +3,8 @@ import path from "node:path";
 import { comfy, modelFolders } from './comfy.js';
 import { families as modelFamilies } from './family-catalog.js';
 
-import { dataDir } from './gallery-store.js';
 import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
+import { catalogueStore } from './library-catalogue.js';
 import { readSafetensorsHeader } from './model-families.js';
 
 // Imported-only model families still need precise adapter compatibility labels.
@@ -306,14 +306,13 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
 }
 
 
+/** The catalogue store (library-catalogue.js), with entry families read the way LoRA metadata is. */
+export const loraCatalogue = () => catalogueStore({ familiesFromMetadata });
+
 /** Provider and local policy metadata can be checked before submitting an optional stack. */
 export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [], triggers: [] }) {
-  let sources = {};
-  let catalogue = {};
-  try { sources = JSON.parse(fs.readFileSync(path.join(dataDir, 'model-download-sources.json'), 'utf8')); } catch { /* No provider downloads yet. */ }
-  // Optional local display metadata: the synced config/ copy (like prompting.json) wins over one installed by hand.
-  for (const file of [path.join(dataDir, 'lora-catalogue.json'), path.join(dataDir, 'config', 'lora-catalogue.json')]) {
-    try { catalogue = { ...catalogue, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch { /* Not there. */ }
-  }
+  // One catalogue (library/catalogue.json) holds provider downloads, the synced and hand-installed
+  // lora-catalogue.json files and Studio's edits; this view keeps the shapes those files had.
+  const { sources, catalogue } = loraCatalogue().loraView();
   return enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
 }

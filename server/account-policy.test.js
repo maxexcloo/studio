@@ -32,9 +32,20 @@ test("access profiles contain only currently available generation profiles and k
       cloudModels: false,
       // Unmarked profiles predate NSFW Models, so it stays on until it is stored.
       nsfwModels: true,
-      presets: false
+      presets: false,
+      // Prompt Assistant arrived on for every existing profile.
+      promptAssistant: true
     }
   });
+});
+
+test("Prompt Assistant is on for built-ins and stored profiles until an administrator turns it off", () => {
+  assert.equal(builtInAccessProfiles.every((profile) => profile.features.promptAssistant === true), true);
+  const stored = { id: "artists", name: "Artists", generationProfiles: [], features: { imageGeneration: true } };
+  const user = { id: "u1", role: "user", accessProfileId: "artists" };
+  assert.equal(mayUseFeature(effectiveAccountAccess(user, { artists: stored }), "promptAssistant"), true);
+  assert.equal(mayUseFeature(effectiveAccountAccess(user, { artists: { ...stored, features: { ...stored.features, promptAssistant: false } } }), "promptAssistant"), false);
+  assert.equal(mayUseFeature(effectiveAccountAccess({ id: "a1", role: "administrator" }, {}), "promptAssistant"), true);
 });
 
 test("administrators receive current full access and ordinary users receive one assigned profile", () => {

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, defaultAccessProfileId, requireApproval, setRequireApproval, ensureBuiltInAccessProfiles, listAccessProfiles, setDefaultAccessProfile, listAccounts, migrateCloudModelAccess, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, defaultAccessProfileId, requireApproval, setRequireApproval, gatewayAdminTools, setGatewayAdminTools, ensureBuiltInAccessProfiles, listAccessProfiles, setDefaultAccessProfile, listAccounts, migrateCloudModelAccess, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf, endDeviceSession } from "./access.js";
 import { grokEnabled, lorasEnabled, presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
@@ -27,12 +27,55 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
+  // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
+  ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/]
 ];
 
 export function mcpBearerRouteAllowed(method, routePath) {
   return mcpBearerRoutes.some(([allowedMethod, pattern]) => allowedMethod === method && pattern.test(routePath));
 }
+
+/**
+ * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
+ * guides and the export. Only an administrator's own MCP token reaches them, or MCP's loopback
+ * credential for a gateway-linked administrator while Chat Gateway Admin Tools is on. Nothing here
+ * deletes a file, replaces a download or touches a GPU.
+ */
+const routeId = "[\\w.-]+";
+const mcpAdminRoutes = [
+  ["GET", /^\/api\/library\/items$/],
+  ["GET", /^\/api\/library\/imports$/],
+  ["POST", /^\/api\/library\/imports$/],
+  ["POST", /^\/api\/library\/imports\/image$/],
+  ["GET", new RegExp(`^/api/library/imports/${routeId}$`)],
+  ["POST", new RegExp(`^/api/library/imports/${routeId}/(?:download|describe|draft-profile)$`)],
+  ["POST", /^\/api\/library\/lookup$/],
+  ["GET", /^\/api\/library\/placement$/],
+  ["PATCH", /^\/api\/library\/catalogue$/],
+  ["POST", /^\/api\/library\/catalogue\/undo$/],
+  ["GET", /^\/api\/library\/updates$/],
+  ["POST", /^\/api\/library\/updates\/(?:check|apply)$/],
+  ["GET", /^\/api\/models\/downloads$/],
+  ["POST", /^\/api\/models\/downloads$/],
+  ["POST", /^\/api\/models\/downloads\/cancel$/],
+  ["GET", /^\/api\/profiles\/editable$/],
+  ["GET", new RegExp(`^/api/profiles/editable/${routeId}(?:/guide|/versions|/versions/\\d+)?$`)],
+  ["PUT", new RegExp(`^/api/profiles/editable/${routeId}$`)],
+  ["POST", new RegExp(`^/api/profiles/editable/${routeId}/(?:approve|revert)$`)],
+  ["GET", /^\/api\/profiles\/guides$/],
+  ["GET", new RegExp(`^/api/profiles/guides/${routeId}(?:/versions|/versions/\\d+)?$`)],
+  ["PUT", new RegExp(`^/api/profiles/guides/${routeId}$`)],
+  ["POST", new RegExp(`^/api/profiles/guides/${routeId}/(?:approve|revert)$`)],
+  ["GET", /^\/api\/profiles\/export$/]
+];
+
+export function mcpAdminRouteAllowed(method, routePath) {
+  return mcpAdminRoutes.some(([allowedMethod, pattern]) => allowedMethod === method && pattern.test(routePath));
+}
+
+/** An administrator's access on an admin route, marked as MCP's so the routes record chat as its origin. */
+const asMcpAdmin = (access) => access?.authenticated && access.role === "administrator" ? { ...access, credential: "mcp-admin" } : null;
 
 // MCP's own loopback calls for gateway-linked accounts carry this per-process credential, never a stored token.
 const internalSecret = crypto.randomBytes(32).toString("base64url");
@@ -43,8 +86,11 @@ export function internalMcpHeaders(accountId) {
 function internalMcpAccount(req, method, routePath) {
   const given = String(req?.headers?.["x-studio-mcp-internal"] || "");
   if (!given || Buffer.byteLength(given) !== Buffer.byteLength(internalSecret) || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(internalSecret))) return null;
-  if (!clientOf(req).thisComputer || !mcpBearerRouteAllowed(method, routePath)) return null;
+  if (!clientOf(req).thisComputer) return null;
   const access = accountAccessForId(String(req.headers["x-studio-mcp-account"] || ""));
+  // A gateway-linked administrator reaches the admin routes only while Chat Gateway Admin Tools is on.
+  if (mcpAdminRouteAllowed(method, routePath)) return gatewayAdminTools() ? asMcpAdmin(access) : null;
+  if (!mcpBearerRouteAllowed(method, routePath)) return null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
@@ -55,6 +101,7 @@ export function accountForRequest(req) {
   const method = String(req?.method || "GET").toUpperCase();
   const account = accountSession(cookieToken(req))
     || (bearer && mcpBearerRouteAllowed(method, routePath) ? verifyAccountMcpToken(bearer) : null)
+    || (bearer && mcpAdminRouteAllowed(method, routePath) ? asMcpAdmin(verifyAccountMcpToken(bearer)) : null)
     || internalMcpAccount(req, method, routePath);
   if (req) req.studioAccount = account;
   return account;
@@ -296,7 +343,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       requireApproval: requireApproval(),
       // Features the deployment switched off for everyone; their access-profile options show locked.
       lockedFeatures: { loras: !lorasEnabled, cloudModels: !grokEnabled, presets: !presetsEnabled() },
-      gateway: listGatewayIdentities()
+      gateway: { ...listGatewayIdentities(), adminTools: gatewayAdminTools() }
     });
   });
 
@@ -307,6 +354,16 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       if (typeof body.requireApproval === "boolean") setRequireApproval(body.requireApproval);
       if (typeof body.accessProfileId === "string") setDefaultAccessProfile(body.accessProfileId);
       res.json({ ok: true, defaultAccessProfileId: defaultAccessProfileId(), requireApproval: requireApproval() });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Chat Gateway Admin Tools: gateway-linked administrators get MCP's admin tools (off by default).
+  post("/api/accounts/gateway-admin", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      res.json({ ok: true, adminTools: setGatewayAdminTools(req.body?.on) });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

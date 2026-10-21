@@ -14,7 +14,16 @@ import { registerComparisonRoutes } from './comparisons.js';
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from './preset-routes.js';
-import { registerProfileEditorRoutes } from './profile-editor.js';
+import { registerLibraryRoutes } from './library-routes.js';
+import { createEditableProfile, listEditableProfiles, profileIdTaken, readEditableProfile, registerProfileEditorRoutes, validateProfileText } from './profile-editor.js';
+import { registerProfileRoutes } from './profile-routes.js';
+import { draftProfileFromImport } from './profile-drafts.js';
+import { seedDirectory, seedMissing } from './profile-seed.js';
+import { draftedProfile } from './assistant.js';
+import { catalogDownloadsForFile } from './family-profiles.js';
+import { familyFromName } from './family-catalog.js';
+import { assistantIntegration, assistantSettingKeys, assistantSettingValue, registerAssistantRoutes } from './assistant-routes.js';
+import { guideStore, livePrompting, profileStore } from './profile-store.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
@@ -35,6 +44,7 @@ import { canAdmin, clientOf, deviceSession, migrateDeviceCookie, studioPasswordS
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard, signInHeader } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
+import { createHandoverStore, registerChatRoutes } from './chat-handover.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { startServers } from './listen.js';
@@ -52,7 +62,7 @@ import { hfTokenStatus } from './hf-access.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { dedupeGallery, filterVisibleGallery, flushGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
 import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
-import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
+import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, recordPrompt, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
 import { derivedMediaCache, immutableMediaCache } from './media-response.js';
@@ -60,7 +70,7 @@ import { startMediaWarmup } from './media-warmup.js';
 import { scheduleTrashPurge } from './gallery-trash.js';
 import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from './jobs.js';
 import { cancelPrompt } from './comfy-queue.js';
-import { loraInfos } from './lora-info.js';
+import { familiesFromMetadata, loraCatalogue, loraInfos } from './lora-info.js';
 import { deleteImportedWorkflow, getCustomWorkflow, saveImportedWorkflow, userWorkflowsDir } from './custom-workflows.js';
 import { galleryStats } from './stats.js';
 import { describeHardware } from './hardware.js';
@@ -93,7 +103,7 @@ import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiU
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { isCloudProfile, mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
-import { accountAccessForId, gatewayAccountAccess, migrateCloudModelAccess, migrateFeatureOptionAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
+import { accountAccessForId, gatewayAccountAccess, gatewayAdminTools, migrateCloudModelAccess, migrateFeatureOptionAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -126,8 +136,18 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     return mime ? { content: Buffer.from(bytes), mime } : null;
   } catch { return null; }
 }
+// Once per start and safe to repeat: the seed (STUDIO_SEED_DIR) fills only what is missing, then the
+// catalogue, guide and profile stores take in what the older files hold, which stay where they are
+// (profile-seed.js, library-catalogue.js, profile-store.js). Before MCP reads guides.
+for (const [name, migrate] of [["seed", () => seedMissing({ seedDir: seedDirectory(), dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })], ["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
+  try { migrate(); } catch (error) { console.warn(`[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`); }
+}
+// Refine in Chat's handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
+const chatHandovers = createHandoverStore({ dataDir });
 registerMcpRoutes(app, {
   dataDir,
+  gatewayAdminTools,
+  claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
   accountMode: multiUserEnabled,
@@ -720,9 +740,15 @@ function modelsForAccount(models, req) {
     if (mayUseFeature(req.studioAccount, "loras")) return profile;
     return { ...profile, capabilities: { ...profile.capabilities, lora: false }, options: { ...profile.options, loras: [] } };
   });
-  // The Image & Model Library stays administration for now: its saved images are shared across Studio.
+  // Saved images stay administration: they are shared across Studio (the Library itself is withLibrary below).
   const features = models.features ? { ...models.features, presets: Boolean(models.features.presets) && req.studioAccount.role === "administrator" } : models.features;
   return { ...models, loras: mayUseFeature(req.studioAccount, "loras") ? models.loras : [], profiles, ...(features ? { features } : {}) };
+}
+
+/** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
+function withLibrary(models, req) {
+  if (!models?.features) return models;
+  return { ...models, features: { ...models.features, library: canAdmin(req) } };
 }
 
 function accountMayUseLoras(req) {
@@ -735,9 +761,9 @@ app.get("/api/models", async (req, res) => {
     const { models } = await mediaModels(req.query.cached !== "1");
     // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
     if (req.studioAccount) try { migrateCloudModelAccess((models.profiles || []).filter(isCloudProfile).map((profile) => profile.id)); } catch { /* Tried again on the next load. */ }
-    res.json(modelsForAccount(models, req));
+    res.json(withLibrary(modelsForAccount(models, req), req));
   } catch {
-    res.json(modelsForAccount(unavailableModels(), req));
+    res.json(withLibrary(modelsForAccount(unavailableModels(), req), req));
   }
 });
 
@@ -782,10 +808,32 @@ app.put("/api/models/recommendations/:key", (req, res) => {
   }
 });
 
-registerPresetRoutes(app, { models: async () => {
+const presetRoutes = registerPresetRoutes(app, { models: async () => {
   const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
   return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
 } });
+// The Library (library-routes.js): imports, their records and grades, and what is installed with its provenance.
+const unique = (...lists) => [...new Set(lists.flat().filter((name) => typeof name === "string" && name))];
+registerLibraryRoutes(app, {
+  presets: presetRoutes,
+  catalogue: loraCatalogue,
+  draftProfile: (record, options) => draftCheckpointProfile(record, options),
+  // Lookup says which ready profiles a link's base model fits.
+  families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
+  profiles: async () => ((await mediaModels(false)).models.profiles || []).filter((profile) => profile.ready !== false).map(({ id, family }) => ({ id, family })),
+  loraInfo: (names) => lorasEnabled ? loraInfos(names) : Promise.resolve({}),
+  installed: async () => {
+    const { info } = await loadComfyContext();
+    return {
+      loras: lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [],
+      checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
+      diffusion_models: unique(optionsFor(info, "UNETLoader", "unet_name"), optionsFor(info, "UnetLoaderGGUF", "unet_name")),
+      text_encoders: unique(optionsFor(info, "CLIPLoader", "clip_name"), optionsFor(info, "CLIPLoaderGGUF", "clip_name")),
+      vae: optionsFor(info, "VAELoader", "vae_name"),
+      clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name")
+    };
+  }
+});
 
 app.get("/api/paths", async (req, res) => {
   if (req.studioAccount && req.studioAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });
@@ -797,7 +845,7 @@ app.get("/api/paths", async (req, res) => {
 function workflowsForRequest(req, workflows) {
   if (!req.studioAccount || canAdmin(req)) return workflows;
   return workflows
-    .filter((item) => mayUseGenerationProfile(req.studioAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw }))
+    .filter((item) => mayUseGenerationProfile(req.studioAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw, aiDrafted: item.aiDrafted }))
     .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
 }
 
@@ -860,9 +908,78 @@ app.post("/api/workflows/import", async (req, res) => {
   }
 });
 
+const profileObjectInfo = async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info;
+// A saved, drafted, reverted or approved profile is seen on the next models read.
+const profilesChanged = () => { inferredModels.clear(); };
 registerProfileEditorRoutes(app, {
-  objectInfo: async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info,
+  objectInfo: profileObjectInfo,
+  onSaved: profilesChanged,
   accountName: (req) => req.studioAccount?.userId || ""
+});
+// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile-routes.js).
+registerProfileRoutes(app, {
+  profiles: () => profileStore(),
+  guides: () => guideStore(),
+  objectInfo: profileObjectInfo,
+  onSaved: profilesChanged,
+  accountName: (req) => req.studioAccount?.userId || "",
+  exportOptions: () => ({ dataDir, workflowsDir: userWorkflowsDir, catalogue: loraCatalogue(), manifestFile: loraCatalogue().manifestFile?.() || "", studioVersion: appVersion })
+});
+
+/**
+ * A checkpoint or diffusion model import's AI-drafted profile and guide (profile-drafts.js): the
+ * nearest same-family profile as template, parts through Download Missing, checked against
+ * ComfyUI's object_info before it is written. Administrators only until approved.
+ */
+async function draftCheckpointProfile(record, options) {
+  return draftProfileFromImport(record, options, {
+    templates: () => listEditableProfiles().filter((item) => item.readable).map((item) => {
+      try { return { ...item, raw: JSON.parse(readEditableProfile(item.id).text) }; } catch { return null; }
+    }).filter(Boolean),
+    info: () => profileObjectInfo("image"),
+    families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
+    familyFromName: (file) => familyFromName(file),
+    taken: profileIdTaken,
+    downloadsFor: catalogDownloadsForFile,
+    engine: assistantEngine,
+    draftedProfile,
+    validate: validateProfileText,
+    create: (id, text, { by }) => createEditableProfile(id, text, { by, origin: "ai", aiDrafted: true, info: null, note: `Drafted from import ${record.id}` }),
+    guides: guideStore(),
+    onSaved: profilesChanged
+  });
+}
+
+// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
+const assistantGuides = (() => {
+  try { return livePrompting({ negatives: true }); } catch (error) { console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`); return () => null; }
+})();
+const assistantProfiles = async (req) => {
+  try { return modelsForAccount((await mediaModels(false)).models, req).profiles || []; } catch { return []; }
+};
+const assistantLoras = async (req) => {
+  if (!accountMayUseLoras(req) || !lorasEnabled) return [];
+  try {
+    const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
+    const infos = await loraInfos(names);
+    return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
+  } catch { return []; }
+};
+const assistantEngine = registerAssistantRoutes(app, {
+  profiles: assistantProfiles,
+  guide: (profile) => { try { return assistantGuides(profile, true); } catch { return null; } },
+  loras: assistantLoras,
+  // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
+  starred: async (req, profile) => {
+    const families = new Map((await assistantProfiles(req)).map((item) => [item.id, item.family]));
+    const same = (item) => item.settings?.profileId === profile.id || (profile.family && families.get(item.settings?.profileId) === profile.family);
+    const items = gallery.filter((item) => item.favorite && item.status === "done" && item.prompt && recordBelongsToRequest(item, req) && same(item)).slice(0, 6);
+    return { examples: items.map((item) => item.prompt), loras: [...new Set(items.flatMap((item) => (item.settings?.loras || []).map((lora) => lora?.name).filter(Boolean)))] };
+  },
+  template: async (id) => { try { return JSON.parse(readEditableProfile(id).text); } catch { return null; } },
+  checkProfile: async (id, text) => validateProfileText(id, text, { info: await loadComfyContext().then((context) => context.info).catch(() => null) }),
+  pack: (id) => { try { return guideStore().pack(id).pack; } catch { return null; } },
+  requireAdmin
 });
 
 registerGalleryBundleRoutes(app);
@@ -886,6 +1003,12 @@ app.delete("/api/workflows/:id", (req, res) => {
 });
 
 registerGalleryReadRoutes(app);
+// Refine in Chat: the chat's address, and handing a result the account owns to its chat.
+registerChatRoutes(app, {
+  store: chatHandovers,
+  ownerId: ownerIdForRequest,
+  owned: (req, jobId) => recordsForRequest(gallery, req).some((item) => item.jobId === jobId && item.status === "done")
+});
 registerComparisonRoutes(app, { dataDir, gallery: () => filterVisibleGallery(gallery) });
 
 
@@ -967,6 +1090,15 @@ app.post("/api/prompts/enabled", (req, res) => {
 app.post("/api/prompts/pin", (req, res) => {
   if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind, ownerIdForRequest(req)) });
+});
+
+// The prompt assistant keeps the text it replaced (a rewrite, a written negative), so History can bring it back.
+app.post("/api/prompts/record", (req, res) => {
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  const kind = req.body?.kind === "negative" ? "negative" : "positive";
+  const ownerId = ownerIdForRequest(req);
+  recordPrompt(String(req.body?.text || "").slice(0, 8000), kind, ownerId);
+  res.json({ ok: true, prompts: listPrompts(kind, ownerId) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {
@@ -1187,7 +1319,8 @@ app.get("/api/settings/deployment", async (req, res) => {
     catalogue: catalogueFlags.map(describeFlag),
     integrations: {
       civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
-      huggingFace: { token: hfTokenStatus() }
+      huggingFace: { token: hfTokenStatus() },
+      assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource })
     },
     storage: { outputs: mediaStorageEnabled ? "studio" : "comfy", ...settingSource("STUDIO_OUTPUT_STORAGE"), workerToken: Boolean(process.env.STUDIO_WORKER_TOKEN), multiUser: multiUserEnabled }
   });
@@ -1204,6 +1337,10 @@ app.post("/api/settings/deployment", (req, res) => {
       const item = catalogueFlags.find((entry) => entry.key === key);
       // Back to the default is no line at all, so a later default change still applies.
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"), key, applies: item.applies } });
+      return;
+    }
+    if (assistantSettingKeys.includes(key)) {
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, assistantSettingValue(key, value)), key, applies: "now" } });
       return;
     }
     if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {

@@ -11,10 +11,13 @@ export type Source = { source: 'deployment' | 'studio' | 'default'; locked: bool
 type DefaultProfile = Source & { key: string; configured: string; effective: string };
 type CatalogueFlag = Source & { key: string; label: string; description: string; value: boolean; defaultOn: boolean; applies: 'now' | 'restart' };
 type TokenStatus = { set: boolean; editable: boolean; source?: string };
+type AssistantModel = Source & { key: string; configured: string; effective: string; vision?: boolean };
+/** The prompt assistant's gateway models (server/assistant-routes.js assistantIntegration). */
+type AssistantIntegration = { available: boolean; note?: string; writerModel: string; models: string[]; model: AssistantModel; spicy: AssistantModel };
 export type DeploymentSettings = {
   defaults: { image: DefaultProfile; video: DefaultProfile; profiles: { id: string; label: string; kind: string; ready: boolean }[] };
   catalogue: CatalogueFlag[];
-  integrations: { civitai: { token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
+  integrations: { civitai: { token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus }; assistant?: AssistantIntegration };
   storage: Source & { outputs: 'studio' | 'comfy'; workerToken: boolean; multiUser: boolean };
 };
 
@@ -54,8 +57,8 @@ async function postJson(url: string, body: unknown) {
   return { response, data };
 }
 
-/** The profiles a fresh composer starts on, and what the catalogue offers. */
-export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+/** Saves one deployment setting, with its outcome in the status pill. */
+function useSaveSetting(showToast: ShowToast, onSaved: () => void) {
   const [busy, setBusy] = React.useState('');
   const save = async (key: string, value: string | boolean) => {
     setBusy(key);
@@ -67,6 +70,12 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
     } catch { showToast('Can’t reach Studio. Make sure it’s running.', 'error'); }
     finally { setBusy(''); }
   };
+  return { busy, save };
+}
+
+/** Settings › Models › Defaults: the profiles a fresh composer starts on. */
+export function DefaultsGroup({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+  const { busy, save } = useSaveSetting(showToast, onSaved);
   const label = (id: string) => settings.defaults.profiles.find((profile) => profile.id === id)?.label || id;
   const defaultRow = (kind: 'image' | 'video') => {
     const entry = settings.defaults[kind];
@@ -77,23 +86,58 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
       {entry.locked ? <span className="set-locked-value">{entry.configured ? label(entry.configured) : 'First Ready Profile'}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} value={entry.configured || FIRST_READY} options={options} onChange={(value) => void save(entry.key, value === FIRST_READY ? '' : value)} /></div>}
     </Row>;
   };
+  return <Group title="Defaults" note="Locked values come from the server configuration and can only be changed there">
+    {defaultRow('image')}
+    {defaultRow('video')}
+  </Group>;
+}
+
+/** Library › Models › Catalogue: the catalogue switches that remain global (none when every one is an access-profile feature). */
+export function CatalogueFlagsGroup({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+  const { busy, save } = useSaveSetting(showToast, onSaved);
   const catalogue = settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key));
+  return catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers">
+    {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description.replace(/\.$/, '')}${item.applies === 'restart' ? '; applies after a restart' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
+  </Group> : null;
+}
+
+const DEFAULT_MODEL = '__default__';
+
+/** The prompt assistant's two models: the everyday one and the uncensored one for Spicy. */
+function AssistantRows({ assistant, showToast, onSaved }: { assistant: AssistantIntegration; showToast?: ShowToast; onSaved?: () => void }) {
+  const [busy, setBusy] = React.useState('');
+  if (!assistant.available) return <Row label="Assistant Model" description={(assistant.note || 'The prompt assistant isn’t set up').replace(/\.$/, '')}><Status>Off</Status></Row>;
+  const save = async (key: string, value: string) => {
+    setBusy(key);
+    try {
+      const { response, data } = await postJson('/api/settings/deployment', { key, value });
+      if (!response.ok) { showToast?.(data.error || 'Couldn’t save that setting.', 'error'); return; }
+      showToast?.('Saved', 'success');
+      onSaved?.();
+    } catch { showToast?.('Can’t reach Studio. Make sure it’s running.', 'error'); }
+    finally { setBusy(''); }
+  };
+  const options = (entry: AssistantModel, first: { label: string; value: string }) => {
+    const list = [first, ...assistant.models.map((model) => ({ label: model, value: model }))];
+    if (entry.configured && !assistant.models.includes(entry.configured)) list.push({ label: `${entry.configured} (Not Listed)`, value: entry.configured });
+    return list;
+  };
+  const vision = (on?: boolean) => on ? 'reads reference images' : 'text only, reference images aren’t read';
+  const row = (entry: AssistantModel, label: string, description: string, first: { label: string; value: string }) => <Row key={entry.key} label={<>{label} <SourceTag source={entry.source} locked={entry.locked} /></>} description={description} disabled={busy === entry.key}>
+    {entry.locked ? <span className="set-locked-value">{entry.configured || first.label}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={label} value={entry.configured || first.value} options={options(entry, first)} onChange={(value) => void save(entry.key, value === first.value ? '' : value)} /></div>}
+  </Row>;
   return <>
-    <Group title="Defaults" note="Locked values come from the server configuration and can only be changed there">
-      {defaultRow('image')}
-      {defaultRow('video')}
-    </Group>
-    {catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers">
-      {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description.replace(/\.$/, '')}${item.applies === 'restart' ? '; applies after a restart' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
-    </Group> : null}
+    {row(assistant.model, 'Assistant Model', `Rewrites prompts, writes negatives and suggests LoRAs · ${vision(assistant.model.vision)}`, { label: `Prompt Writer Model (${assistant.writerModel})`, value: DEFAULT_MODEL })}
+    {row(assistant.spicy, 'Assistant Spicy Model', assistant.spicy.effective ? `Uncensored model for the Spicy preset, for accounts with NSFW Models · ${vision(assistant.spicy.vision)}` : 'Uncensored model for the Spicy preset, for accounts with NSFW Models; Spicy stays hidden until one is chosen', { label: 'Off', value: DEFAULT_MODEL })}
   </>;
 }
 
 /** Third-party services and storage at a glance: what is on, configured and available. */
-export function IntegrationsOverview({ settings }: { settings: DeploymentSettings }) {
-  const { civitai } = settings.integrations;
+export function IntegrationsOverview({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast?: ShowToast; onSaved?: () => void }) {
+  const { civitai, assistant } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <Group title="Integrations">
+    {assistant ? <AssistantRows assistant={assistant} showToast={showToast} onSaved={onSaved} /> : null}
     <Row label="Civitai" description={`Token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' in the server configuration' : ''} · presets ${civitai.presets ? 'on' : 'off'} · PNGs carry settings Civitai can read`}>{state(civitai.token.set || civitai.presets, ['On', 'Off'])}</Row>
     <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs${settings.storage.workerToken ? ' · worker token set' : ''}` : 'Finished outputs stay in ComfyUI’s output folder'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
   </Group>;

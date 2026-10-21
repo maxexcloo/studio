@@ -30,8 +30,8 @@ type Common = {
   label: string;
   options: DropdownOption[];
   disabled?: boolean;
-  /** `row`: the value muted at the end of a list row; `pill`: a compact toolbar pill; `field`: a filled control; `heading`: a picker heading's menu. */
-  variant?: 'row' | 'pill' | 'field' | 'heading';
+  /** `row`: the value muted at the end of a list row; `pill`: a compact toolbar pill; `field`: a filled control; `heading`: a picker heading's menu; `icon`: only `summary` (an icon or a caret), in an icon row such as the prompt's. */
+  variant?: 'row' | 'pill' | 'field' | 'heading' | 'icon';
   /** The trigger's accessible name when it differs from the menu's ("Stacks: Portraits"). */
   triggerLabel?: string;
   /** Commands under the choices, after a divider. */
@@ -147,8 +147,10 @@ export function Dropdown(props: DropdownProps) {
         if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setQuery(''); setSearchOpen(false); setOpen(true); }
       }}
     >
-      <span className="dropdown-value">{shown}</span>
-      <ChevronDown size={14} aria-hidden="true" />
+      {variant === 'icon' ? summary : <>
+        <span className="dropdown-value">{shown}</span>
+        <ChevronDown size={14} aria-hidden="true" />
+      </>}
     </button>
     <AnimatePresence>
       {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} fitWidth={fitMenu ? Math.max(...options.map((option) => option.label.length), 6) * 8.5 + 72 : 0} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>

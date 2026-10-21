@@ -120,11 +120,16 @@ test('FLUX.3 Klein provider and training metadata do not fall back to FLUX.1', (
   assert.deepEqual(familiesFromMetadata({ base_model: 'Flux.1 Dev' }), ['flux1']);
 });
 
-test("the LoRA catalogue is read from data/config as well, the synced copy winning", () => {
+test("the LoRA catalogue merges data/config (seed) and the data folder (admin), the admin copy winning", () => {
   const data = process.env.STUDIO_DATA_DIR;
   fs.mkdirSync(path.join(data, "config"), { recursive: true });
   fs.writeFileSync(path.join(data, "lora-catalogue.json"), JSON.stringify({ "a.safetensors": { title: "By Hand" }, "b.safetensors": { title: "Only By Hand" } }));
   fs.writeFileSync(path.join(data, "config", "lora-catalogue.json"), JSON.stringify({ "a.safetensors": { title: "Synced" } }));
-  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "Synced");
+  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "By Hand");
   assert.equal(catalogueLoraInfo("b.safetensors", { families: [], triggers: [] }).title, "Only By Hand");
+  fs.writeFileSync(path.join(data, "config", "lora-catalogue.json"), JSON.stringify({ "a.safetensors": { title: "Synced" }, "c.safetensors": { title: "Only Synced" } }));
+  assert.equal(catalogueLoraInfo("c.safetensors", { families: [], triggers: [] }).title, "Only Synced", "seed updates still flow");
+  // Both files stay as they were; the catalogue holds the merge.
+  assert.match(fs.readFileSync(path.join(data, "lora-catalogue.json"), "utf8"), /By Hand/);
+  assert.ok(fs.existsSync(path.join(data, "library", "catalogue.json")));
 });

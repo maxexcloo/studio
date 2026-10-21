@@ -14,18 +14,18 @@ import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { knownAccountStatus } from './accounts';
 import { ProfilesSettings } from './ProfilesSettings';
-import { AdapterLibraryGroup, PromptHistoryRow } from './LibrarySettings';
+import { PromptHistoryRow } from './LibrarySettings';
 import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnostics';
 import { AccountSettings, GroupsSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
-import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
+import { DefaultsGroup, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
 import { WorkerSettings } from './WorkerSettings';
 
 /** Account first, then alphabetical (UI-PATTERNS › Settings). */
 export const SETTINGS_SECTIONS = [
   { id: 'account', label: 'Account', icon: UserRound, description: 'Your profile and MCP connection' },
   { id: 'groups', label: 'Groups', icon: ShieldCheck, description: 'What each group can use, and where new accounts start' },
-  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, LoRAs and integrations' },
-  { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'Edit a model profile’s JSON, checked before it saves' },
+  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models and integrations' },
+  { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'Model profiles and guides: JSON, versions, drafts and export' },
   { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio works for you' },
   { id: 'users', label: 'Users', icon: UsersRound, description: 'Accounts and chat users' },
   { id: 'workers', label: 'Workers', icon: Plug, description: 'The ComfyUI workers that run your jobs' },
@@ -297,10 +297,9 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
 
         {section === 'models' && sectionShown('models') ? (
           <>
-            {deployment.settings ? <DefaultsCatalogueGroups settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
+            {deployment.settings ? <DefaultsGroup settings={deployment.settings} showToast={showToast} onSaved={() => { void deployment.refresh(); refreshModels(false); refreshWorkflows(); }} /> : null}
             {deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : null}
-            <AdapterLibraryGroup />
-            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} /> : null}
+            {deployment.settings ? <IntegrationsOverview settings={deployment.settings} showToast={showToast} onSaved={() => void deployment.refresh()} /> : null}
           </>
         ) : null}
 

@@ -225,3 +225,45 @@ test("administrators can dismiss a pending gateway identity, which returns only 
   noteGatewayIdentity("librechat-probe");
   assert.ok((await pending()).includes("librechat-probe"));
 });
+
+test("MCP admin routes take only an administrator's own token, or a gateway-linked administrator while Chat Gateway Admin Tools is on", async () => {
+  const { rotateAccountMcpToken } = await import("./account-store.js");
+  const { internalMcpHeaders, mcpAdminRouteAllowed } = await import("./multi-user-auth.js");
+  const { canAdmin } = await import("./access.js");
+  const { fromChat } = await import("./route-access.js");
+  const signedIn = await call(routes["POST /api/accounts/sign-in"], local({ username: "recovery", password: "a secure recovery password" }));
+  const admin = { ...local(), headers: { ...local().headers, cookie: [].concat(signedIn.headers["Set-Cookie"])[0].split(";")[0] } };
+  const adminId = accountForRequest(admin).userId;
+  const artist = (await call(routes["GET /api/accounts/admin"], admin)).body.accounts.find((account) => account.username === "artist");
+  const bearer = (token, method, routePath) => ({ ...local(), method, path: routePath, headers: { ...local().headers, authorization: `Bearer ${token}` } });
+  const internal = (accountId, method, routePath) => ({ ...local(), method, path: routePath, headers: { ...local().headers, ...Object.fromEntries(Object.entries(internalMcpHeaders(accountId)).map(([name, value]) => [name.toLowerCase(), value])) } });
+
+  assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
+  assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
+  // Nothing that deletes or replaces files, and no account or GPU administration.
+  for (const [method, routePath] of [["POST", "/api/models/downloads/replace"], ["DELETE", "/api/loras"], ["POST", "/api/models/manifest/restore"], ["GET", "/api/accounts/admin"], ["POST", "/api/library/imports/x/folder"]]) assert.equal(mcpAdminRouteAllowed(method, routePath), false, `${method} ${routePath}`);
+
+  const adminToken = (await call(routes["POST /api/accounts/mcp-token"], admin)).body.token;
+  const asAdmin = accountForRequest(bearer(adminToken, "POST", "/api/library/imports"));
+  assert.equal(asAdmin.credential, "mcp-admin");
+  assert.equal(canAdmin({ studioAccount: asAdmin }), true);
+  assert.equal(fromChat({ studioAccount: asAdmin }), true);
+  assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/accounts/admin")), null);
+  assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/models")).credential, "mcp-token");
+  assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/reference-assets/asset-1/media")).credential, "mcp-token", "an upload's pixels, for its owner");
+  const artistToken = rotateAccountMcpToken(artist.id).token;
+  assert.equal(accountForRequest(bearer(artistToken, "POST", "/api/library/imports")), null);
+
+  // The switch is off by default: a gateway-linked administrator's loopback calls stay out.
+  assert.equal((await call(routes["GET /api/accounts/admin"], admin)).body.gateway.adminTools, false);
+  assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")), null);
+  assert.equal(accountForRequest(internal(adminId, "POST", "/api/generate")).credential, "mcp-token");
+  const refused = await call(routes["POST /api/accounts/gateway-admin"], { ...local({ on: true }), socket: { remoteAddress: "192.168.1.30" } });
+  assert.equal(refused.statusCode, 403);
+  assert.equal((await call(routes["POST /api/accounts/gateway-admin"], { ...admin, body: { on: "yes" } })).statusCode, 400);
+  assert.equal((await call(routes["POST /api/accounts/gateway-admin"], { ...admin, body: { on: true } })).body.adminTools, true);
+  assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")).credential, "mcp-admin");
+  assert.equal(accountForRequest(internal(artist.id, "POST", "/api/library/imports")), null);
+  await call(routes["POST /api/accounts/gateway-admin"], { ...admin, body: { on: false } });
+  assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")), null);
+});
