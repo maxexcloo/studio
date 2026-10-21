@@ -207,3 +207,23 @@ test('in the phone\'s focused-text row, one tap rewrites with the last preset an
   await expect(field).toHaveValue('A cabin at dusk, warm light.');
   await expect(focused).toHaveCount(1);
 });
+
+test('a focused prompt or negative takes the field\'s full width, the tools sitting above the text', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone Create sheet.');
+  await fakeKeyboard(page);
+  await mockStudio(page);
+  await page.goto('/');
+  const sheet = await studioUi(page).openComposer();
+  for (const label of ['Prompt', 'Negative Prompt'] as const) {
+    if (label === 'Negative Prompt') await sheet.getByRole('button', { name: /Negative/ }).first().click().catch(() => {});
+    const field = sheet.getByRole('textbox', { name: label, exact: true });
+    await field.fill('gggf '.repeat(60));
+    await field.focus();
+    await raiseKeyboard(page, 336);
+    await expect(sheet.locator('.is-text-focused.has-assistant textarea')).toHaveCount(1);
+    const padding = await field.evaluate((node) => parseFloat(getComputedStyle(node).paddingRight));
+    expect(padding, label).toBeLessThanOrEqual(16);
+    await sheet.getByRole('button', { name: 'Done', exact: true }).click();
+    await raiseKeyboard(page, 0);
+  }
+});

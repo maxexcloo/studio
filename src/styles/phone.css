@@ -1127,7 +1127,8 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .create-prompts .composer-field-tools .prompt-assistant-menu.dropdown-trigger[aria-expanded="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
 .create-prompts .composer-prompt-field.has-assistant textarea { padding-right: calc(4 * var(--prompt-tool-w) + var(--space-3)) !important; }
 .create-prompts .is-negative.has-assistant textarea { padding-right: calc(3 * var(--prompt-tool-w) + var(--space-3)) !important; }
-.create-prompts .composer-prompt-field.is-text-focused.has-assistant textarea { padding-right: calc(4 * var(--prompt-tool-w) + 72px) !important; }
+/* Focused, the tools sit above the text (the top padding clears them), so the text takes the full width. */
+.create-prompts .is-text-focused.has-assistant textarea { padding-right: 14px !important; }
 @media (pointer: coarse) {
   .create-prompts .assistant-chips-dismiss { height: var(--control-h-touch); }
   .create-prompts .assistant-chips-dismiss { width: var(--control-h-touch); }
