@@ -179,6 +179,10 @@
   .gallery-search-tools { grid-column: 1; grid-row: 2; }
   .gallery-toolbar-actions { grid-column: 2; grid-row: 2; }
 }
+/* Selecting in the two-row toolbar: the search tools keep only their own width, so every selection action fits. */
+@media (min-width: 601px) and (max-width: 1050px) {
+  .gallery-toolbar:has(.gallery-management.is-selecting) { grid-template-columns: auto minmax(0, 1fr); }
+}
 @media (max-width: 600px) {
   .gallery-toolbar { --gallery-toolbar-h: 160px; grid-template-columns: minmax(0, 1fr); }
   .gallery-toolbar .gallery-generation-mode { grid-column: 1; }

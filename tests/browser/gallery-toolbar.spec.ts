@@ -53,8 +53,10 @@ test.describe('with a mouse', () => {
     await expect(toolbar.getByRole('status')).toHaveText('8 Selected');
     const centred = await toolbar.locator('.gallery-selection-actions button').evaluateAll(buttons => buttons.every(button => { const a = button.getBoundingClientRect(), b = button.querySelector('svg')!.getBoundingClientRect(); return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 0.5 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 0.5; }));
     expect(centred).toBe(true);
-    await expect(grouping).toBeVisible();
+    // The view toggles step aside while selecting, so every selection action has room.
+    await expect(grouping).toHaveCount(0);
     await toolbar.getByRole('button', { name: 'Stop Selecting' }).click();
+    await expect(grouping).toBeVisible();
     for (const width of [1440, 900, 640]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await toolbar.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
@@ -246,19 +248,23 @@ test('grouping uses the same glass shell and inset action states as Search and S
   await page.waitForTimeout(200);
   expect(await state(select)).toEqual(hover);
   await grouping.click();
-  await select.click();
   await page.mouse.move(0, 500);
   await page.waitForTimeout(400);
-  // Grouping on is a pressed button; "N Selected" is plain text beside its X.
+  // Grouping on is a pressed button.
   expect(await grouping.evaluate(n => getComputedStyle(n).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
-  expect(await select.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  expect(await shell.evaluate(n => getComputedStyle(n).backgroundColor)).toBe(await toolbar.locator('.gallery-management').evaluate(n => getComputedStyle(n).backgroundColor));
-  await toolbar.screenshot({ path: testInfo.outputPath('desktop-selected.png') });
+  const shellBackground = await shell.evaluate(n => getComputedStyle(n).backgroundColor);
   await page.keyboard.press('Tab');
   await grouping.focus();
   const focus = await grouping.evaluate(n => ({ outline: getComputedStyle(n).outline, offset: getComputedStyle(n).outlineOffset }));
   await select.focus();
   expect(await select.evaluate(n => ({ outline: getComputedStyle(n).outline, offset: getComputedStyle(n).outlineOffset }))).toEqual(focus);
+  await select.click();
+  await page.mouse.move(0, 500);
+  await page.waitForTimeout(400);
+  // "N Selected" is plain text beside its X, on the same glass as the other shells.
+  expect(await select.evaluate(n => getComputedStyle(n).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await toolbar.locator('.gallery-management').evaluate(n => getComputedStyle(n).backgroundColor)).toBe(shellBackground);
+  await toolbar.screenshot({ path: testInfo.outputPath('desktop-selected.png') });
 });
 
 test('the search’s clear X is a round plain icon button', async ({ page, isMobile }) => {

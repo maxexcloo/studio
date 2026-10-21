@@ -40,6 +40,8 @@ type VirtualMasonryGalleryProps = {
   /** Scroll this run into view once it is laid out (opened from zen or the sheet). */
   focusRun?: string;
   onFocused?: () => void;
+  /** Called once the grid has its first real layout, before that frame paints (a mode's saved place goes back then). */
+  onLaidOut?: () => void;
   /** The item open in the viewer: its tile is scrolled into view whenever the viewer moves to another one. */
   followItem?: string;
   smartUpscale?: boolean;
@@ -63,7 +65,8 @@ function scrollParent(node: HTMLElement | null) {
 function useElementWidth<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
   const [width, setWidth] = useState(0);
-  useEffect(() => {
+  // Measured before the first paint, so the grid never shows (or glides from) a layout for no width.
+  React.useLayoutEffect(() => {
     if (!ref.current) return;
     const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
     observer.observe(ref.current);
@@ -91,6 +94,7 @@ export function VirtualMasonryGallery({
   items,
   moments = false,
   onFocused,
+  onLaidOut,
   onStackPress,
   openItem,
   openRuns = emptySet,
@@ -132,10 +136,12 @@ export function VirtualMasonryGallery({
   const safeColumns = Math.max(1, columns);
   React.useLayoutEffect(() => {
     const gap = containerRef.current ? parseFloat(getComputedStyle(containerRef.current).columnGap) : NaN;
-    if (Number.isFinite(gap)) setColumnGap((current) => (current === gap ? current : gap));
+    // Unreadable (no grid styles): fall back to the spacing below, but count it as measured.
+    const next = Number.isFinite(gap) ? gap : -1;
+    setColumnGap((current) => (current === next ? current : next));
   }, [containerWidth, safeColumns]); // eslint-disable-line react-hooks/exhaustive-deps
   const spacing = containerWidth < 620 ? 4 : 7;
-  const gutter = columnGap ?? spacing;
+  const gutter = columnGap !== null && columnGap >= 0 ? columnGap : spacing;
   // The grid is newest first, each tile in the shortest column: the newest top
   // left, the same layout a reload gives. That places every tile by the ones
   // before it, so a tile that goes (deleted, hidden, stopped) only moves the
@@ -382,9 +388,25 @@ export function VirtualMasonryGallery({
     }
   }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Nothing is placed until the grid knows its width and gap: tiles mount where
+  // they belong, rather than at a provisional place they would glide away from
+  // (a new list after Images | Videos, a search or a filter).
+  const measured = containerWidth > 0 && columnGap !== null;
+  // A window resized within the same columns moves tiles with it at once;
+  // gliding there leaves them trailing (and overlapping) behind the edge.
+  // A change of columns still glides (UI-PATTERNS › Motion).
+  const geometry = useRef({ columns: safeColumns, width: containerWidth });
+  const resizedInPlace = geometry.current.width !== containerWidth && geometry.current.columns === safeColumns;
+  useEffect(() => { geometry.current = { columns: safeColumns, width: containerWidth }; });
+  const laidOut = useRef(false);
+  React.useLayoutEffect(() => {
+    if (!measured || laidOut.current) return;
+    laidOut.current = true;
+    onLaidOut?.();
+  }, [measured]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = useMemo(
-    () => layout.entries.filter((entry) => entry.y + entry.h >= range.start && entry.y <= range.end),
-    [layout, range]
+    () => measured ? layout.entries.filter((entry) => entry.y + entry.h >= range.start && entry.y <= range.end) : [],
+    [layout, measured, range]
   );
   // Arrows follow time across whatever is shown: tiles and stacks, newest first.
   const order = useMemo(() => {
@@ -421,7 +443,7 @@ export function VirtualMasonryGallery({
       }}
       style={{ "--gallery-columns": safeColumns, "--gallery-gap": `${spacing}px` } as React.CSSProperties}
     >
-      <div className="virtual-gallery-spacer" style={{ height: layout.total }}>
+      <div className="virtual-gallery-spacer" style={{ height: measured ? layout.total : 0 }}>
         {visible.map((entry) => {
           if (entry.kind === "moment") {
             return (
@@ -468,7 +490,7 @@ export function VirtualMasonryGallery({
                 ? tweens.base
                 : dealing
                   ? { ...glide, opacity: tweens.slow }
-                  : glide}
+                  : resizedInPlace ? { duration: 0 } : glide}
             >
               {entry.kind === "stack" ? (
                 <RunStack
