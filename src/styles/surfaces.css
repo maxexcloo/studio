@@ -1,3 +1,5 @@
+/* Modals and the shared surface treatments. */
+
 /* ---------------------------------------------------------------------------
    Shared surfaces: Modal, buttons and the prompt field (status messages: 30-islands)
 
@@ -5,9 +7,7 @@
    the sheet, the head/body/foot anatomy and the sizes; feature CSS only lays
    out what goes inside the body.
 --------------------------------------------------------------------------- */
-
 /* ----------------------------------------------------------------- Scrim */
-
 .modal-scrim {
   position: fixed;
   inset: 0;
@@ -24,9 +24,7 @@
   animation: modal-fade var(--motion-fast) var(--motion-ease), modal-glass var(--motion-fast) step-end;
 }
 @keyframes modal-glass { from { -webkit-backdrop-filter: none; backdrop-filter: none; } }
-
 /* ----------------------------------------------------------------- Sheet */
-
 .modal {
   position: relative;
   display: flex;
@@ -46,12 +44,9 @@
 .modal-alert { width: min(420px, 100%); }
 .modal-wide { width: min(1280px, 100%); height: min(840px, calc(100dvh - 48px)); }
 .modal-sheet { width: min(1200px, 100%); height: min(800px, calc(100dvh - 48px)); }
-
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: scale(.96); } }
-
 /* ------------------------------------------------------------------ Head */
-
 .modal-head {
   flex: none;
   display: flex;
@@ -103,10 +98,8 @@
 }
 .modal-close:hover:not(:disabled) { background: var(--control-hover); color: #fff; }
 .modal-close:disabled { opacity: .4; cursor: default; }
-
 /* Alerts stack the icon above the title, like a note rather than a form. */
 .modal-alert > .modal-head { flex-direction: column; gap: var(--space-6); padding-right: 24px; }
-
 /* Libraries and settings: a toolbar head over a full-bleed body. */
 .modal-wide > .modal-head,
 .modal-sheet > .modal-head {
@@ -117,7 +110,6 @@
 }
 .modal-wide > .modal-head .modal-close,
 .modal-sheet > .modal-head .modal-close { margin: 0; }
-
 /* A hero image sits flush on top; the close button floats over it. */
 .modal-hero {
   display: block;
@@ -138,9 +130,7 @@
   backdrop-filter: var(--glass-bar-blur);
   color: hsl(var(--foreground));
 }
-
 /* ------------------------------------------------------------- Body, foot */
-
 .modal-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -164,42 +154,8 @@
   gap: var(--space-4);
   padding: 24px;
 }
-
 .modal :focus-visible { outline: none; box-shadow: var(--focus-ring); }
-
-/* --------------------------------------------------------------- Buttons
-   40px pills. Default is the soft fill; primary is the white action. */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  height: var(--control-h);
-  min-height: var(--control-h);
-  padding: 0 18px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: var(--control-fill);
-  color: hsl(var(--foreground));
-  font-size: 13px;
-  font-weight: 550;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.btn:hover:not(:disabled) { background: var(--control-hover); }
-.btn:disabled { opacity: .45; cursor: default; }
-.btn.is-primary { background: var(--action); color: var(--action-ink); }
-.btn.is-primary:hover:not(:disabled) { background: #fff; }
-.btn.is-danger { background: #c4553f; color: #fff; }
-.btn.is-danger:hover:not(:disabled) { background: #d46149; }
-.btn.is-ghost { background: transparent; color: hsl(var(--muted-foreground)); }
-.btn.is-ghost:hover:not(:disabled) { background: var(--control-hover); color: #fff; }
-.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-
 /* ---------------------------------------------------------- Single field */
-
 .modal-input {
   width: 100%;
   height: var(--control-h);
@@ -211,17 +167,7 @@
   font-size: 13px;
 }
 .modal-input:focus-visible { border-color: var(--line-strong); }
-
-/* ------------------------------------------------------------ Copied
-   A copy button confirms in place (src/app/CopyFeedback.tsx): its icon turns
-   into a green check for a moment. */
-
-.copy-icon { display: inline-grid; flex: none; place-items: center; }
-.copy-icon > * { display: grid; grid-area: 1 / 1; }
-.copy-icon.is-copied { color: #7fd49a; }
-
 /* ---------------------------------------------------------------- Phone */
-
 @media (max-width: 760px) {
   .modal-scrim {
     padding:
@@ -240,22 +186,15 @@
   .modal-head { padding: 20px 12px 0 20px; }
   .modal-body { padding: 16px 20px 0; }
   .modal-foot { padding: 20px; }
-  .modal-alert .modal-foot .btn,
-  .modal-form .modal-foot .btn { flex: 1; min-height: 44px; }
-  .modal-head-actions .btn span { display: none; }
-  .modal-head-actions .btn { width: var(--control-h); padding: 0; }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .modal-scrim,
   .modal { animation: none; }
 }
-
-/* A glass surface on the move (useSettling in composerSurface.ts) skips its
-   backdrop blur and takes a near-solid fill; the glass returns when it settles.
-   Re-blurring the page behind on every frame is what made motion stutter. */
-[data-settling] {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  background-color: var(--glass-panel-solid) !important;
+@media (max-height: 520px) {
+  /* Dialogs drop their desktop padding and header height. */
+  .modal-wide,
+  .modal-sheet { height: calc(100dvh - 16px); max-height: none; }
 }
+.surface-head-slot { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); min-width: 0; }
+.surface-head-slot:empty { display: none; }

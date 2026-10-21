@@ -1,3 +1,5 @@
+/* The lock screen, account gate and device gate. */
+
 /* ---------------------------------------------------------------------------
    Lock screen (src/app/DeviceGate.tsx)
 
@@ -5,7 +7,6 @@
    gallery's place, set like the offline and empty stages, with the password
    field under it.
 --------------------------------------------------------------------------- */
-
 /* In the gallery's place, set like the offline and empty stages. */
 .lockscreen {
   position: fixed;
@@ -20,11 +21,7 @@
 .lock-stage.stage-empty { min-height: 0; width: min(520px, calc(100vw - 32px)); }
 .lock-stage .stage-copy { min-height: 170px; }
 .lock-stage .empty-actions { width: 100%; }
-/* The composer fades and settles as it comes and goes. */
-.zen-prompt { transition: opacity var(--motion-slow) var(--motion-ease), translate var(--motion-slow) var(--motion-ease), border-color var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease); }
-
 /* --------------------------------------------------------------- Unlocking */
-
 .unlock { display: grid; justify-items: center; gap: var(--space-4); width: 100%; }
 .unlock-field {
   display: flex;
@@ -70,15 +67,12 @@
 .unlock.is-compact { justify-items: stretch; }
 .unlock.is-compact .unlock-field { width: 100%; }
 .unlock-spacer { height: 70px; }
-
 @media (prefers-reduced-motion: reduce) {
   .unlock-field.is-wrong { animation: none; }
 }
-
 /* Another device before it signs in (DeviceGate.tsx): this is all it can show, above everything. */
 .device-gate { position: fixed; inset: 0; z-index: 40; background: #0a0a0a; }
 .device-gate.lockscreen { pointer-events: auto; }
-
 /* Account sign-in (DeviceGate.tsx): the lock over a card drawn like the alert modal. */
 .account-gate {
   display: grid;
@@ -102,4 +96,8 @@
 .account-gate-or::before,
 .account-gate-or::after { content: ""; flex: 1; height: 1px; background: var(--glass-border); }
 .account-gate-end { height: 24px; }
-
+@media (max-height: 520px) {
+  /* The lock screen's mark scales with the height it has. */
+  .lock-stage .stage-mark { width: min(520px, 92%, calc(40dvh * 2.5)); }
+  .lock-stage .stage-copy { min-height: 0; }
+}

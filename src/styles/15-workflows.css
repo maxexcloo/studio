@@ -1,7 +1,0 @@
-/* Empty states. */
-.empty { gap: var(--space-4); }
-.empty > svg { color: #777; margin-bottom: 8px; }
-.empty h2 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: -.025em; color: #bfbfbf; }
-.empty p { margin: 0; font-size: 12px; line-height: 1.7; color: #737373; max-width: 32ch; }
-.empty-actions { margin-top: 8px; }
-.empty-actions .reconnect-btn { min-height: 36px; border-radius: var(--r-pill); font-size: 11px; }

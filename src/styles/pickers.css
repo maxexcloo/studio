@@ -1,0 +1,1920 @@
+/* Pickers: Model, LoRAs, References and Size, on the desktop and inside phone pop-ups. */
+
+.model-picker { position: relative; min-width: 0; }
+.picker-search {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / .045);
+  color: hsl(var(--muted-foreground));
+  cursor: text;
+}
+.picker-search:focus-within { box-shadow: inset 0 0 0 1px var(--line-strong); color: hsl(var(--foreground)); }
+.picker-search input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 13px;
+}
+.picker-search input::placeholder { color: hsl(var(--muted-foreground)); }
+.picker-search input::-webkit-search-cancel-button { display: none; }
+.picker-search button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.picker-search button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+@media (pointer: coarse) {
+  .picker-search input { font-size: 16px; }
+}
+.model-option {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid var(--glass-border);
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-radius: var(--r-field);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
+}
+.model-copy { min-width: 0; display: grid; gap: var(--space-1); }
+.model-copy strong {
+  display: block; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; font-weight: 500;
+  letter-spacing: -0.005em;
+  color: hsl(var(--foreground));
+}
+.model-copy em {
+  display: block; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px; font-style: normal;
+}
+/* A model that still needs files or nodes: said in the menu, flagged on the trigger. */
+.model-copy em.is-setup { color: var(--ember); }
+.model-option .model-copy strong,
+.model-option .model-copy em { overflow: visible; white-space: normal; }
+.model-picker.is-compact { width: auto; }
+.model-picker.is-compact .model-trigger {
+  width: auto;
+  min-height: 40px;
+  height: 40px;
+  grid-template-columns: minmax(0, 150px) 12px;
+  gap: var(--space-4);
+  padding: 0 10px;
+}
+.model-picker.is-compact .model-copy { gap: 0; }
+.model-picker.is-compact .model-copy strong { font-size: 12px; }
+.model-picker.is-compact .model-menu {
+  left: 0; right: auto;
+  min-width: 304px;
+  top: auto; bottom: calc(100% + 6px);
+  transform-origin: bottom left;
+}
+.model-menu {
+  position: absolute; z-index: 14;
+  top: calc(100% + 6px); left: 0; right: 0;
+  display: grid; gap: var(--space-1);
+  padding: 4px;
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: top center;
+}
+/* Options: the cursor is a rounded --cursor-bg fill; the pick shows amber ink, never a row fill. */
+.model-option { min-height: 54px; border-color: transparent; border-radius: var(--r-item); background: transparent; }
+.model-option:hover { border-color: transparent; background: var(--cursor-bg); }
+.model-option.active { background: transparent; color: hsl(var(--foreground)); }
+.model-option.active:hover { background: var(--cursor-bg); }
+.model-option.active .model-copy strong { color: var(--selected-ink); }
+.model-badge {
+  margin: 0 !important;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  color: hsl(var(--muted-foreground));
+  font-size: 10px !important;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.aspect-option {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--glass-border);
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-radius: var(--r-field);
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
+}
+.aspect-option > span:nth-child(2) {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.aspect-menu {
+  position: absolute; z-index: 12;
+  top: calc(100% + 6px); left: 0;
+  width: max(100%, min(280px, calc(100vw - 32px)));
+  display: grid; gap: var(--space-2);
+  padding: 6px;
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: top left;
+}
+.aspect-option { grid-template-columns: 30px minmax(44px, auto) minmax(80px, 1fr); border-color: transparent; border-radius: var(--r-item); background: transparent; box-shadow: none; }
+.aspect-option:hover { border-color: transparent; background: var(--cursor-bg); }
+.aspect-option.active { background: transparent; color: var(--selected-ink); }
+.aspect-option.active:hover { background: var(--cursor-bg); }
+.aspect-option > span:nth-child(2) { overflow: visible; text-overflow: clip; }
+.aspect-option em { color: hsl(var(--muted-foreground)); font-size: 11px; font-style: normal; text-align: right; white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
+.aspect-shape { justify-self: center; display: block; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.88; }
+.aspect-shape.default { width: 18px; height: 18px; }
+.aspect-shape.custom { width: 22px; height: 22px; border-style: dashed; }
+/* What a model can do with a picture: bare muted icons just before its family badge. */
+.model-tags { display: inline-flex; align-items: center; gap: var(--space-4); flex: none; }
+.model-abilities { display: inline-flex; align-items: center; gap: var(--space-3); color: hsl(var(--muted-foreground) / .8); }
+.model-ability { display: grid; place-items: center; }
+.model-option:hover .model-abilities,
+.model-option.active .model-abilities { color: hsl(var(--foreground) / .8); }
+@media (max-width: 620px) {
+  .aspect-menu, .model-menu {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 10px;
+    width: auto;
+    max-height: min(72vh, 560px);
+    overflow: auto;
+    z-index: 40;
+    padding: 8px;
+  }
+  .model-option {
+    min-height: 64px;
+    /* The copy, then what the model can do beside it (the icons, never a
+       fixed track: a leading 30px one once squeezed names down to "SA..."). */
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px;
+  }
+  .model-copy strong,
+  .model-copy em {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .model-option .model-copy strong,
+  .model-option .model-copy em { display: block; }
+  .model-badge { display: none !important; }
+  .aspect-option { min-height: 44px; }
+}
+.model-menu,
+.aspect-menu {
+  padding: 7px;
+}
+/* Options (UI-PATTERNS › Selected & Focus States): the cursor is a rounded
+   --cursor-bg fill; the pick has no row fill, only amber ink. */
+.model-option:hover,
+.aspect-option:hover { background: var(--cursor-bg); }
+.model-option.active,
+.aspect-option.active { background: transparent; box-shadow: none; }
+.model-option.active:hover,
+.aspect-option.active:hover { background: var(--cursor-bg); box-shadow: none; }
+.model-option.active .model-copy strong,
+.aspect-option.active > span:nth-child(2) { color: var(--selected-ink); }
+.model-badge {
+  border-color: rgb(255 255 255 / .16);
+  color: rgb(255 255 255 / .52);
+}
+.aspect-option em { color: rgb(255 255 255 / .5); }
+.model-badge {
+  font-variant-numeric: tabular-nums;
+}
+/* ---------------------------------------------------------------------------
+   6. Enter motion
+   The composer's controls appear with the bar, all at once: no stagger, no
+   blur. Menus fade and scale from 0.96 at the control they belong to.
+--------------------------------------------------------------------------- */
+/* Menus open from the control they belong to. */
+@keyframes surfaceIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.model-menu,
+.aspect-menu {
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: bottom center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-menu,
+  .aspect-menu {
+    animation: none;
+  }
+}
+/* "2 LoRAs": the count, then the word. */
+.model-loras { min-width: 0; margin: 12px 0; }
+.model-loras > h3 { margin: 0 0 8px; font-size: 13px; }
+.lora-option-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-menu,
+.aspect-menu {
+  border: 1px solid var(--glass-border);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+}
+.model-menu,
+.aspect-menu { box-shadow: var(--glass-panel-shadow); }
+.model-menu,
+.aspect-menu { border-radius: var(--r-menu); }
+.model-option,
+.aspect-option { border-radius: var(--r-item); }
+/* The lists that hold one grow to fill their picker, so the words sit in its middle. */
+.lora-panel:has(> .empty-state:only-child) { flex: 1 1 auto; }
+.model-filters { flex: none; display: flex; gap: var(--space-3); padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
+.model-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4) var(--space-5); padding: 8px 4px 12px; overflow: visible; }
+.model-filter-group { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.model-filter-group:not(.model-filter-library) button { flex: 1; padding: 0 8px; }
+.model-filters::-webkit-scrollbar { display: none; }
+.model-filters button {
+  flex: none;
+  height: var(--control-h-sm);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.model-filters button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.model-filters button.active { background: var(--selected-bg); box-shadow: none; color: var(--selected-ink); }
+.model-filters button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (max-width: 760px) {
+  .model-filters { padding: 10px 12px 12px; }
+}
+/* ---------------------------------------------------------------------------
+   Sidebar and LoRAs (src/app/SidebarControls.tsx, src/app/LoraPanel.tsx)
+
+   The sidebar is the composer's drawer: mode, the workflow in use, then three
+   tabs. The LoRA tab is a stack of cards with a picker that takes over the
+   tab while you choose, so nothing floats or clips inside the panel.
+--------------------------------------------------------------------------- */
+/* ---------------------------------------------------------- Workflow card */
+/* ------------------------------------------------------------------ Tabs */
+/* ------------------------------------------------------------ LoRA panel */
+.lora-panel { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
+/* Header: count on the left, quiet bulk actions on the right. */
+.lora-head { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; padding: 0 2px; }
+.lora-count { flex: 1; font-size: 12px; font-weight: 550; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.lora-count em { font-style: normal; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.lora-head-action {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 11.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.lora-head-action:hover { background: var(--control-hover); color: #fff; }
+/* Stacks: saved sets as chips, loaded with one click. */
+/* Modified: a small ember square, the same status marker used everywhere. */
+/* The x takes the count's place on hover, so chips never reserve room for it. */
+.lora-name-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 3px 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18);
+}
+.lora-name-field input { flex: 1; min-width: 0; height: 100%; color: hsl(var(--foreground)); font-size: 12.5px; }
+/* Cards: one left edge for name, slider and warnings. The grip lives in the
+   card's left margin and, like remove, only shows on hover or focus. */
+.lora-list { display: grid; gap: var(--space-3); }
+.lora-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: 10px 12px 12px 16px;
+  border-radius: calc(var(--r-item) + 2px);
+  /* Each card is its own frosted pane. */
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+  list-style: none;
+  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+}
+.lora-card:hover { background: var(--surface-grain), rgb(44 44 44 / .66); }
+.lora-card.has-warning { box-shadow: inset 0 0 0 1px rgb(255 154 82 / .24); }
+.lora-card.is-off .lora-name,
+.lora-card.is-off .lora-strength { opacity: .45; }
+/* Reordering moves nothing until the drop (useReorderDrag): the dragged card dims, the target is outlined. */
+.lora-card.is-dragging { opacity: .55; }
+.lora-card.is-drop-target { box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
+.lora-grip {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-check);
+  background: transparent;
+  color: hsl(var(--muted-foreground) / .7);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity var(--motion-fast), color var(--motion-fast);
+}
+.lora-card:hover .lora-grip,
+.lora-grip:focus-visible { opacity: 1; }
+.lora-grip:hover { color: hsl(var(--foreground)); }
+.lora-grip:active { cursor: grabbing; }
+.lora-card-top { display: flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 26px; }
+.lora-name {
+  flex: 1;
+  min-width: 0;
+  margin-left: -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--r-check);
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background var(--motion-fast), opacity var(--motion-fast);
+}
+.lora-name:hover { background: var(--control-hover); }
+.lora-remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
+}
+.lora-card:hover .lora-remove,
+.lora-remove:focus-visible { opacity: 1; }
+.lora-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
+.lora-card-top .switch { margin-left: 4px; }
+.lora-warning { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: 11.5px; color: var(--ember); }
+/* Made for another model: worth knowing, not an error. */
+.lora-warning.is-soft { color: hsl(var(--muted-foreground)); }
+.lora-warning.is-soft svg { color: var(--ember); opacity: .8; }
+/* Trigger words, each a quiet chip that copies itself. */
+.lora-triggers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.lora-triggers > span { margin-right: 2px; }
+.lora-trigger {
+  max-width: 100%;
+  padding: 1px 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / .06);
+  font: 500 11px/1.6 var(--font-mono);
+  color: hsl(var(--foreground) / .85);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: copy;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.lora-trigger:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.lora-trigger:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lora-trigger.is-copied { color: hsl(var(--foreground)); background: rgb(255 255 255 / .12); }
+/* Strength: a slim slider and a value that reads as text until you edit it. */
+.lora-strength { display: flex; align-items: center; gap: var(--space-4); transition: opacity var(--motion-fast); }
+.lora-strength input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.lora-strength input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(to right, hsl(var(--foreground) / .85) var(--fill), rgb(255 255 255 / .1) var(--fill));
+}
+.lora-strength input[type="range"]::-moz-range-track { height: 3px; border-radius: var(--r-pill); background: rgb(255 255 255 / .1); }
+.lora-strength input[type="range"]::-moz-range-progress { height: 3px; border-radius: var(--r-pill); background: hsl(var(--foreground) / .85); }
+.lora-strength input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: var(--r-pill);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / .5);
+}
+.lora-strength input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: var(--r-pill); background: #fff; }
+.lora-strength input[type="range"]:hover::-webkit-slider-thumb,
+.lora-strength input[type="range"]:focus-visible { outline: none; }
+.lora-strength input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+.lora-strength-value {
+  flex: none;
+  width: 44px;
+  height: 24px;
+  margin-right: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-check);
+  background: transparent;
+  color: hsl(var(--foreground) / .85);
+  font: 500 12px/1 var(--font-mono);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  transition: background var(--motion-fast);
+}
+.lora-strength-value:hover { background: var(--control-fill); }
+.lora-strength-value:focus { outline: none; background: var(--well); color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
+.lora-add { width: 100%; }
+/* ---------------------------------------------------------------- Picker */
+.lora-picker { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; max-height: min(62dvh, 560px); }
+.lora-picker-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); font-size: 12px; color: hsl(var(--muted-foreground)); }
+.lora-picker-head strong { color: hsl(var(--foreground)); font-weight: 550; }
+.lora-picker-back { height: 32px; min-height: 32px; padding: 0 10px 0 6px; font-size: 12.5px; }
+.lora-picker-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--control-h);
+  padding: 0 6px 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: hsl(var(--muted-foreground));
+}
+.lora-picker-search:focus-within { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.lora-picker-search input { flex: 1; min-width: 0; height: 100%; color: hsl(var(--foreground)); font-size: 13px; }
+.lora-picker-search button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--r-pill); background: transparent; color: inherit; cursor: pointer; }
+.lora-picker-list { flex: 1; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
+.lora-picker-section { display: grid; gap: var(--space-1); padding-bottom: 8px; }
+.lora-picker-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 11.5px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+}
+.lora-picker-heading span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lora-picker-heading em { font-style: normal; font-variant-numeric: tabular-nums; opacity: .7; }
+.lora-picker-heading svg { transition: transform var(--motion-fast); }
+.lora-picker-heading svg.is-collapsed { transform: rotate(-90deg); }
+.lora-picker-heading.is-static { cursor: default; }
+.lora-picker-heading:not(.is-static):hover { color: hsl(var(--foreground)); }
+.lora-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 40px;
+  padding: 4px 4px 4px 10px;
+  border-radius: var(--r-item);
+  cursor: pointer;
+}
+/* The keyboard cursor and hover take the neutral fill; a pick shows only its amber check. */
+.lora-option.is-highlight { background: var(--cursor-bg); }
+.lora-option[aria-disabled="true"] { cursor: default; }
+.lora-option.is-added { opacity: .5; }
+.lora-option-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-check);
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .22);
+  color: var(--accent-amber-ink);
+}
+.lora-option.is-selected .lora-option-check { background: var(--accent-amber); box-shadow: none; }
+.lora-option.is-added .lora-option-check { background: rgb(255 255 255 / .2); box-shadow: none; color: hsl(var(--foreground)); }
+.lora-option-copy { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
+.lora-option-copy strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lora-option-copy span { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lora-option > em { flex: none; font-size: 11px; font-style: normal; color: hsl(var(--muted-foreground)); }
+/* Made for another model: named, a little dimmer, never hidden. */
+.lora-option > em.lora-fit { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75; }
+.lora-option:has(> em.lora-fit) .lora-option-copy strong { color: hsl(var(--foreground) / .7); }
+.lora-option-star {
+  flex: none;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground) / .5);
+  opacity: 0;
+  cursor: pointer;
+}
+.lora-option:hover .lora-option-star,
+.lora-option.is-highlight .lora-option-star,
+.lora-option-star.active,
+.lora-option-star:focus-visible { opacity: 1; }
+.lora-option-star:hover { background: var(--control-hover); color: #fff; }
+.lora-option-star.active { color: var(--ember); }
+.lora-picker-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-top: 10px; box-shadow: inset 0 1px 0 var(--glass-border); }
+.lora-picker-foot > span { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
+@media (hover: none) {
+  .lora-grip,
+  .lora-remove,
+  .lora-option-star { opacity: 1; }
+}
+.reference-slot-list { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-4); }
+.reference-count { color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+.ref-chip { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: var(--r-item); color: hsl(var(--foreground)); }
+.ref-add { flex-direction: column; gap: var(--space-2); padding: 6px; border: 1px dashed var(--glass-border); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast); }
+.ref-add > svg { flex: none; }
+.ref-add:hover, .ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-add-label { max-width: 100%; font-size: 10px; line-height: 1.2; text-align: center; white-space: normal; }
+.ref-add-label em { color: var(--ember); font-style: normal; }
+.ref-selected { display: block; }
+.ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--glass-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.ref-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ref-add:focus-visible, .ref-thumb:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ref-chip.is-busy { flex-direction: column; gap: var(--space-3); background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
+   clip-path wipes open to the left, so nothing reflows while it animates. */
+/* Each chip stacks on its own, and the one whose menu is open sits over its
+   neighbours, so their thumbnails can't cover its × (until the menu has wiped shut). */
+.ref-selected { position: relative; z-index: 0; display: block; transition: z-index 0s var(--motion-slow); }
+.ref-selected.is-hover,
+.ref-selected.is-intro,
+.ref-selected:has(:focus-visible),
+.ref-selected.is-open { z-index: 1; transition-delay: 0s; }
+.ref-thumb {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-media);
+  background: var(--well);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .16), 0 4px 12px rgb(0 0 0 / .35);
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ref-selected.is-hover .ref-thumb { box-shadow: 0 0 0 1px rgb(255 255 255 / .32), 0 6px 16px rgb(0 0 0 / .4); }
+.ref-menu {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: max-content; /* its parent is only the thumbnail */
+  height: calc(100% + 6px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 74px 0 6px;
+  border-radius: var(--r-menu);
+  /* Opaque enough that the prompt it slides over never reads through, blurred for the rest. */
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  clip-path: inset(0 0 0 calc(100% - 34px) round var(--r-menu));
+  transition: clip-path var(--motion-slow) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease);
+}
+/* Hover is set from script with a short delay each way (ReferenceSlot), so the
+   menu neither flickers on a pass nor snaps shut on a wobble off its edge. */
+.ref-selected.is-hover .ref-menu,
+.ref-selected.is-intro .ref-menu,
+.ref-selected:focus-within .ref-menu,
+.ref-selected.is-open .ref-menu { opacity: 1; pointer-events: auto; clip-path: inset(0 0 0 0 round var(--r-menu)); }
+.ref-menu > * { opacity: 0; transition: opacity var(--motion-base) var(--motion-ease); }
+.ref-selected.is-hover .ref-menu > *,
+.ref-selected.is-intro .ref-menu > *,
+.ref-selected:focus-within .ref-menu > *,
+.ref-selected.is-open .ref-menu > * { opacity: 1; transition-delay: var(--motion-stagger); }
+/* Remove sits on the thumbnail's corner: shown on hover or focus (always on
+   touch), away from Edit | Ref, and red only under the pointer. */
+.ref-thumb-remove {
+  position: absolute;
+  z-index: 4;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgb(46 46 46);
+  color: hsl(var(--foreground));
+  box-shadow: 0 0 0 2px rgb(24 24 24);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.ref-selected.is-hover .ref-thumb-remove,
+.ref-selected:focus-within .ref-thumb-remove { opacity: 1; pointer-events: auto; }
+/* Solid red under the pointer: the tint alone let the thumbnail show through the ×. */
+.ref-thumb-remove:hover { background: rgb(150 58 44); color: #fff; }
+.ref-thumb-remove:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(24 24 24), var(--focus-ring); }
+@media (hover: none) {
+  .ref-thumb-remove { opacity: 1; pointer-events: auto; }
+}
+/* Edit: this very image is what changes, so the thumbnail says so at rest with a brighter ring and EDIT. */
+.ref-selected.is-edit .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .55), 0 4px 12px rgb(0 0 0 / .35); }
+.ref-selected.is-edit.is-hover .ref-thumb { box-shadow: 0 0 0 1.5px rgb(255 255 255 / .7), 0 6px 16px rgb(0 0 0 / .4); }
+/* Inpaint: the brush sits right next to the thumbnail. */
+.ref-menu-divider { flex: none; width: 1px; height: 22px; margin: 0 4px; background: var(--glass-border); }
+.ref-menu-paint {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--control-fill);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.ref-menu-paint > svg { flex: none; margin: 0 10.5px; }
+.ref-menu-paint:hover { background: var(--control-hover); }
+.ref-menu-paint.is-active { background: var(--selected-bg); color: var(--selected-ink); }
+.ref-menu-paint.is-masked:not(.is-active) > svg { color: var(--ember); }
+/* The one-time intro: a label shows beside the brush, then fades away. */
+.ref-menu-paint-label { display: grid; grid-template-columns: 0fr; }
+.ref-menu-paint-label > span {
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 0;
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--motion-ease);
+}
+.ref-selected.is-intro .ref-menu-paint { background: var(--selected-bg); color: var(--selected-ink); }
+.ref-selected.is-intro .ref-menu-paint-label { grid-template-columns: 1fr; }
+.ref-selected.is-intro .ref-menu-paint-label > span { padding-right: 14px; margin-left: -4px; opacity: 1; transition-delay: 0ms; }
+/* A painted reference says so without a hover. */
+.ref-mask-badge {
+  position: absolute;
+  z-index: 3;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--ember);
+  color: #1a0d04;
+  box-shadow: 0 0 0 2px rgb(24 24 24);
+  pointer-events: none;
+  animation: ref-pop var(--motion-base) var(--motion-ease);
+}
+/* A freshly dropped or uploaded image fades into place (no overshoot). */
+.ref-selected.is-new .ref-thumb { animation: ref-pop var(--motion-base) var(--motion-ease); }
+@keyframes ref-pop {
+  from { scale: .96; opacity: 0; }
+  to { scale: 1; opacity: 1; }
+}
+.ref-chip.is-busy {
+  gap: var(--space-4);
+  padding: 0 12px;
+  background: var(--control-fill);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .ref-chip { width: 56px; height: 56px; }
+  .ref-add { gap: var(--space-2); padding: 5px; }
+  .ref-add-label { font-size: 9px; }
+  .reference-slot-list { gap: var(--space-4); }
+}
+/* --------------------------------------------------------------- Popover */
+.reference-popover {
+  position: fixed;
+  z-index: 90; /* over the deck and composer, under modals */
+  display: flex;
+  flex-direction: column;
+  height: min(440px, 58dvh);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-panel);
+  /* The same frosted glass as the prompt bar. */
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
+  transform-origin: 94% 100%;
+}
+.reference-popover-head { flex: none; display: flex; align-items: center; gap: var(--space-4); padding: 10px 10px 10px 12px; box-shadow: inset 0 -1px 0 var(--glass-border); }
+.reference-tabs { display: inline-flex; gap: var(--space-1); padding: var(--seg-pad); border-radius: var(--r-pill); background: var(--well); }
+.reference-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: calc(var(--control-h-sm) - 2 * var(--seg-pad));
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.reference-tabs button:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.reference-tabs button.active { background: var(--selected-bg); color: var(--selected-ink); }
+/* Clear Selection stays at the right of its tabs row in references and LoRAs. */
+.picker-clear-all {
+  flex: none;
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.picker-clear-all:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.picker-clear-all:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) {
+  .picker-clear-all { height: 44px; }
+}
+.reference-upload { height: 36px; min-height: 36px; padding: 0 14px; font-variant-numeric: tabular-nums; }
+.reference-popover-close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+.reference-popover-close:hover { background: var(--control-hover); color: #fff; }
+.reference-popover-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px; mask-image: linear-gradient(to bottom, transparent, #000 10px, #000); }
+.reference-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--space-4); }
+.reference-tile { position: relative; aspect-ratio: 1; }
+.reference-tile-select {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-media);
+  background: var(--well);
+  cursor: pointer;
+  transition: outline-color var(--motion-fast) var(--motion-ease);
+}
+.reference-tile-select img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.reference-tile-select:hover { outline: 2px solid var(--glass-border); outline-offset: -2px; }
+.reference-tile-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.reference-tile.is-selected .reference-tile-select { outline: 2px solid var(--accent-amber); outline-offset: -2px; }
+.reference-tile.is-new .reference-tile-select { animation: ref-pop var(--motion-base) var(--motion-ease); }
+.reference-tile-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--accent-amber);
+  color: var(--accent-amber-ink);
+}
+.reference-tile-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  color: #fff;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--motion-fast), background var(--motion-fast);
+}
+.reference-tile:hover .reference-tile-delete,
+.reference-tile-delete:focus-visible { opacity: 1; }
+.reference-tile-delete:hover { background: rgb(196 85 63 / .9); }
+.reference-tile-busy { position: absolute; inset: 0; display: grid; place-items: center; border-radius: var(--r-media); background: rgb(0 0 0 / .45); color: #fff; }
+.reference-skeleton { aspect-ratio: 1; border-radius: var(--r-media); background: rgb(255 255 255 / .03); animation: mosaic-flicker 2.4s steps(3, jump-none) infinite; }
+.reference-skeleton:nth-child(3n) { animation-delay: -.8s; }
+.reference-skeleton:nth-child(3n + 1) { animation-delay: -1.6s; }
+.reference-more { display: flex; margin: 12px auto 0; }
+.reference-page-error { display: grid; justify-items: center; gap: var(--space-4); margin: 12px 0; text-align: center; }
+.reference-page-error p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+.reference-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-panel);
+  background:
+    radial-gradient(240px circle at var(--drop-x, 50%) var(--drop-y, 50%), rgb(255 255 255 / .12), transparent 70%),
+    rgb(14 14 14 / .74);
+  pointer-events: none;
+}
+.reference-drop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--drop-angle), rgb(255 255 255 / .08), rgb(255 255 255 / .75) 12%, rgb(255 255 255 / .08) 30%, rgb(255 255 255 / .08) 55%, rgb(255 255 255 / .55) 68%, rgb(255 255 255 / .08) 85%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: drop-spin 2.6s linear infinite;
+}
+.drop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-5);
+  color: #fff;
+  font-size: 13.5px;
+  transform: scale(.96);
+  transition: transform var(--motion-base) var(--motion-ease), opacity var(--motion-base) var(--motion-ease);
+}
+.reference-drop .drop-badge { transform: none; }
+.drop-badge strong { font-weight: 550; }
+.drop-badge-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--action-ink);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .4);
+}
+@media (hover: none) {
+  .reference-tile-delete { opacity: 1; }
+}
+@media (max-width: 760px) {
+  .reference-popover { height: min(420px, 62dvh); }
+  .reference-upload span { display: none; }
+  .reference-upload { width: 36px; padding: 0; }
+  .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+}
+/* Three shelves on a phone: the words carry the tabs. */
+@media (max-width: 480px) {
+  .reference-tabs button { padding: 0 10px; }
+  .reference-tabs button svg { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ref-add,
+  .ref-menu,
+  .ref-menu > *,
+  .ref-add-label > span { transition: none; }
+  .reference-drop::before { animation: none; }
+}
+/* The first reference at the top of the sidebar's Basics: what the composer's
+   chip holds, with how much it may change right under it. */
+/* Edit or Ref on the framing reference: what decides the output's size. The
+   chosen half takes the selected fill; it does not slide. */
+.ref-menu-role {
+  position: relative;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--control-fill);
+}
+.ref-menu-role > i {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--r-pill);
+  background: var(--selected-bg);
+  pointer-events: none;
+}
+.ref-menu-role.is-ref > i { transform: translateX(100%); }
+.ref-menu-role button {
+  position: relative;
+  min-width: 46px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+.ref-menu-role button:hover { color: hsl(var(--foreground)); }
+.ref-menu-role button.is-active { color: var(--selected-ink); }
+.ref-menu-role button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* The brush's divider and button, folding to nothing while the image is a Ref. */
+.ref-menu-paint-slot {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  overflow: hidden;
+  transition: opacity var(--motion-base) var(--motion-ease);
+}
+/* Its width tweens from script (ReferenceSlot), between its measured width and this. */
+.ref-selected .ref-menu > .ref-menu-paint-slot.is-hidden { width: 0; opacity: 0; pointer-events: none; }
+.ref-role-badge {
+  transform-origin: 30% 70%;
+  position: absolute;
+  z-index: 3;
+  left: -4px;
+  bottom: -4px;
+  padding: 1px 4px;
+  border-radius: var(--r-check);
+  background: var(--action);
+  color: var(--action-ink);
+  font-size: 8.5px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: .04em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+.ref-role-badge.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ref-menu-paint-slot, .ref-role-badge { transition: none; }
+}
+/* ------------------------------------------------------------------ Stack
+   Several references (a model that reads more than one): the first stays the
+   chip in the corner, the others are a deck behind it that fans out into its
+   strip on hover, followed by a + for the next (greyed once all are used). */
+/* Fanned out: the strip shows them, so the deck tucks in behind the thumbnail. */
+/* Inside the strip's clip, so it sits on the thumbnail's own corner. */
+/* Every slot used: still there, greyed, and its tooltip says why. */
+.ref-add.is-full { opacity: .38; cursor: default; }
+.ref-add.is-full:hover { background: rgb(34 34 34 / .55); }
+@media (prefers-reduced-motion: reduce) {
+  .ref-selected { transition: none; }
+}
+/* Arriving (a second picture, or the switch appearing) they ease in from the thumbnail, not pop. */
+@starting-style {
+  .ref-role-badge.is-on { opacity: 0; }
+}
+/* A painted mask settles it as Edit: Reference stays in view, unavailable. */
+.ref-menu-role.is-locked button[aria-disabled] { opacity: .4; cursor: not-allowed; }
+.ref-menu-role.is-locked button[aria-disabled]:hover { color: hsl(var(--muted-foreground)); }
+/* No hover (a tablet): the references in a row, with Edit | Reference
+   as a chip of its own at its start, so the thumbnail's menu is only the brush; with the brush
+   folded away (Reference) or absent, there's no menu to open. */
+.ref-role-chip { flex: none; align-self: center; }
+.ref-role-chip button { height: 34px; }
+.reference-grid.is-virtual { position: relative; }
+.reference-search { margin: 10px 16px; }
+.reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--glass-panel-bg); }
+/* Full capacity is said in the picker itself, on the phone too. */
+/* One References button for a model that reads several (FLUX.3 [klein] takes
+   ten): the picked pictures overlap at its start, then References and n/max.
+   It opens the chooser; the slots never get a control each. */
+.ref-chip.ref-group { width: auto; min-width: 0; flex-direction: row; gap: var(--space-4); padding: 0 12px 0 10px; border-style: solid; border-radius: var(--r-pill); white-space: nowrap; }
+.ref-chip.ref-group { height: var(--control-h); }
+.ref-group.has-items { padding-left: 5px; color: hsl(var(--foreground)); }
+.ref-group-thumbs { display: inline-flex; }
+.ref-group-thumbs img { display: block; width: 28px; height: 28px; border-radius: var(--r-pill); object-fit: cover; box-shadow: 0 0 0 2px var(--well); }
+.ref-group-thumbs img + img { margin-left: -12px; }
+.ref-group-label { font-size: 12px; font-weight: 550; }
+.ref-group-label em { color: var(--accent-amber); font-style: normal; }
+.ref-group-count { font-size: 11.5px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.ref-group:focus-visible, .ref-brush:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ref-chip.ref-brush { width: var(--control-h); height: var(--control-h); padding: 0; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--muted-foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
+.ref-brush:hover, .ref-brush.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
+.ref-brush.is-masked { color: var(--accent-amber); }
+/* Selected n/max: what is picked, in order, to reorder or take off. */
+.reference-selected-tab em { font-style: normal; font-variant-numeric: tabular-nums; opacity: .8; }
+.reference-selected-tab.is-full em { color: var(--accent-amber); opacity: 1; }
+.reference-tabs button:disabled { opacity: .45; cursor: default; }
+.reference-selected-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.reference-selected-row { display: flex; align-items: center; gap: var(--space-4); min-height: 60px; padding: 6px 6px 6px 4px; border-radius: var(--r-item); background: var(--control-fill); }
+.reference-selected-number { flex: none; width: 22px; color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
+.reference-selected-thumb { flex: none; display: grid; place-items: center; width: 48px; height: 48px; overflow: hidden; border-radius: var(--r-media); background: var(--well); color: hsl(var(--muted-foreground)); }
+.reference-selected-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.reference-selected-name { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.reference-selected-actions { flex: none; display: inline-flex; gap: var(--space-1); }
+.reference-tile-check { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* ------------------------------------------------------- Sidebar notice */
+/* The folder glyph: cells that fill with heat from the base, a quiet loop. */
+/* The model menu's last row: always one tap to look for missing models. */
+.model-menu-find-cta { justify-self: start; margin-top: 8px; }
+/* ---------------------------------------------------------------------------
+   Model menu: search, Favorites / Recent / All, a capped scrolling list with
+   "Find more models" pinned under it.
+--------------------------------------------------------------------------- */
+.model-menu {
+  display: flex;
+  flex-direction: column;
+  max-height: min(480px, calc(100dvh - 160px));
+  overflow: hidden;
+  gap: 0;
+  padding: 8px;
+}
+.model-menu-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  /* Room for the scrollbar without it touching the rows. */
+  scrollbar-gutter: stable;
+  /* The heading draws the one line above the list. */
+  padding-top: 4px;
+}
+.model-menu .model-filters { display: flex; gap: var(--space-3); padding: 8px 2px 12px; overflow-x: auto; }
+.model-menu .model-filter-group { flex: none; flex-wrap: nowrap; }
+.model-menu .model-filter-group:not(.model-filter-library) { padding-left: 0; border-left: 0; }
+.model-menu .model-filter-group button { flex: none; padding: 0 10px; height: 32px; }
+.model-menu-section { display: grid; gap: var(--space-1); }
+.model-menu-label {
+  padding: 6px 10px 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: rgb(255 255 255 / .6);
+}
+.model-menu-search { margin-bottom: 4px; }
+.model-menu .model-option { min-height: 58px; }
+.model-option.active { grid-template-columns: 15px minmax(0, 1fr) auto; }
+.model-option.is-cursor { background: var(--cursor-bg); }
+@media (max-width: 760px) {
+  .model-menu { max-height: min(72vh, 560px); }
+}
+/* Chips above the dock (Group runs, Stop) must not sit on an open sidebar. */
+/* A start image's menu opens leftward from its thumbnail, which runs off a
+   phone's left edge; there it drops below the chip instead, inside the bar. */
+@media (max-width: 620px) {
+  .ref-menu {
+    top: calc(100% + 6px);
+    right: -3px;
+    max-width: calc(100vw - 40px);
+    padding: 0 6px;
+    overflow-x: auto;
+    clip-path: none;
+  }
+  /* In the phone's create sheet the thumbnail sits on the left: the menu opens rightward from it. */
+  /* The brush leads, next to the thumbnail, so it never scrolls out of reach. */
+}
+/* ------------------------------------------------------- Touch: tap targets */
+/* Small icon buttons keep their look but get an invisible 44px hit area. The
+   :where() position is zero-specificity: it only applies to buttons that are
+   not already positioned, so absolutely placed ones stay where they are. */
+@media (pointer: coarse) {
+  /* Sliders: a thumb you can find with a finger. */
+  .lora-strength input[type="range"] { height: 32px; }
+  .lora-strength input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9.5px; }
+  .lora-strength input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+}
+/* ------------------------------------------------------------- Menus: dvh */
+/* vh counts the space under Safari's toolbars; dvh is what is actually visible. */
+@media (max-width: 620px) {
+  .aspect-menu,
+  .model-menu { max-height: min(72dvh, 560px); }
+}
+.phone-model-tools .phone-search { margin: 0 0 6px; }
+.phone-model-tools .model-filters { padding: 8px 4px 12px; }
+/* The reference picker (and LoRAs), as a sheet from the bottom edge.
+   With the keyboard up for its search, it sits on the keyboard inside the visible viewport. */
+.reference-popover.is-sheet {
+  left: 0;
+  right: 0;
+  bottom: var(--kb-inset, 0px);
+  z-index: var(--z-phone-pop);
+  width: auto;
+  height: min(600px, 82dvh, calc(var(--vv-height, 100dvh) - max(20px, env(safe-area-inset-top))));
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  transform-origin: 50% 100%;
+}
+.reference-popover.is-sheet .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.phone-size .size-fields { --pill: 24px; --reach: -22px; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); height: 48px; }
+.phone-size .size-field input { font-size: 16px; }
+/* ------------------------------------------------------ Sidebar, in words */
+/* The model menu's quiet size note, and About's line about staying local. */
+.model-size { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .ref-menu-paint-label,
+  .ref-menu-paint-label > span { transition: none; }
+  .ref-mask-badge { animation: none; }
+}
+/* ---------------------------------------------------------------------------
+   Smart upscale: three tabs on top of the size menu. A dark well whose chosen
+   tab takes the selected fill, like Segmented in Settings; a tier that is on carries the
+   ember note, here and as a small tag on the closed trigger.
+--------------------------------------------------------------------------- */
+.aspect-list { display: grid; gap: var(--space-2); }
+.aspect-upscale {
+  display: grid;
+  gap: var(--space-4);
+  padding: 4px 4px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.aspect-upscale-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.aspect-upscale-tabs {
+  --tab-count: 3;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), 1fr);
+  padding: var(--seg-pad);
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+}
+/* The chosen tab takes the selected fill in place; nothing slides. */
+.aspect-upscale-tabs > i { display: none; }
+.aspect-upscale-tabs button {
+  position: relative;
+  min-height: calc(var(--control-h-sm) - 2 * var(--seg-pad));
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
+}
+.aspect-upscale-tabs button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.aspect-upscale-tabs button.is-active { background-color: var(--selected-bg); color: var(--selected-ink); }
+.aspect-upscale-tabs button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* On the closed trigger: a tag pinned to the ratio icon's corner. It is out
+   of the flow, so switching tiers never resizes the button or the bar. */
+.aspect-shape-slot {
+  position: relative;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+}
+@media (max-width: 760px) {
+  .aspect-upscale-tabs button { min-height: 38px; }
+}
+/* Phone studio: the same three tiers as a segmented row in the create sheet. */
+/* An upscaled tab: a small arrow on a tag of its own, right after the size. */
+.aspect-upscale-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
+/* The phone's chosen segment is white: the arrow takes the beta tag's darker ember. */
+/* How the chosen size is made, and what it ends at. */
+/* The size list: compact rows; "Default" carries its own ratio in a quieter white. */
+.aspect-option > span:nth-child(2) small { margin-left: 7px; font-weight: 500; color: rgb(255 255 255 / .45); }
+@media (pointer: fine) {
+  .aspect-menu .aspect-option { min-height: 34px; box-shadow: none; }
+  .aspect-menu .aspect-upscale { gap: var(--space-3); padding-bottom: 8px; }
+}
+/* ---------------------------------------------------------------------------
+   The size menu (SizeMenu.tsx, components.tsx AspectPicker): a live frame on
+   the left, the tabs, Custom's linked fields and the shapes on the right.
+   Same well, pill and ember as the rest of the composer's menus.
+--------------------------------------------------------------------------- */
+.aspect-menu.size-menu {
+  width: min(300px, calc(100vw - 24px));
+  gap: var(--space-2);
+  padding: 7px;
+}
+.size-menu-side { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
+/* The top block spaces its rows with padding, not a grid gap: a gap would stay
+   behind Custom's fold until it's gone, and the menu would drop 6px at the end. */
+.aspect-menu.size-menu .aspect-upscale { gap: 0; }
+.aspect-menu.size-menu .aspect-upscale-head { padding-bottom: 6px; }
+.aspect-menu.size-menu .size-menu-note { padding-top: 6px; }
+.size-menu .aspect-list { gap: var(--space-1); }
+.size-menu .aspect-option { min-height: 32px; align-items: center; }
+/* The sizes: one mono column, right-aligned, so their digits line up row to row. */
+.size-menu .aspect-option em {
+  justify-self: end;
+  padding-right: 4px;
+  color: hsl(var(--muted-foreground) / .85);
+  font: 500 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.aspect-tag {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgb(255 154 82 / .15);
+  box-shadow: inset 0 0 0 1px rgb(255 154 82 / .22);
+  color: var(--ember);
+  font: 700 9.5px/1 var(--font-mono);
+  letter-spacing: .03em;
+}
+/* No label beside it: the tag sits on the shape's corner, solid so the shape can't show through. */
+.aspect-tag.is-corner {
+  position: absolute;
+  right: -7px;
+  bottom: -6px;
+  height: 12px;
+  min-width: 12px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #3a2414;
+  box-shadow: 0 0 0 1.5px #090909, inset 0 0 0 1px rgb(255 154 82 / .3);
+  font-size: 8px;
+}
+/* Never narrower than its opening width while the menu is open (AspectPicker):
+   the bar stays put, and the label is never cut short. */
+/* The preview: a window of its own to the menu's left, its full height. The
+   window is the stage; lines from the frame's edges run across all of it. */
+.size-peek {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: calc(100% + 8px);
+  width: 216px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-menu);
+  /* Nearly opaque: inside the menu's own blur its backdrop would read as empty. */
+  background: var(--surface-grain), rgb(22 22 22 / .96);
+  box-shadow: var(--glass-panel-shadow);
+  opacity: 0;
+  transform: scale(.96);
+  transform-origin: right center;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
+}
+.size-peek.is-on { opacity: 1; transform: none; }
+/* Until it's measured, nothing in it has a place to glide from. */
+.size-peek:not(.is-measured) * { transition: none !important; }
+.size-guide {
+  position: absolute;
+  background: rgb(255 255 255 / .07);
+}
+.size-guide.is-x { left: 0; right: 0; height: 1px; }
+.size-guide.is-y { top: 0; bottom: 0; width: 1px; }
+.size-frame {
+  position: absolute;
+  border: 1.5px solid rgb(255 255 255 / .92);
+  border-radius: 5px;
+  background: rgb(255 255 255 / .03);
+  transition: border-color var(--motion-base) var(--motion-ease);
+}
+/* 2K or Custom: the frame takes the ember, like the tag on the trigger. */
+.size-peek.is-accent .size-frame { border-color: var(--ember); }
+.size-peek-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin: 0;
+  white-space: nowrap;
+}
+.size-peek-caption strong { color: hsl(var(--foreground)); font-size: 12.5px; font-weight: 600; }
+.size-peek-caption span {
+  color: hsl(var(--muted-foreground));
+  font: 500 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* With the window there, the rows don't draw their shapes: the window does. */
+@media (hover: hover) and (min-width: 761px) {
+  .size-menu .aspect-option { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-5); padding-left: 12px; }
+  .size-menu .aspect-option > .aspect-shape { display: none; }
+}
+/* Touch, or a narrow window: no room beside the menu, so no window; the rows keep their shapes. */
+@media (hover: none), (max-width: 760px) {
+  .size-peek { display: none; }
+}
+/* Custom: width and height on one line: W, the link, H.
+   Linked, the two pills reach under the link from each side and overlap
+   there, so they read as one pill with no seam. Hovering the link draws
+   them back a little and shows the link's own middle cell between them,
+   a preview of the split. Apart, two pills with the link floating free;
+   hovering it draws them in, and linking joins them under it (no layout
+   animation: the pills change shape in place).
+   The link itself never grows a shape of its own. */
+.size-custom { overflow: hidden; }
+.size-custom-body { display: grid; gap: var(--space-3); min-inline-size: 0; margin: 0; padding: 8px 0 0; border: 0; }
+.size-custom-body:disabled { opacity: .5; }
+.size-custom-body:disabled .size-field-key { pointer-events: none; }
+.size-fields {
+  --pill: 18px; /* half the cells' height: a full round end */
+  --seam: 0px;
+  --inner: 0px;
+  --reach: -16px; /* how far each pill reaches under the 30px link: past its middle, so they overlap */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+  align-items: stretch;
+  column-gap: var(--seam);
+  height: 36px;
+}
+/* The hover previews are for a pointer: a tap leaves :hover stuck on touch, which would hold a split preview open. */
+@media (hover: hover) {
+  .size-fields.is-linked:not(.is-fresh):has(.size-link:hover) { --seam: 3px; --inner: 9px; --reach: 0px; }
+}
+.size-fields:not(.is-linked) { --seam: 8px; --inner: var(--pill); --reach: 0px; }
+@media (hover: hover) {
+  .size-fields:not(.is-linked):not(.is-fresh):has(.size-link:hover) { --seam: 3px; }
+}
+.size-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / .5);
+  transition: background-color var(--motion-base) var(--motion-ease);
+}
+/* Each pill pads by as much as it reaches, so its W/H and digits stay put. */
+.size-field:first-child { margin-right: var(--reach); padding-right: calc(var(--reach) * -1); border-radius: var(--pill) var(--inner) var(--inner) var(--pill); }
+.size-field:last-child { margin-left: var(--reach); padding-left: calc(var(--reach) * -1); border-radius: var(--inner) var(--pill) var(--pill) var(--inner); }
+/* Focus lifts the cell a shade; no ring around a borderless field. */
+.size-field:focus-within { background: linear-gradient(rgb(255 255 255 / .045), rgb(255 255 255 / .045)), var(--well); }
+/* The W/H label is the drag handle. */
+.size-field-key {
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  color: hsl(var(--muted-foreground) / .8);
+  font: 600 11px/1 var(--font-mono);
+  cursor: ew-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+/* Hover only where there is one: a tap leaves :hover stuck, which read as still dragging. */
+@media (hover: hover) {
+  .size-field-key:hover { color: var(--ember); }
+}
+.size-field.is-dragging .size-field-key { color: var(--ember); }
+.size-field input,
+.size-field input:focus,
+.size-field input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: 500 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.size-field input::selection { background: rgb(255 154 82 / .32); color: #fff; }
+.size-link {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.size-link:hover,
+.size-link[aria-pressed="true"] { color: hsl(var(--foreground)); }
+/* The middle cell shows only in the hover preview of a split, between the drawn-back pills. */
+@media (hover: hover) {
+  .size-fields.is-linked:not(.is-fresh) .size-link:hover { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
+}
+.size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-link-icon { display: grid; place-items: center; }
+.size-menu-note {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.size-menu-note { display: block; font-size: 11.5px; text-wrap: pretty; }
+@keyframes sizeLabelIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Every composer menu leaves the way it came. */
+@keyframes surfaceOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(.96); }
+}
+[data-open-surface]:is(.aspect-menu, .model-menu).is-closing {
+  animation: surfaceOut var(--motion-fast) var(--motion-ease) both;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .size-frame, .size-field, .size-link, .size-peek { transition: none; }
+  .size-mp-label small { animation: none; }
+  [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
+}
+/* Megapixels (Settings › Studio), under the shapes: what it is on the left, the count on
+   the right as one pill whose MP is the drag handle, so it reads "2.5 MP". */
+.size-mp {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: 6px;
+  padding: 10px 4px 2px 6px;
+  box-shadow: inset 0 1px 0 var(--glass-border);
+}
+.size-mp-label { flex: 1; display: grid; justify-items: start; gap: var(--space-1); min-width: 0; font-size: 12.5px; font-weight: 550; color: hsl(var(--foreground)); }
+.size-mp-label small { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); animation: sizeLabelIn var(--motion-fast) var(--motion-ease) both; }
+.size-mp-reset-slot { flex: none; display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); margin-left: calc(-1 * var(--space-2)); }
+.size-mp-reset {
+  display: grid;
+  place-items: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background-color: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
+}
+.size-mp-reset:hover { color: hsl(var(--foreground)); background-color: var(--control-hover); }
+.size-mp-reset:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.size-mp .size-mp-field {
+  flex: none;
+  width: 96px;
+  height: 32px;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-radius: var(--r-pill);
+}
+.size-mp .size-mp-field input,
+.size-mp .size-mp-field input:focus,
+.size-mp .size-mp-field input:focus-visible { padding: 0 4px 0 0; text-align: right; }
+.size-mp .size-mp-field .size-field-key { width: 30px; padding-right: 4px; }
+.size-tier-controls, .size-resolution { display: grid; gap: var(--space-3); min-width: 0; }
+.library-sources { gap: var(--space-1); }
+.composer-loras .model-loras { padding: 0; }
+.composer-loras .model-loras > h3 { display: none; }
+.model-menu .model-option .model-copy em { display: block; font-size: 12px; line-height: 1.45; white-space: normal; }
+.model-menu .model-menu-list { scrollbar-gutter: auto; }
+/* LoRA browsing shares the reference picker's anchored glass surface. */
+.composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
+.composer-loras .lora-popover-body { display: flex; flex-direction: column; mask-image: none; }
+.composer-loras .model-loras, .composer-loras .lora-panel { flex: 1; min-height: 0; }
+.composer-loras .lora-picker { max-height: none; height: 100%; }
+.composer-loras .lora-picker-list { min-height: 60px; }
+.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+.composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: var(--space-4); min-height: 54px; padding: 8px; border: 0; background: transparent; }
+.composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--cursor-bg); }
+.composer-loras .lora-option-check { flex: none; }
+.composer-loras .lora-option-copy span { white-space: normal; overflow-wrap: anywhere; }
+.composer-loras .lora-option > em { max-width: 28%; }
+.composer-loras .lora-picker-foot { gap: var(--space-4); }
+.composer-loras .lora-picker-foot .btn { flex-shrink: 0; }
+.composer-loras .model-loras { display: flex; flex-direction: column; margin: 0; }
+.composer-loras .lora-picker { flex: 1; height: auto; }
+.composer-loras .lora-picker-head, .composer-loras .lora-picker-search { flex-shrink: 0; }
+/* A tick identifies the chosen model without a persistent selected surface. */
+.model-menu .model-option.active { background: transparent; box-shadow: none; }
+.model-menu .model-option.active:hover { background: var(--control-hover); }
+.composer-loras .lora-picker:not(.is-list) .lora-option { display: flex; min-height: 52px; }
+/* Resource pickers share the reference surface, search and selection rhythm. */
+.composer-loras .lora-popover-body { padding: 0; overflow: hidden; }
+.composer-loras .lora-panel { display: flex; flex-direction: column; overflow-y: auto; }
+.composer-loras .lora-picker { gap: 0; }
+.composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--line); }
+.composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: var(--control-fill); }
+.composer-loras .lora-picker-list { order: 2; margin: 0; padding: 4px 8px 8px; }
+.composer-loras .lora-panel > :not(.lora-picker) { margin-left: 12px; margin-right: 12px; }
+/* -------------------------------------------------------------- Choosers (References, LoRAs, Models) */
+/* One pattern (UI-PATTERNS › Pickers): a title bar with Close, the tab pills with Clear
+   Selection beside them, a search field, then the list or grid. */
+.picker-title { flex: 1; display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; font-size: 13px; font-weight: 550; white-space: nowrap; }
+.picker-title > svg { flex: none; color: hsl(var(--muted-foreground)); }
+.is-sheet .picker-title { font-size: 16px; }
+.picker-toolbar { flex: none; display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 10px 12px 0; }
+.picker-toolbar .reference-tabs { flex: none; }
+/* PickerTools: tabs or filters, then Clear Selection on the right, then the search icon; search opens
+   as its own row under them only when asked for (or while a query is active). */
+.picker-tools { flex: none; display: grid; min-width: 0; }
+.picker-tools .picker-toolbar { padding: 8px 12px 0; }
+.picker-tools .picker-toolbar { flex-wrap: wrap; row-gap: var(--space-3); }
+/* The tabs never hide behind Clear or search: when a narrow picker has no room, those two wrap to the right of a second line. */
+.picker-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-3); max-width: 100%; }
+.picker-tools .picker-clear-all + .picker-search-toggle { margin-inline-start: 0; }
+.picker-search-toggle { flex: none; display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); margin-inline-start: auto; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+/* Hover only where there is a pointer: on touch a tap would leave the fill on the button that slides under the finger. */
+@media (hover: hover) {
+  .picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+}
+.picker-search-toggle[aria-expanded="true"] { color: var(--selected-ink); }
+.picker-search-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) {
+  .picker-search-toggle { width: var(--control-h-touch); height: var(--control-h-touch); }
+}
+.picker-search-row { padding: 8px 12px 0; }
+.picker-search-row > .picker-search, .picker-search-row > .lora-picker-search, .picker-search-row > .reference-search, .picker-search-row > .model-menu-search { margin: 0; }
+.picker-clear-short { display: none; }
+@media (max-width: 480px) {
+  .picker-clear-long { display: none; }
+  .picker-clear-short { display: inline; }
+  .picker-toolbar .reference-tabs button { padding: 0 10px; font-size: 13px; }
+}
+/* Tab names stay on one line; at 320 px the pills give up padding first. */
+.reference-tabs button { white-space: nowrap; }
+@media (max-width: 359px) {
+  .picker-toolbar .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
+}
+/* The picked order, the same mark in every chooser: an empty ring, then the number on amber. */
+.picker-order { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1.5px solid hsl(var(--foreground) / .3); border-radius: var(--r-pill); color: var(--accent-amber-ink); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.picker-order.is-on { border-color: var(--accent-amber); background: var(--accent-amber); }
+.picker-grip { display: grid; place-items: center; flex: none; width: 28px; height: 40px; padding: 0; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
+.picker-grip:active { cursor: grabbing; }
+.picker-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.reference-selected-row.is-dragging, .lora-library-row.is-dragging { opacity: .55; }
+.reference-selected-row.is-drop-target { border-radius: var(--r-item); box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
+/* Rows are flat: hairlines between them, no card behind the picked one. */
+.reference-selected-list { display: flex; flex-direction: column; gap: 0; }
+.reference-selected-row { min-height: 52px; border-radius: 0; background: transparent; }
+.reference-selected-row + .reference-selected-row { border-top: 1px solid var(--list-hairline); }
+/* ---------------------------------------------------------------------------
+   LoRA rows (UI-PATTERNS › Pickers): the Models chooser's rows. The friendly
+   name, one muted line of description cut short, then on the right the amber
+   tick, View Source (one icon per host) and Star. Hover and the keyboard
+   cursor fill the whole row; no hairlines, pills or cards. The Selected view
+   adds the grip and order mark, and under the row its information and
+   on/off · strength · order.
+--------------------------------------------------------------------------- */
+.composer-loras .lora-picker-items { gap: var(--space-1); }
+.composer-loras .lora-picker-section { gap: var(--space-1); padding-bottom: 6px; }
+.composer-loras .lora-picker-heading.is-static { height: auto; padding: 6px 10px 2px; color: rgb(255 255 255 / .6); font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
+.lora-library-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; min-width: 0; border-radius: var(--r-item); }
+.lora-library-row > .lora-library-grip { grid-column: 1; }
+.lora-library-row > .lora-library-select { grid-column: 2; }
+.lora-library-row > .lora-row-actions { grid-column: 3; }
+.lora-library-row > .lora-library-expansion { grid-column: 2 / -1; }
+@media (hover: hover) {
+  .lora-library-row:hover { background: var(--cursor-bg); }
+}
+/* The keyboard cursor shows while the list has keyboard focus, never after a click. */
+.lora-picker-list:has(:focus-visible) .lora-library-row.is-cursor { background: var(--cursor-bg); }
+.lora-library-select { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-width: 0; min-height: 58px; padding: 6px 8px 6px 10px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--foreground)); font: inherit; text-align: left; cursor: pointer; }
+.lora-library-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.lora-library-select:disabled { cursor: default; }
+.lora-library-select:disabled > .lora-option-copy { opacity: .5; }
+.lora-library-select .lora-option-copy { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
+.lora-library-select .lora-option-copy strong { overflow: hidden; color: hsl(var(--foreground)); font-size: 12px; font-weight: 500; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.lora-library-row.is-selected:not(.is-reviewing) .lora-option-copy strong { color: var(--selected-ink); }
+.lora-library-select .lora-option-copy em { overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 12px; font-style: normal; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+/* Why a LoRA can't be added (or may not suit): said in full, never cut off. */
+.lora-library-select .lora-library-note { color: hsl(var(--muted-foreground)); font-size: 11.5px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.lora-library-select .selected-tick { margin-inline-start: auto; }
+.lora-row-actions { display: inline-flex; align-items: center; gap: 0; padding-right: 4px; }
+.lora-row-actions .lora-option-star { opacity: 1; }
+.lora-sources { display: inline-flex; flex: none; align-items: center; gap: 0; }
+.lora-source { display: grid; place-items: center; flex: none; width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); text-decoration: none; }
+.lora-source:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
+.lora-source:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lora-library-grip { display: grid; place-items: center; width: 24px; height: 40px; margin-left: 2px; padding: 0; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
+.lora-library-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 4px; }
+.lora-library-row.is-dragging { opacity: .55; }
+.lora-library-row.is-drop-target { box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
+/* Selected view: its information, then on/off · strength · order, on the name's left edge (after the order mark). */
+.lora-library-row.is-reviewing { align-items: start; }
+.lora-library-row.is-reviewing > .lora-library-select { min-height: 44px; }
+.lora-library-row.is-reviewing > .lora-row-actions { margin-top: 6px; }
+.lora-library-row.is-reviewing > .lora-library-grip { margin-top: 2px; }
+.lora-library-expansion { display: grid; gap: var(--space-3); min-width: 0; padding: 0 12px 10px 38px; }
+.lora-library-row:has(> .lora-library-grip) > .lora-library-expansion { padding-left: 32px; }
+.lora-library-settings { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.lora-library-settings .lora-strength { flex: 1; min-width: 100px; }
+.lora-library-settings .switch { position: relative; }
+/* The switch is small to look at but a full finger's width to tap. */
+.lora-library-settings .switch::after { content: ""; position: absolute; inset: -13px -4px; }
+.lora-library-order { display: inline-flex; align-items: center; }
+.lora-library-order .prompt-action { width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); }
+/* What a LoRA says about itself (LoraDetails): plain muted text, no card; the same in the Selected view and Details. */
+.lora-info-panel { display: grid; gap: var(--space-3); min-width: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.lora-info-panel p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lora-info-panel strong { color: hsl(var(--foreground)); font-weight: 550; }
+/* The phone pop-up: Models' phone rows (15 px names, 12.5 px lines), hairlines between, 40 px icon targets. */
+.reference-popover.is-pop .lora-library-row { border-radius: 0; }
+.reference-popover.is-pop .lora-picker-items { gap: 0; }
+.reference-popover.is-pop .lora-picker-items > .lora-library-row + .lora-library-row { border-top: 1px solid var(--list-hairline); }
+.reference-popover.is-pop .lora-library-select { min-height: 52px; padding: 6px 4px 6px 2px; }
+.reference-popover.is-pop .lora-library-select .lora-option-copy strong { font-size: 15px; font-weight: 450; line-height: 1.35; }
+.reference-popover.is-pop .lora-library-select .lora-option-copy em { font-size: 12.5px; }
+.reference-popover.is-pop .lora-library-select .lora-library-note { font-size: 12.5px; }
+.reference-popover.is-pop .lora-row-actions { padding-right: 0; }
+.reference-popover.is-pop :is(.lora-source, .lora-row-actions .lora-option-star) { width: 40px; height: 40px; }
+.reference-popover.is-pop .lora-picker-heading.is-static { padding: 14px 2px 4px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+.reference-popover.is-pop .lora-picker-section:first-child .lora-picker-heading.is-static { padding-top: 4px; }
+.reference-popover.is-pop .lora-library-expansion { padding: 0 4px 10px 30px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-library-select { min-height: 52px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-row-actions { margin-top: 6px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-library-grip { margin-top: 6px; }
+/* A model's LoRA limit in a line above the search (Radiance video: "Up to rank 64 in total"). */
+.lora-picker-note { margin: 0 2px 6px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+/* Model filters in PickerTools: one row that scrolls sideways beside the search icon, on both layouts. */
+.picker-controls:has(.model-filters) { flex: 1 1 auto; min-width: 0; }
+.picker-controls .model-filters { display: flex; flex: 1 1 auto; gap: var(--space-3); min-width: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
+.picker-controls .model-filter-group { flex: none; flex-wrap: nowrap; }
+.picker-controls .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--line); }
+.picker-controls .model-filter-group button { flex: none; height: var(--control-h-sm); padding: 0 10px; }
+.reference-popover-head > .surface-title { flex: none; white-space: nowrap; }
+.reference-popover-head > .reference-popover-close { flex: none; }
+.reference-popover-head:has(> .surface-head-slot:empty) > .surface-title { flex: 1; }
+.picker-tools.is-heading { display: block; }
+.picker-heading-tools { flex: 1 1 auto; display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.picker-heading-tools > .picker-controls { flex: 0 1 auto; display: flex; align-items: center; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.picker-heading-tools .reference-tabs { flex: none; }
+.picker-heading-tools .reference-tabs button { padding: 0 10px; }
+.picker-heading-tools > .picker-controls::-webkit-scrollbar { display: none; }
+.picker-heading-tools > .picker-clear-all,
+.picker-heading-tools > .reference-upload,
+.picker-heading-tools > .dropdown-trigger { flex: none; }
+.picker-heading-tools .picker-search-toggle { margin-inline-start: 0; }
+/* Upload is a round icon in the heading; its name is in its tooltip and label. */
+.picker-heading-tools > .reference-upload { width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; justify-content: center; border-radius: var(--r-pill); }
+.picker-heading-tools > .reference-upload > span { display: none; }
+/* Search grows leftwards from its icon, beside Close, and the views give way to it. */
+.picker-heading-tools > .picker-search-field { flex: 0 1 200px; display: flex; justify-content: flex-end; min-width: 120px; margin-inline-start: auto; animation: searchIn var(--motion-fast) var(--motion-ease); transform-origin: right center; }
+.reference-popover-head .picker-heading-tools > .picker-search-field > * { box-sizing: border-box; flex: 1 1 auto; max-width: 280px; height: var(--control-h-sm); min-height: 0; margin: 0; }
+.picker-heading-tools:not(.is-searching) > .picker-controls { margin-inline-end: auto; }
+@keyframes searchIn { from { opacity: 0; transform: scaleX(.96); } to { opacity: 1; transform: none; } }
+.picker-tools.is-searching .picker-toolbar > .picker-search-field { flex: 1 1 220px; min-width: 120px; }
+.picker-tools.is-searching .picker-toolbar > .picker-search-field > * { height: var(--control-h-sm); margin: 0; }
+/* The desktop model menu takes the same heading. */
+.model-menu > .model-menu-head { margin: -7px -7px 4px; padding: 7px 7px 7px 12px; border-radius: var(--r-menu) var(--r-menu) 0 0; }
+.model-menu > .model-menu-head .surface-title { font-size: 13px; font-weight: 550; }
+.model-menu .model-option,
+.model-menu .model-option.active { grid-template-columns: minmax(0, 1fr) auto auto; }
+.model-menu .model-option .model-selection-tick { margin-inline: var(--space-2) 0; }
+.picker-dropdown-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lora-stack-modified { flex: none; width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--accent-amber); }
+.lora-stacks-icon { flex: none; }
+/* The phone heading keeps its room for "LoRAs · This Model": Stacks is its icon there. */
+.reference-popover.is-pop .lora-stacks .picker-dropdown-text { display: none; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { justify-content: center; width: var(--control-h-touch); padding: 0; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks > svg { display: none; }
+.reference-popover.is-pop .surface-head-slot .picker-heading-clear { padding: 0 8px; }
+.reference-popover.is-pop .reference-popover-head .picker-view-label > strong { font-size: 16px; font-weight: 600; }
+/* A narrow desktop popover drops the title's words before anything else (the icon stays). */
+.reference-popover:not(.is-pop) { container-type: inline-size; }
+@container (max-width: 600px) {
+  .composer-loras .reference-popover-head:has(.picker-heading-tools) > .surface-title { display: none; }
+  .composer-loras .lora-stacks .picker-dropdown-text { display: none; }
+}
+.picker-heading-tools { gap: var(--space-2); }
+.picker-menu-action { flex: none; height: var(--control-h-sm); padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--foreground)); font-size: 13px; font-weight: 550; cursor: pointer; }
+.picker-menu-action.is-primary { background: var(--action); color: var(--action-ink); }
+.picker-menu-action:disabled { opacity: .45; cursor: default; }
+.picker-heading-clear { flex: none; height: var(--control-h-sm); padding: 0 10px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 500; cursor: pointer; }
+@media (hover: hover) {
+  .picker-heading-clear:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+}
+.picker-heading-clear:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) {
+  .picker-heading-clear { height: var(--control-h-touch); }
+}
+/* Phone pop-ups: the views dropdown carries the title ("LoRAs · This Model"), and the list starts under the heading. */
+.reference-popover.is-pop .reference-popover-head:has(.picker-view) > .surface-title,
+.reference-popover.is-pop .reference-popover-head:has(.picker-view) > svg:first-child { display: none; }
+.reference-popover.is-pop .reference-popover-head:has(.picker-view) { min-height: 0; padding: 4px 4px 4px 6px; gap: var(--space-2); }
+.reference-popover.is-pop .surface-head-slot { justify-content: flex-start; gap: var(--space-1); }
+.reference-popover.is-pop .picker-view { flex: 0 1 auto; margin-inline-end: auto; }
+/* The phone title is plain text; only the view after it opens the menu ("LoRAs · [This Model ▾]"). */
+.picker-view-title { display: inline-flex; flex: 0 1 auto; align-items: center; gap: var(--space-3); min-width: 0; margin-inline-end: auto; padding-left: 10px; font-size: 16px; white-space: nowrap; }
+.reference-popover .reference-popover-head .picker-view-title > strong { flex: none; font-size: 16px; font-weight: 600; }
+.picker-view-title > span[aria-hidden] { color: hsl(var(--muted-foreground)); }
+.reference-popover.is-pop .picker-view-title > .dropdown-trigger.picker-view { min-width: 0; margin-inline-end: 0; padding-left: 2px; }
+/* Stacks are a desktop tool; the phone edits them in Settings › Studio › LoRA Stacks. */
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { display: none; }
+.reference-popover.is-pop .dropdown-trigger.picker-view { font-size: 16px; padding-left: 10px; }
+.picker-view-label { display: inline-flex; align-items: baseline; gap: var(--space-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.picker-view-label > strong { font-weight: 600; }
+.picker-view-label > span { color: hsl(var(--muted-foreground)); font-weight: 450; }
+.picker-view-label > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { max-width: 130px; }
+.reference-popover.is-pop .reference-upload { width: var(--control-h-touch); height: var(--control-h-touch); padding: 0; justify-content: center; border-radius: var(--r-pill); }
+.reference-popover.is-pop .reference-upload > span { display: none; }
+.reference-popover.is-pop .picker-tools.is-heading .picker-search-row { padding: 6px 14px 2px; }
+/* LoRAs' body already insets by 14px: its field lands exactly where References' does. */
+.composer-loras.is-pop .lora-picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
+/* Picked reference tiles: the amber tick badge; the order shows under Selected. */
+.reference-tile-check .selected-tick { width: 14px; height: 14px; color: var(--accent-amber-ink); }
+/* Settings › Studio › LoRA Stacks: a stack's editor opens under its row, indented like a drawer. */
+.lora-stack-setting.is-open > .set-drawer-toggle .set-drawer-knob { transform: rotate(180deg); }
+.lora-stack-editor { display: grid; padding-left: var(--space-6); border-bottom: 1px solid var(--line); }
+.lora-stack-editor .list-row-control { display: inline-flex; align-items: center; gap: var(--space-3); }
+.lora-stack-name, .lora-stack-strength { height: var(--control-h-sm); padding: 0 12px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font-size: 13px; }
+.lora-stack-name { width: min(240px, 46vw); }
+.lora-stack-strength { width: 84px; font-variant-numeric: tabular-nums; text-align: right; }
+.lora-stack-name:focus, .lora-stack-strength:focus { outline: none; border-color: var(--line-strong); }
+.lora-stack-remove { display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
+.lora-stack-remove:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.lora-stack-remove:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lora-stack-delete { color: var(--danger-ink); }
+@media (pointer: coarse) {
+  .lora-stack-remove { width: var(--control-h-touch); height: var(--control-h-touch); }
+}
+/* Choosers keep a steady size: a short list or a search with few matches doesn't shrink the popover. */
+.model-menu, .reference-popover, .composer-loras { min-height: min(360px, 70vh); }
+.picker-search-row { padding: 8px 12px; }
+/* The model filters use the References/LoRAs selector track; the star cell centres its icon. */
+.model-filters.reference-tabs { display: inline-flex; flex: none; gap: 0; padding: var(--seg-pad, 3px); overflow: visible; }
+.model-filters.reference-tabs button[aria-label="Favourites"] { display: inline-grid; place-items: center; }
+.model-filters.reference-tabs button { height: auto; min-height: 30px; padding: 0 12px; border: 0; box-shadow: none; background: transparent; }
+.model-filters.reference-tabs button:not(.active):hover { background-color: var(--control-hover); }
+.model-filters.reference-tabs button.active { background: var(--selected-bg); color: var(--selected-ink); }
+/* Desktop heading search: `cover` fills the heading over the views and tools; its close sits inside the field. */
+.picker-heading-tools.is-searching { flex: 1 1 auto; }
+.picker-search-field.is-cover { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 0; }
+.picker-search-field.is-cover > :first-child, .picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
+.picker-search-field, .picker-search-row { position: relative; }
+/* It overlaps the field's end in the flex row, so it shares the field's centre line on every padding (no transform: touch screens reset button transforms). */
+.picker-search-field, .picker-search-row { display: flex; align-items: center; }
+.picker-search-close { position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 6px 0 -32px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
+.picker-search-close:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.picker-search-close:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+/* The cover field fills the heading; its close keeps its own small size, centred inside the field's end. */
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover { flex: 1 1 auto; justify-content: stretch; min-width: 0; margin-inline-start: 0; }
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover > :first-child { max-width: none; }
+.reference-popover-head .picker-heading-tools > .picker-search-field > .picker-search-close { flex: none; width: 26px; height: 26px; max-width: none; margin: 0 6px 0 -32px; }
+/* The field's own clear button would duplicate Close Search. */
+:is(.picker-search-field, .picker-search-row) .picker-search > button, :is(.picker-search-field, .picker-search-row) .lora-picker-search > button, :is(.picker-search-field, .picker-search-row) .reference-search > button, :is(.picker-search-field, .picker-search-row) .model-menu-clear { display: none; }
+:is(.picker-search-field, .picker-search-row) input { padding-right: 30px; }
+/* Desktop pickers carry no title or icon: the views lead the heading. */
+.reference-popover:not(.is-pop) > .reference-popover-head > :is(.surface-title, svg:first-child) { display: none; }
+.reference-upload.picker-search-toggle { flex: none; }
+/* One search field in every chooser (References, LoRAs, Models): the same height, width, radius, padding and fill. */
+:is(.picker-search-row, .picker-search-field) > .picker-search { box-sizing: border-box; height: var(--control-h-sm); min-height: 0; margin: 0; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-pill); background: var(--control-fill); }
+.reference-popover.is-pop :is(.picker-search-row, .picker-search-field) > .picker-search { height: var(--control-h-touch, 44px); }
+/* A desktop chooser's heading keeps its height when the search icon gives way to the field (44 px touch targets). */
+@media (pointer: coarse) {
+  .model-menu > .model-menu-head { min-height: calc(var(--control-h-touch) + 14px); }
+  .reference-popover:not(.is-pop) > .reference-popover-head { min-height: calc(var(--control-h-touch) + 20px); }
+}
+/* ---------------------------------------------------------------------------
+   Phone pop-ups and the Create sheet (UI-PATTERNS › Surfaces, Composer)
+
+   Model, References, LoRAs, Size and Advanced Settings open as one kind of
+   pop-up over the Create sheet: anchored to the row that opened it, the
+   screen's width less a margin, as tall as the room on that side allows.
+   Create stays in view behind it, dimmed and inert (phoneLayers.ts).
+--------------------------------------------------------------------------- */
+.reference-popover.is-pop {
+  z-index: var(--z-phone-pop);
+  height: auto;
+  max-height: var(--pop-max, 70dvh);
+  border-radius: var(--r-menu);
+  /* Nearly solid: Create's rows and close button must not read through the pop-up's edges. */
+  background: var(--glass-panel-solid);
+  transform-origin: 50% 100%;
+}
+.reference-popover.is-pop .reference-popover-head { min-height: 52px; padding: 6px 6px 6px 16px; }
+.reference-popover.is-pop .reference-popover-head > strong,
+.reference-popover.is-pop .picker-title { flex: 1; min-width: 0; font-size: 16px; }
+/* Close on the right, a 44 px target like every phone icon button. */
+.reference-popover.is-pop .reference-popover-close { width: 44px; height: 44px; margin-left: auto; border-radius: var(--r-pill); }
+.reference-popover.is-pop .reference-popover-close > svg { width: 19px; height: 19px; }
+.reference-popover.is-pop .reference-popover-body { padding: 0 14px 12px; }
+.reference-popover.is-pop .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.model-pop-row { gap: var(--space-2); padding: 0; }
+.model-pop-pick { display: flex; flex: 1; align-items: center; gap: var(--space-4); min-width: 0; min-height: 52px; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+.model-pop-name { display: grid; flex: 1; min-width: 0; font-size: 15px; }
+.model-pop-name small { overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 12.5px; white-space: nowrap; text-overflow: ellipsis; }
+.model-pop-name small.is-setup { color: var(--accent-amber); }
+.model-pop-row .picker-star { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); }
+.model-pop-row .picker-star.is-on { color: var(--accent-amber); }
+/* The shapes: one vertical list of the shared rows, Custom last (UI-PATTERNS › Lists). */
+.size-options .size-option .list-row-label small { margin-left: var(--space-3); color: hsl(var(--muted-foreground)); font-size: 13px; }
+.lora-library-note.is-suggested { color: hsl(var(--muted-foreground)); }
