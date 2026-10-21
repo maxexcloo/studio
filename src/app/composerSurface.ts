@@ -150,3 +150,24 @@ export function useSettling() {
     onAnimationComplete: () => setSettling(false),
   };
 }
+
+/**
+ * `useSettling` for a menu on the CSS `surfaceIn` entry (the Model and Size
+ * menus): solid, without the blur, from when it mounts until its own
+ * `animationend`, and again while an exit animation runs. With reduced motion
+ * (no animation, so no end) it starts settled.
+ */
+export function useCssSettling(mounted: boolean) {
+  const [settling, setSettling] = React.useState(true);
+  React.useLayoutEffect(() => {
+    if (mounted) setSettling(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, [mounted]);
+  // Only the surface's own animation counts; a spinner or search field inside it bubbles too.
+  const own = (event: React.AnimationEvent<HTMLElement>) => event.target === event.currentTarget;
+  return {
+    'data-settling': settling ? '' : undefined,
+    onAnimationStart: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(true); },
+    onAnimationEnd: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(false); },
+    onAnimationCancel: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(false); },
+  };
+}
