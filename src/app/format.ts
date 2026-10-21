@@ -132,6 +132,16 @@ export function settingsText(item: GalleryItem) {
   return lines.filter(Boolean).join("\n");
 }
 
+const assistantPresetNames: Record<string, string> = { enhance: "Enhance", spicy: "Spicy", photographic: "Photographic", cinematic: "Cinematic", concise: "Concise", candid: "Candid" };
+
+/** Who wrote the prompt, for Details and Copy: "Assistant · Enhance", or "Assistant in Chat · Enhance". */
+export function assistantSummary(item: Pick<GalleryItem, "assistant">) {
+  const record = item.assistant;
+  if (!record?.preset) return "";
+  const preset = assistantPresetNames[record.preset] || record.preset.replace(/^./, (letter) => letter.toUpperCase());
+  return `Assistant${record.source === "chat" ? " in Chat" : ""} · ${preset}`;
+}
+
 export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; file: string; strength: string }>; note?: string };
 
 /**
@@ -163,6 +173,12 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     // Weights only when they say more than the profile's own name.
     const weights = model ? partName(String(model)) : "";
     if (weights && weights.trim().toLowerCase() !== String(names.profile || "").trim().toLowerCase()) add("Weights", weights);
+  });
+  // Written by the prompt assistant: its preset, and the suggested LoRAs that were chosen.
+  section("Prompt", (add) => {
+    add("Written By", assistantSummary(item));
+    const chosen = (item.assistant?.lorasSuggested || []).map((file) => names.lora ? names.lora(file) : fileStem(file));
+    if (chosen.length) add("Suggested LoRAs", chosen.join(", "));
   });
   // Friendly names (the catalogue's title), the file kept beside them for a tooltip and Copy Settings.
   const loras = activeLoras(settings.loras).map((lora) => ({ name: names.lora ? names.lora(lora.name) : fileStem(lora.name), file: String(lora.name).split(/[\\/]/).pop() || String(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));

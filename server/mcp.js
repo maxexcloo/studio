@@ -13,6 +13,9 @@ import { livePrompting } from './profile-store.js';
 import { asksForCloud, familyMatches, fastestFirst, findProfile, isCloudProfile, localUnlessAsked, mcpTiers, nameWords, profileFromRequest, speedWordList, profilesNearTier, searchProfiles, tierOf, withinFamily } from './mcp-tiers.js';
 import { createPromptWriter } from './prompt-writer.js';
 import { createControlClient } from './ai-control.js';
+import { gatewaySettings } from './assistant.js';
+import { mayUseFeature } from './account-policy.js';
+import { createChatAssistantMemory, registerAssistantTools } from './mcp-assistant.js';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
 export const generateWaitSeconds = 60;
@@ -78,6 +81,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   // Optional: with a writer, Studio writes each prompt from the request; a partial setting fails at start.
   const writer = createPromptWriter(environment, { fetchImpl });
   const instructions = mediaInstructions(Boolean(writer));
+  // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
+  const assistantGateway = Boolean(gatewaySettings(environment));
+  const chatAssistant = createChatAssistantMemory();
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
   if (media) app.use('/api/models', (req, _res, next) => {
     if (req.method !== 'GET' ? true : req.path === '/' && req.query.cached !== '1') media.invalidateProfiles();
@@ -140,7 +146,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation)) return res.status(400).json({ error: 'Invalid conversation identity.' });
     const owner = account?.userId || (scope === 'media' ? media.owner(user, token) : null);
     // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
-    req.mcpActor = { scope, owner, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
+    // Prompt Assistant is an access-profile feature; the shared key without accounts (single user) has it.
+    const assistant = scope === 'media' && assistantGateway && (!account || mayUseFeature(account, 'promptAssistant'));
+    req.mcpActor = { scope, owner, assistant, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
     next();
   };
   const create = (actor) => {
@@ -324,7 +332,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           faceNote = 'Face detail on for the full-body person. ';
           args.face_detail = true;
         }
-        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, request ? { request, styled: source !== 'exact' } : {});
+        // A prompt RewritePrompt wrote records its preset (and chosen SuggestLoras picks) on the results.
+        const assistant = actor.assistant ? chatAssistant.record(owner, args.prompts || [], args.loras || []) : null;
+        const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, { ...(request ? { request, styled: source !== 'exact' } : {}), ...(assistant ? { assistant } : {}) });
         return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
       });
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
@@ -334,6 +344,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
       tool(server, 'Result', 'Show Result', 'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for "show them" or "show me all"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its link: share it and stop. Never poll.', { ...output, job_id: z.string().min(1).max(200), delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => /^\s*all\s*$/i.test(job_id) ? media.resultsAll(owner, refs, { signal }) : media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      if (actor.assistant) registerAssistantTools({ tool, server, media, owner, memory: chatAssistant, profileOf: async (value) => namedInTier(await media.profiles('all', owner), value).profile });
       tool(server, 'Handover', 'Copy Chat Summary', 'Prepare a copy-paste summary when asked or when the host reports about 90% context used. Pass decisions, preferences and unfinished work as summary. Never guesses context usage.', {
         summary: z.string().trim().min(1).max(12000)
       }, async ({ summary }, signal) => {

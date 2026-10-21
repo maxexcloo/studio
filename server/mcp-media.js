@@ -275,7 +275,7 @@ export class McpMedia {
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
     assertJobCount(prompts.length, runs);
-    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
+    const body = { ...profile.defaults, ...controls, ...(record.assistant ? { assistant: record.assistant } : {}), kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;

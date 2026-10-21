@@ -4,6 +4,8 @@ import { popoverMotion } from "./composerSurface";
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
+import { LoraSuggestionChips, NegativeAssistantButton, PromptAssistantButton, assistantButtonWidth, negativeAssistantWidth } from './PromptAssistant';
+import type { PromptAssistant } from './usePromptAssistant';
 import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { preloadable } from './preloadable';
@@ -112,6 +114,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const canUseNegativePrompt = true;
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const assistant = view.assistant as PromptAssistant | undefined;
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -493,12 +496,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
-              <PromptField kind="positive" value={prompt} textareaRef={promptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
+              <PromptField kind="positive" value={prompt} textareaRef={promptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory}
+                assistant={assistant?.available ? <PromptAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} assistantWidth={assistantButtonWidth} busy={assistant?.busy === 'rewrite'} />
               <div className="composer-primary-actions" ref={setComposerPrimaryTarget} />
             </div>
+            {assistant ? <LoraSuggestionChips assistant={assistant} /> : null}
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {negativeSupported ? <div className="composer-secondary-row">
-              <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative("")} historyAvailable={hasNegativeHistory} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen((open) => historyKind !== 'negative' || !open); }} />
+              <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative("")} historyAvailable={hasNegativeHistory} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen((open) => historyKind !== 'negative' || !open); }}
+                assistant={assistant?.negativeOffered ? <NegativeAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} assistantWidth={negativeAssistantWidth} busy={assistant?.busy === 'negative'} />
               {nearTextLimit(negative, negativeLimit) ? <span className="prompt-count">{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
             <StableComposerBar

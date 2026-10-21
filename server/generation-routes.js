@@ -21,6 +21,7 @@ import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
 import { ownerIdForRequest } from './account-ownership.js';
 import { mayUseFeature, mayUseGenerationProfile } from './account-policy.js';
 import { configuredAccountJobLimit, reserveAccountJob } from './account-jobs.js';
+import { assistantRecord } from './assistant-routes.js';
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
@@ -164,6 +165,9 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
     body.comfyBackend = currentComfyBackend();
     body.ownerId = ownerIdForRequest(req);
+    // What the prompt assistant did for this run (preset, chosen LoRAs), for Details; only with the feature.
+    const assistant = !req.studioAccount || mayUseFeature(req.studioAccount, 'promptAssistant') ? assistantRecord(req.body?.assistant, body.loras) : null;
+    if (assistant) body.assistant = assistant; else delete body.assistant;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.

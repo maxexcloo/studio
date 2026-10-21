@@ -56,7 +56,7 @@ import { hfTokenStatus } from './hf-access.js';
 import { primeModelMetadata, setModelChoice } from './model-families.js';
 import { dedupeGallery, filterVisibleGallery, flushGallery, gallery, galleryLimit, dataDir, recordsFromComfyHistory, saveGallery, setGallery, cleanupGalleryState, updateGalleryJob, galleryRevisionValue } from './gallery-store.js';
 import { buildStats, getFileThumbnail, getThumbnail } from './thumbnails.js';
-import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
+import { clearPromptHistory, forgetPrompts, listPrompts, promptHistoryEnabled, recordPrompt, setPromptHistoryEnabled, setPromptPinned } from './prompt-history.js';
 import { addLibraryFolder, fillVideoSizes, importOutputFolder, libraryFile, libraryFolders, removeLibraryFolder, rescanLibraryFolders, scanLibraryFolder } from './library.js';
 import { getComfyVideoPoster, getComfyVideoPreview, getFileVideoPoster, getFileVideoPreview, sendVideoPreview, sendVideoPoster } from './video-previews.js';
 import { derivedMediaCache, immutableMediaCache } from './media-response.js';
@@ -1046,6 +1046,15 @@ app.post("/api/prompts/enabled", (req, res) => {
 app.post("/api/prompts/pin", (req, res) => {
   if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind, ownerIdForRequest(req)) });
+});
+
+// The prompt assistant keeps the text it replaced (a rewrite, a written negative), so History can bring it back.
+app.post("/api/prompts/record", (req, res) => {
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  const kind = req.body?.kind === "negative" ? "negative" : "positive";
+  const ownerId = ownerIdForRequest(req);
+  recordPrompt(String(req.body?.text || "").slice(0, 8000), kind, ownerId);
+  res.json({ ok: true, prompts: listPrompts(kind, ownerId) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {

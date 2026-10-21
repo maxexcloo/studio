@@ -8,7 +8,7 @@ import express from 'express';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-assistant-routes-'));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, 'studio-env');
-const { registerAssistantRoutes, assistantIntegration, assistantSettingValue, imageFromDataUrl } = await import('./assistant-routes.js');
+const { registerAssistantRoutes, assistantIntegration, assistantRecord, assistantSettingValue, imageFromDataUrl } = await import('./assistant-routes.js');
 const { createAssistant } = await import('./assistant.js');
 const { builtInAccessProfiles, effectiveAccountAccess } = await import('./account-policy.js');
 
@@ -50,7 +50,7 @@ const loras = [{ name: 'cabin.safetensors', info: { title: 'Cabin', families: ['
 registerAssistantRoutes(app, {
   engine,
   profiles: async (req) => [sfw, nsfw].filter((profile) => !req.studioAccount || req.studioAccount.role === 'administrator' || !profile.nsfw || req.studioAccount.features.nsfwModels),
-  guide: () => ({ summary: 'Lead with light.' }),
+  guide: (profile) => profile.id === nsfw.id ? { summary: 'Tags.', negative: { effect: 'none' } } : { summary: 'Lead with light.' },
   loras: async () => loras,
   starred: async () => ({ examples: ['a starred prompt'], loras: [] }),
   template: async (id) => id === 'base' ? { heissUi: { id: 'base', name: 'Base', kind: 'image', defaults: { model: 'old.safetensors' }, controls: { prompt: { node: '1', input: 'text' } } }, graph: { 1: { class_type: 'CLIPTextEncode', inputs: { text: '' } } } } : null
@@ -123,4 +123,18 @@ test('Settings rows: gateway models, vision and validated model names', async ()
   assert.throws(() => assistantSettingValue('STUDIO_PROMPT_WRITER_KEY', 'x'), /cannot be changed/);
   assert.deepEqual(imageFromDataUrl('data:image/png;base64,AAAA'), { mime: 'image/png', data: 'AAAA' });
   assert.equal(imageFromDataUrl('data:text/html;base64,AAAA'), null);
+});
+
+test('the composer learns which profiles take no negative', async () => {
+  assert.deepEqual((await get('/api/assistant', 'adult')).noNegative, [nsfw.id]);
+  assert.deepEqual((await get('/api/assistant', 'user')).noNegative, [], 'only profiles the account may use');
+});
+
+test('a generation records the preset, model, source and only the chosen LoRAs it stacked', () => {
+  const stack = [{ name: 'a.safetensors', enabled: true }, { name: 'b.safetensors', enabled: false }];
+  assert.deepEqual(assistantRecord({ preset: 'enhance', model: 'ai/text-quick', source: 'ui', lorasSuggested: ['a.safetensors', 'b.safetensors', 'c.safetensors', 'a.safetensors'] }, stack), { preset: 'enhance', model: 'ai/text-quick', source: 'ui', lorasSuggested: ['a.safetensors'] });
+  assert.deepEqual(assistantRecord({ preset: 'cinematic', source: 'chat', model: 'bad\nmodel' }), { preset: 'cinematic', source: 'chat' });
+  assert.equal(assistantRecord({ preset: 'nonsense' }), null);
+  assert.equal(assistantRecord('enhance'), null);
+  assert.equal(assistantRecord(null), null);
 });
