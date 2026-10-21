@@ -27,7 +27,7 @@ const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment'
 
 /** Where a value comes from, and a lock when the deployment owns it. */
 export function SourceTag({ source, locked }: Source) {
-  return <span className={cn('set-source', `is-${source}`)} title={locked ? 'Set by the deployment configuration. Change it there.' : undefined}>
+  return <span className={cn('set-source', `is-${source}`)} title={locked ? 'Set in the server configuration; change it there' : undefined}>
     {locked ? <Lock size={11} aria-hidden="true" /> : null}{sourceWords[source]}{locked ? ' · Locked' : ''}
   </span>;
 }
@@ -41,7 +41,7 @@ export function useDeploymentSettings(enabled: boolean) {
       setSettings(await apiJson<DeploymentSettings & { ok: boolean }>('/api/settings/deployment', { cache: 'no-store' }));
       setError('');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not load deployment settings.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load server settings');
     }
   }, [enabled]);
   React.useEffect(() => { void refresh(); }, [refresh]);
@@ -73,18 +73,18 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
     const options = [{ label: 'First Ready Profile', value: FIRST_READY }, ...settings.defaults.profiles.filter((profile) => profile.kind === kind).map((profile) => ({ label: `${profile.label}${profile.ready ? '' : ' (Not Ready)'}`, value: profile.id }))];
     if (entry.configured && !options.some((option) => option.value === entry.configured)) options.push({ label: `${entry.configured} (Unavailable)`, value: entry.configured });
     const missing = entry.configured && entry.configured !== entry.effective;
-    return <Row key={kind} label={<>{kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} <SourceTag source={entry.source} locked={entry.locked} /></>} description={entry.effective ? `${missing ? `${entry.configured} isn’t ready, so new composers start on ` : 'New composers start on '}${label(entry.effective)}. Existing drafts keep their choice.` : `No ${kind} profile is ready.`} disabled={busy === entry.key}>
+    return <Row key={kind} label={<>{kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} <SourceTag source={entry.source} locked={entry.locked} /></>} description={entry.effective ? `${missing ? `${entry.configured} isn’t ready, so new drafts start on ` : 'New drafts start on '}${label(entry.effective)}` : `No ${kind} profile is ready`} disabled={busy === entry.key}>
       {entry.locked ? <span className="set-locked-value">{entry.configured ? label(entry.configured) : 'First Ready Profile'}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} value={entry.configured || FIRST_READY} options={options} onChange={(value) => void save(entry.key, value === FIRST_READY ? '' : value)} /></div>}
     </Row>;
   };
   const catalogue = settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key));
   return <>
-    <Group title="Defaults" note="Deployment settings override these until they are removed from its configuration.">
+    <Group title="Defaults" note="Locked values come from the server configuration and can only be changed there">
       {defaultRow('image')}
       {defaultRow('video')}
     </Group>
-    {catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
-      {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
+    {catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers">
+      {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description.replace(/\.$/, '')}${item.applies === 'restart' ? '; applies after a restart' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
     </Group> : null}
   </>;
 }
@@ -94,8 +94,8 @@ export function IntegrationsOverview({ settings }: { settings: DeploymentSetting
   const { civitai } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <Group title="Integrations">
-    <Row label="Civitai" description={`Token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}. New PNGs always carry their settings in the form Civitai reads.`}>{state(civitai.token.set || civitai.presets, ['On', 'Off'])}</Row>
-    <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
+    <Row label="Civitai" description={`Token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' in the server configuration' : ''} · presets ${civitai.presets ? 'on' : 'off'} · PNGs carry settings Civitai can read`}>{state(civitai.token.set || civitai.presets, ['On', 'Off'])}</Row>
+    <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs${settings.storage.workerToken ? ' · worker token set' : ''}` : 'Finished outputs stay in ComfyUI’s output folder'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
   </Group>;
 }
 

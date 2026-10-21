@@ -476,7 +476,7 @@ button.list-row { isolation: isolate; }
   .set-panel .list-row:has(.segmented, .number-picker, .set-type-picker, .multi-select-trigger, .account-field) .list-row-control { flex-basis: 100%; justify-content: stretch; }
   .set-panel .list-row .segmented { width: 100%; }
   .set-panel .list-row .segmented button { flex: 1; }
-  .set-panel .list-row .set-type-picker, .set-panel .list-row .account-field { width: 100%; }
+  .set-panel .list-row .set-type-picker, .set-panel .list-row .account-field, .set-panel .list-row .list-row-control > .multi-select-trigger.is-field { width: 100%; }
   .set-panel .list-switch { flex-wrap: nowrap; }
 }
 
@@ -687,6 +687,8 @@ button.list-row { isolation: isolate; }
 /* A row's value sits muted at its end; a filled field (Settings, forms) sits in the well. */
 .dropdown-trigger.is-row { margin-inline-end: -10px; }
 .dropdown-trigger.is-field { width: 100%; background-color: var(--well); color: hsl(var(--foreground)); }
+/* A Settings multi-select is as wide as the text fields beside it (Groups › Features, Workers › Capabilities). */
+.list-row-control > .dropdown-trigger.is-field.multi-select-trigger { width: 220px; }
 .dropdown-trigger.is-field:hover:not(:disabled), .dropdown-trigger.is-field[aria-expanded="true"] { background-color: var(--well); background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
 .dropdown-trigger.is-pill { border: 1px solid var(--glass-border); color: hsl(var(--foreground)); }
 @media (pointer: coarse) { .dropdown-trigger { min-height: var(--control-h-touch); height: auto; } .dropdown-trigger.is-row { min-height: var(--control-h-sm); } }

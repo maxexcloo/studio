@@ -65,10 +65,7 @@
 
 /* Models as chips: name, then its family, quieter. */
 .set-type-picker { width: 200px; }
-/* Settings › Workers: a worker's capabilities as pressed toggles while it is being edited,
-   and an action that doesn't apply, off, with its reason in its place. */
-.set-capabilities { flex-wrap: wrap; justify-content: flex-start; }
-.set-worker-field { width: min(320px, 52vw); }
+/* Settings › Workers: an action that doesn't apply, off, with its reason in its place. */
 .set-action-reason { font-size: 12px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
 
 /* Output folder: a live verdict above the path, found folders as pickable rows. */

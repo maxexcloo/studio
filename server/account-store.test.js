@@ -50,9 +50,9 @@ test("profile assignment, duplicate names and account disabling fail closed", as
 });
 
 test("ordinary accounts cannot be created without one existing profile", async () => {
-  await assert.rejects(store.createLocalAccount({ username: "no.profile", password: "a valid long password", accessProfileId: "missing" }), /existing access profile/);
+  await assert.rejects(store.createLocalAccount({ username: "no.profile", password: "a valid long password", accessProfileId: "missing" }), /existing group/);
   // An ordinary account may go without a password (single sign-on only); an administrator may not.
-  await assert.rejects(store.createLocalAccount({ username: "empty.pass", password: "" }), /existing access profile/);
+  await assert.rejects(store.createLocalAccount({ username: "empty.pass", password: "" }), /existing group/);
   await assert.rejects(store.createLocalAccount({ username: "empty.admin", password: "", role: "administrator" }), /Enter a password/);
 });
 
@@ -124,9 +124,9 @@ test("new accounts start on the default access profile: local at once, single si
   // Without a default, a new sign-on account waits and an unknown gateway email gets nothing.
   assert.deepEqual(store.signInWithOidcIdentity({ issuer: "https://id.example", subject: "one", email: "one@example.com", emailVerified: true }), { pending: true });
   assert.equal(store.gatewayAccountAccess("chat-one", "chat.one@example.com"), null);
-  await assert.rejects(store.createLocalAccount({ username: "nodefault@example.com", password: "a valid long password" }), /existing access profile/);
+  await assert.rejects(store.createLocalAccount({ username: "nodefault@example.com", password: "a valid long password" }), /existing group/);
 
-  assert.throws(() => store.setDefaultAccessProfile("missing"), /existing access profile/);
+  assert.throws(() => store.setDefaultAccessProfile("missing"), /existing group/);
   assert.equal(store.setDefaultAccessProfile("starter"), "starter");
   const local = await store.createLocalAccount({ username: "local@example.com", password: "a valid long password" });
   assert.equal(local.accessProfileId, "starter");

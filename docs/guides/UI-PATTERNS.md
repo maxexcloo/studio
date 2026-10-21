@@ -249,7 +249,7 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
 - **Multi-selects** (`MultiSelect.tsx`): picked rows take the accent tint and
   its tick. **All** picks everything at once, even values that wait for
   another one (References need Generation): pass `onAll`. A short list
-  (an access profile's Models) has no search box.
+  (a group's Models) has no search box.
 - **Size** shows the resolutions and then the shapes as full-width toggles with
   no label, with **Custom** as the last option and Width and Height always at
   the bottom. The fields are enabled only while Custom is the pick; choosing a
@@ -423,21 +423,22 @@ holds:
 | --- | --- | --- |
 | Account | MCP and Profile (name, email, password) | Every account |
 | About | The banner, Version, Changelog, Licence, Source, credits (HEISS UI, J-AI Studio, ComfyUI, Radiance) and stats | Everyone |
+| Groups | Groups (a picker with New, multi-selects, Save & Discard) and New Accounts (Default Group, with Require Approval beside it) | Administrators |
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
 | Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
-| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
-| Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
+| Users | Accounts (each account with its group, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
+| Workers | Add Worker on the Workers heading, then every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; Name and Remove for Studio's own) | Administrators |
 
-**Order:** the rail reads Account, Models, Profiles, Studio, Users, Workers, Maintenance, About; a General group always leads its page; groups, rows,
+**Order:** the rail reads Account, Groups, Models, Profiles, Studio, Users, Workers, Maintenance, About; a General group always leads its page; groups, rows,
 option lists and pills inside them read alphabetically too. The exceptions are
 logical ones: a master switch comes before what depends on it, Save & Discard
 is an editor's last row, an editor's fields follow the order they are filled
 in, Version leads About, Reset (destructive) stays its own group, and Workers
-lists its workers before Upscale.
+lists the deployment's workers before Studio's own.
 
-**Access profiles** grant features and local models. Cloud models are never
+**Groups** (access profiles on the server) grant features and local models. Cloud models are never
 listed: the Cloud Models feature grants them. NSFW Models gates any model
 profile marked `nsfw`. A feature the deployment switched off (LoRAs, Cloud
 Models) shows disabled with "Off for This Deployment"; there are no global
@@ -463,14 +464,17 @@ Controls](#gallery-view-controls)).
 **Workers** (`WorkerSettings.tsx`) shows every worker the same way: one
 group headed by its name, then the same rows in the same order with the same
 words: Address (with its source tag and Edit), Capabilities, Status with Test,
-Open, Restart. Only the capabilities differ. An action that doesn't apply stays
-in its place, off, with a short reason before it ("Locked", "Offline", "Save
-first"). The deployment's workers come first and are locked; Studio's own are
-edited in place (Name, Address, Capabilities as pressed toggles, Remove) as one
-draft with one Save & Discard row under Add Worker. With no workers the page
-is an `EmptyState` ("No Workers Yet") with Add Worker. Restart acts at once.
+Open, Restart, and Remove (a quiet text action) on Studio's own. Only the
+capabilities differ; there is no separate Upscale status, as Capabilities shows
+it. An action that doesn't apply stays in its place, off, with a short reason
+before it ("Locked", "Offline", "Save first"). **Add Worker** sits on the
+Workers heading's line, like New Account. The deployment's workers come first
+and are locked; Studio's own, and a new one, are edited in place (Name and
+Address as fields as wide as the account editor's, Capabilities as a
+multi-select) as one draft with one Save & Discard row after the last worker.
+With no workers the page is an `EmptyState` ("No Workers Yet") under the
+heading. Restart acts at once.
 GPU allocation is not in Studio: it stays in AI Control's own UI and Mise.
-Other Workers groups (such as upscale status) follow the worker list.
 
 ## Library
 

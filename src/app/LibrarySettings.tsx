@@ -26,12 +26,12 @@ export function PromptHistoryRow({ showToast }: { showToast: ShowToast }) {
     <>
       <SwitchRow
         label="Keep Recent Prompts"
-        description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one. Shared with other devices.${enabled && prompts.length ? ` ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}.` : ''}`}
+        description={`Press ↑ in an empty prompt, or the clock beside Negative, to reuse one; shared across your devices${enabled && prompts.length ? ` · ${plural(recent, 'recent prompt')}${starred ? `, ${starred} starred` : ''}` : ''}`}
         checked={enabled}
         onChange={(next) => void toggle(next)}
       />
       {enabled && recent ? (
-        <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay.' : 'The list starts over with your next prompt.'}>
+        <Row label="Forget Recent Prompts" description={starred ? 'Starred prompts stay' : 'The list starts over with your next prompt'}>
           <button className="btn" onClick={async () => {
             clearPrompts().catch(fail);
           }}>Forget</button>
@@ -50,8 +50,8 @@ export function AdapterLibraryGroup() {
     apiJson<{ loras?: Record<string, LoraInfo> }>('/api/loras/info').then((data) => { if (live) setInfos(data.loras || {}); }).catch(() => { if (live) setError('Couldn’t load the LoRA list.'); });
     return () => { live = false; };
   }, []);
-  return <Group title="LoRAs & Supporting Files" note="Choose acceleration through a prepared recipe. Supporting files stay out of the optional LoRA picker.">
+  return <Group title="LoRAs & Supporting Files" note="Speed-up LoRAs come with recipes; supporting files stay out of the LoRAs picker">
     {error ? <Row label="LoRAs Unavailable" description={error} /> : infos === null ? <Row label="Loading LoRAs…" /> : Object.entries(infos).sort(([a, left], [b, right]) => loraName(a, left).localeCompare(loraName(b, right))).map(([name, info]) => <Row key={name} label={loraName(name, info)} description={<>{info.role ? loraRoleLabel(info) : 'LoRA · Role Unknown'}{info.base ? ` · ${info.base}` : ''}<br /><code className="set-path">{name}</code>{info.note ? <><br />{info.note}</> : null}</>} />)}
-    {infos && !Object.keys(infos).length ? <Row label="No LoRAs Yet" description="LoRAs and supporting files on the workers show here." /> : null}
+    {infos && !Object.keys(infos).length ? <Row label="No LoRAs Yet" description="LoRAs and supporting files on your workers show up here" /> : null}
   </Group>;
 }

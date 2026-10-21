@@ -358,7 +358,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       let account;
       if (typeof body.accessProfileId === "string") account = assignAccessProfile(req.params.id, body.accessProfileId);
       else if (typeof body.disabled === "boolean") account = setAccountDisabled(req.params.id, body.disabled);
-      else return res.status(400).json({ ok: false, error: "Choose an access profile or account status." });
+      else return res.status(400).json({ ok: false, error: "Choose a group or account status" });
       res.json({ ok: true, account });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });

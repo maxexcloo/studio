@@ -147,7 +147,7 @@ const startingProfileId = () => requireApproval() ? "" : defaultAccessProfileId(
 
 export function setDefaultAccessProfile(profileId) {
   const store = readStore();
-  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId])) throw new Error("Choose an existing access profile.");
+  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId])) throw new Error("Choose an existing group");
   if (profileId) store.defaultAccessProfileId = profileId;
   else delete store.defaultAccessProfileId;
   saveStore();
@@ -163,7 +163,7 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
   // Cloud profiles follow Cloud Models, never a grant of their own.
   const profile = normaliseAccessProfile({ ...input, generationProfiles: Array.isArray(input?.generationProfiles) ? input.generationProfiles.filter((id) => !cloud.has(id)) : [], retiredCloudGrants: stored?.retiredCloudGrants }, [...availableProfiles, ...existing].filter((id) => !cloud.has(id)));
   if (!profile.id) throw new Error("Choose a valid profile ID.");
-  if (!profile.name) throw new Error("Enter a name for this access profile.");
+  if (!profile.name) throw new Error("Enter a name for this group");
   // A profile that could not be settled yet keeps its old cloud grants unless this save turns Cloud Models on.
   if (stored && predatesCloudModels(stored) && !profile.features.cloudModels) delete profile.features.cloudModels;
   readStore().profiles[profile.id] = profile;
@@ -175,7 +175,7 @@ export function assignAccessProfile(accountId, profileId) {
   const store = readStore();
   const account = store.accounts.find((item) => item.id === accountId && item.role === accountRoles.user);
   if (!account) throw new Error("That ordinary user account was not found.");
-  if (!validAccountKey(profileId) || !store.profiles[profileId]) throw new Error("Choose an existing access profile.");
+  if (!validAccountKey(profileId) || !store.profiles[profileId]) throw new Error("Choose an existing group");
   account.accessProfileId = profileId;
   // Assigning a profile is how an administrator approves a pending sign-in.
   delete account.pending;
@@ -192,7 +192,7 @@ export async function createLocalAccount({ username, displayName = "", password,
   const withPassword = Boolean(String(password || ""));
   if (!withPassword && role !== accountRoles.user) throw new Error("Enter a password.");
   if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
-  if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign an existing access profile to this user.");
+  if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign this user to an existing group");
   if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("An account with that email already exists.");
 
   const salt = crypto.randomBytes(16);

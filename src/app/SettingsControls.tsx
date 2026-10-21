@@ -30,7 +30,8 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
 
 /*
  * A group's heading may carry one action on its right (`action`), such as
- * New Account: a small link-style button on the heading's line.
+ * New Account or Add Worker: a small link-style button on the heading's line.
+ * A heading-only group (no rows) carries just that action and its note.
  *
  * Settings rows are the flat list every phone sheet uses (SheetList.tsx,
  * 41-lists.css, UI-PATTERNS › Lists and › Settings): a quiet heading over
@@ -42,7 +43,7 @@ export function Group({ title, action, note, tone, children, className }: React.
     <section className={cn('list-section set-group', tone === 'danger' && 'is-danger', className)}>
       {title && action ? <div className="set-group-head"><h4 className="list-section-title">{title}</h4>{action}</div>
         : title ? <h4 className="list-section-title">{title}</h4> : null}
-      <div className="list-group">{children}</div>
+      {children ? <div className="list-group">{children}</div> : null}
       {note ? <p className="list-note">{note}</p> : null}
     </section>
   );

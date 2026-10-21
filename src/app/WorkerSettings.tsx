@@ -1,9 +1,10 @@
 import React from 'react';
-import { Check, ExternalLink, Pencil, PlugZap, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, Pencil, PlugZap, Plus, RotateCw } from 'lucide-react';
 import { apiFetch, apiJson } from './api';
 import { EmptyState } from './EmptyState';
 import { SourceTag } from './DeploymentSettings';
-import { Group, Row, SaveRow, Status } from './SettingsControls';
+import { MultiSelect } from './MultiSelect';
+import { Group, GroupAction, Row, SaveRow, Status } from './SettingsControls';
 import type { ShowToast } from './toast';
 import type { ComfyStatus, WorkerState } from './types';
 
@@ -12,9 +13,10 @@ import type { ComfyStatus, WorkerState } from './types';
  * standard group, headed by its name, with the same rows in the same order
  * (Address, Capabilities, Status with Test, Open, Restart) and the same words;
  * only its capabilities differ. An action that doesn't apply stays in its
- * place, off, with a short reason. Studio's own workers are edited as one
- * draft with Save & Discard; the deployment's are locked. A fork module, kept
- * apart from SettingsDialog so other Workers groups can follow it.
+ * place, off, with a short reason. Add Worker sits on the Workers heading,
+ * like New Account; Studio's own workers are edited in place (Name, Address,
+ * Capabilities as a multi-select, Remove) as one draft with one Save &
+ * Discard row; the deployment's are locked.
  */
 
 export type WorkerCapability = 'image' | 'video' | 'upscale' | 'models';
@@ -61,12 +63,12 @@ export function useWorkers(enabled: boolean) {
 
 /** Where a worker's status stands, in one word and one line. */
 function statusWords(live: WorkerState | undefined, saved: boolean): { tone?: 'ok' | 'bad' | 'warn'; word: string; detail: string } {
-  if (!saved) return { word: 'Not Saved', detail: 'Save to connect to it.' };
+  if (!saved) return { word: 'Not Saved', detail: 'Save to connect' };
   if (!live) return { word: 'Checking', detail: 'Checking…' };
-  if (live.restarting) return { tone: 'warn', word: 'Restarting', detail: 'Reconnects when it’s back.' };
-  if (live.busy) return { tone: 'warn', word: 'Busy', detail: `${live.device ? `${live.device} · ` : ''}Slow to answer; its runs carry on.` };
-  if (live.connected) return { tone: 'ok', word: 'Ready', detail: live.device || 'Ready to generate.' };
-  return { tone: 'bad', word: 'Offline', detail: 'Studio can’t reach it.' };
+  if (live.restarting) return { tone: 'warn', word: 'Restarting', detail: 'Reconnects when it’s back' };
+  if (live.busy) return { tone: 'warn', word: 'Busy', detail: `${live.device ? `${live.device} · ` : ''}Slow to answer; its runs carry on` };
+  if (live.connected) return { tone: 'ok', word: 'Ready', detail: live.device || 'Ready to generate' };
+  return { tone: 'bad', word: 'Offline', detail: 'Studio can’t reach it' };
 }
 
 /** A row's action, or the same action off with a short reason in its place. */
@@ -135,42 +137,41 @@ export function WorkerGroup({ worker, source, locked, saved, live, editing, capa
     setTesting(true);
     try {
       const { ok, data } = await sendJson<{ reachable: boolean; detail?: string; device?: string }>('/api/workers/test', 'POST', saved ? { id: worker.id } : { url: worker.url });
-      setTested(!ok ? data.error || 'Couldn’t test it.' : data.reachable ? `Answered just now${data.device ? ` · ${data.device}` : ''}.` : data.detail || 'Didn’t answer.');
+      setTested(!ok ? data.error || 'Couldn’t test it' : data.reachable ? `Answered just now${data.device ? ` · ${data.device}` : ''}` : data.detail || 'Didn’t answer');
       if (saved) onCheck();
-    } catch { setTested('Can’t reach Studio.'); }
+    } catch { setTested('Can’t reach Studio'); }
     finally { setTesting(false); }
   };
-  const toggle = (id: WorkerCapability) => onChange({ ...worker, capabilities: worker.capabilities.includes(id) ? worker.capabilities.filter((item) => item !== id) : capabilityOrder.filter((item) => item === id || worker.capabilities.includes(item)) });
+  const setCapabilities = (values: string[]) => onChange({ ...worker, capabilities: capabilityOrder.filter((item) => values.includes(item)) });
+  const capabilityOptions = capabilityOrder.map((id) => ({ value: id, label: capabilities.find((item) => item.id === id)?.label || id })).sort((x, y) => x.label.localeCompare(y.label));
   const openReason = !saved ? 'Save first' : !live?.connected ? 'Offline' : '';
   const restartReason = !saved ? 'Save first' : phase === 'restarting' || live?.restarting ? '' : !live?.connected ? 'Offline' : '';
   const name = worker.name.trim() || 'New Worker';
   return (
     <Group title={name} className="set-worker">
       {editing ? <Row label="Name">
-        <input className="modal-input set-worker-field" value={worker.name} onChange={(event) => onChange({ ...worker, name: event.target.value })} aria-label={`${name} Name`} autoComplete="off" maxLength={60} placeholder="Image Worker" />
+        <input className="modal-input account-field" value={worker.name} onChange={(event) => onChange({ ...worker, name: event.target.value })} aria-label={`${name} Name`} autoComplete="off" maxLength={60} placeholder="Image Worker" />
       </Row> : null}
       <Row label={<>Address <SourceTag source={source} locked={locked} /></>} description={editing ? undefined : <code className="set-path is-oneline">{worker.url || 'Not set'}</code>}>
         {editing
-          ? <input className="modal-input set-worker-field" value={worker.url} onChange={(event) => onChange({ ...worker, url: event.target.value })} aria-label={`${name} Address`} spellCheck={false} autoComplete="off" placeholder="http://127.0.0.1:8188" />
+          ? <input className="modal-input account-field" value={worker.url} onChange={(event) => onChange({ ...worker, url: event.target.value })} aria-label={`${name} Address`} spellCheck={false} autoComplete="off" placeholder="http://127.0.0.1:8188" />
           : <Action reason={locked ? 'Locked' : ''}><button type="button" className="btn is-ghost" disabled={locked} aria-label={`Edit ${name}`} onClick={onEdit}><Pencil size={14} /> Edit</button></Action>}
       </Row>
-      <Row label="Capabilities" stacked={editing} description={editing ? undefined : [...labels].sort((x, y) => x.localeCompare(y)).join(' · ') || 'None'}>
-        {editing ? <div className="list-segments set-capabilities" role="group" aria-label={`${name} Capabilities`}>
-          {capabilities.map((item) => <button key={item.id} type="button" aria-pressed={worker.capabilities.includes(item.id)} title={item.description || undefined} onClick={() => toggle(item.id)}>{item.label}</button>)}
-        </div> : null}
+      <Row label="Capabilities" description={editing ? (worker.capabilities.length ? undefined : 'Pick at least one') : labels.join(' · ') || 'None'}>
+        {editing ? <MultiSelect label={`${name} Capabilities`} values={worker.capabilities} options={capabilityOptions} onChange={setCapabilities} searchFrom={Infinity} /> : null}
       </Row>
       <Row label="Status" description={tested || status.detail}>
         <Status tone={status.tone}>{status.word}</Status>
         <button type="button" className="btn is-ghost" disabled={testing || !worker.url.trim()} aria-label={`Test ${name}`} onClick={() => void test()}><PlugZap size={14} /> {testing ? 'Testing…' : 'Test'}</button>
       </Row>
-      <Row label="Open" description="Its own ComfyUI page, in a new tab.">
+      <Row label="Open" description="Its ComfyUI page, in a new tab">
         <Action reason={openReason}>
           {openReason
             ? <button type="button" className="btn is-ghost" disabled aria-label={`Open ${name}`}><ExternalLink size={14} /> Open</button>
             : <a className="btn is-ghost" href={live?.url || worker.url} target="_blank" rel="noreferrer" aria-label={`Open ${name}`}><ExternalLink size={14} /> Open</a>}
         </Action>
       </Row>
-      <Row label="Restart" description="Loads new custom nodes and files, and frees memory. Its running and queued generations stop.">
+      <Row label="Restart" description="Loads new nodes and frees memory; running and queued jobs stop">
         <Action reason={restartReason}>
           <button type="button" className="btn" disabled={Boolean(restartReason) || Boolean(phase) || Boolean(live?.restarting)} aria-label={`Restart ${name}`} onClick={() => void restart()}>
             {phase === 'restarting' || live?.restarting ? <Check size={14} /> : <RotateCw size={14} className={phase === 'asking' ? 'is-spinning' : undefined} />}
@@ -178,9 +179,9 @@ export function WorkerGroup({ worker, source, locked, saved, live, editing, capa
           </button>
         </Action>
       </Row>
-      {editing ? <Row label="Remove" description="Takes it out of Studio when you save. Studio stops following jobs still on it.">
-        <button type="button" className="btn is-danger-soft" aria-label={`Remove ${name}`} onClick={onRemove}><Trash2 size={14} /> Remove</button>
-      </Row> : null}
+      {locked ? null : <Row label="Remove" description="Takes it out of Studio when you save">
+        <GroupAction className="set-group-action is-danger" aria-label={`Remove ${name}`} onClick={onRemove}>Remove</GroupAction>
+      </Row>}
     </Group>
   );
 }
@@ -238,7 +239,8 @@ export function WorkerSettings({ status, showToast, onChanged, onCheck }: { stat
   const fromDeployment = list.deployment.variable === 'STUDIO_WORKERS';
   return (
     <>
-      {!locked.length && !own.length ? <EmptyState title="No Workers Yet">Add a ComfyUI worker to generate images and videos.</EmptyState> : null}
+      <Group title="Workers" action={<GroupAction onClick={add} disabled={busy}><Plus size={13} aria-hidden="true" /> Add Worker</GroupAction>} note={fromDeployment ? 'Locked workers come from the deployment; ones you add run beside them' : undefined} />
+      {!locked.length && !own.length ? <EmptyState title="No Workers Yet">Add a ComfyUI worker to make images and videos.</EmptyState> : null}
       {locked.map((worker) => <WorkerGroup key={worker.id} worker={toDraft(worker)} source={worker.source} locked saved live={live(worker.id)} editing={false} capabilities={capabilities} showToast={showToast} onEdit={() => {}} onChange={() => {}} onRemove={() => {}} onCheck={onCheck} onBack={onChanged} />)}
       {own.map((worker) => <WorkerGroup
         key={worker.key}
@@ -256,12 +258,9 @@ export function WorkerSettings({ status, showToast, onChanged, onCheck }: { stat
         onCheck={onCheck}
         onBack={onChanged}
       />)}
-      <Group className="set-worker-add" note={fromDeployment ? 'STUDIO_WORKERS defines the locked workers; workers added here run beside them.' : undefined}>
-        <Row label="Add Worker" description="Another ComfyUI, with what it runs: images, videos, upscaling or model downloads.">
-          <button type="button" className="btn" onClick={add} disabled={busy}><Plus size={14} /> Add Worker</button>
-        </Row>
-        <SaveRow dirty={dirty} busy={busy} onSave={() => void save()} onDiscard={discard} canSave={canSave} note={canSave ? 'New and changed workers are tested once saved.' : 'Each worker needs a name, an address and at least one capability.'} />
-      </Group>
+      {dirty ? <Group>
+        <SaveRow dirty busy={busy} onSave={() => void save()} onDiscard={discard} canSave={canSave} note={canSave ? 'Studio tests new and changed workers once saved' : 'Each worker needs a name, an address and a capability'} />
+      </Group> : null}
     </>
   );
 }

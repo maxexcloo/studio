@@ -88,15 +88,15 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
   };
 
   if (listError) return <Group><Row label="Profiles Unavailable" description={listError}><button className="btn is-ghost" onClick={() => void refreshList()}><RefreshCw size={14} /> Try Again</button></Row></Group>;
-  if (list && !list.length) return <Group><Row label="No Profiles Here" description="Studio has no profile files of its own to edit. Profiles arrive from the profiles repository." /></Group>;
+  if (list && !list.length) return <Group><Row label="No Profiles Here" description="Profiles come from the profiles repository; Studio has none of its own to edit" /></Group>;
   const current = list?.find((item) => item.id === id);
   const lines = text ? text.split('\n').length : 0;
   return <div className="set-sections">
-    <Group title="Profile" note="This edits Studio’s own copy. An edited copy stops receiving updates from the profiles repository until the edit is committed there; each save keeps the previous file in Studio’s backups.">
+    <Group title="Profile" note="You edit Studio’s copy: it stops getting repository updates until the change is committed there, and each save backs up the previous file">
       <Row label="Profile" description={current ? `${current.kind === 'video' ? 'Video' : 'Image'}${current.family ? ` · ${current.family}` : ''} · ${current.id}.json` : undefined}>
         {list ? <div className="set-type-picker is-wide"><StudioSelect ariaLabel="Profile to Edit" value={id} options={list.map((item) => ({ label: `${item.name}${item.edited ? ' · Edited' : ''}`, value: item.id }))} onChange={pick} /></div> : <Skeleton className="skeleton-text short" />}
       </Row>
-      <Row label="Source" description={current?.edited ? `Edited here ${new Date(current.edited.editedAt).toLocaleString('en-AU')}, so repository updates no longer reach it.` : 'As it came from the profiles repository.'}>
+      <Row label="Source" description={current?.edited ? `Edited here ${new Date(current.edited.editedAt).toLocaleString('en-AU')}; repository updates no longer reach it` : 'As it came from the profiles repository'}>
         {current ? <Status tone={current.edited ? 'warn' : 'ok'}>{current.edited ? 'Edited Here' : 'From the Repository'}</Status> : null}
       </Row>
     </Group>
@@ -117,7 +117,7 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
         {parseError ? <p className="list-note is-error" role="alert">Not valid JSON: {parseError}</p> : null}
       </div>
       {dirty && !reviewing ? <div className="list-row is-static set-row set-save-row" role="group" aria-label="Unsaved Changes">
-        <span className="list-row-text"><span className="list-row-label">Unsaved Changes</span><span className="list-row-detail">Review the changes and Studio’s check before saving.</span></span>
+        <span className="list-row-text"><span className="list-row-label">Unsaved Changes</span><span className="list-row-detail">Review the changes and Studio’s check before you save</span></span>
         <span className="list-row-control">
           <button type="button" className="btn is-ghost" disabled={busy} onClick={discard}>Discard</button>
           <button type="button" className="btn is-primary" disabled={busy || Boolean(parseError)} onClick={() => void runCheck()}>{busy ? 'Checking…' : 'Review Changes'}</button>
@@ -126,7 +126,7 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
     </Group>
     {reviewing && diff ? <Group title={`Changes · ${diff.added} added · ${diff.removed} removed`}>
       {check ? <div className="profile-check" role="status">
-        {check.errors.length ? check.errors.map((item) => <p key={item} className="is-error">{item}</p>) : <p className="is-ok"><CheckCircle2 size={14} aria-hidden="true" /> The profile parses, keeps its id and every control points at a node that exists.</p>}
+        {check.errors.length ? check.errors.map((item) => <p key={item} className="is-error">{item}</p>) : <p className="is-ok"><CheckCircle2 size={14} aria-hidden="true" /> The JSON is valid, the ID is unchanged and every control points at a real node</p>}
         {check.warnings.map((item) => <p key={item} className="is-warn">{item}</p>)}
       </div> : null}
       <ol className="profile-diff" aria-label="Changes">
@@ -134,7 +134,7 @@ export function ProfilesSettings({ showToast, onSaved }: { showToast: ShowToast;
           ? <li key={index} className="is-skip">{line.count} unchanged line{line.count === 1 ? '' : 's'}</li>
           : <li key={index} className={`is-${line.type}`}><span className="profile-diff-num" aria-hidden="true">{line.type === 'add' ? '' : line.oldLine}</span><span className="profile-diff-num" aria-hidden="true">{line.type === 'remove' ? '' : line.newLine}</span><span className="profile-diff-mark" aria-label={line.type === 'add' ? 'Added' : line.type === 'remove' ? 'Removed' : undefined}>{line.type === 'add' ? '+' : line.type === 'remove' ? '−' : ' '}</span><code>{line.text || ' '}</code></li>)}
       </ol>
-      <SaveRow dirty busy={busy} saveLabel="Save Profile" canSave={Boolean(check?.ok)} onSave={() => void save()} onDiscard={discard} note={check && !check.ok ? 'Fix the problems above, then review again.' : 'Saves over Studio’s copy; the previous file goes to backups.'} />
+      <SaveRow dirty busy={busy} saveLabel="Save Profile" canSave={Boolean(check?.ok)} onSave={() => void save()} onDiscard={discard} note={check && !check.ok ? 'Fix the problems above, then review again' : 'Saves over Studio’s copy and backs up the previous file'} />
     </Group> : null}
   </div>;
 }

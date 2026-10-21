@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Groups:** access profiles are now called groups and have their own administrator page, Settings › Groups, with the group editor and New Accounts (Default Group and Require Approval). Users keeps Accounts and Chat Gateway. Server data, routes and field names are unchanged, so nothing migrates.
+- **Workers:** Add Worker sits on the Workers heading like New Account; a new or Studio-owned worker is edited in place with Name and Address fields, Capabilities as a multi-select and a quiet Remove, under one Save & Discard row. The separate Upscale Status group is gone (each worker's Capabilities shows Upscale), so Workers is for administrators only again.
+- **Settings copy:** page and row descriptions are shorter and read in one plain voice, without internal names such as `STUDIO_WORKERS` or "deployment lock" wording.
+
 ## [0.41.0] - 2026-10-21
 
 > Studio becomes a hard fork of HEISS UI: Studio names everywhere, with the old settings, headers, cookie and browser storage still read, and dead upstream code removed

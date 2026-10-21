@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { studioUi } from './helpers/ui';
 
-test('administrators can manage access profiles, accounts and a personal MCP token', async ({ page }) => {
-  // One long end-to-end walk through Users and Account; CI runners need more than the default 30 s.
+test('administrators can manage groups, accounts and a personal MCP token', async ({ page }) => {
+  // One long end-to-end walk through Groups, Users and Account; CI runners need more than the default 30 s.
   test.setTimeout(90_000);
   const otherAccountText = 'private-draft-from-another-account';
   const posts: { url: string; body: unknown }[] = [];
@@ -80,19 +80,20 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(await page.evaluate(() => localStorage.getItem('studio-lora-pending:account:admin-id'))).toBeNull();
   await studioUi(page).openSettings();
   // Account first, then the pages alphabetically.
-  await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'Models', 'Profiles', 'Studio', 'Users', 'Workers', 'Maintenance', 'About']);
-  await page.getByRole('button', { name: 'Users', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
-  // Groups read alphabetically, and the model profile editor is its own page now.
-  await expect(page.locator('#settings-panel .list-section-title')).toHaveText(['Access Profiles', 'Accounts', 'Chat Gateway']);
+  await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'Groups', 'Models', 'Profiles', 'Studio', 'Users', 'Workers', 'Maintenance', 'About']);
+  const sections = page.getByRole('navigation', { name: 'Settings Sections' });
+  await sections.getByRole('button', { name: 'Users', exact: true }).click();
+  // Users keeps accounts and chat users; groups have their own page.
+  await expect(page.locator('#settings-panel .list-section-title')).toHaveText(['Accounts', 'Chat Gateway']);
   await expect(page.getByRole('button', { name: 'Edit Profiles', exact: true })).toHaveCount(0);
   // New Account sits on the Accounts heading's line, not in a row of its own.
   await expect(page.locator('.set-group-head').filter({ hasText: 'Accounts' }).getByRole('button', { name: 'New Account', exact: true })).toBeVisible();
-  await expect(page.getByText('A local account with an access profile.', { exact: true })).toHaveCount(0);
-  // One access profile at a time: picked from a list with New, edited with multi-selects, then saved or discarded.
-  await page.getByLabel('Access Profile to Edit').click();
-  await page.getByRole('option', { name: 'New Access Profile', exact: true }).click();
-  await page.getByLabel('Profile Name').fill('Video Artists');
+  await sections.getByRole('button', { name: 'Groups', exact: true }).click();
+  await expect(page.locator('#settings-panel .list-section-title')).toHaveText(['Groups', 'New Accounts']);
+  // One group at a time: picked from a list with New, edited with multi-selects, then saved or discarded.
+  await page.getByLabel('Group to Edit').click();
+  await page.getByRole('option', { name: 'New Group', exact: true }).click();
+  await page.getByLabel('Group Name').fill('Video Artists');
   // The ID comes from the name; there is no Profile ID row.
   await expect(page.getByLabel('Profile ID')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Features', exact: true }).click();
@@ -109,16 +110,16 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   // Escape closes the menu alone; Settings stays open.
   await page.keyboard.press('Escape');
   await expect(features).toHaveCount(0);
-  await expect(page.getByLabel('Profile Name')).toBeVisible();
-  const users = page.getByRole('region', { name: 'Users', exact: true });
-  await users.getByRole('combobox', { name: 'Models', exact: true }).click();
+  await expect(page.getByLabel('Group Name')).toBeVisible();
+  const groups = page.getByRole('region', { name: 'Groups', exact: true });
+  await groups.getByRole('combobox', { name: 'Models', exact: true }).click();
   // Models has no search box.
   await expect(page.getByLabel('Search Models', { exact: true })).toHaveCount(0);
   await page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ }).click();
   await expect(page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ })).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Create Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Create Group', exact: true }).click();
   await expect.poll(() => posts.some((post) => post.url === '/api/accounts/profiles')).toBe(true);
   const profile = posts.find((post) => post.url === '/api/accounts/profiles')?.body as { id: string; generationProfiles: string[]; features: { loras: boolean; videoGeneration: boolean } };
   expect(profile.id).toBe('video-artists');
@@ -127,27 +128,30 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(profile.features.videoGeneration).toBe(true);
   expect(profile.features.cloudModels).toBe(false);
 
-  // One default access profile for every new account, saved at once.
-  await page.getByLabel('Default Access Profile', { exact: true }).click();
-  await page.getByRole('option', { name: 'Artists', exact: true }).click();
+  // One default group for every new account, saved at once.
+  await page.getByLabel('Default Group', { exact: true }).click();
+  await page.getByRole('listbox', { name: 'Default Group', exact: true }).getByRole('option', { name: 'Artists', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/default-profile')?.body).toEqual({ accessProfileId: 'artists' });
   // Require Approval sits beside it, on until turned off; a waiting sign-in is approved onto the default.
   const approval = page.getByRole('switch', { name: 'Require Approval', exact: true });
   await expect(approval).toHaveAttribute('aria-checked', 'true');
-  await page.getByRole('button', { name: 'Approve Waiting One', exact: true }).click();
-  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/pending-id')?.body).toEqual({ accessProfileId: 'artists' });
   await approval.click();
   await expect.poll(() => posts.filter((post) => post.url === '/api/accounts/default-profile').at(-1)?.body).toEqual({ requireApproval: false });
   await expect(approval).toHaveAttribute('aria-checked', 'false');
+
+  await page.getByLabel('Group to Edit').click();
+  await page.getByRole('listbox', { name: 'Group to Edit', exact: true }).getByRole('option', { name: 'Artists', exact: true }).click();
+  await expect(page.getByLabel('Group Name')).toHaveValue('Artists');
+  await expect(groups.getByRole('combobox', { name: 'Models', exact: true })).toContainText('image-fast');
+
+  // A waiting sign-in in Users is approved onto the default group.
+  await sections.getByRole('button', { name: 'Users', exact: true }).click();
+  await page.getByRole('button', { name: 'Approve Waiting One', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/pending-id')?.body).toEqual({ accessProfileId: 'artists' });
   await page.locator('.set-row').filter({ hasText: 'artist.one' }).getByRole('button', { name: 'Disable', exact: true }).click();
   // Disabling acts at once (it can be enabled again); no question in the pill.
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
-
-  await page.getByLabel('Access Profile to Edit').click();
-  await page.getByRole('option', { name: 'Artists', exact: true }).click();
-  await expect(page.getByLabel('Profile Name')).toHaveValue('Artists');
-  await expect(users.getByRole('combobox', { name: 'Models', exact: true })).toContainText('image-fast');
 
   // The placeholder shows by name, not as its sentinel value.
   await expect(page.getByLabel('Account for librechat-user-7')).toContainText('Choose an Account');
@@ -176,7 +180,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Temporary Password', { exact: true }).fill('a secure temporary password');
   // The username is the account's email, so a new one must look like one.
   await expect(page.getByRole('button', { name: 'Create Account', exact: true })).toBeDisabled();
-  await expect(page.getByText('Enter an email address.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Enter an email address;', { exact: false })).toBeVisible();
   await newEmail.fill(' new.artist@example.com ');
   await page.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users')?.body).toMatchObject({ username: 'new.artist@example.com' });
@@ -209,14 +213,10 @@ test('ordinary accounts open their own studio without administration sections', 
   const sections = page.getByRole('navigation', { name: 'Settings Sections' });
   await expect(sections.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
   // Administration stays with administrators; everyone has Studio and Maintenance.
-  for (const name of ['Users', 'Models', 'Profiles']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
-  for (const name of ['Studio', 'Maintenance', 'About', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
-  // Everyone reads Upscale's status in Workers; the worker list stays with administrators.
-  await sections.getByRole('button', { name: 'Workers', exact: true }).click();
-  await expect(page.locator('.set-row').filter({ hasText: 'Upscale Status' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add Worker', exact: true })).toHaveCount(0);
+  for (const name of ['Groups', 'Users', 'Models', 'Profiles', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Studio', 'Maintenance', 'About']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
   await sections.getByRole('button', { name: 'Account', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toHaveCount(0);
 });

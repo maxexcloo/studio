@@ -30,6 +30,13 @@ async function openWorkers(page: Page, workers: object[], live: object[]) {
   return { dialog, saved };
 }
 
+/** Ticks or unticks one capability in a worker's Capabilities multi-select, then closes it. */
+async function pickCapability(page: Page, dialog: ReturnType<Page['locator']>, field: string, capability: string) {
+  await dialog.getByRole('combobox', { name: field, exact: true }).click();
+  await page.getByRole('listbox', { name: field, exact: true }).getByRole('option', { name: new RegExp(`^${capability}`) }).click();
+  await page.keyboard.press('Escape');
+}
+
 test('every worker shows the same rows and actions; only its capabilities differ', async ({ page }) => {
   const { dialog } = await openWorkers(page, [locked, own], [
     { id: 'gpu0', name: 'Image GPU', capabilities: locked.capabilities, default: true, connected: true, device: 'RTX 5090', url: locked.url },
@@ -39,11 +46,11 @@ test('every worker shows the same rows and actions; only its capabilities differ
   await expect(groups).toHaveCount(2);
   await expect(dialog.getByRole('heading', { name: 'Image GPU' })).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Video Box' })).toBeVisible();
-  // The same rows, in the same order, for every worker.
+  // The same rows, in the same order, for every worker; Studio's own end with Remove.
   for (const index of [0, 1]) {
-    await expect(groups.nth(index).locator('.list-row-label')).toHaveText([/^Address/, 'Capabilities', 'Status', 'Open', 'Restart']);
+    await expect(groups.nth(index).locator('.list-row-label')).toHaveText(index === 0 ? [/^Address/, 'Capabilities', 'Status', 'Open', 'Restart'] : [/^Address/, 'Capabilities', 'Status', 'Open', 'Restart', 'Remove']);
   }
-  await expect(groups.nth(0).locator('.set-row').filter({ hasText: 'Capabilities' })).toContainText('Image · Upscale · Model Library');
+  await expect(groups.nth(0).locator('.set-row').filter({ hasText: 'Capabilities' })).toContainText('Image · Model Library · Upscale');
   await expect(groups.nth(1).locator('.set-row').filter({ hasText: 'Capabilities' })).toContainText('Video');
   await expect(groups.nth(0).locator('.set-row').filter({ hasText: 'Status' })).toContainText('RTX 5090');
   // Locked by the deployment: Edit stays in its place, off, with the reason.
@@ -64,10 +71,11 @@ test('Studio’s own workers are added, edited and removed as one draft with Sav
     { id: 'gpu0', name: 'Image GPU', capabilities: locked.capabilities, default: true, connected: true, device: 'RTX 5090', url: locked.url },
     { id: 'video-box', name: 'Video Box', capabilities: own.capabilities, connected: true, device: 'RTX 4090', url: own.url }
   ]);
+  // Add Worker sits on the Workers heading, like New Account.
+  await expect(dialog.locator('.set-group-head').filter({ has: page.getByRole('heading', { name: 'Workers', exact: true }) }).getByRole('button', { name: 'Add Worker', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Edit Video Box' }).click();
-  const capabilityGroup = dialog.getByRole('group', { name: 'Video Box Capabilities' });
-  await capabilityGroup.getByRole('button', { name: 'Upscale', exact: true }).click();
-  await expect(capabilityGroup.getByRole('button', { name: 'Upscale', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await pickCapability(page, dialog, 'Video Box Capabilities', 'Upscale');
+  await expect(dialog.getByRole('combobox', { name: 'Video Box Capabilities', exact: true })).not.toHaveText('Video');
   const save = dialog.getByRole('group', { name: 'Unsaved Changes' });
   await expect(save).toBeVisible();
   await save.getByRole('button', { name: 'Discard' }).click();
@@ -77,9 +85,11 @@ test('Studio’s own workers are added, edited and removed as one draft with Sav
   await dialog.getByRole('button', { name: 'Add Worker', exact: true }).click();
   await dialog.getByLabel('New Worker Name').fill('Upscaler');
   await dialog.getByLabel('Upscaler Address').fill('upscaler:8188');
-  const upscaler = dialog.getByRole('group', { name: 'Upscaler Capabilities' });
-  await upscaler.getByRole('button', { name: 'Image', exact: true }).click();
-  await upscaler.getByRole('button', { name: 'Upscale', exact: true }).click();
+  // Name and Address are fields as wide as the account editor's; Capabilities is the shared multi-select.
+  const fieldWidths = await dialog.locator('.set-worker').last().locator('input.account-field').evaluateAll((fields) => fields.map((field) => Math.round(field.getBoundingClientRect().width)));
+  expect(new Set(fieldWidths).size).toBe(1);
+  await pickCapability(page, dialog, 'Upscaler Capabilities', 'Image');
+  await pickCapability(page, dialog, 'Upscaler Capabilities', 'Upscale');
   await expect(dialog.locator('.set-worker').filter({ hasText: 'Upscaler' }).locator('.set-row').filter({ hasText: 'Status' })).toContainText('Not Saved');
   await dialog.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Save' }).click();
   await expect.poll(() => saved).toEqual([{ workers: [

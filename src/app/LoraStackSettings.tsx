@@ -29,7 +29,7 @@ export function LoraStackSettings() {
   const stacks = useStacks();
   const [open, setOpen] = React.useState('');
   return (
-    <Group title="LoRA Stacks" note={stacks.length ? undefined : 'Save a stack from the Stacks menu at the top of the LoRAs picker.'}>
+    <Group title="LoRA Stacks" note={stacks.length ? undefined : 'Save a stack from the Stacks menu at the top of the LoRAs picker'}>
       {stacks.length ? stacks.map((entry) => (
         <StackRow key={`${entry.key}:${entry.stack.id}`} entry={entry} open={open === entry.stack.id} onToggle={() => setOpen((current) => current === entry.stack.id ? '' : entry.stack.id)} />
       )) : <Row label="No Saved Stacks" />}
@@ -79,8 +79,8 @@ function StackRow({ entry, open, onToggle }: { entry: Entry; open: boolean; onTo
               </Row>
             );
           })}
-          {!loras.length ? <Row label="No LoRAs" description="Saving keeps an empty stack; Delete removes it." /> : null}
-          <Row label="Delete Stack" description="Takes it out of every LoRAs picker. Undo brings it back.">
+          {!loras.length ? <Row label="No LoRAs" description="Saving keeps an empty stack; Delete removes it" /> : null}
+          <Row label="Delete Stack" description="Removes it from every LoRAs picker; you can undo">
             <button type="button" className="btn is-ghost lora-stack-delete" onClick={remove}><Trash2 size={14} /> Delete</button>
           </Row>
           <SaveRow dirty={dirty} canSave={Boolean(name.trim())} onSave={save} onDiscard={discard} />

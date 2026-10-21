@@ -20,10 +20,10 @@ test('deployment settings show sources, keep locked values read-only and save th
   await page.goto('/');
   await studioUi(page).openSettings();
   const dialog = page.locator('.settings-modal');
+  // Each worker's Capabilities shows Upscale: there is no separate Upscale Status group.
   await dialog.getByRole('button', { name: 'Workers', exact: true }).click();
-  // Upscale Status is its own group at the end of Workers, and no longer in Studio.
-  await expect(dialog.locator('#settings-panel .list-section-title').last()).toHaveText('Upscale');
-  await expect(dialog.locator('.set-row').filter({ hasText: 'Upscale Status' })).toBeVisible();
+  await expect(dialog.locator('#settings-panel .list-section-title').first()).toHaveText('Workers');
+  await expect(dialog.getByText('Upscale Status', { exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Studio', exact: true }).click();
   await expect(dialog.locator('#settings-panel .list-section-title')).toHaveText(['General', 'Features', 'Gallery', 'Generation', 'LoRA Stacks', 'Sharing']);
   await expect(dialog.getByText('Upscale Status', { exact: true })).toHaveCount(0);
