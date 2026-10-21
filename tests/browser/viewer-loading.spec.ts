@@ -26,6 +26,8 @@ test('the viewer shows each picture at its final size from the first frame, shar
     await route.fulfill({ body: (display ? displays : thumbnails)[indexOf(url)], contentType: 'image/webp' });
   });
   await page.route('**/comfy/view?*', async (route) => {
+    // Details' Size reads the file's length with a one-byte Range request; that is not loading the picture.
+    if (route.request().headers().range === 'bytes=0-0') return route.fulfill({ status: 206, headers: { 'Content-Range': `bytes 0-0/${originals[indexOf(route.request().url())].length}` }, body: Buffer.alloc(1) });
     asked.push(`original ${indexOf(route.request().url())}`);
     await later(900);
     await route.fulfill({ body: originals[indexOf(route.request().url())], contentType: 'image/png' });
