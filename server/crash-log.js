@@ -103,14 +103,12 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
     const meant = code === 0;
     recordExit({ who: "server", clean: meant, code, reason: meant ? "Stopped" : `The server stopped with exit code ${code}` });
   });
-  // Only noted: gallery-store.js owns stopping (it saves the gallery first,
-  // then raises the signal again for Node's default exit). Once, like that
-  // one: a listener left behind would catch the raised signal and the server
-  // would never stop (Ctrl+C, the launcher's stop, a test's SIGTERM).
+  // Gallery-store.js owns stopping: it saves synchronously, then exits explicitly
+  // so container PID 1 stops too. Note the requested stop before that handler runs.
   for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.once(signal, () => {
       write("info", `Stopping on ${signal}`);
-      // A stop asked for. Written here: the re-raised signal ends Node without an "exit" event.
+      // A stop asked for, recorded before the gallery handler exits.
       recordExit({ who: "server", clean: true, signal, reason: "Stopped" });
     });
   }

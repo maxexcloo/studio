@@ -714,12 +714,13 @@ function flushBeforeExit() {
 }
 
 // Ctrl+C, a stop from the launcher or process.exit() (restart, shutdown):
-// the save that was waiting still lands. A signal is then passed on as before.
+// the save that was waiting still lands. Exit explicitly: Linux PID 1 can ignore
+// a re-raised signal with its default disposition inside a container.
 process.on("exit", flushBeforeExit);
 for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.once(signal, () => {
     flushBeforeExit();
-    process.kill(process.pid, signal);
+    process.exit(0);
   });
 }
 

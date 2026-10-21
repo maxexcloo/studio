@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Fixed
+- Containers stop promptly on termination after saving pending gallery changes, including when Node runs as PID 1.
+
 ## [0.37.0] - 2026-10-21
 
 > Controlled comparisons, clearer Details actions and steadier gallery layouts
