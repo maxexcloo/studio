@@ -1,46 +1,73 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { animate, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { cn } from './format';
 
-/** Animate the actual content height, keeping the prompt, model and send mounted. */
+/**
+ * The composer keeps its natural height (typing a line resizes it in the same
+ * frame). Only opening and closing animate: from the height it had just before
+ * to the height its new content takes, measured after that content rendered,
+ * so it never shrinks to a stale size and grows back.
+ */
 export function ExpandingComposer({ children, expanded, onExpandedChange }: {
   children: React.ReactNode;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
 }) {
-  const body = React.useRef<HTMLDivElement>(null);
-  const [height, setHeight] = React.useState<number>();
-  const [animating, setAnimating] = React.useState(false);
+  const section = React.useRef<HTMLElement>(null);
+  const lastHeight = React.useRef(0);
+  const animating = React.useRef(false);
+  const first = React.useRef(true);
   const reduced = useReducedMotion();
-  // Only opening and closing spring; text growing a line resizes at once, so the bottom-anchored
-  // composer never spills downward and then slides back up while typing.
-  const toggledAt = React.useRef(-Infinity);
-  const wasExpanded = React.useRef(expanded);
-  if (wasExpanded.current !== expanded) { wasExpanded.current = expanded; toggledAt.current = performance.now(); }
-  const toggling = performance.now() - toggledAt.current < 600;
+
+  // The settled height, kept up to date while nothing animates.
   React.useLayoutEffect(() => {
-    const node = body.current;
+    const node = section.current;
     if (!node) return;
-    const measure = () => setHeight(node.offsetHeight + 2);
-    measure();
-    const observer = new ResizeObserver(measure);
+    lastHeight.current = node.offsetHeight;
+    const observer = new ResizeObserver(() => { if (!animating.current) lastHeight.current = node.offsetHeight; });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  return <motion.section
+
+  React.useLayoutEffect(() => {
+    if (first.current) { first.current = false; return; }
+    const node = section.current;
+    if (!node) return;
+    const from = lastHeight.current;
+    const to = node.offsetHeight;
+    lastHeight.current = to;
+    if (reduced || !from || Math.abs(from - to) < 1) return;
+    animating.current = true;
+    node.style.overflow = 'hidden';
+    node.style.height = `${from}px`;
+    const inner = node.firstElementChild as HTMLElement | null;
+    const edges = node.offsetHeight - (inner?.offsetHeight ?? node.offsetHeight);
+    let controls: ReturnType<typeof animate> | null = null;
+    const finish = () => { node.style.height = ''; node.style.overflow = ''; animating.current = false; lastHeight.current = node.offsetHeight; observer.disconnect(); };
+    const run = (start: number, target: number) => {
+      controls?.stop();
+      controls = animate(node, { height: [start, target] }, { ...tweens.slow, onComplete: finish });
+    };
+    // Content that settles mid-way (a row appearing) retargets the same movement instead of snapping at the end.
+    let target = to;
+    const observer = new ResizeObserver(() => {
+      const next = (inner?.offsetHeight ?? target) + Math.max(0, edges);
+      if (inner && Math.abs(next - target) >= 1) { target = next; run(node.getBoundingClientRect().height, target); }
+    });
+    if (inner) observer.observe(inner);
+    run(from, to);
+    return () => { controls?.stop(); finish(); };
+  }, [expanded, reduced]);
+
+  return <section
+    ref={section}
     className={cn('zen-prompt', expanded && 'is-expanded')}
     aria-label="Create"
-    initial={false}
-    animate={{ height: toggling && !reduced ? height ?? 'auto' : 'auto' }}
-    transition={reduced || !toggling ? { duration: 0 } : tweens.slow}
-    style={{ overflow: animating ? 'hidden' : 'visible' }}
-    onAnimationStart={() => setAnimating(true)}
-    onAnimationComplete={() => setAnimating(false)}
     onFocusCapture={(event) => { if (!(event.target instanceof Element) || !event.target.closest('.generate')) onExpandedChange(true); }}
     onBlurCapture={(event) => {
       const next = event.relatedTarget;
       if (next instanceof Element && !event.currentTarget.contains(next) && !next.closest('[role="dialog"], [role="alertdialog"], [data-status-message], .dropdown-menu')) onExpandedChange(false);
     }}
-  ><div ref={body} className="composer-inner">{children}</div></motion.section>;
+  ><div className="composer-inner">{children}</div></section>;
 }
