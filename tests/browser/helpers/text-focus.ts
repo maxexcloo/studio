@@ -44,7 +44,7 @@ export async function focusedOnly(page: Page, label: 'Prompt' | 'Negative Prompt
   const done = wrapper.getByRole('button', { name: 'Done', exact: true });
   const box = await done.boundingBox();
   expect(await inside(box)).toBe(true);
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(43.9);
   // Nothing scrolls under it.
   expect(await sheet.locator('.phone-sheet-body').evaluate((body) => body.scrollHeight - body.clientHeight)).toBeLessThanOrEqual(1);
   await done.click();

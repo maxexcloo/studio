@@ -78,6 +78,9 @@ for (const promptsOnly of [false]) {
     await ui.prompt.fill('Original draft');
     await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
     await page.getByRole('button', { name: reference.name, exact: true }).click();
+    // A pick keeps the chooser open (UI-PATTERNS › Pickers); Escape closes it.
+    if (await page.locator('.reference-popover').count()) await page.keyboard.press('Escape');
+    await expect(page.locator('.reference-popover')).toHaveCount(0);
     await ui.closeComposer();
     const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
     await (await ui.reuseButton()).click();

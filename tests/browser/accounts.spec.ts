@@ -207,8 +207,12 @@ test('ordinary accounts open their own studio without administration sections', 
   const sections = page.getByRole('navigation', { name: 'Settings Sections' });
   await expect(sections.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
   // Administration stays with administrators; everyone has Studio and Maintenance.
-  for (const name of ['Users', 'Models', 'Profiles', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
-  for (const name of ['Studio', 'Maintenance', 'About']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
+  for (const name of ['Users', 'Models', 'Profiles']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Studio', 'Maintenance', 'About', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
+  // Everyone reads Upscale's status in Workers; the worker list stays with administrators.
+  await sections.getByRole('button', { name: 'Workers', exact: true }).click();
+  await expect(page.locator('.set-row').filter({ hasText: 'Upscale Status' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Worker', exact: true })).toHaveCount(0);
   await sections.getByRole('button', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();

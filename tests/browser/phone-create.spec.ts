@@ -48,6 +48,9 @@ test('the prompt actions are one alike row at the top right, centred on the firs
   await ui.prompt.fill('A harbour at dawn');
   const field = sheet.locator('.composer-prompt-field.is-fill');
   const actions = field.locator('.composer-field-tools .prompt-action');
+  // Measured once the sheet has stopped moving: the row and the text are read in separate calls.
+  let lastY = -1;
+  await expect.poll(async () => { const y = (await field.boundingBox())!.y; const still = Math.abs(y - lastY) < 0.1; lastY = y; return still; }, { intervals: [150] }).toBe(true);
   const boxes = await actions.evaluateAll((nodes) => nodes.filter((node) => (node as HTMLElement).offsetParent).map((node) => {
     const box = node.getBoundingClientRect();
     const style = getComputedStyle(node);
