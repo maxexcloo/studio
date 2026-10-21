@@ -11,6 +11,7 @@ import { readJsonFile, writeJsonFile } from './json-store.js';
 import { libraryDownload, libraryDownloadAccess, libraryDownloads, resolveModelLink, startLibraryDownload } from './library-downloads.js';
 import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from './video-previews.js';
 import { requireAdmin, requireLocal } from './route-access.js';
+import { refreshWorkerModels } from './worker-models.js';
 
 const presetsPath = path.join(dataDir, 'presets.json');
 const previewsDir = path.join(dataDir, 'preset-previews');
@@ -148,6 +149,7 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     res.type('webp').send(buffer);
   }));
   app.get('/api/library/downloads', route(async (_req, res) => {
+    await refreshWorkerModels();
     res.json({ ok: true, downloads: libraryDownloads(), access: libraryDownloadAccess() });
   }));
   app.post('/api/library/downloads/preview', route(async (req, res) => {

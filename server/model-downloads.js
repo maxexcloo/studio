@@ -1,9 +1,10 @@
+import { remoteModelsEnabled, workerInventory, workerCopy, workerModelFile, refreshWorkerModels, uploadWorkerModel } from './worker-models.js';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { comfyModelsDir, modelFolders } from './comfy.js';
+import { comfyModelsDir, comfyUrl, modelFolders } from './comfy.js';
 import { renameWithRetry } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
@@ -39,14 +40,15 @@ export function setDownloadTransport(fn) {
 
 function snapshot(entry) {
   if (!entry) return null;
-  const { controller, alternatives, url, dir, ...rest } = entry;
+  const { controller, alternatives, url, dir, workerUrl, ...rest } = entry;
   return rest;
 }
 
 export function downloadState() {
   return {
-    // Downloads land in ComfyUI's models folder, so only a ComfyUI on this computer can take them.
-    local: Boolean(comfyModelsDir()),
+    // Retain the existing capability field for clients; backend names the selected storage.
+    local: remoteModelsEnabled() || Boolean(comfyModelsDir()),
+    backend: remoteModelsEnabled() ? 'worker' : 'local',
     active: snapshot(active),
     queued: queue.map(snapshot),
     recent: recent.map(snapshot),
@@ -57,6 +59,10 @@ export function downloadState() {
 
 /** Half-finished files on disk that nothing is fetching right now, from their .part.json notes. */
 function pausedDownloads() {
+  if (remoteModelsEnabled()) {
+    const busy = new Set([active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`));
+    return workerInventory().paused.filter((entry) => !busy.has(`${entry.folder}/${entry.file}`));
+  }
   const busy = new Set([active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`));
   const found = [];
   for (const folder of allowedFolders) {
@@ -88,13 +94,14 @@ function remember(entry) {
 }
 
 function targetFor(spec) {
-  const modelsDir = comfyModelsDir();
-  if (!modelsDir) throw new Error("ComfyUI isn't on this computer. Download the file from the link and add it there.");
+  const modelsDir = remoteModelsEnabled() ? '' : comfyModelsDir();
+  if (!modelsDir && !remoteModelsEnabled()) throw new Error("Connect a Studio worker with model management or configure a local ComfyUI model folder.");
   if (!allowedFolders.has(spec.folder)) throw new Error("That file doesn’t belong in a ComfyUI model folder.");
   const name = path.basename(String(spec.file || ""));
   if (!name || name !== spec.file || !/\.(safetensors|gguf)$/i.test(name)) throw new Error("That isn’t a downloadable model file.");
   const url = new URL(spec.url);
   if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password || (url.port && url.port !== '443')) throw new Error("Only Civitai and Hugging Face downloads are supported.");
+  if (remoteModelsEnabled()) return { dir: "" };
   // Land it where ComfyUI itself reads that kind from, so it shows up without a restart.
   const dirs = folderDirs(spec.folder);
   const dir = dirs.find((item) => path.basename(item) === spec.folder) || dirs[0] || path.join(modelsDir, spec.folder);
@@ -113,6 +120,7 @@ function folderDirs(folder) {
  * a file someone has since deleted.
  */
 export function existingCopy(spec) {
+  if (remoteModelsEnabled()) return workerCopy(spec)?.size > 0 ? `worker:${spec.folder}/${spec.file}` : "";
   for (const dir of folderDirs(spec.folder)) {
     const file = path.join(dir, spec.file);
     if (fileSize(file) > 0) return file;
@@ -181,13 +189,14 @@ export function startDownload(spec) {
   const waiting = queue.find(same);
   if (waiting) return snapshot(waiting);
   const existing = existingCopy(spec);
-  if (existing) {
-    const size = fileSize(existing);
+  if (existing && !remoteModelsEnabled()) {
+    const size = remoteModelsEnabled() ? workerCopy(spec).size : fileSize(existing);
     const done = { id: spec.id, file: spec.file, folder: spec.folder, label: spec.label || spec.file, status: "done", already: true, receivedBytes: size, totalBytes: size, finishedAt: Date.now() };
     remember(done);
     return done;
   }
   const entry = {
+    ...(remoteModelsEnabled() ? { workerUrl: spec.workerUrl || comfyUrl } : {}),
     id: spec.id,
     file: spec.file,
     folder: spec.folder,
@@ -292,6 +301,7 @@ function fallbackFor(failed) {
     try { targetFor(spec); } catch { continue; }
     if (existingCopy(spec)) return null;
     return {
+      ...(failed.workerUrl ? { workerUrl: failed.workerUrl } : {}),
       // Checked against its own published checksum, like the build it stands in for.
       id: spec.id, file: spec.file, folder: spec.folder, label: spec.label || spec.file, url: spec.url, sha256: catalogSha256(spec), dir: targetFor(spec).dir,
       status: "queued", receivedBytes: 0, totalBytes: Number(spec.bytes || 0), bytesPerSecond: 0, queuedAt: Date.now(), error: "",
@@ -303,6 +313,7 @@ function fallbackFor(failed) {
 
 /** Free space where each kind of model lands, and which disk that is, so a batch can be checked before it starts. */
 export function downloadSpace() {
+  if (remoteModelsEnabled()) return workerInventory().space;
   const space = {};
   if (!comfyModelsDir()) return space;
   for (const folder of allowedFolders) {
@@ -320,6 +331,7 @@ export function downloadSpace() {
 }
 
 async function fetchInto(entry, signal) {
+  if (entry.workerUrl) return fetchIntoWorker(entry, signal);
   const request = new URL(entry.url).hostname === 'civitai.com' ? civitaiFetch : fetch;
   const provider = new URL(entry.url).hostname === 'civitai.com' ? 'Civitai' : 'Hugging Face';
   const { dir, target, partial, note } = targetFor(entry);
@@ -473,7 +485,9 @@ function finishDownload(entry, partial, target, note) {
 
 /** Throws away a stopped download's partial file. */
 export function discardDownload(spec) {
+  const workerUrl = [active, ...queue].find(entry => entry?.id === spec.id)?.workerUrl || comfyUrl;
   cancelDownload(spec.id);
+  if (remoteModelsEnabled()) return workerModelFile({ ...spec, workerUrl }, "discard").then(() => refreshWorkerModels({ force: true, workerUrl }));
   for (const dir of folderDirs(spec.folder)) {
     fs.rmSync(path.join(dir, `${spec.file}.part`), { force: true });
     fs.rmSync(path.join(dir, `${spec.file}.part.json`), { force: true });
@@ -487,9 +501,79 @@ export function discardDownload(spec) {
  */
 export function replaceDownload(spec) {
   targetFor(spec);
+  if (remoteModelsEnabled()) {
+    spec = { ...spec, workerUrl: spec.workerUrl || comfyUrl };
+    if ([active, ...queue].some((entry) => entry?.folder === spec.folder && entry.file === spec.file)) return startDownload(spec);
+    return workerModelFile(spec, "replace").then(() => workerModelFile(spec, "discard")).then(() => refreshWorkerModels({ force: true, workerUrl: spec.workerUrl })).then(() => startDownload(spec));
+  }
   const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
   if (same(active) || queue.some(same)) return startDownload(spec);
   for (let broken = existingCopy(spec); broken; broken = existingCopy(spec)) fs.rmSync(broken, { force: true });
   discardDownload(spec);
   return startDownload(spec);
+}
+
+
+/** Studio keeps provider credentials; only streamed weights and resume metadata reach the worker. */
+async function fetchIntoWorker(entry, signal) {
+  await refreshWorkerModels({ force: true, workerUrl: entry.workerUrl });
+  if (!/^[a-f0-9]{64}$/i.test(entry.sha256 || '')) throw finalError('The worker requires a published SHA-256 checksum.');
+  const source = crypto.createHash('sha256').update(entry.url).digest('hex');
+  const saved = await workerModelFile(entry);
+  if (saved.size > 0) {
+    const existing = await workerModelFile(entry, 'hash');
+    if (existing.sha256 !== entry.sha256.toLowerCase()) throw finalError('A different model already uses this filename. Keep it or replace it explicitly.');
+    entry.receivedBytes = existing.size;
+    entry.totalBytes = existing.size;
+    entry.already = true;
+    return;
+  }
+  const bound = saved.note?.source === source && saved.note?.sha256 === entry.sha256.toLowerCase();
+  let offset = bound ? saved.partialBytes || 0 : 0;
+  const note = saved.note || {};
+  const request = new URL(entry.url).hostname === 'civitai.com' ? civitaiFetch : fetch;
+  const validator = resumeValidator(note);
+  const headers = offset ? { range: `bytes=${offset}-`, ...(validator ? { 'if-range': validator } : {}) } : {};
+  let response = await request(entry.url, { redirect: 'follow', signal, headers });
+  if (offset && (response.status === 416 || (response.status === 206 && !sameFile(note, response)))) {
+    await response.body?.cancel().catch(() => {});
+    offset = 0;
+    response = await request(entry.url, { redirect: 'follow', signal });
+  }
+  if (response.status === 200) offset = 0;
+  if (!response.ok || !response.body || (offset && response.status !== 206)) {
+    await response.body?.cancel().catch(() => {});
+    const error = new Error(`The model provider answered HTTP ${response.status}.`);
+    error.status = response.status;
+    error.final = [401, 403, 404, 410].includes(response.status);
+    throw error;
+  }
+  const length = Number(response.headers.get('content-length') || 0);
+  const total = length ? offset + length : Number(entry.totalBytes || 0);
+  if (!Number.isSafeInteger(total) || total <= 0 || total > 256 * 1024 ** 3) {
+    await response.body.cancel();
+    throw finalError('The provider did not supply a model size for the worker transfer.');
+  }
+  if (offset) {
+    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') || '');
+    if (!range || Number(range[1]) !== offset || Number(range[3]) !== total) {
+      await response.body.cancel();
+      throw finalError('The provider returned an inconsistent resume range.');
+    }
+  }
+  entry.totalBytes = total;
+  entry.receivedBytes = offset;
+  let started = Date.now();
+  let bytes = 0;
+  const result = await uploadWorkerModel(entry, response, { offset, total, signal,
+    note: { source, id: entry.id, label: entry.label, etag: response.headers.get('etag') || note.etag || '', lastModified: response.headers.get('last-modified') || note.lastModified || '' },
+    progress(size) {
+      entry.receivedBytes += size;
+      bytes += size;
+      const elapsed = Date.now() - started;
+      if (elapsed >= 1000) { entry.bytesPerSecond = bytes * 1000 / elapsed; started = Date.now(); bytes = 0; }
+    }
+  });
+  entry.receivedBytes = result.size;
+  entry.totalBytes = result.size;
 }

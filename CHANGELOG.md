@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Active worker model storage and clean container shutdown
+
+### Added
+- **Worker model storage:** `STUDIO_MODEL_STORAGE=worker` lists and downloads models in the active ComfyUI library. Studio retains provider credentials and streams weights directly to authenticated worker endpoints, with source-bound resume, published checksum verification and no destination overwrites.
+
+### Changed
+- Worker model storage respects ComfyUI folder aliases and extra roots. Saved-image checks use the active worker; manifest import, verification and restore are explicitly unavailable in this mode. Local model storage remains the default.
+
 ### Fixed
 - Containers stop promptly on termination after saving pending gallery changes, including when Node runs as PID 1.
 

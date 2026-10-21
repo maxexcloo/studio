@@ -1,3 +1,4 @@
+import { refreshWorkerModels, remoteModelsEnabled } from './worker-models.js';
 import { comfyUrl } from './comfy.js';
 import { catalogDownload } from './family-profiles.js';
 import { cancelDownload, discardDownload, downloadState, replaceDownload, startDownload } from './model-downloads.js';
@@ -9,6 +10,15 @@ import { libraryDownload } from './library-downloads.js';
 import { clearImportedManifest, importManifest, loadManifest, manifestStatus, restoreMissing, startVerify } from './model-manifest.js';
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
+  app.use('/api/models/manifest', (req, res, next) => {
+    if (!requireAdmin(req, res)) return;
+    if (remoteModelsEnabled()) return res.status(409).json({ ok: false, error: 'Manifest import, verification and restore require local model storage. Worker mode manages the active library through Downloads.' });
+    next();
+  });
+  app.use('/api/models/downloads', async (req, res, next) => {
+    try { await refreshWorkerModels(); next(); }
+    catch (error) { res.status(503).json({ ok: false, error: error.message }); }
+  });
   // The pinned model manifest (model-manifest.js): administrators only, like every model change.
   app.get("/api/models/manifest", (req, res) => {
     if (!requireAdmin(req, res)) return;
@@ -51,7 +61,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
       return;
     }
     try {
-      const download = startDownload(spec);
+      const download = await startDownload(spec);
       // Already on disk: rescan now so the model page catches up without another click.
       if (download?.already) await loadComfyContext({ force: true }).catch(() => null);
       res.json({ ok: true, download, ...downloadState() });
@@ -68,13 +78,15 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
     res.json({ ok: true, hardware, local: downloadState().local, families: starterPlan({ hardware, info: context?.info }) });
   });
 
-  app.post("/api/models/downloads/cancel", (req, res) => {
+  app.post("/api/models/downloads/cancel", async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const id = String(req.body?.id || "");
     const spec = req.body?.discard ? catalogDownload(id) || libraryDownload(id) : null;
-    if (spec) discardDownload(spec);
-    else cancelDownload(id);
-    res.json({ ok: true, ...downloadState() });
+    try {
+      if (spec) await discardDownload(spec);
+      else cancelDownload(id);
+      res.json({ ok: true, ...downloadState() });
+    } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
   });
 
   // A Hugging Face token for gated downloads: kept in .env, only ever sent to huggingface.co, never shown back.
@@ -92,7 +104,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   });
 
   // "Download again" for a catalog file a run found damaged: the broken copy goes first.
-  app.post("/api/models/downloads/replace", (req, res) => {
+  app.post("/api/models/downloads/replace", async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const spec = catalogDownload(req.body?.id);
     if (!spec) {
@@ -100,7 +112,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
       return;
     }
     try {
-      res.json({ ok: true, download: replaceDownload(spec), ...downloadState() });
+      res.json({ ok: true, download: await replaceDownload(spec), ...downloadState() });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }
