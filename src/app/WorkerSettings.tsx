@@ -26,7 +26,8 @@ type WorkerList = { workers: Worker[]; capabilities: CapabilityInfo[]; deploymen
 /** A worker being edited; `key` stays put while a new worker has no id yet. */
 type Draft = { key: string; id: string; name: string; url: string; capabilities: WorkerCapability[] };
 
-const capabilityOrder: WorkerCapability[] = ['image', 'video', 'upscale', 'models'];
+// Alphabetical by label: Image · Model Library · Upscale · Video.
+const capabilityOrder: WorkerCapability[] = ['image', 'models', 'upscale', 'video'];
 const fallbackCapabilities: CapabilityInfo[] = [
   { id: 'image', label: 'Image', description: '' },
   { id: 'video', label: 'Video', description: '' },
