@@ -460,7 +460,7 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
   return (
     <>
       <div className="phone-model-tools">
-        {recipes.length ? <ListItem label="Recipe"><ListSelect native label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
+        {recipes.length ? <ListItem label="Recipe"><ListSelect label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
         {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={<label className="picker-search">
             <Search size={16} aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />

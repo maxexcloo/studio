@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tip } from './components';
 import { AnimatePresence, motion } from 'framer-motion';
 import { popoverMotion, useSettling } from './composerSurface';
 import { Search, Star, X } from 'lucide-react';
@@ -185,12 +186,12 @@ function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'e
                     <span className="prompt-history-text"><Highlighted text={row.entry.text} ranges={row.ranges} /></span>
                     <span className="prompt-history-meta">{meta(row.entry)}</span>
                   </button>
-                  <button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar This Prompt' : 'Star This Prompt to Keep It'} title={row.entry.pinned ? 'Unstar' : 'Star to Keep'} onClick={() => pin(row.entry)}>
+                  <Tip content={row.entry.pinned ? 'Unstar' : 'Star to Keep'}><button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar This Prompt' : 'Star This Prompt to Keep It'} onClick={() => pin(row.entry)}>
                     <Star size={14} fill={row.entry.pinned ? 'currentColor' : 'none'} />
-                  </button>
-                  <button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove This Prompt" title="Remove" onClick={() => forget(row.entry)}>
+                  </button></Tip>
+                  <Tip content="Remove"><button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove This Prompt" onClick={() => forget(row.entry)}>
                     <X size={14} />
-                  </button>
+                  </button></Tip>
                 </div>
               );
             })}

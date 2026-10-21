@@ -3,7 +3,7 @@ import { Pencil } from 'lucide-react';
 import { Modal } from './Modal';
 import { dismissToast, toast } from './toast';
 
-/** `irreversible` confirms even when the "Confirm before removing things" setting is off. `items` lists what it acts on (thumbnails and names). */
+/** Only `irreversible` actions ask (Reset All Settings); the rest act at once, with Undo where they can. `items` lists what it acts on (thumbnails and names). */
 export type ConfirmationItem = { id: string; name: string; thumb?: string };
 export type ConfirmationOptions = { title: string; description: string; action: string; destructive?: boolean; irreversible?: boolean; items?: ConfirmationItem[] };
 export type ConfirmAction = (options: ConfirmationOptions) => Promise<boolean>;

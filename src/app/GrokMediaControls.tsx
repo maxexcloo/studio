@@ -14,7 +14,7 @@ export function GrokMediaControls({ view }: { view: any; phone?: boolean }) {
     {profile.capabilities.resolution && resolutions.length > 1 ? (
       <ListItem label="Resolution">
         {resolutions.length > 2
-          ? <ListSelect native={native} label="Resolution" value={resolution} options={resolutions.map((value) => ({ value, label: value }))} onChange={setResolution} />
+          ? <ListSelect label="Resolution" value={resolution} options={resolutions.map((value) => ({ value, label: value }))} onChange={setResolution} />
           : <div className="list-segments" role="group" aria-label="Resolution">{resolutions.map((value) => <button key={value} type="button" aria-pressed={resolution === value} onClick={() => setResolution(value)}>{value}</button>)}</div>}
       </ListItem>
     ) : null}

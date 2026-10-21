@@ -235,7 +235,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
             <div className="set-row">
               <div className="set-row-text"><strong>Model</strong><span>The source model is picked when it is installed. Another model may change the result.</span></div>
               <div className="set-row-control library-model-choice">
-                <ListSelect native={phone} label="Use With Model" value={profileId || NO_MODEL} onChange={(value) => setProfileId(value === NO_MODEL ? '' : value)}
+                <ListSelect label="Use With Model" value={profileId || NO_MODEL} onChange={(value) => setProfileId(value === NO_MODEL ? '' : value)}
                   options={[{ value: NO_MODEL, label: 'Choose a Model' }, ...profiles.map((candidate) => ({ value: candidate.id, label: `${candidate.displayName || candidate.label}${candidate.ready === false ? ' · Setup Required' : ''}` }))]} />
               </div>
             </div>
@@ -311,7 +311,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         </form>
         {huggingFace ? <section className="set-group"><div className="set-card"><div className="set-row">
           <div className="set-row-text"><strong>Destination</strong><span>Hugging Face links name a SafeTensors or GGUF file; choose its folder.</span></div>
-          <div className="set-row-control library-model-choice"><ListSelect native={phone} label="Hugging Face Destination" value={folder} onChange={(value) => { setFolder(value); setFile(null); }}
+          <div className="set-row-control library-model-choice"><ListSelect label="Hugging Face Destination" value={folder} onChange={(value) => { setFolder(value); setFile(null); }}
             options={['checkpoints', 'clip_vision', 'diffusion_models', 'loras', 'text_encoders', 'vae'].map((value) => ({ value, label: FOLDERS[value] }))} /></div>
         </div></div></section> : <p className="set-note">Civitai models choose their folder on their own.</p>}
         {file ? <section className="set-group"><h4 className="set-group-title">Ready to Download</h4><div className="set-card"><div className="set-row">

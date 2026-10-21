@@ -284,7 +284,8 @@ function AccessProfileEditor({ admin, profiles, showToast, onSaved }: { admin: A
   // All Models shows every model it currently opens as picked.
   const modelValues = draft.allModels ? grantable.filter((id) => admin.availableProfiles.includes(id) && usable(id)) : draft.models;
 
-  const featureOptions: MultiSelectOption[] = featureLabels.map(([key, label]) => {
+  // Presets & Civitai Imports stays with administrators, so it isn't offered here (the saved value is kept).
+  const featureOptions: MultiSelectOption[] = featureLabels.filter(([key]) => key !== 'presets').map(([key, label]) => {
     const lock = lockOf(key);
     return { value: key, label, disabled: Boolean(lock) || (!featureApplies(key, on) && !on.has(key)), reason: lock || featureNeeds[key]?.reason };
   });

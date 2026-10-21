@@ -277,7 +277,7 @@ test('LoRA stacks apply, update, rename and delete from the Stacks menu with Und
   const ink = picker.getByRole('checkbox', { name: 'Select Ink', exact: true });
   const grain = picker.getByRole('checkbox', { name: 'Select Grain', exact: true });
   // The Stacks dropdown's menu floats on the page (Dropdown.tsx); its choices are options, its commands buttons.
-  const menu = page.locator('.dropdown-menu').filter({ has: page.getByRole('listbox', { name: /^Saved Stacks for/ }) });
+  const menu = page.locator('.dropdown-menu');
   const openStacks = async () => { await picker.getByRole('combobox', { name: /^Stacks/ }).click(); await expect(menu).toBeVisible(); };
   await ink.click();
   await openStacks();

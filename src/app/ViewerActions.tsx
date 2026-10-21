@@ -31,9 +31,23 @@ export function PromptReadout({ label, text, onCopy, onUse }: {
   );
 }
 
-/** Only what was set: no empty text, lists, objects or switched-off flags; numbers (seed 0 too) stay. */
-const isSet = (value: unknown): boolean => value !== undefined && value !== null && value !== false && value !== ''
-  && !(Array.isArray(value) && !value.length) && !(typeof value === 'object' && !Array.isArray(value) && !Object.keys(value as object).length);
+/**
+ * Only what was set, at every depth: no blank text, empty lists or objects,
+ * switched-off flags or switched-off LoRAs (`enabled: false`); numbers (seed 0 too) stay.
+ */
+const prune = (value: unknown): unknown => {
+  if (value === undefined || value === null || value === false) return undefined;
+  if (typeof value === 'string') return value.trim() ? value : undefined;
+  if (Array.isArray(value)) {
+    const items = value.filter((item) => !(item && typeof item === 'object' && (item as { enabled?: unknown }).enabled === false)).map(prune).filter((item) => item !== undefined);
+    return items.length ? items : undefined;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as object).map(([key, item]) => [key, prune(item)] as const).filter(([, item]) => item !== undefined);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+  return value;
+};
 
 /** Copies the saved generation inputs that were set, with IDs, numbers and nested reference settings. */
 export function generationInputsText(item: GalleryItem) {
@@ -48,7 +62,7 @@ export function generationInputsText(item: GalleryItem) {
     ...(item.referenceImageName ? { startImageName: item.referenceImageName } : {}),
   };
   const labels: Record<string, string> = { seed: 'Seed', model: 'Model', kind: 'Kind', width: 'Width', height: 'Height', profileId: 'Profile ID', steps: 'Steps', cfg: 'CFG' };
-  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', ...Object.entries(inputs).filter(([, value]) => isSet(value)).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
+  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
 }
 
 export function DetailsFooter({ onCopy, onRecreate }: { onCopy: () => Promise<boolean>; onRecreate?: () => void }) {

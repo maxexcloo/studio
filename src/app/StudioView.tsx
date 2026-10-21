@@ -136,8 +136,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     if (!composerExpanded || phone) return;
     const outside = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      // The status pill (an Undo) is never a press outside: the composer stays as it was.
-      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"], [data-status-message]')) return;
+      // The status pill (an Undo) and a dropdown's floating menu (Dropdown.tsx) are never a press outside.
+      if (target?.closest('.zen-prompt, [role="dialog"], [role="alertdialog"], [data-status-message], .dropdown-menu')) return;
       setComposerExpanded(false);
     };
     document.addEventListener('pointerdown', outside, true);
@@ -412,7 +412,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         <AnimatePresence initial={false}>
           {runningCount ? (
             <motion.div key="cancel" {...dockChip}>
-              <Tip content="Stop Everything Running & Queued" side="left">
+              <Tip content="Stop Everything Running & Queued">
                 <button type="button" className="dock-chip is-cancel" onClick={cancelQueue}>
                   <CircleStop size={14} />
                   <span>Stop All</span>

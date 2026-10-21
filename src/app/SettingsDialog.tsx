@@ -33,8 +33,9 @@ export const SETTINGS_SECTIONS = [
   { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker: its address, what it runs, its status and whether Upscale is ready.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
-/** Studio administration that ordinary accounts never see; the server refuses it too. */
-const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'profiles', 'workers', 'users']);
+/** Studio administration that ordinary accounts never see; the server refuses it too. Workers is
+ *  shown to everyone, but only administrators get its worker list; everyone reads Upscale's status. */
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'profiles', 'users']);
 /** Sections only an account deployment has. */
 const ACCOUNT_SECTIONS: ReadonlySet<SettingsSection> = new Set(['account', 'users']);
 
@@ -305,12 +306,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
 
         {/* Workers: the worker list (WorkerSettings.tsx); further Workers groups follow it here. */}
         {section === 'workers' && sectionShown('workers') ? <>
-          <WorkerSettings
+          {administrator ? <WorkerSettings
             status={view.comfyStatus || null}
             showToast={showToast}
             onCheck={() => { view.refreshComfyStatus?.(); refreshHealth(); }}
             onChanged={() => { void deployment.refresh(); refreshHealth(); view.refreshComfyStatus?.(); refreshModels(false); refreshWorkflows(); }}
-          />
+          /> : null}
           <UpscaleStatusGroup status={upscaleStatus} reason={upscaleUnavailableReason} install={upscaleInstall} />
         </> : null}
 

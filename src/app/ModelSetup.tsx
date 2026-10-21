@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tip } from './components';
 import { Check, ChevronDown, Download, ExternalLink, Pause, Play, RefreshCw, RotateCw, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
@@ -426,7 +427,7 @@ function DiscardButton({ file, receivedBytes, onDiscard }: { file: string; recei
   if (asking) {
     return <button type="button" className="btn is-danger-soft" onClick={() => { setAsking(false); onDiscard(); }}>Discard {formatBytes(receivedBytes) || 'it'}?</button>;
   }
-  return <button type="button" className="btn is-ghost is-icon" aria-label={`Discard Partial Download of ${file}`} title="Discard" onClick={() => setAsking(true)}><X size={14} /></button>;
+  return <Tip content="Discard"><button type="button" className="btn is-ghost is-icon" aria-label={`Discard Partial Download of ${file}`} onClick={() => setAsking(true)}><X size={14} /></button></Tip>;
 }
 
 function RowActions({ rowState, download, current, remote, run, start, pause, discard }: {
@@ -446,7 +447,7 @@ function RowActions({ rowState, download, current, remote, run, start, pause, di
     </a>
   );
   if (rowState === 'downloading' || rowState === 'queued') {
-    return <button type="button" className="btn is-ghost is-icon" aria-label={`Pause ${download.file}`} title="Pause" onClick={() => run(() => pause(current?.id || download.id))}><Pause size={14} /></button>;
+    return <Tip content="Pause"><button type="button" className="btn is-ghost is-icon" aria-label={`Pause ${download.file}`} onClick={() => run(() => pause(current?.id || download.id))}><Pause size={14} /></button></Tip>;
   }
   if (rowState === 'paused') {
     return (

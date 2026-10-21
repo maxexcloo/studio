@@ -440,7 +440,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-generate.is-restarting { background: rgb(255 190 110 / .12); color: rgb(255 214 160); opacity: 1; }
 .phone-generate.is-offline { background: rgb(255 120 100 / .14); color: #ffc4b9; }
 
-/* The reference picker (and LoRAs, Reference With), as a sheet from the bottom edge.
+/* The reference picker (and LoRAs), as a sheet from the bottom edge.
    With the keyboard up for its search, it sits on the keyboard inside the visible viewport. */
 .reference-popover.is-sheet {
   left: 0;

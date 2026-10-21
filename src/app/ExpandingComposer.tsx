@@ -40,7 +40,7 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
     onFocusCapture={(event) => { if (!(event.target instanceof Element) || !event.target.closest('.generate')) onExpandedChange(true); }}
     onBlurCapture={(event) => {
       const next = event.relatedTarget;
-      if (next instanceof Element && !event.currentTarget.contains(next) && !next.closest('[role="dialog"], [role="alertdialog"], [data-status-message]')) onExpandedChange(false);
+      if (next instanceof Element && !event.currentTarget.contains(next) && !next.closest('[role="dialog"], [role="alertdialog"], [data-status-message], .dropdown-menu')) onExpandedChange(false);
     }}
   ><div ref={body} className="composer-inner">{children}</div></motion.section>;
 }

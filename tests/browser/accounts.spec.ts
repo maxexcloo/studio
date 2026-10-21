@@ -95,11 +95,11 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByLabel('Profile ID')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Features', exact: true }).click();
   const features = page.getByRole('listbox', { name: 'Features', exact: true });
-  await expect(features.getByRole('option')).toHaveText([/^Cloud Models/, /^Gallery/, /^Image Generation/, /^Image References/, /^LoRAs/, /^NSFW Models/, /^Presets & Civitai Imports/, /^Prompt History/, /^Video Generation/, /^Video References/]);
+  await expect(features.getByRole('option')).toHaveText([/^Cloud Models/, /^Gallery/, /^Image Generation/, /^Image References/, /^LoRAs/, /^NSFW Models/, /^Prompt History/, /^Video Generation/, /^Video References/]);
   // All picks everything at once, dependants included; presets stay with administrators.
   await page.locator('.dropdown-menu').getByRole('button', { name: 'All', exact: true }).click();
   for (const name of ['Cloud Models', 'Image References', 'LoRAs', 'NSFW Models', 'Video References']) await expect(features.getByRole('option', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-selected', 'true');
-  await expect(features.getByRole('option', { name: /^Presets & Civitai Imports/ })).toBeDisabled();
+  await expect(features.getByRole('option', { name: /^Presets & Civitai Imports/ })).toHaveCount(0);
   await page.locator('.dropdown-menu').getByRole('button', { name: 'Clear', exact: true }).click();
   await features.getByRole('option', { name: /^Image Generation/ }).click();
   await features.getByRole('option', { name: /^Video Generation/ }).click();

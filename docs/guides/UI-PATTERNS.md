@@ -434,8 +434,9 @@ lists its workers before Upscale.
 **Access profiles** grant features and local models. Cloud models are never
 listed: the Cloud Models feature grants them. NSFW Models gates any model
 profile marked `nsfw`. A feature the deployment switched off (LoRAs, Cloud
-Models, Presets & Civitai Imports) shows disabled with "Off for This
-Deployment"; there are no global switches for them in Settings.
+Models) shows disabled with "Off for This Deployment"; there are no global
+switches for them in Settings. Presets & Civitai Imports is not offered: it
+stays with administrators.
 
 A new setting goes in the section that matches who changes it and why;
 destructive actions live in Maintenance, never beside everyday switches.

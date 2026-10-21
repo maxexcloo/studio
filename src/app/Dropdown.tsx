@@ -48,7 +48,7 @@ type Common = {
   searchFrom?: number;
 };
 
-type Single = Common & { value: string; onChange: (value: string) => void; multiple?: false };
+type Single = Common & { value: string; onChange: (value: string) => void; multiple?: false; /** Choosing the current value runs onChange again (applying a stack anew). */ reselect?: boolean };
 type Multiple = Common & { value: string[]; onChange: (values: string[]) => void; multiple: true; allLabel?: string; noneLabel?: string; onAll?: () => void; allPicked?: boolean; /** All and Clear in the menu's head (off for filters that have their own All). */ head?: boolean };
 
 export type DropdownProps = Single | Multiple;
@@ -92,7 +92,7 @@ export function Dropdown(props: DropdownProps) {
 
   const choose = (value: string) => {
     if (props.multiple) props.onChange(props.value.includes(value) ? props.value.filter((item) => item !== value) : [...props.value, value]);
-    else { if (value !== props.value) props.onChange(value); close(); }
+    else { if (value !== props.value || props.reselect) props.onChange(value); close(); }
   };
 
   // Type-ahead: letters typed in quick succession jump to the first name that starts with them.
@@ -131,8 +131,13 @@ export function Dropdown(props: DropdownProps) {
       aria-expanded={open}
       aria-controls={open ? id : undefined}
       data-open-trigger
+      // While open, Escape on the trigger closes the menu only, not the surface around it.
+      data-own-escape={open ? '' : undefined}
       onClick={() => { if (!open) setQuery(''); setOpen((value) => !value); }}
-      onKeyDown={(event) => { if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setQuery(''); setOpen(true); } }}
+      onKeyDown={(event) => {
+        if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+        if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); setQuery(''); setOpen(true); }
+      }}
     >
       <span className="dropdown-value">{shown}</span>
       <ChevronDown size={14} aria-hidden="true" />

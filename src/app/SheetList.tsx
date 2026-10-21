@@ -65,7 +65,7 @@ type SelectOption = { value: string; label: string; detail?: string };
  * phone's own picker). The row shows the friendly name and the menu adds each
  * option's detail (a file name); a value no longer offered still shows as itself.
  */
-export function ListSelect({ label, value, options, onChange }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void; /** Unused: both devices use the same dropdown. */ native?: boolean }) {
+export function ListSelect({ label, value, options, onChange }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void }) {
   const known = options.some((option) => option.value === value);
   const all = known || !value ? options : [{ value, label: value }, ...options];
   return <Dropdown label={label} value={value} options={all} onChange={onChange} variant="row" />;

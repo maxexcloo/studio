@@ -540,6 +540,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
       summary={<><Bookmark size={14} className="lora-stacks-icon" aria-hidden="true" /><span className="picker-dropdown-text">{active ? active.name : 'Stacks'}</span>{modified ? <i className="lora-stack-modified" aria-hidden="true" /> : null}</>}
       options={sorted.map((stack) => ({ value: stack.id, label: stack.name, ariaLabel: `${stack.name}, ${stack.loras.length} LoRA${stack.loras.length === 1 ? '' : 's'}`, meta: stack.loras.length }))}
       value={active?.id || ''}
+      reselect
       searchFrom={Infinity}
       empty="No saved stacks yet."
       onChange={(id) => { const stack = sorted.find((item) => item.id === id); if (stack) { onLoad(stack); setActiveId(stack.id); } }}

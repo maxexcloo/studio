@@ -45,8 +45,8 @@ export function practicalStepRange(profile: any, meta: { min?: number; max?: num
 /**
  * Advanced Settings, one flat list (UI-PATTERNS › Lists) for the desktop
  * popover and the phone sheet: one line per setting, the label on the left
- * and its control on the right. Steppers for numbers, the studio's select on
- * the desktop and the phone's own picker on a phone, friendly names for the
+ * and its control on the right. Steppers for numbers, the shared dropdown on
+ * both devices, friendly names for the
  * model parts, Upscale for the run, and Back to Recommended. Steps sit
  * in the composer (the phone's Create footer); width and height belong to Size.
  */
@@ -74,7 +74,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   const sampling = currentProfile?.capabilities.sampler !== false;
   const fixedSeed = String(seed || "").trim();
   const select = (label: string, value: string, options: Array<string | { label: string; value: string }>, onChange: (value: string) => void, friendly = false) => (
-    <ListItem label={label}><ListSelect native={phone} label={label} value={value} options={friendly ? partOptions(options) : options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} onChange={onChange} /></ListItem>
+    <ListItem label={label}><ListSelect label={label} value={value} options={friendly ? partOptions(options) : options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} onChange={onChange} /></ListItem>
   );
   const stepper = (label: string, value: number, onChange: (value: number) => void, min: number, max: number, step: number, precision?: number) => (
     <ListItem label={label}><NumberPicker label={label} value={value} onChange={onChange} min={min} max={max} step={step} precision={precision} size="sm" density="compact" /></ListItem>

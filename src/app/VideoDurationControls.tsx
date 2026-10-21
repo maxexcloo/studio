@@ -13,7 +13,7 @@ export function VideoDurationControls({ view }: { view: any; phone?: boolean }) 
   const editableFps = profile.capabilities.fps && !(Number.isFinite(fpsMeta.min) && fpsMeta.min === fpsMeta.max);
   if (!options.length && !editableFps) return null;
   return <ListSection title="Video">
-    {options.length ? <ListItem label="Duration"><ListSelect native={native} label="Duration" value={String(frames)} options={options} onChange={(value) => setFrames(Number(value))} /></ListItem> : null}
+    {options.length ? <ListItem label="Duration"><ListSelect label="Duration" value={String(frames)} options={options} onChange={(value) => setFrames(Number(value))} /></ListItem> : null}
     {editableFps ? <ListItem label="Frames Per Second"><NumberPicker label="Frames Per Second" value={fps} onChange={setFps} min={fpsMeta.min ?? 1} max={fpsMeta.max ?? 60} step={fpsMeta.step || 1} size="sm" density="compact" /></ListItem> : null}
     {options.length ? <ListItem label="Frames"><span className="list-row-value">{frames} Frames · {effectiveFps} FPS</span></ListItem> : null}
   </ListSection>;
