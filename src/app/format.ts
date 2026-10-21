@@ -228,18 +228,19 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     add("File", item.outputName || item.filename);
     add("Generated", formatGeneratedAt(item.createdAt));
   });
-  // Rows read alphabetically; Timing keeps measured times before the estimates that split them.
+  // Rows read alphabetically; Timing reads in its own order.
   for (const entry of sections) sortDetailRows(entry);
   section("Timing", (add) => {
     const timing = item.timing;
     const elapsed = (value?: number) => value !== undefined && Number.isFinite(value) && value >= 0 ? formatElapsed(value) : "";
+    // Active leads (the time shown everywhere else), then Total and Queue, then the run's phases in order.
     add("Active", elapsed(timing?.runMs));
-    add("Upscale", elapsed(timing?.upscaleMs));
-    add("Queue", elapsed(timing?.queueMs));
     add("Total", item.durationMs ? formatElapsed(item.durationMs) : "");
-    add("Setup (Est.)", elapsed(timing?.setupMs));
-    add("Sampling (Est.)", elapsed(timing?.samplingMs));
-    add("Finishing (Est.)", elapsed(timing?.finishMs));
+    add("Queue", elapsed(timing?.queueMs));
+    add("Setup", elapsed(timing?.setupMs));
+    add("Sampling", elapsed(timing?.samplingMs));
+    add("Finishing", elapsed(timing?.finishMs));
+    add("Upscale", elapsed(timing?.upscaleMs));
   });
   return sections;
 }
