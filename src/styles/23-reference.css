@@ -87,12 +87,13 @@
    menu neither flickers on a pass nor snaps shut on a wobble off its edge. */
 .ref-selected.is-hover .ref-menu,
 .ref-selected.is-intro .ref-menu,
-.ref-selected:has(:focus-visible) .ref-menu,
+.ref-selected:focus-within .ref-menu,
+/* Revealing controls follow any focus inside (a click on Paint keeps its menu); rings stay keyboard-only. */
 .ref-selected.is-open .ref-menu { opacity: 1; pointer-events: auto; clip-path: inset(0 0 0 0 round var(--r-menu)); }
 .ref-menu > * { opacity: 0; transition: opacity var(--motion-base) var(--motion-ease); }
 .ref-selected.is-hover .ref-menu > *,
 .ref-selected.is-intro .ref-menu > *,
-.ref-selected:has(:focus-visible) .ref-menu > *,
+.ref-selected:focus-within .ref-menu > *,
 .ref-selected.is-open .ref-menu > * { opacity: 1; transition-delay: 70ms; }
 /* Remove sits on the thumbnail's corner: shown on hover or focus (always on
    touch), away from Edit | Ref, and red only under the pointer. */
@@ -117,7 +118,7 @@
   transition: opacity var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .ref-selected.is-hover .ref-thumb-remove,
-.ref-selected:has(:focus-visible) .ref-thumb-remove { opacity: 1; pointer-events: auto; }
+.ref-selected:focus-within .ref-thumb-remove { opacity: 1; pointer-events: auto; }
 /* Solid red under the pointer: the tint alone let the thumbnail show through the ×. */
 .ref-thumb-remove:hover { background: rgb(150 58 44); color: #fff; }
 .ref-thumb-remove:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(24 24 24), var(--focus-ring); }
@@ -557,7 +558,7 @@
 /* Fanned out: the strip shows them, so the deck tucks in behind the thumbnail. */
 .ref-selected.is-hover .ref-deck-card,
 .ref-selected.is-intro .ref-deck-card,
-.ref-selected:has(:focus-visible) .ref-deck-card,
+.ref-selected:focus-within .ref-deck-card,
 .ref-selected.is-open .ref-deck-card { transform: none; opacity: 0; }
 
 .ref-stack { display: inline-flex; align-items: center; gap: var(--space-3); padding-right: 2px; }
@@ -607,7 +608,7 @@
   transition: opacity var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
 .ref-stack-item:hover .ref-stack-remove,
-.ref-stack-item:has(:focus-visible) .ref-stack-remove { opacity: 1; }
+.ref-stack-item:focus-within .ref-stack-remove { opacity: 1; }
 .ref-stack-remove:hover { background: rgb(150 58 44); color: #fff; }
 .ref-stack-remove:focus-visible { outline: none; box-shadow: 0 0 0 1.5px rgb(24 24 24), var(--focus-ring); }
 .ref-stack-add {

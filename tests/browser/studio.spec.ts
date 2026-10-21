@@ -588,9 +588,10 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   } else {
     const bounds = await menu.boundingBox();
     const viewport = page.viewportSize()!;
-    expect(bounds!.x).toBeGreaterThanOrEqual(15);
+    // Anchored at its button and kept 8px inside the window (UI-PATTERNS › Surfaces).
+    expect(bounds!.x).toBeGreaterThanOrEqual(8);
     expect(bounds!.y).toBeGreaterThanOrEqual(7);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width - 8);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height - 7);
   }
   await search.fill('Model 28');
