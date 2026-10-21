@@ -290,7 +290,9 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
   of its row in a list (`row`), a compact bordered pill in a toolbar (`pill`),
   a filled well in a form (`field`), or a picker heading's menu (`heading`,
   the phone views and Stacks, in the foreground and the selected tint while
-  open). It is a combobox named by its label.
+  open), or only an icon in an icon row (`icon`: the prompt assistant's caret
+  on the desktop and its magic button on the phone). It is a combobox named by
+  its label.
 - **Menu:** the shared popover placement and motion (see
   [Surfaces](#surfaces)), on the panel glass with `--r-menu`; on a phone the
   pop-up list's width, still anchored to its trigger and one layer only. Rows
@@ -388,6 +390,11 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   Profile names show as they are, on two lines at most.
 - A model's own LoRA limit shows as one quiet line under the heading
   (Radiance video: "Up to rank 64 in total").
+- **Suggested:** with the prompt assistant, This Model opens with a Suggested
+  section for the current prompt (cached per prompt and kept while the picker
+  is open, so rows never move), each row's line giving the reason, strength
+  and the trigger words it adds; the rest follow under More LoRAs. Picking a
+  suggested row adds it like a chip: its strength, its triggers, Undo.
 
 ## Empty States
 
@@ -416,16 +423,55 @@ A picker, tab or list with nothing to show uses `EmptyState`
   inpaint brush sit beside the button.
 - **LoRAs** use the same pattern: This Model | All | Selected n/max in
   the library, one tap to add or remove, no row animations.
+- **Prompt assistant** (`PromptAssistant.tsx`, `usePromptAssistant.ts`; only
+  for accounts with Prompt Assistant and a configured model, otherwise absent):
+  - **Magic button:** a Sparkles icon first in the prompt's action row, the
+    same quiet icon button as History and Clear. On the desktop a tap rewrites
+    with the last preset (Enhance at first) and a caret beside it opens the
+    shared Dropdown of presets (Enhance, Spicy only with NSFW Models,
+    Photographic, Cinematic, Concise, Candid), each with a one-line
+    description, then Suggest LoRAs as a command. On the phone the button
+    opens that list as the pop-up list, with the last preset ticked; it sits
+    in the row's one free place. In the focused-text row it rewrites with the
+    last preset in one tap and keeps the keyboard up, so the text streams in
+    where it is being edited.
+  - **While it writes:** the text streams into the field in place, the field
+    is read-only (no caret), History and Clear wait, and the button becomes
+    Stop. Stopping or a failure puts the original text back.
+  - **When it ends:** the pill says "Prompt rewritten · Enhance" ("Prompt and
+    negative rewritten" when the negative followed) with one Undo for both,
+    and the replaced text goes to History. Failures say why in the pill
+    ("Couldn’t rewrite the prompt. The prompt assistant took too long") with
+    Try Again; offline and not-set-up say so too. Nothing asks first.
+  - **References:** a vision model reads the attached references (downscaled
+    to 1024 px); otherwise the rewrite is text only and the button's tooltip
+    adds "References not read by this model."
+  - **Negative:** a Sparkles button beside Negative's History writes one, with
+    Undo. It is absent where the profile takes no negative (its capability, or
+    a guide whose negative does nothing), and a rewrite refreshes the
+    negative only there.
+  - **Suggested LoRAs:** after a rewrite or Suggest LoRAs, one row of chips
+    under the prompt (title, strength, the first triggers), ending in Add All
+    and a Dismiss; it scrolls sideways when full. A tap adds the LoRA at its
+    suggested strength, an added chip takes the amber tint and a second tap
+    takes it off. Adding puts its missing trigger words at the start of the
+    prompt (`assistantText.js`); Undo takes the LoRA and the words back. Taking
+    a suggested LoRA off the stack anywhere offers **Remove Trigger Words** in
+    the pill. Nothing is added without a tap.
+  - **Results** record the preset, model and chosen suggestions; Details shows
+    "Written By: Assistant · Enhance" ("Assistant in Chat" for MCP) and
+    the inputs Copy includes it.
 - **Number steppers:** one `NumberPicker` (minus, value, plus) everywhere; on
   touch screens each part is a 44 px target. Names read "Decrease Images",
   "Increase Steps".
 - **Phone Create sheet:** one flat column. The prompt takes the height the
-  rest leaves (it scrolls rather than grows), with Select All, History and
-  Clear in one row at its top right, centred on the first line of text (the
-  text runs beside it; the row has room for one more action). Every icon there
+  rest leaves (it scrolls rather than grows), with the prompt assistant's magic
+  button (when the account has it), Select All, History and Clear in one row at
+  its top right, centred on the first line of text (the text runs beside it).
+  Suggested LoRA chips follow the prompt as one sideways-scrolling row. Every icon there
   is the same quiet button: muted, `--control-hover`, the global press, amber
-  only while its surface (History) is open. Negative is two lines with History
-  and Clear.
+  only while its surface (History, the assistant's list) is open. Negative is
+  two lines with its assistant button, History and Clear.
   Then one row each for Model, References, LoRAs (their Clear on the right),
   Size and Advanced; each opens its pop-up list over Create. The sticky footer
   has two lines, always in view: Steps then the image count, labelled (the
@@ -473,10 +519,10 @@ holds:
 | About | The banner, Version, Changelog, Licence, Source, credits (HEISS UI, J-AI Studio, ComfyUI, Radiance) and stats | Everyone |
 | Groups | Groups (a picker with New, multi-selects, Save & Discard) and New Accounts (Default Group, with Require Approval beside it) | Administrators |
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
-| Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
-| Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
+| Models | Defaults and Integrations (the assistant models, Civitai and output storage). LoRAs, the catalogue and downloads are in the [Library](#library) | Administrators |
+| Profiles | One model profile at a time: Profile and Source (AI-Drafted with Approve, From the Seed, Edited in Studio), then JSON, Guide or Versions (a segmented Show row). JSON and Guide edit with Review Changes and Save & Discard; Versions is a flat list whose rows open in place to their diff and Revert. Export on the heading downloads the bundle for the profiles repository | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
-| Users | Accounts (each account with its group, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
+| Users | Accounts (each account with its group, with Approve on a waiting one; New Account on the heading) and Chat Gateway (Chat Gateway Admin Tools, off by default, then each linked and waiting chat user) | Administrators |
 | Workers | Add Worker on the Workers heading, then every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; Name and Remove for Studio's own) | Administrators |
 
 **Order:** the rail reads Account, Groups, Models, Profiles, Studio, Users, Workers, Maintenance, About; a General group always leads its page; groups, rows,
@@ -526,27 +572,59 @@ GPU allocation is not in Studio: it stays in AI Control's own UI and Mise.
 
 ## Library
 
-The Image & Model Library (administrators, where presets are on) uses the
-Settings panel's anatomy: the same sheet, a section rail (a sideways row on the
-phone) and one page at a time with its title and one line.
+The Library (`Library.tsx`, administrators only) opens from the desktop dock
+and the phone Menu and uses the Settings panel's anatomy: the same sheet, a
+section rail (a sideways row on the phone) and one page at a time with its
+title and one line. Choosing the page you are on starts it over (a review
+returns to its list). Its five pages, in this order:
 
-- **Saved Images:** a link field with Save Image on one line (the button turns
-  primary once there is a link), search once there are two or more, then a grid
-  of even 4:5 cards: the picture, the name, then the base model and creator. A
-  card with files to fetch carries an amber "n Missing" badge.
-- A card opens its **review in place** (Back reads "Saved Images"), with View on
-  Civitai and Delete as icons on the right of that bar: the picture beside the
-  name, where it stands in one line (Ready To Use, Needs Review, Downloading
-  Models), the prompts and settings, then the Use With and Models & LoRAs
-  groups. Use Prompt and Use Settings sit in the footer.
-- **Models:** a link field with Preview Download, the previewed file as a row
-  with Download, then Downloads: one row per file, its folder by name ("LoRAs",
-  not `loras`), the shared `set-progress` bar while it runs, its state on the
-  right and Retry when it failed.
-- **Speed:** the list compares file names and sizes only; opening one image
-  checks its checksums (kept on disk, so a restart never reads every model
-  again). The code loads while idle (`preloadable.ts`), placeholders hold the
-  grid's place while the list arrives, and the last list shows at once on
+| Page | Holds |
+| --- | --- |
+| Import | One field: paste a Civitai or Hugging Face link, or drop one on it (dropped image files come later). Under it, the History: one row per import with its kind icon, name, kind, "From Chat" for an administrator's chat import (MCP's Import), "n Missing" and date, the grade chip and its state |
+| Images | The saved Civitai images as an even 4:5 grid, each with its grade chip and missing count; search once there are two or more |
+| LoRAs | Installed and catalogued LoRAs and supporting files, with provenance, version, links, trigger words and file |
+| Models | Checkpoints, diffusion models, text encoders, VAEs and CLIP vision the same way, then any catalogue switch that remains global |
+| Downloads | Every model download in Running, Failed and Done groups |
+
+Import and Images follow the deployment's Presets & Civitai Imports switch;
+without it the Library holds LoRAs, Models and Downloads.
+
+- **Grades:** one chip, Exact (green with its tick), Close (quiet) or Partial
+  (amber), with a missing count on an Images card ("Partial · 2 Missing") and
+  its reasons in the tooltip. A review lists the reasons under the chip.
+- **Records open in place:** an import (or an Images card) opens its review
+  where the list was, with Back ("Import", "Images") on the left of the bar and
+  the source links (the LoRA rows' "com" and "red" pills, "HF") or View on
+  Civitai and Delete on the right. Then the name and kind, the grade with its
+  reasons and the Files group.
+- **Files:** one row per file: its name, then its folder by name ("LoRAs",
+  not `loras`), version, size and source; a reason when it is unavailable
+  (paid, early access, restricted, no checksum) with a free version to use
+  instead where there is one; the shared `set-progress` bar while it
+  downloads; its state on the right. A Hugging Face file whose folder is a
+  guess carries its Destination dropdown until it downloads. Check Again sits
+  on the group's heading.
+- **Footer:** the review's actions: **Download Missing** (one tap queues every
+  missing file; unavailable files never download), Use Prompt and Use
+  Settings. A repository's files are optional: each has its own Download.
+- **Drafted profiles:** a checkpoint or diffusion model import drafts its
+  profile on import; the review says so in one note (AI-Drafted, for
+  administrators until approved in Settings › Profiles). The parts it needs
+  join the Files group. When a draft failed, its reason is among the notes and
+  **Draft Profile** (Sparkles) sits in the footer before Download Missing.
+- **LoRAs and Models:** compact `PickerTools` search, the Installed |
+  Catalogue views and family (LoRAs) or kind (Models) pills on one row, then a
+  flat list: the title, then what it is, version, base model and size, its
+  provenance ("Civitai · Imported", "From the Seed"), trigger words and
+  strength, and the file; the source links and Installed or Not Installed on
+  the right.
+- **Downloads:** the shared progress pattern: the file, its folder and size,
+  the bar while it runs, the failure under the name, the state on the right
+  with one action (Cancel, Retry or Resume).
+- **Speed:** lists compare file names and sizes only; opening one import or
+  image checks its checksums (kept on disk, so a restart never reads every
+  model again). The code loads while idle (`preloadable.ts`), placeholders hold
+  the list's place while it arrives, and the last list shows at once on
   reopening.
 - Failures go to the status pill; the page never grows its own error box.
 
@@ -673,7 +751,10 @@ kind of element:
   Weights only when they differ from the profile's name). Rows within a group
   read alphabetically, except Timing (measured times before the estimates).
   The phone and the desktop show the same Details, from one component.
-  The one footer is Copy · Recreate. Copy includes generation inputs and saved
+  The one footer is Copy · Refine · Recreate. **Refine** ("Refine in Chat",
+  on a finished result) opens the deployment's chat with the prompt, profile
+  and job ID filled in, unsent, or copies that message where no chat is set,
+  and says which in the status pill. Copy includes generation inputs and saved
   settings, including IDs, seed and reference settings; output filenames,
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run

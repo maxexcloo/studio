@@ -7,10 +7,10 @@ import { MultiSelect, type MultiSelectOption } from './MultiSelect';
 import { Group, GroupAction, Row, SaveRow, SwitchRow } from './SettingsControls';
 import type { ShowToast } from './toast';
 
-type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
+type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptAssistant' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; allModels?: boolean; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
-type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
+type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[]; /** Chat Gateway Admin Tools (server/account-store.js gatewayAdminTools). */ adminTools?: boolean };
 type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; defaultAccessProfileId?: string; requireApproval?: boolean; lockedFeatures?: Partial<Record<Feature, boolean>>; gateway?: GatewayIdentities };
 export type ProfileInfo = { label: string; kind?: string; cloud?: boolean; nsfw?: boolean };
 
@@ -19,7 +19,7 @@ const featureLabels: [Feature, string][] = [
   ['cloudModels', 'Cloud Models'], ['gallery', 'Gallery'],
   ['imageGeneration', 'Image Generation'], ['imageReferences', 'Image References'],
   ['loras', 'LoRAs'], ['nsfwModels', 'NSFW Models'], ['presets', 'Presets & Civitai Imports'],
-  ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
+  ['promptAssistant', 'Prompt Assistant'], ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
 ];
 const anyGeneration = { needs: ['imageGeneration', 'videoGeneration'] as Feature[], reason: 'Needs Image or Video Generation' };
 // A feature that only means something while another one is on.
@@ -28,6 +28,7 @@ const featureNeeds: Partial<Record<Feature, { needs: Feature[]; reason: string }
   imageReferences: { needs: ['imageGeneration'], reason: 'Needs Image Generation' },
   loras: anyGeneration,
   nsfwModels: anyGeneration,
+  promptAssistant: anyGeneration,
   videoReferences: { needs: ['videoGeneration'], reason: 'Needs Video Generation' }
 };
 const featureApplies = (feature: Feature, on: Set<Feature>) => !featureNeeds[feature] || featureNeeds[feature]!.needs.some((need) => on.has(need));
@@ -233,6 +234,13 @@ export function UsersSettings({ showToast }: { showToast: ShowToast }) {
   const dismissGatewayIdentity = async (identity: string) => {
     if (await run(() => apiJson('/api/accounts/gateway-pending/dismiss', jsonPost('POST', { identity })), 'Couldn’t dismiss the chat user')) await refresh();
   };
+  // Gateway-linked administrators get MCP's admin tools only while this is on (off by default).
+  const setGatewayAdminTools = async (on: boolean) => {
+    if (await run(() => apiJson('/api/accounts/gateway-admin', jsonPost('POST', { on })), 'Couldn’t save Chat Gateway Admin Tools')) {
+      showToast(on ? 'Admin tools on for gateway administrators' : 'Admin tools off for gateway administrators', 'success');
+      await refresh();
+    }
+  };
   const accountOptions = (list: Account[]) => byName(list).map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
 
   if (!admin) return loadError
@@ -244,6 +252,7 @@ export function UsersSettings({ showToast }: { showToast: ShowToast }) {
   return <div className="set-sections">
     <AccountsGroup admin={admin} showToast={showToast} onSaved={refresh} />
     <Group title="Chat Gateway" note="Chat users get in once linked to an account, here or by a matching email; with a default group, a new email gets a new account">
+      <SwitchRow label="Chat Gateway Admin Tools" description={admin.gateway?.adminTools ? 'Linked administrators manage the Library, catalogue and profiles from chat' : 'Only an administrator’s own MCP token gets the admin tools'} checked={admin.gateway?.adminTools === true} disabled={busy} onChange={(next) => void setGatewayAdminTools(next)} />
       {gatewayLinks.map((link) => {
         const account = admin.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
@@ -274,7 +283,7 @@ function AccessProfileEditor({ admin, profiles, showToast, onSaved }: { admin: A
   const sorted = byProfileName(admin.accessProfiles);
   const [choice, setChoice] = React.useState(sorted[0]?.id || NEW);
   const saved = admin.accessProfiles.find((profile) => profile.id === choice) || null;
-  const blank: Draft = { name: '', models: [], allModels: false, features: ['gallery', 'imageGeneration', 'imageReferences', 'promptHistory'] };
+  const blank: Draft = { name: '', models: [], allModels: false, features: ['gallery', 'imageGeneration', 'imageReferences', 'promptAssistant', 'promptHistory'] };
   const fromSaved = (profile: AccessProfile | null): Draft => profile ? { name: profile.name, models: profile.generationProfiles, allModels: profile.allModels === true, features: featureLabels.map(([key]) => key).filter((key) => profile.features?.[key]) } : blank;
   const [draft, setDraft] = React.useState(() => fromSaved(saved));
   const [busy, setBusy] = React.useState(false);

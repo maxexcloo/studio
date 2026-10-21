@@ -26,7 +26,7 @@ import { loraName } from './app/catalogueNames';
 import { apiJson, loadDraft, referenceAssetFromGallery, saveDraft } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
-import { normalizeLoras } from './app/loras';
+import { maxLoras, normalizeLoras } from './app/loras';
 import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
 import { deleteLoraStack, restoreLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, toggleLoraFavorite, updateLoraStack, type LoraSnapshot } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
@@ -38,7 +38,8 @@ import { setShareSettings } from './app/shareSettings';
 import { validVideoFrames } from './app/videoDuration';
 import { ModelLoraControls, PhoneAdvancedControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
-import { loraFit, useLoraInfo } from './app/useLoraInfo';
+import { knownLoraInfo, loraFit, useLoraInfo } from './app/useLoraInfo';
+import { usePromptAssistant } from './app/usePromptAssistant';
 import type { LoraMismatch } from './app/LoraMismatchChip';
 import { useViewerControls } from './app/useViewerControls';
 import { useGalleryGroups } from './app/useGalleryGroups';
@@ -144,7 +145,7 @@ function App() {
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowPreferences, setWorkflowPreferences] = useState<WorkflowPreferences>({ favorites: [], lastUsed: {}, thumbnails: {} });
   const [workflowGalleryOpen, setWorkflowGalleryOpen] = useState(false);
-  const [presetLibraryOpen, setPresetLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const modelsRefreshRef = useRef<Promise<unknown> | null>(null);
   const [active, setActive] = useState<GalleryItem | null>(null);
   const [viewerZoom, setViewerZoom] = useState(1);
@@ -1196,7 +1197,16 @@ function App() {
     }
   }
 
+  // The prompt assistant: the magic button, the negative writer and LoRA suggestions (usePromptAssistant.ts).
+  const assistant = usePromptAssistant({
+    prompt, setPrompt, negative, setNegative,
+    clampPrompt: (value: string) => clampText(value, promptLimit), clampNegative: (value: string) => clampText(value, negativeLimit),
+    profile: currentProfile || null, loras, setLoras: setLorasWithMemory, loraOptions: loraOptionNames, loraCap: Math.min(maxLoras, currentProfile?.maxLoras || maxLoras),
+    cfg: currentProfile?.capabilities?.cfg !== false ? cfg : undefined, references: composerReferenceAssets, showToast,
+    loraTitle: (name: string) => loraName(name, knownLoraInfo()?.[name])
+  });
   const generationActions = useGenerationActions({
+    assistantRecord: assistant.record,
     active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
@@ -1206,7 +1216,11 @@ function App() {
 
   const viewerActions = useViewerControls({
     onReuseProfile: applyProfileReferences, onReuseReferences: applyReusedReferences, referenceForAspect,
-    onReuseOutput: (item: GalleryItem | null) => { reusedImage.current = item?.type === 'image' && item.status === 'done' && item.url && !item.library ? item : null; },
+    onReuseOutput: (item: GalleryItem | null) => {
+      reusedImage.current = item?.type === 'image' && item.status === 'done' && item.url && !item.library ? item : null;
+      // Recreate keeps how the prompt was written (the assistant, in Studio or chat) while the prompt stays as it was.
+      if (item) assistant.adopt(item.assistant, item.prompt || '');
+    },
     negativeForMode: (next: Mode) => modePromptsRef.current[next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt, clipType, customSize, denoise, fps, frames, sampler, scheduler, textEncoder, textEncoders, vae, weightDtype, startImage, startImageId, startImageName }, active, deleteItem, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, viewerGallery
   });
   const { fitViewer, cycleViewerSize, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveViewer, submitPrompt, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
@@ -1265,12 +1279,12 @@ function App() {
   };
   // The first reference, shown at the top of the sidebar's Basics with how much it may change.
   const sidebarReference = referenceInput && referenceAsset ? { asset: referenceAsset, label: referenceInput.role === "start" ? "Start image" : referenceInput.label || "Reference image", remove: () => removeReferenceAsset(referenceInput.id) } : null;
-  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, recommended, prefs, setPrefs, upscaleStatus };
+  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, recommended, prefs, setPrefs, upscaleStatus, assistant };
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
   const modelLoraControls = <StableModelLoraControls view={sidebarView} />;
   const phoneAdvancedControls = <StablePhoneAdvancedControls view={sidebarView} />;
 
-  const baseView = { fitViewer, cycleViewerSize, viewerNativeZoom, presetLibraryOpen, setPresetLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, clearFailedItems, resetAllSettings, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, hasMoreGallery, health, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, showDetails, showNegativePrompt, showToast, modelLoraControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, promptRef, dragViewer, endViewerTouch, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
+  const baseView = { fitViewer, cycleViewerSize, viewerNativeZoom, libraryOpen, setLibraryOpen, applyImagePreset, applyPresetPrompt, changeMode, viewerGallery, gallerySearch, setGallerySearch, toggleFavorite, seed, setSeed, galleryGroups, settleVersion, stackRuns, openRuns, setRunOpen, unstackRun, active, applyAllSettings, applyPromptsOnly, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, sizeTier, sizeTiers, sizeArea, megapixelControl, sizeMax, customLimits, chooseSizeTier, applyCustomRatio, setCustomDimensions, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, clearFailedItems, resetAllSettings, clickViewer, comfyStatus, copyToClipboard, copyItemToClipboard, count, countMeta, currentProfile, customSize, deleteItem, deleteItems, gallery, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, galleryTotalApprox, generate, generateDisabled, generateDisabledReason, hasMoreGallery, health, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, now, onGalleryScroll, onGalleryUserScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, retryComfyStatus, comfyRetrying, comfyReconnectedAt, refreshHealth, refreshModels, refreshWorkflows, removeReferenceAsset, renderedGallery, resetCreation, resetViewer, runningCount, selectReferenceAsset, selectWorkflow, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, setWorkflowPreferences, setWorkflows, showDetails, showNegativePrompt, showToast, modelLoraControls, phoneAdvancedControls, startViewerDrag, startViewerTouch, status, steps, stepsMeta, stopViewerDrag, submitPrompt, touchGestureRef, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, workflowPreferences, workflows, promptRef, dragViewer, endViewerTouch, characterMeta, formatElapsed, generationDetailEntries, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, settings, setPrefs, upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, toggleUpscale, cancelUpscale, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, chooseAutoUpscale, upscaleDisplayUrl, modelFolders, generationEstimate, onStarterStarted: rememberStarter, selectStarterModel, generateKey: generateShortcut(prefs.enterToGenerate), failureFixes: generationActions.failureFixes };
 
   // Painting on the first reference, for a model that can inpaint (InpaintStudio.tsx).
   const referenceInpaint: ReferenceInpaint | null = canInpaint && referenceInput && referenceAsset ? {
@@ -1288,7 +1302,7 @@ function App() {
   } : null;
   // The phone's LoRAs row clears the stack in one tap, with Undo in the status pill.
   const clearLoras = () => { const before = loras; setLoras([]); showToast('LoRAs cleared', 'default', { action: { label: 'Undo', onClick: () => setLoras(before) } }); };
-  const view = { ...baseView, clearLoras, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  const view = { ...baseView, assistant, clearLoras, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />

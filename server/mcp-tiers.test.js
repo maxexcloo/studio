@@ -195,3 +195,17 @@ test('a model named only in the request ("six baby ducks, fast moss") is used wh
   assert.equal(pick('moss or qwen, a pond'), undefined, 'two families named');
   assert.match(profileFromRequest(bento, 'ducks, moss', 'turbo').note, /^Used MOSS Image Base · Fast .*, the model the request names\. MOSS Image Base has no Super Fast profile/);
 });
+
+// Access tiers above media: the admin tools (mcp-admin.js) and who gets them (mcp.js adminScope).
+test('admin tools go to administrator accounts by their own token, and through the gateway only with the switch on', async () => {
+  const { adminScope } = await import('./mcp.js');
+  const administrator = { userId: 'a', role: 'administrator', authenticated: true };
+  const user = { userId: 'u', role: 'user', authenticated: true };
+  assert.equal(adminScope({ account: administrator }), true, 'a direct administrator MCP token');
+  assert.equal(adminScope({ account: user }), false, 'an ordinary account');
+  assert.equal(adminScope({ account: null }), false, 'the shared key without an account');
+  assert.equal(adminScope({ account: administrator, gateway: true }), false, 'a gateway-linked administrator, switch off by default');
+  assert.equal(adminScope({ account: administrator, gateway: true, gatewayAdminTools: () => true }), true, 'with Chat Gateway Admin Tools on');
+  assert.equal(adminScope({ account: user, gateway: true, gatewayAdminTools: () => true }), false, 'never an ordinary gateway account');
+  assert.equal(adminScope({ account: { ...administrator, authenticated: false } }), false);
+});

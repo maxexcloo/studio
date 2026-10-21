@@ -142,6 +142,22 @@ export function setRequireApproval(on) {
   return requireApproval();
 }
 
+/**
+ * Chat Gateway Admin Tools: whether chat users linked through the trusted gateway to an
+ * administrator account get MCP's admin tools (Library, catalogue, profiles). Off unless an
+ * administrator turned it on; direct administrator MCP tokens have them either way.
+ */
+export function gatewayAdminTools() {
+  return readStore().gatewayAdminTools === true;
+}
+
+export function setGatewayAdminTools(on) {
+  if (typeof on !== "boolean") throw new Error("Choose on or off.");
+  readStore().gatewayAdminTools = on;
+  saveStore();
+  return gatewayAdminTools();
+}
+
 /** The default access profile a new self-arriving account starts on now, or "" when it waits. */
 const startingProfileId = () => requireApproval() ? "" : defaultAccessProfileId();
 

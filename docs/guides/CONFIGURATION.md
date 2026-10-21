@@ -134,6 +134,20 @@ MCP clients connect in one of three ways in multi-user mode:
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
+### MCP Admin Tools
+
+An administrator's chat can manage the Library, downloads, the catalogue, profiles and guides with eleven more tools (see the README's MCP section). They call the same routes as the UI with the administrator's credential, so the same checks, Undo and versions apply, and every import, catalogue edit and version they make records `chat` as its origin.
+
+- **Who gets them:** an administrator account's own MCP token. A chat user linked through the trusted gateway to an administrator account gets them only while **Settings › Users › Chat Gateway › Chat Gateway Admin Tools** is on; it is off by default and stored with the accounts. Ordinary accounts, unlinked or anonymous gateway users, AI Control's key and the single-user shared key never get them.
+- **What they reach:** only the Library, model download, catalogue, profile, guide and export routes. A personal token is otherwise still no administrator credential. Nothing deletes a file or replaces a download, Cancel only stops one (its partial file stays for Resume), and no tool touches a GPU.
+- **Export links** are signed with `MCP_SIGNING_KEY`, last an hour and serve the bundle Export wrote under `exports/`.
+
+### Refine in Chat
+
+`STUDIO_CHAT_URL` is the chat's base address, such as `https://chat.example.com` for LibreChat. With it, **Refine** in a result's Details opens `<STUDIO_CHAT_URL>/c/new?prompt=…`, which LibreChat (v0.8.8 and later) fills into a new chat's message box without sending: the result's prompt, profile, how the prompt was written and its stable job ID, in the Handover summary's form. Without it, Refine copies the same message for pasting. The handover is kept for 30 days in `chat-handovers.json`; when that account's chat names the job, MCP takes it into the account's chat jobs, so Review, Reuse and Result work on it. Only the account that owns a result can hand it over.
+
+What the chat's RewritePrompt and SuggestLoras did is kept for six hours in `mcp-assistant.json` beside `mcp-ownership.json`, so a later Generate still records it on its results after a restart. Each result's record also travels in its ComfyUI run (`extra_data.studio_generation.assistant`), so results rebuilt from ComfyUI's history keep it.
+
 `Status` and `Result` wait at most 20 seconds for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, waits up to 1500 seconds, below LibreChat's 1800-second background deadline. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
 
 `STUDIO_ENABLE_GROK=0`, `STUDIO_ENABLE_TESSERA=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. All three are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
@@ -146,15 +160,47 @@ Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a to
 
 ## Civitai Images & Downloads
 
-Image & Model Library is disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer it; keep it unset or `0` everywhere else. The server enforces this switch for preset data, thumbnails, imports, provider downloads and Civitai token settings, and the desktop and phone controls follow the server’s feature flag. Existing catalogue downloads remain available independently.
+Imports into the **Library** are disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer them; keep it unset or `0` everywhere else. The server enforces this switch for saved images, thumbnails, imports, provider downloads and Civitai token settings, and the Library's Import and Images pages follow the server’s feature flag. The Library itself (LoRAs, Models and Downloads) is always there for administrators, and existing catalogue downloads remain available independently.
 
-Open **Image & Model Library** from the desktop toolbar or phone gallery. **Images** accepts a Civitai image link and downloads the full image into this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations. Missing supported resources queue automatically through the configured downloader; filename conflicts and unavailable resources remain explicit. Existing saved presets migrate to gallery images when the library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models.
+Open the **Library** from the desktop dock or the phone Menu. **Import** accepts a Civitai image or model link or a Hugging Face file or repository link and records each import in `library/imports/<id>.json` with its grade (Exact, Close or Partial) and reasons. A Civitai image lands in **Images** and in this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations; a LoRA writes its catalogue entry; a checkpoint is recorded. Missing files wait for **Download Missing**, which queues them through the configured downloader; paid, early-access and restricted Civitai files are never downloaded and show why. Filename conflicts stay explicit. Existing saved presets migrate to gallery images when the Library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models.
 
 **Use Settings** applies the image’s recipe to its installed image workflow without starting a generation. Exact resource matches use SHA-256, including renamed files. Missing LoRAs, unknown weights and unsupported resource types require attention; **Use Prompt** is available independently. Civitai metadata is optional, and additional processing such as ControlNet, high-resolution passes and CLIP skip needs a matching workflow. Imported settings cannot guarantee an identical image.
 
 **Models** accepts Civitai model links (including `modelVersionId`) and Hugging Face links to individual SafeTensors or GGUF files. Local downloads use the existing resumable queue and check published SHA-256 values. Hugging Face revisions are pinned to a commit when previewed. A filename conflict is never resolved by replacing the existing file automatically.
 
 Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server environment for resources your account can access. Tokens are kept on the server and are never returned to the browser or forwarded to the image/file CDN. Imports, image deletion and model downloads are available at the server or from a signed-in device. Provider credential changes retain the existing admin boundary; the library does not expose credential controls.
+
+## Prompt Assistant
+
+The prompt assistant uses the MCP prompt writer's LiteLLM gateway: `STUDIO_PROMPT_WRITER_URL`, `STUDIO_PROMPT_WRITER_KEY` and `STUDIO_PROMPT_WRITER_MODEL` (see the README's MCP section). It adds no provider key, and LiteLLM budgets are its only limit. Without the gateway, the assistant is off.
+
+- `STUDIO_ASSISTANT_MODEL`: the model that rewrites prompts, writes negatives, suggests LoRAs and describes images. Unset, it is `STUDIO_PROMPT_WRITER_MODEL`. MCP Generate keeps `STUDIO_PROMPT_WRITER_MODEL` either way.
+- `STUDIO_ASSISTANT_SPICY_MODEL`: an uncensored model for the Spicy preset. Unset, Spicy is hidden and refused.
+
+Administrators choose both in **Settings › Models › Integrations**, which lists the gateway's models (`GET /v1/models`) and shows whether each one reads reference images (`supports_vision` from LiteLLM's `GET /model/info`; unknown counts as text-only). A deployment that sets either variable locks its row. Choices apply at once.
+
+The **Prompt Assistant** access-profile feature gates every assistant route. It is on for the built-in profiles and for access profiles stored before it existed; turn it off per profile. Spicy also needs **NSFW Models**. LoRA suggestions need **LoRAs**, and drafting guides and profiles is for administrators. Replies are never logged; logs carry only the operation, profile, timing and a short failure reason. Each call times out (30 s, 90 s for a streamed rewrite) and falls back: a rewrite returns the original prompt, a negative the guide's default, LoRA suggestions the word-matched candidates.
+
+`mise run eval:assistant` replays the recorded cases in `server/fixtures/assistant-evals/` against the live gateway, using the variables above, and scores them; `--record` writes the live replies back for review. CI only scores the recorded replies.
+
+## Studio-Owned Catalogue, Profiles & Guides
+
+These files live in the data folder (`STUDIO_DATA_DIR`, `/data` in Kubelab). Each one is written atomically by a single module. The first start of a new version snapshots the small state files first (`.backups/`), and every migration below is safe to run again.
+
+- **`library/catalogue.json`:** one entry per model file, keyed by `folder/file`, with hash, size, title, triggers, strength, licence, links and provenance (`origin`, `source`, `by`, the last 20 changes). It takes in `config/lora-catalogue.json` (seed), `lora-catalogue.json` (installed by hand, wins over the seed), `model-download-sources.json` (provider links and hashes), `model-hashes.json` (hashes of unchanged files) and the restore manifest. Those files are never written or removed: a changed file refreshes its layer, and a removed one keeps its last copy. Studio's own catalogue edits sit above all of them.
+- **`guides/prompting.json`:** the prompting guides, in `prompting.json`'s schema plus `meta.<packId>` (version, origin, AI-Drafted). The first start copies the seed in as version 1. After that the seed only adds packs and bindings the store doesn't have: a pack Studio holds is never replaced, whoever last changed it. The guide loader reads this file first, falling back to the seed.
+- **`history/profiles/<id>/<n>.json` and `history/guides/<packId>/<n>.json`:** immutable versions, recording who saved each one (an account, `assistant`, `chat` or `seed`). The first start records each profile's `backups/profile-edits` copies and current file as versions: the oldest is `seed`, and later ones are `studio` when `.studio-edits.json` lists the profile. A revert saves an earlier version as a new one.
+- **`workflows/.studio-meta.json`:** each profile's current version, origin, AI-Drafted marker, editor, seed hash and last exported hash. `workflows/.studio-edits.json` is still written for every profile Studio changed or drafted.
+- **`exports/studio-profiles-<time>.zip`:** the 20 newest exports (see [Seed, Export & the Retired Deploy](#seed-export--the-retired-deploy)).
+
+### Seed, Export & the Retired Deploy
+
+Studio is the only writer of live profiles and prompting guides. The profiles repository (`ai/profiles/`) is their **seed and backup**, and `mise run profiles:deploy` is **retired**: do not run it against a Studio data folder. Changes flow one way, Studio → **Settings › Profiles › Export** → a reviewed commit in `ai/profiles/`.
+
+- **`STUDIO_SEED_DIR`** names a directory in the seed's layout: `config/studio/workflows/*.json`, `config/prompting.json`, `config/lora-catalogue.json` and `config/models.json` (an unpacked export has the same layout). It is read-only and optional. At each start Studio copies only what is missing: a profile file it has never held (one removed in Studio is not brought back) and a `config/` file the data folder lacks. Nothing Studio holds is overwritten. Without the variable nothing is copied.
+- **Guides' seed:** `MCP_PROMPTING_PATH`, else (with `STUDIO_SEED_DIR`) the data folder's `config/prompting.json`. It fills a new install and adds missing packs only.
+- **Export** (`GET /api/profiles/export`, administrators) is a zip in the seed's layout: every profile file exactly as on disk, `config/prompting.json` (the guide store without `meta`), `config/lora-catalogue.json` (the LoRA catalogue by file name, with Studio's edits), `config/models.json` (the restore manifest, when there is one) and `EXPORT.json`, which lists each profile's and guide's version, origin and AI-Drafted state, what changed since the last export, and the AI drafts nobody has approved yet.
+- **AI drafts:** a checkpoint or diffusion model imported in the Library drafts a profile from the nearest same-family profile and the page's recommended settings, and a guide from the page. It is checked against ComfyUI's `object_info` before it is written (nothing is activated while ComfyUI can't be asked, or when it doesn't know a node type), marked NSFW unless the source says otherwise, and the parts it needs (VAE, text encoders) join the import's files for Download Missing. It is **AI-Drafted**: live for administrators only, and hidden from every other account (even with an explicit grant) until an administrator approves it or edits it in Settings › Profiles.
 
 ## Hidden Removal
 
@@ -223,7 +269,7 @@ Some names on disk still come from HEISS UI. Gallery records, account media and 
 | `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`) | `studio/` |
 | `.heiss-trash/` | Beside trashed files in the output and media folders | `.studio-trash/` (skipped by snapshots) |
 | `heiss_generation` | Run records in ComfyUI's queue and history | `studio_generation` (written now) |
-| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, `studio-profiles`) | Not renamed: it is the profile file format |
+| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, the `ai/profiles/` seed) | `studio` (read; Studio still writes `heissUi`) |
 | `heiss_*` sections, `.heiss-backup` | ComfyUI's `extra_model_paths.yaml` (single-user mode) | Not renamed |
 | `heiss` text chunk | Metadata in PNGs Studio wrote | Not renamed |
 | `heiss-ui-reference-*`, `heiss-ui-upscale-*` | File names in ComfyUI's input folder | Not renamed |
@@ -243,4 +289,4 @@ A later release adds an explicit migration command. It is never run automaticall
 4. **Switch.** The release that ships the command changes `outputFolderName` and `trashFolderName` in `server/data-names.js` to the Studio names; the old names stay readable for one more release.
 5. **Recovery.** `--undo <manifest>` renames the folders back and restores the records from the backups the apply step made. If anything else is wrong, restore the snapshots from step 1 and redeploy the previous image.
 
-The `heissUi` profile block is a file format shared with `studio-profiles`; renaming it needs a reader for both names first and its own decision.
+The profile block is a file format shared with the `ai/profiles/` seed. Studio reads both `studio` and `heissUi` (a file with both is refused by the profile check), and keeps writing `heissUi` (`writtenBlockName` in `server/profile-block.js`) until the seed and its checks are migrated to `studio`; that switch is its own change.

@@ -93,7 +93,7 @@ export type GenerationFailure = {
   /** What a retry after running out of memory may change. */
   retry?: { smaller?: boolean; tiledDecode?: boolean };
 };
-export type GalleryItem = Output & { failure?: GenerationFailure; id: string; jobId?: string; status: "done" | "pending" | "error" | "canceled"; progress?: Progress; preview?: string; width?: number; height?: number; createdAt?: string; durationMs?: number; timing?: RunTiming; model?: string; settings?: GenerationSettings; index?: number; referenceImage?: string; referenceImageName?: string; startImageId?: string; optimistic?: boolean; promptProtected?: boolean; thumbnailUrl?: string; upscale?: UpscaleState; upscaleActive?: boolean; /** A stacked run standing in for its outputs (zen's strip). */ run?: Run; /** Starred. */ favorite?: boolean; /** Added from another folder and shown where it is (server/library.js). */ library?: { folder: string; path: string } };
+export type GalleryItem = Output & { failure?: GenerationFailure; id: string; jobId?: string; status: "done" | "pending" | "error" | "canceled"; progress?: Progress; preview?: string; width?: number; height?: number; createdAt?: string; durationMs?: number; timing?: RunTiming; model?: string; settings?: GenerationSettings; index?: number; referenceImage?: string; referenceImageName?: string; startImageId?: string; optimistic?: boolean; promptProtected?: boolean; thumbnailUrl?: string; upscale?: UpscaleState; upscaleActive?: boolean; /** A stacked run standing in for its outputs (zen's strip). */ run?: Run; /** Starred. */ favorite?: boolean; /** Written by the prompt assistant (server/assistant-routes.js assistantRecord). */ assistant?: { preset: string; model?: string; source?: 'ui' | 'chat'; lorasSuggested?: string[] }; /** Added from another folder and shown where it is (server/library.js). */ library?: { folder: string; path: string } };
 export type Job = { status: string; outputs: GalleryItem[]; error?: string; progress?: Progress; preview?: string; previews?: string[]; /** Its pictures were kept without their Smart upscale, and why, for a toast. */ kept?: string };
 export type TouchGesture =
   | { mode: "swipe"; id: number; x: number; y: number; dx: number; dy: number; axis: "x" | "y" | null; velocity: import("./viewerGesture").Velocity; moved: boolean }
@@ -199,7 +199,7 @@ export type Models = {
   modelFiles?: ModelFile[];
   modelTypeChoices?: Record<ModelSource, SelectOption[]>;
   /** Release switches for features that are built but not yet public (server/features.js). */
-  features?: { inpainting?: boolean; presets?: boolean };
+  features?: { inpainting?: boolean; presets?: boolean; /** The Library: administrators only (server/index.js withLibrary). */ library?: boolean };
   textEncoders: string[];
   vaes: string[];
   clipTypes?: string[];

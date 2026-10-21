@@ -107,12 +107,14 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe, prompting, nsfw = false }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe, prompting, nsfw = false, aiDrafted = false }) {
   return {
     id,
     kind,
     label,
     ...(nsfw === true ? { nsfw: true } : {}),
+    // Drafted by the assistant and not yet reviewed: administrators only (account-policy.js).
+    ...(aiDrafted === true ? { aiDrafted: true } : {}),
     displayName: displayName || label,
     description: description || modelBasename(model),
     ...((imageModes.generate?.prompting ?? prompting) ? { prompting: structuredClone(imageModes.generate?.prompting ?? prompting) } : {}),
@@ -255,6 +257,7 @@ export function inferModels(info, stats = {}) {
       workflow: workflow.profileId,
       family: workflow.family,
       nsfw: workflow.nsfw,
+      aiDrafted: workflow.aiDrafted,
       recipe: workflow.recipe,
       defaults: {
         count: detectedDefault(countRange, Number(defaults.count || 1)),

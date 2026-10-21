@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../src/app/format.ts', import.meta.url),
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
   // A data URL has no base for relative imports, so point format.ts's one helper import at its file.
   .replace("from './partNames'", `from '${new URL('../src/app/partNames.js', import.meta.url)}'`);
-const { fullGenerationText, generationDetailEntries, settingsText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { assistantSummary, fullGenerationText, generationDetailEntries, settingsText } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const item = {
   type: 'video', model: 'custom:grok-video-standard', prompt: 'A hot-air balloon', width: 1280, height: 720,
   settings: { modelName: 'grok-imagine-video', steps: 20, cfg: 8, sampler: 'euler', scheduler: 'simple', seed: '397422498', duration: 6, resolution: '720p' }
@@ -38,4 +38,14 @@ test('Radiance references do not advertise unsupported denoise settings', () => 
   assert.ok(!generationDetailEntries(reference).flatMap((section) => section.rows.map(([label]) => label)).includes('Denoise'));
   const ordinary = { ...reference, settings: { ...reference.settings, modelName: 'qwen.safetensors' } };
   assert.match(settingsText(ordinary), /Denoise:/);
+});
+
+test('Details say when the prompt assistant wrote the prompt, and which suggested LoRAs were chosen', () => {
+  const written = { type: 'image', prompt: 'A cabin', width: 512, height: 512, settings: {}, assistant: { preset: 'cinematic', source: 'chat', lorasSuggested: ['styles/glow.safetensors'] } };
+  assert.equal(assistantSummary(written), 'Assistant in Chat · Cinematic');
+  assert.equal(assistantSummary({ assistant: { preset: 'enhance', source: 'ui' } }), 'Assistant · Enhance');
+  assert.equal(assistantSummary({}), '');
+  const prompt = generationDetailEntries(written, { lora: (file) => file === 'styles/glow.safetensors' ? 'Glow' : file }).find((section) => section.title === 'Prompt');
+  assert.deepEqual(prompt.rows, [['Suggested LoRAs', 'Glow'], ['Written By', 'Assistant in Chat · Cinematic']]);
+  assert.equal(generationDetailEntries({ ...written, assistant: undefined }).some((section) => section.title === 'Prompt'), false);
 });

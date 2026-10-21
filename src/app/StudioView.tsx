@@ -4,12 +4,14 @@ import { popoverMotion } from "./composerSurface";
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
+import { LoraSuggestionChips, NegativeAssistantButton, PromptAssistantButton, assistantButtonWidth, negativeAssistantWidth } from './PromptAssistant';
+import type { PromptAssistant } from './usePromptAssistant';
 import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GalleryViewControls } from './GalleryViewControls';
-import { CircleStop, ChevronLeft, ChevronRight, Info, Library, Settings, X } from 'lucide-react';
+import { CircleStop, ChevronLeft, ChevronRight, Info, Library as LibraryIcon, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn, nearTextLimit, sortDetailRows, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Tip } from './components';
@@ -33,6 +35,7 @@ import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, generationInputsText } from './ViewerActions';
+import { refineInChat, useChatAddress } from './refineInChat';
 import { itemProfile, itemProfileName } from './itemProfile';
 import { LoraDetails, LoraSources } from './LoraPanel';
 import { loraName, modelName } from './catalogueNames';
@@ -88,7 +91,7 @@ function comfyStatusLabel(status: any) {
 
 const loadSettings = () => import('./SettingsDialog');
 const SettingsDialog = React.lazy(() => loadSettings().then((module) => ({ default: module.SettingsDialog })));
-const { Component: PresetLibrary, preload: loadPresetLibrary } = preloadable(() => import('./PresetLibrary').then((module) => module.PresetLibrary));
+const { Component: Library, preload: loadLibrary } = preloadable(() => import('./Library').then((module) => module.Library));
 const loadWorkflows = () => import('./WorkflowGallery');
 const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ default: module.WorkflowGallery })));
 // One empty list until models load, so the tiles' profile context holds steady.
@@ -112,6 +115,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const canUseNegativePrompt = true;
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
+  const assistant = view.assistant as PromptAssistant | undefined;
+  // Refine in Chat opens the deployment's chat, or copies the job reference without one.
+  const chatUrl = useChatAddress();
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -126,10 +132,10 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // Advanced Settings open in a popover above the composer, like LoRAs (UI-PATTERNS › Composer).
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
   // Where the library is offered, fetch its code while idle, so it opens at once (preloadable.ts).
-  const presetsOffered = models?.features?.presets === true;
+  const presetsOffered = models?.features?.library === true;
   React.useEffect(() => {
     if (!presetsOffered) return;
-    const idle = window.requestIdleCallback ? window.requestIdleCallback(() => { void loadPresetLibrary().catch(() => undefined); }, { timeout: 4000 }) : window.setTimeout(() => { void loadPresetLibrary().catch(() => undefined); }, 1500);
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(() => { void loadLibrary().catch(() => undefined); }, { timeout: 4000 }) : window.setTimeout(() => { void loadLibrary().catch(() => undefined); }, 1500);
     return () => { if (window.cancelIdleCallback) window.cancelIdleCallback(idle); else window.clearTimeout(idle); };
   }, [presetsOffered]);
   React.useEffect(() => {
@@ -425,7 +431,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         </AnimatePresence>
       </div>
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
-      {models?.features?.presets === true ? <Tip content="Image & Model Library"><button className="icon-button" aria-label="Image & Model Library" aria-haspopup="dialog" aria-expanded={Boolean(view.presetLibraryOpen)} onClick={() => view.setPresetLibraryOpen(true)}><Library size={16} /></button></Tip> : null}
+      {models?.features?.library === true ? <Tip content="Library"><button className="icon-button" aria-label="Library" aria-haspopup="dialog" aria-expanded={Boolean(view.libraryOpen)} onClick={() => view.setLibraryOpen(true)}><LibraryIcon size={16} /></button></Tip> : null}
       <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
       {hasAccountStorageScope() ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
     </div>
@@ -494,12 +500,15 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const composer = (
           <ExpandingComposer expanded={composerExpanded} onExpandedChange={setComposerExpanded}>
             <div className="composer-prompt-row">
-              <PromptField kind="positive" value={prompt} textareaRef={promptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory} />
+              <PromptField kind="positive" value={prompt} textareaRef={promptRef} ariaLabel="Prompt" onKeyDown={promptKeyDown} onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt("")} historyAvailable={hasPromptHistory} historyOpen={historyOpen && historyKind === 'positive'} onHistory={toggleHistory}
+                assistant={assistant?.available ? <PromptAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} assistantWidth={assistantButtonWidth} busy={assistant?.busy === 'rewrite'} />
               <div className="composer-primary-actions" ref={setComposerPrimaryTarget} />
             </div>
+            {assistant ? <LoraSuggestionChips assistant={assistant} /> : null}
             {nearTextLimit(prompt, promptLimit) ? <span className={cn("prompt-count", promptRemaining === 0 && "limit")}>{characterMeta(prompt, promptLimit)}</span> : null}
             {negativeSupported ? <div className="composer-secondary-row">
-              <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative("")} historyAvailable={hasNegativeHistory} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen((open) => historyKind !== 'negative' || !open); }} />
+              <PromptField kind="negative" value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative("")} historyAvailable={hasNegativeHistory} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen((open) => historyKind !== 'negative' || !open); }}
+                assistant={assistant?.negativeOffered ? <NegativeAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} assistantWidth={negativeAssistantWidth} busy={assistant?.busy === 'negative'} />
               {nearTextLimit(negative, negativeLimit) ? <span className="prompt-count">{characterMeta(negative, negativeLimit)}</span> : null}
             </div> : null}
             <StableComposerBar
@@ -763,6 +772,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     <DetailsFooter
                       onCopy={() => copyToClipboard(generationInputsText(active), 'Inputs copied')}
                       onRecreate={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
+                      onRefine={active.jobId && active.status === "done" && active.prompt ? () => refineInChat(active, { chatUrl, profileName: itemProfileName(active, models?.profiles || []) }) : undefined}
                     />
                   </aside>
                 ) : null}
@@ -801,7 +811,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           </div>
         );
       })() : null}
-      {models?.features?.presets === true && view.presetLibraryOpen ? <React.Suspense fallback={<Modal open title="Image & Model Library" onOpenChange={() => view.setPresetLibraryOpen(false)}><p role="status">Opening presets…</p></Modal>}><PresetLibrary onClose={() => view.setPresetLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} /></React.Suspense> : null}
+      {models?.features?.library === true && view.libraryOpen ? <React.Suspense fallback={<Modal open title="Library" onOpenChange={() => view.setLibraryOpen(false)}><p role="status">Opening the Library…</p></Modal>}><Library onClose={() => view.setLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} /></React.Suspense> : null}
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
       {/* Generation progress for screen readers: started, rendering, ready. */}
       <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>

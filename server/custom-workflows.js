@@ -1,3 +1,4 @@
+import { profileBlock, profileBlockNames, withWrittenBlock } from "./profile-block.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -32,7 +33,7 @@ function readJson(file) {
 }
 
 function workflowMeta(raw = {}) {
-  return raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio || {};
+  return profileBlock(raw) || {};
 }
 
 function loraStackConfig(meta = {}) {
@@ -90,10 +91,7 @@ export function graphFromJson(raw, info = {}) {
   if (raw?.graph && typeof raw.graph === "object") return raw.graph;
   if (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) return visualWorkflowToApi(raw, info);
   const copy = { ...raw };
-  delete copy.heissUi;
-  delete copy.heiss_ui;
-  delete copy.jAiStudio;
-  delete copy.j_ai_studio;
+  for (const name of profileBlockNames) delete copy[name];
   delete copy.metadata;
   return copy;
 }
@@ -297,7 +295,10 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
   for (const { dir, source } of dirs) {
     if (source === "bundled" && !builtInProfilesEnabled()) continue;
     if (!fs.existsSync(dir)) continue;
-    for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+    // profile-store.js keeps each Studio profile's version and AI-Drafted marker beside them.
+    const versions = source === "custom" ? readJson(path.join(dir, ".studio-meta.json")) || {} : {};
+    // Dotfiles beside the profiles (.studio-edits.json, .studio-meta.json) are Studio's records, not workflows.
+    for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith("."))) {
       const fullPath = path.join(dir, file);
       const raw = readJson(fullPath);
       if (!raw) {
@@ -320,7 +321,8 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
         continue;
       }
       try {
-        items.push({ ...metadataFromJson(raw, fullPath), source, raw });
+        const drafted = versions[path.basename(file, ".json")]?.aiDrafted === true;
+        items.push({ ...metadataFromJson(raw, fullPath), source, raw, ...(drafted ? { aiDrafted: true } : {}) });
       } catch (error) {
         items.push({
           id: safeId(path.basename(file, ".json")),
@@ -410,13 +412,13 @@ export function saveImportedWorkflow(raw, meta = {}) {
     ...workflowMeta(raw),
     ...meta
   };
-  const workflow = metadataFromJson({ ...raw, heissUi: mergedMeta });
+  const workflow = metadataFromJson(withWrittenBlock(raw, mergedMeta));
   workflow.id = unshadowedId(workflow.id);
   mergedMeta.id = workflow.id;
   workflow.profileId = `custom:${workflow.id}`;
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   const file = path.join(userWorkflowsDir, `${workflow.id}.json`);
-  writeJsonFile(file, { ...raw, heissUi: mergedMeta });
+  writeJsonFile(file, withWrittenBlock(raw, mergedMeta));
   return { ...workflow, path: file };
 }
 

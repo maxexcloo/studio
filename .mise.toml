@@ -28,6 +28,10 @@ run = "npm ci --no-audit --no-fund"
 [tasks."test:mcp"]
 run = "node --test server/mcp*.test.js"
 
+# Prompt Assistant Evals (live LiteLLM replay on demand, never in CI; --record refreshes the fixtures)
+[tasks."eval:assistant"]
+run = "node scripts/assistant-eval.mjs"
+
 # Studio Import (a dry run unless --apply; see docs/guides/CONFIGURATION.md)
 [tasks."import:studio"]
 run = "node scripts/import-studio.mjs"

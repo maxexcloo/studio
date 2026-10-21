@@ -111,6 +111,15 @@ export class McpMedia {
   own(owner, id, kind = 'jobs') {
     if (typeof id !== 'string' || !Object.hasOwn(this.state[kind], id) || !(kind === 'assets' ? [this.state[kind][id]].flat().includes(owner) : this.state[kind][id] === owner)) throw new Error(`Choose ${kind === 'jobs' ? 'a job' : 'a reference'} submitted by this account to this studio.`);
   }
+  /** Whether this owner holds the job. */
+  owns(owner, id) { return typeof id === 'string' && Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] === owner; }
+  /** Takes a Studio job into this owner's MCP jobs (a Refine in Chat handover); never one another owner holds. */
+  adopt(owner, id) {
+    if (typeof id !== 'string' || !id || !owner || (Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] !== owner)) return false;
+    this.state.jobs[id] = owner;
+    this.save();
+    return true;
+  }
   async response(method, route, body, owner = "", { credential: override, signal } = {}) {
     const base = new URL(typeof this.baseUrl === 'function' ? this.baseUrl() : this.baseUrl);
     if (!['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname) || base.protocol !== 'http:') throw new Error('MCP requires the studio’s private HTTP loopback endpoint.');
@@ -127,7 +136,7 @@ export class McpMedia {
     if (!response.ok) {
       // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
       let reason = '';
-      if ([400, 403, 409, 422, 429].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
+      if ([400, 403, 404, 409, 422, 429].includes(response.status)) try { const answer = await response.json(); reason = typeof answer?.error === 'string' ? answer.error.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch { /* No JSON reason. */ }
       throw new Error(reason ? `Studio refused the request: ${reason}` : `Studio refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`);
     }
     return response;
@@ -275,7 +284,7 @@ export class McpMedia {
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
     assertJobCount(prompts.length, runs);
-    const body = { ...profile.defaults, ...controls, kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
+    const body = { ...profile.defaults, ...controls, ...(record.assistant ? { assistant: record.assistant } : {}), kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;
@@ -294,7 +303,8 @@ export class McpMedia {
           if (this.cloudJobs.size >= 256) this.cloudJobs.delete(this.cloudJobs.keys().next().value);
           this.cloudJobs.set(result.jobId, { owner, at: Date.now(), ended: false });
         }
-        this.recordPrompt(result.jobId, { prompt, ...(record.request ? { request: record.request } : {}), ...(record.changes?.length ? { changes: record.changes } : {}) });
+        // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
+        this.recordPrompt(result.jobId, { prompt, ...(record.request ? { request: record.request } : {}), ...(record.changes?.length ? { changes: record.changes } : {}), ...(record.assistant ? { assistant: record.assistant } : {}) });
         this.save();
         queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), prompt });
       } catch (error) {
