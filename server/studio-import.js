@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { writeJsonFile } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { accountFolders } from "./data-names.js";
 
@@ -29,12 +30,8 @@ function readJson(file, fallback) {
   }
 }
 
-function writeJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temporary = `${file}.${process.pid}.import.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });
-  fs.renameSync(temporary, file);
-}
+// The same crash-safe write as the server's own (json-store.js), so the file it replaces stays as .bak.
+const writeJson = (file, value) => writeJsonFile(file, value, { mode: 0o600, compact: true });
 
 function viewRef(url) {
   const value = String(url || "");

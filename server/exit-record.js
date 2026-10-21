@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { currentDataDir, projectRoot } from "./data-root.js";
+import { applyLegacyEnvNames } from "./env-names.js";
+import { removeJsonFile, writeJsonFile } from "./json-store.js";
 import { readEnvFile } from "./lan.js";
 
 /**
@@ -20,31 +22,34 @@ import { readEnvFile } from "./lan.js";
  *   time, and not reported, since that's not something going wrong).
  */
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
 /** The server's exit code when its port is taken: that start never ran, so it leaves the record alone. */
 export const PORT_IN_USE_CODE = 78;
 
-function dataDir() {
-  // The launchers don't load .env (the server does), so its data folder is read from it here.
-  const configured = process.env.STUDIO_DATA_DIR || process.env.HEISS_DATA_DIR || (() => {
-    try { const values = readEnvFile(root).values; return values.STUDIO_DATA_DIR || ""; } catch { return ""; }
-  })();
-  return configured ? path.resolve(configured) : path.join(root, "data");
+/**
+ * The data folder, as the server finds it (data-root.js). The launchers don't
+ * load .env (the server does), so its values fill in what the shell left unset,
+ * and an old HEISS_* name in the shell still beats the file, as in the server.
+ */
+export function exitRecordDataDir(env = process.env, fileValues = null) {
+  const shell = Object.fromEntries(Object.entries(env).filter(([, value]) => value));
+  applyLegacyEnvNames(shell);
+  let file = fileValues;
+  if (!file) {
+    try { file = readEnvFile(projectRoot).values; } catch { file = {}; }
+  }
+  return currentDataDir({ ...file, ...shell });
 }
-const logDir = () => path.join(dataDir(), "logs");
+const logDir = () => path.join(exitRecordDataDir(), "logs");
 const sessionFile = () => path.join(logDir(), "session.json");
 const exitFile = () => path.join(logDir(), "last-exit.json");
 
+// Plain reads, never the .bak copy: a record removed on purpose must stay gone.
 function read(file) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
 }
 function writeSync(file, value) {
-  try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    // Synchronous: this runs on the way out, where nothing async finishes.
-    fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
-  } catch { /* writing down a stop must never be what fails */ }
+  // Synchronous: this runs on the way out, where nothing async finishes.
+  try { writeJsonFile(file, value); } catch { /* writing down a stop must never be what fails */ }
 }
 
 /**
@@ -66,7 +71,7 @@ export function startSession({ pid = process.pid, now = Date.now(), bootedAt = n
   const previous = read(sessionFile());
   const exit = read(exitFile());
   // Read once: this run's stop is written afresh, so last run's can't pass for it.
-  try { fs.rmSync(exitFile(), { force: true }); } catch { /* nothing to clear */ }
+  try { removeJsonFile(exitFile()); } catch { /* nothing to clear */ }
   writeSync(sessionFile(), { pid, startedAt: now, lastSeen: now });
   if (!previous) return null;
   const lastSeen = previous.lastSeen || previous.startedAt;

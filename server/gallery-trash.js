@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir } from "./comfy.js";
 import { outputFileCandidates } from "./gallery-store.js";
-import { renameWithRetry } from "./json-store.js";
+import { renameWithRetry, writeJsonFile } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { forgetItemThumbnails } from "./thumbnails.js";
 import { forgetItemVideoPreviews } from './video-previews.js';
@@ -115,7 +115,7 @@ export function trashGalleryItems(items, baseDir = ALL) {
     }
   }
   if (!files.length) return { batch: "", moved: 0, skipped };
-  fs.writeFileSync(path.join(dir, "batch.json"), JSON.stringify({ version: 1, id, createdAt: new Date().toISOString(), items: kept, files }, null, 2), { mode: 0o600 });
+  writeJsonFile(path.join(dir, "batch.json"), { version: 1, id, createdAt: new Date().toISOString(), items: kept, files }, { mode: 0o600 });
   return { batch: id, moved: files.length, skipped };
 }
 
@@ -185,7 +185,7 @@ export function restoreTrash(batchId = "", baseDir = ALL, ownerId = "") {
   // Whatever could not go back stays in the trash with its own record; an empty batch goes.
   const left = found.batch.files.filter((rel) => !back.has(path.resolve(base, rel)));
   if (left.length) {
-    fs.writeFileSync(path.join(found.dir, "batch.json"), JSON.stringify({ ...found.batch, files: left, items: (found.batch.items || []).filter((item) => !restored.includes(item)) }, null, 2), { mode: 0o600 });
+    writeJsonFile(path.join(found.dir, "batch.json"), { ...found.batch, files: left, items: (found.batch.items || []).filter((item) => !restored.includes(item)) }, { mode: 0o600 });
   } else {
     fs.rmSync(found.dir, { recursive: true, force: true });
   }

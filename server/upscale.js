@@ -8,7 +8,7 @@ import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
 import { nodePacks } from "./node-packs.js";
-import { renameWithRetry } from "./json-store.js";
+import { renameWithRetry, writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 import { outputFolderName } from "./data-names.js";
 
@@ -363,7 +363,7 @@ function rememberValidated(dir, file, spec) {
     try { cache = JSON.parse(fs.readFileSync(cachePath, "utf8")) || {}; } catch { cache = {}; }
     const stat = fs.statSync(path.join(dir, file));
     cache[file] = { size: stat.size, mtime: stat.mtimeMs / 1000, hash: spec.sha256 };
-    fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2));
+    writeJsonFile(cachePath, cache);
   } catch {
     // Only a speed-up; the node validates on its own without it.
   }

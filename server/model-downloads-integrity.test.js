@@ -70,6 +70,8 @@ test("resuming the same file asks for the rest only if it is still that file", a
   assert.equal((await settle("same.safetensors")).status, "done");
   assert.deepEqual(remote.requests[0], { range: "bytes=5-", ifRange: '"v1"' });
   assert.equal(fs.readFileSync(path.join(vaeDir, "same.safetensors"), "utf8"), "0123456789");
+  // The resume note is rewritten the crash-safe way, and goes with its backup once the file is in place.
+  assert.deepEqual(fs.readdirSync(vaeDir).filter((name) => name.startsWith("same.safetensors.")), []);
 });
 
 test("a file changed on the server in between starts over instead of being glued together", async () => {

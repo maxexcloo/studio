@@ -5,7 +5,7 @@ import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { comfyModelsDir, comfyUrl, modelFolders } from './comfy.js';
-import { renameWithRetry } from "./json-store.js";
+import { removeJsonFile, renameWithRetry, writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
@@ -394,7 +394,7 @@ async function fetchInto(entry, signal) {
     // lastModified say which version of the file the part holds, for the next resume.
     const etag = offset ? saved.etag || "" : response.headers.get("etag") || "";
     const lastModified = offset ? saved.lastModified || "" : response.headers.get("last-modified") || "";
-    fs.writeFileSync(note, JSON.stringify({ id: entry.id, label: entry.label, totalBytes: entry.totalBytes, exact: Boolean(expected), etag, lastModified }));
+    writeJsonFile(note, { id: entry.id, label: entry.label, totalBytes: entry.totalBytes, exact: Boolean(expected), etag, lastModified }, { compact: true });
   } catch {
     // Without the note it still resumes this session; only a restart forgets it.
   }
@@ -465,7 +465,7 @@ async function verifyAndFinish(entry, partial, target, note) {
       const actual = await sha256Of(partial, entry.controller?.signal);
       if (actual !== entry.sha256) {
         fs.rmSync(partial, { force: true });
-        fs.rmSync(note, { force: true });
+        removeJsonFile(note);
         throw new Error(`${entry.file} didn’t match its published checksum, so it was deleted. Try again to download it fresh.`);
       }
     } finally {
@@ -479,7 +479,7 @@ function finishDownload(entry, partial, target, note) {
   entry.receivedBytes = fileSize(partial);
   entry.totalBytes = entry.receivedBytes;
   renameWithRetry(partial, target);
-  fs.rmSync(note, { force: true });
+  removeJsonFile(note);
 }
 
 
@@ -490,7 +490,7 @@ export function discardDownload(spec) {
   if (remoteModelsEnabled()) return workerModelFile({ ...spec, workerUrl }, "discard").then(() => refreshWorkerModels({ force: true, workerUrl }));
   for (const dir of folderDirs(spec.folder)) {
     fs.rmSync(path.join(dir, `${spec.file}.part`), { force: true });
-    fs.rmSync(path.join(dir, `${spec.file}.part.json`), { force: true });
+    removeJsonFile(path.join(dir, `${spec.file}.part.json`));
   }
 }
 
