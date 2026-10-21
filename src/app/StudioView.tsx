@@ -13,7 +13,7 @@ import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GalleryViewControls } from './GalleryViewControls';
 import { CircleStop, ChevronLeft, ChevronRight, Info, Library as LibraryIcon, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, sortDetailRows, type GenerationDetailSection } from './format';
+import { clockTime, cn, nearTextLimit, sortDetailRows, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Tip } from './components';
 import { useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -682,10 +682,9 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         // name, then where it is in the gallery, when it was made and its size.
         const viewerList = (view.viewerGallery || []) as GalleryItem[];
         const viewerIndex = viewerList.findIndex((item) => item.id === active.id);
-        const madeAt = active.createdAt ? new Date(active.createdAt) : null;
         const phoneDetail = [
           viewerList.length > 1 && viewerIndex >= 0 ? `${viewerIndex + 1} / ${viewerList.length}` : '',
-          madeAt && !Number.isNaN(madeAt.getTime()) ? madeAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
+          clockTime(active.createdAt),
           profileDetail,
         ].filter(Boolean).join(' · ');
         return (
