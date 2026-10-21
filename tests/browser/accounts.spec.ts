@@ -15,6 +15,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     { id: 'pending-id', username: 'waiting@example.com', displayName: 'Waiting One', role: 'user', pending: true, signInLinked: true, disabled: false }
   ];
   const defaults = { defaultAccessProfileId: '', requireApproval: true };
+  let gatewayAdminTools = false;
   const route = async (request: import('@playwright/test').Route) => {
     const url = new URL(request.request().url());
     if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn, account: signedIn ? { id: 'admin-id', role: 'administrator' } : null } });
@@ -24,7 +25,12 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
     if (url.pathname === '/api/accounts/me') return request.fulfill({ json: { ok: true, account: { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator' }, mcp: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } } });
-    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], ...defaults, lockedFeatures: { loras: false, cloudModels: false, presets: false }, gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
+    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], ...defaults, lockedFeatures: { loras: false, cloudModels: false, presets: false }, gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }], adminTools: gatewayAdminTools } } });
+    if (url.pathname === '/api/accounts/gateway-admin') {
+      posts.push({ url: url.pathname, body: request.request().postDataJSON() });
+      gatewayAdminTools = request.request().postDataJSON().on;
+      return request.fulfill({ json: { ok: true, adminTools: gatewayAdminTools } });
+    }
     if (url.pathname === '/api/accounts/gateway-links') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
@@ -157,6 +163,12 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-links')?.body).toEqual({ identity: 'librechat-user-7', accountId: 'artist-id' });
   await page.getByRole('button', { name: 'Dismiss librechat-user-7', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-pending/dismiss')?.body).toEqual({ identity: 'librechat-user-7' });
+  // Chat Gateway Admin Tools: off by default, first in its group.
+  const adminTools = page.getByRole('switch', { name: 'Chat Gateway Admin Tools', exact: true });
+  await expect(adminTools).toHaveAttribute('aria-checked', 'false');
+  await adminTools.click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-admin')?.body).toEqual({ on: true });
+  await expect(adminTools).toHaveAttribute('aria-checked', 'true');
 
   // The personal token lives in Account; Users is administration only.
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toHaveCount(0);

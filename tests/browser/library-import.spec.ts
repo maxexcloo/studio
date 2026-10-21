@@ -177,3 +177,19 @@ test('LoRAs and Models list what is installed and catalogued, with provenance, l
   await dialog.getByRole('group', { name: 'Kind' }).getByRole('button', { name: 'VAE', exact: true }).click();
   await expect(rows).toHaveCount(1);
 });
+
+test('an import from chat shows in the history as from chat, with its grade and missing files', async ({ page }) => {
+  const fromChat = { ...loraRecord, id: 'imp-chat01', origin: 'chat' };
+  await page.route('**/api/library/imports', (route) => route.fulfill({ json: { ok: true, imports: [fromChat] } }));
+  await page.route('**/api/library/imports/imp-chat01', (route) => route.fulfill({ json: { ok: true, import: fromChat } }));
+  await page.route('**/api/models/downloads', (route) => route.fulfill({ json: noDownloads }));
+  await page.goto('/');
+  const dialog = await openLibrary(page);
+  const row = dialog.getByRole('button', { name: /Watercolour Style/ });
+  await expect(row).toContainText('From Chat');
+  await expect(row).toContainText('1 Missing');
+  await expect(row).toContainText('Partial');
+  await row.click();
+  await expect(dialog.locator('.set-page-head p')).toContainText('From Chat');
+  await expect(dialog.getByText('watercolour-v2.safetensors', { exact: true })).toBeVisible();
+});

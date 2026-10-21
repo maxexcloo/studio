@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Native port of the Studio MCP service; see mcp.LICENSE.
 import crypto from 'node:crypto';
+import path from 'node:path';
 import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -16,6 +17,8 @@ import { createControlClient } from './ai-control.js';
 import { gatewaySettings } from './assistant.js';
 import { mayUseFeature } from './account-policy.js';
 import { createChatAssistantMemory, registerAssistantTools } from './mcp-assistant.js';
+import { adminInstructions, registerAdminTools } from './mcp-admin.js';
+import fs from 'node:fs';
 
 // Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
 export const generateWaitSeconds = 60;
@@ -60,10 +63,21 @@ const shortPrompt = (prompt) => {
   const flat = String(prompt).replace(/\s+/g, ' ').trim();
   return (flat.length > maxShownPromptCharacters ? `${flat.slice(0, maxShownPromptCharacters - 1)}…` : flat).replace(/[\\`*_[\]<>#|]/g, '\\$&');
 };
+const exportLinkMs = 60 * 60 * 1000;
+const exportName = /^studio-profiles-[A-Za-z0-9-]+\.zip$/;
+/**
+ * Whether a media caller gets the admin tools: an administrator account by its own MCP token, or
+ * through the trusted gateway only while Chat Gateway Admin Tools (`gatewayAdminTools()`) is on.
+ * Without an account (the shared key in single-user mode) there are none.
+ */
+export function adminScope({ account, gateway = false, gatewayAdminTools = () => false }) {
+  if (account?.role !== 'administrator' || account.authenticated === false) return false;
+  return gateway ? gatewayAdminTools() === true : true;
+}
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, imageWaitSeconds = generateWaitSeconds, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, imageWaitSeconds = generateWaitSeconds, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult, gatewayAdminTools = () => false, claimHandover = () => false } = {}) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
@@ -83,7 +97,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
   const instructions = mediaInstructions(Boolean(writer));
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
-  const chatAssistant = createChatAssistantMemory();
+  const chatAssistant = createChatAssistantMemory({ file: dataDir ? path.join(dataDir, 'mcp-assistant.json') : '' });
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
   if (media) app.use('/api/models', (req, _res, next) => {
     if (req.method !== 'GET' ? true : req.path === '/' && req.query.cached !== '1') media.invalidateProfiles();
@@ -148,7 +162,10 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
     // Prompt Assistant is an access-profile feature; the shared key without accounts (single user) has it.
     const assistant = scope === 'media' && assistantGateway && (!account || mayUseFeature(account, 'promptAssistant'));
-    req.mcpActor = { scope, owner, assistant, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
+    // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
+    // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
+    const admin = scope === 'media' && adminScope({ account, gateway: equal(token, mediaKey), gatewayAdminTools });
+    req.mcpActor = { scope, owner, assistant, admin, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
     next();
   };
   const create = (actor) => {
@@ -171,7 +188,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         if (key && inflight.get(key) === controller) inflight.delete(key);
       }
     });
-    const resolve = (value) => media.resolve(owner, refs, value);
+    // A job handed over from Studio's Refine in Chat becomes this account's for the chat (chat-handover.js).
+    const resolve = (value) => {
+      const id = media.resolve(owner, refs, value);
+      if (typeof id === 'string' && !media.owns(owner, id) && claimHandover(owner, id, { accountMode })) media.adopt(owner, id);
+      return id;
+    };
     /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
     const respond = async (submission, profile, waitSeconds, signal, guide = '', promptSource = 'exact', notice = '') => {
       const label = profile.label || profile.id;
@@ -248,7 +270,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       else Object.assign(args, { prompts: written.prompts, count });
       return written.source;
     };
-    const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions: scope === 'control' ? controlInstructions : instructions });
+    const server = new McpServer({ name: 'Studio', version: '1.0.0' }, { instructions: scope === 'control' ? controlInstructions : actor.admin ? `${instructions} ${adminInstructions}` : instructions });
     const toolError = server.createToolError.bind(server);
     server.createToolError = (message) => toolError(conciseError(message));
     if (scope === 'media' || scope === 'unlinked' || scope === 'anonymous') {
@@ -344,6 +366,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson({ job_id: id, ...(ref ? { ref } : {}), link: media.pageUrl(owner, id), ...media.summary(status), outputs: (status.outputs || []).flatMap((item, index) => mcpOutputPath(item.url) ? [{ output_index: index, url: media.url(owner, id, index) }] : []) });
       }, { readOnlyHint: true });
       tool(server, 'Result', 'Show Result', 'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for "show them" or "show me all"). wait_seconds up to 20 allows a nearly finished job to end. A job still running returns its link: share it and stop. Never poll.', { ...output, job_id: z.string().min(1).max(200), delivery: z.enum(['notification', 'preview']).default('preview'), wait_seconds: wait(1800), detail: z.boolean().default(false).describe('Adds the JSON record to a notification.') }, ({ job_id, output_index, delivery, wait_seconds, detail }, signal) => /^\s*all\s*$/i.test(job_id) ? media.resultsAll(owner, refs, { signal }) : media.result(owner, resolve(job_id), output_index, capWait(wait_seconds, delivery), delivery, { scope: refs, signal, detail }), { readOnlyHint: true });
+      if (actor.admin) registerAdminTools({ tool, server, media, owner, resolve, signExport: (name) => signExport(name) });
       if (actor.assistant) registerAssistantTools({ tool, server, media, owner, memory: chatAssistant, profileOf: async (value) => namedInTier(await media.profiles('all', owner), value).profile });
       tool(server, 'Handover', 'Copy Chat Summary', 'Prepare a copy-paste summary when asked or when the host reports about 90% context used. Pass decisions, preferences and unfinished work as summary. Never guesses context usage.', {
         summary: z.string().trim().min(1).max(12000)
@@ -422,7 +445,9 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
           const fallback = [request ? `${item.prompt}, ${request}` : item.prompt];
           source = usePrompts(plan.args, await write(plan.profile, { request: base, changes, count, references, role: kind !== own ? 'first-frame' : references ? item.settings?.referenceRole || 'reference' : '', fallback, signal }), count);
         }
-        const submission = await submit(plan.profile, plan.args, prompt ? { request: prompt } : { request: base, changes, styled: source !== 'exact' });
+        // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
+        const carried = !prompt && !request && !moved && source === 'exact' ? item.assistant || recorded?.assistant : null;
+        const submission = await submit(plan.profile, plan.args, { ...(prompt ? { request: prompt } : { request: base, changes, styled: source !== 'exact' }), ...(carried ? { assistant: carried } : {}) });
         const dropped = plan.droppedLoras?.length ? `Left out ${plan.droppedLoras.length === 1 ? 'a LoRA' : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(', ')}); tell the user. ` : '';
         return respond(submission.queued, plan.profile, wait_seconds, signal, submission.guide, source, `${plan.tierNote || ''}${dropped}`);
       });
@@ -480,6 +505,24 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     }
   });
   app.all('/mcp', guard, (_req, res) => res.status(405).set('Allow', 'POST').json({ error: 'Use Streamable HTTP POST for MCP.' }));
+  // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
+  const exportsDir = dataDir ? path.join(dataDir, 'exports') : '';
+  function signExport(name, now = Date.now()) {
+    const expiresAt = new Date(now + exportLinkMs).toISOString();
+    const claims = Buffer.from(JSON.stringify({ n: name, e: now + exportLinkMs })).toString('base64url');
+    return { url: `${publicUrl}/mcp/exports/${claims}.${media.digest(`export:${claims}`)}`, expiresAt };
+  }
+  if (media && exportsDir) app.get('/mcp/exports/:token', (req, res) => {
+    try {
+      if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');
+      const [claims, signature] = String(req.params.token).split('.');
+      if (!claims || !equal(signature, media.digest(`export:${claims}`))) throw new Error('Invalid link.');
+      const { n: name, e: expires } = JSON.parse(Buffer.from(claims, 'base64url').toString());
+      if (!exportName.test(String(name)) || !(Number(expires) > Date.now())) throw new Error('Expired.');
+      const archive = fs.readFileSync(path.join(exportsDir, name));
+      res.set({ 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${name}"` }).send(archive);
+    } catch { res.status(404).json({ error: 'The export link is invalid, unavailable or expired.' }); }
+  });
   if (media) app.get('/mcp/results/:token', async (req, res) => {
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()) throw new Error('Invalid host.');

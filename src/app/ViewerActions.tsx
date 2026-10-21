@@ -1,10 +1,10 @@
-import { RotateCcw } from 'lucide-react';
+import { MessageSquare, RotateCcw } from 'lucide-react';
 import { assistantSummary, cn } from './format';
 import { Tip } from './components';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import type { GalleryItem } from './types';
 
-/* Details shares one Copy · Recreate footer on desktop and phone. */
+/* Details shares one Copy · Refine · Recreate footer on desktop and phone. */
 
 /** A prompt as text, with Copy beside its label. */
 export function PromptReadout({ label, text, onCopy, onUse }: {
@@ -65,11 +65,13 @@ export function generationInputsText(item: GalleryItem) {
   return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', assistantSummary(item) ? `Written By: ${assistantSummary(item)}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
 }
 
-export function DetailsFooter({ onCopy, onRecreate }: { onCopy: () => Promise<boolean>; onRecreate?: () => void }) {
+/** Copy · Refine · Recreate. Refine in Chat hands the result to the deployment's chat (refineInChat.ts). */
+export function DetailsFooter({ onCopy, onRecreate, onRefine }: { onCopy: () => Promise<boolean>; onRecreate?: () => void; onRefine?: () => void }) {
   const copy = useCopyFeedback();
   return <div className="details-footer" role="group" aria-label="Details Actions">
     <div className="details-footer-row">
       <button type="button" className={cn('btn details-footer-btn', copy.copied && 'is-copied')} onClick={() => { void copy.copyWith(onCopy); }}><CopyIcon copied={Boolean(copy.copied)} size={15} /><span>{copy.copied ? 'Copied' : 'Copy'}</span></button>
+      {onRefine ? <Tip content="Refine in Chat"><button type="button" className="btn details-footer-btn" aria-label="Refine in Chat" onClick={onRefine}><MessageSquare size={15} /><span>Refine</span></button></Tip> : null}
       {onRecreate ? <Tip content="Recreate With the Same Seed"><button type="button" className="btn is-primary details-footer-btn" onClick={onRecreate}><RotateCcw size={16} /><span>Recreate</span></button></Tip> : null}
     </div>
   </div>;

@@ -155,3 +155,40 @@ test('the catalogue and manifest join the bundle when there are any', (t) => {
   assert.equal(names['config/models.json'], fs.readFileSync(manifest, 'utf8'));
   assert.equal(names['config/prompting.json'], undefined);
 });
+
+test('chat edits through the same routes record chat as the origin, and a chat draft stays AI-Drafted', async (t) => {
+  const app = express();
+  app.use(express.json());
+  // MCP's admin tools reach these routes with the administrator's MCP credential (multi-user-auth.js).
+  app.use((req, _res, next) => { if (req.headers['x-test-chat']) req.studioAccount = { userId: 'admin-1', role: 'administrator', credential: 'mcp-admin' }; next(); });
+  editor.registerProfileEditorRoutes(app, { accountName: () => 'admin-1' });
+  registerProfileRoutes(app, { profiles: () => profileStore(), guides: () => guideStore(), accountName: () => 'admin-1' });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, route, body, chat = true) => {
+    const response = await fetch(`${base}${route}`, { method, headers: { 'content-type': 'application/json', ...(chat ? { 'x-test-chat': '1' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    return { status: response.status, body: await response.json() };
+  };
+
+  const listed = await call('GET', '/api/profiles/guides');
+  assert.ok(listed.body.packs.some((pack) => pack.packId === 'krea2' && pack.version >= 1));
+  const pack = await call('GET', '/api/profiles/guides/krea2');
+  assert.equal(pack.body.packId, 'krea2');
+  assert.equal((await call('GET', '/api/profiles/guides/missing')).status, 404);
+  const drafted = await call('PUT', '/api/profiles/guides/krea2', { pack: { ...pack.body.pack, summary: 'From chat.' }, baseHash: pack.body.hash, draft: true });
+  assert.deepEqual([drafted.body.meta.origin, drafted.body.meta.aiDrafted], ['chat', true]);
+  // The UI's draft flag means nothing: only chat drafts are AI-Drafted.
+  const ui = await call('PUT', '/api/profiles/guides/krea2', { pack: { ...pack.body.pack, summary: 'From Studio.' }, baseHash: drafted.body.hash, draft: true }, false);
+  assert.deepEqual([ui.body.meta.origin, ui.body.meta.aiDrafted], ['studio', false]);
+  const reverted = await call('POST', '/api/profiles/guides/krea2/revert', { version: drafted.body.meta.version, baseHash: ui.body.hash });
+  assert.equal(reverted.body.meta.origin, 'chat');
+
+  const current = editor.readEditableProfile('krea-test');
+  assert.equal((await call('PUT', '/api/profiles/editable/krea-test', { text: profile('Chat'), baseHash: 'f'.repeat(64) })).status, 409, 'a stale base is refused');
+  const edited = await call('PUT', '/api/profiles/editable/krea-test', { text: profile('Chat'), baseHash: current.hash, draft: true });
+  assert.deepEqual([edited.body.version.origin, edited.body.version.aiDrafted], ['chat', true]);
+  const back = await call('POST', '/api/profiles/editable/krea-test/revert', { version: 1, baseHash: edited.body.hash });
+  assert.deepEqual([back.body.version.origin, back.body.version.aiDrafted], ['chat', false]);
+});

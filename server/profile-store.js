@@ -306,9 +306,9 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
   }
 
   /** Restores an earlier version as a new version (history only grows). */
-  function revert(packId, n, { by = '', baseHash = '' } = {}) {
+  function revert(packId, n, { by = '', baseHash = '', origin = 'studio' } = {}) {
     const old = version(packId, n);
-    return save(packId, old.pack, { by, origin: 'studio', baseHash });
+    return save(packId, old.pack, { by, origin, baseHash });
   }
 
   function approve(packId, { by = '' } = {}) {

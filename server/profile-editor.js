@@ -4,7 +4,7 @@ import path from "node:path";
 import { metadataFromJson, userWorkflowsDir, validateGraph, workflowMissingFiles } from "./custom-workflows.js";
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { requireAdmin } from "./route-access.js";
+import { fromChat, requireAdmin } from "./route-access.js";
 import { profileStore } from "./profile-store.js";
 import { profileBlock, profileBlockName, profileBlocksIn } from "./profile-block.js";
 
@@ -164,9 +164,9 @@ export function saveEditableProfile(id, text, { baseHash = "", by = "", info = n
 }
 
 /** Restores an earlier version as a new version, checked like any edit. */
-export function revertEditableProfile(id, version, { by = "", baseHash = "", info = null } = {}) {
+export function revertEditableProfile(id, version, { by = "", baseHash = "", info = null, origin = "studio" } = {}) {
   const old = profileStore({ workflowsDir: userWorkflowsDir }).version(id, version);
-  return saveEditableProfile(id, old.text, { baseHash, by, info, origin: "studio" });
+  return saveEditableProfile(id, old.text, { baseHash, by, info, origin });
 }
 
 export function registerProfileEditorRoutes(app, { objectInfo = async () => null, onSaved = () => {}, accountName = () => "" } = {}) {
@@ -196,7 +196,9 @@ export function registerProfileEditorRoutes(app, { objectInfo = async () => null
     try {
       let kind = "image";
       try { kind = metaOf(JSON.parse(String(req.body?.text || "")))?.kind || "image"; } catch { /* the check reports it */ }
-      const saved = saveEditableProfile(req.params.id, req.body?.text, { baseHash: String(req.body?.baseHash || ""), by: accountName(req), info: await info(kind) });
+      // From chat (MCP's admin tools) the version's origin is chat; a draft stays AI-Drafted until approved.
+      const chat = fromChat(req);
+      const saved = saveEditableProfile(req.params.id, req.body?.text, { baseHash: String(req.body?.baseHash || ""), by: accountName(req), info: await info(kind), origin: chat ? "chat" : "studio", aiDrafted: chat && req.body?.draft === true });
       await onSaved(req.params.id);
       res.json({ ok: true, ...saved });
     } catch (error) { fail(res, error); }

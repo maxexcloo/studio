@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { inspectInstalled, libraryItems } from './library-routes.js';
+import express from 'express';
+import { inspectInstalled, libraryItems, registerLibraryRoutes } from './library-routes.js';
+import { createImportStore } from './library-imports.js';
+import { createCatalogueStore } from './library-catalogue.js';
 
 test('installed files join the catalogue, and catalogued files that are not installed still list', () => {
   const items = libraryItems({
@@ -34,4 +37,46 @@ test('a wanted file is installed by checksum, unverified by name and size, or a 
   assert.deepEqual(await inspectInstalled({ ...want, sha256: 'f'.repeat(64) }, { foldersFor, verify: true }), { status: 'conflict' });
   assert.deepEqual(await inspectInstalled({ ...want, file: 'other.safetensors' }, { foldersFor }), { status: 'missing' });
   assert.deepEqual(await inspectInstalled({ ...want, folder: 'nowhere' }, { foldersFor }), { status: 'missing' });
+});
+
+test('an import from chat goes through the same pipeline, records chat as its origin and shows in the history; catalogue edits undo', async (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-library-chat-'));
+  const presets = process.env.STUDIO_ENABLE_PRESETS;
+  process.env.STUDIO_ENABLE_PRESETS = '1';
+  t.after(() => { fs.rmSync(dataDir, { recursive: true, force: true }); if (presets === undefined) delete process.env.STUDIO_ENABLE_PRESETS; else process.env.STUDIO_ENABLE_PRESETS = presets; });
+  const { model, versions } = JSON.parse(fs.readFileSync(new URL('./fixtures/civitai/model-versions.json', import.meta.url), 'utf8'));
+  const json = async (pathname) => pathname === 'models/9' ? model : Object.values(versions).find((item) => item.id === Number(pathname.split('/')[1]));
+  const catalogue = createCatalogueStore({ dataDir, log: {} });
+  const app = express();
+  app.use(express.json());
+  // MCP's admin tools arrive with the administrator's MCP credential (multi-user-auth.js).
+  app.use((req, _res, next) => { if (req.headers['x-test-chat']) req.studioAccount = { id: 'admin-1', role: 'administrator', credential: 'mcp-admin' }; next(); });
+  registerLibraryRoutes(app, {
+    presets: {}, installed: async () => ({}), loraInfo: async () => ({}), catalogue: () => catalogue, json,
+    inspect: async () => ({ status: 'missing' }), downloads: () => ({ active: null, queued: [], recent: [] }), startDownload: async () => ({}),
+    store: createImportStore({ dataDir, log: {} })
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, route, body, chat = true) => (await fetch(`${base}${route}`, { method, headers: { 'content-type': 'application/json', ...(chat ? { 'x-test-chat': '1' } : {}) }, body: body ? JSON.stringify(body) : undefined })).json();
+
+  const { import: record } = await call('POST', '/api/library/imports', { url: 'https://civitai.com/models/9?modelVersionId=20' });
+  assert.deepEqual([record.origin, record.by, record.state, record.grade.value], ['chat', 'admin-1', 'needs-files', 'partial']);
+  assert.deepEqual(record.resources.map((resource) => [resource.want.file, resource.status]), [['watercolour-v2.safetensors', 'missing']]);
+  assert.equal(catalogue.entry('loras/watercolour-v2.safetensors').origin, 'chat', 'its catalogue entry is from chat too');
+  const ui = await call('POST', '/api/library/imports', { url: 'https://civitai.com/models/9?modelVersionId=20' }, false);
+  assert.equal(ui.import.origin, 'ui');
+  const history = (await call('GET', '/api/library/imports', undefined, false)).imports;
+  assert.deepEqual(history.map((item) => item.origin).sort(), ['chat', 'ui'], 'both show in Library › Import');
+
+  const edited = await call('PATCH', '/api/library/catalogue', { key: 'loras/watercolour-v2.safetensors', patch: { title: 'Watercolour FX', notes: 'Soft edges.' } });
+  assert.equal(edited.ok, true, JSON.stringify(edited));
+  assert.deepEqual([edited.entry.title, edited.entry.origin], ['Watercolour FX', 'chat']);
+  assert.ok(Object.hasOwn(edited.previous, 'title'), 'the previous values come back');
+  const refused = await call('PATCH', '/api/library/catalogue', { key: 'loras/watercolour-v2.safetensors', patch: { bytes: 5 } });
+  assert.equal(refused.ok, false, 'an edit changes no provenance');
+  const undone = await call('POST', '/api/library/catalogue/undo', { key: 'loras/watercolour-v2.safetensors' });
+  assert.notEqual(undone.entry.title, 'Watercolour FX');
 });

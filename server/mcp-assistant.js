@@ -2,9 +2,11 @@
 // The prompt assistant's MCP tools: RewritePrompt, SuggestNegative and SuggestLoras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
 // share one engine and one set of rules (Prompt Assistant, NSFW Models for Spicy, LoRAs, the
-// account's profiles). What the chat used is remembered briefly, so a Generate with that prompt
-// records it on the result (`assistant`, source "chat") for Details and Recreate.
+// account's profiles). What the chat used is remembered for six hours, on disk (mcp-assistant.json
+// beside MCP's ownership file), so a Generate with that prompt records it on the result
+// (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from 'zod';
+import { readJsonFile, writeJsonFile } from './json-store.js';
 import { assistantPresets, defaultPreset } from './assistant-presets.js';
 import { mcpJson } from './mcp-media.js';
 
@@ -13,18 +15,35 @@ const rememberMs = 6 * 60 * 60 * 1000;
 const maxReferences = 4;
 const key = (owner, prompt) => JSON.stringify([owner || '', String(prompt || '').replace(/\s+/g, ' ').trim().toLowerCase()]);
 
-/** What each owner's chat recently had written or suggested, for the generation record. */
-export function createChatAssistantMemory({ now = Date.now } = {}) {
+/**
+ * What each owner's chat recently had written or suggested, for the generation record. With `file`,
+ * it is kept there (owners are account ids or MCP's keyed hashes; prompts are already in the results).
+ */
+export function createChatAssistantMemory({ now = Date.now, file = '', log = console } = {}) {
   const rewrites = new Map();
   const suggested = new Map();
+  const fresh = (entry) => entry && now() - entry.at < rememberMs ? entry : null;
+  if (file) {
+    try {
+      const saved = readJsonFile(file);
+      for (const [map, entries] of [[rewrites, saved?.rewrites], [suggested, saved?.suggested]]) {
+        for (const [id, value] of Array.isArray(entries) ? entries.slice(-maxRemembered) : []) if (typeof id === 'string' && fresh(value)) map.set(id, value);
+      }
+    } catch (error) { if (error.code !== 'ENOENT') log.warn?.(`[mcp] The chat assistant records couldn’t be read; starting afresh: ${error.message}`); }
+  }
+  const save = () => {
+    if (!file) return;
+    try { writeJsonFile(file, { version: 1, rewrites: [...rewrites].filter(([, value]) => fresh(value)), suggested: [...suggested].filter(([, value]) => fresh(value)) }, { mode: 0o600 }); }
+    catch (error) { log.warn?.(`[mcp] The chat assistant records couldn’t be saved: ${error.message}`); }
+  };
   const keep = (map, id, value) => {
     map.delete(id);
     if (map.size >= maxRemembered) map.delete(map.keys().next().value);
     map.set(id, { ...value, at: now() });
+    save();
   };
-  const fresh = (entry) => entry && now() - entry.at < rememberMs ? entry : null;
   return {
-    rewrote(owner, prompt, { preset, model }) { keep(rewrites, key(owner, prompt), { preset, model }); },
+    rewrote(owner, prompt, { preset, model }) { keep(rewrites, key(owner, prompt), { preset, ...(model ? { model } : {}) }); },
     suggested(owner, names) { keep(suggested, owner || '', { names: [...new Set([...(fresh(suggested.get(owner || ''))?.names || []), ...names])].slice(-32) }); },
     /** The `assistant` record for a run of these prompts with this stack, or null when the chat wrote none of them. */
     record(owner, prompts = [], loras = []) {

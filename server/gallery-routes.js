@@ -115,7 +115,7 @@ export function registerGalleryReadRoutes(app) {
     cleanupGalleryState(jobs);
     const items = filterVisibleGallery(recordsForRequest(gallery, req).filter((item) => item.jobId === req.params.id));
     // Prompts and settings only on request: MCP reads them to run a finished result again or animate it.
-    const fields = ["jobId", "index", "status", "type", "url", ...(req.query.settings === "1" ? ["prompt", "negative", "width", "height", "settings"] : [])];
+    const fields = ["jobId", "index", "status", "type", "url", ...(req.query.settings === "1" ? ["prompt", "negative", "width", "height", "settings", "assistant"] : [])];
     res.json({ items: items.map((item) => Object.fromEntries(
       fields.filter((key) => key in item).map((key) => [key, item[key]])
     )) });

@@ -27,7 +27,7 @@ export type ImportResource = {
   downloadId?: string; downloadError?: string; progress?: { receivedBytes: number; totalBytes: number }; unverified?: boolean; nameOnly?: boolean;
 };
 export type ImportRecord = {
-  id: string; createdAt: string; state: 'resolving' | 'needs-files' | 'downloading' | 'ready' | 'failed' | 'cancelled';
+  id: string; createdAt: string; /** Where it was imported: here, or from an administrator's chat (MCP's Import). */ origin?: 'ui' | 'chat'; state: 'resolving' | 'needs-files' | 'downloading' | 'ready' | 'failed' | 'cancelled';
   input: { kind: 'civitai-image' | 'civitai-model' | 'hf-file' | 'hf-repo' | 'image-file' | 'described'; url?: string; presetId?: string };
   title: string; version?: string; baseModel?: string; modelType?: string; links?: Links;
   resources: ImportResource[]; grade: Grade; results: { catalogueKeys?: string[]; galleryItemId?: string; profileId?: string; guideId?: string }; error?: string; warnings?: string[];
@@ -43,6 +43,9 @@ const KindIcon = ({ kind }: { kind: ImportRecord['input']['kind'] }) => kind ===
 const when = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
 /** Files Download Missing would queue: required, missing, downloadable. */
 const missingOf = (record: ImportRecord) => record.resources.filter((resource) => !resource.optional && resource.status === 'missing' && resource.supported !== false && !resource.unavailable);
+
+/** Required files that aren't installed, whether or not they can download: the history's "n Missing". */
+const absentOf = (record: ImportRecord) => record.resources.filter((resource) => !resource.optional && ['missing', 'unavailable', 'unsupported', 'conflict'].includes(resource.status));
 
 let lastImports: ImportRecord[] | null = null;
 
@@ -156,7 +159,7 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
       </div>
       <header className="set-page-head">
         <h3 id="library-panel-title">{record.title || record.input.url}</h3>
-        <p>{[kindWords[record.input.kind], record.modelType && record.modelType !== 'repository' ? record.modelType : '', record.version, record.baseModel].filter(Boolean).join(' · ')}</p>
+        <p>{[kindWords[record.input.kind], record.modelType && record.modelType !== 'repository' ? record.modelType : '', record.version, record.baseModel, record.origin === 'chat' ? 'From Chat' : ''].filter(Boolean).join(' · ')}</p>
       </header>
       <section className="library-grade-block" aria-label="Grade">
         <div className="library-grade-line"><GradeChip grade={record.grade} /><span className="library-grade-state">{stateWords[record.state]}</span></div>
@@ -207,10 +210,10 @@ export function LibraryImport({ showToast, downloads, landed, busy, run, onOpenI
         <span className="library-import-icon" aria-hidden="true"><KindIcon kind={item.input.kind} /></span>
         <span className="list-row-text">
           <span className="list-row-label">{item.title || item.input.url}</span>
-          <span className="list-row-detail">{[kindWords[item.input.kind], item.baseModel, when(item.createdAt)].filter(Boolean).join(' · ')}</span>
+          <span className="list-row-detail">{[kindWords[item.input.kind], item.baseModel, item.origin === 'chat' ? 'From Chat' : '', item.state !== 'failed' && absentOf(item).length ? `${absentOf(item).length} Missing` : '', when(item.createdAt)].filter(Boolean).join(' · ')}</span>
         </span>
         <span className="list-row-control library-import-meta"><GradeChip grade={item.state === 'failed' ? null : item.grade} /><span className={cn('library-status', `is-${item.state}`)}>{stateWords[item.state]}</span></span>
       </button>)}</Group>
-      : <Group title="History"><EmptyState compact title="No Imports Yet">Imports from here show here, with their grade.</EmptyState></Group>}
+      : <Group title="History"><EmptyState compact title="No Imports Yet">Imports from here and from chat show here, with their grade.</EmptyState></Group>}
   </div>;
 }

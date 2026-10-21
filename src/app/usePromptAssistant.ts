@@ -3,7 +3,7 @@ import { ApiError, apiFetch, apiJson, scopedStorageKey } from './api';
 import { insertTriggers, removeTriggers, saysAny, stillWritten } from './assistantText';
 import { refreshPrompts } from './recentPrompts';
 import type { ShowToast } from './toast';
-import type { LoraSelection, Profile, SelectedReferenceAsset } from './types';
+import type { GalleryItem, LoraSelection, Profile, SelectedReferenceAsset } from './types';
 
 /**
  * The prompt assistant in the composer (UI-PATTERNS › Composer): the magic button's rewrite, which
@@ -49,6 +49,8 @@ export type PromptAssistant = {
   loadPickerSuggestions: () => void;
   /** For the generation request: what the assistant did, while the prompt is still its own. */
   record: () => AssistantRecord | null;
+  /** Recreate: a result's record comes along with its prompt, so the rerun says how it was written too. */
+  adopt: (record: GalleryItem["assistant"] | null, prompt: string) => void;
 };
 
 type Options = {
@@ -139,7 +141,7 @@ export function usePromptAssistant(options: Options): PromptAssistant {
   const stopped = useRef(false);
   const pickerCache = useRef(new Map<string, LoraSuggestion[]>());
   /** The last rewrite: its text, preset and model, for the generation record. */
-  const written = useRef<{ prompt: string; preset: string; model?: string } | null>(null);
+  const written = useRef<{ prompt: string; preset: string; model?: string; source?: 'ui' | 'chat' } | null>(null);
   /** Suggested LoRAs added from chips or the picker, and the trigger words each one inserted. */
   const chosen = useRef(new Set<string>());
   const triggerWords = useRef(new Map<string, string[]>());
@@ -361,7 +363,13 @@ export function usePromptAssistant(options: Options): PromptAssistant {
     if (!last || !stillWritten(latest.current.prompt, last.prompt)) return null;
     const stacked = new Set(stackNames());
     const picked = [...chosen.current].filter((name) => stacked.has(name));
-    return { preset: last.preset, ...(last.model ? { model: last.model } : {}), source: 'ui', ...(picked.length ? { lorasSuggested: picked } : {}) };
+    return { preset: last.preset, ...(last.model ? { model: last.model } : {}), source: last.source || 'ui', ...(picked.length ? { lorasSuggested: picked } : {}) };
+  }, []);
+
+  const adopt = useCallback((recorded: GalleryItem["assistant"] | null, text: string) => {
+    if (!recorded?.preset || !text.trim()) { written.current = null; return; }
+    written.current = { prompt: text, preset: recorded.preset, ...(recorded.model ? { model: recorded.model } : {}), source: recorded.source === 'chat' ? 'chat' : 'ui' };
+    for (const name of recorded.lorasSuggested || []) chosen.current.add(name);
   }, []);
 
   const suggestions = chips.profileId === profileId ? chips.list : [];
@@ -376,6 +384,6 @@ export function usePromptAssistant(options: Options): PromptAssistant {
     addSuggestion: (item: LoraSuggestion) => add([item]), addAllSuggestions: () => add(suggestions),
     removeSuggestion: (name: string) => latest.current.setLoras(latest.current.loras.filter((item) => item.name !== name)),
     isAdded: (name: string) => loras.some((item) => item.name === name),
-    pickerSuggestions: pickerList, loadPickerSuggestions, record
-  }), [available, info.presets, chosenPreset, busy, rewrite, stop, referencesNote, negativeOffered, writeNegative, lorasOffered, suggestLoras, suggestions, add, loras, pickerList, loadPickerSuggestions, record]);
+    pickerSuggestions: pickerList, loadPickerSuggestions, record, adopt
+  }), [available, info.presets, chosenPreset, busy, rewrite, stop, referencesNote, negativeOffered, writeNegative, lorasOffered, suggestLoras, suggestions, add, loras, pickerList, loadPickerSuggestions, record, adopt]);
 }
