@@ -210,6 +210,10 @@ function TooltipInner({
             sideOffset={sideOffset}
             collisionPadding={8}
             forceMount
+            // A label never takes a click: Radix's positioning wrapper would
+            // otherwise sit over the neighbouring control (the phone's Model
+            // row under a References label shown after Escape hands focus back).
+            ref={(node) => { if (node?.parentElement) node.parentElement.style.pointerEvents = "none"; }}
             style={{ pointerEvents: "none", zIndex: "var(--z-tooltip)" as unknown as number }}
           >
             <motion.div
