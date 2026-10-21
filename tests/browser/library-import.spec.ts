@@ -139,7 +139,7 @@ test('a link that can’t be imported says why in the status pill and stays in t
   await expect(dialog.getByText('No Imports Yet', { exact: true })).toBeVisible();
   await dialog.getByLabel('Link', { exact: true }).fill(failed.input.url);
   await dialog.locator('form').getByRole('button', { name: 'Import', exact: true }).click();
-  await expect(statusPill(page).filter({ hasText: 'This repository is gated or private.' })).toBeVisible();
+  await expect(statusPill(page).filter({ hasText: 'This repository is gated or private' })).toBeVisible();
   const row = dialog.getByRole('button', { name: /huggingface\.co\/org\/gated/ });
   await expect(row).toContainText('Failed');
   await expect(dialog.getByRole('heading', { name: 'Import', exact: true })).toBeVisible();
@@ -313,7 +313,7 @@ test('a bare image is described by AI and graded Partial; without vision it says
   dialog = await openLibrary(page);
   await expect(dialog.getByText('Images without metadata can’t be described: The assistant model can’t read images. Choose a vision model in Settings › Models › Integrations.')).toBeVisible();
   await dropImage(page, dialog.locator('form.library-drop'), 'photo.png');
-  await expect(statusPill(page).filter({ hasText: 'This image has no generation metadata.' })).toBeVisible();
+  await expect(statusPill(page).filter({ hasText: 'This image has no generation metadata' })).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Import', exact: true })).toBeVisible();
 });
 

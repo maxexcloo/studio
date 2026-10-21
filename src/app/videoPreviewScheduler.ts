@@ -1,4 +1,5 @@
 import { forcedPhone, NARROW_QUERY } from './device';
+import { accountStorageScopeChangeEvent, scopedStorageKey } from './api';
 
 /** One visibility observer and a small decoder budget for every video tile. */
 type Preview = { video: HTMLVideoElement; update: (load: boolean) => void; ratio: number; near: boolean; loaded: boolean };
@@ -8,17 +9,29 @@ let visibleObserver: IntersectionObserver | undefined;
 let suspended = 0;
 // Phones and touch screens start with grid autoplay off.
 const SMALL_QUERY = `${NARROW_QUERY}, (pointer: coarse)`;
-let autoplay = typeof window === 'undefined' || !window.matchMedia(SMALL_QUERY).matches;
-try {
-  const saved = localStorage.getItem('studio-grid-autoplay');
-  if (saved !== null) autoplay = saved !== 'off';
-} catch { /* Storage may be disabled. */ }
+const autoplayDefault = typeof window === 'undefined' || !window.matchMedia(SMALL_QUERY).matches;
+let autoplay = autoplayDefault;
+// Each account keeps its own choice; the unscoped key is what it chose before accounts kept one.
+const readAutoplay = () => {
+  try {
+    const saved = localStorage.getItem(scopedStorageKey('studio-grid-autoplay')) ?? localStorage.getItem('studio-grid-autoplay');
+    return saved === null ? autoplayDefault : saved !== 'off';
+  } catch { return autoplayDefault; /* Storage may be disabled. */ }
+};
+autoplay = readAutoplay();
 const autoplayListeners = new Set<() => void>();
+if (typeof window !== 'undefined') window.addEventListener(accountStorageScopeChangeEvent, () => {
+  const next = readAutoplay();
+  if (next === autoplay) return;
+  autoplay = next;
+  reconcile();
+  autoplayListeners.forEach((listener) => listener());
+});
 export const gridAutoplayEnabled = () => autoplay;
 export function subscribeGridAutoplay(listener: () => void) { autoplayListeners.add(listener); return () => { autoplayListeners.delete(listener); }; }
 export function toggleGridAutoplay() {
   autoplay = !autoplay;
-  try { localStorage.setItem('studio-grid-autoplay', autoplay ? 'on' : 'off'); } catch { /* Keep the current session setting. */ }
+  try { localStorage.setItem(scopedStorageKey('studio-grid-autoplay'), autoplay ? 'on' : 'off'); } catch { /* Keep the current session setting. */ }
   reconcile();
   autoplayListeners.forEach((listener) => listener());
 }

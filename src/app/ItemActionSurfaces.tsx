@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, RefreshCw, Square, Star } from 'lucide-react';
+import { Info, LoaderCircle, Square, Star } from 'lucide-react';
 import { cn } from './format';
 import { Tip } from './components';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
@@ -38,7 +38,7 @@ function UpscaleBarButton({ item, action }: { item: GalleryItem; action: ItemAct
   return (
     <button type="button" className={cn(item.upscaleActive && item.upscale?.url && 'is-on')} aria-label={running ? upscaleTooltip(item, clock.leftMs) : undefined} disabled={busy} onClick={action.run}>
       <i className={cn('viewer-phone-upscale', running && 'is-running', running && !ratio && 'is-indeterminate', running && clock.ratio !== null && 'is-timed')}>
-        {busy ? <RefreshCw size={18} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={19} />}
+        {busy ? <LoaderCircle size={18} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={19} />}
         {running ? (
           <svg className="viewer-phone-upscale-ring" viewBox="0 0 30 30" aria-hidden="true" focusable="false">
             <circle className="is-track" cx="15" cy="15" r="14" />
@@ -105,7 +105,7 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
         disabled={busy}
         onClick={action.run}
       >
-        {busy ? <RefreshCw size={16} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
+        {busy ? <LoaderCircle size={16} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
         {running && clock.leftMs !== null ? <span className="viewer-upscale-left" aria-hidden="true">{shortLeft(clock.leftMs)}</span> : null}
       </button>
     </Tip>

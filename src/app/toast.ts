@@ -115,7 +115,13 @@ function close(id: string, ran: 'action' | 'close') {
   });
 }
 
-function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
+/** News and failures read without a closing full stop (UI-PATTERNS › Messages), whoever wrote the words: a server's error included. */
+export function pillWords(title: string) {
+  return title.replace(/(?<!\.)\.\s*$/, '').trimEnd();
+}
+
+function show(tone: ToastTone, rawTitle: string, options: ToastOptions = {}) {
+  const title = options.confirm ? rawTitle : pillWords(rawTitle);
   const count = Math.max(1, options.count ?? 1);
   const group = options.group ?? (options.id ? `id:${options.id}` : `${tone}:${title}`);
   const duration = durationFor(options);

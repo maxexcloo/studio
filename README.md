@@ -93,7 +93,7 @@ npm run build
 npm start
 ```
 
-`npm start` serves **http://localhost:8787** (or the next free port if that one is taken). Models, samplers and VAEs show up once ComfyUI is connected.
+`npm start` serves **http://localhost:8787** (set `PORT` for another; Studio won’t start on a port that’s taken). Models, samplers and VAEs show up once ComfyUI is connected.
 
 ComfyUI on another machine or port? Set its address in **Settings › Workers**, or copy `.env.example` to `.env` and set `COMFY_URL`.
 

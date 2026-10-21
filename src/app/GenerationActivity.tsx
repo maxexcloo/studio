@@ -70,7 +70,7 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
     if (done.length && wasStandingIn.current && enabled) {
       const first = done[0];
       const kind = first.type === 'video' ? 'Video' : 'Image';
-      toast.success(done.length === 1 ? `${kind} Ready` : `${done.length} ${kind}s Ready`, { group: 'generation-ready', action: { label: 'View', onClick: () => onViewRef.current(first) } });
+      toast.success(done.length === 1 ? `${kind} ready` : `${done.length} ${kind.toLowerCase()}s ready`, { group: 'generation-ready', action: { label: 'View', onClick: () => onViewRef.current(first) } });
     }
     wasStandingIn.current = false;
   }, [pendingKey, standingIn, items]); // eslint-disable-line react-hooks/exhaustive-deps

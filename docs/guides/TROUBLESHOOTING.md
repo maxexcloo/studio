@@ -25,7 +25,7 @@ Open the address the server log shows under **Open**, usually `http://localhost:
 
 ### The port is taken, or Studio is already running
 
-When port 8787 is in use, the next free one (8788, 8789, …) is used instead. The log says which. To keep one fixed port, set `PORT` in `.env`.
+When port 8787 is in use, Studio stops and says so rather than moving to another port that nothing publishes. Set `PORT` to use a different one.
 
 """Studio is already running""" means another copy has the port. Open that copy, or stop it first.
 

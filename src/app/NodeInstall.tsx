@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Download, RotateCw } from 'lucide-react';
+import { Check, Download, LoaderCircle } from 'lucide-react';
 import { ComfyRestart, managerMajor, useComfyManager } from './ComfyRestart';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { apiJson, copyText } from './api';
@@ -14,7 +14,7 @@ export function CopyRow({ text, label, block, showToast }: { text: string; label
   const { copied, copyWith } = useCopyFeedback();
   const copy = () => copyWith(async () => {
     const ok = await copyText(text);
-    if (!ok) showToast('Copy failed', 'error');
+    if (!ok) showToast('Couldn’t copy', 'error');
     return ok;
   });
   return (
@@ -116,7 +116,7 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
   return (
     <div className="node-quick">
       <button type="button" className="btn is-primary" onClick={() => start()} disabled={running}>
-        {running ? <RotateCw size={14} className="is-spinning" /> : <Download size={14} />}
+        {running ? <LoaderCircle size={14} className="spin" /> : <Download size={14} />}
         {running ? state.step || 'Installing…' : state?.status === 'error' ? 'Try Again' : `Install ${pack.name}`}
         {running ? null : <BetaTag />}
       </button>

@@ -19,7 +19,7 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
   complete = true;
   // Both say it in the status pill (UI-PATTERNS › Messages).
-  const notification = page.locator('.status-message').filter({ hasText: 'Image Ready' });
+  const notification = page.locator('.status-message').filter({ hasText: 'Image ready' });
   await expect(notification).toBeVisible();
   await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
   await expect.poll(async () => (await notification.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(56);

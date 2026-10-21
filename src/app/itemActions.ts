@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, CircleStop, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, Trash2, Clapperboard } from 'lucide-react';
+import { CheckSquare, CircleStop, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, Trash2, Clapperboard } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
 import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
@@ -148,7 +148,7 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
       id: 'compare', group: 'make', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare With the Original', Icon: Columns2, pressed: extras.compare.open, run: extras.compare.toggle,
     },
     canStar(item) && { id: 'star', group: 'organise', label: item.favorite ? 'Unstar' : 'Star', Icon: Star, pressed: Boolean(item.favorite), run: () => handlers.star(item) },
-    extras.select && (item.status === 'done' || item.status === 'error') && { id: 'select', group: 'organise', label: 'Select', Icon: CheckCircle2, run: () => extras.select!(item) },
+    extras.select && (item.status === 'done' || item.status === 'error') && { id: 'select', group: 'organise', label: 'Select', Icon: CheckSquare, run: () => extras.select!(item) },
     item.status !== 'pending' && {
       id: 'delete', group: 'organise', label: item.library ? 'Remove' : 'Delete', tip: item.library ? 'Remove From Gallery' : 'Delete',
       Icon: Trash2, danger: true, run: () => handlers.remove(item),

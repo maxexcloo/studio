@@ -40,7 +40,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { printBanner } from './banner.js';
 import { allowLanActions, lan, lanListening, demoMode, comfy, comfyRecentlyUnreachable, inDotFolder, localOutputFile, outputMediaPattern, comfyOutputDir, comfyUrl, host, noteComfyFetchError, noteComfyReachable, noteComfySilent, isComfyTimeout, optionsFor, port, root, setComfyFolderPaths, setComfyUrl, requestedPort, setListeningPort } from './comfy.js';
-import { canAdmin, clientOf, deviceSession, migrateDeviceCookie, studioPasswordSet } from './access.js';
+import { canAdmin, clientOf, deviceSession, migrateDeviceCookie } from './access.js';
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard, signInHeader } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
@@ -1241,7 +1241,7 @@ app.get("/api/library/thumb", async (req, res) => {
     res.type("image/webp");
     await pipeline(fs.createReadStream(thumbnail.file), res);
   } catch (error) {
-    if (!res.headersSent) res.status(502).json({ error: error.message }); else res.destroy();
+    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message }); else res.destroy();
   }
 });
 
@@ -1814,8 +1814,8 @@ app.get("/comfy/thumb", async (req, res) => {
   const filename = String(req.query.filename || "");
   const subfolder = String(req.query.subfolder || "");
   const type = String(req.query.type || "output");
-  if (!filename) { res.status(400).json({ error: "filename is required." }); return; }
-  if (req.studioAccount && (!mayUseFeature(req.studioAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
+  if (!filename) { res.status(400).json({ ok: false, error: "filename is required." }); return; }
+  if (req.studioAccount && (!mayUseFeature(req.studioAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ ok: false, error: "Not an output." }); return; }
   // The same outputs /comfy/view serves, and nothing else.
   if (!["output", "input", "temp", mediaType].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
@@ -1826,7 +1826,7 @@ app.get("/comfy/thumb", async (req, res) => {
     }
     // ?size=display is the viewer's larger copy (thumbnails.js RENDITIONS).
     const thumbnail = await getThumbnail(filename, subfolder, type, req.query.size === "display" ? "display" : "thumb");
-    if (!thumbnail) { res.status(404).json({ error: "Source image is unavailable." }); return; }
+    if (!thumbnail) { res.status(404).json({ ok: false, error: "Source image is unavailable." }); return; }
     // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
     if (thumbnail.original) { res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`); return; }
     // The ETag is a source-content hash, so revalidation safely handles a reused filename.
@@ -1836,7 +1836,7 @@ app.get("/comfy/thumb", async (req, res) => {
     res.type("image/webp");
     await pipeline(fs.createReadStream(thumbnail.file), res);
   } catch (error) {
-    if (!res.headersSent) res.status(502).json({ error: error.message }); else res.destroy();
+    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message }); else res.destroy();
   }
 });
 
@@ -1952,7 +1952,7 @@ app.get("/comfy/*path", async (req, res) => {
     res.type(response.headers.get("content-type") || "application/octet-stream");
     await pipeline(Readable.fromWeb(response.body), res);
   } catch (error) {
-    if (!res.headersSent) res.status(502).json({ error: error.message }); else res.destroy();
+    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message }); else res.destroy();
   }
 });
 
@@ -1972,20 +1972,19 @@ scheduleTrashPurge();
 // Studio media's thumbnails and posters are built ahead of their first view.
 if (mediaStorageEnabled) startMediaWarmup();
 
-// Under `npm run dev*` the page comes from Vite, which forwards to this exact port, so it stays put there.
+// One port, always: under `npm run dev*` Vite forwards to this exact port, and in a
+// container a quietly moved port is one nothing publishes or health-checks.
 const dev = /^dev/.test(process.env.npm_lifecycle_event || "");
 startServers(app, {
   host,
   port,
-  fallback: !dev,
+  fallback: false,
   onFatal(error) {
     let message = `\n  Studio couldn’t start: ${error.message}\n`;
     // Where the running copy answered: this computer, or the one address HOST names.
     const runningHost = !error.host || error.host === "127.0.0.1" ? "localhost" : error.host.includes(":") ? `[${error.host}]` : error.host;
     if (error.studioRunning) message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
-    else if (error.code === "EADDRINUSE") message = dev
-      ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT in .env.\n`
-      : `\n  Ports ${port} to ${port + 9} are all in use. Set another PORT in .env.\n`;
+    else if (error.code === "EADDRINUSE") message = `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`;
     console.error(message);
     // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
     process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
@@ -2006,9 +2005,6 @@ startServers(app, {
           ? startupTls.names.filter((name) => !name.startsWith("*.")).map((name) => `https://${name.includes(":") ? `[${name}]` : name}:${httpsPort}`)
           : Object.values(os.networkInterfaces()).flatMap((entries) => entries || []).filter((entry) => entry.family === "IPv4" && !entry.internal).map((entry) => `http://${entry.address}:${pagePort}`);
         for (const address of addresses) console.log(`    ➜  Network   ${address}`);
-        if (addresses.length) console.log(studioPasswordSet()
-          ? "    Other devices sign in with the studio password.\n"
-          : "    Other devices sign in with a studio password: set one in Settings › Connection first.\n");
       }
       // No workers is a setup of its own: say so, and look for nothing.
       if (!listWorkers().length) { if (!demoMode) console.log("    No workers are set up yet. Add one in Settings › Workers.\n"); return; }

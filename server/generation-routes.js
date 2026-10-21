@@ -140,7 +140,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     } else {
       const prompt = String(req.body?.prompt || "").trim();
       if (!prompt) {
-        res.status(400).json({ error: "Enter a prompt." });
+        res.status(400).json({ ok: false, error: "Enter a prompt." });
         return;
       }
       isMockJob = true;

@@ -193,7 +193,9 @@ function ActivityIsland({ activity }: { activity: Activity }) {
       layout="position"
       className={cn('island', 'activity', `is-${activity.state}`, activity.compact && 'is-compact', activity.wide && 'is-wide', expanded && 'is-expanded')}
       role="status"
-      aria-live="polite"
+      // Not live: its percentage and time left change every tick, and would be read out each time.
+      // The bar carries the number (aria-valuenow); news such as "Image ready" goes through the status pill's announcer.
+      aria-live="off"
       // Opacity on the glass itself: on a parent it would cut off the backdrop blur.
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1, height: height ?? 'auto' }}

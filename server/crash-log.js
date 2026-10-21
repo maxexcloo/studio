@@ -37,6 +37,8 @@ function write(level, message, extra) {
   const line = `${stamp()} ${level.padEnd(5)} ${message}${extra ? ` ${JSON.stringify(extra)}` : ""}`;
   recent.push(line);
   if (recent.length > recentLimit) recent.shift();
+  // In a container stdout and stderr are the log: what went wrong reaches `docker logs` too.
+  if (level === "warn" || level === "error" || level === "fatal") console.error(line);
   try {
     fs.mkdirSync(logDir, { recursive: true });
     // Synchronous on purpose: a crash line has to reach the disk before exit.

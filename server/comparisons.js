@@ -10,7 +10,7 @@ export function registerComparisonRoutes(app, { dataDir, gallery }) {
   const read = () => { try { return readJsonFile(file); } catch (error) { if (error.code === 'ENOENT') return []; throw error; } };
   const allowed = (req, res) => {
     if (!req.studioAccount || mayUseFeature(req.studioAccount, 'gallery')) return true;
-    res.status(403).json({ error: 'Gallery access is disabled for this account.' }); return false;
+    res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' }); return false;
   };
   const visible = req => recordsForRequest(gallery(), req).filter(item => item.type === 'image' && item.status !== 'canceled');
   const show = (record, req) => {
@@ -24,12 +24,12 @@ export function registerComparisonRoutes(app, { dataDir, gallery }) {
   app.post('/api/comparisons', (req, res) => {
     if (!allowed(req, res)) return;
     const jobIds = req.body?.jobIds;
-    if (!Array.isArray(jobIds) || jobIds.length < 2 || jobIds.length > 4 || new Set(jobIds).size !== jobIds.length || jobIds.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'Choose 2–4 different image jobs.' });
+    if (!Array.isArray(jobIds) || jobIds.length < 2 || jobIds.length > 4 || new Set(jobIds).size !== jobIds.length || jobIds.some(id => typeof id !== 'string')) return res.status(400).json({ ok: false, error: 'Choose 2–4 different image jobs.' });
     const items = visible(req);
     const variants = jobIds.map(jobId => items.find(item => item.jobId === jobId));
-    if (variants.some(item => !item)) return res.status(404).json({ error: 'A comparison image is unavailable.' });
+    if (variants.some(item => !item)) return res.status(404).json({ ok: false, error: 'A comparison image is unavailable.' });
     const seeds = variants.map(item => String(item.settings?.seed ?? ''));
-    if (!seeds.every(seed => /^\d+$/.test(seed) && seed === seeds[0])) return res.status(400).json({ error: 'Comparison variants must use the same recorded seed.' });
+    if (!seeds.every(seed => /^\d+$/.test(seed) && seed === seeds[0])) return res.status(400).json({ ok: false, error: 'Comparison variants must use the same recorded seed.' });
     const ownerId = ownerIdForRequest(req);
     const record = { id: crypto.randomUUID(), ownerId, createdAt: new Date().toISOString(), seed: seeds[0], jobIds, vote: null };
     const records = read();
@@ -40,9 +40,9 @@ export function registerComparisonRoutes(app, { dataDir, gallery }) {
     if (!allowed(req, res)) return;
     const records = read();
     const record = records.find(item => item.id === req.params.id && item.ownerId === ownerIdForRequest(req));
-    if (!record) return res.status(404).json({ error: 'That comparison is unavailable.' });
+    if (!record) return res.status(404).json({ ok: false, error: 'That comparison is unavailable.' });
     const vote = req.body?.jobId;
-    if (vote !== null && (!record.jobIds.includes(vote) || !visible(req).some(item => item.jobId === vote && item.status === 'done'))) return res.status(400).json({ error: 'Choose a finished, available variant.' });
+    if (vote !== null && (!record.jobIds.includes(vote) || !visible(req).some(item => item.jobId === vote && item.status === 'done'))) return res.status(400).json({ ok: false, error: 'Choose a finished, available variant.' });
     record.vote = vote; writeJsonFile(file, records); res.json(show(record, req));
   });
 }

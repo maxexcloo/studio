@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { tweens } from "@/lib/springs";
-import { TriangleAlert, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 export type LoraMismatch = { key: string; names: string[]; madeFor: string[]; model: string };
 
@@ -48,7 +48,7 @@ export function LoraMismatchChip({ mismatch, onOpenLoras, onDismiss }: { mismatc
           exit={{ opacity: 0, transition: tweens.fast }}
           transition={tweens.base}
         >
-          <TriangleAlert size={14} aria-hidden="true" />
+          <AlertTriangle size={14} aria-hidden="true" />
           <span>
             {mismatch.names.length === 1
               ? <><b>{shortName(mismatch.names[0])}</b> is made for {mismatch.madeFor[0] || "another model"}, not {mismatch.model}.</>

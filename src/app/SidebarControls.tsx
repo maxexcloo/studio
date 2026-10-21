@@ -23,7 +23,7 @@ function loraSetup(view: any) {
   const loraUnavailable = currentProfile && !currentProfile.capabilities.lora
     ? { title: "This Model Doesn’t Support LoRAs" }
     : !loraOptions.length
-      ? { title: "No LoRAs Yet", hint: "Add LoRA files to ComfyUI, then rescan in Settings › Models." }
+      ? { title: "No LoRAs Yet", hint: "Add LoRA files to ComfyUI, then check Library › LoRAs." }
       : null;
   return { loraOptions, loraLimit, loraUnavailable };
 }
