@@ -1,0 +1,926 @@
+/* The viewer: the stage, its dock and arrows, Details, comparisons, inpainting and video. */
+
+/* The viewer's top fade, the bottom fade turned over: the title, Star · Info · Close and the
+   phone's heading stay readable over a picture that reaches the top (desktop and phone). */
+.viewer-stage::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 140px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background) / 0.9) 0%,
+    hsl(var(--background) / 0.62) 36%,
+    hsl(var(--background) / 0.18) 72%,
+    transparent 100%
+  );
+}
+.viewer-stage > .viewer-side { z-index: 5; }
+.viewer-shell {
+  position: relative;
+  width: 100%; height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  z-index: 21;
+  background: transparent;
+}
+.viewer-divider {
+  width: 1px; height: 22px;
+  background: var(--line);
+  margin: 0 6px;
+  display: inline-block;
+}
+.viewer-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex; align-items: center;
+}
+.viewer-stage.with-side .viewer-dock { left: calc(50% - 190px); }
+.viewer-dock .icon-button:hover { background-color: var(--control-hover); border-color: transparent; color: hsl(var(--foreground)); }
+.viewer-dock .icon-button.active { color: var(--selected-ink); }
+.viewer-dock .icon-button:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; color: hsl(var(--muted-foreground)); }
+.viewer-dock .icon-button:disabled:hover { background-color: transparent; color: hsl(var(--muted-foreground)); }
+.viewer-dock .danger-tone:hover { background-color: hsl(var(--destructive) / 0.22); color: hsl(var(--destructive-foreground)); }
+.viewer-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0; min-width: 0;
+  overflow: hidden;
+}
+.viewer-stage.with-side { grid-template-columns: minmax(0, 1fr) 380px; }
+.viewer-canvas {
+  position: relative;
+  min-width: 0; min-height: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 80px 80px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: default;
+}
+.viewer-canvas.is-zoomed { cursor: grab; }
+.viewer-canvas.is-zoomed:active { cursor: grabbing; }
+.viewer-canvas img, .viewer-canvas video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--r-media);
+  transform: translate3d(var(--pan-x, 0), var(--pan-y, 0), 0) scale(var(--zoom, 1));
+  transform-origin: center;
+  transition: transform var(--motion-instant) var(--ease-soft);
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  will-change: transform;
+}
+/* Finished images remain native image targets for Save/Copy and iOS long press.
+   Gestures still bubble to the canvas; video keeps its own player controls. */
+.viewer-canvas img.generation-result {
+  pointer-events: auto;
+  -webkit-touch-callout: default;
+}
+.viewer-canvas.is-zoomed img, .viewer-canvas.is-zoomed video { cursor: grab; transition: none; }
+.viewer-canvas.is-dragging img, .viewer-canvas.is-dragging video { transition: none; }
+/* Touch paints the transform itself (viewerGesture.ts): nothing eases while a
+   finger leads, then the picture springs to rest, or slides off for the next. */
+.viewer-canvas[data-gesture] img, .viewer-canvas[data-gesture] video,
+.viewer-canvas[data-gesture] .generation-surface { transition: none; }
+.viewer-canvas[data-settle] img, .viewer-canvas[data-settle] video,
+.viewer-canvas[data-settle] .generation-surface { transition: transform var(--motion-slow) var(--motion-ease); }
+.viewer-canvas[data-settle="slide"] .generation-surface,
+.viewer-canvas[data-settle="slide"] img, .viewer-canvas[data-settle="slide"] video { transition: transform var(--motion-fast) var(--motion-ease); }
+/* Inside the surface the picture itself stays put; only the surface moves. */
+.viewer-canvas[data-settle] .generation-surface img, .viewer-canvas[data-settle] .generation-surface video { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .viewer-canvas[data-settle] .generation-surface,
+  .viewer-canvas[data-settle] img { transition-duration: 1ms; }
+}
+.viewer-side {
+  min-width: 0; min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  animation: slideInRight var(--motion-base) var(--motion-ease);
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
+}
+.viewer-side-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.viewer-side-head h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -0.005em; color: hsl(var(--foreground)); }
+.viewer-side-body {
+  min-width: 0; min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 20px;
+  display: grid; gap: 18px;
+  align-content: start;
+  /* Rows keep their full height and the body scrolls; with overflow:hidden
+     children (the disclosure) auto rows would otherwise shrink to fit. */
+  grid-auto-rows: max-content;
+}
+/* The detail actions: one white pill for the main move, the rest a quieter
+   row of equal-width pills under it. Hover, press and focus come from .btn;
+   .btn loads later, so the overrides carry its class too. */
+/* Two to a row in name order; Use Settings, the main move, takes a row to itself when it would sit alone. */
+/* Details: each prompt unboxed under its label, its Copy and Use beside the label. */
+.prompt-readout { display: grid; gap: var(--space-3); min-width: 0; }
+.prompt-readout-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 28px; }
+.prompt-readout-head > span:first-child,
+.detail-grid span {
+  color: hsl(var(--muted-foreground));
+  font-size: 11px; font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.prompt-readout-actions { display: inline-flex; gap: var(--space-1); }
+.prompt-readout p {
+  max-height: 32vh;
+  overflow: auto;
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prompt-readout p.is-empty { color: hsl(var(--muted-foreground)); }
+.readout-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.readout-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.readout-action.is-copied { color: var(--accent-amber); }
+.readout-action:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (pointer: coarse) {
+  .readout-action { height: 36px; padding: 0 12px; }
+}
+.details-footer { display: grid; gap: var(--space-3); padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); }
+/* Two equal buttons a row: Copy Prompts · Copy Settings, then Edit · Rerun (Rerun the primary). Never a faded ghost. */
+.details-footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.details-footer-row > *, .details-footer-btn { width: 100%; min-width: 0; justify-content: center; }
+.details-footer-btn:not(.is-primary) { background: var(--control-fill); color: hsl(var(--foreground)); }
+.details-footer-btn.is-copied { color: var(--accent-amber); }
+.detail-grid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-4) var(--space-5);
+  align-items: baseline;
+}
+.detail-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: hsl(var(--foreground));
+  font-size: 13px; font-weight: 500;
+}
+/* Generation Settings sit on the panel like Prompt and Negative: a quiet label, no box. */
+.detail-settings { display: grid; gap: var(--space-5); min-width: 0; }
+.detail-settings .detail-section { display: grid; gap: var(--space-4); }
+.detail-settings .detail-grid { margin-top: 0; grid-template-columns: 72px minmax(0, 1fr); }
+/* The viewer shows its settings outright, so the heading stands where the
+   old expander's summary did. */
+/* "Copy as text" in the header: a quiet pill that copies without opening or closing it. */
+.detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+/* Each LoRA as a flat row, like the LoRA chooser's: its name, then its strength and View Source on the right; its information under the name. Hairlines between. */
+.detail-loras { display: grid; gap: 0; margin: 2px 0 0; padding: 0; list-style: none; }
+.detail-lora { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); min-height: 40px; padding: 4px 0; }
+.detail-lora + .detail-lora { border-top: 1px solid var(--list-hairline, var(--line)); }
+.detail-lora-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 500;
+}
+.detail-lora-strength {
+  flex: none;
+  color: hsl(var(--muted-foreground));
+  font: 500 12px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.detail-lora > .lora-info-panel { flex-basis: 100%; padding: 0 0 6px; }
+.detail-section h4 {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px; font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.viewer-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center;
+  cursor: pointer;
+  z-index: 3;
+  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+.viewer-arrow:hover { border-color: var(--line-strong); }
+.viewer-arrow.prev { left: 16px; }
+.viewer-arrow.next { right: 16px; }
+.viewer-stage.with-side .viewer-arrow.next { right: calc(380px + 16px); }
+/* Original against upscale. The comparer rides the viewer's zoom: the viewer
+   transforms every img in its canvas, so both layers scale and pan as one,
+   while the split, line and tags stay fixed on screen. */
+.upscale-compare {
+  /* Fills the canvas's content box, so it keeps the same margins as a plain image. */
+  position: relative;
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  container-type: size;
+  outline: none;
+  touch-action: none;
+}
+/* Keyboard focus shows on the handle, not as a ring round the whole stage. */
+.upscale-compare:focus-visible { outline: none; }
+.upscale-compare:focus-visible .upscale-compare-line span { outline: 2px solid rgb(255 255 255 / .55); outline-offset: 3px; }
+.upscale-compare[data-state="near"],
+.upscale-compare[data-state="dragging"] { cursor: ew-resize; }
+/* Sized to the image itself (contain-fit into the stage), so the split line
+   and the tags sit on the picture, not on the empty stage around it. */
+.upscale-compare-frame {
+  position: relative;
+  width: min(100cqw, 100cqh * var(--compare-ratio, 1));
+  aspect-ratio: var(--compare-ratio, 1);
+  overflow: hidden;
+  border-radius: var(--r-media);
+}
+/* Outrank the viewer's own img sizing (width: auto, max-width): the original
+   and the upscale differ in pixel size and must fill the same box exactly. */
+.upscale-compare .upscale-compare-image {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  max-width: none; max-height: none;
+  object-fit: contain;
+  border-radius: 0;
+}
+.upscale-compare-reveal {
+  position: absolute; inset: 0;
+  clip-path: inset(0 calc(100% - var(--compare-position, 50%)) 0 0);
+}
+.upscale-compare-line {
+  position: absolute; top: 0; bottom: 0;
+  left: var(--compare-position, 50%);
+  width: 2px;
+  margin-left: -1px;
+  background: rgb(255 255 255 / .92);
+  box-shadow: 0 0 0 .5px rgb(0 0 0 / .3), 0 0 14px rgb(0 0 0 / .4);
+  pointer-events: none;
+}
+.upscale-compare-line span {
+  position: absolute; top: 50%; left: 50%;
+  display: grid; place-items: center;
+  width: 38px; height: 38px;
+  translate: -50% -50%;
+  border: 2px solid rgb(255 255 255 / .95);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
+  color: #fff;
+  transition: scale var(--motion-base) var(--motion-ease), background var(--motion-base);
+}
+.upscale-compare[data-state="near"] .upscale-compare-line span { scale: 1.08; background: rgb(28 28 28 / .7); }
+.upscale-compare[data-state="dragging"] .upscale-compare-line span { scale: 1.14; background: rgb(255 255 255 / .22); }
+.upscale-compare-tag {
+  position: absolute; top: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  color: #fff;
+  font-size: 11.5px; font-weight: 550;
+  letter-spacing: -.01em;
+  pointer-events: none;
+  transition: opacity var(--motion-base), translate var(--motion-base) var(--motion-ease);
+}
+.upscale-compare-tag.is-before { left: 12px; }
+.upscale-compare-tag.is-after { right: 12px; }
+.upscale-compare[data-edge="start"] .upscale-compare-tag.is-before { opacity: 0; translate: -4px 0; }
+.upscale-compare[data-edge="end"] .upscale-compare-tag.is-after { opacity: 0; translate: 4px 0; }
+@media (max-width: 620px) {
+  .upscale-compare-tag { top: 8px; font-size: 10px; padding: 3px 7px; }
+  .upscale-compare-tag.is-before { left: 8px; }
+  .upscale-compare-tag.is-after { right: 8px; }
+}
+.viewer-profile-summary {
+  position: absolute;
+  inset: 12px 72px auto 16px;
+  z-index: 5;
+  display: grid;
+  gap: var(--space-2);
+  width: fit-content;
+  max-width: calc(100% - 88px);
+  /* A title, not a box: plain text over the backdrop, legible over light pictures too. */
+  padding: 0;
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / .6);
+  cursor: text;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.viewer-profile-summary strong { font-size: 14px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.viewer-profile-summary span { color: rgb(255 255 255 / .7); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.viewer-zoom-controls { display: flex; align-items: center; gap: 0; }
+/* The zoom: a small − 100% + pill in the bottom right corner of the picture's
+   column, level with the action bar, fading with the other controls. Never
+   above the bar: the bar's tooltips open there. */
+.viewer-zoom-pill {
+  position: absolute;
+  right: 18px;
+  bottom: calc(18px + (var(--dock-h) - 34px) / 2);
+  z-index: 6;
+  padding: 2px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  opacity: .72;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+.viewer-zoom-pill:hover,
+.viewer-zoom-pill:has(:focus-visible) { opacity: 1; }
+.viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: calc(380px + 18px); }
+/* Too narrow beside an open Details column for the bar and the pill side by
+   side: the top right corner of the picture's column instead. */
+@media (min-width: 1025px) and (max-width: 1120px) {
+  .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { top: 18px; bottom: auto; }
+}
+@media (max-width: 1024px) {
+  .viewer-zoom-pill:not(.is-phone),
+  .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: max(12px, env(safe-area-inset-right)); }
+  .viewer-zoom-pill:not(.is-phone) { bottom: calc(14px + env(safe-area-inset-bottom) + (var(--dock-h) - 34px) / 2); }
+}
+/* A narrow window: the bar spans the width, leaving the pill no room beside
+   it; zoom by pinch, wheel or double click there, as the dock's own zoom does. */
+@media (max-width: 620px) {
+  .viewer-zoom-pill:not(.is-phone) { display: none; }
+}
+.viewer-zoom-step { display: grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
+.viewer-zoom-step:hover:not(:disabled) { background: var(--control-hover); }
+.viewer-zoom-step:disabled { opacity: .35; }
+.viewer-zoom-pill .viewer-zoom-percent { height: 28px; border: 0; border-radius: var(--r-pill); background: transparent; cursor: pointer; }
+.viewer-zoom-pill.is-phone { right: auto; left: 50%; bottom: calc(var(--viewer-bar-h, 84px) + 10px); translate: -50% 0; }
+.viewer-zoom-pill.is-phone .viewer-zoom-step { width: 36px; height: 36px; }
+.viewer-zoom-pill.is-phone .viewer-zoom-percent { height: 36px; min-width: 48px; }
+.viewer-zoom-percent { min-width: 42px; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
+.viewer-zoom-percent.is-toggle { min-width: 52px; color: hsl(var(--foreground)); }
+/* The viewer's picture loads in layers (GenerationPreview.tsx StagedImage):
+   the thumbnail, then the display copy or original fading in over it. Both
+   are contained in the same box, so they cover the same rectangle. */
+.viewer-canvas .generation-surface img.generation-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.viewer-canvas .generation-surface img.generation-result.is-loading { opacity: 0; }
+.viewer-canvas .generation-surface img.generation-result:not(.is-loading) { transition: opacity var(--motion-base) var(--ease-soft); }
+@media (prefers-reduced-motion: reduce) {
+  .viewer-canvas .generation-surface img.generation-result:not(.is-loading) { transition: none; }
+}
+/* Info in the viewer's top right on the desktop and tablets, as on phones;
+   the open Details panel takes its place and carries its own Close. */
+.viewer-info {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  width: var(--dock-h);
+  height: var(--dock-h);
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: var(--glass-bar-shadow);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+.viewer-info:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
+.viewer-info:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--glass-bar-shadow); }
+.viewer-side-close { flex: none; margin: -8px -10px -8px 0; }
+@media (max-width: 1024px) {
+  /* Beside the corner Close. */
+  .viewer-info { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px); }
+}
+/* Detail group labels share one readable hierarchy. */
+.prompt-readout-head > span:first-child, .detail-heading {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.viewer-profile-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-profile-summary span { white-space: nowrap; }
+@media (min-width: 901px) {
+  .viewer-stage.with-side .viewer-profile-summary { max-width: calc(100% - 468px); }
+}
+.detail-settings .detail-note { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
+@media (max-width: 620px) {
+  .viewer-shell { grid-template-rows: minmax(0, 1fr); }
+  .viewer-stage.with-side { grid-template-columns: minmax(0, 1fr); }
+  .viewer-canvas { padding: 8px 8px 80px; }
+  .viewer-dock {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .viewer-dock::-webkit-scrollbar { display: none; }
+  .viewer-stage.with-side .viewer-dock { left: 50%; }
+  .viewer-canvas img, .viewer-canvas video { border-radius: var(--r-media); }
+  .viewer-side {
+    position: absolute;
+    left: 8px; right: 8px; top: 8px; bottom: 76px;
+    z-index: 6;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-menu);
+  }
+  .viewer-side-body { padding: 14px; gap: 14px; }
+  .viewer-arrow { top: calc(50% - 36px); }
+  .viewer-arrow.prev { left: 10px; }
+  .viewer-arrow.next,
+  .viewer-stage.with-side .viewer-arrow.next { right: 10px; }
+}
+.viewer-canvas .generation-surface {
+  transform: translate(var(--pan-x, 0), var(--pan-y, 0)) scale(var(--zoom, 1));
+  transform-origin: center;
+}
+.viewer-canvas .generation-surface img,
+.viewer-canvas .generation-surface video {
+  width: 100%; height: 100%; object-fit: contain; transform: none; transition: none;
+}
+.viewer-dock,
+.viewer-arrow {
+  border: 1px solid var(--glass-border);
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+}
+.viewer-dock,
+.viewer-arrow { box-shadow: var(--glass-bar-shadow); }
+.viewer-dock {
+  height: var(--dock-h);
+  min-height: var(--dock-h);
+  padding: 3px;
+  gap: var(--space-1);
+  border-radius: var(--r-pill);
+}
+.viewer-arrow {
+  width: var(--dock-h);
+  height: var(--dock-h);
+  min-height: var(--dock-h);
+  padding: 0;
+  border-radius: var(--r-pill);
+  color: hsl(var(--foreground));
+}
+.viewer-dock .icon-button {
+  width: var(--control-h);
+  height: var(--control-h);
+  min-width: var(--control-h);
+  min-height: var(--control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+.viewer-dock .icon-button:hover:not(:disabled) {
+  background-color: var(--control-hover);
+  color: #fff;
+}
+.viewer-dock .icon-button.danger-tone:hover:not(:disabled) { background-color: var(--danger-fill); color: var(--danger-ink); }
+.viewer-dock .icon-button {
+  padding: var(--icon-fill-inset);
+  background-clip: content-box;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.viewer-dock .icon-button.danger-tone:active:not(:disabled) { background-color: var(--danger-ring); }
+.viewer-dock .icon-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
+/* The countdown widens the button; the fill stays a pill around it. */
+.viewer-dock .icon-button.has-count { padding-inline: calc(var(--icon-fill-inset) + 6px); }
+/* The viewer arrows are centred with translateY(-50%), so resetting the
+   transform on hover made them jump half their height. Tint only. */
+.viewer-arrow:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); box-shadow: var(--glass-bar-shadow); }
+/* --------------------------------------------------------------- 3. Modals
+   Solid sheets for things you open on purpose. Dialogs are <Modal>, styled in
+   18-surfaces.css; the viewer's side panel uses the same material. */
+.viewer-side { background: var(--surface-modal); box-shadow: inset 1px 0 0 var(--glass-border); }
+/* The viewer's upscale button while it counts down: the time beside the stop square. */
+.icon-button.has-count { width: auto; min-width: 34px; padding-inline: 9px; gap: var(--space-3); }
+.viewer-upscale-left { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* ----------------------------------------------------------------- Viewer */
+.viewer-close { display: none; }
+@media (max-width: 1024px) {
+  /* The side panel overlays the image instead of taking a 380px column. */
+  .viewer-stage.with-side { grid-template-columns: minmax(0, 1fr); }
+  .viewer-stage.with-side .viewer-dock { left: 50%; }
+  .viewer-stage.with-side .viewer-arrow.next { right: max(12px, env(safe-area-inset-right)); }
+  .viewer-canvas {
+    padding:
+      max(16px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      calc(var(--dock-h) + 28px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+  .viewer-side {
+    position: absolute;
+    top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 8px);
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(var(--dock-h) + 26px + env(safe-area-inset-bottom));
+    left: auto;
+    z-index: 6;
+    width: min(380px, calc(100% - 16px));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-menu);
+  }
+  .viewer-arrow.prev { left: max(12px, env(safe-area-inset-left)); }
+  .viewer-arrow.next { right: max(12px, env(safe-area-inset-right)); }
+  .viewer-dock { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .viewer-dock-close { display: none; }
+  .viewer-close {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    z-index: 7;
+    display: grid;
+    place-items: center;
+    width: var(--dock-h);
+    height: var(--dock-h);
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-pill);
+    background: var(--glass-bar-bg);
+    -webkit-backdrop-filter: var(--glass-bar-blur);
+    backdrop-filter: var(--glass-bar-blur);
+    box-shadow: var(--glass-bar-shadow);
+    color: hsl(var(--foreground));
+  }
+}
+@media (max-width: 620px) {
+  /* Pinch and double tap zoom; the zoom buttons would push actions off-screen. */
+  .viewer-dock .is-zoom-control,
+  .viewer-dock .viewer-divider { display: none; }
+  .viewer-dock {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    max-width: none;
+    transform: none;
+    justify-content: space-around;
+    /* Visible, not scrolling: nothing may hide past the edge, and the upscale
+       notice that rises out of the dock must not be clipped. */
+    overflow: visible;
+  }
+  .viewer-stage.with-side .viewer-dock { left: max(8px, env(safe-area-inset-left)); }
+  .viewer-dock .icon-button { flex: 1 1 0; min-width: 0; width: auto; max-width: 48px; }
+  .viewer-canvas { padding-inline: 8px; }
+  .viewer-side {
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+  }
+}
+/* ------------------------------------------------------------------ Stars */
+/* A tile's Star sits in its top row (04-gallery.css); once set it stays in view. */
+.viewer-dock .icon-button.viewer-star.is-on,
+.viewer-dock .icon-button.viewer-star.is-on:hover { color: var(--ember); }
+/* ---------------------------------------------------------------------------
+   Inpaint studio (src/app/InpaintStudio.tsx)
+
+   Rises out of the prompt bar like the reference picker, in the same glass.
+   The image fills it edge to edge; the tools float over it: a pill at the
+   top, the brush size on the left.
+--------------------------------------------------------------------------- */
+.inpaint-studio {
+  position: fixed;
+  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals */
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-panel);
+  background: var(--surface-grain), var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
+  transform-origin: 94% 100%;
+  isolation: isolate;
+}
+.inpaint-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* No fill: around the image the popover's own frosted glass shows, like the other menus. */
+  background: transparent;
+}
+.inpaint-viewport.is-brush,
+.inpaint-viewport.is-eraser { cursor: none; }
+.inpaint-viewport.is-hand { cursor: grab; }
+.inpaint-viewport.is-hand.is-panning { cursor: grabbing; }
+.inpaint-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.inpaint-stage img,
+.inpaint-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+/* The paint is opaque on the canvas, so overlapping strokes never darken; the
+   whole layer is see-through instead. */
+.inpaint-stage canvas { opacity: .55; }
+.inpaint-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12.5px;
+  color: hsl(var(--muted-foreground));
+}
+/* The brush outline follows the pointer at its true size. */
+.inpaint-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .9), 0 0 0 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(0 0 0 / .35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+.inpaint-ring.is-eraser { box-shadow: 0 0 0 1px rgb(255 255 255 / .9), 0 0 0 2px rgb(0 0 0 / .35); background: rgb(255 255 255 / .08); }
+.inpaint-ring.is-preview { background: rgb(255 154 82 / .3); }
+.inpaint-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 2;
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  background: var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  translate: -50% 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--motion-ease);
+}
+.inpaint-hint.is-hidden { opacity: 0; }
+/* ------------------------------------------------------------- Tool pill */
+.inpaint-pill {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: var(--space-2);
+  border-radius: var(--r-pill);
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
+  translate: -50% 0;
+}
+.inpaint-tool {
+  flex: none;
+  width: var(--control-h);
+  height: var(--control-h);
+  display: grid;
+  place-items: center;
+  /* A glass-bar icon button: the fill is the --icon-fill circle inside the target. */
+  padding: var(--icon-fill-inset);
+  border: 0;
+  border-radius: var(--r-pill);
+  background-color: transparent;
+  background-clip: content-box;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.inpaint-tool:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.inpaint-tool.is-active { background-color: var(--selected-bg); color: var(--selected-ink); }
+.inpaint-tool:disabled { opacity: .35; cursor: default; }
+.inpaint-tool:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
+.inpaint-zoom-reset:focus-visible,
+.inpaint-size:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.inpaint-divider { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--glass-border); }
+/* Fit-to-view appears only once zoomed, as the zoom level (mounted only then). */
+.inpaint-zoom { flex: none; overflow: hidden; }
+.inpaint-zoom-reset {
+  height: var(--icon-fill);
+  margin-left: var(--space-1);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+.inpaint-zoom-reset:hover { background: var(--control-hover); }
+/* -------------------------------------------------------- Brush size */
+/* At rest a slim pill; hovered or dragged, a wedge that is wide at the top
+   (big brush) and fine at the bottom (small brush). */
+.inpaint-size {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  z-index: 3;
+  width: 44px;
+  height: min(200px, calc(100% - 96px));
+  padding: 14px 0;
+  border-radius: var(--r-pill);
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
+  translate: 0 -50%;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.inpaint-size-track { position: relative; height: 100%; }
+.inpaint-size-wedge {
+  position: absolute;
+  inset: 0 0 0 0;
+  background: rgb(255 255 255 / .28);
+  /* Collapsed: a 4px rod. Open: the wedge. Both shapes have the same points, so it morphs. */
+  clip-path: polygon(calc(50% - 2px) 0, calc(50% + 2px) 0, calc(50% + 2px) 100%, calc(50% - 2px) 100%);
+  transition: clip-path var(--motion-slow) var(--motion-ease), background var(--motion-fast);
+}
+.inpaint-size:hover .inpaint-size-wedge,
+.inpaint-size:focus-visible .inpaint-size-wedge,
+.inpaint-size.is-dragging .inpaint-size-wedge {
+  background: rgb(255 255 255 / .34);
+  clip-path: polygon(calc(50% - 9px) 0, calc(50% + 9px) 0, calc(50% + 1px) 100%, calc(50% - 1px) 100%);
+}
+.inpaint-size-thumb {
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / .45), 0 0 0 .5px rgb(0 0 0 / .2);
+  translate: -50% -50%;
+}
+/* ------------------------------------------------------------- Phone */
+.inpaint-studio.is-sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  width: auto;
+  height: min(640px, 82dvh);
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 24px 24px 0 0;
+  transform-origin: 50% 100%;
+}
+@media (max-width: 620px) {
+  .inpaint-pill { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100% - 20px); }
+  .inpaint-divider { margin: 0 1px; }
+  .inpaint-viewport { top: 68px; bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .inpaint-hint { bottom: 8px; }
+  .inpaint-size { left: 10px; }
+  .inpaint-zoom { position: absolute; right: 0; bottom: calc(100% + 8px); border-radius: var(--r-pill); background: rgb(30 30 30 / .82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inpaint-ring,
+  .inpaint-hint,
+  .inpaint-size-wedge,
+  .inpaint-size-thumb { transition: none; }
+}
+/* Done: its own round button top right, apart from the tools. */
+.inpaint-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-grain), var(--glass-bar-bg);
+  -webkit-backdrop-filter: var(--glass-bar-blur);
+  backdrop-filter: var(--glass-bar-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-bar-shadow);
+  color: hsl(var(--foreground) / .85);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.inpaint-close:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--surface-grain), var(--glass-bar-bg); color: hsl(var(--foreground)); }
+.inpaint-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (max-width: 640px) {
+  .inpaint-close { top: 10px; right: 10px; width: 48px; height: 48px; }
+}
+.studio-video-viewer { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; touch-action: auto; color: #fff; }
+.viewer-canvas.is-video { touch-action: auto; }
+.viewer-canvas.is-video .generation-surface { transform: none; overflow: visible; }
+.viewer-canvas .studio-video-viewer video { pointer-events: auto; transform: none; transition: none; will-change: auto; width: 100%; height: 100%; border-radius: inherit; }
+.viewer-canvas .studio-desktop-video:fullscreen { width: 100% !important; height: 100% !important; max-width: none; max-height: none; border-radius: 0; }
+.viewer-stage:has(.viewer-canvas.is-video) .is-zoom-control { display: none; }
+.studio-video-controls { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; display: flex; gap: var(--space-3); align-items: center; padding: 20px 8px 8px; border-radius: 0 0 var(--r-media) var(--r-media); background: linear-gradient(transparent, rgb(0 0 0 / .85)); pointer-events: auto; }
+/* Glass-bar icon buttons: a 44px target with a 36px fill circle (--icon-fill on the desktop bar). */
+.studio-video-button { --fill-inset: 4px; display: grid; place-items: center; flex: none; width: var(--control-h-touch); height: var(--control-h-touch); padding: var(--fill-inset); border: 0; border-radius: var(--r-pill); color: rgb(255 255 255 / .55); background-color: transparent; background-clip: content-box; cursor: pointer; touch-action: manipulation; transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease); }
+.studio-video-button:hover { color: rgb(255 255 255 / .9); background-color: var(--control-hover); }
+.studio-video-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--fill-inset)); }
+.studio-video-slider:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; border-radius: var(--r-pill); }
+.studio-video-timeline { flex: 1; min-width: 0; }
+.studio-video-slider { position: relative; display: flex; align-items: center; width: 100%; height: 44px; touch-action: none; cursor: pointer; user-select: none; }
+.studio-video-track { position: relative; width: 100%; height: 4px; border-radius: 2px; overflow: hidden; background: rgb(255 255 255 / .22); }
+.studio-video-fill, .studio-video-buffer { position: absolute; inset: 0 auto 0 0; width: var(--media-slider-fill); background: #fff; }
+.studio-video-buffer { width: var(--media-slider-buffer); background: rgb(255 255 255 / .3); }
+.studio-video-thumb { position: absolute; left: var(--media-slider-fill); width: 12px; height: 12px; border-radius: 50%; transform: translateX(-50%); background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.studio-video-time { display: flex; align-items: center; gap: var(--space-3); margin-top: -6px; font: 10px var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .75); }
+.studio-video-desktop-controls { left: 12px; right: 12px; bottom: 12px; gap: var(--space-4); padding: 2px 6px; height: 44px; box-sizing: border-box; border-radius: var(--r-pill); background: var(--glass-bar-bg); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: var(--glass-bar-blur); }
+.studio-video-desktop-controls .studio-video-button { --fill-inset: calc((38px - var(--icon-fill)) / 2); width: 38px; height: 38px; }
+.studio-video-desktop-controls .studio-video-slider { height: 38px; }
+.studio-video-desktop-controls .studio-video-button svg { width: 18px; height: 18px; }
+.studio-video-desktop-controls .studio-video-time { color: rgb(255 255 255 / .45); }
+.studio-video-desktop-controls .studio-video-track { background: rgb(255 255 255 / .12); height: 3px; }
+.studio-video-desktop-controls .studio-video-fill { background: rgb(255 255 255 / .6); }
+.studio-video-desktop-controls .studio-video-thumb { background: #aaa; width: 9px; height: 9px; }
+.studio-video-desktop-controls .studio-video-buffer { background: rgb(255 255 255 / .2); }
+.studio-video-error { position: absolute; z-index: 20; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-5); padding: 24px; background: rgb(10 10 10 / .94); text-align: center; border-radius: var(--r-media); }
+.studio-video-error p { max-width: 340px; color: rgb(255 255 255 / .7); line-height: 1.5; }
+.studio-video-error button { display: flex; align-items: center; gap: var(--space-4); min-height: 44px; padding: 0 18px; border-radius: var(--r-pill); background: #fff; color: #0a0a0a; }
+.video-viewer-loading { display: grid; place-items: center; width: 100%; height: 100%; color: hsl(var(--muted-foreground)); }
+.animate-photos .animation-model { display: grid; gap: var(--space-4); margin-bottom: 16px; font-size: 13px; }
+.animate-photos select, .animate-photos textarea { width: 100%; padding: 10px; border: 1px solid var(--glass-border); border-radius: var(--r-item); background: var(--well); color: hsl(var(--foreground)); font: inherit; }
+.animation-photo { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: var(--space-5); padding: 14px 0; border-top: 1px solid var(--glass-border); }
+.animation-photo img, .animation-photo-fallback { width: 64px; height: 64px; border-radius: var(--r-item); object-fit: cover; }
+.animation-photo-fallback { display: grid; place-items: center; background: var(--control-fill); color: hsl(var(--muted-foreground)); }
+.animation-photo label { display: grid; min-width: 0; gap: var(--space-3); font-size: 13px; }
+.animation-photo textarea { font-size: 16px; resize: vertical; min-height: 110px; }
+.animation-photo p { grid-column: 2; margin: 0; font-size: 13px; }
+.animation-photo [role="alert"] { color: var(--danger-ink); }
+.animate-photos .modal-foot { flex-wrap: wrap; }
+.animate-photos .modal-foot [role="status"] { flex-basis: 100%; font-size: 13px; }
+.comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--space-6); }
+.comparison-grid section { min-width: 0; }
+.comparison-grid img { width: 100%; max-height: 55vh; object-fit: contain; }
+.compare-variants label { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.compare-variants textarea { width: 100%; min-height: 110px; resize: vertical; }
+.compare-variants pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.compare-variants select { max-width: 100%; }
+.comparison-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }

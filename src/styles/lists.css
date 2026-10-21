@@ -1,0 +1,183 @@
+/* Rows: the shared list rows, sections, groups, toggles and segments of sheets, pop-ups and Settings. */
+
+/* A row that opens a drawer of rows below it (Settings › Studio › Keyboard).
+   Title and hint share one thin line; the hint gives way first. */
+.set-drawer-toggle.set-row {
+  width: 100%;
+  min-height: 42px;
+  padding-block: 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.list-note.is-error { color: var(--danger-ink); }
+.library-import-meta { flex: none; }
+.library-page .list-section { margin-top: 0; }
+.list-section { margin-top: 22px; }
+.list-section:first-child { margin-top: 2px; }
+.list-section-title {
+  margin: 0 0 2px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.list-group { display: flex; flex-direction: column; min-width: 0; }
+.list-group > :not(:first-child) { border-top: 1px solid var(--list-hairline); }
+.list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--list-row-h);
+  margin: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 15px;
+  font-weight: 450;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.list-row.is-static { cursor: default; }
+button.list-row:hover { background: transparent; }
+@media (hover: hover) {
+  button.list-row:hover .list-row-value, button.list-row:hover .list-row-end:not(.selected-tick) { color: hsl(var(--foreground)); }
+}
+/* Hover, the keyboard cursor and a press draw one rounded fill on ::before, inset from the
+   hairlines and reaching a little past the text, so it never squares off a row or bleeds
+   past a rounded popover. Selection is the amber check or lead, never a row fill. */
+button.list-row { isolation: isolate; }
+.list-row:disabled { opacity: .45; cursor: default; }
+.list-row-lead { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; color: hsl(var(--muted-foreground)); }
+.list-row-label { flex: none; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.list-row-value, .list-row-gap { flex: 1; min-width: 0; }
+.list-row-value {
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+.list-row-end { flex: none; margin-left: -4px; color: hsl(var(--muted-foreground) / .7); transition: color var(--motion-fast) var(--motion-ease); }
+.list-row-check.is-off { visibility: hidden; }
+.list-row.is-selected .list-row-check { color: var(--accent-amber); }
+.list-row-control { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
+.list-row-control .number-picker-label { display: none; }
+.list-row-control .number-picker { flex: none; }
+/* A native select laid over the row's value, so the tap opens the phone's own picker. */
+.list-row-control input.list-field {
+  width: 100%;
+  max-width: 150px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-field);
+  background: var(--control-fill);
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.list-row-control input.list-field::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+.list-note { margin: 4px 2px 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; line-height: 1.4; }
+/* -------------------------------------------------------------- Account menu (desktop dock) */
+.account-menu { position: relative; display: inline-flex; }
+.account-menu-list {
+  position: absolute;
+  right: -6px;
+  bottom: calc(100% + 8px);
+  z-index: var(--z-popover, 50);
+  display: grid;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-menu);
+  background: var(--glass-panel-bg);
+  -webkit-backdrop-filter: var(--glass-panel-blur);
+  backdrop-filter: var(--glass-panel-blur);
+  box-shadow: var(--glass-panel-shadow);
+  transform-origin: bottom right;
+}
+.account-menu-list[data-settling] { background: var(--glass-panel-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.account-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--row-h-menu);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-item);
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu-list button > svg { color: hsl(var(--muted-foreground)); }
+.account-menu-list button:hover { background-color: var(--cursor-bg); }
+.account-menu-list button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; box-shadow: none; }
+.account-menu-list button.is-danger, .account-menu-list button.is-danger > svg { color: var(--danger-ink); }
+/* -------------------------------------------------------------- List controls */
+.list-toggle, .list-segments button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: var(--control-h-sm);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--control-fill);
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.list-toggle:hover, .list-segments button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.list-toggle.is-on, .list-segments button[aria-pressed="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
+/* A segmented toggle is one small track (UI-PATTERNS › Geometry): --seg-pad around
+   options that fill it, the chosen one in the selected fill. */
+.list-segments { display: inline-flex; gap: var(--space-1); height: var(--control-h-sm); padding: var(--seg-pad); border-radius: var(--r-pill); background: var(--well); }
+.list-segments button { height: 100%; background: transparent; }
+.list-row-control .number-picker.is-sm { height: var(--control-h-sm); }
+.list-row-control input.list-field { max-width: 120px; height: var(--control-h-sm); }
+.list-row-text { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
+.list-row-text > .list-row-label { max-width: none; overflow-wrap: anywhere; white-space: normal; }
+.list-row-text > .list-row-label .beta-tag { margin-left: 8px; }
+.list-row-detail { font-size: 12px; font-weight: 400; line-height: 1.45; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+.list-row-text + .list-row-control { flex: none; }
+.list-section.is-danger .list-row-label { color: var(--danger-ink); }
+.list-row-control > .set-status { font-size: 12.5px; font-weight: 550; }
+/* A switch row is one target: it hovers and presses like every button row (its ::before). */
+.list-switch:disabled { opacity: 1; cursor: default; }
+.list-switch:disabled .switch { opacity: .4; }
+.list-switch:disabled .list-row-label { color: hsl(var(--muted-foreground)); }
+.list-switch > .switch { flex: none; pointer-events: none; }
+/* ---------------------------------------------------------------------------
+   Picker headings (UI-PATTERNS › Pickers). One row: the title, the views
+   (tabs on the desktop, a dropdown after the title on the phone), the Stacks
+   dropdown, Clear, search (growing leftwards from its icon) and Close.
+--------------------------------------------------------------------------- */
+/* The one selected mark: the amber tick, the same in every chooser. */
+.selected-tick { flex: none; width: var(--icon); height: var(--icon); color: var(--selected-ink); }
+.selected-tick.is-off { visibility: hidden; }
+/* A Settings multi-select is as wide as the text fields beside it (Groups › Features, Workers › Capabilities). */
+.list-row-control > .dropdown-trigger.is-field.multi-select-trigger { width: 220px; }
+/* Clear at the end of the References and LoRAs rows. */
+.list-row-clear { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: 0 -6px 0 2px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); position: relative; z-index: 2; }
+.list-row-wrap { position: relative; display: flex; align-items: center; }
+.list-row-wrap > .list-row { flex: 1; min-width: 0; }
+.list-row-wrap > .list-row-clear { margin-right: -6px; }

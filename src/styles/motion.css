@@ -1,0 +1,28 @@
+/* Motion: the press feedback every control shares and the transition defaults components refine. */
+
+/* Shared motion system + composer polish.
+   One vocabulary of durations, easings and press feedback so every control in
+   the app moves the same way. Loaded last so it can normalise earlier layers. */
+/* ---------------------------------------------------------------------------
+   1. One press state everywhere: nothing moves
+   A press darkens the control's fill in place (UI-PATTERNS › Motion). No
+   control scales, shrinks or shifts when it is pressed. Light controls take a
+   dark overlay; gradient buttons dim; tiles and thumbnails dim their media.
+   The overlay is a background-image so it keeps each control's own fill,
+   shape and background-clip (the 32px --icon-fill circles stay circles).
+--------------------------------------------------------------------------- */
+button:not(:disabled) {
+  transition-timing-function: var(--motion-ease);
+  transition-duration: var(--motion-base);
+}
+.sr-only-value,
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

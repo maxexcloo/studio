@@ -1,0 +1,8 @@
+/* Keyboard focus: one neutral ring for anything focusable that has no focus style of its own. */
+
+/* Keyboard focus: one neutral ring everywhere. :where keeps it at zero
+   specificity so components with their own focus style still win. */
+:where(button, a, summary, [role="button"], [role="tab"], [role="switch"], [tabindex]):focus-visible {
+  outline: 2px solid var(--icon-ring);
+  outline-offset: 2px;
+}
