@@ -61,7 +61,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       if (!profile) return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
       if (accountUser) {
         const feature = (req.body?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
-        if (!mayUseGenerationProfile(req.heissAccount, profile.id) || !mayUseFeature(req.heissAccount, feature)) {
+        if (!mayUseGenerationProfile(req.heissAccount, profile) || !mayUseFeature(req.heissAccount, feature)) {
           return res.status(403).json({ ok: false, error: "This account cannot use the selected generation profile." });
         }
         if (Array.isArray(req.body?.loras) && req.body.loras.length && !mayUseFeature(req.heissAccount, "loras")) {

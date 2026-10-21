@@ -20,12 +20,12 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
  * Catalogue switches: what the generation catalogue offers. Some are read once,
  * at start. STUDIO_ENABLE_BUILTIN_PROFILES and STUDIO_ENABLE_TESSERA remain
  * deployment variables (features.js) but are no longer switched in Settings.
+ * LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features;
+ * STUDIO_ENABLE_LORAS, STUDIO_ENABLE_GROK and STUDIO_ENABLE_PRESETS stay
+ * deployment variables that switch one off for everyone (feature-options.js).
  */
 export const catalogueFlags = [
-  flag("STUDIO_ENABLE_LORAS", "LoRAs", "LoRA browsing and LoRA settings on generations.", { applies: "restart" }),
-  flag("STUDIO_ENABLE_GROK", "Cloud Models", "Grok image and video models, run by the provider rather than a worker.", { applies: "restart" }),
-  flag("HEISS_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" }),
-  flag("STUDIO_ENABLE_PRESETS", "Presets & Civitai Imports", "Saved image presets and Civitai image imports.", { defaultOn: false })
+  flag("HEISS_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" })
 ];
 
 const flagOn = (item) => (item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1");

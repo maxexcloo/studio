@@ -10,12 +10,18 @@ export type MultiSelectOption = { value: string; label: string; detail?: string;
 /**
  * A dropdown that picks several values (UI-PATTERNS › Settings): the trigger
  * names the one picked or counts them, the menu ticks values with All and
- * Clear in its head, a search field once the list is long, and disabled values
- * say why. It opens in the dialog it sits in, so focus and clicks stay there.
+ * Clear in its head, a search field once the list is long (unless `searchFrom`
+ * is Infinity), and disabled values say why. It opens in the dialog it sits
+ * in, so focus and clicks stay there.
+ *
+ * All picks every enabled value. Where values are disabled only until another
+ * is picked (References need Generation), pass `onAll` and `allPicked` so one
+ * press picks everything at once rather than the enabled half.
  */
-export function MultiSelect({ label, values, options, onChange, disabled, allLabel = 'All', noneLabel = 'None', searchFrom = 8 }: {
+export function MultiSelect({ label, values, options, onChange, disabled, allLabel = 'All', noneLabel = 'None', searchFrom = 8, onAll, allPicked }: {
   label: string; values: string[]; options: MultiSelectOption[]; onChange: (values: string[]) => void;
   disabled?: boolean; allLabel?: string; noneLabel?: string; searchFrom?: number;
+  onAll?: () => void; allPicked?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -82,7 +88,7 @@ export function MultiSelect({ label, values, options, onChange, disabled, allLab
     }}>
       <div className="gallery-filter-menu-head">
         <strong>{label}</strong>
-        <button type="button" className="gallery-filter-clear" disabled={enabled.every((option) => values.includes(option.value))} onClick={() => onChange([...new Set([...values, ...enabled.map((option) => option.value)])])}>All</button>
+        <button type="button" className="gallery-filter-clear" disabled={allPicked ?? enabled.every((option) => values.includes(option.value))} onClick={() => onAll ? onAll() : onChange([...new Set([...values, ...enabled.map((option) => option.value)])])}>All</button>
         <button type="button" className="gallery-filter-clear" disabled={!values.length} onClick={() => onChange([])}>Clear</button>
       </div>
       {searchable ? <div className="gallery-filter-search"><Search size={14} aria-hidden="true" /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}

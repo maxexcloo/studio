@@ -1,4 +1,5 @@
 import React from 'react';
+import { ExternalLink as ExternalLinkIcon } from 'lucide-react';
 import { cn } from './format';
 
 /** Preference switches shown both in Settings and on the phone's More sheet, under one name. */
@@ -29,15 +30,19 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
 }
 
 /*
+ * A group's heading may carry one action on its right (`action`), such as
+ * New Account: a small link-style button on the heading's line.
+ *
  * Settings rows are the flat list every phone sheet uses (SheetList.tsx,
  * 41-lists.css, UI-PATTERNS › Lists and › Settings): a quiet heading over
  * full-width rows split by hairlines, no cards. A Settings row may carry one
  * line of description under its label.
  */
-export function Group({ title, note, tone, children, className }: React.PropsWithChildren<{ title?: string; note?: React.ReactNode; tone?: 'danger'; className?: string }>) {
+export function Group({ title, action, note, tone, children, className }: React.PropsWithChildren<{ title?: string; action?: React.ReactNode; note?: React.ReactNode; tone?: 'danger'; className?: string }>) {
   return (
     <section className={cn('list-section set-group', tone === 'danger' && 'is-danger', className)}>
-      {title ? <h4 className="list-section-title">{title}</h4> : null}
+      {title && action ? <div className="set-group-head"><h4 className="list-section-title">{title}</h4>{action}</div>
+        : title ? <h4 className="list-section-title">{title}</h4> : null}
       <div className="list-group">{children}</div>
       {note ? <p className="list-note">{note}</p> : null}
     </section>
@@ -95,4 +100,14 @@ export function SaveRow({ dirty, busy, onSave, onDiscard, saveLabel = 'Save', no
 /** A status word with its coloured light. */
 export function Status({ tone, children }: React.PropsWithChildren<{ tone?: 'ok' | 'bad' | 'warn' }>) {
   return <span className={cn('set-status', tone && `is-${tone}`)}><i aria-hidden="true" />{children}</span>;
+}
+
+/** A row's only control when it leaves Studio: a plain link on the right, no button chrome (UI-PATTERNS › Lists). */
+export function ExternalLink({ href, children, label }: { href: string; children: React.ReactNode; label?: string }) {
+  return <a className="set-link" href={href} target="_blank" rel="noreferrer" aria-label={label}>{children}<ExternalLinkIcon size={12} aria-hidden="true" /></a>;
+}
+
+/** The small text button on a group's heading line (Group's `action`). */
+export function GroupAction({ children, ...button }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" className="set-group-action" {...button}>{children}</button>;
 }

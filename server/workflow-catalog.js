@@ -166,6 +166,7 @@ export function workflowSummaries({ info = {}, profiles = [], preferences = load
       description: profile.description || "",
       kind: profile.kind,
       family: profile.family,
+      ...(profile.nsfw ? { nsfw: true } : {}),
       familyName: profile.familyName || "",
       // Every workflow-JSON profile is `custom:*`, bundled or not, so the id
       // prefix cannot tell them apart - use the record's actual folder.

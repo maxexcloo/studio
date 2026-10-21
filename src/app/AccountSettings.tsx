@@ -1,43 +1,53 @@
 import React from 'react';
-import { Ban, Copy, FileJson, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
+import { Ban, Check, Copy, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
 import { cachedMe, emailFieldProps, knownAccountStatus, loadMe, looksLikeEmail, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
 import { apiJson } from './api';
 import { Skeleton, StudioSelect } from './components';
 import { MultiSelect, type MultiSelectOption } from './MultiSelect';
-import { Group, Row, SaveRow } from './SettingsControls';
+import { Group, GroupAction, Row, SaveRow, SwitchRow } from './SettingsControls';
 import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
-type Feature = 'loras' | 'imageGeneration' | 'videoGeneration' | 'imageReferences' | 'videoReferences' | 'gallery' | 'promptHistory';
-type AccessProfile = { id: string; name: string; generationProfiles: string[]; features: Record<Feature, boolean> };
+type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
+type AccessProfile = { id: string; name: string; generationProfiles: string[]; allModels?: boolean; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
 type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
-type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; gateway?: GatewayIdentities };
-export type ProfileInfo = { label: string; kind?: string };
+type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; defaultAccessProfileId?: string; requireApproval?: boolean; lockedFeatures?: Partial<Record<Feature, boolean>>; gateway?: GatewayIdentities };
+export type ProfileInfo = { label: string; kind?: string; cloud?: boolean; nsfw?: boolean };
 
+/** Access-profile features, alphabetically (UI-PATTERNS › Settings). */
 const featureLabels: [Feature, string][] = [
+  ['cloudModels', 'Cloud Models'], ['gallery', 'Gallery'],
   ['imageGeneration', 'Image Generation'], ['imageReferences', 'Image References'],
-  ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References'],
-  ['loras', 'LoRAs'], ['gallery', 'Gallery'], ['promptHistory', 'Prompt History']
+  ['loras', 'LoRAs'], ['nsfwModels', 'NSFW Models'], ['presets', 'Presets & Civitai Imports'],
+  ['promptHistory', 'Prompt History'], ['videoGeneration', 'Video Generation'], ['videoReferences', 'Video References']
 ];
+const anyGeneration = { needs: ['imageGeneration', 'videoGeneration'] as Feature[], reason: 'Needs Image or Video Generation' };
 // A feature that only means something while another one is on.
 const featureNeeds: Partial<Record<Feature, { needs: Feature[]; reason: string }>> = {
+  cloudModels: anyGeneration,
   imageReferences: { needs: ['imageGeneration'], reason: 'Needs Image Generation' },
-  videoReferences: { needs: ['videoGeneration'], reason: 'Needs Video Generation' },
-  loras: { needs: ['imageGeneration', 'videoGeneration'], reason: 'Needs Image or Video Generation' }
+  loras: anyGeneration,
+  nsfwModels: anyGeneration,
+  videoReferences: { needs: ['videoGeneration'], reason: 'Needs Video Generation' }
 };
 const featureApplies = (feature: Feature, on: Set<Feature>) => !featureNeeds[feature] || featureNeeds[feature]!.needs.some((need) => on.has(need));
+/**
+ * Why a feature can't be granted at all: the deployment switched it off for everyone,
+ * or (Presets & Civitai Imports) it stays with administrators, as saved images are shared.
+ */
+const featureLock = (feature: Feature, locked: AdminData['lockedFeatures']) => locked?.[feature] ? 'Off for This Deployment' : feature === 'presets' ? 'Administrators Only' : '';
 const jsonPost = (method: string, body: unknown) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const message = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 const NEW = '__new__';
 const NONE = '__none__';
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((item) => b.includes(item));
-const profileIdFrom = (name: string) => name.trim().toLocaleLowerCase('en-AU').replace(/[^a-z0-9:-]+/g, '-').replace(/^-+|-+$/g, '');
+const profileIdFrom = (name: string) => name.trim().toLocaleLowerCase('en-AU').replace(/[^a-z0-9:-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 128);
 
 // Settings loads this module when its button is hovered or focused, so the account is on its way before Settings opens.
 if (typeof window !== 'undefined' && knownAccountStatus()?.signedIn && !cachedMe()) void loadMe().catch(() => undefined);
 
-/** Settings › Account: who you are, your password, your MCP connection and this browser's session. */
+/** Settings › Account: your MCP connection, then who you are and your password (alphabetical groups). */
 export function AccountSettings({ showToast, copyToClipboard, confirmAction }: { showToast: ShowToast; copyToClipboard: (text: string) => Promise<boolean>; confirmAction: ConfirmAction }) {
   // Drawn at once from what the sign-in gate and the last visit knew; a fresh copy fills in behind.
   const [me, setMe] = React.useState<Me | null>(cachedMe());
@@ -86,7 +96,6 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction }: {
   const token = me?.mcp || null;
   return <div className="set-sections" data-account-ready={me ? '' : undefined}>
     {loadError && !me ? <Group><Row label="Account Unavailable" description={loadError}><button className="btn is-ghost" onClick={() => void refresh()}><RefreshCw size={14} /> Try Again</button></Row></Group> : null}
-    <ProfileGroup account={account} showToast={showToast} onSaved={(next) => { setMe((current) => current ? { ...current, account: next } : current); updateCachedMe({ account: next }); }} />
     <Group title="MCP" note="The token belongs to your account and uses its current access. It only works for MCP, never for account or Studio administration.">
       <Row label="Endpoint" description={token?.endpoint || <Skeleton className="skeleton-text path" />}>
         {token?.endpoint ? <button className="btn is-ghost" onClick={() => void copy(token.endpoint, 'URL')}><Copy size={14} /> Copy URL</button> : null}
@@ -100,6 +109,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction }: {
         <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
       </Row> : null}
     </Group>
+    <ProfileGroup account={account} showToast={showToast} onSaved={(next) => { setMe((current) => current ? { ...current, account: next } : current); updateCachedMe({ account: next }); }} />
   </div>;
 }
 
@@ -177,8 +187,8 @@ function PasswordRows({ account, showToast }: { account: OwnAccount | null; show
   </>;
 }
 
-/** Settings › Users (administrators): access profiles, accounts and chat gateway users. */
-export function UsersSettings({ showToast, confirmAction, profiles, onOpenProfiles }: { showToast: ShowToast; confirmAction: ConfirmAction; profiles?: Record<string, ProfileInfo>; onOpenProfiles: () => void }) {
+/** Settings › Users (administrators): access profiles, accounts and chat gateway users, alphabetically. */
+export function UsersSettings({ showToast, confirmAction, profiles }: { showToast: ShowToast; confirmAction: ConfirmAction; profiles?: Record<string, ProfileInfo> }) {
   const [admin, setAdmin] = React.useState<AdminData | null>(null);
   const [loadError, setLoadError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -207,104 +217,133 @@ export function UsersSettings({ showToast, confirmAction, profiles, onOpenProfil
     if (!await confirmAction({ title: 'Dismiss This Chat User?', description: 'They leave this list. If the gateway sends them again, they return here waiting to be linked.', action: 'Dismiss Chat User', destructive: true })) return;
     if (await run(() => apiJson('/api/accounts/gateway-pending/dismiss', jsonPost('POST', { identity })), 'Couldn’t dismiss the chat user')) await refresh();
   };
-  const accountOptions = (list: Account[]) => list.map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
+  const accountOptions = (list: Account[]) => byName(list).map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
 
   if (!admin) return loadError
     ? <Group><Row label="Users Unavailable" description={loadError}><button className="btn is-ghost" onClick={() => void refresh()}><RefreshCw size={14} /> Try Again</button></Row></Group>
-    : <Group title="Accounts"><Row label={<Skeleton className="skeleton-text short" />} /></Group>;
+    : <Group title="Access Profiles"><Row label={<Skeleton className="skeleton-text short" />} /></Group>;
 
+  const gatewayLinks = [...(admin.gateway?.links || [])].sort((a, b) => a.identity.localeCompare(b.identity));
+  const gatewayPending = [...(admin.gateway?.pending || [])].sort((a, b) => a.identity.localeCompare(b.identity));
   return <div className="set-sections">
-    <AccountsGroup admin={admin} showToast={showToast} confirmAction={confirmAction} onSaved={refresh} />
     <AccessProfileEditor admin={admin} profiles={profiles} showToast={showToast} onSaved={refresh} />
-    <Group title="Chat Gateway" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, here or automatically when the gateway forwards an enabled account's email.">
-      {(admin.gateway?.links || []).map((link) => {
+    <AccountsGroup admin={admin} showToast={showToast} confirmAction={confirmAction} onSaved={refresh} />
+    <Group title="Chat Gateway" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, here or automatically when the gateway forwards an enabled account's email. With a default access profile, an email no account has becomes a new account.">
+      {gatewayLinks.map((link) => {
         const account = admin.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>
           <button className="btn is-ghost" disabled={busy} aria-label={`Unlink ${link.identity}`} onClick={() => void setGatewayLink(link.identity, '')}><Unlink size={14} /> Unlink</button>
         </Row>;
       })}
-      {(admin.gateway?.pending || []).map((item) => <Row key={item.identity} label={item.identity} description={`Waiting since ${new Date(item.firstSeenAt).toLocaleString('en-AU')}`}>
+      {gatewayPending.map((item) => <Row key={item.identity} label={item.identity} description={`Waiting since ${new Date(item.firstSeenAt).toLocaleString('en-AU')}`}>
         <div className="set-type-picker"><StudioSelect ariaLabel={`Account for ${item.identity}`} value={gatewayChoice[item.identity] || NONE} options={[...(gatewayChoice[item.identity] ? [] : [{ label: 'Choose an Account', value: NONE }]), ...accountOptions(admin.accounts)]} onChange={(value) => setGatewayChoice((current) => ({ ...current, [item.identity]: value === NONE ? '' : value }))} /></div>
         <button className="btn is-primary" disabled={busy || !gatewayChoice[item.identity]} onClick={() => void setGatewayLink(item.identity, gatewayChoice[item.identity])}><Link2 size={14} /> Link</button>
         <button className="btn is-ghost" disabled={busy} aria-label={`Dismiss ${item.identity}`} onClick={() => void dismissGatewayIdentity(item.identity)}><X size={14} /> Dismiss</button>
       </Row>)}
-      {!admin.gateway?.links.length && !admin.gateway?.pending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
-    </Group>
-    <Group title="Profiles" note="Model profiles arrive from the profiles repository. An edited copy stops receiving its updates until the edit is committed there.">
-      <Row label="Profile JSON" description="Edit one model profile’s JSON, checked and reviewed before it is saved, including its starting values such as steps and frames.">
-        <button className="btn is-ghost" onClick={onOpenProfiles}><FileJson size={14} /> Edit Profiles</button>
-      </Row>
+      {!gatewayLinks.length && !gatewayPending.length ? <Row label="No Chat Users Yet" description="Users appear here after their first request through the gateway." /> : null}
     </Group>
   </div>;
 }
 
-/** One access profile at a time, picked from a list with New, edited with multi-selects and saved or discarded. */
+const byName = <T extends { displayName: string }>(list: T[]) => [...list].sort((a, b) => a.displayName.localeCompare(b.displayName, 'en-AU', { sensitivity: 'base' }));
+const byProfileName = (list: AccessProfile[]) => [...list].sort((a, b) => a.name.localeCompare(b.name, 'en-AU', { sensitivity: 'base' }));
+
+type Draft = { name: string; models: string[]; allModels: boolean; features: Feature[] };
+
+/**
+ * One access profile at a time, picked from a list with New, edited with multi-selects and
+ * saved or discarded. New profiles take their ID from the name. Cloud models are not listed:
+ * the Cloud Models feature grants them. All Models also grants local models added later.
+ */
 function AccessProfileEditor({ admin, profiles, showToast, onSaved }: { admin: AdminData; profiles?: Record<string, ProfileInfo>; showToast: ShowToast; onSaved: () => Promise<void> }) {
-  const [choice, setChoice] = React.useState(admin.accessProfiles[0]?.id || NEW);
+  const sorted = byProfileName(admin.accessProfiles);
+  const [choice, setChoice] = React.useState(sorted[0]?.id || NEW);
   const saved = admin.accessProfiles.find((profile) => profile.id === choice) || null;
-  const blank = { name: '', id: '', models: [] as string[], features: ['imageGeneration', 'imageReferences', 'gallery', 'promptHistory'] as Feature[] };
-  const fromSaved = (profile: AccessProfile | null) => profile ? { name: profile.name, id: profile.id, models: profile.generationProfiles, features: featureLabels.map(([key]) => key).filter((key) => profile.features?.[key]) } : blank;
+  const blank: Draft = { name: '', models: [], allModels: false, features: ['gallery', 'imageGeneration', 'imageReferences', 'promptHistory'] };
+  const fromSaved = (profile: AccessProfile | null): Draft => profile ? { name: profile.name, models: profile.generationProfiles, allModels: profile.allModels === true, features: featureLabels.map(([key]) => key).filter((key) => profile.features?.[key]) } : blank;
   const [draft, setDraft] = React.useState(() => fromSaved(saved));
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => { setDraft(fromSaved(saved)); }, [choice, saved]); // eslint-disable-line react-hooks/exhaustive-deps
   const base = fromSaved(saved);
-  const dirty = choice === NEW ? Boolean(draft.name.trim() || draft.models.length) : draft.name !== base.name || !sameSet(draft.models, base.models) || !sameSet(draft.features, base.features);
+  const dirty = choice === NEW ? Boolean(draft.name.trim() || draft.models.length || draft.allModels) : draft.name !== base.name || draft.allModels !== base.allModels || !sameSet(draft.models, base.models) || !sameSet(draft.features, base.features);
   const on = new Set(draft.features);
-  // Stored grants stay listed while discovery is degraded, marked unavailable.
-  const grantable = [...new Set([...admin.availableProfiles, ...draft.models])];
+  const lockOf = (feature: Feature) => featureLock(feature, admin.lockedFeatures);
+
+  // Stored grants stay listed while discovery is degraded, marked unavailable; cloud profiles never are.
+  const local = (id: string) => !profiles?.[id]?.cloud;
+  const grantable = [...new Set([...admin.availableProfiles, ...draft.models])].filter(local);
   const kindOn = (kind?: string) => kind === 'video' ? on.has('videoGeneration') : on.has('imageGeneration');
+  const usable = (id: string) => kindOn(profiles?.[id]?.kind) && (!profiles?.[id]?.nsfw || on.has('nsfwModels'));
   const modelOptions: MultiSelectOption[] = grantable.map((id) => {
     const info = profiles?.[id];
     const unavailable = !admin.availableProfiles.includes(id);
-    const off = !kindOn(info?.kind);
-    return { value: id, label: info?.label || id, detail: unavailable ? 'Unavailable' : info?.kind === 'video' ? 'Video' : 'Image', disabled: off && !draft.models.includes(id), reason: off ? `Turn on ${info?.kind === 'video' ? 'Video' : 'Image'} Generation first` : undefined };
+    const kindWord = info?.kind === 'video' ? 'Video' : 'Image';
+    const reason = !kindOn(info?.kind) ? `Turn on ${kindWord} Generation first` : info?.nsfw && !on.has('nsfwModels') ? 'Turn on NSFW Models first' : undefined;
+    return { value: id, label: info?.label || id, detail: unavailable ? 'Unavailable' : info?.nsfw ? `${kindWord} · NSFW` : kindWord, disabled: Boolean(reason) && !draft.models.includes(id), reason };
   }).sort((a, b) => a.label.localeCompare(b.label));
-  const featureOptions: MultiSelectOption[] = featureLabels.map(([key, label]) => ({ value: key, label, disabled: !featureApplies(key, on) && !on.has(key), reason: featureNeeds[key]?.reason }));
+  // All Models shows every model it currently opens as picked.
+  const modelValues = draft.allModels ? grantable.filter((id) => admin.availableProfiles.includes(id) && usable(id)) : draft.models;
+
+  const featureOptions: MultiSelectOption[] = featureLabels.map(([key, label]) => {
+    const lock = lockOf(key);
+    return { value: key, label, disabled: Boolean(lock) || (!featureApplies(key, on) && !on.has(key)), reason: lock || featureNeeds[key]?.reason };
+  });
+  const grantableFeatures = featureLabels.map(([key]) => key).filter((key) => !lockOf(key));
   const setFeatures = (values: string[]) => {
     // A feature whose prerequisite went off goes with it.
     const next = new Set(values as Feature[]);
     for (const [key] of featureLabels) if (next.has(key) && !featureApplies(key, next)) next.delete(key);
     setDraft((current) => ({ ...current, features: featureLabels.map(([key]) => key).filter((key) => next.has(key)) }));
   };
+
   const save = async () => {
-    const id = choice === NEW ? (draft.id.trim() || profileIdFrom(draft.name)) : choice;
-    if (!id || !draft.name.trim()) return;
+    const name = draft.name.trim();
+    const id = choice === NEW ? profileIdFrom(name) : choice;
+    if (!name) return;
+    if (!id) { showToast('Use letters or numbers in the name', 'error'); return; }
+    if (choice === NEW && admin.accessProfiles.some((profile) => profile.id === id)) { showToast('An access profile with that name already exists', 'error'); return; }
     setBusy(true);
     try {
-      const usable = draft.models.filter((model) => kindOn(profiles?.[model]?.kind) || !admin.availableProfiles.includes(model));
-      await apiJson('/api/accounts/profiles', jsonPost('POST', { id, name: draft.name.trim(), generationProfiles: usable, features: Object.fromEntries(featureLabels.map(([key]) => [key, on.has(key)])) }));
-      showToast(`${draft.name.trim()} saved`, 'success');
+      const models = draft.allModels ? [] : draft.models.filter((model) => usable(model) || !admin.availableProfiles.includes(model));
+      await apiJson('/api/accounts/profiles', jsonPost('POST', { id, name, generationProfiles: models, allModels: draft.allModels, features: Object.fromEntries(featureLabels.map(([key]) => [key, on.has(key)])) }));
+      showToast(`${name} saved`, 'success');
       await onSaved();
       setChoice(id);
     } catch (error) { showToast(message(error, 'Couldn’t save the access profile'), 'error'); }
     finally { setBusy(false); }
   };
-  const options = [...admin.accessProfiles.map((profile) => ({ label: profile.name, value: profile.id })), { label: 'New Access Profile', value: NEW }];
-  const offModels = draft.models.filter((model) => admin.availableProfiles.includes(model) && !kindOn(profiles?.[model]?.kind)).length;
-  return <Group title="Access Profiles" note="Each ordinary account gets one access profile. Administrators always have full access, and new models stay administrator-only until granted here.">
-    <Row label="Access Profile" description={saved ? `${saved.generationProfiles.length} model${saved.generationProfiles.length === 1 ? '' : 's'} · ${admin.accounts.filter((account) => account.accessProfileId === saved.id).length} account${admin.accounts.filter((account) => account.accessProfileId === saved.id).length === 1 ? '' : 's'}` : 'A new access profile.'}>
+  const options = [...sorted.map((profile) => ({ label: profile.name, value: profile.id })), { label: 'New Access Profile', value: NEW }];
+  const offModels = draft.allModels ? 0 : draft.models.filter((model) => admin.availableProfiles.includes(model) && !usable(model)).length;
+  const accounts = saved ? admin.accounts.filter((account) => account.accessProfileId === saved.id).length : 0;
+  const generation = on.has('imageGeneration') || on.has('videoGeneration');
+  return <Group title="Access Profiles" note="Each ordinary account gets one access profile. Administrators always have full access. Cloud models follow the Cloud Models feature; other new models stay administrator-only until granted here or through All.">
+    <Row label="Access Profile" description={saved ? `${saved.allModels ? 'All models' : `${saved.generationProfiles.length} model${saved.generationProfiles.length === 1 ? '' : 's'}`} · ${accounts} account${accounts === 1 ? '' : 's'}` : 'A new access profile.'}>
       <div className="set-type-picker"><StudioSelect ariaLabel="Access Profile to Edit" value={choice} options={options} onChange={(value) => { if (!dirty || value === choice) setChoice(value); else showToast('Save or discard the changes first', 'error'); }} /></div>
     </Row>
     <Row label="Name"><input className="modal-input account-field" aria-label="Profile Name" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Studio Artists" /></Row>
-    {choice === NEW ? <Row label="Profile ID" description="Lowercase letters, numbers, colon and hyphen. Taken from the name when empty."><input className="modal-input account-field" aria-label="Profile ID" value={draft.id} onChange={(event) => setDraft((current) => ({ ...current, id: event.target.value }))} placeholder={profileIdFrom(draft.name) || 'studio-artists'} /></Row> : <Row label="Profile ID" description={choice} />}
     <Row label="Features" description="What accounts with this profile can use.">
-      <MultiSelect label="Features" values={draft.features} options={featureOptions} onChange={setFeatures} />
+      <MultiSelect label="Features" values={draft.features} options={featureOptions} onChange={setFeatures} allPicked={grantableFeatures.every((key) => on.has(key))} onAll={() => setFeatures(grantableFeatures)} />
     </Row>
-    <Row label="Models" description={offModels ? `${offModels} picked model${offModels === 1 ? '' : 's'} won’t be granted while ${offModels === 1 ? 'its' : 'their'} generation is off.` : 'The models these accounts may generate with.'} disabled={!on.has('imageGeneration') && !on.has('videoGeneration')}>
-      <MultiSelect label="Models" values={draft.models} options={modelOptions} disabled={!on.has('imageGeneration') && !on.has('videoGeneration')} onChange={(values) => setDraft((current) => ({ ...current, models: values }))} />
+    <Row label="Models" description={!generation ? 'Turn on Image or Video Generation first.' : draft.allModels ? 'Every local model these accounts’ features allow, including ones added later.' : offModels ? `${offModels} picked model${offModels === 1 ? '' : 's'} won’t be granted while ${offModels === 1 ? 'it is' : 'they are'} switched off.` : 'The local models these accounts may generate with.'} disabled={!generation}>
+      <MultiSelect label="Models" values={modelValues} options={modelOptions} disabled={!generation} searchFrom={Infinity} allPicked={draft.allModels} onAll={() => setDraft((current) => ({ ...current, allModels: true, models: [] }))} onChange={(values) => setDraft((current) => ({ ...current, allModels: false, models: values }))} />
     </Row>
-    <SaveRow dirty={dirty} busy={busy} saveLabel={choice === NEW ? 'Create Profile' : 'Save Profile'} canSave={Boolean(draft.name.trim())} onSave={() => void save()} onDiscard={() => { setDraft(fromSaved(saved)); if (choice === NEW && admin.accessProfiles[0]) setChoice(admin.accessProfiles[0].id); }} />
+    <SaveRow dirty={dirty} busy={busy} saveLabel={choice === NEW ? 'Create Profile' : 'Save Profile'} canSave={Boolean(draft.name.trim())} onSave={() => void save()} onDiscard={() => { setDraft(fromSaved(saved)); if (choice === NEW && sorted[0]) setChoice(sorted[0].id); }} />
   </Group>;
 }
 
-/** Every account in one list, each with its access profile and Enable or Disable; New Account opens its form in place. */
+/**
+ * Every account in one list (by name), each with its access profile and Enable or Disable,
+ * after the default access profile for new accounts. New Account, on the heading's line,
+ * opens its form in place.
+ */
 function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: AdminData; showToast: ShowToast; confirmAction: ConfirmAction; onSaved: () => Promise<void> }) {
   const [busy, setBusy] = React.useState('');
   const [creating, setCreating] = React.useState(false);
   const [username, setUsername] = React.useState('');
   const [displayName, setDisplayName] = React.useState('');
   const [password, setPassword] = React.useState('');
-  const [profileId, setProfileId] = React.useState(admin.accessProfiles[0]?.id || '');
+  const startingProfile = () => admin.defaultAccessProfileId || byProfileName(admin.accessProfiles)[0]?.id || '';
+  const [profileId, setProfileId] = React.useState(startingProfile);
   const run = async (key: string, action: () => Promise<unknown>, failure: string) => {
     setBusy(key);
     try { await action(); await onSaved(); return true; }
@@ -320,31 +359,44 @@ function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: Ad
     if (!account.disabled && !await confirmAction({ title: `Disable ${account.displayName}?`, description: 'Their browser sessions end and their MCP token stops working. Their outputs are kept.', action: 'Disable Account', destructive: true })) return;
     await run(account.id, () => patch(account, { disabled: !account.disabled }), 'Couldn’t update the account');
   };
-  const reset = () => { setUsername(''); setDisplayName(''); setPassword(''); setCreating(false); };
+  const setDefault = async (value: string) => {
+    const next = value === NONE ? '' : value;
+    if (next === (admin.defaultAccessProfileId || '')) return;
+    if (await run('default', () => apiJson('/api/accounts/default-profile', jsonPost('POST', { accessProfileId: next })), 'Couldn’t save the default access profile')) showToast('Default access profile saved', 'success');
+  };
+  const approval = admin.requireApproval !== false;
+  const setApproval = async (next: boolean) => {
+    if (await run('approval', () => apiJson('/api/accounts/default-profile', jsonPost('POST', { requireApproval: next })), 'Couldn’t save Require Approval')) showToast(next ? 'New sign-ins wait for approval' : 'New sign-ins start at once', 'success');
+  };
+  const reset = () => { setUsername(''); setDisplayName(''); setPassword(''); setProfileId(startingProfile()); setCreating(false); };
   const create = async () => {
     if (await run('new', () => apiJson('/api/accounts/users', jsonPost('POST', { username: username.trim(), displayName, ...(password ? { password } : {}), accessProfileId: profileId })), 'Couldn’t create the account')) {
       showToast(`${displayName || username.trim()} created`, 'success');
       reset();
     }
   };
-  const profileOptions = (current: string) => [...(current ? [] : [{ label: 'Choose a Profile', value: NONE }]), ...admin.accessProfiles.map((profile) => ({ label: profile.name, value: profile.id }))];
+  const profileOptions = (current: string) => [...(current ? [] : [{ label: 'Choose a Profile', value: NONE }]), ...byProfileName(admin.accessProfiles).map((profile) => ({ label: profile.name, value: profile.id }))];
   const pending = admin.accounts.filter((item) => item.pending).length;
-  return <Group title="Accounts" note={pending ? `${pending} sign-in${pending === 1 ? '' : 's'} waiting: choose an access profile to approve.` : 'Accounts are never deleted, only disabled, so their outputs stay.'}>
-    {admin.accounts.map((account) => {
-      const isAdmin = account.role === 'administrator';
-      return <Row key={account.id} label={account.displayName} description={`${account.username} · ${isAdmin ? 'Administrator' : 'User'}${account.signInLinked ? ' · single sign-on' : ''}${account.pending ? ' · waiting for approval' : ''}${account.disabled ? ' · disabled' : ''}`} disabled={account.disabled}>
-        {isAdmin ? <span className="set-locked-value">Full Access</span> : <div className="set-type-picker"><StudioSelect ariaLabel={`Access Profile for ${account.username}`} value={account.accessProfileId || NONE} options={profileOptions(account.accessProfileId || '')} onChange={(value) => void assign(account, value)} /></div>}
-        <button className="btn is-ghost" disabled={Boolean(busy)} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
-      </Row>;
-    })}
+  const defaultId = admin.defaultAccessProfileId || '';
+  return <Group title="Accounts" action={creating ? null : <GroupAction onClick={() => { setProfileId(startingProfile()); setCreating(true); }}><UserPlus size={13} aria-hidden="true" /> New Account</GroupAction>} note={pending ? `${pending} sign-in${pending === 1 ? '' : 's'} waiting: choose an access profile to approve.` : 'Accounts are never deleted, only disabled, so their outputs stay.'}>
     {creating ? <>
       <Row label="Email" description={username.trim() && !looksLikeEmail(username) ? 'Enter an email address. It is the account’s sign-in name.' : 'The sign-in name; single sign-on links to it.'}><input className="modal-input account-field" aria-label="Email" autoComplete="off" autoFocus {...emailFieldProps} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="artist@example.com" /></Row>
       <Row label="Display Name"><input className="modal-input account-field" aria-label="Display Name" autoComplete="off" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="New Artist" /></Row>
       <Row label="Temporary Password" description="Optional. Without one the account signs in through single sign-on only."><input className="modal-input account-field" aria-label="Temporary Password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></Row>
       <Row label="Access Profile"><div className="set-type-picker"><StudioSelect ariaLabel="Access Profile for the New Account" value={profileId || NONE} options={profileOptions(profileId)} onChange={(value) => setProfileId(value === NONE ? '' : value)} /></div></Row>
       <SaveRow dirty busy={busy === 'new'} saveLabel="Create Account" canSave={looksLikeEmail(username) && Boolean(profileId)} onSave={() => void create()} onDiscard={reset} />
-    </> : <Row label="New Account" description="A local account with an access profile.">
-      <button className="btn is-ghost" onClick={() => setCreating(true)}><UserPlus size={14} /> New Account</button>
-    </Row>}
+    </> : null}
+    <Row label="Default Access Profile" description={defaultId ? 'New accounts start on it: added here, through single sign-on or the chat gateway.' : 'New single sign-on accounts wait for approval, and the chat gateway adds no accounts.'} disabled={busy === 'default'}>
+      <div className="set-type-picker"><StudioSelect ariaLabel="Default Access Profile" value={defaultId || NONE} options={[{ label: 'None · Approve Each', value: NONE }, ...byProfileName(admin.accessProfiles).map((profile) => ({ label: profile.name, value: profile.id }))]} onChange={(value) => void setDefault(value)} /></div>
+    </Row>
+    {defaultId ? <SwitchRow label="Require Approval" description={approval ? 'New single sign-on and chat gateway accounts wait here, then get the default access profile when approved.' : 'New single sign-on and chat gateway accounts start on the default access profile at once.'} checked={approval} disabled={busy === 'approval'} onChange={(next) => void setApproval(next)} /> : null}
+    {byName(admin.accounts).map((account) => {
+      const isAdmin = account.role === 'administrator';
+      return <Row key={account.id} label={account.displayName} description={`${account.username} · ${isAdmin ? 'Administrator' : 'User'}${account.signInLinked ? ' · single sign-on' : ''}${account.identity?.provider === 'gateway' ? ' · chat gateway' : ''}${account.pending ? ' · waiting for approval' : ''}${account.disabled ? ' · disabled' : ''}`} disabled={account.disabled}>
+        {account.pending && defaultId ? <button className="btn is-primary" disabled={Boolean(busy)} aria-label={`Approve ${account.displayName}`} onClick={() => void assign(account, defaultId)}><Check size={14} /> Approve</button> : null}
+        {isAdmin ? <span className="set-locked-value">Full Access</span> : <div className="set-type-picker"><StudioSelect ariaLabel={`Access Profile for ${account.username}`} value={account.accessProfileId || NONE} options={profileOptions(account.accessProfileId || '')} onChange={(value) => void assign(account, value)} /></div>}
+        <button className="btn is-ghost" disabled={Boolean(busy)} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
+      </Row>;
+    })}
   </Group>;
 }

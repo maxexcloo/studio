@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
-import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, listAccessProfiles, listAccounts, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, defaultAccessProfileId, requireApproval, setRequireApproval, ensureBuiltInAccessProfiles, listAccessProfiles, setDefaultAccessProfile, listAccounts, migrateCloudModelAccess, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf, endDeviceSession } from "./access.js";
+import { grokEnabled, lorasEnabled, presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
@@ -102,7 +103,11 @@ export function checkSetupToken(value = process.env.STUDIO_SETUP_TOKEN) {
 const setupTokenUsable = () => String(process.env.STUDIO_SETUP_TOKEN || "").length >= 32;
 if (multiUserEnabled) checkSetupToken();
 
-export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], oidcClient } = {}) {
+/**
+ * `availableProfiles` lists the grantable local profile ids; `cloudProfiles` the cloud ones,
+ * which access profiles grant through their Cloud Models feature instead.
+ */
+export function registerMultiUserAuthRoutes(app, { availableProfiles = async () => [], cloudProfiles = async () => [], oidcClient } = {}) {
   oidc = oidcClient !== undefined ? oidcClient : multiUserEnabled && oidcConfigFromEnv() ? createOidcClient(oidcConfigFromEnv()) : null;
   // Single-user mode answers only the status route, even if an old account store remains.
   const route = (method) => (path, handler) => app[method](path, (req, res) => (multiUserEnabled || path === "/api/accounts/status"
@@ -278,9 +283,33 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
 
   get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    const profiles = await availableProfiles();
+    const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
+    migrateCloudModelAccess(cloud);
+    ensureBuiltInAccessProfiles();
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, accounts: listAccounts(), accessProfiles: listAccessProfiles(profiles), availableProfiles: profiles, gateway: listGatewayIdentities() });
+    res.json({
+      ok: true,
+      accounts: listAccounts(),
+      accessProfiles: listAccessProfiles(),
+      availableProfiles: profiles,
+      defaultAccessProfileId: defaultAccessProfileId(),
+      requireApproval: requireApproval(),
+      // Features the deployment switched off for everyone; their access-profile options show locked.
+      lockedFeatures: { loras: !lorasEnabled, cloudModels: !grokEnabled, presets: !presetsEnabled() },
+      gateway: listGatewayIdentities()
+    });
+  });
+
+  post("/api/accounts/default-profile", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      const body = req.body || {};
+      if (typeof body.requireApproval === "boolean") setRequireApproval(body.requireApproval);
+      if (typeof body.accessProfileId === "string") setDefaultAccessProfile(body.accessProfileId);
+      res.json({ ok: true, defaultAccessProfileId: defaultAccessProfileId(), requireApproval: requireApproval() });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
   });
 
   post("/api/accounts/gateway-links", (req, res) => {
@@ -304,7 +333,8 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
   post("/api/accounts/profiles", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
-      res.json({ ok: true, profile: saveAccessProfile(req.body, await availableProfiles()) });
+      const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
+      res.json({ ok: true, profile: saveAccessProfile(req.body, profiles, cloud) });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

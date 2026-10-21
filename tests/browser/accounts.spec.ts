@@ -9,8 +9,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   const profiles = [{ id: 'artists', name: 'Artists', generationProfiles: ['image-fast'], features: { loras: true } }];
   const accounts = [
     { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator', disabled: false },
-    { id: 'artist-id', username: 'artist.one', displayName: 'Artist One', role: 'user', accessProfileId: 'artists', disabled: false }
+    { id: 'artist-id', username: 'artist.one', displayName: 'Artist One', role: 'user', accessProfileId: 'artists', disabled: false },
+    { id: 'pending-id', username: 'waiting@example.com', displayName: 'Waiting One', role: 'user', pending: true, signInLinked: true, disabled: false }
   ];
+  const defaults = { defaultAccessProfileId: '', requireApproval: true };
   const route = async (request: import('@playwright/test').Route) => {
     const url = new URL(request.request().url());
     if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn, account: signedIn ? { id: 'admin-id', role: 'administrator' } : null } });
@@ -20,7 +22,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
     if (url.pathname === '/api/accounts/me') return request.fulfill({ json: { ok: true, account: { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator' }, mcp: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } } });
-    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
+    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], ...defaults, lockedFeatures: { loras: false, cloudModels: false, presets: false }, gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
     if (url.pathname === '/api/accounts/gateway-links') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
@@ -33,11 +35,17 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, profile: request.request().postDataJSON() } });
     }
+    if (url.pathname === '/api/accounts/default-profile' && request.request().method() === 'POST') {
+      const body = request.request().postDataJSON();
+      posts.push({ url: url.pathname, body });
+      Object.assign(defaults, typeof body.accessProfileId === 'string' ? { defaultAccessProfileId: body.accessProfileId } : {}, typeof body.requireApproval === 'boolean' ? { requireApproval: body.requireApproval } : {});
+      return request.fulfill({ json: { ok: true, ...defaults } });
+    }
     if (url.pathname === '/api/accounts/users' && request.request().method() === 'POST') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, account: { ...request.request().postDataJSON(), id: 'new-user', role: 'user' } } });
     }
-    if (url.pathname === '/api/accounts/users/artist-id' && request.request().method() === 'PATCH') {
+    if (/^\/api\/accounts\/users\/(artist|pending)-id$/.test(url.pathname) && request.request().method() === 'PATCH') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, account: { id: 'artist-id', ...request.request().postDataJSON() } } });
     }
@@ -69,14 +77,31 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(loraOps.join('\n')).not.toContain(otherAccountText);
   expect(await page.evaluate(() => localStorage.getItem('heiss-ui-lora-pending:account:admin-id'))).toBeNull();
   await studioUi(page).openSettings();
+  // Account first, then the pages alphabetically.
+  await expect(page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button')).toHaveText(['Account', 'About', 'Maintenance', 'Models', 'Profiles', 'Studio', 'Users', 'Workers']);
   await page.getByRole('button', { name: 'Users', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toBeVisible();
+  // Groups read alphabetically, and the model profile editor is its own page now.
+  await expect(page.locator('#settings-panel .list-section-title')).toHaveText(['Access Profiles', 'Accounts', 'Chat Gateway']);
+  await expect(page.getByRole('button', { name: 'Edit Profiles', exact: true })).toHaveCount(0);
+  // New Account sits on the Accounts heading's line, not in a row of its own.
+  await expect(page.locator('.set-group-head').filter({ hasText: 'Accounts' }).getByRole('button', { name: 'New Account', exact: true })).toBeVisible();
+  await expect(page.getByText('A local account with an access profile.', { exact: true })).toHaveCount(0);
   // One access profile at a time: picked from a list with New, edited with multi-selects, then saved or discarded.
   await page.getByLabel('Access Profile to Edit').click();
   await page.getByRole('option', { name: 'New Access Profile', exact: true }).click();
   await page.getByLabel('Profile Name').fill('Video Artists');
+  // The ID comes from the name; there is no Profile ID row.
+  await expect(page.getByLabel('Profile ID')).toHaveCount(0);
   await page.getByRole('button', { name: 'Features', exact: true }).click();
   const features = page.getByRole('listbox', { name: 'Features', exact: true });
+  await expect(features.getByRole('option')).toHaveText([/^Cloud Models/, /^Gallery/, /^Image Generation/, /^Image References/, /^LoRAs/, /^NSFW Models/, /^Presets & Civitai Imports/, /^Prompt History/, /^Video Generation/, /^Video References/]);
+  // All picks everything at once, dependants included; presets stay with administrators.
+  await page.locator('.multi-select-menu').getByRole('button', { name: 'All', exact: true }).click();
+  for (const name of ['Cloud Models', 'Image References', 'LoRAs', 'NSFW Models', 'Video References']) await expect(features.getByRole('option', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-selected', 'true');
+  await expect(features.getByRole('option', { name: /^Presets & Civitai Imports/ })).toBeDisabled();
+  await page.locator('.multi-select-menu').getByRole('button', { name: 'Clear', exact: true }).click();
+  await features.getByRole('option', { name: /^Image Generation/ }).click();
   await features.getByRole('option', { name: /^Video Generation/ }).click();
   await features.getByRole('option', { name: /^LoRAs/ }).click();
   // Escape closes the menu alone; Settings stays open.
@@ -85,7 +110,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByLabel('Profile Name')).toBeVisible();
   const users = page.getByRole('region', { name: 'Users', exact: true });
   await users.getByRole('button', { name: 'Models', exact: true }).click();
+  // Models has no search box; picked rows use the shared accent.
+  await expect(page.getByLabel('Search Models', { exact: true })).toHaveCount(0);
   await page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ }).click();
+  await expect(page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ })).toHaveCSS('background-color', 'rgba(255, 154, 82, 0.14)');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Create Profile', exact: true }).click();
@@ -95,6 +123,20 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(profile.generationProfiles).toEqual(['video-hd']);
   expect(profile.features.loras).toBe(true);
   expect(profile.features.videoGeneration).toBe(true);
+  expect(profile.features.cloudModels).toBe(false);
+
+  // One default access profile for every new account, saved at once.
+  await page.getByLabel('Default Access Profile', { exact: true }).click();
+  await page.getByRole('option', { name: 'Artists', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/default-profile')?.body).toEqual({ accessProfileId: 'artists' });
+  // Require Approval sits beside it, on until turned off; a waiting sign-in is approved onto the default.
+  const approval = page.getByRole('switch', { name: 'Require Approval', exact: true });
+  await expect(approval).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: 'Approve Waiting One', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/pending-id')?.body).toEqual({ accessProfileId: 'artists' });
+  await approval.click();
+  await expect.poll(() => posts.filter((post) => post.url === '/api/accounts/default-profile').at(-1)?.body).toEqual({ requireApproval: false });
+  await expect(approval).toHaveAttribute('aria-checked', 'false');
   await page.locator('.set-row').filter({ hasText: 'artist.one' }).getByRole('button', { name: 'Disable', exact: true }).click();
   // Disabling acts at once (it can be enabled again); no question in the pill.
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
@@ -165,7 +207,7 @@ test('ordinary accounts open their own studio without administration sections', 
   const sections = page.getByRole('navigation', { name: 'Settings Sections' });
   await expect(sections.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
   // Administration stays with administrators; everyone has Studio and Maintenance.
-  for (const name of ['Users', 'Models', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Users', 'Models', 'Profiles', 'Workers']) await expect(sections.getByRole('button', { name, exact: true })).toHaveCount(0);
   for (const name of ['Studio', 'Maintenance', 'About']) await expect(sections.getByRole('button', { name, exact: true })).toBeVisible();
   await sections.getByRole('button', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);

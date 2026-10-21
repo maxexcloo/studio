@@ -1,16 +1,16 @@
 import React from 'react';
-import { Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
+import { ExternalLink, Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
 import { ComfyRestart } from './ComfyRestart';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { usePhone, useThisComputer } from './device';
-import { ArrowLeft, Boxes, ExternalLink, Github, Info, LifeBuoy, Plug, Scale, ScrollText, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
+import { Boxes, FileJson, Info, Plug, SlidersHorizontal, UserRound, UsersRound, Wrench } from 'lucide-react';
 import { githubUrl } from './constants';
 import { Skeleton } from './components';
 import { Modal } from './Modal';
 import { HeatMark } from './HeatMark';
 import { apiFetch, apiJson } from './api';
-import type { Models, UpscaleInstall, UpscaleStatus } from './types';
-import { formatBytes } from './useUpscale';
+import type { Models } from './types';
+import { UpscaleStatusGroup } from './UpscaleStatusGroup';
 import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { knownAccountStatus } from './accounts';
@@ -21,18 +21,20 @@ import { AccountSettings, UsersSettings, type ProfileInfo } from './AccountSetti
 import { AiControlGroup, useAiControlAvailability } from './AiControlSettings';
 import { DefaultsCatalogueGroups, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings, VideoWorkerRestart, WorkerGroups } from './DeploymentSettings';
 
+/** Account first, then alphabetical (UI-PATTERNS › Settings). */
 export const SETTINGS_SECTIONS = [
-  { id: 'account', label: 'Account', icon: UserRound, description: 'Your profile, your MCP connection and this browser’s session.' },
-  { id: 'users', label: 'Users', icon: UsersRound, description: 'Accounts, access profiles, chat gateway users and model profiles.' },
-  { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: generation, features, the gallery and sharing.' },
-  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, the catalogue, LoRAs and integrations.' },
-  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker and what each GPU runs: addresses, status and restarts.' },
-  { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, reset and help.' },
-  { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' }
+  { id: 'account', label: 'Account', icon: UserRound, description: 'Your MCP connection and your profile.' },
+  { id: 'about', label: 'About', icon: Info, description: 'The version running here, its stats and the projects Studio builds on.' },
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'Clean up, help and reset.' },
+  { id: 'models', label: 'Models', icon: Boxes, description: 'Default models, LoRAs and integrations.' },
+  { id: 'profiles', label: 'Profiles', icon: FileJson, description: 'One model profile’s JSON at a time, checked and reviewed before it is saved.' },
+  { id: 'studio', label: 'Studio', icon: SlidersHorizontal, description: 'How Studio behaves for you: features, the gallery, generation and sharing.' },
+  { id: 'users', label: 'Users', icon: UsersRound, description: 'Access profiles, accounts and chat gateway users.' },
+  { id: 'workers', label: 'Workers', icon: Plug, description: 'Each ComfyUI worker, what each GPU runs and whether Upscale is ready.' }
 ] as const;
 export type SettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 /** Studio administration that ordinary accounts never see; the server refuses it too. */
-const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'workers', 'users']);
+const ADMINISTRATION_SECTIONS: ReadonlySet<SettingsSection> = new Set(['models', 'profiles', 'workers', 'users']);
 /** Sections only an account deployment has. */
 const ACCOUNT_SECTIONS: ReadonlySet<SettingsSection> = new Set(['account', 'users']);
 
@@ -75,17 +77,6 @@ function ShortcutsDrawer() {
   );
 }
 
-/** Where Upscale stands, in words: read only, as its weights and nodes are the worker's business. */
-function upscaleReadiness(status: UpscaleStatus | null, reason: string | undefined, install: UpscaleInstall): { tone: 'ok' | 'warn' | 'bad'; label: string; detail: string } {
-  if (install?.status === 'running') return { tone: 'warn', label: 'Downloading', detail: `${formatBytes(install.receivedBytes)} of ${formatBytes(install.totalBytes)} of the upscale model.` };
-  if (!status) return { tone: 'warn', label: 'Unavailable', detail: reason || 'Upscale isn’t available right now.' };
-  if (!status.nodesInstalled) return { tone: 'warn', label: 'Not Set Up', detail: 'The worker needs the SeedVR2 nodes.' };
-  if (install?.status === 'error' && !status.ready) return { tone: 'bad', label: 'Download Stopped', detail: install.error || 'The upscale model didn’t finish downloading.' };
-  if (status.needsDownload) return { tone: 'warn', label: 'Not Set Up', detail: `The worker needs ${formatBytes(status.downloadBytes)} of SeedVR2 weights.` };
-  if (status.substituting) return { tone: 'warn', label: 'Ready', detail: 'Upscales with a substitute model until its own is on the worker.' };
-  return { tone: 'ok', label: 'Ready', detail: 'The upscale arrow sits on finished images.' };
-}
-
 /** Maintenance › Help: where the common fixes are, and the setup lines a bug report needs. */
 function HelpGroup({ copyToClipboard }: { copyToClipboard: (text: string) => Promise<boolean> }) {
   const copy = useCopyFeedback();
@@ -101,11 +92,11 @@ function HelpGroup({ copyToClipboard }: { copyToClipboard: (text: string) => Pro
   };
   return (
     <Group title="Help">
-      <Row label="Troubleshooting" description="Common errors and how to fix them.">
-        <a className="btn is-ghost" href={troubleshootingUrl()} target="_blank" rel="noreferrer"><LifeBuoy size={13} /> Open</a>
-      </Row>
       <Row label="Copy Diagnostics" description="Studio, ComfyUI and Node.js versions, system and GPU, for a bug report. Prompts, images and file names aren’t included.">
         <button className="btn" onClick={() => copy.copyWith(copyDiagnostics)}><CopyIcon copied={Boolean(copy.copied)} /> {copy.copied ? 'Copied' : 'Copy'}</button>
+      </Row>
+      <Row label="Troubleshooting" description="Common errors and how to fix them.">
+        <ExternalLink href={troubleshootingUrl()}>Open</ExternalLink>
       </Row>
     </Group>
   );
@@ -138,11 +129,11 @@ function formatDay(value: string) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 }
 
-/** Settings › About credits: the projects Studio is built from and runs on. */
+/** Settings › About credits: the projects Studio is built from and runs on, alphabetically. */
 const credits = [
+  { name: 'ComfyUI', link: 'ComfyUI', what: 'Renders every local image and video.', url: 'https://github.com/comfyanonymous/ComfyUI' },
   { name: 'HEISS UI', link: 'HEISS UI', what: 'Studio is a fork of HEISS UI and merges its model, workflow and studio work.', url: 'https://github.com/tristmeister/HEISS-UI' },
   { name: 'J-AI Studio by Jasper', link: 'J-AI Studio', what: 'HEISS UI started as a fork of J-AI Studio. The prompt-first idea and much of the foundation are his work.', url: 'https://github.com/jasperdevs/J-AI-Studio' },
-  { name: 'ComfyUI', link: 'ComfyUI', what: 'Renders every local image and video.', url: 'https://github.com/comfyanonymous/ComfyUI' },
   { name: 'Radiance', link: 'Radiance', what: 'The fast inference runtime behind the Radiance model profiles.', url: 'https://hub.docker.com/r/stilldeadcode/radiance' }
 ];
 
@@ -157,13 +148,10 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
     health, refreshHealth, models, refreshModels, refreshWorkflows,
     workflows, modelProfiles
   } = view;
-  const [usersPage, setUsersPage] = React.useState<'main' | 'profiles'>('main');
-  React.useEffect(() => { setUsersPage('main'); }, [section]);
-  const sub = section === 'users' && usersPage === 'profiles';
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) || SETTINGS_SECTIONS[0];
 
   const modelList = models as Models | null;
-  const profileInfo = React.useMemo<Record<string, ProfileInfo>>(() => Object.fromEntries((modelList?.profiles || []).map((profile) => [profile.id, { label: profile.displayName || profile.label, kind: profile.kind }])), [modelList]);
+  const profileInfo = React.useMemo<Record<string, ProfileInfo>>(() => Object.fromEntries((modelList?.profiles || []).map((profile) => [profile.id, { label: profile.displayName || profile.label, kind: profile.kind, cloud: profile.family === 'grok' || /^grok/i.test(profile.id), nsfw: profile.nsfw === true }])), [modelList]);
   // What the sign-in gate already knew, so Account and Users draw at once; checked again on each open.
   const known = knownAccountStatus();
   const [accountMode, setAccountMode] = React.useState(known?.mode === 'multi-user');
@@ -219,7 +207,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
     return backend === 'primary' && health ? { connected, device: '', url: health.comfyUrl } : null;
   };
 
-  const upscale = upscaleReadiness(upscaleStatus, upscaleUnavailableReason, upscaleInstall);
   // Inpainting is the deployment's catalogue switch; administrators turn it here, everyone sees it.
   const inpaintFlag = deployment.settings?.catalogue.find((item) => item.key === inpaintFlagKey);
   const inpaintOn = inpaintFlag ? inpaintFlag.value : Boolean(modelList?.features?.inpainting);
@@ -263,44 +250,26 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       </nav>
 
       {/* A region named by its heading, so a screen reader hears where it landed. */}
-      <div className="set-panel" key={`${section}-${usersPage}`} id="settings-panel" role="region" aria-labelledby="settings-panel-title">
+      <div className="set-panel" key={section} id="settings-panel" role="region" aria-labelledby="settings-panel-title">
         <header className="set-page-head">
-          {sub ? <button type="button" className="btn is-ghost set-back" onClick={() => setUsersPage('main')}><ArrowLeft size={14} /> Users</button> : null}
-          <h3 id="settings-panel-title">{sub ? 'Profiles' : current.label}</h3>
-          <p>{sub ? 'One model profile’s JSON at a time, checked and reviewed before it is saved.' : section === 'workers' && !administrator ? 'What each GPU runs right now.' : current.description}</p>
+          <h3 id="settings-panel-title">{current.label}</h3>
+          <p>{section === 'workers' && !administrator ? 'What each GPU runs right now and whether Upscale is ready.' : current.description}</p>
         </header>
 
         {section === 'account' && accountMode ? <AccountSettings showToast={showToast} copyToClipboard={copyToClipboard} confirmAction={confirmAction} /> : null}
-        {section === 'users' && sectionShown('users') && !sub ? <UsersSettings showToast={showToast} confirmAction={confirmAction} profiles={profileInfo} onOpenProfiles={() => setUsersPage('profiles')} /> : null}
-        {sub && sectionShown('users') ? <ProfilesSettings showToast={showToast} onSaved={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
+        {section === 'users' && sectionShown('users') ? <UsersSettings showToast={showToast} confirmAction={confirmAction} profiles={profileInfo} /> : null}
+        {section === 'profiles' && sectionShown('profiles') ? <ProfilesSettings showToast={showToast} onSaved={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
 
         {section === 'studio' ? (
           <>
-            <Group title="General">
-              <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
-              {phoneDevice ? null : <ShortcutsDrawer />}
-            </Group>
-            <Group title="Generation">
-              <Row label="Run Several Images As" description={prefs.variationQueueMode === 'separate' ? 'One job per image. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
-                <Segmented label="Run Several Images As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
-              </Row>
-              <SwitchRow label="Size in Megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
-              <Row label="While Generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
-                <Segmented label="Previews While Generating" value={prefs.generationPreviewMode === 'simple' ? 'simple' : 'advanced'} onChange={(next) => setPrefs({ generationPreviewMode: next })} options={[{ value: 'advanced', label: 'Mosaic' }, { value: 'simple', label: 'Simple' }]} />
-              </Row>
-              <SwitchRow label="Auto-Resize Input Images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
-              <PromptHistoryRow showToast={showToast} confirmAction={confirmAction} />
-            </Group>
             <Group title="Features">
-              <SwitchRow label={preferenceLabels.smartUpscale} description="Shows an upscale arrow on finished images; the larger copy is saved next to the original." checked={prefs.smartUpscale} onChange={(next) => setPrefs({ smartUpscale: next })} />
-              {prefs.smartUpscale ? <Row label="Upscale Status" description={upscale.detail}><Status tone={upscale.tone}>{upscale.label}</Status></Row> : null}
               {administrator && inpaintFlag
                 ? <SwitchRow label="Inpainting" description={`A brush on a reference image: paint over part of it and only that part changes. For everyone on this Studio${inpaintFlag.locked ? '; set by the deployment' : ''}. Applies after a restart.`} checked={inpaintOn} disabled={inpaintFlag.locked || inpaintBusy} onChange={(next) => void setInpainting(next)} />
                 : <Row label="Inpainting" description={inpaintOn ? 'A brush on a reference image: paint over part of it and only that part changes.' : 'Off for this Studio.'}><Status tone={inpaintOn ? 'ok' : undefined}>{inpaintOn ? 'On' : 'Off'}</Status></Row>}
+              <SwitchRow label={preferenceLabels.smartUpscale} description="Shows an upscale arrow on finished images; the larger copy is saved next to the original. Settings › Workers shows whether it is ready." checked={prefs.smartUpscale} onChange={(next) => setPrefs({ smartUpscale: next })} />
             </Group>
             <Group title="Gallery">
               <SwitchRow label="Date Headers" description="Headings like “Today” and “This Evening” split the gallery by when you made things." checked={Boolean(prefs.dateHeaders)} onChange={(next) => setPrefs({ dateHeaders: next })} />
-              <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
                 <Segmented
                   label="Stacks Look Like"
@@ -311,6 +280,22 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                     { value: 'flow', label: <><RunStyleGlyph kind="flow" /> Cover Flow</> },
                   ]}
                 />
+              </Row>
+              <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
+            </Group>
+            <Group title="General">
+              <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
+              {phoneDevice ? null : <ShortcutsDrawer />}
+            </Group>
+            <Group title="Generation">
+              <SwitchRow label="Auto-Resize Input Images" description="Fits large start and reference images to the generation size. Keeps their proportions and your originals." checked={prefs.autoResizeInputs} onChange={(next) => setPrefs({ autoResizeInputs: next })} />
+              <PromptHistoryRow showToast={showToast} confirmAction={confirmAction} />
+              <Row label="Run Several Images As" description={prefs.variationQueueMode === 'separate' ? 'One job per image. Easier to cancel one at a time.' : 'One ComfyUI job with a larger batch. Reference images run separately to use less memory.'}>
+                <Segmented label="Run Several Images As" value={prefs.variationQueueMode === 'separate' ? 'separate' : 'batch'} onChange={(next) => setPrefs({ variationQueueMode: next })} options={[{ value: 'batch', label: 'One Batch' }, { value: 'separate', label: 'Separate Jobs' }]} />
+              </Row>
+              <SwitchRow label="Size in Megapixels" description={prefs.megapixelSizing ? 'The size menu has a Megapixels field in place of 2K. Every shape is drawn at the count you set.' : 'Set a megapixel count in the size menu instead of choosing 2K.'} checked={Boolean(prefs.megapixelSizing)} onChange={(next) => setPrefs({ megapixelSizing: next })} />
+              <Row label="While Generating" description={prefs.generationPreviewMode === 'simple' ? 'Each sampler step as it arrives. Lighter on the GPU.' : 'Early steps show as an animated pixel mosaic. With reduced motion on, Simple is used.'}>
+                <Segmented label="Previews While Generating" value={prefs.generationPreviewMode === 'simple' ? 'simple' : 'advanced'} onChange={(next) => setPrefs({ generationPreviewMode: next })} options={[{ value: 'advanced', label: 'Mosaic' }, { value: 'simple', label: 'Simple' }]} />
               </Row>
             </Group>
             <Group title="Sharing">
@@ -340,6 +325,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
               : <VideoWorkerRestart showToast={showToast} confirm={() => confirmAction({ title: 'Restart the Video Worker?', description: 'Running and queued videos stop. It takes a few seconds.', action: 'Restart', destructive: true })} />}
           /> : deployment.error ? <DeploymentSettingsError error={deployment.error} onRetry={() => void deployment.refresh()} /> : <Group title="Image Worker"><Row label={<Skeleton className="skeleton-text short" />} /></Group>}
           {aiControl ? <AiControlGroup admin={administrator} phone={phoneDevice} showToast={showToast} confirmAction={confirmAction} /> : null}
+          <UpscaleStatusGroup status={upscaleStatus} reason={upscaleUnavailableReason} install={upscaleInstall} />
         </> : null}
 
         {section === 'maintenance' ? (
@@ -352,12 +338,12 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                 <a className="btn" href="/api/gallery/export" download>Export</a>
               </Row>
             </Group>
+            <HelpGroup copyToClipboard={copyToClipboard} />
             <Group title="Reset" tone="danger">
               <Row label="Reset All Settings" description="Prompts, layout, model choices, LoRA stacks and every preference in this browser. It asks first.">
                 <button className="btn is-danger-soft" onClick={resetAllSettings}>Reset</button>
               </Row>
             </Group>
-            <HelpGroup copyToClipboard={copyToClipboard} />
           </>
         ) : null}
 
@@ -385,15 +371,21 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
               <Row label="Version" description={sinceRelease?.commits ? `${sinceRelease.commits} commit${sinceRelease.commits === 1 ? '' : 's'} since the ${sinceRelease.tag} release.` : 'The release running here.'}>
                 <span className="set-status">{appVersion ? `v${appVersion}` : <Skeleton className="skeleton-text short" />}</span>
               </Row>
-              <Row label="Source" description="Studio’s repository on GitHub.">
-                <a className="btn is-ghost" href={githubUrl} target="_blank" rel="noreferrer"><Github size={14} /> GitHub</a>
-              </Row>
               <Row label="Changelog" description="What changed in each release.">
-                <a className="btn is-ghost" href={`${githubUrl}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer"><ScrollText size={14} /> Changelog</a>
+                <ExternalLink href={`${githubUrl}/blob/main/CHANGELOG.md`}>Changelog</ExternalLink>
               </Row>
               <Row label="Licence" description="MIT, with the J-AI Studio and HEISS UI notices kept.">
-                <a className="btn is-ghost" href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer"><Scale size={14} /> Licence</a>
+                <ExternalLink href={`${githubUrl}/blob/main/LICENSE`}>Licence</ExternalLink>
               </Row>
+              <Row label="Source" description="Studio’s repository on GitHub.">
+                <ExternalLink href={githubUrl}>GitHub</ExternalLink>
+              </Row>
+            </Group>
+
+            <Group title="Credits">
+              {credits.map((credit) => <Row key={credit.name} label={credit.name} description={credit.what}>
+                <ExternalLink href={credit.url}>{credit.link}</ExternalLink>
+              </Row>)}
             </Group>
 
             <Group title="Stats" note={stats && stats.outputs ? <>Since {formatDay(stats.firstAt)} · {stats.activeDays} active day{stats.activeDays === 1 ? '' : 's'}{stats.busiestCount > 1 ? <> · busiest day {formatDay(stats.busiestDay)} with {stats.busiestCount}</> : null}.</> : undefined}>
@@ -413,12 +405,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                   </div>
                 ))}
               </div>
-            </Group>
-
-            <Group title="Credits">
-              {credits.map((credit) => <Row key={credit.name} label={credit.name} description={credit.what}>
-                <a className="btn is-ghost" href={credit.url} target="_blank" rel="noreferrer"><ExternalLink size={13} /> {credit.link}</a>
-              </Row>)}
             </Group>
           </>
         ) : null}

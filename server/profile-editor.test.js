@@ -45,6 +45,11 @@ test("checks parse errors, required fields, the id, and controls pointing at rea
   assert.deepEqual([fine.ok, fine.errors, fine.warnings], [true, [], []]);
 });
 
+test("the optional nsfw marker must be a boolean", () => {
+  assert.match(editor.validateProfileText("image-test", JSON.stringify(profile({ nsfw: "yes" }))).errors.join(" "), /nsfw must be true or false/);
+  assert.deepEqual(editor.validateProfileText("image-test", JSON.stringify(profile({ nsfw: true })), { info }).errors, []);
+});
+
 test("unknown nodes and files are warnings, not errors", () => {
   const raw = profile();
   raw.graph["1"].inputs.unet_name = "absent.safetensors";

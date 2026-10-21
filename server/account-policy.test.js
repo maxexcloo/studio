@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { effectiveAccountAccess, mayUseFeature, mayUseGenerationProfile, normaliseAccessProfile, validAccountKey, visibleGenerationProfiles } from "./account-policy.js";
+import { builtInAccessProfiles, effectiveAccountAccess, mayUseFeature, mayUseGenerationProfile, migrateCloudModels, normaliseAccessProfile, validAccountKey, visibleGenerationProfiles } from "./account-policy.js";
 
 const available = ["image-fast", "image-quality", "video"];
 
@@ -20,6 +20,7 @@ test("access profiles contain only currently available generation profiles and k
     id: "artists",
     name: "Artists",
     generationProfiles: ["image-fast"],
+    allModels: false,
     features: {
       loras: true,
       imageGeneration: false,
@@ -27,7 +28,11 @@ test("access profiles contain only currently available generation profiles and k
       imageReferences: false,
       videoReferences: false,
       gallery: false,
-      promptHistory: false
+      promptHistory: false,
+      cloudModels: false,
+      // Unmarked profiles predate NSFW Models, so it stays on until it is stored.
+      nsfwModels: true,
+      presets: false
     }
   });
 });
@@ -49,4 +54,61 @@ test("disabled, unknown-role, and unassigned accounts do not authenticate", () =
   assert.equal(effectiveAccountAccess({ id: "disabled", role: "user", disabled: true }, {}).authenticated, false);
   assert.equal(effectiveAccountAccess({ id: "unassigned", role: "user" }, {}).reason, "profile-unassigned");
   assert.equal(effectiveAccountAccess({ id: "unknown", role: "owner" }, {}).authenticated, false);
+});
+
+test("cloud profiles follow the Cloud Models feature, never a grant of their own", () => {
+  const grok = { id: "custom:grok-video", family: "grok", kind: "video" };
+  const local = { id: "image-fast", family: "flux" };
+  const profiles = {
+    on: { name: "On", generationProfiles: ["image-fast"], features: { imageGeneration: true, cloudModels: true } },
+    off: { name: "Off", generationProfiles: ["image-fast", "custom:grok-video"], features: { imageGeneration: true, cloudModels: false } }
+  };
+  const on = effectiveAccountAccess({ id: "a", role: "user", accessProfileId: "on" }, profiles);
+  const off = effectiveAccountAccess({ id: "b", role: "user", accessProfileId: "off" }, profiles);
+  assert.equal(mayUseGenerationProfile(on, grok), true);
+  assert.equal(mayUseGenerationProfile(off, grok), false, "a stray grant does not open a cloud profile");
+  assert.equal(mayUseGenerationProfile(off, local), true);
+  assert.deepEqual(visibleGenerationProfiles([grok, local], on), [grok, local]);
+  assert.deepEqual(visibleGenerationProfiles([grok, local], off), [local]);
+  const admin = effectiveAccountAccess({ id: "admin", role: "administrator" }, profiles);
+  assert.equal(mayUseGenerationProfile(admin, grok), true);
+  assert.equal(mayUseFeature(admin, "cloudModels"), true);
+});
+
+test("an access profile stored before Cloud Models keeps its old cloud grants until it is settled", () => {
+  const grokVideo = { id: "custom:grok-video", family: "grok" };
+  const grokImage = { id: "custom:grok-image", family: "grok" };
+  const legacy = { name: "Old", generationProfiles: ["image-fast", "custom:grok-video"], features: { imageGeneration: true, videoGeneration: true } };
+  const access = effectiveAccountAccess({ id: "a", role: "user", accessProfileId: "old" }, { old: legacy });
+  assert.equal(mayUseGenerationProfile(access, grokVideo), true);
+  assert.equal(mayUseGenerationProfile(access, grokImage), false);
+
+  const settled = migrateCloudModels(legacy, ["custom:grok-video", "custom:grok-image"]);
+  assert.equal(settled.features.cloudModels, true);
+  assert.deepEqual(settled.generationProfiles, ["image-fast"]);
+  assert.deepEqual(settled.retiredCloudGrants, ["custom:grok-video"]);
+  const after = effectiveAccountAccess({ id: "a", role: "user", accessProfileId: "old" }, { old: settled });
+  assert.equal(mayUseGenerationProfile(after, grokImage), true, "Cloud Models grants every cloud profile");
+  assert.equal(normaliseAccessProfile(settled).retiredCloudGrants[0], "custom:grok-video", "the old grants stay on record");
+
+  const none = migrateCloudModels({ name: "Local", generationProfiles: ["image-fast"], features: {} }, ["custom:grok-video"]);
+  assert.equal(none.features.cloudModels, false);
+  assert.equal(none.retiredCloudGrants, undefined);
+  assert.equal(migrateCloudModels(legacy, []), legacy, "without a known cloud profile nothing is settled");
+  assert.equal(migrateCloudModels(settled, ["custom:grok-video"]), settled, "a settled profile stays as it is");
+});
+
+test("NSFW profiles need NSFW Models and All Models grants every local profile", () => {
+  const nsfw = { id: "image-spicy", nsfw: true };
+  const plain = { id: "image-plain" };
+  const grok = { id: "grok-image", family: "grok" };
+  const [administrator, user] = builtInAccessProfiles;
+  const profiles = { administrator, user, granted: { name: "Granted", generationProfiles: ["image-spicy"], features: { nsfwModels: false } } };
+  const as = (id) => effectiveAccountAccess({ id, role: "user", accessProfileId: id }, profiles);
+  assert.deepEqual(visibleGenerationProfiles([nsfw, plain, grok], as("administrator")), [nsfw, plain, grok]);
+  assert.deepEqual(visibleGenerationProfiles([nsfw, plain, grok], as("user")), [plain]);
+  assert.equal(mayUseFeature(as("user"), "loras"), false);
+  assert.equal(mayUseGenerationProfile(as("granted"), nsfw), false, "a grant alone does not open an NSFW profile");
+  const admin = effectiveAccountAccess({ id: "admin", role: "administrator" }, {});
+  assert.equal(mayUseGenerationProfile(admin, nsfw), true);
 });

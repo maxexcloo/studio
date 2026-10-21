@@ -24,7 +24,8 @@ type BackendStatus = { connected: boolean; device?: string; restarting?: boolean
 const FIRST_READY = '__first-ready__';
 // Inpainting is switched in Studio › Features, beside Upscale.
 export const inpaintFlagKey = 'HEISS_ENABLE_INPAINT';
-const hiddenCatalogueKeys = new Set([inpaintFlagKey]);
+// LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features (Settings › Users); an older server may still list them.
+const hiddenCatalogueKeys = new Set([inpaintFlagKey, 'STUDIO_ENABLE_LORAS', 'STUDIO_ENABLE_GROK', 'STUDIO_ENABLE_PRESETS']);
 const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment', studio: 'This Studio', default: 'Default' };
 
 /** Where a value comes from, and a lock when the deployment owns it. */
@@ -164,14 +165,15 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
       {entry.locked ? <span className="set-locked-value">{entry.configured ? label(entry.configured) : 'First Ready Profile'}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} value={entry.configured || FIRST_READY} options={options} onChange={(value) => void save(entry.key, value === FIRST_READY ? '' : value)} /></div>}
     </Row>;
   };
+  const catalogue = settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key));
   return <>
     <Group title="Defaults" note="Deployment settings override these until they are removed from its configuration.">
       {defaultRow('image')}
       {defaultRow('video')}
     </Group>
-    <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
-      {settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key)).map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
-    </Group>
+    {catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
+      {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
+    </Group> : null}
   </>;
 }
 
