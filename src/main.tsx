@@ -12,18 +12,24 @@ import "./styles.css";
 
 import { useComposerState } from "./app/useComposerState";
 import { useModelFolders } from './app/useModelFolders';
-import type { AutoUpscale, PreviousExit, SavedSize, ComfyStatus, GalleryItem, Health, LoraSelection, MediaInput, Mode, Models, Paths, Preferences, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
+import { useSavedSizes } from './app/useSavedSizes';
+import { usePreferences } from './app/usePreferences';
+import { useComfyStatus } from './app/useComfyStatus';
+import { useStarterPick } from './app/useStarterPick';
+import { OPEN_DIALOG, useAppKeys, useLoraSync, useWindowGuards } from './app/useAppEffects';
+import { copyItemToClipboard, copyToClipboard } from './app/clipboardNotices';
+import type { AutoUpscale, GalleryItem, LoraSelection, MediaInput, Mode, Models, Paths, Profile, ReferenceAsset, ReferenceInpaint, ReferenceRole, ReferenceRoleControl, SelectedReferenceAsset, TouchGesture, WorkflowPreferences, WorkflowSummary } from './app/types';
 import { fallbackAspectPresets } from './app/constants';
 import { statusForProfile } from "./app/backendStatus";
 import { clampProfileCount, generationPlan, imageDimension, profileCountRange, profileImageCount, profileImageSize, referenceImageSize } from './app/generationOptions';
 import { canRestoreLoras, composerSettings, modePrompts, modeSettings, modeReferences, savedModeReferences } from './app/composerSettings';
 import { loraName } from './app/catalogueNames';
-import { apiJson, copyImage, copyText, loadDraft, loadPrefs, referenceAssetFromGallery, saveDraft, savePrefs, scopedStorageKey } from './app/api';
-import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
+import { apiJson, loadDraft, referenceAssetFromGallery, saveDraft } from './app/api';
+import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras } from './app/loras';
 import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
-import { deleteLoraStack, restoreLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
+import { deleteLoraStack, restoreLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, toggleLoraFavorite, updateLoraStack, type LoraSnapshot } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
 import { DeviceGate } from './app/DeviceGate';
@@ -46,18 +52,16 @@ import { runTitle, type Run } from './app/runs';
 import { useGalleryStore } from './app/useGalleryStore';
 import { emptySearch, searchActive, useFavorites, type GallerySearch } from './app/favorites';
 import { sizePlan, tiledDecodeFor, upscaleDisplayUrl, upscaleSize, useUpscale } from './app/useUpscale';
-import { closestPreset, fitRatio, MEGAPIXEL, sameRatio, snapSide } from './app/sizing';
+import { closestPreset, fitRatio, MEGAPIXEL, snapSide } from './app/sizing';
 import type { MegapixelControl, SizeTier } from './app/SizeMenu';
 import { useVisibleInterval } from './hooks/use-visible-interval';
 import { useKeyboardInset } from './hooks/use-keyboard-inset';
-import { setAtComputer, setThisComputer } from './app/device';
 import { useArrowKeyGroups } from './hooks/use-arrow-key-groups';
 import { useGenerationEstimate } from './app/useGenerationEstimate';
 import { listNames, registerRestartConfirm, setComfyRestartClock, setComfyRestartResult, setComfyRestarting } from './app/ComfyRestart';
 import { memoLatest } from './lib/memo-latest';
 import { refreshHardware } from './app/hardware';
 import { generateShortcut } from './app/shortcuts';
-import type { StarterPick } from './app/StarterModels';
 import { presetFit, type ImagePreset } from './app/presets';
 
 // Rebuilt from scratch on every App render (each keystroke in the prompt); skips unless its data changed.
@@ -88,14 +92,13 @@ function imageInputsForProfile(profile: Profile | null | undefined): MediaInput[
 
 // Another dialog on top owns the keyboard. The viewer is a dialog too, but it is
 // the surface these shortcuts drive, so it does not count (data-focus-trap).
-const OPEN_DIALOG = '[role="dialog"]:not([data-focus-trap]), [role="alertdialog"]';
 
 function App() {
   useKeyboardInset();
   useArrowKeyGroups();
   const now = Date.now();
   const initialDraft = useMemo(() => loadDraft(), []);
-  const [prefs, setPrefsState] = useState<Preferences>(() => loadPrefs());
+  const { prefs, setPrefs, setPrefsState } = usePreferences();
   const {
     mode, setMode,
     prompt, setPrompt,
@@ -130,8 +133,7 @@ function App() {
     referenceAssets, setReferenceAssets,
   } = useComposerState(initialDraft, prefs);
   const [models, setModels] = useState<Models | null>(null);
-  const [health, setHealth] = useState<Health | null>(null);
-  const [backendStatus, setComfyStatus] = useState<ComfyStatus>({ connected: false, checking: true });
+  const { health, backendStatus, comfyRetrying, refreshHealth, refreshComfyStatus, retryComfyStatus } = useComfyStatus({ refreshModels });
   // Read by every download link and share as it is made (shareSettings.ts); kept in step here.
   setShareSettings(prefs);
   const comfyStatus = statusForProfile(backendStatus, { kind: mode, family: models?.profiles.find((profile) => profile.id === model)?.family });
@@ -169,9 +171,6 @@ function App() {
   const selectedModeRef = useRef(mode);
   selectedModeRef.current = mode;
   composerByMode.current[mode] = composerSettings({ model, textEncoder, textEncoders, vae, clipType, weightDtype, width, height, steps, cfg, denoise, inpaintStrength, inpaintFeather, seed, count, frames, fps, duration, resolution, sampler, scheduler, loras, customSize });
-  const comfyStatusRequestRef = useRef<Promise<void> | null>(null);
-  const backendAvailabilityRef = useRef("");
-  const [comfyRetrying, setComfyRetrying] = useState(false);
   const touchGestureRef = useRef<TouchGesture | null>(null);
   // The gallery search: words and the Favourites filter. Lives in memory only, never saved.
   const [gallerySearch, setGallerySearch] = useState<GallerySearch>(emptySearch);
@@ -232,15 +231,6 @@ function App() {
   // takes one after another where the stack stands, not wherever they fell in time.
   const viewerGallery = useMemo(() => viewerOrder(shownGallery, stackRuns ? galleryGroups : null, openRuns), [shownGallery, stackRuns, galleryGroups, openRuns]);
 
-  // Chrome on Windows can hand playing videos to a hardware layer that frosted
-  // glass can't blur, so the glass over the video gallery shows it through.
-  // There, in video mode, the glass turns nearly opaque (16-system.css).
-  useEffect(() => {
-    const root = document.documentElement;
-    const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "";
-    root.classList.toggle("is-windows", /^win/i.test(platform));
-    root.classList.toggle("is-video-mode", mode === "video");
-  }, [mode]);
   useEffect(() => {
     refreshHealth();
     refreshComfyStatus();
@@ -261,25 +251,6 @@ function App() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [loadGallery]);
 
-  // The LoRA library lives on the server and syncs edit by edit. Speak up only
-  // when edits are actually stuck (a server restart with nothing to sync is not
-  // worth an error), and say so again once they have gone through.
-  const loraSyncFailing = useRef(false);
-  useEffect(() => {
-    const stop = startLoraSync();
-    const offLibrary = subscribeLoraLibrary(() => setLoraSnapshotRevision((value) => value + 1));
-    const offSync = subscribeLoraSync((sync: LoraSyncStatus) => {
-      if (sync.failing && sync.pending > 0 && !loraSyncFailing.current) {
-        showToast(sync.locked
-          ? "LoRA changes are saved on this device. Sign in again to sync them."
-          : "Can’t reach Studio. LoRA changes are saved on this device and sync when it’s back.", "error");
-      } else if (!sync.failing && loraSyncFailing.current && !sync.pending) {
-        showToast("LoRA changes synced", "success");
-      }
-      if (!sync.failing || sync.pending > 0) loraSyncFailing.current = sync.failing && sync.pending > 0;
-    });
-    return () => { stop(); offLibrary(); offSync(); };
-  }, []);
 
   // Keep the current stack within one model family; a different family starts empty.
   // Explicit recreated settings and image/video mode drafts restore their own stacks.
@@ -364,6 +335,10 @@ function App() {
 
   useVisibleInterval(loadGalleryDelta, 2500);
 
+  useWindowGuards(mode);
+  useLoraSync(() => setLoraSnapshotRevision((value) => value + 1));
+  useAppKeys({ active, setActive, settings, setSettings, workflowGalleryOpen, setWorkflowGalleryOpen, promptRef });
+
   useEffect(() => {
     const textarea = promptRef.current;
     if (!textarea) return;
@@ -372,14 +347,6 @@ function App() {
   }, [prompt]);
 
 
-  useEffect(() => {
-    if (!active && !settings && !workflowGalleryOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [active, settings, workflowGalleryOpen]);
 
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
@@ -392,66 +359,8 @@ function App() {
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
   }, [active, showDetails]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (document.querySelector(OPEN_DIALOG)) return;
-      if (event.defaultPrevented || document.fullscreenElement) return;
-      if (event.key !== "Escape") return;
-      if (settings) {
-        event.preventDefault();
-        setSettings(false);
-        return;
-      }
-      if (workflowGalleryOpen) {
-        event.preventDefault();
-        setWorkflowGalleryOpen(false);
-        return;
-      }
-      if (active) {
-        event.preventDefault();
-        setActive(null);
-        return;
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [settings, active, workflowGalleryOpen]);
 
-  // A file dropped outside a drop zone would make the browser open it and
-  // leave the app. Swallow file drags the zones haven't claimed.
-  useEffect(() => {
-    const isFileDrag = (event: DragEvent) => Boolean(event.dataTransfer?.types.includes("Files"));
-    function onDragOver(event: DragEvent) {
-      if (!isFileDrag(event) || event.defaultPrevented) return;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
-    }
-    function onDrop(event: DragEvent) {
-      if (isFileDrag(event)) event.preventDefault();
-    }
-    window.addEventListener("dragover", onDragOver);
-    window.addEventListener("drop", onDrop);
-    return () => {
-      window.removeEventListener("dragover", onDragOver);
-      window.removeEventListener("drop", onDrop);
-    };
-  }, []);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (document.querySelector(OPEN_DIALOG)) return;
-      if (settings || active) return;
-      // AltGr types @ { \ € on many layouts; Windows reports it as Ctrl+Alt.
-      const altGraph = event.getModifierState("AltGraph") || (event.ctrlKey && event.altKey);
-      if (!altGraph && (event.ctrlKey || event.metaKey || event.altKey)) return;
-      if (event.key.length !== 1 && event.key !== "Backspace") return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, button, a, [contenteditable='true'], [role='dialog'], [role='listbox'], [data-radix-popper-content-wrapper]")) return;
-      promptRef.current?.focus();
-    }
-    window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [settings, active]);
 
   // Each mode keeps its own prompts and references.
   const modePromptsRef = useRef(modePrompts(initialDraft));
@@ -608,15 +517,6 @@ function App() {
     });
   }, [gallery]);
 
-  function setPrefs(next: Partial<Preferences>) {
-    const merged = { ...prefs, ...next };
-    setPrefsState(merged);
-    try {
-      savePrefs(merged);
-    } catch {
-      showToast("Couldn’t save settings", "error");
-    }
-  }
   // Only what can't be undone asks first (UI-PATTERNS › Messages); everything else acts at once.
   const { confirmAction, confirmationDialog } = useConfirmation(false);
 
@@ -630,28 +530,6 @@ function App() {
   });
 
 
-  /**
-   * Copies for a button that shows its own check (useCopyFeedback), so only a
-   * failure is a toast. `announce` says it in a toast instead, for the few
-   * buttons that are gone once clicked (a tile's menu).
-   */
-  async function copyToClipboard(text: string, announce = ""): Promise<boolean> {
-    if (!text) {
-      showToast("Nothing to copy", "error");
-      return false;
-    }
-    const copied = await copyText(text);
-    if (!copied) showToast("Couldn’t copy", "error");
-    else if (announce) showToast(announce, "success");
-    return copied;
-  }
-
-  /** The viewer's copy button: the image itself, its link, or its details. */
-  async function copyItemToClipboard(item: GalleryItem): Promise<boolean> {
-    const copied = await copyImage(item);
-    if (!copied) showToast("Couldn’t copy", "error");
-    return copied;
-  }
 
   function refreshModels(notify = true) {
     const request = apiJson<Models>("/api/models")
@@ -688,75 +566,7 @@ function App() {
       .catch(() => null);
   }
 
-  /** How the last run stopped, when nobody meant it to: told once per stop, on this computer. */
-  function tellPreviousExit(exit: PreviousExit) {
-    const key = `studio:exit-told:${exit.at}`;
-    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { /* told this session at most */ }
-    const when = new Date(exit.lastSeen || exit.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
-    const details = [`Studio stopped: ${exit.reason}`, `Last seen running: ${new Date(exit.lastSeen || exit.at).toISOString()}`, exit.code !== null ? `Exit code: ${exit.code}` : "", exit.signal ? `Signal: ${exit.signal}` : "", exit.detail ? `\nLast output:\n${exit.detail}` : ""].filter(Boolean).join("\n");
-    showToast(`Studio stopped unexpectedly last time: ${exit.reason.replace(/\.?$/, "")}, last seen running ${when}`, "warning", {
-      duration: 20_000,
-      action: { label: "Copy Details", onClick: () => { void copyToClipboard(details, "Details copied"); } }
-    });
-  }
 
-  function refreshHealth() {
-    // 503 only means ComfyUI isn't answering: its body still says whether
-    // this is the computer that looks after Studio, so read it either way.
-    fetch("/api/health", { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null) as Health | null;
-        if (!data) throw new Error(response.statusText || "Connection failed");
-        setHealth(data);
-        if (typeof data.thisComputer === "boolean") setThisComputer(data.thisComputer);
-        if (typeof data.atComputer === "boolean") setAtComputer(data.atComputer);
-        if (data.previousExit) tellPreviousExit(data.previousExit);
-      })
-      .catch((error) => setHealth({ ok: false, error: error instanceof Error && !/fetch|load failed/i.test(error.message) ? error.message : "Can’t reach Studio. Make sure it’s running." }));
-  }
-
-  /** The status poll mostly returns the same answer; a new object would re-render the whole app every five seconds. */
-  function setComfyStatusIfChanged(next: ComfyStatus) {
-    setComfyStatus((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
-  }
-
-  function refreshComfyStatus(): Promise<void> {
-    if (comfyStatusRequestRef.current) return comfyStatusRequestRef.current;
-    // Only the first check shows as "checking". Later polls keep the last answer
-    // on screen until the new one arrives, so the offline screen and the status
-    // dot do not blink (and restart their animations) every five seconds.
-    setComfyStatus((current) => (current.checked ? current : { ...current, checking: true }));
-    const request = apiJson<ComfyStatus>("/api/comfy/status")
-      .then((data) => {
-        const availability = JSON.stringify(data.backends || {});
-        // A change in which backends answer refreshes the models; the first answer only records
-        // it (the models are already loading from the start, a second fetch would race them).
-        if (availability !== backendAvailabilityRef.current) {
-          const known = backendAvailabilityRef.current;
-          backendAvailabilityRef.current = availability;
-          if (known) refreshModels();
-        }
-        // Not at the saved address, but on ComfyUI Desktop's port (or the other way round): now saved.
-        if (data.found) {
-          showToast(`Found ComfyUI at ${data.found.replace(/^https?:\/\//, "")}`, "success");
-          refreshHealth();
-        }
-        const { found: _found, ...status } = data;
-        setComfyStatusIfChanged({ ...status, checking: false, checked: true });
-      })
-      .catch((error) => setComfyStatusIfChanged({ connected: false, checking: false, checked: true, error: error instanceof Error ? error.message : "Connection failed" }))
-      .finally(() => { comfyStatusRequestRef.current = null; });
-    comfyStatusRequestRef.current = request;
-    return request;
-  }
-
-  /** A retry someone asked for: the buttons say "Checking…" for at least a beat, even when the answer is instant. */
-  function retryComfyStatus() {
-    if (comfyRetrying) return;
-    setComfyRetrying(true);
-    const shown = new Promise((resolve) => window.setTimeout(resolve, 700));
-    Promise.all([refreshComfyStatus(), shown]).finally(() => setComfyRetrying(false));
-  }
 
   function refreshPaths() {
     apiJson<Paths>("/api/paths")
@@ -934,94 +744,6 @@ function App() {
     const size = fitRatio(ratio, width * height, customLimits.width, customLimits.height, 16);
     setWidth(size.width);
     setHeight(size.height);
-  }
-  /* Saved custom sizes (the size menu's "Save size"): the studio's, on the
-     server (/api/sizes), so every device and every model has the same list.
-     Named Custom, Custom 2, … in turn; picking one puts it in Custom, fitted
-     to this model's limits; removing one can be undone from its toast.
-     Changes show at once and are sent behind; another device's arrive when
-     this page comes back into view. */
-  const [savedSizes, setSavedSizesState] = useState<SavedSize[]>([]);
-  const savedSizesRef = useRef<SavedSize[]>([]);
-  // The ids last had from the server: sent with each save, so one another device added since is kept, not overwritten.
-  const serverSizeIdsRef = useRef<string[]>([]);
-  function updateSavedSizes(change: (current: SavedSize[]) => SavedSize[]) {
-    const next = change(savedSizesRef.current);
-    savedSizesRef.current = next;
-    setSavedSizesState(next);
-    apiJson<{ sizes: SavedSize[] }>("/api/sizes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sizes: next, base: serverSizeIdsRef.current }) })
-      .then((data) => {
-        if (!Array.isArray(data.sizes)) return;
-        serverSizeIdsRef.current = data.sizes.map((item) => item.id);
-        // Another device's sizes come in with the answer, unless this page changed again meanwhile.
-        if (savedSizesRef.current === next) { savedSizesRef.current = data.sizes; setSavedSizesState(data.sizes); }
-      })
-      .catch(() => showToast("Couldn’t save your sizes. They’re kept on this page until it reloads.", "error"));
-  }
-  useEffect(() => {
-    let alive = true;
-    const load = () => apiJson<{ sizes: SavedSize[] }>("/api/sizes").then((data) => {
-      if (!alive) return;
-      const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-      serverSizeIdsRef.current = sizes.map((item) => item.id);
-      // Sizes saved in this browser before they lived on the server move over, once.
-      const local = loadPrefs().savedSizes || [];
-      if (local.length) {
-        const known = new Set(sizes.map((item) => item.id));
-        savedSizesRef.current = sizes;
-        updateSavedSizes((current) => [...current, ...local.filter((item) => !known.has(item.id))]);
-        setPrefsState((current) => {
-          const { savedSizes: _moved, ...rest } = current;
-          try { savePrefs(rest); } catch { /* moved either way */ }
-          return rest;
-        });
-        return;
-      }
-      savedSizesRef.current = sizes;
-      setSavedSizesState(sizes);
-    }).catch(() => null);
-    load();
-    const onVisible = () => { if (document.visibilityState === "visible") load(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { alive = false; document.removeEventListener("visibilitychange", onVisible); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  function saveCustomSize() {
-    if (savedSizesRef.current.some((item) => item.width === width && item.height === height)) return;
-    updateSavedSizes((current) => {
-      const names = new Set(current.map((item) => item.name));
-      let name = "Custom";
-      for (let n = 2; names.has(name); n += 1) name = `Custom ${n}`;
-      return [...current, { id: clientJobUuid(), name, width, height }];
-    });
-  }
-  function renameSavedSize(id: string, name: string) {
-    const next = name.trim().slice(0, 32);
-    if (!next) return;
-    updateSavedSizes((current) => current.map((item) => item.id === id ? { ...item, name: next } : item));
-  }
-  function removeSavedSize(id: string) {
-    const index = savedSizesRef.current.findIndex((item) => item.id === id);
-    if (index < 0) return;
-    const removed = savedSizesRef.current[index];
-    updateSavedSizes((current) => current.filter((item) => item.id !== id));
-    showToast(`Removed “${removed.name}”`, "removed", {
-      action: { label: "Undo", onClick: () => updateSavedSizes((current) => {
-        if (current.some((item) => item.id === removed.id)) return current;
-        const restored = [...current];
-        restored.splice(Math.min(index, restored.length), 0, removed);
-        return restored;
-      }) }
-    });
-  }
-  function pickSavedSize(saved: SavedSize) {
-    const snapped = { width: snapSide(saved.width, customLimits.width), height: snapSide(saved.height, customLimits.height) };
-    // Past this model's limits: its shape at the largest size that fits, not each side cut on its own (a 2:1 turned 4:3).
-    const fitted = sameRatio(snapped, saved) ? snapped : fitRatio(saved.width / saved.height, saved.width * saved.height, customLimits.width, customLimits.height, 16);
-    setCustomDimensions(fitted);
-    if (fitted.width !== saved.width || fitted.height !== saved.height) {
-      showToast(`“${saved.name}” fitted to this model: ${fitted.width} × ${fitted.height}`, "default");
-    }
   }
   function setCustomDimensions(next: { width: number; height: number }) {
     setWidth(next.width);
@@ -1219,6 +941,8 @@ function App() {
   const sizeTier: AutoUpscale = customSize || mode !== "image" || megapixelMode || !sizeTiers.includes(savedTier) ? "none" : savedTier;
   const sizeMax = Math.min(Number(widthMeta.max) || 8192, Number(heightMeta.max) || 8192);
   const customLimits = { width: customSideLimits(widthMeta), height: customSideLimits(heightMeta) };
+  // Saved custom sizes (the size menu's "Save size"): the studio's, so every device and every model has the same list.
+  const { savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize } = useSavedSizes({ width, height, customLimits, setCustomDimensions, setPrefsState });
   const megapixelControl: MegapixelControl | null = megapixelMode ? {
     target: megapixelTarget,
     max: megapixelMax,
@@ -1499,32 +1223,7 @@ function App() {
   });
   const { fitViewer, cycleViewerSize, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveViewer, submitPrompt, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;
 
-  // Select a downloaded starter model once ComfyUI reports it ready.
-  const starterKey = scopedStorageKey("studio:starter-pick");
-  const [starterPick, setStarterPick] = useState<StarterPick | null>(() => {
-    try { return JSON.parse(localStorage.getItem(starterKey) || "null"); } catch { return null; }
-  });
-  function rememberStarter(pick: StarterPick | null) {
-    setStarterPick(pick);
-    try { if (pick) localStorage.setItem(starterKey, JSON.stringify(pick)); else localStorage.removeItem(starterKey); } catch { /* it just won't survive a reload */ }
-  }
-  const profileForFile = (file: string) => models?.profiles.find((profile) => profile.model === file || profile.model.split(/[\\/]/).pop() === file);
-  function selectStarterModel(file: string) {
-    const profile = profileForFile(file);
-    if (!profile) { rememberStarter({ family: "", file, title: file }); refreshModels(false); return; }
-    if (profile.kind !== mode) changeMode(profile.kind);
-    pickModel(profile.id);
-  }
-  useEffect(() => {
-    if (!starterPick || !models) return;
-    const profile = profileForFile(starterPick.file);
-    if (!profile || profile.ready === false) return;
-    rememberStarter(null);
-    if (profile.kind !== mode) changeMode(profile.kind);
-    pickModel(profile.id);
-    showToast(`${starterPick.title || profile.displayName || "The model"} is ready.`, "success");
-    window.setTimeout(() => promptRef.current?.focus(), 0);
-  }, [models, starterPick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { starterPick, rememberStarter, selectStarterModel } = useStarterPick({ models, mode, changeMode, pickModel, refreshModels, promptRef });
 
   // "Back to recommended": the sampling values the model's makers ship, once anything moved from them.
   const recommendedValues = currentProfile ? {
