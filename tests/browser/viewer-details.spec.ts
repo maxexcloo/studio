@@ -61,10 +61,14 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   }
   await expect(side.getByRole('region', { name: 'Generation Details', exact: true })).toBeVisible();
   const settings = side.locator('.detail-settings');
-  for (const [label, value] of [['Total', '30s'], ['Queue', '15s'], ['Active', '14s'], ['Setup (Est.)', '3s'], ['Sampling (Est.)', '10s'], ['Finishing (Est.)', '1s']]) {
+  const timingRows = [['Active', '14s'], ['Total', '30s'], ['Queue', '15s'], ['Setup', '3s'], ['Sampling', '10s'], ['Finishing', '1s']];
+  for (const [label, value] of timingRows) {
     await expect(settings.getByText(label, { exact: true })).toBeVisible();
     await expect(settings.getByText(value, { exact: true })).toBeVisible();
   }
+  // Active leads, then Total, Queue and the run's phases; no "(Est.)".
+  const timingSection = settings.locator('.detail-section').filter({ has: page.getByRole('heading', { name: 'Timing', exact: true }) });
+  expect((await timingSection.locator('.detail-grid > :nth-child(odd)').allInnerTexts()).map((label) => label.trim())).toEqual(timingRows.map(([label]) => label));
   await expect(settings.locator('.detail-note')).toHaveCount(0);
   // Prompt, Model, Settings and Output (the picture and its file together), then Timing; rows read alphabetically.
   expect(await settings.locator('.detail-heading').allInnerTexts()).toEqual(['Model', 'Settings', 'Output', 'Timing']);
