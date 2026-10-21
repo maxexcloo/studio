@@ -37,12 +37,14 @@ function tileCaptionDetail(item: GalleryItem, profiles: Profile[]) {
 }
 
 /* A tile's top row: 32px glass circles on a 40px pitch, right-aligned, Upscale
-   among them in the make group. When the tile is too narrow for every action,
-   the make group goes first, then keep; Star and Delete stay longest (and an
-   upscale that is running or showing, so its state stays in view), and More
-   (the right-click menu) takes the last slot. */
+   among them in the make group; Star sits alone in the top left corner. When
+   the tile is too narrow for every action, the make group goes first, then
+   keep; Delete stays longest (and an upscale that is running or showing, so
+   its state stays in view), and More (the right-click menu) takes the last slot. */
 const TILE_SLOT = 40;
 const TILE_ROW_RESERVE = 16 + 8;
+/** The top left corner Star takes from the row's width. */
+const TILE_STAR_RESERVE = TILE_SLOT + 8;
 const rowRank = { organise: 3, keep: 2, make: 1 } as const;
 const rankOf = (action: ItemAction, item?: GalleryItem) => action.id === 'upscale' && (action.pressed || item?.upscale?.status === 'running') ? 3 : rowRank[action.group];
 export function tileRow(actions: ItemAction[], width: number, item?: GalleryItem) {
@@ -104,7 +106,9 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
   useEffect(() => { mountedRef.current = true; }, []);
   const actions = useItemActions(item, "tile");
-  const row = tileRow(actions, width, item);
+  // Star keeps the top left corner; the rest share the top right row.
+  const star = actions.find((action) => action.id === "star");
+  const row = tileRow(star ? actions.filter((action) => action !== star) : actions, star ? width - TILE_STAR_RESERVE : width, item);
   const profiles = React.useContext(GenerationProfiles);
   const phoneTiles = React.useContext(TileLongPressContext);
   const captionDetail = phoneTiles ? "" : tileCaptionDetail(item, profiles);
@@ -182,19 +186,27 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
         {/* Beside Stop, in the overlay, so it holds still while the tile is hovered. Phones show only the progress. */}
         {item.status === "pending" && !phoneTiles ? <GenerationModel item={item} className="tile-action" /> : null}
         {item.status === "pending" && !phoneTiles ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
+        {item.status !== "pending" && !phoneTiles && star ? (
+          // The favourite, top left on every desktop tile, image or video; a set Star stays in view.
+          <span className="tile-hover-actions tile-star-corner">
+            <Tip content={star.tip || star.label}>
+              <button type="button" className={cn("tile-icon is-star", star.pressed && "is-on")} aria-label={star.tip || star.label} aria-pressed={Boolean(star.pressed)} onClick={star.run}><ActionIcon action={star} size={14} /></button>
+            </Tip>
+          </span>
+        ) : null}
         {item.status !== "pending" && !phoneTiles && row.shown.length ? (
           // One row of glass circles along the top, in the viewer bar's order; what doesn't fit waits behind More.
           <span className="tile-hover-actions" role="group" aria-label="Item Actions">
             {row.shown.map((action, index) => {
               const name = action.tip || action.label;
-              const className = cn(action.danger ? "tile-delete" : "tile-icon", action.id === "star" && "is-star", action.pressed && "is-on", startsGroup(row.shown, index) && "starts-group");
+              const className = cn(action.danger ? "tile-delete" : "tile-icon", action.pressed && "is-on", startsGroup(row.shown, index) && "starts-group");
               if (action.id === "upscale" && onUpscale) return <UpscaleButton key={action.id} item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} className={cn(startsGroup(row.shown, index) && "starts-group")} />;
               const body = <ActionIcon action={action} size={14} />;
               return (
                 <Tip key={action.id} content={name}>
                   {action.href
                     ? <a className={className} aria-label={name} href={action.href} download={downloadName(item)}>{body}</a>
-                    : <button type="button" className={className} aria-label={name} aria-pressed={action.id === "star" ? Boolean(action.pressed) : undefined} onClick={action.run}>{body}</button>}
+                    : <button type="button" className={className} aria-label={name} onClick={action.run}>{body}</button>}
                 </Tip>
               );
             })}

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { studioUi } from './helpers/ui';
 
 // Desktop tiles: a two-line caption (prompt, then time · profile) and one top
 // row of actions in the viewer bar's order, with More taking what doesn't fit.
@@ -43,14 +44,15 @@ test('desktop tile actions follow the viewer bar, Retry stands in on failures, a
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('/');
     const { wrap, row, names } = await rowNames(page, 'tile-done');
-    // Upscale joins the make group in the row; there is no corner button.
-    const full = ['Download', 'Recreate With the Same Seed', 'Upscale', 'Star', 'Delete'];
+    // Upscale joins the make group in the row; there is no corner button. Star has the top left corner.
+    const full = ['Download', 'Recreate With the Same Seed', 'Upscale', 'Delete'];
+    expect(names).not.toContain('Star');
     const tileWidth = (await wrap.boundingBox())!.width;
-    const slots = Math.max(1, Math.floor((tileWidth - 24) / 40));
+    const slots = Math.max(1, Math.floor((tileWidth - 24 - 48) / 40));
     if (slots >= full.length) expect(names).toEqual(full);
     else {
-      // Make goes first, then keep; Star and Delete stay, More takes the last slot.
-      expect(names.slice(-3)).toEqual(['Star', 'Delete', 'More Actions']);
+      // Make goes first, then keep; Delete stays, More takes the last slot.
+      expect(names.slice(-2)).toEqual(['Delete', 'More Actions']);
       await row.getByRole('button', { name: 'More Actions' }).click();
       await expect(page.getByRole('menu', { name: 'Item Actions' })).toBeVisible();
       await page.keyboard.press('Escape');
@@ -91,6 +93,36 @@ test('a set Star stays in view on a desktop tile without a hover', async ({ page
   await expect(star).toHaveCSS('opacity', '1');
   await expect(star).toHaveCSS('color', 'rgb(255, 154, 82)');
   if (await page.evaluate(() => matchMedia('(hover: hover)').matches)) await expect(wrap.getByRole('button', { name: 'Delete' })).toHaveCSS('opacity', '0');
+});
+
+test('the favourite sits in the top left corner of a desktop tile, image and video alike', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phone tiles show no actions.');
+  const clip = { ...done, id: 'tile-video', type: 'video', url: '/tile-video.mp4', thumbnailUrl: picture, outputName: 'tile-video.mp4', settings: { ...done.settings, duration: 5 } };
+  await page.route('**/api/gallery?*', (route) => route.fulfill({ json: { items: new URL(route.request().url()).searchParams.get('type') === 'video' ? [clip] : [done], revision: 1, hasMore: false } }));
+  await page.route('**/api/gallery/delta?*', (route) => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+  await page.route('**/tile-video.mp4*', (route) => route.fulfill({ status: 404 }));
+  await page.goto('/');
+  const corner = async (id: string) => {
+    const wrap = page.locator(`[data-tile-id="${id}"]`);
+    await wrap.hover();
+    const star = wrap.getByRole('button', { name: 'Star', exact: true });
+    await expect(star).toBeVisible();
+    const tile = (await wrap.boundingBox())!;
+    const box = (await star.boundingBox())!;
+    // Top left, clear of the row on the right and of the caption at the bottom.
+    expect(box.x - tile.x).toBeLessThan(16);
+    expect(box.y - tile.y).toBeLessThan(16);
+    const row = (await wrap.getByRole('group', { name: 'Item Actions' }).locator('a, button').first().boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(row.x);
+    expect(Math.abs(box.y - row.y)).toBeLessThan(1);
+    return { x: box.x - tile.x, y: box.y - tile.y };
+  };
+  const image = await corner('tile-done');
+  await studioUi(page).switchMode('video');
+  const video = await corner('tile-video');
+  expect(video).toEqual(image);
+  // The video's caption reads the same way: time · profile · its length.
+  await expect(page.locator('[data-tile-id="tile-video"] .tile-caption em')).toHaveText(/ · FLUX\.1 Schnell · 5 s$/);
 });
 
 test('phone tiles show nothing over the picture until Tile Captions is on', async ({ page, isMobile }) => {

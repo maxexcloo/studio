@@ -13,6 +13,10 @@ version opens with a `> ` summary line.
 
 ### Changed
 - **Prompt Assistant menus:** Enhance leads, the other presets read alphabetically, and Suggest LoRAs closes the menu, on the desktop caret and the phone list.
+- **Details › Output:** reads Dimensions (the picture's size), File, Size (the file's size on disk, once known) and Time (when it was made) in place of Size, File and Generated, for images and videos alike; a video shows exactly an image's groups and rows, adding only Duration, Frames and FPS, and Count and Reference no longer show on images only.
+- **Viewer title:** names the profile, as Details' Profile row does, instead of the model family, on the desktop and the phone.
+- **Profile names on tiles:** a running tile's label and the phone's run sheet name the profile like a finished tile's caption, rather than the model family or the weights file.
+- **Desktop tiles:** Star sits alone in the top left corner, on the row's line, for images and videos; the row on the right keeps Download, the make group and Delete.
 - **Details › Timing:** reads Active (the time shown everywhere else), Total, Queue, Setup, Sampling and Finishing, without "(Est.)".
 - **Server:** the exit record finds the data folder through the shared helper the rest of the server uses; trash batches, download resume notes, the SeedVR2 validation cache, Studio imports and the exit record are written with the server's crash-safe JSON write.
 - **Docs:** Security and Troubleshooting describe account mode first; LAN mode and the studio password are described only for a single-user studio.
@@ -22,6 +26,7 @@ version opens with a `> ` summary line.
 - **Account status:** the sign-in gate's `/api/accounts/status` answer is shared; Settings reuses it instead of asking on every open (again only once it is over a minute old), and a section that stops being offered gives way to Studio.
 
 ### Removed
+- **Refine in Chat:** Details' footer is Copy · Recreate. The chat handover routes (`/api/chat`, `/api/chat/handover`) and `STUDIO_CHAT_URL` stay for MCP, unused by the studio.
 - **Orphan server routes:** nothing in Studio, MCP or the docs called these since their Settings went: gallery bundles (`/api/gallery/bundles*`) and the server-side run grouping behind them (Auto-Grouping in the browser is unchanged), `/api/gallery/recover` (history is still recovered on start), `/api/gallery/clear` and the trash routes (`/api/gallery/trash*`; an existing trash still empties itself after `STUDIO_TRASH_DAYS`), the earlier-images folder routes (`/api/library/folders*`, `/api/library/output`; folders added before are still read), the model manifest routes (`/api/models/manifest*`), the Hugging Face and Civitai token routes (`/api/settings/hf-token`, `/api/settings/civitai-token`; tokens come from the environment) and `/api/shutdown` (containers stop Studio with a signal).
 
 ### Fixed

@@ -112,7 +112,8 @@ test('queued cards show each saved model', async ({ page, isMobile }) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.goto('/');
-  for (const item of items) await expect(page.locator(`[data-tile-id="${item.id}"] .generate-model`)).toHaveText(item.settings.modelName);
+  // Without a profile, the saved model's part name, as the finished tile's caption shows it.
+  for (const item of items) await expect(page.locator(`[data-tile-id="${item.id}"] .generate-model`)).toHaveText(item.settings.modelName.replace(/\.safetensors$/, ''));
 });
 
 test('a running card names its profile beside Stop and holds still on hover', async ({ page, isMobile }) => {

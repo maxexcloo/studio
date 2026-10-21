@@ -4,7 +4,7 @@ import { tweens } from '@/lib/springs';
 import { cn } from './format';
 import { ElapsedTime } from './ElapsedTime';
 import { serverClockOffset } from './api';
-import { modelName } from './catalogueNames';
+import { itemProfileName, itemProfileTitle } from './itemProfile';
 import type { GalleryItem, Profile, Progress } from './types';
 
 const numberVariants = {
@@ -80,9 +80,8 @@ export const GenerationProfiles = React.createContext<Profile[]>([]);
 /** The run's profile by the name the model picker shows; the saved model file once that profile is gone. */
 export function GenerationModel({ item, className }: { item: GalleryItem; className?: string }) {
   const profiles = React.useContext(GenerationProfiles);
-  const id = String(item.settings?.profileId || item.model || "");
-  const profile = id ? profiles.find((candidate) => candidate.id === id) : undefined;
-  const name = profile ? modelName(profile).name : String(item.settings?.modelName || item.model || "");
+  // The profile's own name, as the finished tile's caption and the viewer's title read it.
+  const name = itemProfileName(item, profiles) || itemProfileTitle(item, profiles) || String(item.settings?.modelName || item.model || "");
   return name ? <span className={cn('generate-model', className)} title={name}>{name}</span> : null;
 }
 

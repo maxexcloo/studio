@@ -195,6 +195,8 @@
 .tile-hover-actions > * { opacity: 0; transition: opacity var(--motion-base) var(--motion-ease); }
 .tile-hover-actions > .starts-group { margin-left: var(--space-2); }
 .tile-hover-actions > .is-star.is-on { opacity: 1; color: var(--accent-amber); }
+/* Star alone in the top left corner, the row's mirror (GalleryTile.tsx). */
+.tile-hover-actions.tile-star-corner { right: auto; left: 8px; justify-content: flex-start; }
 /* Box styling is shared with .tile-hover-actions above; only placement here. */
 /* --primary is near-white here, so an active state must flip the ink too. */
 /* The controls sit in .tile-overlay, a sibling of the tile's button, so the
@@ -1125,6 +1127,7 @@
   }
   .tile:hover { transform: none; box-shadow: none; }
   .tile-hover-actions { top: 6px; right: 6px; }
+  .tile-hover-actions.tile-star-corner { right: auto; left: 6px; }
 }
 @media (hover: none) and (pointer: coarse) {
   .tile-hover-actions { pointer-events: auto; }
@@ -1368,6 +1371,7 @@
     padding: 6px;
     border-radius: var(--r-pill);
   }
+  .tile-overlay .tile-hover-actions.tile-star-corner { right: auto; left: 2px; }
   .tile-motion-wrap:hover .tile-overlay .tile-hover-actions,
   .tile-motion-wrap:focus-within .tile-overlay .tile-hover-actions { pointer-events: auto; }
 }

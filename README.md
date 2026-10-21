@@ -148,7 +148,7 @@ Administrators also get eleven admin tools, from their own MCP token (or through
 - **Export:** the profiles, guides and catalogue bundle as Settings › Profiles › Export builds it, as a signed link valid for an hour.
 - **Placement** (read-only): the worker's inventory, free space and whether it is writable (or the local folders), and where one `key` sits.
 
-None of them deletes a file or touches a GPU. Results carry how their prompt was written (`assistant`) in the gallery and in their ComfyUI run, so a rebuild from ComfyUI's history keeps it, and Recreate and Reuse carry it into a rerun of the same prompt. Details' **Refine** opens the deployment's chat (`STUDIO_CHAT_URL`) with the result's prompt, profile and job ID filled in, or copies that message, and lets that account's chat Review and Reuse the result (see [Configuration](docs/guides/CONFIGURATION.md#refine-in-chat)).
+None of them deletes a file or touches a GPU. Results carry how their prompt was written (`assistant`) in the gallery and in their ComfyUI run, so a rebuild from ComfyUI's history keeps it, and Recreate and Reuse carry it into a rerun of the same prompt.
 
 Handover prepares a copy-paste summary with the caller's decisions, preferences, unfinished work and the current conversation's recent job IDs and result links. It never generates images. Call it when requested, or when the chat host reports about 90% context usage; Studio cannot measure the host's context itself. Stable job IDs work in a new chat, while result numbers remain local to their original conversation. The host owns automatic usage detection and its summary interface.
 

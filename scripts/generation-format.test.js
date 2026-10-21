@@ -49,3 +49,18 @@ test('Details say when the prompt assistant wrote the prompt, and which suggeste
   assert.deepEqual(prompt.rows, [['Suggested LoRAs', 'Glow'], ['Written By', 'Assistant in Chat · Cinematic']]);
   assert.equal(generationDetailEntries({ ...written, assistant: undefined }).some((section) => section.title === 'Prompt'), false);
 });
+
+test('an image and a video share the Output rows; a video only adds Duration, Frames and FPS', () => {
+  const base = { prompt: 'A harbour', width: 1024, height: 1024, outputName: 'harbour.png', createdAt: '2026-10-21T12:00:00Z', referenceImage: 'start-asset', referenceImageName: 'start.png', settings: { seed: '1', count: 2 } };
+  const output = (entry, names) => generationDetailEntries(entry, names).find((section) => section.title === 'Output').rows;
+  const image = output({ ...base, type: 'image' }, { fileSize: 1_250_000 });
+  assert.deepEqual(image.map(([label]) => label), ['Count', 'Dimensions', 'File', 'Reference', 'Size', 'Time']);
+  assert.deepEqual(image.find(([label]) => label === 'Dimensions'), ['Dimensions', '1024 × 1024']);
+  assert.deepEqual(image.find(([label]) => label === 'Size'), ['Size', '1.3 MB']);
+  const video = output({ ...base, type: 'video', settings: { ...base.settings, duration: 5, frames: 121, fps: 24 } }, { fileSize: 4_000_000 });
+  const videoOnly = ['Duration', 'Frames', 'FPS'];
+  assert.deepEqual(video.map(([label]) => label).filter((label) => !videoOnly.includes(label)), image.map(([label]) => label));
+  // Unknown size: no Size row, never a placeholder.
+  assert.ok(!output({ ...base, type: 'image' }).some(([label]) => label === 'Size'));
+  assert.match(fullGenerationText({ ...base, type: 'image' }), /File: harbour\.png\n[\s\S]*Dimensions: 1024 × 1024\nTime: /);
+});
