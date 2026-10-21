@@ -2,7 +2,7 @@ import React from 'react';
 import { Check, RotateCw } from 'lucide-react';
 import { apiJson } from './api';
 import { cn } from './format';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import type { RestartResult } from './types';
 
 export type ManagerInfo = { connected: boolean; available: boolean; version: string | null; stale?: boolean; error?: string };
@@ -276,9 +276,9 @@ export function ComfyRestart({ onBack, compact = false, className }: {
   className?: string;
 }) {
   const { info, refresh, phase, error, busy, off, restart, eta, result } = useComfyRestart({ onBack });
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   // Restarting is looked after at the computer; elsewhere only its progress shows.
-  if (!thisComputer && !busy) return <p className={cn('comfy-restart-note', className)}>Restart ComfyUI from the computer running Studio.</p>;
+  if (!administrator && !busy) return <p className={cn('comfy-restart-note', className)}>Restart ComfyUI from the computer running Studio.</p>;
   return (
     <div className={cn('comfy-restart', compact && 'is-compact', className)}>
       <button type="button" className={cn('btn', phase === 'back' && 'is-done')} onClick={restart} disabled={off || busy || info === null} aria-live="polite">

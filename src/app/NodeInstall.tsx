@@ -4,7 +4,7 @@ import { ComfyRestart, managerMajor, useComfyManager } from './ComfyRestart';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { apiJson, copyText } from './api';
 import { BetaTag } from './components';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import { cn } from './format';
 import type { NodePackInfo, PackAutoInstall, PackInstallState, ShellPlan } from './types';
 import type { ShowToast } from './toast';
@@ -158,7 +158,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
     setRoute(manager.available ? 'manager' : 'terminal');
   }, [manager]);
   // One click where Studio can do it, for whoever may install; the manual routes stay one tap away.
-  const admin = useThisComputer();
+  const admin = useAdministrator();
   const canQuick = Boolean(admin && pack.id && autoInstall && (autoInstall.local || (autoInstall.manager && hasManager)));
   const [manual, setManual] = useState(false);
   const [quickError, setQuickError] = useState('');

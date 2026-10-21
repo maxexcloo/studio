@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, RefreshCw } from 'lucide-react';
-import { emailFieldProps, looksLikeEmail, rememberAccountStatus } from './accounts';
+import { emailFieldProps, looksLikeEmail } from './accounts';
+import { loadAccountStatus, setDeviceAdmin } from './access';
 import { ApiError, apiJson, setAccountStorageScope, signedOutEvent } from './api';
-import { setAtComputer, setThisComputer } from './device';
 import { LockMark, type LockMarkStage } from './LockMark';
 import { cn } from './format';
 
@@ -33,20 +33,17 @@ export function DeviceGate({ children }: React.PropsWithChildren) {
 
   const check = useCallback(async () => {
     try {
-      const accountMode = await apiJson<{ ok: boolean; mode: 'single-user' | 'multi-user'; signedIn?: boolean; needsRecoveryAdmin?: boolean; setupTokenAccepted?: boolean; oidc?: { label: string }; account?: { id: string; role: string } | null }>('/api/accounts/status', { cache: 'no-store' });
-      rememberAccountStatus(accountMode);
+      // The account status is the access model's source in account mode (access.ts): the role decides administration.
+      const accountMode = await loadAccountStatus();
       if (accountMode.mode === 'multi-user') {
         const signedIn = accountMode.signedIn === true;
         setAccountStorageScope(signedIn ? accountMode.account?.id : undefined);
-        setThisComputer(signedIn && accountMode.account?.role === 'administrator');
-        setAtComputer(false);
         setState(signedIn ? { kind: 'in' } : { kind: 'account-sign-in', recovery: accountMode.needsRecoveryAdmin === true, setupToken: accountMode.setupTokenAccepted === true, oidcLabel: accountMode.oidc?.label || '' });
         return;
       }
       setAccountStorageScope();
       const status = await apiJson<AccessStatus & { ok: boolean }>('/api/access/status', { cache: 'no-store' });
-      setThisComputer(status.canAdmin);
-      setAtComputer(status.thisComputer);
+      setDeviceAdmin(status.canAdmin);
       setState(status.signedIn ? { kind: 'in' } : { kind: 'sign-in', status });
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) {

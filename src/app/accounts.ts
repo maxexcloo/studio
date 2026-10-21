@@ -12,12 +12,6 @@ export async function signOutAccount() {
   window.location.reload();
 }
 
-/** /api/accounts/status, as the sign-in gate last saw it: Settings reads it at once instead of asking again. */
-export type AccountStatus = { mode: 'single-user' | 'multi-user'; signedIn?: boolean; account?: { id: string; role: string } | null };
-let knownStatus: AccountStatus | null = null;
-export const rememberAccountStatus = (status: AccountStatus | null) => { knownStatus = status; };
-export const knownAccountStatus = () => knownStatus;
-
 /** The signed-in account (server/account-store.js `ownAccount`) and its MCP token, from /api/accounts/me. */
 export type OwnAccount = {
   id: string; username: string; displayName: string; role: 'administrator' | 'user';

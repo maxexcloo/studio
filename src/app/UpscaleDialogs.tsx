@@ -3,7 +3,7 @@ import { Check, ExternalLink, FolderOpen, RefreshCw } from 'lucide-react';
 import { Modal } from './Modal';
 import { NodeInstall } from './NodeInstall';
 import { UpscaleHero } from './UpscaleHero';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import { cn } from './format';
 import { formatBytes, upscaleEfforts, upscaleQualityLabel } from './useUpscale';
 import type { UpscaleSetup, UpscaleSetupStage } from './useUpscale';
@@ -107,7 +107,7 @@ export function UpscaleSetupDialog({
 }) {
   const { stage, pending } = setup;
   // Downloads land on the computer Studio runs on, so only it (or a device trusted with admin) starts them.
-  const admin = useThisComputer();
+  const admin = useAdministrator();
   const progress = install?.totalBytes ? (install.receivedBytes || 0) / install.totalBytes : 0;
   const fallback = status?.substituting ? status.fallbackFile || "another installed SeedVR2 weight" : "";
   // A stopped download says why once, in the description (UI-PATTERNS › Messages: no error box of its own).

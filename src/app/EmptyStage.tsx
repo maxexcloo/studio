@@ -4,7 +4,7 @@ import { githubUrl } from './constants';
 import { EmptyMark } from './EmptyMark';
 import { CONNECT_MS, OfflineMark } from './OfflineMark';
 import { cn } from './format';
-import { useThisComputer } from './device';
+import { useAdministrator } from './access';
 import { RestartEtaText } from './ComfyRestart';
 
 /**
@@ -49,7 +49,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
   /** The "pick a first model" cards, shown when ComfyUI has no model Studio can run. */
   starter?: React.ReactNode;
 }) {
-  const thisComputer = useThisComputer();
+  const administrator = useAdministrator();
   const [phase, setPhase] = useState<Phase>(!known ? 'waiting' : offline ? 'offline' : 'empty');
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [offlineRun, setOfflineRun] = useState(0);
@@ -125,7 +125,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
               <p>Start ComfyUI and it connects.{where ? <> Checking <code className="stage-code">{where}</code>{ports.length ? <> and port {ports.join(', ')}</> : null}.</> : null}</p>
               <div className="empty-actions">
                 <button className="reconnect-btn primary" onClick={onRetry} disabled={retrying} aria-busy={retrying || undefined}><RefreshCw size={14} className={cn(retrying && 'spin')} /> {retrying ? 'Checking…' : 'Check Again'}</button>
-                {thisComputer ? <button className="reconnect-btn" onClick={onOpenConnection}><Plug size={14} /> Change Address</button> : null}
+                {administrator ? <button className="reconnect-btn" onClick={onOpenConnection}><Plug size={14} /> Change Address</button> : null}
               </div>
               {onNoComfy
                 ? <button type="button" className="stage-link" onClick={onNoComfy}>No ComfyUI Yet?</button>
@@ -136,7 +136,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
               <h2 className="stage-connected"><span><Check size={12} strokeWidth={2.5} /></span> Connected</h2>
               <p>{device ? `ComfyUI on ${device}` : 'ComfyUI is ready.'}</p>
             </>
-          ) : copy === 'empty' && noModels && starter && thisComputer ? (
+          ) : copy === 'empty' && noModels && starter && administrator ? (
             <>
               <h2>Choose a First Model</h2>
               <p>It downloads with everything it needs.{onFindModels ? <> Already have models on this computer? <button type="button" className="stage-inline-link" onClick={onFindModels}>Find Them</button>.</> : null}</p>
@@ -145,9 +145,9 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
           ) : copy === 'empty' && noModels ? (
             <>
               <h2>No Models Yet</h2>
-              <p>{thisComputer ? 'Put a checkpoint or diffusion model in ComfyUI’s models folder, or find models elsewhere on this computer.' : 'Add a checkpoint or diffusion model to the connected ComfyUI instance, and it shows up here.'}</p>
+              <p>{administrator ? 'Put a checkpoint or diffusion model in ComfyUI’s models folder, or find models elsewhere on this computer.' : 'Add a checkpoint or diffusion model to the connected ComfyUI instance, and it shows up here.'}</p>
               <div className="empty-actions">
-                {onFindModels && thisComputer ? <button className="reconnect-btn primary" onClick={onFindModels}><FolderSearch size={14} /> Find Models</button> : null}
+                {onFindModels && administrator ? <button className="reconnect-btn primary" onClick={onFindModels}><FolderSearch size={14} /> Find Models</button> : null}
                 <a className="reconnect-btn" href={`${githubUrl}#supported-models`} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Which Models Work</a>
               </div>
             </>
