@@ -44,7 +44,7 @@ test('search and filters share one row: opening one collapses the other to its i
   expect(names).toEqual(['Starred', 'Models', 'LoRAs', 'Size', 'Aspect Ratio']);
   // Then the gallery view controls, as on the desktop (Grid Autoplay only where there are videos), and Clear last.
   const row = await filterRow(page).locator('button').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') || node.textContent?.trim()));
-  expect(row.slice(names.length)).toEqual(['Hide Failed & Queued', 'Auto-Grouping', 'Clear Filters']);
+  expect(row.slice(names.length)).toEqual(['Auto-Grouping', 'Hide Failed & Queued', 'Clear Filters']);
   expect(await filterRow(page).evaluate((node) => getComputedStyle(node).overflowX)).toBe('auto');
   await searchButton(page).click();
   await expect(filterRow(page)).toHaveCount(0);

@@ -25,14 +25,14 @@ function StatusToggle({ prefs, setPrefs }: { prefs: Preferences; setPrefs: (next
 
 /**
  * How the gallery is shown, the same on desktop and phones (UI-PATTERNS ›
- * Gallery View Controls): Hide Failed & Queued, Auto-Grouping and Grid Autoplay
- * (only where there are videos). The desktop toolbar holds them after its
+ * Gallery View Controls): Auto-Grouping, Grid Autoplay (only where there
+ * are videos), then Hide Failed & Queued. The desktop toolbar holds them after its
  * filters; the phone's filter row ends with them, before Clear.
  */
 export function GalleryViewControls({ prefs, setPrefs, hasVideos, searching }: { prefs: Preferences; setPrefs: (next: Partial<Preferences>) => void; hasVideos: boolean; searching: boolean }) {
   return <>
-    <StatusToggle prefs={prefs} setPrefs={setPrefs} />
     <StackRunsButton labelled on={Boolean(prefs.stackRuns)} disabled={searching} onToggle={() => setPrefs({ stackRuns: !prefs.stackRuns })} />
     {hasVideos ? <GridAutoplayButton labelled /> : null}
+    <StatusToggle prefs={prefs} setPrefs={setPrefs} />
   </>;
 }

@@ -390,10 +390,10 @@ test('video gallery actions run from playback through grouping to Select', async
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
   const status = toolbar.getByRole('button', { name: 'Hide Failed & Queued', exact: true });
   await expect(play).toBeVisible();
-  // The view controls in their one order (UI-PATTERNS): Status, Auto-Grouping, Grid Autoplay, then Select.
-  expect((await status.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
+  // The view controls in their one order (UI-PATTERNS): Auto-Grouping, Grid Autoplay, Hide Failed & Queued, then Select.
   expect((await group.boundingBox())!.x).toBeLessThan((await play.boundingBox())!.x);
-  expect((await play.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
+  expect((await play.boundingBox())!.x).toBeLessThan((await status.boundingBox())!.x);
+  expect((await status.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
   // One toggle hides failed and queued outputs, remembered like the other view controls.
   await expect(status).toHaveAttribute('aria-pressed', 'false');
   await status.click();

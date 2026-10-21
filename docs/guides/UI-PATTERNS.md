@@ -761,8 +761,8 @@ paginated results, and never show misleading zero counts.
 
 How the gallery shows, the same three on both devices
 (`GalleryViewControls.tsx`): **Auto-Grouping**, **Grid Autoplay** (one name
-everywhere, only where there are videos) and **Failed** (whether failed
-outputs show). They are pressed toggles, not settings and not filters, so
+everywhere, only where there are videos) and **Hide Failed & Queued** (one
+toggle that hides failed and not-yet-running outputs), in that order. They are pressed toggles, not settings and not filters, so
 Clear leaves them alone. The desktop gallery toolbar holds them after its
 filters; the phone's filter row ends with them, after a divider and before
 Clear. Stop All, with the running count, sits in the desktop dock and in the
