@@ -45,6 +45,7 @@ import { canAdmin, clientOf, deviceSession, migrateDeviceCookie, studioPasswordS
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard, signInHeader } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
+import { createHandoverStore, registerChatRoutes } from './chat-handover.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { startServers } from './listen.js';
@@ -103,7 +104,7 @@ import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiU
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
 import { isCloudProfile, mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
-import { accountAccessForId, gatewayAccountAccess, migrateCloudModelAccess, migrateFeatureOptionAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
+import { accountAccessForId, gatewayAccountAccess, gatewayAdminTools, migrateCloudModelAccess, migrateFeatureOptionAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -142,8 +143,12 @@ async function resolveSignedMcpResult(owner, jobId, index) {
 for (const [name, migrate] of [["seed", () => seedMissing({ seedDir: seedDirectory(), dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })], ["catalogue", () => loraCatalogue().migrate()], ["guides", () => guideStore().migrate()], ["profiles", () => profileStore().migrate()]]) {
   try { migrate(); } catch (error) { console.warn(`[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`); }
 }
+// Refine in Chat's handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
+const chatHandovers = createHandoverStore({ dataDir });
 registerMcpRoutes(app, {
   dataDir,
+  gatewayAdminTools,
+  claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) => hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
   accountMode: multiUserEnabled,
@@ -814,6 +819,9 @@ registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
   draftProfile: (record, options) => draftCheckpointProfile(record, options),
+  // Lookup says which ready profiles a link's base model fits.
+  families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
+  profiles: async () => ((await mediaModels(false)).models.profiles || []).filter((profile) => profile.ready !== false).map(({ id, family }) => ({ id, family })),
   loraInfo: (names) => lorasEnabled ? loraInfos(names) : Promise.resolve({}),
   installed: async () => {
     const { info } = await loadComfyContext();
@@ -1010,6 +1018,12 @@ app.delete("/api/workflows/:id", (req, res) => {
 });
 
 registerGalleryReadRoutes(app);
+// Refine in Chat: the chat's address, and handing a result the account owns to its chat.
+registerChatRoutes(app, {
+  store: chatHandovers,
+  ownerId: ownerIdForRequest,
+  owned: (req, jobId) => recordsForRequest(gallery, req).some((item) => item.jobId === jobId && item.status === "done")
+});
 registerComparisonRoutes(app, { dataDir, gallery: () => filterVisibleGallery(gallery) });
 
 

@@ -471,7 +471,7 @@ holds:
 | Models | Defaults and Integrations (the assistant models, Civitai and output storage). LoRAs, the catalogue and downloads are in the [Library](#library) | Administrators |
 | Profiles | One model profile at a time: Profile and Source (AI-Drafted with Approve, From the Seed, Edited in Studio), then JSON, Guide or Versions (a segmented Show row). JSON and Guide edit with Review Changes and Save & Discard; Versions is a flat list whose rows open in place to their diff and Revert. Export on the heading downloads the bundle for the profiles repository | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
-| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
+| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway (Chat Gateway Admin Tools, off by default, then each linked and waiting chat user) | Administrators |
 | Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
 
 **Order:** Account comes first, then the pages alphabetically; groups, rows,
@@ -526,7 +526,7 @@ returns to its list). Its five pages, in this order:
 
 | Page | Holds |
 | --- | --- |
-| Import | One field: paste a Civitai or Hugging Face link, or drop one on it (dropped image files come later). Under it, the History: one row per import with its kind icon, name, kind and date, the grade chip and its state |
+| Import | One field: paste a Civitai or Hugging Face link, or drop one on it (dropped image files come later). Under it, the History: one row per import with its kind icon, name, kind, "From Chat" for an administrator's chat import (MCP's Import), "n Missing" and date, the grade chip and its state |
 | Images | The saved Civitai images as an even 4:5 grid, each with its grade chip and missing count; search once there are two or more |
 | LoRAs | Installed and catalogued LoRAs and supporting files, with provenance, version, links, trigger words and file |
 | Models | Checkpoints, diffusion models, text encoders, VAEs and CLIP vision the same way, then any catalogue switch that remains global |
@@ -696,7 +696,10 @@ kind of element:
   Weights only when they differ from the profile's name). Rows within a group
   read alphabetically, except Timing (measured times before the estimates).
   The phone and the desktop show the same Details, from one component.
-  The one footer is Copy · Recreate. Copy includes generation inputs and saved
+  The one footer is Copy · Refine · Recreate. **Refine** ("Refine in Chat",
+  on a finished result) opens the deployment's chat with the prompt, profile
+  and job ID filled in, unsent, or copies that message where no chat is set,
+  and says which in the status pill. Copy includes generation inputs and saved
   settings, including IDs, seed and reference settings; output filenames,
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run

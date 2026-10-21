@@ -61,7 +61,7 @@ export function PhoneViewerBar({ item, showDetails, onToggleDetails, compare }: 
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const handlers = useItemActionHandlers();
   const all = useItemActions(item, 'bar', { compare });
-  // With Details open its footer holds Copy and Recreate: the bar steps aside rather than repeat them.
+  // With Details open its footer holds Copy, Refine and Recreate: the bar steps aside rather than repeat them.
   const actions = showDetails ? [] : all.filter((action) => action.id !== 'star');
   const star = handlers && canStar(item) ? { pressed: Boolean(item.favorite), run: () => handlers.star(item) } : null;
   const copy = useCopyFeedback();

@@ -35,6 +35,7 @@ import { useGenerationActivity, useTilesOnScreen } from './GenerationActivity';
 import { ActivityColumn } from './Activities';
 import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, generationInputsText } from './ViewerActions';
+import { refineInChat, useChatAddress } from './refineInChat';
 import { itemProfile, itemProfileName } from './itemProfile';
 import { LoraDetails, LoraSources } from './LoraPanel';
 import { loraName, modelName } from './catalogueNames';
@@ -115,6 +116,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
   const assistant = view.assistant as PromptAssistant | undefined;
+  // Refine in Chat opens the deployment's chat, or copies the job reference without one.
+  const chatUrl = useChatAddress();
   const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
   const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
   const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
@@ -771,6 +774,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                     <DetailsFooter
                       onCopy={() => copyToClipboard(generationInputsText(active), 'Inputs copied')}
                       onRecreate={active.prompt ? () => itemActionHandlers.reuse(active) : undefined}
+                      onRefine={active.jobId && active.status === "done" && active.prompt ? () => refineInChat(active, { chatUrl, profileName: itemProfileName(active, models?.profiles || []) }) : undefined}
                     />
                   </aside>
                 ) : null}

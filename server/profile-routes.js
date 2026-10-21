@@ -7,16 +7,19 @@
  *   POST /api/profiles/editable/:id/revert          {version, baseHash}: that version again, as a new version
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
  *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, or its own guidance
- *   PUT  /api/profiles/guides/:packId               {pack, baseHash}: saves a guide pack as a new version
+ *   GET  /api/profiles/guides                       every guide pack with its version and AI-Drafted state
+ *   GET  /api/profiles/guides/:packId               one pack with its hash (an edit's base) and meta
+ *   PUT  /api/profiles/guides/:packId               {pack, baseHash, draft?}: saves a guide pack as a new version
  *   GET  /api/profiles/guides/:packId/versions      the pack's versions, newest first
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/profiles/ layout
  *
- * Every change is a new version; nothing is deleted.
+ * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
+ * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
-import { requireAdmin } from './route-access.js';
+import { fromChat, requireAdmin } from './route-access.js';
 import { approveEditableProfile, readEditableProfile, revertEditableProfile } from './profile-editor.js';
 import { profileBlock } from './profile-block.js';
 import { writeExport } from './profile-export.js';
@@ -52,7 +55,7 @@ export function registerProfileRoutes(app, { profiles, guides, objectInfo = asyn
     const current = readEditableProfile(req.params.id);
     let kind = 'image';
     try { kind = profileBlock(JSON.parse(current.text))?.kind || 'image'; } catch { /* The check reports it. */ }
-    const saved = revertEditableProfile(req.params.id, versionNumber(req.body?.version), { by: accountName(req), baseHash: String(req.body?.baseHash || ''), info: await info(kind) });
+    const saved = revertEditableProfile(req.params.id, versionNumber(req.body?.version), { by: accountName(req), baseHash: String(req.body?.baseHash || ''), info: await info(kind), origin: fromChat(req) ? 'chat' : 'studio' });
     await onSaved(req.params.id);
     res.json({ ok: true, ...saved });
   }));
@@ -78,12 +81,24 @@ export function registerProfileRoutes(app, { profiles, guides, objectInfo = asyn
     try { pack = guides().pack(resolved.packId); } catch { /* Seed only: shown read-only. */ }
     res.json({ ok: true, ...resolved, profile, ...(pack ? { pack: pack.pack, hash: pack.hash, meta: pack.meta } : { readOnly: true }) });
   }));
+  app.get('/api/profiles/guides', route((_req, res) => {
+    const store = guides().read() || {};
+    const packs = Object.keys(store.packs || {}).sort().map((packId) => {
+      const meta = store.meta?.[packId] || {};
+      return { packId, version: meta.version || 0, origin: meta.origin || 'seed', aiDrafted: meta.aiDrafted === true, editedAt: meta.editedAt || '' };
+    });
+    res.json({ ok: true, packs });
+  }));
+  app.get('/api/profiles/guides/:packId', route((req, res) => {
+    res.json({ ok: true, ...guides().pack(req.params.packId) });
+  }));
   app.put('/api/profiles/guides/:packId', route((req, res) => {
     let pack = req.body?.pack;
     if (typeof pack === 'string') {
       try { pack = JSON.parse(pack); } catch (error) { throw Object.assign(new Error(`Not valid JSON: ${error.message}`), { status: 400 }); }
     }
-    const saved = guides().save(req.params.packId, pack, { by: accountName(req), origin: 'studio', baseHash: String(req.body?.baseHash || '') });
+    const chat = fromChat(req);
+    const saved = guides().save(req.params.packId, pack, { by: accountName(req), origin: chat ? 'chat' : 'studio', aiDrafted: chat && req.body?.draft === true, baseHash: String(req.body?.baseHash || '') });
     res.json({ ok: true, ...saved });
   }));
   app.get('/api/profiles/guides/:packId/versions', route((req, res) => {
@@ -94,7 +109,7 @@ export function registerProfileRoutes(app, { profiles, guides, objectInfo = asyn
     res.json({ ok: true, version: guides().version(req.params.packId, versionNumber(req.params.n)) });
   }));
   app.post('/api/profiles/guides/:packId/revert', route((req, res) => {
-    const saved = guides().revert(req.params.packId, versionNumber(req.body?.version), { by: accountName(req), baseHash: String(req.body?.baseHash || '') });
+    const saved = guides().revert(req.params.packId, versionNumber(req.body?.version), { by: accountName(req), baseHash: String(req.body?.baseHash || ''), origin: fromChat(req) ? 'chat' : 'studio' });
     res.json({ ok: true, ...saved });
   }));
   app.post('/api/profiles/guides/:packId/approve', route((req, res) => {

@@ -91,3 +91,20 @@ test('the chat memory matches prompts loosely, per owner, and forgets after a wh
   clock = 7 * 60 * 60 * 1000;
   assert.equal(memory.record('a', ['a cabin at dusk.']), null);
 });
+
+test('what the chat wrote is kept on disk, so a Generate after a restart still records it', (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-mcp-assistant-memory-'));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  const file = path.join(dataDir, 'mcp-assistant.json');
+  let clock = 1000;
+  const before = createChatAssistantMemory({ now: () => clock, file });
+  before.rewrote('owner-a', 'A cabin at dusk.', { preset: 'cinematic', model: 'ai/text-quick' });
+  before.suggested('owner-a', ['glow.safetensors']);
+  assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600');
+  const after = createChatAssistantMemory({ now: () => clock, file });
+  assert.deepEqual(after.record('owner-a', ['a cabin at dusk.'], [{ name: 'glow.safetensors' }]), { preset: 'cinematic', model: 'ai/text-quick', source: 'chat', lorasSuggested: ['glow.safetensors'] });
+  clock += 7 * 60 * 60 * 1000;
+  assert.equal(createChatAssistantMemory({ now: () => clock, file }).record('owner-a', ['a cabin at dusk.']), null, 'old records are dropped on load');
+  fs.writeFileSync(file, '{ broken');
+  assert.equal(createChatAssistantMemory({ now: () => clock, file, log: {} }).record('owner-a', ['a cabin at dusk.']), null, 'an unreadable file starts afresh');
+});

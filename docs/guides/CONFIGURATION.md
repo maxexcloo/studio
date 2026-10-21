@@ -134,6 +134,20 @@ MCP clients connect in one of three ways in multi-user mode:
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
+### MCP Admin Tools
+
+An administrator's chat can manage the Library, downloads, the catalogue, profiles and guides with eleven more tools (see the README's MCP section). They call the same routes as the UI with the administrator's credential, so the same checks, Undo and versions apply, and every import, catalogue edit and version they make records `chat` as its origin.
+
+- **Who gets them:** an administrator account's own MCP token. A chat user linked through the trusted gateway to an administrator account gets them only while **Settings › Users › Chat Gateway › Chat Gateway Admin Tools** is on; it is off by default and stored with the accounts. Ordinary accounts, unlinked or anonymous gateway users, AI Control's key and the single-user shared key never get them.
+- **What they reach:** only the Library, model download, catalogue, profile, guide and export routes. A personal token is otherwise still no administrator credential. Nothing deletes a file or replaces a download, Cancel only stops one (its partial file stays for Resume), and no tool touches a GPU.
+- **Export links** are signed with `MCP_SIGNING_KEY`, last an hour and serve the bundle Export wrote under `exports/`.
+
+### Refine in Chat
+
+`STUDIO_CHAT_URL` is the chat's base address, such as `https://chat.example.com` for LibreChat. With it, **Refine** in a result's Details opens `<STUDIO_CHAT_URL>/c/new?prompt=…`, which LibreChat (v0.8.8 and later) fills into a new chat's message box without sending: the result's prompt, profile, how the prompt was written and its stable job ID, in the Handover summary's form. Without it, Refine copies the same message for pasting. The handover is kept for 30 days in `chat-handovers.json`; when that account's chat names the job, MCP takes it into the account's chat jobs, so Review, Reuse and Result work on it. Only the account that owns a result can hand it over.
+
+What the chat's RewritePrompt and SuggestLoras did is kept for six hours in `mcp-assistant.json` beside `mcp-ownership.json`, so a later Generate still records it on its results after a restart. Each result's record also travels in its ComfyUI run (`extra_data.studio_generation.assistant`), so results rebuilt from ComfyUI's history keep it.
+
 `Status` and `Result` wait at most 20 seconds for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, waits up to 1500 seconds, below LibreChat's 1800-second background deadline. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
 
 `STUDIO_ENABLE_GROK=0`, `STUDIO_ENABLE_TESSERA=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching access-profile options show as locked. All three are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every access profile once (a profile keeps a feature only where the switch had it on) and then dropped from Studio's own env file.

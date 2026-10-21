@@ -10,7 +10,7 @@ import type { ShowToast } from './toast';
 type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences' | 'loras' | 'nsfwModels' | 'presets' | 'promptAssistant' | 'promptHistory' | 'videoGeneration' | 'videoReferences';
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; allModels?: boolean; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
-type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
+type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[]; /** Chat Gateway Admin Tools (server/account-store.js gatewayAdminTools). */ adminTools?: boolean };
 type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; defaultAccessProfileId?: string; requireApproval?: boolean; lockedFeatures?: Partial<Record<Feature, boolean>>; gateway?: GatewayIdentities };
 export type ProfileInfo = { label: string; kind?: string; cloud?: boolean; nsfw?: boolean };
 
@@ -213,6 +213,13 @@ export function UsersSettings({ showToast, profiles }: { showToast: ShowToast; p
   const dismissGatewayIdentity = async (identity: string) => {
     if (await run(() => apiJson('/api/accounts/gateway-pending/dismiss', jsonPost('POST', { identity })), 'Couldn’t dismiss the chat user')) await refresh();
   };
+  // Gateway-linked administrators get MCP's admin tools only while this is on (off by default).
+  const setGatewayAdminTools = async (on: boolean) => {
+    if (await run(() => apiJson('/api/accounts/gateway-admin', jsonPost('POST', { on })), 'Couldn’t save Chat Gateway Admin Tools')) {
+      showToast(on ? 'Admin tools on for gateway administrators' : 'Admin tools off for gateway administrators', 'success');
+      await refresh();
+    }
+  };
   const accountOptions = (list: Account[]) => byName(list).map((account) => ({ label: `${account.displayName} (${account.username})`, value: account.id }));
 
   if (!admin) return loadError
@@ -225,6 +232,7 @@ export function UsersSettings({ showToast, profiles }: { showToast: ShowToast; p
     <AccessProfileEditor admin={admin} profiles={profiles} showToast={showToast} onSaved={refresh} />
     <AccountsGroup admin={admin} showToast={showToast} onSaved={refresh} />
     <Group title="Chat Gateway" note="A trusted chat gateway forwards its own user IDs. Each one reaches Studio only once it is linked to an account, here or automatically when the gateway forwards an enabled account's email. With a default access profile, an email no account has becomes a new account.">
+      <SwitchRow label="Chat Gateway Admin Tools" description={admin.gateway?.adminTools ? 'Administrators linked here manage the Library, catalogue and profiles from chat, as with their own MCP token.' : 'Only an administrator’s own MCP token gets the Library, catalogue and profile tools in chat.'} checked={admin.gateway?.adminTools === true} disabled={busy} onChange={(next) => void setGatewayAdminTools(next)} />
       {gatewayLinks.map((link) => {
         const account = admin.accounts.find((item) => item.id === link.accountId);
         return <Row key={link.identity} label={link.identity} description={`Linked to ${account ? `${account.displayName} (${account.username})` : 'a removed account'}`}>

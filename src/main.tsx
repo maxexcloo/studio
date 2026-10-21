@@ -1221,7 +1221,11 @@ function App() {
 
   const viewerActions = useViewerControls({
     onReuseProfile: applyProfileReferences, onReuseReferences: applyReusedReferences, referenceForAspect,
-    onReuseOutput: (item: GalleryItem | null) => { reusedImage.current = item?.type === 'image' && item.status === 'done' && item.url && !item.library ? item : null; },
+    onReuseOutput: (item: GalleryItem | null) => {
+      reusedImage.current = item?.type === 'image' && item.status === 'done' && item.url && !item.library ? item : null;
+      // Recreate keeps how the prompt was written (the assistant, in Studio or chat) while the prompt stays as it was.
+      if (item) assistant.adopt(item.assistant, item.prompt || '');
+    },
     negativeForMode: (next: Mode) => modePromptsRef.current[next].negative, draft: { prompt, negative, seed, mode, model, width, height, steps, cfg, count, duration, resolution, loras, showNegativePrompt, clipType, customSize, denoise, fps, frames, sampler, scheduler, textEncoder, textEncoders, vae, weightDtype, startImage, startImageId, startImageName }, active, deleteItem, generate, generateDisabled, height, lastTapRef, lastTouchRef, mode, models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras: setLorasWithMemory, setMode: changeMode, setModel, setNegative, setPrompt, setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth, showToast, touchGestureRef, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, visibleGallery, width, viewerGallery
   });
   const { fitViewer, cycleViewerSize, viewerNativeZoom, resetViewer, openItem, applyAllSettings, applyPromptsOnly, applyLoras, moveViewer, submitPrompt, zoomViewer, wheelViewer, clickViewer, startViewerDrag, dragViewer, stopViewerDrag, startViewerTouch, moveViewerTouch, endViewerTouch } = viewerActions;

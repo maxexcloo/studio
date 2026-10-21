@@ -46,7 +46,8 @@ function queue(id, body) {
 }
 
 test("concurrent image/video submissions, progress and completion stay on their own backends", { timeout: 10000 }, async () => {
-  const imageBody = request("primary");
+  // Written by the prompt assistant in chat: the record rides in extra_data, so a rebuild from history keeps it.
+  const imageBody = { ...request("primary"), assistant: { preset: "cinematic", model: "ai/text-quick", source: "chat" } };
   const videoBody = request("video");
   queue("image-one", imageBody);
   queue("video-one", videoBody);
@@ -79,6 +80,11 @@ test("concurrent image/video submissions, progress and completion stay on their 
   assert.equal(recovered.prompt, videoBody.prompt);
   assert.equal(recovered.width, 512);
   assert.equal(recovered.settings.comfyBackend, "video");
+  assert.equal(recovered.assistant, undefined);
+  const primaryHistory = await withComfyBackend("primary", () => comfy("/history"));
+  const rebuilt = store.recordsFromComfyHistory(primaryHistory).find((item) => item.jobId === "image-one");
+  assert.deepEqual(rebuilt?.assistant, { preset: "cinematic", model: "ai/text-quick", source: "chat" });
+  assert.deepEqual(store.makePendingItems("x", imageBody)[0].assistant, imageBody.assistant);
 });
 
 test("cancel a video without interrupting primary image work", async () => {

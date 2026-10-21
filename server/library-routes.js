@@ -9,8 +9,13 @@
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
  *   POST /api/library/imports/:id/draft-profile  {index?}: draft a checkpoint's profile and guide (again, after a failure)
  *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance
+ *   POST /api/library/lookup {url|query}      a link's versions and files, or a Civitai search, without importing
+ *   GET  /api/library/placement?key=          where model files live, and where one file sits
+ *   PATCH /api/library/catalogue {key, patch} edit one catalogue entry; the reply has the previous values
+ *   POST /api/library/catalogue/undo {key}    undo its newest change (recorded as a change of its own)
  *
- * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do.
+ * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do. MCP's admin
+ * tools (mcp-admin.js) call these same routes; their imports and edits record chat as the origin.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +29,8 @@ import { startLibraryDownload } from './library-downloads.js';
 import { createImportEngine, importStore, publicImport } from './library-imports.js';
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from './library-sources.js';
 import { downloadState } from './model-downloads.js';
-import { requireLocal } from './route-access.js';
+import { fromChat, requireLocal } from './route-access.js';
+import { libraryPlacement, lookupLibrary } from './library-lookup.js';
 import { refreshWorkerModels, remoteModelsEnabled, workerInventory, workerModelFile } from './worker-models.js';
 
 const subfolders = { diffusion_models: ['diffusion_models', 'unet'], text_encoders: ['text_encoders', 'clip'] };
@@ -96,7 +102,7 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
  * files ComfyUI lists per folder; `loraInfo(names)` the LoRA metadata (lora-info.js);
  * `catalogue()` the catalogue store.
  */
-export function registerLibraryRoutes(app, { presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore(), draftProfile = null }) {
+export function registerLibraryRoutes(app, { presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore(), draftProfile = null, families = () => [], profiles = async () => [] }) {
   const engine = createImportEngine({
     store, detect: detectLink, inspect, downloads, startDownload, catalogue: { edit: (...args) => catalogue().edit(...args) }, draftProfile,
     resolveCivitai: (url) => resolveCivitaiModel(url, { json }),
@@ -104,7 +110,7 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
     importImage: (url) => presets.importImage(url),
     resolvePreset: (id, options) => presets.resolvePreset(id, options)
   });
-  const by = (req) => String(req.studioAccount?.id || req.studioAccount?.username || '');
+  const by = (req) => String(req.studioAccount?.userId || req.studioAccount?.id || req.studioAccount?.username || '');
   const route = (handler, { imports = true } = {}) => async (req, res) => {
     if (!requireLocal(req, res)) return;
     if (imports && !presetsEnabled()) { res.status(404).json({ ok: false, error: 'Imports are off for this deployment.' }); return; }
@@ -117,7 +123,7 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
     res.json({ ok: true, imports: (await engine.list()).map(publicImport) });
   }));
   app.post('/api/library/imports', route(async (req, res) => {
-    const record = await engine.create(String(req.body?.url || ''), { by: by(req), origin: 'ui' });
+    const record = await engine.create(String(req.body?.url || ''), { by: by(req), origin: fromChat(req) ? 'chat' : 'ui' });
     // A failed resolve is still a record (with its reason), so it answers like any other.
     res.json({ ok: true, import: publicImport(record) });
   }));
@@ -142,6 +148,24 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
     const files = await installed().catch(() => ({}));
     const info = await loraInfo(files.loras || []).catch(() => ({}));
     res.json({ ok: true, items: libraryItems({ installed: files, entries: catalogue().entries({ throttleMs: 5000 }), loraInfo: info }) });
+  }, { imports: false }));
+  app.post('/api/library/lookup', route(async (req, res) => {
+    const found = await lookupLibrary({ url: String(req.body?.url || '').trim(), query: String(req.body?.query || '') }, { json, hfRequest, inspect, families, profiles });
+    res.json({ ok: true, lookup: found });
+  }, { imports: false }));
+  app.get('/api/library/placement', route(async (req, res) => {
+    if (remoteModelsEnabled()) await refreshWorkerModels().catch(() => null);
+    res.json({ ok: true, placement: libraryPlacement({ key: String(req.query.key || '') }, { remote: remoteModelsEnabled(), inventory: workerInventory, foldersFor: modelFolders }) });
+  }, { imports: false }));
+  // One entry's edit, as Studio's catalogue keeps it: the previous values come back, so it can be undone.
+  app.patch('/api/library/catalogue', route(async (req, res) => {
+    const key = String(req.body?.key || '');
+    const { entry, previous } = catalogue().edit(key, req.body?.patch, { by: by(req), origin: fromChat(req) ? 'chat' : 'admin' });
+    res.json({ ok: true, key, entry, previous });
+  }, { imports: false }));
+  app.post('/api/library/catalogue/undo', route(async (req, res) => {
+    const key = String(req.body?.key || '');
+    res.json({ ok: true, key, entry: catalogue().undo(key, { by: by(req) }) });
   }, { imports: false }));
   return engine;
 }
