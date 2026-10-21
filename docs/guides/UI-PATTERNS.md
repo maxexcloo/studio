@@ -776,7 +776,7 @@ kind of element:
   groups are Prompt, Model, Settings and Output (the picture's size, reference,
   upscale and its file together), then Timing, in one readable heading style;
   empty groups and rows are left out, and nothing repeats (no output Type;
-  Weights only when they differ from the profile's name). Rows within a group
+  Model shows the Profile, never a Weights row). Rows within a group
   read alphabetically, except Timing (measured times before the estimates).
   The phone and the desktop show the same Details, from one component.
   The one footer is Copy · Refine · Recreate. **Refine** ("Refine in Chat",

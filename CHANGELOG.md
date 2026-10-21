@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Details name the profile and LoRAs; Copy gives LoRA files
+
+### Changed
+- **Details:** the Model group shows the Profile only; there is no Weights row. LoRAs show by name with their information, and Copy lists their files and strengths.
+
 ## [0.42.0] - 2026-10-21
 
 > Studio gains the Library (Civitai, Hugging Face and image imports, graded with their missing files, substitutes, version offers and update checks), a prompt assistant in the composer, Refine in Chat, Studio-owned profiles and guides with versions and AI drafts, and MCP admin tools for the Library and profiles, plus a round of UI polish: Groups, pickers, selection and the phone shell
