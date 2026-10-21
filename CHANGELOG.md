@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-21
+
 > Studio gains the Library (Civitai, Hugging Face and image imports, graded with their missing files, substitutes, version offers and update checks), a prompt assistant in the composer, Refine in Chat, Studio-owned profiles and guides with versions and AI drafts, and MCP admin tools for the Library and profiles, plus a round of UI polish: Groups, pickers, selection and the phone shell
 
 ### Added
@@ -1702,7 +1704,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.41.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.42.0...HEAD
+[0.42.0]: https://github.com/maxexcloo/studio/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/maxexcloo/studio/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/maxexcloo/studio/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/maxexcloo/studio/compare/v0.39.0...v0.40.0
