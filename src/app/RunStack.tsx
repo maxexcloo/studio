@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { ChevronsDownUp, Ungroup } from 'lucide-react';
-import { cn, fileStem } from './format';
+import { clockFormat, cn, fileStem } from './format';
 import { Media, Tip } from './components';
 import { SafeImg } from './SafeImg';
 import { mediaUrl } from './mediaUrl';
@@ -31,11 +31,9 @@ export function Still({ item, onLoad }: { item: GalleryItem; onLoad?: () => void
   );
 }
 
-const timeFormat = () => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-
 /** "7:42 – 11:10 PM", or one time when it all happened at once. */
 export function timeSpan(start: number, end: number) {
-  const format = timeFormat() as Intl.DateTimeFormat & { formatRange?: (a: Date, b: Date) => string };
+  const format = clockFormat() as Intl.DateTimeFormat & { formatRange?: (a: Date, b: Date) => string };
   if (end - start < 60_000) return format.format(new Date(end));
   return format.formatRange ? format.formatRange(new Date(start), new Date(end)) : `${format.format(new Date(start))} – ${format.format(new Date(end))}`;
 }

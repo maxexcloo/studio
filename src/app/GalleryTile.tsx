@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Check, Loader2, MoreHorizontal, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { tweens } from "@/lib/springs";
-import { cn } from './format';
+import { clockTime, cn } from './format';
 import { Tip } from './components';
 import { GenerationMedia } from './GenerationPreview';
 import { GenerationModel, GenerationProfiles, GenerationProgress } from './GenerationProgress';
@@ -30,8 +30,7 @@ export const TileLongPressContext = React.createContext<PhoneTiles | null>(null)
 
 /** A desktop caption's second line: when it was made · the profile's friendly name (· a video's length). */
 function tileCaptionDetail(item: GalleryItem, profiles: Profile[]) {
-  const made = item.createdAt ? new Date(item.createdAt) : null;
-  const time = made && !Number.isNaN(made.getTime()) ? made.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  const time = clockTime(item.createdAt);
   const duration = item.type === 'video' && item.settings?.duration ? `${item.settings.duration} s` : '';
   // The profile's own name, as Details' Profile row reads it (falling back to the model part).
   return [time, itemProfileName(item, profiles) || itemProfileTitle(item, profiles), duration].filter(Boolean).join(' · ');

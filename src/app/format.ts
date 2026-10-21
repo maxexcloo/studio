@@ -33,6 +33,19 @@ export function formatElapsed(ms: number) {
   return minutes ? `${minutes}:${String(rest).padStart(2, "0")}` : `${rest}s`;
 }
 
+let clock: Intl.DateTimeFormat | null = null;
+/** The one clock-time format ("2:14 PM"), made once: creating a formatter per tile is slow when a gallery page lands. */
+export function clockFormat() {
+  return clock || (clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }));
+}
+
+/** "2:14 PM" for a date or timestamp, or "" when there is none. */
+export function clockTime(value?: string | number | Date | null) {
+  if (value === undefined || value === null || value === "") return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : clockFormat().format(date);
+}
+
 export function formatGeneratedAt(value?: string) {
   if (!value) return "";
   const date = new Date(value);
