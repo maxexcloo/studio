@@ -341,8 +341,11 @@ test('filter options scroll independently and have a compact local search', asyn
   await expect(search).toBeFocused();
   await search.fill('not in this list');
   await expect(menu.getByRole('status')).toHaveText('No Matches');
-  await menu.getByRole('button', { name: 'Clear Option Search' }).click();
+  // The open field carries its own Close Search: it clears the query and folds the field away.
+  await menu.getByRole('button', { name: 'Close Search', exact: true }).click();
   await expect(list.getByRole('option')).toHaveCount(45);
+  await expect(search).toHaveCount(0);
+  await menu.getByRole('button', { name: /^Search / }).click();
   await search.fill('model 32');
   await search.press('Enter');
   await expect(page.getByRole('button', { name: 'Filter By Model' })).toHaveText('Model 32');

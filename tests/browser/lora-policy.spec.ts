@@ -131,11 +131,15 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
   // Stacks live in the heading's Stacks dropdown; there is no footer and no Enable All or Disable All.
   await expect(picker.getByRole('button', { name: /^(Enable|Disable) All$/ })).toHaveCount(0);
-  await picker.getByRole('combobox', { name: 'Stacks', exact: true }).click();
-  await page.locator('.dropdown-menu').getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
-  await page.locator('.dropdown-menu').getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
-  await page.locator('.dropdown-menu').getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(picker.getByRole('combobox', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
+  // Stacks are a desktop tool; the phone heading leaves them out (Settings › Studio › LoRA Stacks edits them).
+  if (phone) await expect(picker.getByRole('combobox', { name: 'Stacks', exact: true })).toHaveCount(0);
+  else {
+    await picker.getByRole('combobox', { name: 'Stacks', exact: true }).click();
+    await page.locator('.dropdown-menu').getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
+    await page.locator('.dropdown-menu').getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
+    await page.locator('.dropdown-menu').getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(picker.getByRole('combobox', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
+  }
   await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true }).or(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true }))).toBeVisible();
   // Each pick turns off and on with its own switch in the Selected view.
   await picker.getByRole('switch', { name: 'Turn Off Cards Two', exact: true }).click();
@@ -151,7 +155,8 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'true');
-  await search.clear();
+  // On the desktop choosing Selected closed the covering search (and its query) already.
+  if (await search.count()) await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
   const before = await other.boundingBox();
   await other.click();
@@ -259,7 +264,8 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await expect(crossFamily).toHaveCount(0);
 });
 
-test('LoRA stacks apply, update, rename and delete from the Stacks menu with Undo, and edit in Settings', async ({ page }) => {
+test('LoRA stacks apply, update, rename and delete from the Stacks menu with Undo, and edit in Settings', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The Stacks menu is a desktop heading tool; the phone has none.');
   await page.route('**/api/loras/library/ops', async route => {
     const library = await page.evaluate(() => JSON.parse(localStorage.getItem('studio-lora-library') || '{}'));
     await route.fulfill({ json: { library } });

@@ -44,18 +44,20 @@ export function HeadingPortal({ children }: { children: React.ReactNode }) {
 /* -------------------------------------------------------------- Tools */
 
 /**
- * The phone heading's views ("LoRAs · This Model") on the shared Dropdown:
- * one view at a time, or (`multi`) filters that combine, ticked, with the
- * menu staying open.
+ * The phone heading's views on the shared Dropdown: the title stays plain text
+ * and only the view is the trigger ("LoRAs · [This Model ▾]"). One view at a
+ * time, or (`multi`) filters that combine, ticked, with the menu staying open.
+ * The menu is as wide as its options, not the screen.
  */
 function ViewsDropdown({ views, title }: { views: PickerViews; title: string }) {
   const options = views.options.map((option) => ({ value: option.id, label: option.label, ariaLabel: option.ariaLabel, disabled: option.disabled }));
   const run = (id: string | undefined) => views.options.find((option) => option.id === id)?.onSelect();
-  const summary = title ? <span className="picker-view-label"><strong>{title}</strong><span aria-hidden="true">·</span><span>{views.current}</span></span> : <span className="picker-view-label"><span>{views.current}</span></span>;
+  const summary = <span className="picker-view-label"><span>{views.current}</span></span>;
   const checked = views.options.filter((option) => option.checked).map((option) => option.id);
-  return views.multi
-    ? <Dropdown multiple head={false} variant="heading" className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={(next) => run([...next.filter((id) => !checked.includes(id)), ...checked.filter((id) => !next.includes(id))][0])} />
-    : <Dropdown variant="heading" className="picker-view" label={views.label} summary={summary} options={options} value={checked[0] || ''} searchFrom={Infinity} onChange={run} />;
+  const menu = views.multi
+    ? <Dropdown multiple head={false} variant="heading" fitMenu className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={(next) => run([...next.filter((id) => !checked.includes(id)), ...checked.filter((id) => !next.includes(id))][0])} />
+    : <Dropdown variant="heading" fitMenu className="picker-view" label={views.label} summary={summary} options={options} value={checked[0] || ''} searchFrom={Infinity} onChange={run} />;
+  return title ? <span className="picker-view-title"><strong>{title}</strong><span aria-hidden="true">·</span>{menu}</span> : menu;
 }
 
 export type PickerViewOption = { id: string; label: string; checked: boolean; disabled?: boolean; onSelect: () => void; ariaLabel?: string };
@@ -119,7 +121,8 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
     return () => scope.removeEventListener('keydown', type);
   }, [onType, Boolean(search), inHeading]);
   const toggle = () => {
-    if (expanded) { setOpen(false); onClearSearch(); }
+    // Closing hands the focus back to the search icon, which takes the field's place again.
+    if (expanded) { setOpen(false); onClearSearch(); requestAnimationFrame(() => (heading?.slot?.querySelector<HTMLElement>('.picker-search-toggle') || root.current?.querySelector<HTMLElement>('.picker-search-toggle'))?.focus({ preventScroll: true })); }
     else {
       setOpen(true);
       focusSearch();

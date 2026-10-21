@@ -275,7 +275,10 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
   are `--row-h-menu` (44 px on touch), `--r-item`, `--cursor-bg` under the
   pointer or keyboard cursor, and the chosen option shows the shared amber
   tick (`SelectedTick`) with no row fill. Long lists scroll and offer a search
-  field.
+  field behind an icon in the head; the open field carries its own Close
+  Search at its end (it clears and folds the search), in place of the icon.
+  The gallery's filter menus search the same way. A heading's views menu is
+  as wide as its options (within the usual bounds), on the phone too.
 - **Keyboard:** the arrow keys, Home and End move between options, typing
   jumps to a name, Enter or Space chooses, Escape or a click outside closes,
   and the focus returns to the trigger.
@@ -300,12 +303,14 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   search icon), **Clear**, the search icon, then Close, all on one centre line.
   There is no hint text and no toolbar row under the heading. A narrow LoRAs
   popover drops the Stacks label first.
-- **Phone heading:** the views become a dropdown that carries the title
-  ("LoRAs · This Model ▾", "References · Library ▾", "Model · All ▾"); the
-  filters that combine (Favourites with Fast or Quality) are ticks in the same
-  menu, which stays open while choosing. Then Stacks (its icon), Clear, the
-  search icon and Close, every target 44 px. The list starts right under the
-  heading.
+- **Phone heading:** the title stays plain text and only the view after it
+  is the dropdown ("LoRAs · [This Model ▾]", "Reference · [Library ▾]" or
+  "References" with several slots, "Model · [All ▾]"); the filters that
+  combine (Favourites with Fast or Quality) are ticks in the same menu, which
+  stays open while choosing. Then Upload (References, an icon like search),
+  Clear, the search icon and Close, every target 44 px. There are no Stacks on
+  the phone (Settings › Studio › LoRA Stacks edits them). The list starts
+  right under the heading, with no empty tools row.
 - **Compact search:** an icon, not a permanent row. The icon (or typing
   anywhere in the chooser) opens the field with the focus in it. On the
   desktop References and LoRAs `cover` the heading: the field fills it, at
@@ -320,9 +325,10 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
 - **Clear** shows only while something is picked. It empties the selection at
   once and offers Undo in the status pill; it never asks first.
 - **One selected mark:** a picked row or tile shows the amber tick
-  (`SelectedTick`: the same icon, size, stroke 2.5 and place at the row's end
-  in every chooser, the model lists included; on a tile, an amber badge in the
-  corner). One tap adds or removes; a pick stays where it is, across searches
+  (`SelectedTick`: the same icon, size and stroke 2.5 in every chooser; it
+  leads a row's right-hand icons, so in Models it sits third from the right,
+  before the abilities and Star, and in LoRAs before View Source and Star; on
+  a tile, an amber badge in the corner). One tap adds or removes; a pick stays where it is, across searches
   and views. Order numbers (the number on amber) appear only in the Selected
   view, where the picks are listed in order with strength and enable controls.
 - **Reordering** happens in the Selected view (and the LoRA card list): drag a
@@ -344,14 +350,14 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   browsing; the Selected view shows each pick's information in full in place
   of the one line, then on/off · strength · order (see [Action
   Placement](#action-placement) › LoRA information).
-- **LoRA stacks:** the Stacks dropdown, the same on both devices, lists the
+- **LoRA stacks:** the Stacks dropdown in the desktop heading lists the
   model family's saved stacks alphabetically with the one in use ticked;
   choosing one applies it at once with Undo. Under them: Save Current as New
   Stack, and for the stack in use Update "…" with Current Picks, Rename and
   Delete (at once, with Undo). There is no Enable All or Disable All; each pick
   has its own switch in the Selected view. Settings › Studio › LoRA Stacks
   edits them.
-- **Heading dropdowns** (the phone views, Stacks) are the shared `Dropdown`
+- **Heading dropdowns** (the phone views, the desktop's Stacks) are the shared `Dropdown`
   (`variant="heading"`; the combining filters as `multiple`), so they share its
   entry, rows, amber tick, keyboard and Escape that closes the menu only.
   There is no separate picker menu component.
@@ -729,9 +735,10 @@ and no boxes in the bars.
   Running and Stop All. On narrow phones (under 380 px) the name hides.
 - **Centre:** empty and flexible; a message takes it while it shows (see
   [Messages](#messages)).
-- **Right,** in this order: **Select**, **Search**, **Filter** and **Menu**,
-  all 44 px icon buttons. Menu's pop-up list, anchored at the right edge,
-  holds Library · Settings, then Account and Sign Out in account mode.
+- **Right,** in this order: **Search**, **Filter** and **Menu**, all 44 px
+  icon buttons. There is no Select button: selecting starts with a long press
+  on a tile, or Menu › Select. Menu's pop-up list, anchored at the right edge,
+  holds Select, Library · Settings, then Account and Sign Out in account mode.
 - **One bar height:** the top bar, the select bar, the viewer's top icons and
   the status pill share `--bar-h` and `--bar-pill-h`, so nothing jumps when one
   replaces another.

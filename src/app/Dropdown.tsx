@@ -46,6 +46,8 @@ type Common = {
   className?: string;
   /** The menu offers a search field from this many options. */
   searchFrom?: number;
+  /** The menu is as wide as its longest option (within the usual bounds), even on a phone: the picker headings' views. */
+  fitMenu?: boolean;
 };
 
 type Single = Common & { value: string; onChange: (value: string) => void; multiple?: false; /** Choosing the current value runs onChange again (applying a stack anew). */ reselect?: boolean };
@@ -67,7 +69,7 @@ const ROW_TOUCH = 44;
  * that combine (`multiple`, no head) and the LoRA Stacks with its commands.
  */
 export function Dropdown(props: DropdownProps) {
-  const { label, options, disabled, variant = 'field', summary, placeholder = 'Not Set', className, searchFrom = 12, triggerLabel, actions = [], panel, empty } = props;
+  const { label, options, disabled, variant = 'field', summary, placeholder = 'Not Set', className, searchFrom = 12, triggerLabel, actions = [], panel, empty, fitMenu = false } = props;
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const trigger = React.useRef<HTMLButtonElement>(null);
@@ -149,15 +151,16 @@ export function Dropdown(props: DropdownProps) {
       <ChevronDown size={14} aria-hidden="true" />
     </button>
     <AnimatePresence>
-      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
+      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} fitWidth={fitMenu ? Math.max(...options.map((option) => option.label.length), 6) * 8.5 + 72 : 0} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
         {shownPanel ?? <>
         {head || searchable ? <div className="dropdown-head">
           <strong>{label}</strong>
-          {searchable ? <button type="button" className={cn('dropdown-search-toggle', showSearch && 'is-on')} aria-label={showSearch ? 'Close Search' : `Search ${label}`} aria-expanded={showSearch} onClick={() => { if (showSearch) { setSearchOpen(false); setQuery(''); } else openSearch(); }}>{showSearch ? <X size={14} /> : <Search size={14} />}</button> : null}
+          {/* The icon only opens search; the open field carries its own Close Search (UI-PATTERNS › Pickers). */}
+          {searchable && !showSearch ? <button type="button" className="dropdown-search-toggle" aria-label={`Search ${label}`} aria-expanded={false} onClick={() => openSearch()}><Search size={14} /></button> : null}
           {head ? <><button type="button" className="dropdown-head-action" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
           <button type="button" className="dropdown-head-action" disabled={!picked.length} onClick={() => { if (props.multiple) props.onChange([]); }}>Clear</button></> : null}
         </div> : null}
-        {showSearch ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
+        {showSearch ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} /><button type="button" aria-label="Close Search" onClick={() => { setSearchOpen(false); setQuery(''); requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>('.dropdown-search-toggle')?.focus({ preventScroll: true })); }}><X size={12} /></button></div> : null}
         <div id={id} ref={list} className="dropdown-options" role="listbox" aria-label={label} aria-multiselectable={props.multiple || undefined}>
           {matches.map((option) => {
             const on = isPicked(option.value);
@@ -188,7 +191,7 @@ export function Dropdown(props: DropdownProps) {
  * clicks and focus outside itself) or the page, placed by anchoredPlacement
  * at its trigger, and on a phone the pop-up list's width.
  */
-const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement | null; rows: number; onKeyDown: (event: React.KeyboardEvent) => void; children: React.ReactNode }>(function DropdownSurface({ trigger, rows, onKeyDown, children }, ref) {
+const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement | null; rows: number; fitWidth?: number; onKeyDown: (event: React.KeyboardEvent) => void; children: React.ReactNode }>(function DropdownSurface({ trigger, rows, fitWidth = 0, onKeyDown, children }, ref) {
   const settling = useSettling();
   const [place, setPlace] = React.useState<(AnchoredPlacement & { offsetLeft: number; offsetTop: number; offsetBottom: number }) | null>(null);
   // A modal ignores clicks and focus outside itself, so the menu joins it; elsewhere (a popover
@@ -202,7 +205,8 @@ const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement 
       const phone = coarse && window.innerWidth <= 640;
       const height = Math.min(360, rows * (coarse ? ROW_TOUCH : ROW) + 12);
       // A phone's pop-up list spans the screen less a margin; the desktop's menu is at least its trigger's width.
-      const placement = anchoredPlacement(rect, phone ? { width: window.innerWidth, minHeight: height, maxHeight: 420 } : { width: Math.max(rect.width, 240), minWidth: 200, maxWidth: 420, minHeight: height, maxHeight: 360 });
+      // A fitted menu (the picker headings' views) is as wide as its options, within the usual bounds, on both.
+      const placement = anchoredPlacement(rect, fitWidth ? { width: Math.max(rect.width, fitWidth), minWidth: 200, maxWidth: phone ? 320 : 420, minHeight: height, maxHeight: phone ? 420 : 360 } : phone ? { width: window.innerWidth, minHeight: height, maxHeight: 420 } : { width: Math.max(rect.width, 240), minWidth: 200, maxWidth: 420, minHeight: height, maxHeight: 360 });
       // A transformed dialog is the containing block of fixed children.
       // A transformed or filtered host is the containing block of fixed children.
       const style = host !== document.body ? getComputedStyle(host) : null;
@@ -213,7 +217,7 @@ const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement 
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [trigger, rows, host]);
+  }, [trigger, rows, fitWidth, host]);
   // Opening puts the focus on the picked row (else the first, or the search field).
   React.useEffect(() => {
     if (!place) return;

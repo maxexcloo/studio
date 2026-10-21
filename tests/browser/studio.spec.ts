@@ -91,9 +91,9 @@ test('the phone top bar holds the status and the tools, and the prompt bar holds
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
       boxes.push(box);
     }
-    // Select · Search · Filter · Menu, left to right, Menu at the right edge.
+    // Search · Filter · Menu, left to right, Menu at the right edge (no Select: hold a tile, or Menu › Select).
     for (let index = 1; index < boxes.length; index += 1) expect(boxes[index - 1].x + boxes[index - 1].width).toBeLessThanOrEqual(boxes[index].x + 1);
-    expect(viewport.width - (boxes[3].x + boxes[3].width)).toBeLessThanOrEqual(16);
+    expect(viewport.width - (boxes[2].x + boxes[2].width)).toBeLessThanOrEqual(16);
     expect(bar.height).toBeLessThanOrEqual(52);
     // The status light and "Studio" share one line, centred on the bar.
     const light = (await page.locator('.phone-heading-light, .phone-running-inline').first().boundingBox())!;

@@ -319,7 +319,8 @@ button.list-row { isolation: isolate; }
 .picker-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-3); max-width: 100%; }
 .picker-tools .picker-clear-all + .picker-search-toggle { margin-inline-start: 0; }
 .picker-search-toggle { flex: none; display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); margin-inline-start: auto; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
-.picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+/* Hover only where there is a pointer: on touch a tap would leave the fill on the button that slides under the finger. */
+@media (hover: hover) { .picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); } }
 .picker-search-toggle[aria-expanded="true"] { color: var(--selected-ink); }
 .picker-search-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (pointer: coarse) { .picker-search-toggle { width: var(--control-h-touch); height: var(--control-h-touch); } }
@@ -623,7 +624,8 @@ button.list-row { isolation: isolate; }
 .model-menu .model-option.active { grid-template-columns: minmax(0, 1fr) auto auto; }
 .model-menu .model-option .model-selection-tick { margin-inline: var(--space-2) 0; }
 /* With the filters and search in the heading, the phone's model tools row keeps only a Recipe row, if any. */
-.phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
+.phone-model-tools:not(:has(.list-row, .picker-search-row)),
+.phone-model-pop .phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
 
 /* Heading dropdowns: the views on the phone and the LoRA Stacks on both devices. */
 .dropdown-trigger.is-heading { flex: none; gap: var(--space-2); color: hsl(var(--foreground)); font-weight: 500; white-space: nowrap; }
@@ -662,7 +664,7 @@ button.list-row { isolation: isolate; }
 .picker-menu-action.is-primary { background: var(--action); color: var(--action-ink); }
 .picker-menu-action:disabled { opacity: .45; cursor: default; }
 .picker-heading-clear { flex: none; height: var(--control-h-sm); padding: 0 10px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 500; cursor: pointer; }
-.picker-heading-clear:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+@media (hover: hover) { .picker-heading-clear:hover { background: var(--control-hover); color: hsl(var(--foreground)); } }
 .picker-heading-clear:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (pointer: coarse) {
   .picker-heading-clear { height: var(--control-h-touch); }
@@ -674,6 +676,13 @@ button.list-row { isolation: isolate; }
 .reference-popover.is-pop .reference-popover-head:has(.picker-view) { min-height: 0; padding: 4px 4px 4px 6px; gap: var(--space-2); }
 .reference-popover.is-pop .surface-head-slot { justify-content: flex-start; gap: var(--space-1); }
 .reference-popover.is-pop .picker-view { flex: 0 1 auto; margin-inline-end: auto; }
+/* The phone title is plain text; only the view after it opens the menu ("LoRAs · [This Model ▾]"). */
+.picker-view-title { display: inline-flex; flex: 0 1 auto; align-items: center; gap: var(--space-3); min-width: 0; margin-inline-end: auto; padding-left: 10px; font-size: 16px; white-space: nowrap; }
+.reference-popover .reference-popover-head .picker-view-title > strong { flex: none; font-size: 16px; font-weight: 600; }
+.picker-view-title > span[aria-hidden] { color: hsl(var(--muted-foreground)); }
+.reference-popover.is-pop .picker-view-title > .dropdown-trigger.picker-view { min-width: 0; margin-inline-end: 0; padding-left: 2px; }
+/* Stacks are a desktop tool; the phone edits them in Settings › Studio › LoRA Stacks. */
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { display: none; }
 .reference-popover.is-pop .dropdown-trigger.picker-view { font-size: 16px; padding-left: 10px; }
 .picker-view-label { display: inline-flex; align-items: baseline; gap: var(--space-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .picker-view-label > strong { font-weight: 600; }
@@ -682,9 +691,9 @@ button.list-row { isolation: isolate; }
 .reference-popover.is-pop .dropdown-trigger.lora-stacks { max-width: 130px; }
 .reference-popover.is-pop .reference-upload { width: var(--control-h-touch); height: var(--control-h-touch); padding: 0; justify-content: center; border-radius: var(--r-pill); }
 .reference-popover.is-pop .reference-upload > span { display: none; }
-.reference-popover.is-pop .picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
-.reference-popover.is-pop .composer-loras .lora-picker-tools.is-heading .picker-search-row,
-.composer-loras.is-pop .lora-picker-tools.is-heading .picker-search-row { padding: 6px 12px 2px; }
+.reference-popover.is-pop .picker-tools.is-heading .picker-search-row { padding: 6px 14px 2px; }
+/* LoRAs' body already insets by 14px: its field lands exactly where References' does. */
+.composer-loras.is-pop .lora-picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
 .phone-model-tools .picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
 
 
@@ -804,3 +813,13 @@ button.list-row { isolation: isolate; }
 /* Desktop pickers carry no title or icon: the views lead the heading. */
 .reference-popover:not(.is-pop) > .reference-popover-head > :is(.surface-title, svg:first-child) { display: none; }
 .reference-upload.picker-search-toggle { flex: none; }
+
+/* One search field in every chooser (References, LoRAs, Models): the same height, width, radius, padding and fill. */
+:is(.picker-search-row, .picker-search-field) > .picker-search { box-sizing: border-box; height: var(--control-h-sm); min-height: 0; margin: 0; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-pill); background: var(--control-fill); }
+.reference-popover.is-pop :is(.picker-search-row, .picker-search-field) > .picker-search { height: var(--control-h-touch, 44px); }
+
+/* A desktop chooser's heading keeps its height when the search icon gives way to the field (44 px touch targets). */
+@media (pointer: coarse) {
+  .model-menu > .model-menu-head { min-height: calc(var(--control-h-touch) + 14px); }
+  .reference-popover:not(.is-pop) > .reference-popover-head { min-height: calc(var(--control-h-touch) + 20px); }
+}

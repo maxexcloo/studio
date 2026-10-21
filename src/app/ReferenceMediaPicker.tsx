@@ -253,7 +253,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
   const settling = useSettling();
-  const pickerTitle = multiple ? "References" : input.label || "Reference Image";
+  // The phone heading names the chooser plainly ("Reference · Library ▾"), not the slot (Start Image).
+  const pickerTitle = multiple ? "References" : "Reference";
   const heading = useSurfaceHeadingSlot(pickerTitle, Boolean(onPhone));
   const tabName = { generation: "Library", upload: "Uploads", selected: "Selected" } as const;
   if (!box) return null;

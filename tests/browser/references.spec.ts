@@ -179,6 +179,8 @@ test('reference sources name their search and keep one upload action', async ({ 
   await pickerView(picker, 'Uploads');
   await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
   await expect(await pickerSearch(picker, 'Search Uploads', 'searchbox')).toHaveAttribute('placeholder', 'Search Uploads');
+  // On the desktop the open search covers the heading's tools; closed, Upload is back, once.
+  if (!phone) await picker.getByRole('button', { name: 'Close Search', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
   await expect(picker.locator('.empty-state button')).toHaveCount(0);
 });
