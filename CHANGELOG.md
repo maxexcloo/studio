@@ -19,6 +19,10 @@ version opens with a `> ` summary line.
 - **Gallery:** a Status filter (Hide Queued, Hide Failed) replaces the Failed toggle.
 - **Confirmations:** reversible actions (delete with Undo, stop, disable, restart, revoke) act at once; only Reset All Settings asks. The Confirm Before Removing Things setting is gone.
 - **Settings › Account:** no Session group or Access line; Sign Out is in the Menu.
+- **Workers:** Studio runs on zero, one or many ComfyUI workers, each with a name, an address and capabilities (image, video, upscale, model downloads). Administrators add, edit, test and remove them in Settings › Workers with Save & Discard; Studio keeps its own list in the data folder. Deployments define locked workers with `STUDIO_WORKERS` (a JSON list); `COMFY_URL` and `COMFY_VIDEO_URL` keep working as the image and video workers with their old ids, so earlier jobs keep their worker.
+- **Routing:** each job goes to a worker with the capability it needs, preferring one that answers and already has the model, then list order; upscales go to an upscale worker. Nothing falls back to another kind of worker or the cloud, and with no worker Studio says so plainly and refuses the job.
+- **Settings › Workers:** every worker uses one standard group (Address, Capabilities, Status with Test, Open, Restart) with the same words; an action that doesn't apply shows off with its reason.
+- **AI Control:** the panel in Settings › Workers and Studio's `/api/ai-control` routes are gone; GPU allocation stays in AI Control's own UI and Mise. The AI Control MCP tools are unchanged.
 
 ## [0.39.0] - 2026-10-21
 

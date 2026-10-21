@@ -72,6 +72,8 @@ const StableComposerBar = memoLatest(ComposerBar);
 
 function comfyStatusLabel(status: any) {
   const name = status?.label || "ComfyUI";
+  // No worker can run what's selected (or none is set up): say that, not "offline".
+  if (status?.noWorkers) return status.error || "No workers set up";
   if (status?.restarting) return `${name} is restarting…`;
   if (status?.checking) return `Checking ${name}…`;
   if (status?.busy) return `${name} is busy${status.device ? ` · ${status.device}` : ""} · slow to answer, runs carry on`;

@@ -1,4 +1,5 @@
-import { backendUrl, currentComfyBackend } from "./comfy-backends.js";
+import { backendUrl, currentComfyBackend, isDefaultBackend, noteWorkerReachable } from "./comfy-backends.js";
+import { defaultWorker, onWorkersChanged, saveDefaultWorkerUrl } from "./workers.js";
 import { envFileKeys, writeLocalEnvValue } from "./env.js";
 import { listensBeyondThisComputer, resolveLan } from "./lan.js";
 import { noteComfyState } from './crash-log.js';
@@ -11,9 +12,11 @@ import { mediaFile, mediaType } from "./media-paths.js";
 
 export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
-// A live binding: importers see the new address as soon as setComfyUrl changes it.
-// HEISS_DEFAULT_COMFY_URL: where to look before anything is saved (the Docker image's host.docker.internal).
-export let comfyUrl = normalizeComfyUrl(process.env.COMFY_URL || "") || normalizeComfyUrl(process.env.HEISS_DEFAULT_COMFY_URL || "") || "http://127.0.0.1:8188";
+// A live binding: importers see the new address as soon as the workers change.
+// It is the default worker's (workers.js), or "" with no workers at all;
+// HEISS_DEFAULT_COMFY_URL seeds a fresh install (the Docker image's host.docker.internal).
+export let comfyUrl = defaultWorker()?.url || "";
+onWorkersChanged(() => { comfyUrl = defaultWorker()?.url || ""; });
 
 /** "localhost:8000", "http://pc.local:8188/" or a bare port all become a clean http(s) origin. */
 export function normalizeComfyUrl(value = "") {
@@ -32,8 +35,9 @@ export function normalizeComfyUrl(value = "") {
 export function setComfyUrl(value = "") {
   const next = normalizeComfyUrl(value);
   if (!next) throw new Error("That doesn’t look like an address. Try something like 127.0.0.1:8188.");
-  writeLocalEnvValue("COMFY_URL", next);
-  comfyUrl = next;
+  // The default worker's address: Studio's saved workers, or the seed before they are saved.
+  saveDefaultWorkerUrl(next);
+  comfyUrl = defaultWorker()?.url || next;
   return comfyUrl;
 }
 export const lan = resolveLan({ argv: process.argv, env: process.env, fileKeys: envFileKeys });
@@ -191,7 +195,8 @@ const comfySilentSince = new Map();
 export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
   comfySilentSince.delete(currentComfyBackend());
-  if (currentComfyBackend() === "primary") {
+  noteWorkerReachable(currentComfyBackend(), true);
+  if (isDefaultBackend()) {
     comfyUnreachableUntil = 0;
     noteComfyState(true);
   }
@@ -243,7 +248,7 @@ export function comfyTimeoutFor(pathname = "") {
  * a caller's own `signal` still cancels it early. A failed answer throws with
  * `status` and the untouched `raw` text next to the friendly message.
  */
-export const activeComfyUrl = () => backendUrl(comfyUrl);
+export const activeComfyUrl = () => backendUrl();
 
 export async function comfy(pathname, options = {}) {
   const { timeout, ...init } = options;
@@ -253,10 +258,14 @@ export async function comfy(pathname, options = {}) {
   try {
     response = await fetch(`${activeComfyUrl()}${pathname}`, init);
   } catch (error) {
-    if (currentComfyBackend() === "primary") noteComfyFetchError(error);
+    // A busy worker that is slow to answer still counts as there; only a refusal marks it offline for routing.
+    if (!isComfyTimeout(error) && !error?.noWorker) noteWorkerReachable(currentComfyBackend(), false);
+    if (isDefaultBackend()) noteComfyFetchError(error);
     throw error;
   }
   noteComfyReachable();
+  // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
+  if ([502, 503, 504].includes(response.status)) noteWorkerReachable(currentComfyBackend(), false);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;

@@ -16,12 +16,60 @@ COMFY_OUTPUT_DIR=
 
 For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `HEISS_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `HEISS_TLS_CERT`, `HEISS_TLS_KEY` and `HEISS_HTTPS_PORT` for HTTPS. See [Other devices](./SECURITY.md#other-devices-signing-in-admin-https-and-proxies) and [Phones and other devices](./TROUBLESHOOTING.md#phones-and-other-devices).
 
-`COMFY_VIDEO_URL` optionally routes local video workflows to a second ComfyUI endpoint. Images and provider-backed Grok workflows continue to use `COMFY_URL`; if the video endpoint is unavailable, video work does not fall back to the image server. With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) the backends need no shared storage; with ComfyUI's output folder, both must share input and output storage for local gallery access.
+With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) workers need no shared storage; with ComfyUI's output folder, they must share input and output storage for local gallery access. See [Workers](#workers) for one or many ComfyUI workers.
+
+## Workers
+
+Studio runs on zero, one or many ComfyUI workers. Each has a stable id, a name,
+an address and what it can do:
+
+| Capability | Runs |
+| --- | --- |
+| `image` | Image generation, and provider-backed cloud runs (Grok), which go through a worker's provider node |
+| `video` | Local video generation |
+| `upscale` | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too |
+| `models` | Receives model and LoRA downloads with `STUDIO_MODEL_STORAGE=worker` |
+
+Administrators add, edit, test, restart and remove workers in **Settings ›
+Workers**. Studio keeps its own list in `workers.json` in the data folder and
+never writes over it except when an administrator saves.
+
+A deployment can define the workers itself. They show as locked in Settings
+and are changed only in the deployment:
+
+```bash
+STUDIO_WORKERS='[
+  {"id": "primary", "name": "Image Worker", "url": "http://comfyui-image:8188", "capabilities": ["image", "upscale", "models"]},
+  {"id": "video", "name": "Video Worker", "url": "http://comfyui-video:8188", "capabilities": ["video"]}
+]'
+```
+
+`id` is optional (it defaults to the name in lower case) but keep it stable:
+jobs, previews, cancellation and recovery after a restart follow a job's
+worker by id. `STUDIO_WORKERS='[]'` runs Studio with no workers: it says so
+plainly and refuses generation. A malformed value stops Studio at start with
+the reason.
+
+Without `STUDIO_WORKERS`, the older variables still work. `COMFY_URL` from the
+deployment is the locked worker `primary` (Image Worker: image, upscale and
+model downloads, plus video when there is no video worker) and
+`COMFY_VIDEO_URL` the locked worker `video` (Video Worker: video). A
+`COMFY_URL` in `.env`, or the default local address, only seeds Studio's own
+list until it is first saved.
+
+**Routing:** a job goes to a worker with the capability it needs. With several,
+Studio prefers one that answered and already has the model, then the first
+that answered, in list order (Smart upscale also prefers one with `upscale`).
+It never sends work to a worker without the capability, never falls back to
+the cloud and never changes GPU allocation; switching what a GPU runs stays in
+AI Control's own UI and Mise. The first worker with `image` is the default
+worker: upstream conveniences (the output folder, finding ComfyUI on its own,
+restart progress) belong to it.
 
 ## Model Manifest
 
-`STUDIO_MODEL_STORAGE=worker` selects the active ComfyUI worker for model
-inventory and downloads, even when Studio has a local mirror mount. Set the same
+`STUDIO_MODEL_STORAGE=worker` selects the worker with the `models` capability
+(see [Workers](#workers)) for model inventory and downloads, even when Studio has a local mirror mount. Set the same
 nonempty `STUDIO_WORKER_TOKEN` on both services and mount the worker's models
 read-write. Provider credentials remain in Studio; downloads stream directly to
 the worker and resume against their recorded source, size and SHA-256 checksum.
@@ -81,7 +129,7 @@ MCP clients connect in one of three ways in multi-user mode:
 
 - **Personal token:** a client sends the account's own token.
 - **Trusted gateway:** a chat gateway such as LiteLLM sends the shared `STUDIO_MCP_API_KEY` together with its own user ID in `x-ai-user-id`. Studio acts for that user only once the ID is linked to an account. When the gateway also forwards the user's email in `x-ai-user-email` and it matches an enabled, approved account's username (ignoring case), Studio links the ID to that account on its first request, recorded like an administrator's link; it never creates accounts this way. Otherwise an administrator links the ID under **Settings › Users › Chat Gateway Users**, where unlinked IDs are listed; **Dismiss** removes one from the list until the gateway sends it again. Unlinked IDs still see the tools, but every call only returns a message asking for the link, so the chat explains the problem instead of reporting no tools. Unlinking an ID whose email matches an enabled account lets it link again on its next request; disable the account to stop it.
-- **AI Control:** `CONTROL_MCP_API_KEY` keeps its control tools and reaches no galleries or accounts.
+- **AI Control:** `CONTROL_MCP_API_KEY` keeps its control tools and reaches no galleries or accounts. They need `CONTROL_URL` and `CONTROL_API_KEY`; nothing else in Studio uses AI Control, which has no panel in Settings.
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
@@ -91,7 +139,7 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
-Also optional: `HEISS_COMFY_SEARCH=0` keeps Studio on `COMFY_URL` (the **Find ComfyUI on its own** switch under Settings › Workers › Change address; by default, when that doesn't answer, Studio looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
+Also optional: `HEISS_COMFY_SEARCH=0` keeps Studio on the default worker's address (by default, when that doesn't answer, Studio looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `HEISS_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
 
 Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a token saved in **Settings › Models**) opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy.
 

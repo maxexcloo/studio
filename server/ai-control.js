@@ -1,6 +1,8 @@
 /**
  * AI Control, the service that decides by hand which workload each GPU runs.
- * One client serves the MCP tools and Settings › Workers. Studio reaches it
+ * Only the AI Control MCP tools (CONTROL_MCP_API_KEY) use this client; Studio's
+ * own interface has no AI Control panel, as GPU allocation stays in AI
+ * Control's own UI and Mise. Studio reaches it
  * with CONTROL_URL and CONTROL_API_KEY from the server environment only: the
  * key never reaches a browser, and a browser's cookies and headers never
  * reach AI Control.

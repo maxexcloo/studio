@@ -291,7 +291,7 @@ holds:
 | Users | Accounts, Access Profiles (a picker with New, multi-selects, Save & Discard), Chat Gateway and Profiles (a JSON editor; an edited copy stops receiving repository updates) | Administrators |
 | Studio | General, Generation, Features (Upscale and Inpainting as plain rows), Gallery and Sharing | Everyone |
 | Models | Defaults, Catalogue (LoRAs, Cloud Models, Presets & Civitai Imports), LoRAs & Supporting Files and Integrations | Administrators |
-| Workers | ComfyUI connections, restart, and AI Control (what each GPU runs) | Administrators; everyone reads AI Control's status |
+| Workers | Every ComfyUI worker: address, capabilities, status, Open and Restart; adding, editing and removing Studio's own | Administrators |
 | Maintenance | Clean Up, Reset and Help | Everyone (each item as the device allows) |
 | About | The banner, stats, licence and credits to the upstream projects | Everyone |
 
@@ -310,13 +310,17 @@ switch, off by default. Auto-Grouping, Grid Autoplay and Failed are not
 settings: they are gallery view controls (see [Gallery View
 Controls](#gallery-view-controls)).
 
-**Workers** has one heading per backend (Image Worker, Video Worker): its
-locked address, status with Test, Open and Restart. **AI Control** is manual
-only: a select per GPU, a preview of what stops, starts and keeps in the Save
-& Discard row, a confirmation only when something stops, and progress in the
-status pill. A change to both GPUs runs as one job through AI Control's board
-routes (`/api/board/plan`, then `/api/board`). Studio never switches a GPU by
-itself, and non-administrators see the status read-only.
+**Workers** (`WorkerSettings.tsx`) shows every worker the same way: one
+group headed by its name, then the same rows in the same order with the same
+words: Address (with its source tag and Edit), Capabilities, Status with Test,
+Open, Restart. Only the capabilities differ. An action that doesn't apply stays
+in its place, off, with a short reason before it ("Locked", "Offline", "Save
+first"). The deployment's workers come first and are locked; Studio's own are
+edited in place (Name, Address, Capabilities as pressed toggles, Remove) as one
+draft with one Save & Discard row under Add Worker. With no workers the page
+is an `EmptyState` ("No Workers Yet") with Add Worker. Restart acts at once.
+GPU allocation is not in Studio: it stays in AI Control's own UI and Mise.
+Other Workers groups (such as upscale status) follow the worker list.
 
 ## Library
 

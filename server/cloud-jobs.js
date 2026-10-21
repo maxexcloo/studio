@@ -1,3 +1,4 @@
+import { defaultWorkerId } from "./workers.js";
 import { readJsonFile, removeJsonFile, writeJsonFile } from "./json-store.js";
 
 /**
@@ -69,7 +70,7 @@ export function createCloudJobStore(file) {
           status: "running",
           recovered: true,
           cloud: true,
-          comfyBackend: record.comfyBackend || "primary",
+          comfyBackend: record.comfyBackend || defaultWorkerId(),
           promptId: record.promptId,
           submittedAt: record.submittedAt,
           ...(record.ownerId ? { ownerId: record.ownerId } : {}),

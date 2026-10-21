@@ -3,6 +3,7 @@ import { ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, 
 import { dataDir, flushGallery } from './gallery-store.js';
 import { createCloudJobStore, isCloudGraph } from './cloud-jobs.js';
 import { currentComfyBackend, withComfyBackend } from './comfy-backends.js';
+import { defaultWorkerId } from './workers.js';
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
 import { cancelPrompt, promptTracker } from './comfy-queue.js';
 import { describeFailure } from './failures.js';
@@ -188,11 +189,11 @@ function withEta(id, progress, now = Date.now()) {
  * (a model or upscale without a trusted estimate), since everything behind it
  * would be a guess.
  */
-function refreshQueueEstimates(now = Date.now(), { apply = true, backend = "primary" } = {}) {
+function refreshQueueEstimates(now = Date.now(), { apply = true, backend = defaultWorkerId() } = {}) {
   const queues = new Map();
   for (const [id, job] of jobs) {
     if (!["queued", "running", "canceling"].includes(job.status)) continue;
-    const key = job.comfyBackend || "primary";
+    const key = job.comfyBackend || defaultWorkerId();
     if (!queues.has(key)) queues.set(key, { cursor: now, known: true });
     const queue = queues.get(key);
     const timing = runTimings.get(id);
@@ -264,7 +265,7 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
 }
 
 /** When HEISS's own queue should be clear (now, when empty), or null when a job in it has no known length. */
-export function queueClearsAt(now = Date.now(), backend = "primary") {
+export function queueClearsAt(now = Date.now(), backend = defaultWorkerId()) {
   return refreshQueueEstimates(now, { apply: false, backend });
 }
 

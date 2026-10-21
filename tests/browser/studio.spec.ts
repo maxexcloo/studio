@@ -395,13 +395,20 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
 test('secondary panels load only when opened and connections identify each generation mode', async ({ page }) => {
   const loaded: string[] = [];
   page.on('request', (request) => loaded.push(request.url()));
-  await page.route('**/api/comfy/status', (route) => route.fulfill({ json: { connected: true, backends: { primary: { connected: true, device: 'Image GPU', url: 'http://images:8188' }, video: { connected: false, device: '', url: 'http://video:8188' } } } }));
+  await page.route('**/api/comfy/status', (route) => route.fulfill({ json: { connected: true, backends: { primary: { connected: true, device: 'Image GPU', url: 'http://images:8188' }, video: { connected: false, device: '', url: 'http://video:8188' } }, workers: [
+    { id: 'primary', name: 'Image Worker', capabilities: ['image', 'upscale', 'models'], default: true, connected: true, device: 'Image GPU', url: 'http://images:8188' },
+    { id: 'video', name: 'Video Worker', capabilities: ['video'], connected: false, device: '', url: 'http://video:8188' }
+  ] } }));
+  await page.route('**/api/workers', (route) => route.fulfill({ json: { ok: true, deployment: { variable: 'COMFY_URL' }, capabilities: [], workers: [
+    { id: 'primary', name: 'Image Worker', url: 'http://images:8188', capabilities: ['image', 'upscale', 'models'], source: 'deployment', locked: true },
+    { id: 'video', name: 'Video Worker', url: 'http://video:8188', capabilities: ['video'], source: 'deployment', locked: true }
+  ] } }));
   await page.goto('/');
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   expect(loaded.some((url) => /\/(SettingsDialog|WorkflowGallery|InpaintStudio)-/.test(url))).toBe(false);
   const ui = studioUi(page);
   await ui.switchMode('video');
-  await expect(page.getByRole('button', { name: /Video (offline|is offline)/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Video Worker (offline|is offline)/ })).toBeVisible();
   await ui.switchMode('image');
   await ui.openSettings();
   await expect(page.locator('.set-nav')).toBeVisible();
@@ -411,8 +418,6 @@ test('secondary panels load only when opened and connections identify each gener
   await expect(page.getByRole('heading', { name: 'Image Worker' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Video Worker' })).toBeVisible();
   await expect(page.locator('.set-row').filter({ hasText: 'Image GPU' })).toBeVisible();
-  // Without its own address the video worker shares the image worker, so it shows no status of its own.
-  await expect(page.locator('.set-row').filter({ hasText: 'videos run on the image worker' })).toBeVisible();
   await page.locator('.settings-modal').getByRole('button', { name: 'Close', exact: true }).click();
   // Models are picked in the chooser alone: no Browse Models into a workflow modal.
   const menu = await ui.openModelPicker();

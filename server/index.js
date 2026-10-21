@@ -17,7 +17,9 @@ import { registerProfileEditorRoutes } from './profile-editor.js';
 
 import { requireAdmin, requireLocal, requireThisComputer } from "./route-access.js";
 import express from "express";
-import { backendUrl, configuredBackends, currentComfyBackend, isLocalVideoProfile, mergeBackendModels, withComfyBackend } from "./comfy-backends.js";
+import { configuredBackends, currentComfyBackend, forgetWorkerState, isDefaultBackend, mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob, routeProfile, workerAvailability, withComfyBackend } from "./comfy-backends.js";
+import { capabilityForProfile, defaultWorker, defaultWorkerId, listWorkers, noWorkerMessage, workerById } from "./workers.js";
+import { registerWorkerRoutes } from "./worker-routes.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -32,7 +34,6 @@ import { canAdmin, clientOf, deviceSession, studioPasswordSet } from './access.j
 import { registerAccessRoutes } from './access-routes.js';
 import { hostAllowed, requestGuard } from './request-guard.js';
 import { registerMcpRoutes } from './mcp.js';
-import { registerAiControlRoutes } from './ai-control-routes.js';
 import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
@@ -111,9 +112,9 @@ async function resolveSignedMcpResult(owner, jobId, index) {
   const request = { heissAccount: { userId: owner } };
   if (!ownerMediaTypes.has(type) || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
   try {
-    const backend = item.settings?.comfyBackend === 'video' ? 'video' : 'primary';
-    // HEISS media is read from its folder only, whichever backend made it.
-    const file = type === mediaType || backend === 'primary' ? localOutputFile(filename, subfolder, type) : null;
+    const backend = item.settings?.comfyBackend || defaultWorkerId();
+    // HEISS media is read from its folder only, whichever worker made it.
+    const file = type === mediaType || isDefaultBackend(backend) ? localOutputFile(filename, subfolder, type) : null;
     if (type === mediaType && !file) return null;
     const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(backend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
     const extension = path.extname(filename).toLowerCase();
@@ -141,19 +142,31 @@ app.use((error, _req, res, next) => {
 // Gallery pages and model lists travel compressed to phones and tablets; this computer skips the work.
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 const execFileAsync = promisify(execFile);
-let comfyCache = { info: null, stats: null, fetchedAt: 0 };
-let videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
-// A stopped video worker fails slowly (a name that no longer resolves, a refused
+// Each worker's latest ComfyUI answer (node list and stats), by worker id.
+const emptyContext = { info: null, stats: null, fetchedAt: 0 };
+const contextCaches = new Map();
+const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
+// A stopped extra worker fails slowly (a name that no longer resolves, a refused
 // connection), so its failure is remembered briefly rather than retried on every
 // catalogue load and run. A status check that reaches it, or a new address, clears it.
-const videoUnreachableForMs = 30_000;
-let videoUnreachableUntil = 0;
-// Model detection for each backend's latest ComfyUI answer, reused until ComfyUI is asked again.
+// The default worker is always asked: its absence is what the studio's offline screen shows.
+const workerUnreachableForMs = 30_000;
+const workerUnreachableUntil = new Map();
+// Model detection for each worker's latest ComfyUI answer, reused until ComfyUI is asked again.
 const inferredModels = new Map();
+/** Forgets what Studio knew about a worker whose address or capabilities changed, or that was removed. */
+function forgetWorker(id) {
+  contextCaches.delete(id);
+  inferredModels.delete(id);
+  workerUnreachableUntil.delete(id);
+  backendAnswers.delete(id);
+  forgetWorkerState(id);
+}
 const backendUnreachable = (error) => (error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error));
 
 async function loadComfyContext({ force = false } = {}) {
-  const cached = currentComfyBackend() === "video" ? videoComfyCache : comfyCache;
+  const backend = currentComfyBackend();
+  const cached = contextFor(backend);
   const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
   if (fresh) return cached;
   const info = await comfy("/object_info");
@@ -166,8 +179,7 @@ async function loadComfyContext({ force = false } = {}) {
     checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name")
   }).catch(() => null);
   const result = { info, stats, fetchedAt: Date.now() };
-  if (currentComfyBackend() === "video") videoComfyCache = result;
-  else comfyCache = result;
+  if (workerById(backend)) contextCaches.set(backend, result);
   return result;
 }
 
@@ -258,12 +270,10 @@ function requireSignedIn(req, res, next) {
 
 app.use(requireSignedIn);
 registerAccessRoutes(app);
-// What each GPU runs, through AI Control with the server's key; administrators change it by hand.
-registerAiControlRoutes(app, { isAdmin: canAdmin });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
 registerMultiUserAuthRoutes(app, {
   availableProfiles: async () => {
-    const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+    const models = await mediaModels(false).then((result) => result.models).catch(() => unavailableModels());
     return (models.profiles || []).map((profile) => profile.id);
   }
 });
@@ -430,8 +440,8 @@ app.get("/api/estimate", (req, res) => {
   const plan = upscaleQuality ? upscalePlan({ width: body.width, height: body.height, quality: upscaleQuality, target: Number(query.upscaleTarget) || 0 }) : null;
   const upscale = plan ? upscaleEstimate({ quality: upscaleQuality, faceDetail: query.faceDetail === "1", work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight, count: body.count }) }) : null;
   const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
-  const backend = process.env.COMFY_VIDEO_URL && isLocalVideoProfile(body) ? "video" : "primary";
-  const clears = queueClearsAt(now, backend);
+  const backend = routeJob(capabilityForProfile(body), { profileId: body.profileId })?.id || "";
+  const clears = backend ? queueClearsAt(now, backend) : null;
   const queueMs = clears === null ? null : Math.max(0, clears - now);
   const upscaleMs = upscale?.totalMs || 0;
   res.json({ ok: true, ...(trusted ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) } : {}), ...(queueMs ? { queueMs } : {}) });
@@ -444,7 +454,7 @@ app.get("/api/stats", async (req, res) => {
 
 // What ComfyUI runs on (GPU, memory and the budget fit hints use). See server/hardware.js.
 app.get("/api/hardware", async (_req, res) => {
-  const stats = comfyCache.stats?.devices ? comfyCache.stats : await comfy("/system_stats", { signal: AbortSignal.timeout(3000) }).catch(() => null);
+  const stats = contextFor().stats?.devices ? contextFor().stats : await comfy("/system_stats", { signal: AbortSignal.timeout(3000) }).catch(() => null);
   res.json({ ok: true, hardware: await describeHardware({ stats, comfyUrl }) });
 });
 
@@ -456,7 +466,7 @@ app.get("/api/diagnostics", async (_req, res) => {
     : "";
   // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
   let comfyBusy = false;
-  const stats = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then((response) => (response.ok ? response.json() : null), (error) => { comfyBusy = isComfyTimeout(error); return null; });
+  const stats = !comfyUrl ? null : await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then((response) => (response.ok ? response.json() : null), (error) => { comfyBusy = isComfyTimeout(error); return null; });
   const report = diagnostics({ version: appVersion, install, stats, comfyBusy, comfyLocal: comfyIsLocal() });
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
@@ -485,6 +495,11 @@ app.get("/api/logs", (req, res) => {
 });
 
 app.get("/api/health", async (req, res) => {
+  // No workers at all is a setup Studio runs in: it says so plainly instead of naming an address.
+  if (!listWorkers().length && !demoMode) {
+    res.status(503).json({ ok: false, noWorkers: true, comfySearch: false, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, error: noWorkerMessage("image"), startedAt: serverStartedAt, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
+    return;
+  }
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
@@ -501,7 +516,7 @@ function adoptFoundComfy(found) {
   } catch {
     return false; // .env could not be written; the saved address stays.
   }
-  comfyCache = { info: null, stats: null, fetchedAt: 0 };
+  contextCaches.delete(defaultWorkerId());
   console.log(`    Found ComfyUI at ${found}. Using it from now on.\n`);
   return true;
 }
@@ -517,11 +532,16 @@ const ownerMediaTypes = new Set(["output", mediaType]);
 function withoutBackendAddresses(status) {
   // Error text can quote an address too; ordinary accounts get a plain one instead.
   const plain = (value) => (value && typeof value === "object" && typeof value.error === "string" && /:\/\/|\d+\.\d+\.\d+\.\d+|localhost/i.test(value.error) ? { ...value, error: "Not connected" } : value);
-  const { url: _url, nearby: _nearby, found: _found, backends, ...rest } = plain(status) || {};
-  return backends
-    ? { ...rest, backends: Object.fromEntries(Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [name, plain(backend)])) }
-    : rest;
+  const { url: _url, nearby: _nearby, found: _found, backends, workers, ...rest } = plain(status) || {};
+  return {
+    ...rest,
+    ...(backends ? { backends: Object.fromEntries(Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [name, plain(backend)])) } : {}),
+    ...(workers ? { workers: workers.map(({ url: _workerUrl, ...worker }) => plain(worker)) } : {})
+  };
 }
+
+/** One worker as the status poll reports it: who it is, what it runs and whether it answers. */
+const workerStatusEntry = (worker, answer) => ({ id: worker.id, name: worker.name, capabilities: worker.capabilities, ...(isDefaultBackend(worker.id) ? { default: true } : {}), ...answer });
 
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
   if (req.heissAccount && !canAdmin(req) && !res.locals.ordinaryStatus) {
@@ -529,34 +549,51 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     const send = res.json.bind(res);
     res.json = (body) => send(withoutBackendAddresses(body));
   }
-  if (configuredBackends().length > 1) {
+  const workers = listWorkers();
+  // No workers is a setup Studio runs in: nothing to ask, and it says so.
+  if (!workers.length) {
+    if (demoMode) return res.json({ connected: true, isMock: true, url: "", latencyMs: 0, device: "Demo mode", workers: [], backends: {} });
+    return res.json({ connected: false, noWorkers: true, workers: [], backends: {}, error: noWorkerMessage("image") });
+  }
+  if (workers.length > 1) {
     const started = performance.now();
-    const names = configuredBackends();
     const sentAt = Date.now();
-    const results = await Promise.all(names.map((backend) => withComfyBackend(backend, async () => {
-      const url = activeComfyUrl();
+    const results = await Promise.all(workers.map((worker) => withComfyBackend(worker.id, async () => {
+      const url = worker.url;
       try {
         const stats = await comfy("/system_stats", { timeout: 1500 });
         const answer = { busy: false, connected: true, device: stats?.devices?.[0]?.name || "", url, version: stats?.system?.comfyui_version || "" };
-        if (backend === "video") videoUnreachableUntil = 0;
-        backendAnswers.set(backend, answer);
+        workerUnreachableUntil.delete(worker.id);
+        backendAnswers.set(worker.id, answer);
         return answer;
       } catch (error) {
-        const restarting = backend === "primary" && comfyRestarting();
+        const restarting = isDefaultBackend(worker.id) && comfyRestarting();
         const busy = !restarting && isComfyTimeout(error) && noteComfySilent(sentAt).busy;
-        const known = backendAnswers.get(backend);
-        return { busy: Boolean(busy), connected: Boolean(busy), device: busy && known?.url === url ? known.device : "", version: busy && known?.url === url ? known.version : "", url, ...(busy ? {} : { error: "Not connected" }) };
+        const known = backendAnswers.get(worker.id);
+        return { busy: Boolean(busy), connected: Boolean(busy), ...(restarting ? { restarting: true } : {}), device: busy && known?.url === url ? known.device : "", version: busy && known?.url === url ? known.version : "", url, ...(busy ? {} : { error: "Not connected" }) };
       }
     })));
-    const backends = Object.fromEntries(results.map((result, index) => [names[index], result]));
+    const backends = Object.fromEntries(results.map((result, index) => [workers[index].id, result]));
     return res.json({
-      connected: Object.values(backends).some((backend) => backend.connected),
+      connected: results.some((backend) => backend.connected),
       backends,
+      workers: results.map((result, index) => workerStatusEntry(workers[index], result)),
       ...restartFields(),
-      device: Object.entries(backends).filter(([, backend]) => backend.connected).map(([name, backend]) => `${name === "video" ? "Video" : "Images"}: ${backend.device}`).join(" · "),
+      device: results.map((backend, index) => (backend.connected ? `${workers[index].name}: ${backend.device}` : "")).filter(Boolean).join(" · "),
       latencyMs: Math.round(performance.now() - started),
       url: comfyUrl
     });
+  }
+  // One worker: upstream's status, with that worker named in the list as well.
+  if (!res.locals.oneWorker) {
+    res.locals.oneWorker = true;
+    const [worker] = workers;
+    const send = res.json.bind(res);
+    res.json = (body) => {
+      if (!body.busy) noteWorkerReachable(worker.id, Boolean(body.connected));
+      const answer = { connected: Boolean(body.connected), busy: Boolean(body.busy), ...(body.restarting ? { restarting: true } : {}), device: body.device || "", version: body.version || "", url: body.url || worker.url, ...(body.error ? { error: body.error } : {}) };
+      return send({ ...body, workers: [workerStatusEntry(worker, answer)] });
+    };
   }
   const startedAt = performance.now();
   const sentAt = Date.now();
@@ -640,7 +677,7 @@ async function currentPacks(timeout = 8000) {
   try {
     return loadedPacks(await comfy("/object_info", { signal: AbortSignal.timeout(timeout) }));
   } catch {
-    return comfyCache.info ? loadedPacks(comfyCache.info) : null;
+    return contextFor().info ? loadedPacks(contextFor().info) : null;
   }
 }
 
@@ -681,12 +718,16 @@ function watchComfyRestart() {
 
 /** What to say when ComfyUI does not answer: restarting on purpose, or simply not there. */
 function comfyDownMessage(detail = "") {
-  if (comfyRestarting()) return "ComfyUI is restarting. Try again in a few seconds.";
+  const worker = workerById(currentComfyBackend());
+  if (!worker) return noWorkerMessage("image");
+  if (isDefaultBackend() && comfyRestarting()) return "ComfyUI is restarting. Try again in a few seconds.";
+  if (!isDefaultBackend()) return `Can’t reach ${worker.name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
 }
 
 async function backendModels(backend, force = false) {
-  if (backend === "video" && Date.now() < videoUnreachableUntil) throw new Error("The video worker did not answer just now.");
+  const extra = !isDefaultBackend(backend);
+  if (extra && Date.now() < (workerUnreachableUntil.get(backend) || 0)) throw new Error(`${workerById(backend)?.name || "That worker"} did not answer just now.`);
   return withComfyBackend(backend, async () => {
     try {
       const context = await loadComfyContext({ force });
@@ -694,28 +735,43 @@ async function backendModels(backend, force = false) {
       if (known?.fetchedAt === context.fetchedAt) return { ...context, models: known.models };
       const models = inferModels(context.info, context.stats);
       inferredModels.set(backend, { fetchedAt: context.fetchedAt, models });
+      // What this worker has, so a job for one of its profiles goes to it (routeJob).
+      noteWorkerProfiles(backend, models.profiles || []);
       return { ...context, models };
     } catch (error) {
-      if (backend === "video" && backendUnreachable(error)) videoUnreachableUntil = Date.now() + videoUnreachableForMs;
-      if (backend === "video") videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
-      else comfyCache = { info: null, stats: null, fetchedAt: 0 };
+      if (extra && backendUnreachable(error)) workerUnreachableUntil.set(backend, Date.now() + workerUnreachableForMs);
+      contextCaches.delete(backend);
       throw error;
     }
   });
 }
 
+/**
+ * The catalogue across every worker (comfy-backends.js), with whether each
+ * capability's workers answered (`backends`), so MCP can refuse local video
+ * while no video worker is up. One worker that runs everything keeps
+ * upstream's catalogue exactly.
+ */
 async function mediaModels(force = false) {
-  if (configuredBackends().length === 1) {
-    const primary = await backendModels("primary", force);
-    return { models: primary.models, primary };
-  }
-  const [main, secondary] = await Promise.allSettled([backendModels("primary", force), backendModels("video", force)]);
-  const primary = main.status === "fulfilled" ? main.value : null;
-  const video = secondary.status === "fulfilled" ? secondary.value : null;
-  if (!primary && !video) throw new Error("Neither ComfyUI backend is available.");
-  // Whether the local video worker answered this catalogue load, so MCP can send video elsewhere while it is off.
-  const models = { ...mergeBackendModels(primary?.models || inferModels({}, {}), video?.models || inferModels({}, {})), backends: { video: { available: Boolean(video) } } };
-  return { primary, video, models };
+  const workers = listWorkers();
+  if (!workers.length) throw Object.assign(new Error(noWorkerMessage("image")), { noWorker: true });
+  const settled = await Promise.allSettled(workers.map((worker) => backendModels(worker.id, force)));
+  const answered = workers.map((worker, index) => ({ worker, result: settled[index].status === "fulfilled" ? settled[index].value : null })).filter((entry) => entry.result);
+  if (!answered.length) throw settled[0].reason || new Error("No worker is available.");
+  const backends = workerAvailability(new Set(answered.map(({ worker }) => worker.id)), workers);
+  const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result || answered[0].result;
+  const complete = workers.length === 1 && ["image", "video"].every((capability) => workers[0].capabilities.includes(capability));
+  const models = complete
+    ? { ...primary.models, backends }
+    : { ...mergeWorkerModels(answered.map(({ worker, result }) => ({ worker, models: result.models })), inferModels({}, {})), backends };
+  return { primary, models };
+}
+
+/** /api/models with no worker answering: nothing to run, with the plain reason. */
+function unavailableModels() {
+  if (demoMode) return mockModelResult();
+  if (!listWorkers().length) return { ...inferModels({}, {}), reason: noWorkerMessage("image"), backends: workerAvailability() };
+  return offlineModelResult(comfyUrl);
 }
 
 function modelsForAccount(models, req) {
@@ -736,7 +792,7 @@ app.get("/api/models", async (req, res) => {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     res.json(modelsForAccount((await mediaModels(req.query.cached !== "1")).models, req));
   } catch {
-    res.json(modelsForAccount(demoMode ? mockModelResult() : offlineModelResult(comfyUrl), req));
+    res.json(modelsForAccount(unavailableModels(), req));
   }
 });
 
@@ -920,7 +976,7 @@ app.post("/api/workflows/import", async (req, res) => {
 });
 
 registerProfileEditorRoutes(app, {
-  objectInfo: async (kind) => (await withComfyBackend(kind === "video" ? "video" : "primary", () => loadComfyContext())).info,
+  objectInfo: async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info,
   accountName: (req) => req.heissAccount?.userId || ""
 });
 
@@ -1209,25 +1265,30 @@ app.delete("/api/reference-assets/:id", (req, res) => {
   }
 });
 
+/** Whether ComfyUI answers at an address, in words Settings can show. */
+async function probeComfy(candidate) {
+  try {
+    const response = await fetch(`${candidate}/system_stats`, { signal: AbortSignal.timeout(4000) });
+    if (response.ok) {
+      const stats = await response.json().catch(() => ({}));
+      return { reachable: true, detail: "", device: stats?.devices?.[0]?.name || "", version: stats?.system?.comfyui_version || "" };
+    }
+    return { reachable: false, detail: `It answered with HTTP ${response.status}. Is that ComfyUI?` };
+  } catch (error) {
+    return { reachable: false, detail: error?.name === "TimeoutError" ? "Nothing answered there within 4 seconds." : "Nothing is listening at that address." };
+  }
+}
+
 /**
- * Where HEISS UI looks for ComfyUI. Testing tries an address without saving;
- * saving writes it to .env (like the output folder) and takes effect at once.
+ * Where HEISS UI looks for ComfyUI (the default worker). Testing tries an
+ * address without saving; saving keeps it with Studio's workers and takes
+ * effect at once. Other workers are edited in Settings › Workers.
  */
 app.post("/api/comfy-url", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const backend = req.body?.backend === "video" ? "video" : "primary";
-  const key = backend === "video" ? "COMFY_VIDEO_URL" : "COMFY_URL";
   // A deployment-owned address would come back at the next start; it is changed there, not here.
-  if (req.body?.save && settingSource(key).locked) {
+  if (req.body?.save && defaultWorker()?.locked) {
     res.status(409).json({ ok: false, reason: "locked", error: "This address comes from the deployment configuration. Change it there." });
-    return;
-  }
-  // An empty video address hands local video workflows back to the image connection.
-  if (backend === "video" && req.body?.save && !String(req.body?.url || "").trim()) {
-    saveDeploymentSetting(key, "");
-    videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
-    videoUnreachableUntil = 0;
-    res.json({ ok: true, url: "", reachable: false, saved: true, current: "" });
     return;
   }
   const candidate = normalizeComfyUrl(req.body?.url);
@@ -1235,32 +1296,22 @@ app.post("/api/comfy-url", async (req, res) => {
     res.status(400).json({ ok: false, error: "That doesn’t look like an address. Try something like 127.0.0.1:8188." });
     return;
   }
-  let reachable = false;
-  let detail = "";
-  try {
-    const response = await fetch(`${candidate}/system_stats`, { signal: AbortSignal.timeout(4000) });
-    reachable = response.ok;
-    if (!response.ok) detail = `It answered with HTTP ${response.status}. Is that ComfyUI?`;
-  } catch (error) {
-    detail = error?.name === "TimeoutError" ? "Nothing answered there within 4 seconds." : "Nothing is listening at that address.";
-  }
+  const { reachable, detail } = await probeComfy(candidate);
   if (req.body?.save && reachable) {
     try {
-      if (backend === "video") {
-        saveDeploymentSetting(key, candidate);
-        videoComfyCache = { info: null, stats: null, fetchedAt: 0 };
-        videoUnreachableUntil = 0;
-      } else {
-        setComfyUrl(candidate);
-        comfyCache = { info: null, stats: null, fetchedAt: 0 };
-      }
+      const before = defaultWorkerId();
+      setComfyUrl(candidate);
+      forgetWorker(before);
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
       return;
     }
   }
-  res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: backend === "video" ? process.env.COMFY_VIDEO_URL || "" : comfyUrl });
+  res.json({ ok: true, url: candidate, reachable, saved: Boolean(req.body?.save && reachable), detail, current: comfyUrl });
 });
+
+// Settings › Workers: the list, saving it and testing an address (worker-routes.js).
+registerWorkerRoutes(app, { probe: probeComfy, forget: forgetWorker, refresh: refreshComfyContextSoon });
 
 /**
  * What the deployment decides, for Settings: each value with its source
@@ -1269,15 +1320,11 @@ app.post("/api/comfy-url", async (req, res) => {
 app.get("/api/settings/deployment", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.setHeader("Cache-Control", "no-store");
-  const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+  const models = await mediaModels(false).then((result) => result.models).catch(() => unavailableModels());
   const profiles = (models.profiles || []).map((profile) => ({ id: profile.id, label: profile.displayName || profile.label || profile.id, kind: profile.kind, ready: profile.ready !== false }));
   const defaultFor = (key, effective) => ({ key, configured: process.env[key] || "", effective: effective || "", ...settingSource(key) });
   res.json({
     ok: true,
-    connections: [
-      { backend: "primary", label: "Images", key: "COMFY_URL", value: comfyUrl, ...settingSource("COMFY_URL"), routes: process.env.COMFY_VIDEO_URL ? "Image workflows and provider-backed video" : "All workflows" },
-      { backend: "video", label: "Videos", key: "COMFY_VIDEO_URL", value: process.env.COMFY_VIDEO_URL || "", ...settingSource("COMFY_VIDEO_URL"), routes: process.env.COMFY_VIDEO_URL ? "Local video workflows" : "Uses the image worker" }
-    ],
     defaults: {
       image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
       video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
@@ -1335,18 +1382,34 @@ registerGenerationRoutes(app, {
   comfyDownMessage
 });
 
+/**
+ * Upscaling runs on a worker with Upscale (workers.js): the routes below run
+ * inside its scope, so its node list, uploads and the job itself all go there.
+ */
+function onUpscaleWorker(handler) {
+  return (req, res) => {
+    const worker = routeJob("upscale");
+    if (!worker) {
+      res.status(503).json({ ok: false, offline: true, noWorker: true, error: noWorkerMessage("upscale"), install: installState() });
+      return undefined;
+    }
+    return withComfyBackend(worker.id, () => handler(req, res));
+  };
+}
+
 /** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
 async function upscaleContext(res, { force = false } = {}) {
   try {
     const { info } = await loadComfyContext({ force });
     return info;
   } catch {
-    res.status(503).json({ ok: false, offline: true, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting. Smart upscale is back when it’s done." : "ComfyUI is offline, so smart upscale isn’t available.", install: installState() });
+    const restarting = isDefaultBackend() && comfyRestarting();
+    res.status(503).json({ ok: false, offline: true, restarting, error: restarting ? "ComfyUI is restarting. Smart upscale is back when it’s done." : `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`, install: installState() });
     return null;
   }
 }
 
-app.get("/api/upscale/status", async (req, res) => {
+app.get("/api/upscale/status", onUpscaleWorker(async (req, res) => {
   const info = await upscaleContext(res, { force: req.query.fresh === "1" });
   if (!info) return;
   const status = upscaleStatus(info, req.query.quality);
@@ -1363,14 +1426,14 @@ app.get("/api/upscale/status", async (req, res) => {
       .map((id) => ({ manager, pack: nodePack(id), autoInstall: packInstallRoutes(id), ...packInstallPlan(nodePacks[id], comfyRootDir(), process.platform) }));
   }
   res.json({ ok: true, ...status });
-});
+}));
 
 // Download progress never needs ComfyUI, so it keeps reporting while ComfyUI restarts.
 app.get("/api/upscale/install", (_req, res) => {
   res.json({ ok: true, install: installState() });
 });
 
-app.post("/api/upscale/install/preview", async (req, res) => {
+app.post("/api/upscale/install/preview", onUpscaleWorker(async (req, res) => {
   const info = await upscaleContext(res);
   if (!info) return;
   const quality = normalizeQuality(req.body?.quality);
@@ -1380,9 +1443,9 @@ app.post("/api/upscale/install/preview", async (req, res) => {
     return;
   }
   res.json({ ok: true, ...downloadPlan(quality, info) });
-});
+}));
 
-app.post("/api/upscale/install", async (req, res) => {
+app.post("/api/upscale/install", onUpscaleWorker(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const info = await upscaleContext(res);
   if (!info) return;
@@ -1391,14 +1454,14 @@ app.post("/api/upscale/install", async (req, res) => {
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
-});
+}));
 
 app.post("/api/upscale/install/cancel", (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json({ ok: true, install: cancelModelInstall() });
 });
 
-app.post("/api/upscale", async (req, res) => {
+app.post("/api/upscale", onUpscaleWorker(async (req, res) => {
   const info = await upscaleContext(res);
   if (!info) return;
   const quality = normalizeQuality(req.body?.quality);
@@ -1465,7 +1528,7 @@ app.post("/api/upscale", async (req, res) => {
   const customWorkflow = String(item.model || "").startsWith("custom:") ? getCustomWorkflow(item.model) : null;
   const { jobId, plan } = startUpscale({ item: upscaleItem, imageName, quality, faceDetail, info, customWorkflow });
   res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
-});
+}));
 
 // Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
 app.post("/api/upscale/cancel", async (req, res) => {
@@ -1659,28 +1722,34 @@ app.get("/api/comfy/manager", async (_req, res) => {
 });
 
 // ComfyUI is started outside HEISS UI, so only ComfyUI-Manager can restart it in place.
-// The video worker restarts through its own ComfyUI-Manager; its status poll shows it going and coming back.
-async function restartVideoWorker(res) {
-  let url;
-  try { url = withComfyBackend("video", () => backendUrl(comfyUrl)); }
-  catch (error) { res.status(400).json({ ok: false, error: error.message }); return; }
+// Every worker but the default restarts through its own ComfyUI-Manager; its status poll shows it going and coming back.
+async function restartOtherWorker(worker, res) {
+  const url = worker.url;
   const up = await fetch(`${url}/system_stats`, { signal: AbortSignal.timeout(4000) }).then((response) => response.ok, () => false);
-  if (!up) { res.status(503).json({ ok: false, error: "The video worker isn’t running. Start it and Studio connects." }); return; }
+  if (!up) { res.status(503).json({ ok: false, error: `${worker.name} isn’t running. Start it and Studio connects.` }); return; }
   let sawManager = false;
   for (const [method, route] of [["POST", "/v2/manager/reboot"], ["POST", "/manager/reboot"], ["GET", "/v2/manager/reboot"], ["GET", "/api/manager/reboot"], ["GET", "/manager/reboot"]]) {
     let response;
     try { response = await fetch(`${url}${route}`, { method, signal: AbortSignal.timeout(5000) }); }
-    catch { res.json({ ok: true, backend: "video" }); return; }
-    if (response.ok) { res.json({ ok: true, backend: "video" }); return; }
-    if (response.status === 403) { res.status(403).json({ ok: false, error: "ComfyUI-Manager’s security level blocks the restart. Set security_level = normal in Manager’s config.ini, or restart the worker yourself." }); return; }
+    catch { forgetWorker(worker.id); res.json({ ok: true, worker: worker.id }); return; }
+    if (response.ok) { forgetWorker(worker.id); res.json({ ok: true, worker: worker.id }); return; }
+    if (response.status === 403) { res.status(403).json({ ok: false, error: `ComfyUI-Manager’s security level blocks the restart. Set security_level = normal in Manager’s config.ini, or restart ${worker.name} yourself.` }); return; }
     if (response.status !== 404 && response.status !== 405) sawManager = true;
   }
-  res.status(501).json({ ok: false, error: sawManager ? "ComfyUI-Manager couldn’t restart the video worker." : "Restarting needs ComfyUI-Manager on the video worker. Start its ComfyUI with --enable-manager." });
+  res.status(501).json({ ok: false, error: sawManager ? `ComfyUI-Manager couldn’t restart ${worker.name}.` : `Restarting needs ComfyUI-Manager on ${worker.name}. Start its ComfyUI with --enable-manager.` });
 }
 
+/**
+ * Restarts a worker: `worker` names one by id (Settings › Workers), and
+ * without it the default worker, as upstream's restart buttons ask. The
+ * default worker's restart is followed by the server (watchComfyRestart).
+ */
 app.post("/api/comfy/restart", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  if (req.body?.backend === "video") { await restartVideoWorker(res); return; }
+  const named = String(req.body?.worker || (req.body?.backend === "video" ? "video" : "") || "");
+  const worker = named ? workerById(named) : defaultWorker();
+  if (!worker) { res.status(named ? 404 : 503).json({ ok: false, error: named ? "That worker is no longer configured." : noWorkerMessage("image") }); return; }
+  if (!isDefaultBackend(worker.id)) { await restartOtherWorker(worker, res); return; }
   // A dropped connection below means "already going down" only if ComfyUI was
   // up to begin with; otherwise "restarting" would show for minutes over nothing.
   const up = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(4000) }).then((response) => response.ok, () => false);
@@ -1958,6 +2027,8 @@ startServers(app, {
           ? "    Other devices sign in with the studio password.\n"
           : "    Other devices sign in with a studio password: set one in Settings › Connection first.\n");
       }
+      // No workers is a setup of its own: say so, and look for nothing.
+      if (!listWorkers().length) { if (!demoMode) console.log("    No workers are set up yet. Add one in Settings › Workers.\n"); return; }
       // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
       const answering = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(3000) }).then((response) => response.ok, () => false);
       const found = answering || demoMode ? "" : await findComfy({ current: comfyUrl });
