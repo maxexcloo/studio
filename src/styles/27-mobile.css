@@ -243,8 +243,6 @@
 @media (max-height: 520px) {
   /* The sidebar becomes a full-height sheet instead of a sliver above the deck. */
   .zen-prompt textarea { max-height: 72px; }
-  .negative-drawer.open { max-height: 64px; }
-  .negative-drawer textarea { height: 40px; }
   /* Dialogs drop their desktop padding and header height. */
   .modal-wide,
   .modal-sheet { height: calc(100dvh - 16px); max-height: none; }

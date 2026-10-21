@@ -14,8 +14,6 @@
 .composer-prompt-field textarea { display: block; width: 100%; }
 .zen-prompt .composer-prompt-field textarea { min-height: 64px; padding: 8px var(--prompt-text-inset) 5px; font-size: 15px; line-height: 1.4; }
 .composer-secondary-row { display: flex; align-items: center; gap: var(--space-4); border-top: 1px solid var(--glass-border); padding-top: 4px; }
-.composer-secondary-row .negative-drawer.open { max-height: none; overflow: visible; flex: 1; min-width: 0; border: 0; margin: 0; padding: 0 var(--prompt-text-inset, 10px); }
-.composer-secondary-row .phone-negative { flex: 1; min-width: 0; border: 0; padding: 0; }
 .composer-reference-tools:empty { display: none; }
 .prompt-action { display: inline-flex; align-items: center; justify-content: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .prompt-action:hover { background: var(--control-hover); color: hsl(var(--foreground)); }

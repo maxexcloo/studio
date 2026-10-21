@@ -225,5 +225,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .starter-version { transition: none; }
-  .prompt-idea, .prompt-idea.is-surprise svg { animation: none; transition: none; }
 }

@@ -336,7 +336,6 @@ button.list-row { isolation: isolate; }
 @media (max-width: 359px) {
   .picker-toolbar .reference-tabs button { padding: 0 8px; font-size: 12.5px; }
 }
-.reference-popover .reference-popover-hint { flex: 0 1 auto; }
 /* The picked order, the same mark in every chooser: an empty ring, then the number on amber. */
 .picker-order { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1.5px solid hsl(var(--foreground) / .3); border-radius: var(--r-pill); color: var(--accent-amber-ink); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .picker-order.is-on { border-color: var(--accent-amber); background: var(--accent-amber); }
@@ -546,7 +545,6 @@ button.list-row { isolation: isolate; }
 .picker-controls:has(.model-filters) { flex: 1 1 auto; min-width: 0; }
 .picker-controls .model-filters { display: flex; flex: 1 1 auto; gap: var(--space-3); min-width: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
 .picker-controls .model-filter-group { flex: none; flex-wrap: nowrap; }
-.picker-controls .model-filter-label { display: none; }
 .picker-controls .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--line); }
 .picker-controls .model-filter-group button { flex: none; height: var(--control-h-sm); padding: 0 10px; }
 .phone-model-tools .picker-tools .picker-toolbar { padding: 4px 0 6px; }
@@ -623,8 +621,7 @@ button.list-row { isolation: isolate; }
 .model-menu .model-option.active { grid-template-columns: minmax(0, 1fr) auto auto; }
 .model-menu .model-option .model-selection-tick { margin-inline: var(--space-2) 0; }
 /* With the filters and search in the heading, the phone's model tools row keeps only a Recipe row, if any. */
-.phone-model-tools:not(:has(.list-row, .picker-search-row)),
-.phone-model-pop .phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
+.phone-model-tools:not(:has(.list-row, .picker-search-row)), .phone-model-pop .phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
 
 /* Heading dropdowns: the views on the phone and the LoRA Stacks on both devices. */
 .dropdown-trigger.is-heading { flex: none; gap: var(--space-2); color: hsl(var(--foreground)); font-weight: 500; white-space: nowrap; }

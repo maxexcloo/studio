@@ -23,7 +23,7 @@ button:not(:disabled) {
   filter: brightness(.92);
   transition-duration: var(--motion-instant);
 }
-:is(.tile, .run-stack, .run-flow, .cover-flow-show, .reference-tile-select, .ref-stack-thumb):active :is(img, video) {
+:is(.tile, .run-stack, .run-flow, .cover-flow-show, .reference-tile-select):active :is(img, video) {
   filter: var(--press-media);
   transition: filter var(--motion-instant) var(--motion-ease);
 }
