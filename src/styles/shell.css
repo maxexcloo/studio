@@ -1,8 +1,7 @@
 /* The desktop shell: the stage, the docks and the deck of controls around the gallery. */
 
 .app-shell {
-  position: fixed; inset: 0; overflow: hidden;
-  background: hsl(var(--background)); color: hsl(var(--foreground));
+  position: fixed; inset: 0; overflow: hidden; color: hsl(var(--foreground));
   animation: appIn var(--motion-app-in) var(--ease-soft) both;
 }
 @keyframes appIn {
@@ -12,14 +11,12 @@
 .stage-gallery {
   position: absolute; inset: 0;
   overflow: auto;
-  padding: 12px 12px 200px;
   background: hsl(var(--background));
 }
 .bottom-fade {
   /* --scrollbar-w is set on the gallery from StudioView, so the fade stops
      short of its scrollbar (17 px and always visible on Windows). */
   position: fixed; left: 0; right: var(--scrollbar-w, 0px); bottom: 0;
-  height: 150px;
   pointer-events: none;
   z-index: 5;
 }
@@ -27,14 +24,6 @@
   content: "";
   position: absolute; inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    to top,
-    hsl(var(--background)) 0%,
-    hsl(var(--background) / 0.92) 28%,
-    hsl(var(--background) / 0.58) 62%,
-    hsl(var(--background) / 0.18) 86%,
-    transparent 100%
-  );
 }
 .split {
   display: grid;
@@ -60,9 +49,6 @@
   border-color: var(--line-strong);
 }
 .comfy-status-dot span {
-  width: 9px;
-  height: 9px;
-  border-radius: var(--r-pill);
   background: hsl(45 90% 58%);
   box-shadow: 0 0 0 4px hsl(45 90% 58% / 0.12), 0 0 14px hsl(45 90% 58% / 0.2);
   transition: background var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
@@ -139,7 +125,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  background: hsl(var(--card));
   color: hsl(var(--foreground));
   cursor: pointer;
   transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
@@ -154,7 +139,7 @@
 .scrim {
   position: fixed; inset: 0;
   background: hsl(var(--background) / 0.9);
-  z-index: 20;
+  z-index: var(--z-scrim);
   overflow: hidden;
   overscroll-behavior: contain;
   animation: scrimFade var(--motion-base) var(--motion-ease);
@@ -174,14 +159,12 @@
   gap: var(--space-3);
   margin-top: 4px;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
   text-decoration: none;
 }
 .stage-link:hover { color: hsl(var(--foreground)); }
 @media (max-width: 620px) {
   .split { grid-template-columns: 1fr; }
   .stage-gallery {
-    padding: 8px 8px calc(var(--zen-prompt-h, 160px) + 26px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
   }
   .scrim { overflow: hidden; }
@@ -204,18 +187,12 @@
 .bottom-fade::before {
   background: linear-gradient(to top, #0a0a0a 0%, rgb(10 10 10 / .94) 38%, rgb(10 10 10 / .52) 72%, transparent 100%);
 }
-.reconnect-btn {
-  background: rgb(255 255 255 / .08) !important;
-}
 .studio-dock {
   box-sizing: border-box;
 }
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot {
   transition-property: background-color, color;
-}
-@media (max-width: 760px) {
-  .stage-gallery { padding-bottom: calc(var(--zen-prompt-h, 160px) + 34px); }
 }
 /* ---------------------------------------------------------------------------
    5. Tooltips: on-brand floating surface instead of the inverted white pill
@@ -244,18 +221,9 @@
 }
 @media (max-width: 760px) {
   .stage-gallery {
-    padding-right: max(6px, env(safe-area-inset-right));
-    padding-bottom: calc(var(--zen-prompt-h, 160px) + 28px + env(safe-area-inset-bottom));
-    padding-left: max(6px, env(safe-area-inset-left));
     scrollbar-gutter: auto;
   }
   .bottom-fade { height: calc(var(--zen-prompt-h, 160px) + 44px + env(safe-area-inset-bottom)); }
-}
-@media (max-width: 480px) {
-  .stage-gallery {
-    padding-right: max(5px, env(safe-area-inset-right));
-    padding-left: max(5px, env(safe-area-inset-left));
-  }
 }
 /* ---------------------------------------------------------------------------
    The surface system
@@ -282,12 +250,8 @@
 .studio-dock {
   height: var(--dock-h);
   min-height: var(--dock-h);
-  padding: 3px;
-  gap: var(--space-1);
   border-radius: var(--r-pill);
 }
-.dock-chip { height: var(--control-h); border-radius: var(--r-pill); padding: 0 6px 0 14px; }
-.dock-count { min-width: 28px; height: 28px; border-radius: var(--r-pill); }
 /* Ghost icon buttons: every icon-only action, in docks, headers and toolbars. */
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot {
@@ -301,10 +265,6 @@
   background: transparent;
   color: hsl(var(--muted-foreground));
   box-shadow: none;
-}
-.studio-dock .icon-button:hover:not(:disabled) {
-  background-color: var(--control-hover);
-  color: #fff;
 }
 /* Glass icon buttons: the fill is an --icon-fill circle inside the 40px target
    (background clipped to the content box), so a 48px bar keeps 8px of glass
@@ -322,22 +282,22 @@
    Primary is white, secondary is a soft fill, both 40px pills. List rows
    (settings nav, sidebar tabs, options) share the item radius. */
 .reconnect-btn {
-  min-height: var(--control-h) !important;
+  min-height: var(--control-h);
   height: var(--control-h);
-  padding: 0 18px !important;
+  padding: 0 18px;
   border: 0;
-  border-radius: var(--r-pill) !important;
+  border-radius: var(--r-pill);
   box-shadow: none;
   font-size: 13px;
   font-weight: 550;
 }
-.reconnect-btn:not(.primary) { background: var(--control-fill) !important; color: hsl(var(--foreground)) !important; }
-.reconnect-btn:not(.primary):hover { background: var(--control-hover) !important; }
-.reconnect-btn.primary { background: var(--action) !important; color: var(--action-ink) !important; }
+.reconnect-btn:not(.primary) { background: var(--control-fill); color: hsl(var(--foreground)); }
+.reconnect-btn:not(.primary):hover { background: var(--control-hover); }
+.reconnect-btn.primary { background: var(--action); color: var(--action-ink); }
 /* --------------------------------------------------------------- 7. Tooltip */
 .studio-tooltip {
   border: 1px solid var(--glass-border);
-  background: var(--surface-grain), var(--glass-panel-bg) !important;
+  background: var(--surface-grain), var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
   backdrop-filter: var(--glass-panel-blur);
   box-shadow: var(--glass-panel-shadow);
@@ -374,9 +334,8 @@
 .stage-gallery { padding-top: 10px; }
 .studio-dock {
   position: fixed;
-  right: var(--deck-gap);
   bottom: var(--deck-gap);
-  z-index: 13;
+  z-index: var(--z-dock);
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -451,7 +410,6 @@
   .app-shell {
     --deck-lift: calc(var(--zen-prompt-h, 160px) + max(8px, env(safe-area-inset-bottom)) + 8px);
   }
-  .studio-dock { right: max(8px, env(safe-area-inset-right)); }
   /* Pinch and double-tap zoom on touch; the zoom buttons would crowd the row. */
   .stage-gallery {
     padding-top: max(6px, env(safe-area-inset-top));

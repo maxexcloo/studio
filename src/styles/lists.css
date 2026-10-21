@@ -76,8 +76,6 @@ button.list-row { isolation: isolate; }
 /* A native select laid over the row's value, so the tap opens the phone's own picker. */
 .list-row-control input.list-field {
   width: 100%;
-  max-width: 150px;
-  height: 36px;
   padding: 0 10px;
   border: 0;
   border-radius: var(--r-field);

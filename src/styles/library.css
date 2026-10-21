@@ -10,7 +10,7 @@
 .library-nav-count { margin-left: auto; font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
 .library-modal .set-nav-item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* One field and its action on one line: a link to save or preview. */
-.library-link { display: flex; gap: 8px; align-items: center; }
+.library-link { display: flex; gap: var(--space-4); align-items: center; }
 .library-link input { flex: 1; min-width: 0; }
 .library-link .btn { flex: none; }
 .library-search { position: relative; display: flex; align-items: center; }
@@ -20,7 +20,7 @@
 .library-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -58,7 +58,7 @@
   font-size: 11px;
   font-weight: 600;
 }
-.library-card-text { display: grid; gap: 2px; padding: 0 2px; min-width: 0; }
+.library-card-text { display: grid; gap: var(--space-1); padding: 0 2px; min-width: 0; }
 .library-card-text strong,
 .library-card-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-card-text strong { font-size: 13px; font-weight: 550; }
@@ -76,12 +76,12 @@
   .library-card.is-skeleton i { animation: none; }
 }
 /* ---------------------------------------------------------------- Review */
-.library-review-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -6px 0 -8px -10px; }
+.library-review-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin: -6px 0 -8px -10px; }
 .library-back { padding: 0 12px; }
-.library-review-actions { display: flex; gap: 4px; }
+.library-review-actions { display: flex; gap: var(--space-2); }
 .library-icon { width: var(--control-h); padding: 0; text-decoration: none; }
 .library-icon.is-danger:hover:not(:disabled) { background: var(--danger-fill); color: var(--danger-ink); }
-.library-review { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
+.library-review { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr); gap: var(--space-7); align-items: start; }
 .library-preview {
   display: grid;
   place-items: center;
@@ -94,16 +94,16 @@
 }
 .library-preview img,
 .library-preview video { display: block; width: 100%; max-height: 440px; object-fit: contain; }
-.library-recipe { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.library-recipe { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
 .library-recipe .set-page-head h3 { overflow-wrap: anywhere; }
 /* Where the image stands, in one line: the check and amber say ready or not. */
-.library-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 12.5px; }
+.library-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin: 0; font-size: 12.5px; }
 .library-state strong { font-weight: 600; }
 .library-state span { color: hsl(var(--muted-foreground)); }
 .library-state.is-ready strong,
 .library-state.is-ready svg { color: #7fd49a; }
 .library-state.is-pending strong { color: var(--accent-amber); }
-.library-prompt { display: grid; gap: 4px; }
+.library-prompt { display: grid; gap: var(--space-2); }
 .library-prompt p { margin: 0; max-height: 168px; overflow-y: auto; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .library-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px 16px; margin: 0; }
 .library-settings dt { font-size: 11px; color: hsl(var(--muted-foreground)); }
@@ -129,11 +129,11 @@
 .library-error { color: var(--danger-ink) !important; }
 .library-save-legacy { align-self: flex-start; }
 /* The footer holds Use Prompt and Use Settings, on the right. */
-.library-modal .modal-foot { gap: 8px; }
+.library-modal .modal-foot { gap: var(--space-4); }
 /* ----------------------------------------------------------------- Phone */
 @media (max-width: 760px) {
   .library-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
-  .library-review { grid-template-columns: 1fr; gap: 16px; }
+  .library-review { grid-template-columns: 1fr; gap: var(--space-6); }
   .library-preview, .library-preview img, .library-preview video { max-height: 300px; }
   .library-link .btn { min-height: 44px; }
   .library-model-choice { max-width: none; width: 100%; }

@@ -52,11 +52,8 @@
 }
 .model-option {
   width: 100%;
-  min-height: 50px;
   border: 1px solid var(--glass-border);
-  background: hsl(var(--input));
   color: hsl(var(--foreground));
-  border-radius: var(--r-field);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -104,23 +101,16 @@
 .model-menu {
   position: absolute; z-index: 14;
   top: calc(100% + 6px); left: 0; right: 0;
-  display: grid; gap: var(--space-1);
-  padding: 4px;
-  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
-  transform-origin: top center;
 }
 /* Options: the cursor is a rounded --cursor-bg fill; the pick shows amber ink, never a row fill. */
-.model-option { min-height: 54px; border-color: transparent; border-radius: var(--r-item); background: transparent; }
-.model-option:hover { border-color: transparent; background: var(--cursor-bg); }
-.model-option.active { background: transparent; color: hsl(var(--foreground)); }
-.model-option.active:hover { background: var(--cursor-bg); }
-.model-option.active .model-copy strong { color: var(--selected-ink); }
+.model-option { min-height: 54px; border-color: transparent; background: transparent; }
+.model-option:hover { border-color: transparent; }
+.model-option.active { color: hsl(var(--foreground)); }
 .model-badge {
   margin: 0 !important;
   padding: 3px 7px;
   border: 1px solid currentColor;
   border-radius: var(--r-pill);
-  color: hsl(var(--muted-foreground));
   font-size: 10px !important;
   font-weight: 500;
   line-height: 1;
@@ -130,22 +120,17 @@
   width: 100%;
   min-height: 40px;
   border: 1px solid var(--glass-border);
-  background: hsl(var(--input));
   color: hsl(var(--foreground));
-  border-radius: var(--r-field);
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 18px;
   align-items: center;
   gap: var(--space-4);
   padding: 0 12px;
   cursor: pointer;
   text-align: left;
   font-size: 13px;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
   transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
-.aspect-option > span:nth-child(2) {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.aspect-option > span:nth-child(2) { white-space: nowrap;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -154,16 +139,12 @@
   top: calc(100% + 6px); left: 0;
   width: max(100%, min(280px, calc(100vw - 32px)));
   display: grid; gap: var(--space-2);
-  padding: 6px;
-  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
-  transform-origin: top left;
 }
-.aspect-option { grid-template-columns: 30px minmax(44px, auto) minmax(80px, 1fr); border-color: transparent; border-radius: var(--r-item); background: transparent; box-shadow: none; }
-.aspect-option:hover { border-color: transparent; background: var(--cursor-bg); }
-.aspect-option.active { background: transparent; color: var(--selected-ink); }
-.aspect-option.active:hover { background: var(--cursor-bg); }
+.aspect-option { grid-template-columns: 30px minmax(44px, auto) minmax(80px, 1fr); border-color: transparent; background: transparent; box-shadow: none; }
+.aspect-option:hover { border-color: transparent; }
+.aspect-option.active { color: var(--selected-ink); }
 .aspect-option > span:nth-child(2) { overflow: visible; text-overflow: clip; }
-.aspect-option em { color: hsl(var(--muted-foreground)); font-size: 11px; font-style: normal; text-align: right; white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
+.aspect-option em { font-size: 11px; font-style: normal; text-align: right; white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
 .aspect-shape { justify-self: center; display: block; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.88; }
 .aspect-shape.default { width: 18px; height: 18px; }
 .aspect-shape.custom { width: 22px; height: 22px; border-style: dashed; }
@@ -181,10 +162,8 @@
     top: auto;
     bottom: 10px;
     width: auto;
-    max-height: min(72vh, 560px);
     overflow: auto;
-    z-index: 40;
-    padding: 8px;
+    z-index: var(--z-viewer);
   }
   .model-option {
     min-height: 64px;
@@ -267,7 +246,7 @@
 .aspect-option { border-radius: var(--r-item); }
 /* The lists that hold one grow to fill their picker, so the words sit in its middle. */
 .lora-panel:has(> .empty-state:only-child) { flex: 1 1 auto; }
-.model-filters { flex: none; display: flex; gap: var(--space-3); padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
+.model-filters { flex: none; scrollbar-width: none; }
 .model-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4) var(--space-5); padding: 8px 4px 12px; overflow: visible; }
 .model-filter-group { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
 .model-filter-group:not(.model-filter-library) button { flex: 1; padding: 0 8px; }
@@ -606,11 +585,8 @@
 .ref-add:hover, .ref-add.is-open { background: var(--control-hover); color: hsl(var(--foreground)); }
 .ref-add-label { max-width: 100%; font-size: 10px; line-height: 1.2; text-align: center; white-space: normal; }
 .ref-add-label em { color: var(--ember); font-style: normal; }
-.ref-selected { display: block; }
-.ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--glass-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
-.ref-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ref-add:focus-visible, .ref-thumb:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.ref-chip.is-busy { flex-direction: column; gap: var(--space-3); background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ref-chip.is-busy { flex-direction: column; font-size: 11px; }
 /* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
    clip-path wipes open to the left, so nothing reflows while it animates. */
 /* Each chip stacks on its own, and the one whose menu is open sits over its
@@ -780,7 +756,7 @@
 /* --------------------------------------------------------------- Popover */
 .reference-popover {
   position: fixed;
-  z-index: 90; /* over the deck and composer, under modals */
+  z-index: var(--z-picker); /* over the deck and composer, under modals */
   display: flex;
   flex-direction: column;
   height: min(440px, 58dvh);
@@ -912,7 +888,7 @@
 .reference-drop {
   position: absolute;
   inset: 0;
-  z-index: 25;
+  z-index: var(--z-drop);
   display: grid;
   place-items: center;
   border-radius: var(--r-panel);
@@ -1074,7 +1050,7 @@
 .ref-role-chip button { height: 34px; }
 .reference-grid.is-virtual { position: relative; }
 .reference-search { margin: 10px 16px; }
-.reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--glass-panel-bg); }
+.reference-opening { position: fixed; z-index: var(--z-picker); inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--glass-panel-bg); }
 /* Full capacity is said in the picker itself, on the phone too. */
 /* One References button for a model that reads several (FLUX.3 [klein] takes
    ten): the picked pictures overlap at its start, then References and n/max.
@@ -1096,8 +1072,8 @@
 .reference-selected-tab em { font-style: normal; font-variant-numeric: tabular-nums; opacity: .8; }
 .reference-selected-tab.is-full em { color: var(--accent-amber); opacity: 1; }
 .reference-tabs button:disabled { opacity: .45; cursor: default; }
-.reference-selected-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.reference-selected-row { display: flex; align-items: center; gap: var(--space-4); min-height: 60px; padding: 6px 6px 6px 4px; border-radius: var(--r-item); background: var(--control-fill); }
+.reference-selected-list { margin: 0; padding: 0; list-style: none; }
+.reference-selected-row { display: flex; align-items: center; gap: var(--space-4); padding: 6px 6px 6px 4px; }
 .reference-selected-number { flex: none; width: 22px; color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
 .reference-selected-thumb { flex: none; display: grid; place-items: center; width: 48px; height: 48px; overflow: hidden; border-radius: var(--r-media); background: var(--well); color: hsl(var(--muted-foreground)); }
 .reference-selected-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -1508,13 +1484,11 @@
 .size-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .size-link-icon { display: grid; place-items: center; }
 .size-menu-note {
-  display: flex;
   justify-content: space-between;
   gap: var(--space-4);
   margin: 0;
   padding: 0 6px;
   color: hsl(var(--muted-foreground));
-  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
@@ -1535,7 +1509,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .size-frame, .size-field, .size-link, .size-peek { transition: none; }
-  .size-mp-label small { animation: none; }
   [data-open-surface]:is(.aspect-menu, .model-menu).is-closing { animation: none; opacity: 0; }
 }
 /* Megapixels (Settings › Studio), under the shapes: what it is on the left, the count on
@@ -1588,9 +1561,9 @@
 .composer-loras .reference-popover-head strong { flex: 1; font-size: 13px; font-weight: 550; }
 .composer-loras .lora-popover-body { display: flex; flex-direction: column; mask-image: none; }
 .composer-loras .model-loras, .composer-loras .lora-panel { flex: 1; min-height: 0; }
-.composer-loras .lora-picker { max-height: none; height: 100%; }
+.composer-loras .lora-picker { max-height: none; }
 .composer-loras .lora-picker-list { min-height: 60px; }
-.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+.composer-loras .lora-picker-items { display: grid; grid-template-columns: minmax(0, 1fr); }
 .composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: var(--space-4); min-height: 54px; padding: 8px; border: 0; background: transparent; }
 .composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--cursor-bg); }
 .composer-loras .lora-option-check { flex: none; }
@@ -1639,7 +1612,6 @@
 @media (pointer: coarse) {
   .picker-search-toggle { width: var(--control-h-touch); height: var(--control-h-touch); }
 }
-.picker-search-row { padding: 8px 12px 0; }
 .picker-search-row > .picker-search, .picker-search-row > .lora-picker-search, .picker-search-row > .reference-search, .picker-search-row > .model-menu-search { margin: 0; }
 .picker-clear-short { display: none; }
 @media (max-width: 480px) {
@@ -1753,7 +1725,7 @@
 .reference-popover-head > .reference-popover-close { flex: none; }
 .reference-popover-head:has(> .surface-head-slot:empty) > .surface-title { flex: 1; }
 .picker-tools.is-heading { display: block; }
-.picker-heading-tools { flex: 1 1 auto; display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.picker-heading-tools { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 .picker-heading-tools > .picker-controls { flex: 0 1 auto; display: flex; align-items: center; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .picker-heading-tools .reference-tabs { flex: none; }
 .picker-heading-tools .reference-tabs button { padding: 0 10px; }

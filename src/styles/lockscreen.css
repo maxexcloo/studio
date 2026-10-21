@@ -71,7 +71,7 @@
   .unlock-field.is-wrong { animation: none; }
 }
 /* Another device before it signs in (DeviceGate.tsx): this is all it can show, above everything. */
-.device-gate { position: fixed; inset: 0; z-index: 40; background: #0a0a0a; }
+.device-gate { position: fixed; inset: 0; z-index: var(--z-viewer); background: #0a0a0a; }
 .device-gate.lockscreen { pointer-events: auto; }
 /* Account sign-in (DeviceGate.tsx): the lock over a card drawn like the alert modal. */
 .account-gate {

@@ -350,7 +350,7 @@
   font-size: 12px;
   line-height: 1.5;
 }
-.viewer-profile-summary strong { font-size: 14px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.viewer-profile-summary strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .viewer-profile-summary span { color: rgb(255 255 255 / .7); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .viewer-zoom-controls { display: flex; align-items: center; gap: 0; }
 /* The zoom: a small − 100% + pill in the bottom right corner of the picture's
@@ -460,16 +460,12 @@
   .viewer-canvas { padding: 8px 8px 80px; }
   .viewer-dock {
     bottom: calc(10px + env(safe-area-inset-bottom));
-    max-width: calc(100vw - 20px);
-    overflow-x: auto;
     scrollbar-width: none;
   }
   .viewer-dock::-webkit-scrollbar { display: none; }
-  .viewer-stage.with-side .viewer-dock { left: 50%; }
   .viewer-canvas img, .viewer-canvas video { border-radius: var(--r-media); }
   .viewer-side {
-    position: absolute;
-    left: 8px; right: 8px; top: 8px; bottom: 76px;
+    position: absolute; right: 8px; top: 8px; bottom: 76px;
     z-index: 6;
     border: 1px solid var(--glass-border);
     border-radius: var(--r-menu);
@@ -517,7 +513,6 @@
   height: var(--control-h);
   min-width: var(--control-h);
   min-height: var(--control-h);
-  padding: 0;
   border: 0;
   border-radius: var(--r-pill);
   background: transparent;
@@ -631,7 +626,7 @@
 --------------------------------------------------------------------------- */
 .inpaint-studio {
   position: fixed;
-  z-index: 90; /* the reference picker's layer: over the deck and composer, under modals */
+  z-index: var(--z-picker); /* the reference picker's layer: over the deck and composer, under modals */
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: var(--r-panel);
@@ -826,7 +821,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 70;
+  z-index: var(--z-phone-pop);
   width: auto;
   height: min(640px, 82dvh);
   padding-bottom: env(safe-area-inset-bottom);

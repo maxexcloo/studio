@@ -120,8 +120,22 @@
 
   /* Stacking. Everything that floats picks a layer from here, never a raw number. */
   --z-content: 1;
+  /* The desktop stage, bottom up: the composer, the gallery toolbar's rows, the docks, the toolbar
+     and a composer showing Prompt History, the history panel, a composer with a menu open, the
+     viewer's backdrop, drop targets, the deck, the viewer and gates, the reference picker and
+     inpainting, and a composer whose menus must clear that picker. */
+  --z-composer: 10;
+  --z-stage-bar: 12;
+  --z-dock: 13;
+  --z-toolbar: 14;
+  --z-history: 16;
+  --z-composer-open: 18;
+  --z-scrim: 20;
+  --z-drop: 25;
   --z-deck: 30;
   --z-viewer: 40;
+  --z-picker: 90;
+  --z-composer-menus: 95;
   --z-modal: 100;
   --z-popover: 150;
   /* The phone's own layers (phoneLayers.ts): its bars, a sheet's dimmed page, the sheet, a pop-up over the sheet,
@@ -153,28 +167,15 @@
 }
 :root {
   color-scheme: dark;
-
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 6% 6%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 6% 7%;
   --popover-foreground: 0 0% 98%;
   --primary: 0 0% 98%;
   --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 4% 12%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 240 4% 12%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 4% 14%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 4% 16%;
-  --border-strong: 240 4% 22%;
-  --input: 240 5% 9%;
   --ring: 240 5% 64.9%;
-  --radius: 0.625rem;
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.5);
