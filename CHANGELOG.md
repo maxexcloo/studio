@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-21
+
 > Batch 5: a reworked phone Create, inline confirmations in the status pill, Settings as flat lists, a manual AI Control switch, and MCP that owns its chat rules
 
 ### Added
@@ -1523,7 +1525,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.34.3...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/maxexcloo/studio/compare/v0.34.3...v0.35.0
 [0.34.3]: https://github.com/maxexcloo/studio/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/maxexcloo/studio/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/maxexcloo/studio/compare/v0.34.0...v0.34.1
