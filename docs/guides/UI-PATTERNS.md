@@ -526,10 +526,10 @@ returns to its list). Its five pages, in this order:
 
 | Page | Holds |
 | --- | --- |
-| Import | One field: paste a Civitai or Hugging Face link, or drop one on it (dropped image files come later). Under it, the History: one row per import with its kind icon, name, kind and date, the grade chip and its state |
+| Import | One field: paste a Civitai or Hugging Face link, or drop a link or a PNG, WebP or JPEG on it; Image beside it chooses one (the phone's way in). Under it, the History: one row per import with its kind icon, name, kind and date, the grade chip and its state |
 | Images | The saved Civitai images as an even 4:5 grid, each with its grade chip and missing count; search once there are two or more |
-| LoRAs | Installed and catalogued LoRAs and supporting files, with provenance, version, links, trigger words and file |
-| Models | Checkpoints, diffusion models, text encoders, VAEs and CLIP vision the same way, then any catalogue switch that remains global |
+| LoRAs | Installed and catalogued LoRAs and supporting files, with provenance, version, links, trigger words and file; Installed, Catalogue and Updates views |
+| Models | Checkpoints, diffusion models, text encoders, VAEs and CLIP vision the same way (Installed and Updates), then any catalogue switch that remains global |
 | Downloads | Every model download in Running, Failed and Done groups |
 
 Import and Images follow the deployment's Presets & Civitai Imports switch;
@@ -550,15 +550,43 @@ without it the Library holds LoRAs, Models and Downloads.
   downloads; its state on the right. A Hugging Face file whose folder is a
   guess carries its Destination dropdown until it downloads. Check Again sits
   on the group's heading.
+- **Image imports:** a dropped image's review is the Images review's
+  anatomy: the picture beside its name, where the recipe came from ("A1111
+  Metadata · PNG · fox.png"), the prompt, negative and settings, then the
+  grade, Use With (the shared Dropdown) and Files. A file found by name only
+  says Found By Filename. Describe with AI sits on the right of the bar; without
+  a vision model it is disabled with the reason in its tooltip, and the Import
+  page says so in one line. A described image is always Partial and lists the
+  suggested profile and LoRAs in its reasons.
+- **Substitutes:** a stand-in for a missing file is never silent: the row's
+  state says Substitute in amber, a line under the name says "Using
+  `file` · Another Version: Version 9 instead of 8", and the grade lists it.
+  The row offers Download Exact File until the exact file is installed, then
+  Use Exact File.
+- **Other Versions:** offers sit in their own group after Files, one row per
+  file: what it is (Newer Version, Older Version, Other Precision, Other
+  Format), its version, variant ("GGUF Q4_K_M", "FP8"), base model and size,
+  and its own Download on the right. Only offers that fit the family and the
+  worker are listed; a paid or early-access one shows Unavailable · Paid
+  with the reason and no button. Nothing in the group downloads until chosen.
 - **Footer:** the review's actions: **Download Missing** (one tap queues every
-  missing file; unavailable files never download), Use Prompt and Use
-  Settings. A repository's files are optional: each has its own Download.
+  missing file; unavailable files and files with no recorded source never
+  download), Use Prompt and Use Settings. A repository's files are optional:
+  each has its own Download.
 - **LoRAs and Models:** compact `PickerTools` search, the Installed |
-  Catalogue views and family (LoRAs) or kind (Models) pills on one row, then a
-  flat list: the title, then what it is, version, base model and size, its
-  provenance ("Civitai · Imported", "From the Seed"), trigger words and
-  strength, and the file; the source links and Installed or Not Installed on
-  the right.
+  Catalogue | Updates views (Models: Installed | Updates) and family (LoRAs)
+  or kind (Models) pills on one row, then a flat list: the title, then what
+  it is, version, base model and size, its provenance ("Civitai · Imported",
+  "From the Seed"), trigger words and strength, and the file; the source
+  links and Installed, Not Installed or Update Available on the right.
+- **Updates:** the Updates tab carries its count; the view is one group with
+  Check Updates on its heading and when it last checked under it. Each row
+  says "Update Available: V3 · 228 MB" (and why a paid or early-access one is
+  refused, with the free version) and has Update (or Update to the free
+  version). While it downloads the state says Updating…; afterwards a line
+  says whether the old file was removed or what still uses it. An update
+  never downloads on its own. Update Available puts a dot on the dock's
+  Library icon (its tooltip says so) and a count on the phone Menu's Library.
 - **Downloads:** the shared progress pattern: the file, its folder and size,
   the bar while it runs, the failure under the name, the state on the right
   with one action (Cancel, Retry or Resume).

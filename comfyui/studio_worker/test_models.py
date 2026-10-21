@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from models import digest, discard, inventory, preserve_replaced, receive, state, target, MAX_BYTES
+from models import digest, discard, inventory, preserve_replaced, receive, remove, state, target, MAX_BYTES
 
 
 async def chunks(*items):
@@ -98,6 +98,17 @@ class WorkerModelTests(unittest.TestCase):
         discard(self.root, 'loras', self.file.name)
         self.assertEqual(self.file.read_bytes(), b'abcdef')
         self.assertEqual(backups[0].read_bytes(), b'original')
+
+    def test_remove_needs_the_recorded_checksum(self):
+        self.file.write_bytes(b'abcdef')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            remove(self.root, 'loras', self.file.name, '')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            remove(self.root, 'loras', self.file.name, 'f' * 64)
+        self.assertTrue(self.file.exists())
+        self.assertTrue(remove(self.root, 'loras', self.file.name, self.sha))
+        self.assertFalse(self.file.exists())
+        self.assertFalse(remove(self.root, 'loras', self.file.name, self.sha))
 
     def test_malformed_notes_do_not_break_inventory(self):
         Path(str(self.file) + '.part').write_bytes(b'abc')

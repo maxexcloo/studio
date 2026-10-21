@@ -7,7 +7,13 @@
  *   GET  /api/library/imports/:id             one import, its files checked in full
  *   POST /api/library/imports/:id/download    Download Missing ({indices} for chosen files)
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
- *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance
+ *   POST /api/library/imports/image           {image: data URL, name}: a dropped PNG, WebP or JPEG
+ *   GET  /api/library/imports/:id/picture     an image import's own picture
+ *   POST /api/library/imports/:id/describe    describe an imported image with the vision model (a new record)
+ *   POST /api/library/imports/:id/exact       {index}: Use Exact File instead of its substitute
+ *   POST /api/library/imports/:id/offers      {index}: download one offered version or variant
+ *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance and updates
+ *   GET  /api/library/updates                 update states; POST …/check checks now; POST …/apply {key, alternative?}
  *
  * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do.
  */
@@ -15,16 +21,132 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { modelFolders } from './comfy.js';
 import { civitaiJson } from './civitai-access.js';
-import { modelChecksum } from './civitai-import.js';
+import { modelChecksum, versionResource } from './civitai-import.js';
 import { presetsEnabled } from './features.js';
 import { hfFetch } from './hf-access.js';
-import { catalogueKinds } from './library-catalogue.js';
+import { catalogueKinds, splitCatalogueKey } from './library-catalogue.js';
+import { currentDataDir } from './data-dir.js';
+import { fileStem } from './image-metadata.js';
+import { findSubstitute } from './library-substitutes.js';
+import { createUpdateChecker, dailyMs, hfRepositoryMetadata } from './library-updates.js';
+import { loadSharp } from './sharp-loader.js';
 import { startLibraryDownload } from './library-downloads.js';
 import { createImportEngine, importStore, publicImport } from './library-imports.js';
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from './library-sources.js';
 import { downloadState } from './model-downloads.js';
 import { requireLocal } from './route-access.js';
 import { refreshWorkerModels, remoteModelsEnabled, workerInventory, workerModelFile } from './worker-models.js';
+
+const pictureEdge = 1280;
+const maxImageBytes = 24 * 1024 * 1024;
+const imageDataUrl = /^data:image\/(png|webp|jpeg|jpg);base64,([A-Za-z0-9+/=\s]+)$/;
+
+/** A dropped image from its data URL, or an error saying why not. */
+export function imageFromUpload(value) {
+  const match = imageDataUrl.exec(String(value || ''));
+  if (!match) throw new Error('Drop a PNG, WebP or JPEG image.');
+  const data = Buffer.from(match[2], 'base64');
+  if (!data.length || data.length > maxImageBytes) throw new Error('That image is too large to import (24 MB at most).');
+  return data;
+}
+
+/**
+ * A dropped image's recorded file, found in this order: a catalogue entry with its checksum
+ * (SHA-256 or its AutoV2 prefix), the exact file name installed, the exact Civitai version (by
+ * version id or hash, which also gives its download), then the same name installed. Otherwise it
+ * is unsourced: named, but with nothing to download it from.
+ */
+export async function matchImageResource(item, { installed = {}, entries = {}, json = null } = {}) {
+  const folders = ['checkpoint', 'diffusion_model'].includes(item.role) ? ['checkpoints', 'diffusion_models'] : [item.folder];
+  const label = item.name || item.file;
+  const fromEntry = (key, matchedBy, extra = {}) => {
+    const { folder, file } = splitCatalogueKey(key);
+    const entry = entries[key] || {};
+    const url = entry.links?.civitaiCom || entry.links?.hf || '';
+    return { name: entry.title || label, version: entry.version || '', baseModel: entry.baseModel || '', want: { file, folder, sha256: entry.sha256 || '', bytes: entry.bytes || 0, source: { ...(entry.source || {}), ...(url ? { url } : {}) } }, matchedBy, note: '', ...extra };
+  };
+  if (item.hash) {
+    const key = Object.keys(entries).find((candidate) => folders.includes(splitCatalogueKey(candidate).folder) && entries[candidate]?.sha256?.startsWith(item.hash));
+    if (key) return fromEntry(key, 'hash');
+  }
+  for (const folder of folders) {
+    if (item.file && (installed[folder] || []).includes(item.file)) {
+      const entry = entries[`${folder}/${item.file}`];
+      const differs = item.hash && entry?.sha256 && !entry.sha256.startsWith(item.hash);
+      if (!differs) return fromEntry(`${folder}/${item.file}`, 'name', entry?.sha256 ? {} : { nameOnly: true });
+    }
+  }
+  if (json && (item.versionId || item.hash)) {
+    try {
+      const version = await json(item.versionId ? `model-versions/${item.versionId}` : `model-versions/by-hash/${item.hash}`);
+      const resource = versionResource(version, item.strength ?? 1);
+      if (resource.folder && resource.file) return {
+        name: resource.name, version: resource.version, baseModel: resource.baseModel,
+        want: { file: resource.file, folder: resource.folder, sha256: resource.sha256, bytes: resource.bytes, source: { provider: 'civitai', modelId: version.modelId, versionId: version.id, url: resource.sourceUrl } },
+        spec: resource.spec, supported: Boolean(resource.spec), note: resource.note, matchedBy: item.versionId ? 'version' : 'hash',
+        ...(resource.unavailable ? { unavailable: resource.unavailable } : {})
+      };
+    } catch { /* Not on Civitai, or offline: try the name. */ }
+  }
+  const stem = fileStem(item.file || item.name);
+  for (const folder of folders) {
+    const found = stem && (installed[folder] || []).find((name) => fileStem(name) === stem);
+    if (found) return fromEntry(`${folder}/${found}`, 'name', entries[`${folder}/${found}`]?.sha256 ? {} : { nameOnly: true });
+  }
+  return { name: label, want: { file: item.file || '', folder: folders[0], sha256: '' }, unsourced: true, nameOnly: true, note: 'No download source was recorded. Install it by name, or import its model link.' };
+}
+
+/** Removes an installed model file, only when it is still the one recorded (by checksum when known). */
+export async function removeInstalled(want, { foldersFor = modelFolders } = {}) {
+  if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder)) throw new Error('That isn’t a model file Studio manages.');
+  const names = subfolders[want.folder] || [want.folder];
+  if (remoteModelsEnabled()) {
+    await refreshWorkerModels({ force: true });
+    const file = workerInventory().files.find((item) => names.some((folder) => item.path === `${folder}/${want.file}`));
+    if (!file) return { removed: false };
+    await workerModelFile({ folder: file.path.split('/')[0], file: want.file, sha256: want.sha256 || '' }, 'remove');
+    await refreshWorkerModels({ force: true });
+    return { removed: true };
+  }
+  for (const dir of foldersFor(want.folder, names)) {
+    const file = path.join(dir, want.file);
+    let stat;
+    try { stat = await fs.promises.stat(file); } catch { continue; }
+    if (!stat.isFile()) continue;
+    if (want.sha256 && await modelChecksum(file, { verify: true }) !== want.sha256) throw new Error('The installed file has changed since it was recorded, so it stays.');
+    await fs.promises.rm(file);
+    return { removed: true };
+  }
+  return { removed: false };
+}
+
+/** Each import's own picture (longest edge 1280 px, WebP), beside the records. */
+export function importPictures({ dataDir = currentDataDir(), sharp = loadSharp } = {}) {
+  const dir = path.join(dataDir, 'library', 'import-pictures');
+  const fileFor = (id) => /^imp-[a-z0-9]{6,40}$/.test(String(id)) ? path.join(dir, `${id}.webp`) : '';
+  return {
+    file: fileFor,
+    async save(id, buffer) {
+      const target = fileFor(id);
+      const library = await sharp();
+      if (!target || !library) return false;
+      const data = await library(buffer, { limitInputPixels: 80_000_000 }).rotate().resize({ width: pictureEdge, height: pictureEdge, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(`${target}.tmp`, data, { mode: 0o600 });
+      await fs.promises.rename(`${target}.tmp`, target);
+      // Pictures of pruned imports go too.
+      const records = path.join(dataDir, 'library', 'imports');
+      const names = await fs.promises.readdir(dir).catch(() => []);
+      if (names.length > 520) for (const name of names) if (name.endsWith('.webp') && !fs.existsSync(path.join(records, name.replace(/\.webp$/, '.json')))) await fs.promises.rm(path.join(dir, name), { force: true });
+      return true;
+    },
+    async copy(from, to) {
+      if (!fileFor(from) || !fileFor(to)) return false;
+      await fs.promises.copyFile(fileFor(from), fileFor(to));
+      return true;
+    }
+  };
+}
 
 const subfolders = { diffusion_models: ['diffusion_models', 'unet'], text_encoders: ['text_encoders', 'clip'] };
 
@@ -95,14 +217,71 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
  * files ComfyUI lists per folder; `loraInfo(names)` the LoRA metadata (lora-info.js);
  * `catalogue()` the catalogue store.
  */
-export function registerLibraryRoutes(app, { presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore() }) {
+export function registerLibraryRoutes(app, {
+  presets, installed, loraInfo, catalogue, json = civitaiJson, hfRequest = hfFetch, inspect = inspectInstalled, downloads = downloadState, startDownload = startLibraryDownload, store = importStore(),
+  /** [{id, label, kind, family, familyName, model}]: the image profiles and the base model each runs. */
+  profiles = async () => [],
+  /** Family ids for a base model name ("Flux.1 D", "sdxl"). */
+  familiesOf = () => [],
+  /** Whether the worker has the GGUF loader nodes. */
+  gguf = async () => false,
+  /** The prompt assistant engine (assistant.js), or null while it is unset. */
+  assistant = () => null,
+  /** What still uses a model file: ['the Flux Dev profile', …] (update clean-up, Decision 4). */
+  references = async () => [],
+  removeFile = removeInstalled,
+  pictures = importPictures(),
+  schedule = true
+}) {
+  // One answer for a burst of reads (a list of imports asks for every file's stand-in).
+  const recent = (load, ms = 5000) => { let at = 0; let value = null; return async () => { if (!value || Date.now() - at > ms) { value = load(); at = Date.now(); value.catch(() => { value = null; }); } return value; }; };
+  const installedNow = recent(() => installed());
+  const profilesNow = recent(() => profiles());
+  const visionNow = async () => {
+    const engine = assistant();
+    if (!engine) return { available: false, reason: 'Set up the prompt assistant in Settings › Models › Integrations to describe images.' };
+    try { return await engine.supportsVision(engine.settings().model) ? { available: true, reason: '' } : { available: false, reason: 'The assistant model can’t read images. Choose a vision model in Settings › Models › Integrations.' }; }
+    catch { return { available: false, reason: 'The prompt assistant is unavailable.' }; }
+  };
+  const describePicture = async ({ id }) => {
+    const engine = assistant();
+    if (!engine) throw new Error('The prompt assistant isn’t set up.');
+    const file = pictures.file(id);
+    const data = (await fs.promises.readFile(file)).toString('base64');
+    const offered = await profilesNow().catch(() => []);
+    const loras = ((await installedNow().catch(() => ({}))).loras || []).map((name) => ({ name }));
+    const result = await engine.describe({ images: [{ mime: 'image/webp', data }], profiles: offered.map(({ id: profileId, label }) => ({ id: profileId, label })), loras });
+    if (!result.available) throw new Error(result.reason || 'The assistant model can’t read images.');
+    return { ...result, profileLabel: offered.find((item) => item.id === result.profileId)?.label || '', loras: result.loras || [] };
+  };
   const engine = createImportEngine({
     store, detect: detectLink, inspect, downloads, startDownload, catalogue: { edit: (...args) => catalogue().edit(...args) },
-    resolveCivitai: (url) => resolveCivitaiModel(url, { json }),
-    resolveHf: (url) => resolveHuggingFace(url, { request: hfRequest }),
+    resolveCivitai: async (url) => resolveCivitaiModel(url, { json, familiesOf, gguf: await gguf().catch(() => false) }),
+    resolveHf: async (url) => resolveHuggingFace(url, { request: hfRequest, gguf: await gguf().catch(() => false) }),
     importImage: (url) => presets.importImage(url),
-    resolvePreset: (id, options) => presets.resolvePreset(id, options)
+    resolvePreset: (id, options) => presets.resolvePreset(id, options),
+    matchImage: async (item) => matchImageResource(item, { installed: await installedNow().catch(() => ({})), entries: catalogue().entries({ throttleMs: 5000 }), json }),
+    substituteFor: async (resource) => {
+      const files = Object.entries(await installedNow().catch(() => ({}))).flatMap(([folder, names]) => (names || []).map((file) => ({ folder, file })));
+      const list = (await profilesNow().catch(() => [])).filter((item) => item.kind !== 'video');
+      const [family] = familiesOf(resource.baseModel || resource.want.file || resource.name || '');
+      return findSubstitute({ file: resource.want.file, name: resource.want.file ? '' : resource.name, folder: resource.want.folder }, files, { role: resource.role, family, familyName: list.find((item) => item.family === family)?.familyName || '', profiles: list });
+    },
+    profileFor: async (file) => (await profilesNow().catch(() => [])).find((item) => item.kind !== 'video' && item.model === file)?.id || '',
+    pictures, describe: describePicture, vision: visionNow
   });
+  const installedKeys = async () => new Set(Object.entries(await installedNow().catch(() => ({}))).flatMap(([folder, names]) => (names || []).map((file) => `${folder}/${file}`)));
+  const updates = createUpdateChecker({
+    catalogue: { entries: () => catalogue().entries({ throttleMs: 5000 }), edit: (...args) => catalogue().edit(...args) },
+    installed: installedKeys, json, hfMetadata: (repo) => hfRepositoryMetadata(repo, { request: hfRequest }), familiesOf,
+    startDownload, downloads, inspect, references, removeFile
+  });
+  if (schedule) {
+    const check = () => updates.check().catch((error) => console.warn(`[library] The update check failed: ${error.message}`));
+    setTimeout(check, 10 * 60 * 1000).unref?.();
+    setInterval(check, dailyMs).unref?.();
+    setInterval(() => { updates.settle().catch(() => undefined); }, 30 * 1000).unref?.();
+  }
   const by = (req) => String(req.studioAccount?.id || req.studioAccount?.username || '');
   const route = (handler, { imports = true } = {}) => async (req, res) => {
     if (!requireLocal(req, res)) return;
@@ -113,7 +292,27 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
   };
 
   app.get('/api/library/imports', route(async (_req, res) => {
-    res.json({ ok: true, imports: (await engine.list()).map(publicImport) });
+    res.json({ ok: true, imports: (await engine.list()).map(publicImport), vision: await visionNow() });
+  }));
+  app.post('/api/library/imports/image', route(async (req, res) => {
+    const record = await engine.createFromImage({ data: imageFromUpload(req.body?.image), name: String(req.body?.name || ''), by: by(req), origin: 'ui' });
+    res.json({ ok: true, import: publicImport(record) });
+  }));
+  app.get('/api/library/imports/:id/picture', route(async (req, res) => {
+    const file = store.get(req.params.id)?.picture ? pictures.file(req.params.id) : '';
+    if (!file || !fs.existsSync(file)) { res.sendStatus(404); return; }
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.type('webp').sendFile(file, { dotfiles: 'allow' });
+  }));
+  app.post('/api/library/imports/:id/describe', route(async (req, res) => {
+    res.json({ ok: true, import: publicImport(await engine.describeImport(req.params.id, { by: by(req) })) });
+  }));
+  app.post('/api/library/imports/:id/exact', route(async (req, res) => {
+    res.json({ ok: true, import: publicImport(await engine.useExact(req.params.id, Number(req.body?.index))) });
+  }));
+  app.post('/api/library/imports/:id/offers', route(async (req, res) => {
+    const result = await engine.acceptOffer(req.params.id, Number(req.body?.index), { by: by(req) });
+    res.json({ ok: true, import: publicImport(result.record), queued: result.queued, failures: result.failures });
   }));
   app.post('/api/library/imports', route(async (req, res) => {
     const record = await engine.create(String(req.body?.url || ''), { by: by(req), origin: 'ui' });
@@ -136,7 +335,24 @@ export function registerLibraryRoutes(app, { presets, installed, loraInfo, catal
   app.get('/api/library/items', route(async (_req, res) => {
     const files = await installed().catch(() => ({}));
     const info = await loraInfo(files.loras || []).catch(() => ({}));
-    res.json({ ok: true, items: libraryItems({ installed: files, entries: catalogue().entries({ throttleMs: 5000 }), loraInfo: info }) });
+    const state = await updates.settle().catch(() => updates.summary());
+    const items = libraryItems({ installed: files, entries: catalogue().entries({ throttleMs: 5000 }), loraInfo: info }).map((item) => {
+      const update = item.installed ? state.byEntry[item.key] : null;
+      const applied = state.applied[item.key];
+      return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
+    });
+    res.json({ ok: true, items, updates: { checkedAt: state.checkedAt, available: state.available } });
   }, { imports: false }));
-  return engine;
+  app.get('/api/library/updates', route(async (_req, res) => {
+    res.json({ ok: true, ...(await updates.settle().catch(() => updates.summary())) });
+  }, { imports: false }));
+  app.post('/api/library/updates/check', route(async (req, res) => {
+    const keys = Array.isArray(req.body?.keys) ? req.body.keys.map(String).slice(0, 300) : null;
+    res.json({ ok: true, ...(await updates.check({ keys })) });
+  }, { imports: false }));
+  app.post('/api/library/updates/apply', route(async (req, res) => {
+    const applied = await updates.apply(String(req.body?.key || ''), { alternative: req.body?.alternative === true, by: by(req) });
+    res.json({ ok: true, applied, ...updates.summary() });
+  }));
+  return { engine, updates };
 }

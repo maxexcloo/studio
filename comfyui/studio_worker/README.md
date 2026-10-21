@@ -17,7 +17,7 @@ COPY --from=ghcr.io/maxexcloo/studio:<version> /app/comfyui/studio_worker /root/
 - `GET /studio/worker`: version and whether a token is required.
 - `POST /studio/worker/delete`: `{ "files": [{ "type": "output" | "input" | "temp", "subfolder": "…", "filename": "…" }] }`. Up to 256 files per call. Only media files inside ComfyUI's own output, input and temp folders can be deleted. Paths that escape those folders, dot folders and symlinks are refused.
 - `GET /studio/worker/models`: configured model files, partial transfers and available disk space.
-- `POST /studio/worker/models/file`: `{ "folder": "loras", "file": "example.safetensors", "action": "stat" }`. Actions are `stat`, `hash`, `discard` and explicit `replace`; replacement preserves the original as a `.previous.*` file.
+- `POST /studio/worker/models/file`: `{ "folder": "loras", "file": "example.safetensors", "action": "stat" }`. Actions are `stat`, `hash`, `discard`, explicit `replace` and `remove`; replacement preserves the original as a `.previous.*` file, and `remove` (Library updates) deletes an installed model only when its SHA-256 matches the `sha256` given.
 - `PUT /studio/worker/models/upload`: streamed weights with `folder`, `file`, `offset`, `size` and `sha256` query parameters. `X-Studio-Model-Metadata` contains ASCII-escaped JSON with a source fingerprint and resume validators. Transfers require a published SHA-256 checksum, stay below 256 GiB and never overwrite an existing destination. Partial bytes resume only when their source, checksum and total size match.
 
 Model endpoints always require a nonempty matching token. Enable them in Studio

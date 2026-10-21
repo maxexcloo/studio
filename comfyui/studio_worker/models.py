@@ -142,6 +142,23 @@ async def discard_when_idle(root, folder, filename):
     raise ValueError('The active model transfer has not stopped yet.')
 
 
+def remove(root, folder, filename, expected):
+    """Removes an installed model only while it is still the file Studio recorded (by checksum)."""
+    if not re.fullmatch('[a-fA-F0-9]{64}', expected or ''):
+        raise ValueError('A published SHA-256 checksum is required.')
+    file = target(root, folder, filename, subfolders=True)
+    acquire(file)
+    try:
+        if not file.is_file():
+            return False
+        if digest(file) != expected.lower():
+            raise ValueError('The installed file has changed since it was recorded.')
+        file.unlink()
+        return True
+    finally:
+        release(file)
+
+
 def preserve_replaced(root, folder, filename, expected):
     if not re.fullmatch('[a-fA-F0-9]{64}', expected):
         raise ValueError('A published SHA-256 checksum is required.')
