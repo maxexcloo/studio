@@ -69,7 +69,6 @@
 .composer-loras .lora-option { position: relative; display: flex; align-items: center; gap: var(--space-4); min-height: 54px; padding: 8px; border: 0; background: transparent; }
 .composer-loras .lora-option:hover, .composer-loras .lora-option.is-highlight { background: var(--cursor-bg); }
 .composer-loras .lora-option-check { flex: none; }
-.composer-loras .lora-option-star { flex: none; opacity: 1; }
 .composer-loras .lora-option-copy span { white-space: normal; overflow-wrap: anywhere; }
 .composer-loras .lora-option > em { max-width: 28%; }
 .composer-loras .lora-picker-foot { gap: var(--space-4); }
@@ -82,20 +81,6 @@
 .model-menu .model-option.active { background: transparent; box-shadow: none; }
 .model-menu .model-option.active:hover { background: var(--control-hover); }
 
-/* Direct LoRA selection keeps weights beside each selected file. */
-.composer-loras .lora-library-row { position: relative; min-width: 0; padding: 7px 0; border-bottom: 1px solid var(--line); }
-.composer-loras .lora-library-select { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: 44px; padding: 4px 34px 4px 2px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--foreground)); text-align: left; cursor: pointer; }
-.composer-loras .lora-library-select:hover { color: hsl(var(--foreground)); }
-.composer-loras .lora-library-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
-.composer-loras .lora-library-select:disabled { opacity: .45; cursor: default; }
-.composer-loras .lora-library-select .lora-option-copy { flex: 1; min-width: 0; }
-.composer-loras .lora-library-select .lora-option-copy strong { font-size: 12px; }
-.composer-loras .lora-library-select .lora-option-copy span { display: block; overflow-wrap: anywhere; color: hsl(var(--muted-foreground)); font-size: 10.5px; }
-.composer-loras .lora-library-row > .lora-option-star { position: absolute; top: 12px; right: 0; }
-.composer-loras .lora-library-note { margin: 2px 40px 4px 2px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
-.composer-loras .lora-library-settings { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); margin: 6px 2px 4px 30px; }
-.composer-loras .lora-library-settings .lora-strength { flex: 1; min-width: 150px; }
-.composer-loras .lora-library-settings .lora-triggers { flex-basis: 100%; margin: 0; }
 .composer-loras .lora-picker:not(.is-list) .lora-option { display: flex; min-height: 52px; }
 
 /* Creation and dock icons share the same quiet, hover and open states. */
@@ -116,33 +101,8 @@
 .composer-loras .lora-picker { gap: 0; }
 .composer-loras .lora-picker-head { order: 3; padding: 8px 12px; border-top: 1px solid var(--line); }
 .composer-loras .lora-picker-search { order: 0; margin: 10px 16px; height: 44px; padding: 0 10px; border: 1px solid transparent; background: var(--control-fill); }
-.composer-loras .lora-picker-list { order: 2; margin: 0; padding: 0 12px 10px; }
-.composer-loras .lora-library-row:last-child { border-bottom: 0; }
-.composer-loras .lora-library-select:hover { background: var(--cursor-bg); }
+.composer-loras .lora-picker-list { order: 2; margin: 0; padding: 4px 8px 8px; }
 .composer-loras .lora-panel > :not(.lora-picker) { margin-left: 12px; margin-right: 12px; }
-
-/* Selection counts in the resource picker; stacks live in its heading (PickerTools). */
-.composer-loras .lora-library-expansion { overflow: hidden; }
-.composer-loras .lora-library-order { display: inline-flex; align-items: center; }
-.composer-loras .lora-library-order .prompt-action { width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); }
-.composer-loras .lora-library-settings .lora-strength { min-width: 100px; }
-
-.composer-loras .lora-library-grip { position: absolute; top: 7px; left: 0; display: grid; place-items: center; width: 28px; height: 44px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
-.composer-loras .lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 30px; }
-.composer-loras .lora-library-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
-
-.composer-loras .lora-library-row.is-dragging { opacity: .6; }
-.composer-loras .lora-library-row.is-drop-target { outline: 1px solid hsl(var(--foreground) / .6); outline-offset: -1px; border-radius: var(--r-item); }
-
-/* Info sits beside the star as an icon, so a closed row is one line; its details still open below. */
-.composer-loras .lora-library-select { padding-right: 72px; }
-/* On touch the Info target reaches 44px without changing the row; it stops short of the star. */
-/* The keyboard's place in the list is always visible. */
-.composer-loras .lora-library-select[data-highlight="true"] { background: var(--cursor-bg); }
-
-/* The on/off switch beside a strength is small to look at but a full finger's width to tap. */
-.composer-loras .lora-library-settings .switch { position: relative; }
-.composer-loras .lora-library-settings .switch::after { content: ""; position: absolute; inset: -13px -4px; }
 
 /* The closed composer names the active LoRAs instead of counting them. */
 .lora-pill-summary { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

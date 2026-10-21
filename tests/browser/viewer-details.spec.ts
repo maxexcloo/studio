@@ -109,6 +109,8 @@ test('LoRA Details includes its information and both Civitai hosts', async ({ pa
   await expect(viewer.getByText('Catalogue description', { exact: true })).toBeVisible();
   for (const host of ['civitai.com', 'civitai.red']) await expect(viewer.getByRole('link', { name: `View Test Adapter on ${host}`, exact: true })).toHaveAttribute('href', `https://${host}/models/123?modelVersionId=456`);
   await expect(viewer.getByRole('region', { name: 'Test Adapter Information' }).getByRole('link')).toHaveCount(0);
+  // View Source is one icon per host, never a text pill.
+  await expect(viewer.locator('.lora-sources a')).toHaveText(['', '']);
   expect(await viewer.locator('.lora-sources a').evaluateAll(links => {
     const [com, red] = links.map(link => link.getBoundingClientRect());
     return com.right <= red.left + 0.1;

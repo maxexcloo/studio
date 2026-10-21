@@ -293,12 +293,13 @@ One chooser pattern for References, LoRAs and Models (`PickerTools.tsx`): one
 heading row, then the grid or list. On the desktop it is an anchored popover;
 on the phone a pop-up list over Create (see [Layering](#layering)).
 
-- **Desktop heading:** the title, the views (Library | Uploads | Selected
-  n/max, This Model | All Models | Selected n/max, or All | Favourites, Fast |
-  Quality), the LoRA **Stacks** dropdown, Upload (References), **Clear**, the
-  search icon, then Close, all on one centre line. There is no hint text and no
-  toolbar row under the heading. A narrow LoRAs popover drops the title and the
-  Stacks label before anything else.
+- **Desktop heading:** no title or icon: the views lead (Library | Uploads |
+  Selected n/max, This Model | All | Selected n/max, or the model filters All ·
+  ★ · Fast · Quality, all on the same selector track), then the LoRA
+  **Stacks** dropdown, Upload (References: an icon button styled like the
+  search icon), **Clear**, the search icon, then Close, all on one centre line.
+  There is no hint text and no toolbar row under the heading. A narrow LoRAs
+  popover drops the Stacks label first.
 - **Phone heading:** the views become a dropdown that carries the title
   ("LoRAs · This Model ▾", "References · Library ▾", "Model · All ▾"); the
   filters that combine (Favourites with Fast or Quality) are ticks in the same
@@ -306,11 +307,16 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   search icon and Close, every target 44 px. The list starts right under the
   heading.
 - **Compact search:** an icon, not a permanent row. The icon (or typing
-  anywhere in the chooser) opens the field with the focus in it: on the
-  desktop it grows leftwards from the icon inside the heading row, at
-  `--control-h-sm`, and the views give way to it; on the phone it opens under
-  the heading. Close Search clears the query and folds it away; the field stays
-  open while a query is active, with the icon in the accent.
+  anywhere in the chooser) opens the field with the focus in it. On the
+  desktop References and LoRAs `cover` the heading: the field fills it, at
+  `--control-h-sm`, over the views, Stacks, Upload and Clear (Close stays);
+  Models use `row`: the field drops down under the heading, the popover's
+  width, and the filters stay. On the phone it opens under the heading. The
+  open field carries its own Close Search (an X at its end, in place of the
+  icon and of the field's own clear); Close Search clears the query and folds
+  it away, and choosing a view on the desktop starts from there. The field
+  stays open while a query is active. Choosers keep a minimum height, so a
+  short list or a narrow search doesn't shrink them.
 - **Clear** shows only while something is picked. It empties the selection at
   once and offers Undo in the status pill; it never asks first.
 - **One selected mark:** a picked row or tile shows the amber tick
@@ -324,10 +330,19 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   arrow keys on the grip. Nothing animates: the dragged row dims, the row under
   it is outlined, and the order changes on the drop. References and LoRAs use
   the same hook; there is no framer `Reorder`.
-- A LoRA row's actions sit on the right, centred on its title line, in this
-  order: the tick, View Source (small equal text pills, "com" and "red", 32 px
-  targets, 44 px on touch), then Star. Enabled LoRAs show their information
-  automatically below the row, on the title's left edge (see [Action
+- **LoRA rows are Models rows:** the same height (58 px in the desktop
+  popover; 52 px with hairlines between them and 15 px names on the phone, as
+  the phone's model list), padding, rounded `--cursor-bg` hover filling the
+  whole row and section headings (Favourites, this model's family, then under
+  All what the rest were made for). The friendly name, then one muted line of
+  its description cut short with an ellipsis; a reason it can't be added (or
+  may not suit) follows in full. On the right: the amber tick when picked,
+  then View Source as small icon buttons, one per host (`Globe` for
+  civitai.com, `ShieldOff` for civitai.red, `ExternalLink` for any other
+  source; tooltips and names "View X on civitai.com"), then Star. No pills,
+  cards or hairlines on the desktop. Nothing opens under a row while
+  browsing; the Selected view shows each pick's information in full in place
+  of the one line, then on/off · strength · order (see [Action
   Placement](#action-placement) › LoRA information).
 - **LoRA stacks:** the Stacks dropdown, the same on both devices, lists the
   model family's saved stacks alphabetically with the one in use ticked;
@@ -371,7 +386,7 @@ A picker, tab or list with nothing to show uses `EmptyState`
   single-slot model keeps its one thumbnail chip. A model that takes no reference shows no
   References control at all (no Reference With). Edit | Reference and the
   inpaint brush sit beside the button.
-- **LoRAs** use the same pattern: This Model | All Models | Selected n/max in
+- **LoRAs** use the same pattern: This Model | All | Selected n/max in
   the library, one tap to add or remove, no row animations.
 - **Number steppers:** one `NumberPicker` (minus, value, plus) everywhere; on
   touch screens each part is a 44 px target. Names read "Decrease Images",
@@ -404,7 +419,10 @@ A picker, tab or list with nothing to show uses `EmptyState`
   (`--row-h-menu` rows, labels on the left, dropdowns and `NumberPicker`
   steppers on the right at `--control-h-sm`, one quiet heading per group),
   as tall as its rows and scrolling inside past the room above, with every
-  option the profile exposes but Width and Height (they belong to Size). Close is on the right. **Upscale** and **Face Detail** are
+  option the profile exposes but Width and Height (they belong to Size). On
+  the desktop it has no heading (Escape, an outside click or its button close
+  it); the groups, and the rows in each, read alphabetically, with a master
+  control before what depends on it. **Upscale** and **Face Detail** are
   chosen per generation here, starting from Settings › Studio; face detail
   runs only with an upscale. The phone shows the same list as a pop-up over
   Create.
@@ -635,16 +653,19 @@ kind of element:
   the time, the size and steps (a video adds its duration). The phone keeps it
   inline with Star · Info · Close. There is no Image Text button. Keep it clear
   of the Details controls and image actions.
-- **LoRA information:** an enabled LoRA automatically shows what it says about
-  itself under its name, on the name's left edge, with no card or extra inset
-  (`LoraDetails`): the description once, any catalogue note that adds
-  something, the suggested strength once and the trigger words once as chips.
-  No File or Family line, no "No description" placeholder, and no note that
-  only repeats the trigger or the strength; with nothing to say there is no
-  panel. Turning it off hides the panel at once; the friendly title stays and
-  the file name is only in its tooltip. The source pills ("com", "red") open
-  civitai.com and civitai.red and never repeat inside the panel. The same
-  panel serves the picker and generation Details.
+- **LoRA information:** where a LoRA is in use (the chooser's Selected view,
+  while it is on, and generation Details) it shows what it says about itself
+  under its name, on the name's left edge, as plain muted text with no card or
+  extra inset (`LoraDetails`): the description once, in full, in place of the
+  one-line description, any catalogue note that adds something, the suggested
+  strength once and the trigger words once as chips. No File or Family line,
+  no "No description" placeholder, and no note that only repeats the trigger
+  or the strength; with nothing to say there is no panel. Turning it off hides
+  the panel at once; the friendly title stays and the file name is only in its
+  tooltip. The source icons open civitai.com and civitai.red and never repeat
+  inside the panel. Details lists LoRAs as flat rows like the chooser's (the
+  name, then the strength and the source icons on the right, hairlines
+  between), from the same components.
 - **Selecting:** a long press on a phone tile starts selecting with that item
   (there is no long-press action sheet). Selecting offers Select All, then
   Select Failed (in that order on both), then Download (a zip when several)

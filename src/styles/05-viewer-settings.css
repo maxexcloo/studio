@@ -193,18 +193,10 @@
 /* "Copy as text" in the header: a quiet pill that copies without opening or closing it. */
 .detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 
-/* Each LoRA as a card: its name, a hairline, its strength. */
-.detail-loras { display: grid; gap: var(--space-3); margin: 2px 0 0; padding: 0; list-style: none; }
-.detail-lora {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: var(--r-media);
-  background: rgb(255 255 255 / .035);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07);
-}
+/* Each LoRA as a flat row, like the LoRA chooser's: its name, then its strength and View Source on the right; its information under the name. Hairlines between. */
+.detail-loras { display: grid; gap: 0; margin: 2px 0 0; padding: 0; list-style: none; }
+.detail-lora { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); min-height: 40px; padding: 4px 0; }
+.detail-lora + .detail-lora { border-top: 1px solid var(--list-hairline, var(--line)); }
 .detail-lora-name {
   flex: 1;
   min-width: 0;
@@ -215,13 +207,13 @@
   font-size: 13px;
   font-weight: 500;
 }
-.detail-lora > i { flex: none; width: 1px; height: 14px; background: rgb(255 255 255 / .12); }
 .detail-lora-strength {
   flex: none;
   color: hsl(var(--muted-foreground));
   font: 500 12px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+.detail-lora > .lora-info-panel { flex-basis: 100%; padding: 0 0 6px; }
 .detail-section h4 {
   margin: 0;
   color: hsl(var(--muted-foreground));

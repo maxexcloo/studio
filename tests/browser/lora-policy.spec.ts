@@ -157,14 +157,19 @@ test('LoRA library offers direct list selection with inline strengths and access
   await other.click();
   // A pick stays where it was clicked; it doesn't jump away from the pointer.
   await expect.poll(async () => Math.abs((await other.boundingBox())!.y - before!.y)).toBeLessThan(2);
-  await expect(picker.getByRole('region', { name: 'Cards One Information', exact: true })).toBeVisible();
-  await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
+  // Browsing, a row is its name and one line of description, as in Models; nothing opens under it.
+  await expect(picker.locator('[data-lora-name="cards-one.safetensors"] .lora-option-copy em')).toHaveText('Use for printed card illustrations.');
+  await expect(picker.getByRole('region', { name: 'Cards One Information', exact: true })).toHaveCount(0);
   await expect(picker.getByRole('link', { name: 'View Cards One on Source', exact: true })).toHaveAttribute('href', 'https://example.com/cards');
   await expect(other).toHaveAttribute('aria-checked', 'true');
   // Rows never move: the stack order shows in the Selected tab, where they reorder by drag, grip keys or Move.
   const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');
   await expect(picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true })).toHaveCount(0);
   await pickerView(picker, /^Selected 2 of /);
+  // In the Selected view an enabled pick shows its information in full, in place of the one-line description.
+  await expect(picker.getByRole('region', { name: 'Cards One Information', exact: true })).toBeVisible();
+  await expect(picker.getByRole('region', { name: 'Cards One Information', exact: true }).getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
+  await expect(picker.locator('[data-lora-name="cards-one.safetensors"] .lora-option-copy em')).toHaveCount(0);
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).press('ArrowUp');
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Move Cards One Down', exact: true }).click();

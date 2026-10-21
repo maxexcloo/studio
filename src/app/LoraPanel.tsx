@@ -3,7 +3,7 @@ import { scrollBehavior } from '@/lib/springs';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Bookmark, Check, ChevronDown, ChevronUp, GripVertical, Layers, Plus, Search, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Bookmark, Check, ChevronDown, ChevronUp, ExternalLink, Globe, GripVertical, Layers, Plus, Search, ShieldOff, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLoras, type FitOf } from './loras';
 import { Switch } from './SettingsControls';
@@ -141,10 +141,18 @@ export function loraSources(info?: LoraInfo): Array<{ label: string; url: string
   } catch { return []; }
 }
 
-/** View Source as small equal text pills ("com", "red"), centred on the row's title line. */
+/** One icon per host (UI-PATTERNS › Pickers): a globe for civitai.com, a lifted shield for civitai.red, an external link for any other source. */
+const sourceIcon = (host: string) => host === 'civitai.com' ? Globe : host === 'civitai.red' ? ShieldOff : ExternalLink;
+
+/** View Source as small icon buttons, one per host, named and tipped "View X on host". */
 export function LoraSources({ info, label }: { info?: LoraInfo; label: string }) {
   const sources = loraSources(info);
-  return sources.length ? <span className="lora-sources">{sources.map(source => <Tip key={source.label} content={`View ${label} on ${source.label}`}><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${label} on ${source.label}`}><span aria-hidden="true">{source.label === 'Source' ? 'Source' : source.label.replace('civitai.', '')}</span></a></Tip>)}</span> : null;
+  return sources.length ? <span className="lora-sources">{sources.map(source => { const Icon = sourceIcon(source.label); return <Tip key={source.label} content={`View ${label} on ${source.label}`}><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${label} on ${source.label}`}><Icon size={15} aria-hidden="true" /></a></Tip>; })}</span> : null;
+}
+
+/** A LoRA's own description, for the one muted line under its name. */
+export function loraDescription(info?: LoraInfo) {
+  return (info?.description || info?.about || '').trim();
 }
 
 /** A catalogue line that only says the trigger or the strength again, which the panel already shows. */
@@ -163,7 +171,7 @@ function repeatsKnown(text: string, info?: LoraInfo) {
  */
 export function LoraDetails({ info, label, enabled }: { info?: LoraInfo; label: string; enabled: boolean; file?: string }) {
   if (!enabled) return null;
-  const description = (info?.description || info?.about || '').trim();
+  const description = loraDescription(info);
   const extra = [info?.note, info?.guidance].map((line) => (line || '').trim()).filter((line, index, all) => line && line !== description && all.indexOf(line) === index && !repeatsKnown(line, info));
   if (!description && !info?.strengthRange && !extra.length && !info?.triggers?.length) return null;
   return <section className="lora-info-panel" aria-label={`${label} Information`}>
@@ -281,8 +289,21 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(filteredOptions.filter((name) => `${name} ${nameOf(name)}`.toLowerCase().includes(q)), profile, '', fitOf).map((name) => ({ key: `q:${name}`, name })) }];
     if (reviewing) return [{ id: 'selected', label: '', rows: current.map((name) => ({ key: name, name })) }];
     if (libraryView) {
+      // Headed groups, as in Models: Favourites, then this model's family, then (under All) what the rest were made for.
       const ranked = rankedLoras(filteredOptions, profile, '', fitOf);
-      return [{ id: 'all', label: '', rows: [...ranked.filter((name) => favorites.includes(name)), ...ranked.filter((name) => !favorites.includes(name)), ...current.filter((name) => !ranked.includes(name))].map(name => ({ key: name, name })) }];
+      const listed = [...ranked, ...current.filter((name) => !ranked.includes(name))];
+      const family = modelFamilyLabel(profile) || 'This Model';
+      const own = new Set(modelLoras(options, fitOf, false));
+      const groups = new Map<string, string[]>();
+      for (const name of listed.filter((name) => !favorites.includes(name))) {
+        const label = own.has(name) ? family : baseOf(name) || 'Other Models';
+        groups.set(label, [...(groups.get(label) || []), name]);
+      }
+      const fav = listed.filter((name) => favorites.includes(name));
+      return [
+        ...(fav.length ? [{ id: 'favorites', label: 'Favourites', rows: fav.map((name) => ({ key: name, name })) }] : []),
+        ...[...groups].map(([label, names]) => ({ id: `group:${label}`, label, rows: names.map((name) => ({ key: name, name })) })),
+      ];
     }
     const out: PickerSection[] = [];
     const fav = favorites.filter((name) => available.has(name));
@@ -295,7 +316,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }
     return out;
-  }, [available, favorites, fitOf, filteredOptions, nameOf, profile, query, recents, libraryView, current, reviewing]);
+  }, [available, favorites, fitOf, filteredOptions, nameOf, baseOf, options, profile, query, recents, libraryView, current, reviewing]);
 
   const hasRows = sections.some((section) => section.rows.length > 0);
   const visibleRows = useMemo(() => sections.flatMap((section) => collapsed.has(section.id) ? [] : section.rows), [collapsed, sections]);
@@ -393,27 +414,39 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                   const item = inlineSelection.items.find(item => item.name === row.name);
                   const label = nameOf(row.name);
                   const info = inlineSelection.infoOf(row.name);
-                  return <div key={row.key} data-lora-name={row.name} data-reorder-key={reviewing ? row.name : undefined} className={cn('lora-library-row', item && 'is-selected', reorder.rowState(row.name).dragging && 'is-dragging', reorder.rowState(row.name).over && 'is-drop-target')}>
+                  // In use (the Selected view, on), its information replaces the one-line description.
+                  const informed = Boolean(reviewing && item && item.enabled !== false);
+                  const description = informed ? '' : loraDescription(info);
+                  const note = blocked(row.name) ? blockedNote(row.name) : policyNoteOf(row.name) || (fitOf(row.name) === 'other' && baseOf(row.name) ? `Made for ${baseOf(row.name)}` : '');
+                  return <div key={row.key} data-lora-name={row.name} data-reorder-key={reviewing ? row.name : undefined} className={cn('lora-library-row', item && 'is-selected', reviewing && 'is-reviewing', index === highlight && 'is-cursor', reorder.rowState(row.name).dragging && 'is-dragging', reorder.rowState(row.name).over && 'is-drop-target')}>
                     {item && reviewing && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`} {...reorder.grip(row.name)}><GripVertical size={14} /></button> : null}
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
                       {/* The Selected view shows each pick's place in the stack; elsewhere a pick is the amber tick, as in Models. */}
                       {reviewing ? <span className="picker-order is-on" aria-hidden="true">{item ? inlineSelection.items.indexOf(item) + 1 : null}</span> : null}
-                      <span className="lora-option-copy"><strong>{label}</strong></span>
+                      <span className="lora-option-copy">
+                        <strong>{label}</strong>
+                        {description ? <em>{description}</em> : null}
+                        {note ? <span className="lora-library-note">{note}</span> : null}
+                      </span>
                       {reviewing ? null : <SelectedTick on={Boolean(item)} />}
                     </button>
-                    <LoraSources info={info} label={label} />
-                    <LoraDetails info={info} label={label} enabled={Boolean(item && item.enabled !== false)} file={row.name} />
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={14} fill={favorite ? 'currentColor' : 'none'} /></button>
-                    {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
-                    {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
-                    {item && reviewing ? <div className="lora-library-expansion"><div className="lora-library-settings">
-                      <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
-                      <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
-                      {reviewing && inlineSelection.items.length > 1 ? <span className="lora-library-order">
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index - 1); }}><ChevronUp size={14} /></button>
-                        <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index + 1); }}><ChevronDown size={14} /></button>
-                      </span> : null}
-                    </div></div> : null}
+                    {/* Right of the tick, as in Models: View Source (one icon per host), then Star. */}
+                    <span className="lora-row-actions">
+                      <LoraSources info={info} label={label} />
+                      <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={14} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    </span>
+                    {/* A pick is tuned in the Selected view only (UI-PATTERNS › Pickers): its information, then on/off, strength and order. Nothing opens under a row elsewhere. */}
+                    {item && reviewing ? <div className="lora-library-expansion">
+                      <LoraDetails info={info} label={label} enabled={item.enabled !== false} file={row.name} />
+                      <div className="lora-library-settings">
+                        <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={enabled => inlineSelection.update(row.name, { enabled })} />
+                        <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={strength => inlineSelection.update(row.name, { strength })} />
+                        {inlineSelection.items.length > 1 ? <span className="lora-library-order">
+                          <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index - 1); }}><ChevronUp size={14} /></button>
+                          <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index + 1); }}><ChevronDown size={14} /></button>
+                        </span> : null}
+                      </div>
+                    </div> : null}
                   </div>;
                 }
                 return (
