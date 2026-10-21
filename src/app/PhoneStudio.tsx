@@ -290,7 +290,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, showToast,
-    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
+    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, phoneAdvancedControls, generationEstimate,
     customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
@@ -435,7 +435,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
         {open && pop === 'model' ? <ComposerSurface key="model" title="Model" icon={<Wand2 size={16} />} trigger='[data-open-trigger][aria-label="Choose Model"][aria-expanded="true"]' className="phone-model-pop" bodyClassName="phone-model-pop-body" onClose={() => setPop('')}><PhoneModelList view={view} onPicked={() => setPop('')} /></ComposerSurface> : null}
         {open && pop === 'size' ? <ComposerSurface key="size" title="Size" icon={<Ratio size={16} />} trigger='[data-open-trigger][aria-label^="Size:"][aria-expanded="true"]' className="phone-size-pop" bodyClassName="phone-size-pop-body" onClose={() => setPop('')}><PhoneSize view={view} /></ComposerSurface> : null}
       </AnimatePresence>
-      <AdvancedPopover open={open && pop === 'advanced'} onClose={() => setPop('')}>{grokMediaControls}{phoneVideoDurationControls}{phoneAdvancedControls}</AdvancedPopover>
+      <AdvancedPopover open={open && pop === 'advanced'} onClose={() => setPop('')}>{phoneAdvancedControls}</AdvancedPopover>
     </Sheet>
   );
 }

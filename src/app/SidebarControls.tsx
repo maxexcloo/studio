@@ -5,6 +5,8 @@ import { maxLoras } from './loras';
 import { NumberPicker } from './components';
 import { LoraPanel } from './LoraPanel';
 import { ModelSetup } from './ModelSetup';
+import { GrokMediaControls } from './GrokMediaControls';
+import { VideoDurationControls } from './VideoDurationControls';
 import { ListItem, ListSection, ListSelect } from './SheetList';
 import { partOptions } from './partNames';
 import { usePhone } from './device';
@@ -81,7 +83,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   );
   return (
     <div className="advanced-list">
-      {/* Groups and rows read alphabetically (Inpainting or Reference, Model Parts, Sampling, Upscale); a master control leads its dependants. */}
+      {/* Groups and rows read alphabetically (Inpainting or Reference, Model Parts, Sampling, Upscale, Video); a master control leads its dependants. */}
       {currentProfile ? <ModelSetup key={currentProfile.id} profile={currentProfile} showToast={showToast} onInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
 
       {inpaintActive ? (
@@ -130,6 +132,10 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Upscale needs its models first: set it up in Settings › Studio.</p> : null}
         </ListSection>
       ) : null}
+
+      {/* Video (a cloud model's duration and resolution, or a local one's duration and frame rate) reads last, after Upscale. */}
+      <GrokMediaControls view={view} phone />
+      <VideoDurationControls view={view} phone />
 
       {recommended?.differs ? <button type="button" className="list-row list-row-action" onClick={recommended.restore}><RotateCcw size={16} aria-hidden="true" /><span className="list-row-label">Back to Recommended</span></button> : null}
     </div>

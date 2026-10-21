@@ -631,7 +631,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         />
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.grokMediaControls}{view.phoneVideoDurationControls}{view.phoneAdvancedControls}</AdvancedPopover>}
+      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.phoneAdvancedControls}</AdvancedPopover>}
       <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
