@@ -49,17 +49,17 @@
   border-color: var(--line-strong);
 }
 .comfy-status-dot span {
-  background: hsl(45 90% 58%);
-  box-shadow: 0 0 0 4px hsl(45 90% 58% / 0.12), 0 0 14px hsl(45 90% 58% / 0.2);
+  background: hsl(var(--status-waiting));
+  box-shadow: 0 0 0 4px hsl(var(--status-waiting) / 0.12), 0 0 14px hsl(var(--status-waiting) / 0.2);
   transition: background var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 .comfy-status-dot.is-connected span {
-  background: hsl(145 70% 48%);
-  box-shadow: 0 0 0 4px hsl(145 70% 48% / 0.12), 0 0 14px hsl(145 70% 48% / 0.32);
+  background: hsl(var(--status-ready));
+  box-shadow: 0 0 0 4px hsl(var(--status-ready) / 0.12), 0 0 14px hsl(var(--status-ready) / 0.32);
 }
 .comfy-status-dot.is-disconnected span {
-  background: hsl(0 74% 58%);
-  box-shadow: 0 0 0 4px hsl(0 74% 58% / 0.12), 0 0 14px hsl(0 74% 58% / 0.22);
+  background: hsl(var(--status-offline));
+  box-shadow: 0 0 0 4px hsl(var(--status-offline) / 0.12), 0 0 14px hsl(var(--status-offline) / 0.22);
 }
 .comfy-status-dot.is-checking span {
   animation: comfyStatusPulse 1.2s var(--ease-soft) infinite;
@@ -306,8 +306,8 @@
 /* ----------------------------------------------------- Restarting ComfyUI
    Down on purpose, so nothing reads as an alarm: amber and moving, not red. */
 .comfy-status-dot.is-restarting span {
-  background: hsl(38 92% 60%);
-  box-shadow: 0 0 0 4px hsl(38 92% 60% / 0.14), 0 0 14px hsl(38 92% 60% / 0.26);
+  background: hsl(var(--status-busy));
+  box-shadow: 0 0 0 4px hsl(var(--status-busy) / 0.14), 0 0 14px hsl(var(--status-busy) / 0.26);
   animation: comfyStatusPulse 1.2s var(--ease-soft) infinite;
 }
 @media (prefers-reduced-motion: reduce) {

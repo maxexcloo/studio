@@ -74,6 +74,9 @@ Use the tokens in `tokens.css`, never raw values:
   (44 px) on touch screens, `--control-h-sm` (32 px) for controls inside rows
   (Advanced Settings selects, pickers, toggles and segments) and small icon
   buttons in lists (Star, View Source, Search, Close), which are round.
+- **Touch targets:** on the phone everything a finger taps reaches 44 px; a
+  control drawn smaller keeps its look and gets a centred 44 px hit area (the
+  touch-target rule at the end of `phone.css`).
 - **Segmented tracks** come in two sizes only, large (`--control-h`) and small
   (`--control-h-sm`), with `--seg-pad` (3 px) of track around the options.
 - **Rows:** `--row-h-menu` (38 px) in desktop menus and popovers,

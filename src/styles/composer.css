@@ -96,7 +96,7 @@
 .generate.is-offline {
   background: hsl(0 0% 20%);
   color: hsl(0 74% 68%);
-  box-shadow: 0 0 0 1px hsl(0 74% 58% / 0.2) inset;
+  box-shadow: 0 0 0 1px hsl(var(--status-offline) / 0.2) inset;
   cursor: pointer;
 }
 .generate.is-offline:hover {
