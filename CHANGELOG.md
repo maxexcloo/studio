@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Details read alike for images and videos and name the profile, Copy and Recreate close Details, desktop tiles star top left, typed view models with one access model, and orphan server routes removed
+
 ### Changed
 - **Prompt Assistant menus:** Enhance leads, the other presets read alphabetically, and Suggest LoRAs closes the menu, on the desktop caret and the phone list.
 - **Details › Output:** reads Dimensions (the picture's size), File, Size (the file's size on disk, once known) and Time (when it was made) in place of Size, File and Generated, for images and videos alike; a video shows exactly an image's groups and rows, adding only Duration, Frames and FPS, and Count and Reference no longer show on images only.
