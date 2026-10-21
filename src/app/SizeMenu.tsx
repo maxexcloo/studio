@@ -1,12 +1,10 @@
 import React from 'react';
-import { Check, Link2, Pencil, RotateCcw, Trash2, Unlink2 } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useMotionTween } from '@/lib/springs';
-import { aspectIconStyle, cn } from './format';
+import { Link2, RotateCcw, Unlink2 } from 'lucide-react';
+import { cn } from './format';
 import { Tip } from './components';
 import { formatMp, MEGAPIXEL, parseSize, ratioName, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
-import type { AspectPreset, NativeSupport, SavedSize } from './types';
+import type { AspectPreset, NativeSupport } from './types';
 
 /* ---------------------------------------------------------------------------
    The size menu's parts (components.tsx AspectPicker puts them together):
@@ -33,7 +31,7 @@ export type SizeRow = { key: string; value: string; label: string; small?: strin
  * at 2048. Custom is any width and height, typed in the fields under the
  * shapes; a shape row always goes back to its preset.
  */
-export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native: modelNative, sizeMax = 8192, limits, savedSizes = [], targetArea = 0, offerTwoK = true }: {
+export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, native: modelNative, sizeMax = 8192, limits, targetArea = 0 }: {
   value: string;
   options: AspectPreset[];
   currentSize: string;
@@ -42,11 +40,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   native?: NativeSupport;
   sizeMax?: number;
   limits?: { width: SideLimits; height: SideLimits };
-  savedSizes?: SavedSize[];
   /** Megapixels in 2K's place: Default draws each shape at this many pixels (0: as the model has it). */
   targetArea?: number;
-  /** 2K is a tab here (not with Megapixels, nor for video): its sizes are already a click away. */
-  offerTwoK?: boolean;
 }) {
   const custom = tier === "custom";
   // No model picked (ComfyUI off, or none listed): sizes still work, but there is no model to warn about.
@@ -68,16 +63,8 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
     { key: "default", value: "default", label: "Default", small: defaultPreset.label, shape: defaultPreset, size: rowSize(defaultPreset) },
     ...listed.map((option) => ({ key: option.value, value: option.value, label: option.label, shape: option, size: rowSize(option) }))
   ];
-  // In Custom a saved size that is exactly this one is the pick, rather than the shape it shares.
-  const savedMatch = custom ? savedSizes.find((item) => item.width === picked.width && item.height === picked.height) : undefined;
   // A custom size is in the width and height fields: no shape claims it.
   const isActive = (row: SizeRow) => !custom && row.value === value;
-  // "Save size" is for a size of your own: any shape at any size, except one Default or 2K already
-  // gives (a preset row at either tier, within a snap step a side), which is a click away as it is.
-  const offered = custom ? rows.flatMap((row) => [{ width: row.shape.w, height: row.shape.h }, ...(offerTwoK ? [sizePlan("2k", row.shape.w, row.shape.h, native, sizeMax).final] : [])]) : [];
-  const near = (a: Size, b: Size) => Math.abs(a.width - b.width) <= 16 && Math.abs(a.height - b.height) <= 16;
-  const ownSize = custom && !offered.some((size) => near(size, picked));
-  const savedRow = (item: SavedSize): SizeRow => ({ key: item.id, value: "", label: item.name, small: ratioName(item.width, item.height), shape: { label: "", value: "", w: item.width, h: item.height }, size: { width: item.width, height: item.height } });
   const ratio = ratioName(shown.width, shown.height);
   const label = custom ? ratio : selected ? selected.label : isDefault ? "Default" : ratio;
   // Megapixels: an MP tag, the way 2K says its size. The count is in the menu, its preview and the
@@ -88,13 +75,13 @@ export function sizeMenuModel({ value, options, currentSize, defaultSize, tier, 
   /** The preview's caption for a row, or for the size chosen: "Name · ratio" where the name isn't the ratio itself. */
   const captionFor = (row: SizeRow | null) => row
     ? (row.small ? `${row.label} · ${row.small}` : row.label)
-    : custom ? `${savedMatch ? savedMatch.name : "Custom"} · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
+    : custom ? `Custom · ${ratio}` : isDefault ? `Default · ${defaultOption?.label || ratio}` : label;
   const note = !modelNative ? ""
     : (tier === "2k" || tier === "4k" || targetArea > 0) && plan.capped ? `This model goes up to ${plan.maxSide} px a side.`
     : (tier === "2k" || tier === "4k") && plan.untested ? `This model isn’t known for ${tier.toUpperCase()}. Some pictures may repeat or warp.`
     : targetArea > 0 && plan.untested ? "This model isn’t known for sizes this large. Some pictures may repeat or warp."
     : "";
-  return { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note };
+  return { custom, picked, shown, rows, isActive, label, badge, what, captionFor, note };
 }
 
 const tierLabels: Record<SizeTier, string> = { none: "Default", "2k": "2K", "4k": "4K", custom: "Custom" };
@@ -384,14 +371,10 @@ export function MegapixelField({ current, control, custom }: {
  * at the shape it had when the change began (so snapping never drifts it);
  * a side that would pass its limit holds the pair at the limit instead.
  */
-export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false, disabled = false }: {
+export function LinkedSizeFields({ size, limits, onChange, disabled = false }: {
   size: Size;
   limits: { width: SideLimits; height: SideLimits };
   onChange: (size: Size) => void;
-  /** "Save size": keep this size in the menu's list. Left out where there's no list to keep it in. */
-  onSave?: () => void;
-  /** This exact size is saved already. */
-  saved?: boolean;
   disabled?: boolean;
 }) {
   const [linked, setLinked] = React.useState(true);
@@ -427,93 +410,6 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
         </Tip>
         <SizeField axis="H" value={size.height} limits={limits.height} onStart={begin} onChange={setHeight} />
       </div>
-      {onSave ? <div className="size-custom-note">
-          <button type="button" className={cn("size-save", saved && "is-saved")} disabled={saved} onClick={onSave}>
-            {/* Keyed, so the word changes with a small lift rather than a jump. */}
-            <span key={saved ? "saved" : "save"}>{saved ? <><Check size={12} strokeWidth={2.5} /> Saved</> : "Save size"}</span>
-          </button>
-      </div> : null}
     </fieldset>
-  );
-}
-
-/**
- * A saved size in the shape list. It reads like any other row: its name with
- * its ratio beside it, its size on the right. Hovered (or focused), the size
- * steps left for Rename and Remove; renaming edits the name in place, Enter
- * or leaving keeps it, Escape puts it back without closing the menu.
- */
-export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPreview }: {
-  saved: SavedSize;
-  active: boolean;
-  onPick: () => void;
-  onRename: (name: string) => void;
-  onRemove: () => void;
-  /** The row is under the pointer or focused (true), or not any more (false). */
-  onPreview: (on: boolean) => void;
-}) {
-  const [renaming, setRenaming] = React.useState(false);
-  const [draft, setDraft] = React.useState(saved.name);
-  const ratio = ratioName(saved.width, saved.height);
-  const shape = { label: ratio, value: `${saved.width}x${saved.height}`, w: saved.width, h: saved.height };
-  const finish = (keep: boolean) => {
-    const name = draft.trim();
-    if (keep && name && name !== saved.name) onRename(name);
-    setRenaming(false);
-  };
-  const heightTween = useMotionTween();
-  return (
-    <motion.div
-      className="size-saved"
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: "auto", opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={heightTween}
-    >
-      <div className={cn("size-saved-row", renaming && "is-renaming")} onPointerEnter={(event) => { if (event.pointerType !== "touch") onPreview(true); }}>
-        {renaming ? (
-          <div className={cn("aspect-option is-saved", active && "active")}>
-            <span className="aspect-shape" style={aspectIconStyle(shape)} />
-            <input
-              className="size-saved-name"
-              data-own-escape
-              autoFocus
-              value={draft}
-              maxLength={32}
-              aria-label="Name of This Size"
-              onFocus={(event) => event.currentTarget.select()}
-              onChange={(event) => setDraft(event.target.value)}
-              onBlur={() => finish(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") { event.preventDefault(); finish(true); }
-                if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); finish(false); }
-              }}
-            />
-            <em>{saved.width}×{saved.height}</em>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={cn("aspect-option is-saved", active && "active")}
-            role="option"
-            aria-selected={active}
-            onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) onPreview(true); }}
-            onBlur={() => onPreview(false)}
-            onClick={onPick}
-          >
-            <span className="aspect-shape" style={aspectIconStyle(shape)} />
-            {/* The name gives way ("…"), the ratio stays: a long name never runs under the size. */}
-            <span className="size-saved-label" title={saved.name}><span>{saved.name}</span><small>{ratio}</small></span>
-            <em>{saved.width}×{saved.height}</em>
-          </button>
-        )}
-        {renaming ? null : (
-          <span className="size-saved-actions">
-            <Tip content="Rename"><button type="button" aria-label={`Rename ${saved.name}`} onClick={() => { setDraft(saved.name); setRenaming(true); }}><Pencil size={14} /></button></Tip>
-            <Tip content="Remove"><button type="button" className="is-remove" aria-label={`Remove ${saved.name}`} onClick={onRemove}><Trash2 size={13} /></button></Tip>
-          </span>
-        )}
-      </div>
-    </motion.div>
   );
 }

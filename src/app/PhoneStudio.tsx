@@ -12,8 +12,8 @@ import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useMotionTween } from '@/lib/springs';
 import { popoverMotion, useSettling } from './composerSurface';
-import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, Eraser, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Images } from 'lucide-react';
-import { cn, aspectIconStyle } from './format';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, Eraser, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, UserRound, Wand2, X, Images } from 'lucide-react';
+import { cn } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
 import { startsGroup } from './ItemActionSurfaces';
@@ -23,7 +23,7 @@ import { ReferenceSlots } from './ReferenceMediaPicker';
 import { progressReading } from './GenerationProgress';
 import { generatingLabel } from './itemWording';
 import { estimatePhrase } from './useGenerationEstimate';
-import type { GalleryItem, Profile, SavedSize } from './types';
+import type { GalleryItem, Profile } from './types';
 import { LinkedSizeFields, MegapixelField, SizeTabs, sizeMenuModel, type SizeTier } from './SizeMenu';
 import { MEGAPIXEL, ratioName } from './sizing';
 import { ListButton, ListItem, ListSection, ListSelect } from './SheetList';
@@ -36,7 +36,7 @@ import { emptySearch, searchActive, type GallerySearch } from './favorites';
 import { usePromptHistory } from './recentPrompts';
 import { signOutAccount } from './accounts';
 import { hasAccountStorageScope } from './api';
-import { StatusPill, useStatusHost } from './StatusMessage';
+import { PhoneStatus, useStatusHost } from './StatusMessage';
 import { EmptyState } from './EmptyState';
 
 /* ---------------------------------------------------------------------------
@@ -184,27 +184,25 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   const connected = Boolean(comfyStatus?.connected);
   const connectionName = comfyStatus?.label || 'ComfyUI';
   const statusText = restarting ? `${connectionName} is restarting` : comfyStatus?.busy ? `${connectionName} is busy` : connected ? `${connectionName} connected${comfyStatus?.device ? ` · ${comfyStatus.device}` : ''}` : comfyStatus?.checked ? `${connectionName} is offline` : `Checking ${connectionName}…`;
-  const message = useStatusHost();
+  // The phone's one status host, for the whole app (UI-PATTERNS › Messages): every other host gives way to it.
+  const message = useStatusHost(true, true);
   const quickGo = Boolean(prompt.trim()) && !generateDisabled && !comfyOffline && !restarting;
 
   return (
     <>
+      {/* Every message, app-wide, at the top of the screen; the bar's row steps aside while one shows. */}
+      <PhoneStatus message={message} />
       {/* One top bar (UI-PATTERNS › Phone): iOS's status bar sits over it, and a tap there scrolls the page to the top.
           Selecting swaps its contents (Close · n Selected · Failed · All) rather than bringing in a second bar. */}
       <header ref={barRef} className={cn('phone-bar', selecting && 'is-selecting')}>
         {selecting ? (
-          <div className="phone-bar-row">
+          <div className={cn('phone-bar-row', message && 'has-message')}>
             <button type="button" className="phone-icon" aria-label="Stop Selecting" onClick={selection.end}><X size={22} /></button>
-            {/* A message (a question, an Undo) takes the title's place while selecting, too. */}
-            {message ? <StatusPill message={message} className="is-bar" /> : <>
-              <span className="phone-bar-title">{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span>
-              <span className="phone-bar-gap" />
-            </>}
-            {message ? null : <>
+            <span className="phone-bar-title">{selectedItems.length ? `${selectedItems.length} Selected` : 'Select Items'}</span>
+            <span className="phone-bar-gap" />
             <button type="button" className={cn('phone-icon', selection.allSelected && 'is-on')} aria-pressed={selection.allSelected} aria-label={selection.allSelected ? 'Select None' : 'Select All'} title={selection.allSelected ? 'Select None' : 'Select All'} disabled={!selection.selectable.some((item) => item.status !== 'pending')} onClick={selection.toggleAll}><CheckSquare size={20} /></button>
             <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" disabled={!selection.failedCount} onClick={selection.selectFailed}><AlertTriangle size={20} /></button>
             <button type="button" className="phone-icon" aria-label="Select In Progress" title="Select In Progress" disabled={!selection.runningCount} onClick={selection.selectRunning}><LoaderCircle size={20} /></button>
-            </>}
           </div>
         ) : (
           <div className={cn('phone-bar-row', message && 'has-message')}>
@@ -215,15 +213,11 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
               </button> : <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>}
               <span className="phone-heading-name">Studio</span>
             </div>
-            {/* Centre: empty unless a message shows (UI-PATTERNS › Messages). */}
-            {message ? <StatusPill message={message} className="is-bar" /> : <span className="phone-bar-gap" />}
-            {/* A question takes the whole row but "Studio": its answers need the room, and nothing else applies until it is answered. */}
-            {message?.confirm ? null : <>
+            <span className="phone-bar-gap" />
             {/* No Select button on the phone: a long press on a tile starts selecting. */}
             <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
             <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
-            </>}
           </div>
         )}
         {/* Search or the filters, full width under the bar, one at a time. */}
@@ -291,7 +285,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
     referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, showToast,
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
+    customSize, sizeTier, sizeMax, customLimits, sizeArea, sizeTiers, sampler
   } = view;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
   const picked = (referenceAssets || []) as Array<{ slot: string; asset: unknown }>;
@@ -309,7 +303,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
   const maxCount = Math.max(1, Number(countMeta?.max || 8));
   // The size row reads like the desktop's size button: the shape, its name, the size it makes.
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes, targetArea: sizeArea || 0, offerTwoK: Boolean(sizeTiers?.includes('2k')) });
+  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, targetArea: sizeArea || 0 });
   const sizeText = `${ratioName(size.shown.width, size.shown.height)} · ${size.shown.width}×${size.shown.height}`;
   // A long run says so before it starts; a quick one needs no warning.
   const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
@@ -478,143 +472,47 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
 }
 
 /**
- * Size, in the pop-up over Create: the model's native resolutions as one
- * full-width toggle, the shapes as one full-width toggle (their outline and
- * ratio), then Width and Height, always in view, as on the desktop. Typing a
- * side makes it a custom size; a shape or resolution goes back to the preset.
- * The saved sizes follow, with Rename and Remove behind Edit.
+ * Size, in the pop-up over Create, as on the desktop: the model's native
+ * resolutions as one full-width toggle, then one vertical list of the shapes
+ * (the shared list rows: the shape, its name, the size it makes and the amber
+ * tick), Custom last, then Width and Height, always in view and enabled only
+ * while Custom is the pick. A shape or resolution goes back to the preset.
  */
 const shapeIn = (w: number, h: number) => { const scale = Math.min(22 / (w || 1), 16 / (h || 1)); return { width: Math.max(6, Math.round(w * scale)), height: Math.max(6, Math.round(h * scale)) }; };
 
 function PhoneSize({ view }: { view: Record<string, any> }) {
   const {
     aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
-    chooseSizeTier, setCustomDimensions, savedSizes, saveCustomSize, renameSavedSize, removeSavedSize, pickSavedSize,
-    sizeTiers, sizeArea, megapixelControl
+    chooseSizeTier, setCustomDimensions, sizeTiers, sizeArea, megapixelControl
   } = view;
-  const saved = (savedSizes || []) as SavedSize[];
   const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
   const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
-  const model = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, savedSizes: saved, targetArea: sizeArea || 0, offerTwoK: tiers.includes('2k') });
-  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, note } = model;
-  const [editing, setEditing] = React.useState(false);
-  React.useEffect(() => { if (!saved.length) setEditing(false); }, [saved.length]);
+  const { custom, picked, shown, rows, isActive, note } = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, targetArea: sizeArea || 0 });
   const resolutions = tiers.filter((item) => item !== 'custom');
   return (
     <div className="phone-size">
       {resolutions.length > 1 ? <SizeTabs tiers={resolutions} labelled={false} value={tier} onChange={(next) => { chooseSizeTier(next); }} /> : null}
-      <div className="size-shapes" role="radiogroup" aria-label="Shape">
+      <div className="list-group size-options" role="listbox" aria-label="Shape">
         {rows.map((row) => (
-          <button key={row.key} type="button" role="radio" aria-checked={isActive(row)} className={cn('size-shape', isActive(row) && 'is-active')}
+          <ListButton key={row.key} className="size-option" role="option" aria-selected={isActive(row)} selected={isActive(row)} end="check"
             aria-label={`${row.small ? `${row.label}, ${row.small}` : row.label}, ${row.size.width} × ${row.size.height}`}
-            onClick={() => applyAspect(row.value)}>
-            <span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} aria-hidden="true" />
-            <span aria-hidden="true">{row.key === 'default' ? 'Default' : row.label}</span>
-          </button>
+            lead={<span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} />}
+            label={<>{row.label}{row.small ? <small>{row.small}</small> : null}</>}
+            value={`${row.size.width}×${row.size.height}`}
+            onClick={() => applyAspect(row.value)} />
         ))}
         {customLimits ? (
-          <button type="button" role="radio" aria-checked={custom && !savedMatch} className={cn('size-shape is-custom', custom && !savedMatch && 'is-active')}
-            aria-label={custom ? `Custom, ${picked.width} × ${picked.height}` : 'Custom'} onClick={() => chooseSizeTier('custom')}>
-            <span className="aspect-shape" style={shapeIn(shown.width, shown.height)} aria-hidden="true" />
-            <span aria-hidden="true">Custom</span>
-          </button>
+          <ListButton className="size-option is-custom" role="option" aria-selected={custom} selected={custom} end="check"
+            aria-label={custom ? `Custom, ${picked.width} × ${picked.height}` : 'Custom'}
+            lead={<span className="aspect-shape" style={shapeIn(shown.width, shown.height)} />}
+            label="Custom" value={custom ? `${picked.width}×${picked.height}` : ''}
+            onClick={() => chooseSizeTier('custom')} />
         ) : null}
       </div>
       {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
-      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} onSave={custom && (ownSize || savedMatch) ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} disabled={!custom} /></div> : null}
+      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} disabled={!custom} /></div> : null}
       {note ? <p className="list-note">{note}</p> : null}
-      {saved.length ? (
-        <>
-          <div className="phone-size-saved-head">
-            <h3 className="list-section-title">Saved</h3>
-            <button type="button" className={cn('phone-size-edit', editing && 'is-on')} aria-pressed={editing} onClick={() => { setEditing((value) => !value); }}>{editing ? 'Done' : 'Edit'}</button>
-          </div>
-          <div className={cn('list-group phone-size-list', editing && 'is-editing')} role="listbox" aria-label="Saved Sizes">
-            <AnimatePresence initial={false}>
-              {saved.map((item) => (
-                <PhoneSavedSize
-                  key={item.id}
-                  saved={item}
-                  active={savedMatch?.id === item.id}
-                  editing={editing}
-                  pressHandlers={{}}
-                  onPick={() => pickSavedSize(item)}
-                  onRename={(name) => renameSavedSize(item.id, name)}
-                  onRemove={() => removeSavedSize(item.id)}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        </>
-      ) : null}
     </div>
-  );
-}
-
-/**
- * A saved size: a row like the shapes, its name with its ratio under it.
- * Under Edit the name turns into a field where it stands (Enter or leaving
- * keeps it, Escape puts it back) and Remove slides in beside the size, which
- * steps aside for it; Undo is on the toast. One row throughout, so going in
- * and out of Edit glides instead of swapping.
- */
-function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRename, onRemove }: {
-  saved: SavedSize;
-  active: boolean;
-  editing: boolean;
-  pressHandlers: React.HTMLAttributes<HTMLElement>;
-  onPick: () => void;
-  onRename: (name: string) => void;
-  onRemove: () => void;
-}) {
-  const [draft, setDraft] = React.useState(saved.name);
-  React.useEffect(() => { setDraft(saved.name); }, [saved.name, editing]);
-  // Escape leaves the field without keeping what was typed.
-  const reverting = React.useRef(false);
-  const keep = (typed: string) => {
-    const name = typed.trim();
-    if (reverting.current || !name || name === saved.name) { reverting.current = false; setDraft(saved.name); return; }
-    onRename(name);
-  };
-  const ratio = ratioName(saved.width, saved.height);
-  const heightTween = useMotionTween();
-  return (
-    <motion.div
-      className="phone-size-saved"
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={heightTween}
-    >
-      <div className={cn('phone-row phone-size-row is-saved', active && 'is-current', editing && 'is-editing')} {...(editing ? {} : pressHandlers)}>
-        {editing ? null : <button type="button" className="phone-size-hit" role="option" aria-selected={active} aria-label={`${saved.name}, ${ratio}, ${saved.width} × ${saved.height}`} onClick={onPick} />}
-        <span className="phone-size-shape" aria-hidden="true"><span className="aspect-shape" style={aspectIconStyle({ label: ratio, value: '', w: saved.width, h: saved.height })} /></span>
-        <span className="phone-size-text" aria-hidden={!editing || undefined}>
-          <input
-            className="phone-size-name"
-            data-own-escape
-            value={draft}
-            readOnly={!editing}
-            tabIndex={editing ? 0 : -1}
-            maxLength={32}
-            enterKeyHint="done"
-            aria-label={`Name of ${saved.name}`}
-            onFocus={(event) => { if (editing) event.currentTarget.select(); }}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={(event) => { if (editing) keep(event.currentTarget.value); }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
-              if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); reverting.current = true; event.currentTarget.blur(); }
-            }}
-          />
-          <small>{ratio}</small>
-        </span>
-        <em aria-hidden="true">{saved.width}×{saved.height}</em>
-        <span className="phone-size-remove-slot">
-          <button type="button" className="phone-size-remove" tabIndex={editing ? 0 : -1} aria-hidden={!editing || undefined} aria-label={`Remove ${saved.name}`} onClick={onRemove}><Trash2 size={18} /></button>
-        </span>
-      </div>
-    </motion.div>
   );
 }
 

@@ -9,7 +9,7 @@ import { coverMedia } from './mediaCover';
  *   closes, and a nested sheet shows Back.
  * - A `pop` (a picker or menu anchored over the Create sheet or the top bar)
  *   leaves the sheet under it in view, dimmed and inert, so Create stays where
- *   it was and its title row keeps showing messages.
+ *   it was. Messages show over all of them, in the phone's one status pill.
  */
 
 type Kind = 'sheet' | 'pop';

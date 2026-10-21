@@ -243,7 +243,6 @@ Not for Ideogram 4, MageFlow, Sana, video or imported workflows, and there's no 
 - **Supported native resolutions.** The size menu offers only documented native sizes within the model's limits: 2K draws a 2048-pixel long side and 4K draws 4096, without automatic upscaling. Two choices use buttons; more than two use a dropdown. Models without an additional supported resolution hide that control. [Which models ↗](./docs/guides/MODELS.md#native-2k)
 - **See the size before you run.** A live frame shows the shape and pixels you'll get, and hovering a shape previews it.
 - **Custom, linked or not.** Width and height move together and keep the shape, or unlink them. Type, use the arrow keys or drag the label, from 256 to 4096.
-- **Saved sizes on every device.** **Save size** keeps a size of your own, to rename or remove later. Your phone and every other device see the same list.
 - **Or count in megapixels.** **Settings › Studio › Size in Megapixels** puts a Megapixels field in the menu, and every shape is drawn at that many pixels.
 
 A reference being edited or a painted mask sets the size itself, and your 2K pick comes back afterwards.

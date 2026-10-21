@@ -22,6 +22,9 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, open: boolean) 
       const layers = document.querySelectorAll('[role="dialog"], [role="alertdialog"]');
       const top = layers[layers.length - 1];
       if (top && top !== root && !root.contains(top)) return;
+      // A question in the phone's status pill sits outside every sheet, whatever their order.
+      const question = document.querySelector('[role="alertdialog"][data-status-message]');
+      if (question && !root.contains(question)) return;
       const items = focusables();
       if (!items.length) { event.preventDefault(); root.focus(); return; }
       const first = items[0];

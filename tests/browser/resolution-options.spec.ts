@@ -22,7 +22,7 @@ for (const supported of [0, 1, 2]) test(`native resolution choices follow model 
   await expect(menu.getByRole('textbox', { name: 'Width in Pixels', exact: true })).toBeVisible();
   await expect(menu.getByRole('textbox', { name: 'Width in Pixels', exact: true })).toBeDisabled();
   await expect(menu.getByRole('button', { name: 'Custom Size', exact: true })).toHaveCount(0);
-  await expect(menu.locator('.aspect-option, .size-shape').last()).toHaveClass(/is-custom/);
+  await expect(menu.locator('.aspect-option, .size-option').last()).toHaveClass(/is-custom/);
   // The preview already names the size: no megapixel and ratio caption under the fields.
   await expect(menu.locator('.size-custom-note')).toHaveCount(0);
   const resolution = menu.getByRole('radiogroup', { name: 'Resolution', exact: true });
@@ -43,7 +43,7 @@ for (const supported of [0, 1, 2]) test(`native resolution choices follow model 
   }
   // The panel stays open, so a shape can be picked in the same go.
   await expect(menu).toBeVisible();
-  const shape = menu.locator('.aspect-option, .size-shape').filter({ hasText: /1:1|Square/ }).first();
+  const shape = menu.locator('.aspect-option, .size-option').filter({ hasText: /1:1|Square/ }).first();
   if (await shape.count()) { await shape.click(); await expect(menu).toBeVisible(); }
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
@@ -64,12 +64,12 @@ test('Custom sits last in the size options and unlocks width and height', async 
   const menu = await ui.openSizeMenu();
   const width = menu.getByRole('textbox', { name: 'Width in Pixels', exact: true });
   await expect(width).toBeDisabled();
-  const custom = menu.locator('.aspect-option.is-custom, .size-shape.is-custom');
+  const custom = menu.locator('.aspect-option.is-custom, .size-option.is-custom');
   await custom.click();
   await expect(custom).toHaveAttribute(await custom.getAttribute('role') === 'radio' ? 'aria-checked' : 'aria-selected', 'true');
   await expect(width).toBeEnabled();
   // Picking a shape leaves Custom and locks the fields again.
-  await menu.locator('.aspect-option:not(.is-custom), .size-shape:not(.is-custom)').first().click();
+  await menu.locator('.aspect-option:not(.is-custom), .size-option:not(.is-custom)').first().click();
   await expect(width).toBeDisabled();
   await custom.click();
   await expect(width).toBeEnabled();

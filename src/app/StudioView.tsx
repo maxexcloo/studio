@@ -537,11 +537,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               chooseSizeTier={view.chooseSizeTier}
               applyCustomRatio={view.applyCustomRatio}
               setCustomDimensions={view.setCustomDimensions}
-              savedSizes={view.savedSizes}
-              saveCustomSize={view.saveCustomSize}
-              renameSavedSize={view.renameSavedSize}
-              removeSavedSize={view.removeSavedSize}
-              pickSavedSize={view.pickSavedSize}
               customSize={Boolean(customSize)}
               aspectLocked={Boolean(aspectLocked)}
               width={width}

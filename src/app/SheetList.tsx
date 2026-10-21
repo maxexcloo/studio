@@ -1,7 +1,8 @@
 import React from 'react';
-import { Check, ChevronRight, X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { cn } from './format';
 import { Dropdown } from './Dropdown';
+import { SelectedTick } from './PickerTools';
 
 /*
  * The flat settings list every phone sheet uses (UI-PATTERNS › Lists): full
@@ -24,7 +25,7 @@ type RowProps = {
   value?: React.ReactNode;
   /** Before the label: an icon, a shape. */
   lead?: React.ReactNode;
-  /** chevron opens a step, check marks the selected option, none for inline controls. */
+  /** chevron opens a step, check marks the selected option (the shared amber tick), none for inline controls. */
   end?: 'chevron' | 'check' | 'none';
   selected?: boolean;
   className?: string;
@@ -37,7 +38,7 @@ export function ListButton({ label, value, lead, end = 'chevron', selected, clas
       {lead ? <span className="list-row-lead" aria-hidden="true">{lead}</span> : null}
       <span className="list-row-label">{label}</span>
       {value != null && value !== '' ? <span className="list-row-value">{value}</span> : <span className="list-row-gap" />}
-      {end === 'chevron' ? <ChevronRight size={17} className="list-row-end" aria-hidden="true" /> : end === 'check' ? <Check size={17} className={cn('list-row-end list-row-check', !selected && 'is-off')} aria-hidden="true" /> : null}
+      {end === 'chevron' ? <ChevronRight size={17} className="list-row-end" aria-hidden="true" /> : end === 'check' ? <SelectedTick on={Boolean(selected)} className="list-row-end list-row-check" /> : null}
     </button>
   );
 }

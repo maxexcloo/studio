@@ -266,7 +266,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 }
 .phone-row:disabled { opacity: .45; }
 .phone-row > svg { flex: none; color: hsl(var(--muted-foreground)); }
-.phone-row > span:not(.aspect-shape, .aspect-shape-slot, .phone-size-shape, .phone-size-remove-slot) {
+.phone-row > span:not(.aspect-shape, .aspect-shape-slot) {
   flex: 1;
   min-width: 0;
   display: grid;
@@ -416,127 +416,6 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-size .size-fields:not(.is-linked) { --reach: 0px; }
 .phone-size .size-field-key { width: 42px; font-size: 12px; }
 .phone-size .size-field input { font-size: 16px; }
-.phone-size .size-custom-note { min-height: 40px; padding: 0 4px 0 10px; font-size: 13px; }
-/* No hover to find it by: "Save size" reads as something to tap. */
-.phone-size .size-save {
-  height: 36px;
-  margin-right: 0;
-  padding: 0 14px;
-  border-radius: var(--r-pill);
-  background: rgb(255 154 82 / .1);
-  color: var(--ember);
-  font-size: 14px;
-}
-.phone-size .size-save.is-saved { background: transparent; color: hsl(var(--muted-foreground)); }
-
-/* The shapes and the saved sizes: rows with the shape drawn, the size in one mono column.
-   The current one has no row fill: its shape and size take the amber. */
-.phone-size-row { gap: var(--space-4); min-height: 52px; padding: 6px 14px 6px 4px; }
-.phone-size-shape {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 36px;
-  color: hsl(var(--muted-foreground));
-  transition: color var(--motion-fast) var(--motion-ease);
-}
-.phone-size-row em {
-  flex: none;
-  margin-left: auto;
-  color: hsl(var(--muted-foreground));
-  font: 500 13px/1 var(--font-mono);
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-  /* Room for the widest size, so the column lines up and the names under Edit match. */
-  min-width: 9ch;
-  text-align: right;
-}
-.phone-size-row.is-current .phone-size-shape,
-.phone-size-row.is-current em { color: var(--selected-ink); }
-
-.phone-size-saved-head { display: flex; align-items: center; justify-content: space-between; }
-.phone-size-saved-head .phone-section { margin: 4px 6px 8px; }
-.phone-size-edit {
-  min-height: 40px;
-  margin: -4px -2px 4px 0;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font-size: 15px;
-  font-weight: 600;
-}
-.phone-size-edit.is-on { color: var(--ember); }
-
-/* A saved row is one row in and out of Edit: a see-through button under it
-   picks it; under Edit the name's field fills in and Remove fades in. */
-.phone-size-saved { overflow: hidden; }
-.phone-size-row.is-saved { position: relative; isolation: isolate; }
-.phone-size-row.is-saved.is-editing { padding-right: 4px; }
-.phone-size-row.is-saved:not(.is-editing) > :not(.phone-size-hit) { pointer-events: none; }
-.phone-size-hit {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  padding: 0;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-}
-.phone-size-text { gap: 0; }
-.phone-size-name {
-  width: 100%;
-  min-width: 0;
-  height: 26px;
-  min-height: 0;
-  margin: 0 0 0 -8px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--r-field);
-  outline: 0;
-  background: transparent;
-  box-shadow: none;
-  color: hsl(var(--foreground));
-  font: inherit;
-  font-size: 16px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  transition: background-color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
-}
-.phone-size-row.is-editing .phone-size-name { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
-.phone-size-row.is-editing .phone-size-name:focus { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px var(--line-strong); }
-.phone-size-name::selection { background: rgb(255 154 82 / .32); color: #fff; }
-.phone-size-remove-slot {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  width: 0;
-  margin-left: -10px;
-  overflow: hidden;
-}
-.phone-size-row.is-editing .phone-size-remove-slot { width: 44px; margin-left: 0; }
-.phone-size-remove {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--danger-ink);
-  opacity: 0;
-  transition: opacity var(--motion-base) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
-}
-.phone-size-row.is-editing .phone-size-remove { opacity: 1; }
-.phone-size-remove:active { background-color: var(--danger-fill); }
-
-@media (prefers-reduced-motion: reduce) {
-  .phone-size-remove, .phone-size-name, .phone-size-shape { transition: none; }
-}
-
 /* -------------------------------------------------------------- Viewer */
 
 .viewer-phone-bar {
@@ -807,13 +686,6 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora { min-height: 40px; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-lora-name { font-size: 14px; }
 
-/* The status pill over the phone viewer: between Star and Info, never over either. */
-.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {
-  top: calc(max(10px, env(safe-area-inset-top)) + 4px);
-  left: calc(max(10px, env(safe-area-inset-left)) + var(--dock-h) + 8px);
-  max-width: calc(100% - 20px - 3 * var(--dock-h) - 32px);
-  translate: none;
-}
 /* The phone viewer's title keeps to two short lines: the name, then the settings, each cut short. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary :is(strong, span) { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
 @media (max-width: 359px) {

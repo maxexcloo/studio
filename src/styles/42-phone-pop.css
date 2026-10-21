@@ -43,31 +43,14 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .model-pop-row .picker-star { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); }
 .model-pop-row .picker-star.is-on { color: var(--accent-amber); }
 
-/* Size, in its pop-up: the resolutions and the shapes as full-width toggles, then Width and Height. */
+/* Size, in its pop-up: the resolutions as a full-width toggle, the shapes as a list, then Width and Height. */
 .phone-size-pop-body { overflow-y: auto; overscroll-behavior: contain; }
 .phone-size { display: grid; gap: var(--space-4); padding-top: 4px; }
 .phone-size .size-resolution { display: block; }
 .phone-size .aspect-upscale-tabs { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; width: 100%; }
 .phone-size .aspect-upscale-tabs button { min-height: 40px; font-size: 14px; }
-.size-shapes { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: var(--space-2); padding: var(--seg-pad); border-radius: calc(var(--r-item) + var(--seg-pad)); background: var(--well); }
-.size-shape {
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: var(--space-3);
-  min-height: 58px;
-  padding: 6px 2px;
-  border: 0;
-  border-radius: var(--r-item);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font: inherit;
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-.size-shape .aspect-shape { border-width: 1.5px; border-radius: 3px; }
-.size-shape.is-active { background-color: var(--selected-bg); color: var(--selected-ink); }
+/* The shapes: one vertical list of the shared rows, Custom last (UI-PATTERNS › Lists). */
+.size-options .size-option .list-row-label small { margin-left: var(--space-3); color: hsl(var(--muted-foreground)); font-size: 13px; }
 .phone-size .phone-size-fields { padding: 2px 0 0; }
 
 /* -------------------------------------------------------------- The Create sheet */
@@ -139,10 +122,48 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-prompt-bar .phone-gallery-mode button > svg { width: var(--icon); height: var(--icon); }
 .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { color: var(--selected-ink); background-color: var(--selected-bg); }
 .phone-prompt-bar .phone-gallery-mode button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; }
-/* A message takes the middle: between "Studio" and the tools, its words centred, as tall as the bar's controls. */
-.phone-bar-row.has-message .phone-bar-gap { display: none; }
-.status-pill.is-bar { flex: 1 1 auto; justify-content: center; height: var(--bar-pill-h); margin: 0 4px; }
-.status-pill.is-bar .status-pill-body { flex: 1; justify-content: center; }
+/* The status pill (UI-PATTERNS › Messages): one for the whole app, at the top of the screen,
+   centred on the top bar's line and outside every box and header, as wide as the screen less a
+   margin, above every sheet, pop-up and dialog. A long message wraps onto more lines; it is never cut short. */
+.phone-status {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + (var(--bar-h) - var(--bar-pill-h)) / 2);
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: var(--z-phone-status);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.phone-status:empty { display: none; }
+.status-pill.is-phone {
+  pointer-events: auto;
+  height: auto;
+  min-height: var(--bar-pill-h);
+  padding-block: 2px;
+  border-radius: var(--r-menu);
+  /* Over content, not in a bar: nothing under it reads through. */
+  background: var(--surface-grain), var(--glass-panel-solid);
+  box-shadow: var(--glass-panel-shadow);
+}
+.status-pill.is-phone .status-pill-body { padding-block: 4px; }
+.status-pill.is-phone .status-pill-text { overflow: visible; line-height: 1.3; white-space: normal; text-wrap: pretty; }
+/* The main screen: the bar's own row steps aside while a message shows, so nothing peeks out beside it. */
+.phone-bar-row.has-message > * { visibility: hidden; }
+/* Over a sheet, a pop-up, a dialog or the viewer: the top corners stay clear, so Close (and Back) stay in
+   reach, and the title it covers steps aside. */
+html:has(.phone-sheet, .reference-popover.is-pop, .modal-scrim, .viewer-phone-bar) .phone-status {
+  left: calc(max(8px, env(safe-area-inset-left)) + var(--control-h-touch) + 8px);
+  right: calc(max(8px, env(safe-area-inset-right)) + var(--control-h-touch) + 8px);
+}
+html:has(.phone-status .status-message) :is(.phone-sheet:not(.is-covered) .phone-sheet-head > h2, .modal-head .modal-titles) { visibility: hidden; }
+html:has(.viewer-phone-bar) .phone-status { top: calc(max(10px, env(safe-area-inset-top)) + (var(--bar-h) - var(--bar-pill-h)) / 2); }
+html:has(.phone-status .status-message) .scrim .viewer-stage:has(.viewer-phone-bar) :is(.viewer-profile-summary, .viewer-phone-star, .viewer-phone-info) { visibility: hidden; }
+/* A question's panel spans the screen under the pill. */
+.status-pill.is-phone .status-pill-panel {
+  top: calc(100% + 6px);
+  width: calc(100vw - 2 * max(8px, env(safe-area-inset-left)));
+}
 .phone-menu-trigger.is-open { color: var(--selected-ink); }
 
 /* The select bar: the top bar's height and glass, at the bottom edge. */
@@ -217,21 +238,6 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side-body::-webkit-scrollbar { display: none; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .details-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 
-/* Messages over the viewer take the title's place, top left, as tall as the bar's pill and on the corner buttons' centre line. */
-.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer {
-  top: calc(max(10px, env(safe-area-inset-top)) + (var(--bar-h) - var(--bar-pill-h)) / 2);
-  left: max(10px, env(safe-area-inset-left));
-  height: var(--bar-pill-h);
-  max-width: calc(100vw - 3 * (var(--dock-h) + 8px) - 24px);
-  translate: none;
-}
-.scrim .viewer-stage:has(.viewer-phone-bar):has(.status-pill.is-viewer) .viewer-profile-summary { visibility: hidden; }
-
-/* A message while a pop-up covers the top bar: the pop-up's head hosts the pill in the title's place (UI-PATTERNS › Messages). */
-.reference-popover.is-pop .reference-popover-head:has(.status-pill) > strong,
-.reference-popover.is-pop .reference-popover-head:has(.status-pill) > .reference-upload { display: none; }
-.reference-popover.is-pop .reference-popover-head .status-pill.is-surface { flex: 1 1 auto; min-width: 0; height: var(--bar-pill-h, 36px); margin: 0 4px 0 0; }
-
 /* The gallery view controls end the phone's filter row, in the filters' size and shape (UI-PATTERNS › Gallery View Controls). */
 .phone-filter-row .gallery-action-shell { display: contents; }
 .phone-filter-row .gallery-view-toggle { position: static; display: inline-flex; flex: none; align-items: center; gap: var(--space-3); width: auto; height: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: rgb(255 255 255 / .06); box-shadow: none; color: hsl(var(--muted-foreground)); font-size: 14px; white-space: nowrap; }
@@ -240,38 +246,31 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-filter-divider { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--list-hairline); }
 .phone-menu-count { margin-left: auto; padding: 1px 8px; border-radius: var(--r-pill); background: rgb(255 120 100 / .18); font-style: normal; font-size: 13px; font-variant-numeric: tabular-nums; }
 
-/* On the phone a question's panel spans the screen under the bar, whatever the pill's place. */
-.phone-bar .status-pill-panel,
-.reference-popover.is-pop .status-pill-panel,
-.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill-panel {
-  position: fixed;
-  top: calc(max(10px, env(safe-area-inset-top)) + var(--bar-h) + 6px);
-  left: max(8px, env(safe-area-inset-left));
-  right: max(8px, env(safe-area-inset-right));
-  width: auto;
-  translate: none;
-}
-.phone-bar .status-pill-panel { top: calc(env(safe-area-inset-top) + var(--bar-h) + 6px); }
 
 /* -------------------------------------------------------------- Focused text (useTextFocus)
-   A focused Prompt or Negative is the only thing on screen, as tall as the room above the
-   keyboard: its actions in a row along its top with Done at the end, nothing to scroll under it. */
+   A focused Prompt or Negative is the only thing on screen: the prompt box itself (its border,
+   radius and fill), its top where the Create sheet's top is, filling the visible width less a
+   margin and the height down to just above the keyboard. Its actions sit in a row along its top
+   with Done at the end; the text runs the box's full width under them; nothing scrolls under it. */
 .phone-sheet.phone-create.is-text-focus {
-  height: calc(var(--vv-height, 100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)) - max(8px, env(safe-area-inset-top)));
+  height: var(--vv-height, calc(100dvh + var(--pwa-drop, 0px) - var(--kb-inset, 0px)));
   max-height: none;
-  padding-bottom: 8px;
+  padding: max(20px, env(safe-area-inset-top)) 0 8px;
+  border-top: 0;
+  border-radius: 0;
+  background: var(--surface-grain), var(--glass-panel-solid);
+  box-shadow: none;
 }
 .phone-create.is-text-focus :is(.phone-sheet-grab, .phone-sheet-foot, .create-options, .phone-ref-role) { display: none; }
-.phone-create.is-text-focus .phone-sheet-body { overflow: hidden; padding-top: 8px; }
+.phone-create.is-text-focus .phone-sheet-body { overflow: hidden; padding: 0 8px; }
 .phone-create.is-text-focus .create-flow { min-height: 100%; height: 100%; }
 .phone-create.is-text-focus .create-prompts { flex: 1 1 auto; min-height: 0; }
 .phone-create.is-text-focus .composer-prompt-field:not(.is-text-focused) { display: none; }
-/* Focused: just the text, filling the room above the keyboard, with no box or border, the normal
-   padding, and the same row at the top right (44 px targets) ending in Done. */
-.create-prompts .composer-prompt-field.is-text-focused { --prompt-tool-w: 40px; --prompt-tool-h: 44px; flex: 1 1 auto; flex-direction: column; min-height: 0; border-color: transparent; background: transparent; }
-.create-prompts .composer-prompt-field.is-text-focused textarea { flex: 1 1 auto; height: auto !important; min-height: 0; max-height: none; overflow-y: auto; padding-top: var(--prompt-pad) !important; padding-bottom: var(--prompt-pad) !important; padding-right: calc(3 * var(--prompt-tool-w) + 72px) !important; }
-.create-prompts .is-negative.is-text-focused textarea { padding-right: calc(3 * var(--prompt-tool-w) + 72px) !important; }
-.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools { gap: 0; }
+/* Focused: the normal box, the full room, the same row at the top right (44 px targets) ending in Done. */
+.create-prompts .composer-prompt-field.is-text-focused { --prompt-tool-w: 40px; --prompt-tool-h: 44px; --prompt-tools-top: var(--space-3); flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools { top: var(--prompt-tools-top); right: var(--prompt-tools-top); gap: 0; }
+.create-prompts .composer-prompt-field.is-text-focused textarea,
+.create-prompts .is-negative.is-text-focused textarea { flex: 1 1 auto; height: auto !important; min-height: 0; max-height: none; overflow-y: auto; padding: calc(var(--prompt-tools-top) + var(--prompt-tool-h) + var(--space-2)) 14px var(--prompt-pad) !important; }
 .create-prompts .composer-prompt-field.is-text-focused .prompt-select-all { display: inline-flex; }
 .create-prompts .composer-prompt-field.is-text-focused .composer-field-tools .prompt-action.prompt-done {
   order: 9;
@@ -334,15 +333,3 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .compare-variants pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .compare-variants select { max-width: 100%; }
 .comparison-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
-
-
-
-
-/* Confirmation answers need the corner tools' space; Close stays available. */
-.scrim .viewer-stage:has(.viewer-phone-bar) .status-pill.is-viewer[role="alertdialog"] {
-  max-width: calc(100vw - var(--dock-h) - 36px);
-}
-.scrim .viewer-stage:has(.viewer-phone-bar):has(.status-pill.is-viewer[role="alertdialog"]) :is(.viewer-phone-star, .viewer-phone-info) {
-  visibility: hidden;
-}
-

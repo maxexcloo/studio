@@ -13,11 +13,10 @@ import { anchoredPlacement, useCssSettling } from './composerSurface';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { EmptyState } from './EmptyState';
 import { AnimatedNumber } from './AnimatedNumber';
-import type { AspectPreset, NativeSupport, Output, Profile, SavedSize } from './types';
+import type { AspectPreset, NativeSupport, Output, Profile } from './types';
 import { MEGAPIXEL, type SideLimits } from './sizing';
-import { LinkedSizeFields, MegapixelField, SavedSizeRow, SizePreview, SizeTabs, sizeMenuModel, type MegapixelControl, type SizeRow, type SizeTier } from './SizeMenu';
+import { LinkedSizeFields, MegapixelField, SizePreview, SizeTabs, sizeMenuModel, type MegapixelControl, type SizeRow, type SizeTier } from './SizeMenu';
 import { usePresence } from './usePresence';
-import { AnimatePresence } from 'framer-motion';
 import { aspectIconStyle, cn, titleFromPrompt } from './format';
 import { wheelPixels } from './wheel';
 import { formatDownload, modelFits, useHardware } from './hardware';
@@ -310,7 +309,7 @@ function triggerShapeStyle(width: number, height: number): React.CSSProperties {
  * and changes the shape. The trigger draws the real shape and says the ratio,
  * with a tag for 2K ("2K") and Custom ("C").
  */
-export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, savedSizes = [], onSaveSize, onRenameSize, onRemoveSize, onPickSaved, targetArea = 0, megapixel = null }: {
+export function AspectPicker({ value, options, onChange, currentSize, defaultSize, density = "full", tier = "none", tiers = ["none", "custom"], native, sizeMax = 8192, limits, onTierChange, onCustomRatio, onCustomSize, targetArea = 0, megapixel = null }: {
   value: string;
   options: AspectPreset[];
   onChange: (value: string) => void;
@@ -326,12 +325,6 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   onTierChange?: (tier: SizeTier) => void;
   onCustomRatio?: (ratio: number) => void;
   onCustomSize?: (size: { width: number; height: number }) => void;
-  /** Custom sizes kept with "Save size", listed under the shapes on every tab. */
-  savedSizes?: SavedSize[];
-  onSaveSize?: () => void;
-  onRenameSize?: (id: string, name: string) => void;
-  onRemoveSize?: (id: string) => void;
-  onPickSaved?: (saved: SavedSize) => void;
   /** Megapixels in 2K's place (Settings › Studio): Default draws every shape at this area. */
   targetArea?: number;
   megapixel?: MegapixelControl | null;
@@ -349,7 +342,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const [peek, setPeek] = useState(false);
   useEffect(() => { if (!open) { setHovered(null); setPeek(false); } }, [open]);
 
-  const { custom, picked, shown, rows, savedMatch, ownSize, isActive, savedRow, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, savedSizes, targetArea, offerTwoK: tiers.includes("2k") });
+  const { custom, picked, shown, rows, isActive, label, badge, what, captionFor, note } = sizeMenuModel({ value, options, currentSize, defaultSize, tier, native, sizeMax, limits, targetArea });
   const previewRow = hovered;
   const previewSize = previewRow ? previewRow.size : shown;
   const previewLabel = captionFor(previewRow);
@@ -465,23 +458,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                   <em>{row.size.width}×{row.size.height}</em>
                 </button>
               ))}
-              <AnimatePresence initial={false}>
-                {onPickSaved ? savedSizes.map((item) => (
-                  <SavedSizeRow
-                    key={item.id}
-                    saved={item}
-                    active={savedMatch?.id === item.id}
-                    // From Default or 2K it switches to Custom and closes, like any pick there; in Custom it stays open.
-                    onPick={() => onPickSaved(item)}
-                    onRename={(name) => onRenameSize?.(item.id, name)}
-                    onRemove={() => { setHovered(null); onRemoveSize?.(item.id); }}
-                    onPreview={(on) => setHovered((current) => on ? savedRow(item) : current?.key === savedRow(item).key ? null : current)}
-                  />
-                )) : null}
-              </AnimatePresence>
               {/* Custom closes the list; its width and height unlock only while it is the pick. */}
               {limits && onCustomSize && onTierChange ? (
-                <button type="button" className={cn("aspect-option is-custom", custom && !savedMatch && "active")} role="option" aria-selected={custom && !savedMatch} onClick={() => onTierChange("custom")}>
+                <button type="button" className={cn("aspect-option is-custom", custom && "active")} role="option" aria-selected={custom} onClick={() => onTierChange("custom")}>
                   <span className="aspect-shape" style={aspectIconStyle({ label: "Custom", value: "custom", w: shown.width, h: shown.height })} />
                   <span>Custom</span>
                   <em>{custom ? `${picked.width}×${picked.height}` : ""}</em>
@@ -491,7 +470,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
             {/* Under every shape: how big they're all drawn. */}
             {megapixel ? <MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixel} custom={custom} /> : null}
             {/* Width and height stay in view at the bottom, enabled only for Custom (UI-PATTERNS › Lists). */}
-            {limits && onCustomSize ? <div className="size-custom"><LinkedSizeFields size={custom ? picked : shown} limits={limits} onChange={onCustomSize} onSave={custom && (ownSize || savedMatch) ? onSaveSize : undefined} saved={Boolean(savedMatch)} disabled={!custom} /></div> : null}
+            {limits && onCustomSize ? <div className="size-custom"><LinkedSizeFields size={custom ? picked : shown} limits={limits} onChange={onCustomSize} disabled={!custom} /></div> : null}
             {note ? <p className="size-menu-note">{note}</p> : null}
           </div>
         </div>
