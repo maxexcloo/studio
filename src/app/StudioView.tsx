@@ -815,9 +815,8 @@ export function StudioView({ view }: { view: StudioViewModel }) {
       })() : null}
       {models?.features?.library === true && view.libraryOpen ? <React.Suspense fallback={<Modal open title="Library" onOpenChange={() => view.setLibraryOpen(false)}><p role="status">Opening the Library…</p></Modal>}><Library onClose={() => view.setLibraryOpen(false)} models={models} refreshModels={refreshModels} onApply={view.applyImagePreset} onPrompt={view.applyPresetPrompt} showToast={showToast} /></React.Suspense> : null}
       {workflowGalleryOpen ? <React.Suspense fallback={<Modal open title="Workflow Gallery" onOpenChange={(open) => { if (!open) setWorkflowGalleryOpen(false); }}><p role="status">Opening workflows…</p></Modal>}><WorkflowGallery view={{ ...view, onClose: () => setWorkflowGalleryOpen(false) }} /></React.Suspense> : null}
-      {/* Generation progress for screen readers: started, rendering, ready. */}
-      <div className="sr-only" role="status" aria-live="polite">{view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""}</div>
-      <StatusAnnouncer />
+      {/* The one announcer: messages, and generation progress for screen readers (started, ready; not each step). */}
+      <StatusAnnouncer progress={view.status && view.status !== "Ready" && !/^Rendering|^Queued/.test(view.status) ? view.status : ""} />
     </div>
     </GenerationProfiles.Provider>
     </FavoriteContext.Provider>

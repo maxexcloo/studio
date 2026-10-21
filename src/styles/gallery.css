@@ -1862,6 +1862,11 @@
   .gallery-search-tools { grid-column: 1; grid-row: 2; }
   .gallery-toolbar-actions { grid-column: 2; grid-row: 2; }
 }
+/* Selecting in the one-row toolbar: the actions' column never drops below what they need (a narrow desktop window,
+   a message beside them), taking it from the search tools' side; with room to spare the columns stay even. */
+@media (min-width: 1051px) {
+  .gallery-toolbar:has(.gallery-management.is-selecting) { grid-template-columns: minmax(0, 1fr) 160px minmax(min-content, 1fr); }
+}
 /* Selecting in the two-row toolbar: the search tools keep only their own width, so every selection action fits. */
 @media (min-width: 641px) and (max-width: 1050px) {
   .gallery-toolbar:has(.gallery-management.is-selecting) { grid-template-columns: auto minmax(0, 1fr); }

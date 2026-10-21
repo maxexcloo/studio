@@ -65,14 +65,25 @@ export function PhoneStatus({ message }: { message: ToastRecord | null }) {
   );
 }
 
-/** Every message for screen readers, wherever the pill is: polite, errors assertive. Mount once. */
-export function StatusAnnouncer() {
+/**
+ * The one announcer (UI-PATTERNS › Messages): every message for screen
+ * readers, wherever the pill is, polite and failures assertive. `progress`
+ * (a generation started or finished, never each step) speaks through the same
+ * polite region: the region says whichever of the two changed last, so neither
+ * needs a live region of its own. Mount once.
+ */
+export function StatusAnnouncer({ progress = '' }: { progress?: string }) {
   const messages = useSyncExternalStore(subscribeToasts, toastSnapshot, toastSnapshot);
   const front = messages[0];
   const text = front ? messageText(front) : '';
+  const message = front && front.tone !== 'error' ? text : '';
+  const [polite, setPolite] = useState(message || progress);
+  // A message that comes back (merged, counted) is new news; so is any change of progress.
+  useLayoutEffect(() => { setPolite(message); }, [message, front?.id, front?.version]);
+  useLayoutEffect(() => { if (progress) setPolite(progress); }, [progress]);
   return (
     <>
-      <div className="sr-only" role="status" aria-live="polite">{front && front.tone !== 'error' ? text : ''}</div>
+      <div className="sr-only" role="status" aria-live="polite">{polite}</div>
       {/* An alert is announced as it appears, so it exists only while there is one. */}
       {front?.tone === 'error' ? <div className="sr-only" role="alert" aria-live="assertive">{text}</div> : null}
     </>

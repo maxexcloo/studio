@@ -269,7 +269,7 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
         return delta;
       }
     }
-    const page = await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&includeFailed=${includeFailed}&bundles=0${searchQuery()}`);
+    const page = await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&includeFailed=${includeFailed}${searchQuery()}`);
     if (seq !== loadSeq.current) return page;
     dispatch({ type: "reset", page });
     setLoadedKey(requestKeyRef.current);
@@ -296,7 +296,7 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
     const request = { cursor: state.nextCursor, seq };
     loadingMoreRef.current = request;
     try {
-      const page = await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&cursor=${encodeURIComponent(state.nextCursor)}&includeFailed=${includeFailed}&bundles=0${searchQuery()}`);
+      const page = await apiJson<GalleryPage>(`/api/gallery?type=${encodeURIComponent(mode)}&limit=220&cursor=${encodeURIComponent(state.nextCursor)}&includeFailed=${includeFailed}${searchQuery()}`);
       if (seq === loadSeq.current) dispatch({ type: "append", page });
     } catch {
       // Leave the cursor as it was, so the next scroll or the button tries again.
