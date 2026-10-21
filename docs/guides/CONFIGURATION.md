@@ -20,6 +20,15 @@ For other devices: `HEISS_ALLOWED_HOSTS` (extra names to answer to, comma-separa
 
 ## Model Manifest
 
+`STUDIO_MODEL_STORAGE=worker` selects the active ComfyUI worker for model
+inventory and downloads, even when Studio has a local mirror mount. Set the same
+nonempty `STUDIO_WORKER_TOKEN` on both services and mount the worker's models
+read-write. Provider credentials remain in Studio; downloads stream directly to
+the worker and resume against their recorded source, size and SHA-256 checksum.
+The default local backend remains unchanged. Manifest import, verification and
+restore are unavailable in worker mode, so they cannot accidentally inspect or
+change a mirror. See [Studio Worker Node](../../comfyui/studio_worker/README.md).
+
 `STUDIO_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to ComfyUI's model folder; when the manifest's paths start with a deployment folder instead (such as `models/comfyui/`), set `STUDIO_MODEL_MANIFEST_PREFIX` to strip it.
 
 **Settings › Models › Model Manifest** shows which files are verified, present, missing or wrong. It verifies checksums in the background, and restores missing files through Studio's checksum-verifying downloader. Only Civitai and Hugging Face files that go straight into a model folder are restored; others are listed with the reason, for the deployment's own tooling.

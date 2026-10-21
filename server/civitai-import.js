@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { modelFolders } from './comfy.js';
+import { comfyUrl, modelFolders } from './comfy.js';
+import { remoteModelsEnabled, refreshWorkerModels, workerModelFile } from './worker-models.js';
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from './civitai-access.js';
 import { sameResourceFilename, workflowModelSources } from './civitai-workflow.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
@@ -253,6 +254,8 @@ async function hashFile(file) {
  * image checks its checksums in full.
  */
 export async function matchResources(preset, { profiles = [], loras = [], textEncoders = [], vaes = [] } = {}, { foldersFor = modelFolders, verify = true } = {}) {
+  const workerUrl = comfyUrl;
+  const remote = remoteModelsEnabled() ? await refreshWorkerModels({ workerUrl }) : null;
   const resources = [];
   for (const resource of preset.resources) {
     let localName = '';
@@ -263,6 +266,25 @@ export async function matchResources(preset, { profiles = [], loras = [], textEn
       : profiles.filter((item) => item.kind === (preset.type || 'image')).flatMap((item) => [item.defaults?.model, item.model, item.baseModel]).filter(Boolean);
     for (const name of [...new Set(candidates)]) {
       if (typeof name !== 'string' || path.isAbsolute(name) || name.split(/[\\/]/).includes('..')) continue;
+      if (remote) {
+        const folders = ['checkpoints', 'diffusion_models'].includes(resource.folder) ? ['checkpoints', 'diffusion_models'] : [resource.folder];
+        for (const folder of folders) {
+          const file = remote.files.find(item => item.path === `${folder}/${name}`);
+          if (!file) continue;
+          const sameName = resource.nameOnly ? sameResourceFilename(name, resource.file) : path.basename(name) === resource.file;
+          const sameSize = Boolean(resource.bytes) && Math.abs(file.size - resource.bytes) <= 2048;
+          if (!sameName && !sameSize) continue;
+          if (resource.nameOnly && sameName) { localName = name; break; }
+          if (resource.sha256) {
+            const hash = verify ? (await workerModelFile({ folder, file: name, workerUrl }, 'hash')).sha256 : '';
+            if (hash === resource.sha256) { localName = name; break; }
+            if (!hash && sameName && sameSize) { localName = name; unverified = true; break; }
+          }
+          if (sameName) conflict = true;
+        }
+        if (localName) break;
+        continue;
+      }
       const modelDirs = ['checkpoints', 'diffusion_models'].includes(resource.folder)
         ? [...foldersFor('checkpoints', ['checkpoints']), ...foldersFor('diffusion_models', ['diffusion_models', 'unet'])]
         : resource.folder ? foldersFor(resource.folder, [resource.folder]) : [];

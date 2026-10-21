@@ -1,3 +1,4 @@
+import { remoteModelsEnabled, workerInventory, workerModelFile, refreshWorkerModels } from './worker-models.js';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -64,6 +65,7 @@ export async function resolveModelLink(value, directory = 'loras', { json = civi
 }
 
 export function libraryDownloadAccess() {
+  if (remoteModelsEnabled()) return { available: workerInventory().writable, backend: "worker", note: workerInventory().writable ? "Downloads enter the worker’s model library." : "Connect a writable Studio worker model library before downloading." };
   try {
     const dir = comfyModelsDir();
     if (dir) {
@@ -76,14 +78,20 @@ export function libraryDownloadAccess() {
 
 export async function startLibraryDownload(spec) {
   if (!presetsEnabled()) throw new Error('Presets & Models is disabled on this instance.');
+  await refreshWorkerModels({ force: true });
   if (!/^[a-f0-9]{64}$/i.test(spec.sha256 || '')) throw new Error('This model has no valid provider SHA-256 checksum. Preview its source again.');
   if (!libraryDownloadAccess().available) throw new Error(libraryDownloadAccess().note);
   {
     const file = existingCopy(spec);
     if (file) {
-      const hash = crypto.createHash('sha256');
-      for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
-      if (hash.digest('hex') !== spec.sha256) throw new Error('A different model already uses this filename. Keep it and choose another file.');
+      let digest;
+      if (remoteModelsEnabled()) digest = (await workerModelFile(spec, 'hash')).sha256;
+      else {
+        const hash = crypto.createHash('sha256');
+        for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+        digest = hash.digest('hex');
+      }
+      if (digest !== spec.sha256) throw new Error('A different model already uses this filename. Keep it and choose another file.');
     }
     const state = downloadState();
     const running = [state.active, ...state.queued].find((item) => item?.folder === spec.folder && item.file === spec.file);

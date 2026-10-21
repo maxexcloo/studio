@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Worker model storage:** `STUDIO_MODEL_STORAGE=worker` lists and downloads models in the active ComfyUI library. Studio retains provider credentials and streams weights directly to authenticated worker endpoints, with source-bound resume, published checksum verification and no destination overwrites.
+
+### Changed
+- Worker model storage respects ComfyUI folder aliases and extra roots. Saved-image checks use the active worker; manifest import, verification and restore are explicitly unavailable in this mode. Local model storage remains the default.
+
 ## [0.36.0] - 2026-10-21
 
 > Visual image review on request through MCP and a generation timing breakdown
