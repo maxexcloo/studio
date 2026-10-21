@@ -43,6 +43,8 @@ the pattern occurs in the same piece of work.
 - **Media:** a picture never resizes or zooms while it loads. Reserve its
   final box from its known size, show the thumbnail in it, and cross-fade the
   sharp copy over the top (no fade with reduced motion).
+- Switching Images | Videos fades the new list in as one surface at
+  `--motion-base`; tiles don't pop in one by one.
 - Gallery column changes keep moving tiles inside the grid horizontally. Clip
   overflow on the virtual spacer without creating another scrolling container,
   so focus and selection cannot pan the gallery or move its toolbar sideways.
