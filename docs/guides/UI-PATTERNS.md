@@ -7,29 +7,73 @@ the pattern occurs in the same piece of work.
 
 ## Motion
 
-- **Durations:** `--motion-instant` (90 ms) for presses, `--motion-fast`
-  (140 ms) for hover, focus and small state changes, `--motion-base` (200 ms)
-  for surfaces entering or leaving, `--motion-slow` (320 ms) for height
-  changes such as a row's details expanding.
-- **Easing:** `--motion-ease` for interactive state changes; `--ease-soft` for
-  staged sequences and sheets; framer-motion springs (`stiffness: 420,
-  damping: 40`) only for sheets that follow a finger.
-- **Enter and exit:** popovers fade and scale from 0.96 at their trigger;
-  sheets slide up from the bottom edge and leave the same way; inline sections
-  grow their height from 0 with opacity. Exits are as long as entries or
-  shorter, never longer.
+- **Tokens:** every duration and easing comes from `00-tokens.css`:
+  `--motion-instant` (90 ms) for presses, `--motion-fast` (140 ms) for hover,
+  focus and small state changes, `--motion-base` (200 ms) for surfaces
+  entering or leaving, `--motion-slow` (320 ms) for height changes such as a
+  row's details expanding. `--motion-ease` for interactive state changes;
+  `--ease-soft` for staged sequences and sheets. No raw milliseconds or
+  `cubic-bezier()` in transitions.
+- **Framer motion** uses `src/lib/springs.ts` only: `tweens.*` match the CSS
+  tokens, `springs.*` have no bounce, and `springs.sheet` (`stiffness: 420,
+  damping: 40`) is only for sheets that follow a finger. Nothing overshoots.
+- **Presses never move anything.** No control scales, shrinks, lifts or shifts
+  when it is pressed or hovered. A press darkens the fill in place at
+  `--motion-instant` (one global rule in `09-motion.css`): `--press-overlay`
+  on dark controls, `--press-overlay-dark` on light ones, a slight dim on
+  Generate, and `--press-media` on the picture of a tile or thumbnail.
+- **Animate only `transform` and `opacity`.** Never transition `top`, `left`,
+  `width`, `height`, margins, padding or grid tracks; such changes are
+  instant. The one exception is an inline section's framer `height: 'auto'`
+  at `--motion-slow`. Never `transition: all`.
+- **Enter and exit:** popovers fade and scale from 0.96 at their trigger
+  (`popoverMotion` in `composerSurface.ts`, the `surfaceIn` keyframe in CSS);
+  sheets, nested ones too, slide up from the bottom edge and leave the same
+  way; inline sections grow their height from 0 with opacity. Exits are as
+  long as entries or shorter, never longer. No filter blur in any entry.
 - **Reduced motion:** with `prefers-reduced-motion` (or `useReducedMotion()`),
   movement becomes a plain fade or an instant change, and smooth scrolling
-  becomes `behavior: 'auto'`. Nothing essential depends on an animation
-  finishing.
-- **Media:** a picture never resizes while it loads. Reserve its final box from
-  its known size, show the thumbnail in it, and cross-fade the sharp copy over
-  the top (no fade with reduced motion).
+  becomes `behavior: 'auto'`. The CSS kill-switch covers CSS; framer height,
+  width and filter animations and JS scrolling branch on `useReducedMotion()`.
+  Nothing essential depends on an animation finishing.
+- **Media:** a picture never resizes or zooms while it loads. Reserve its
+  final box from its known size, show the thumbnail in it, and cross-fade the
+  sharp copy over the top (no fade with reduced motion).
 - Gallery column changes keep moving tiles inside the grid horizontally. Clip
   overflow on the virtual spacer without creating another scrolling container,
   so focus and selection cannot pan the gallery or move its toolbar sideways.
-- No decorative motion: no bouncing rows, no reorder animation, no odd
-  open/close flourishes on pickers.
+- No decorative motion: no hover lifts or nudges, no bouncing rows, no
+  staggered entrances, no reorder animation, no sliding highlights, no
+  bobbing, wobble or endless glow (real progress and status indicators may
+  pulse or spin), and no odd open/close flourishes on pickers.
+
+## Geometry
+
+Use the tokens in `00-tokens.css`, never raw values:
+
+- **Spacing:** gaps and padding step through `--space-1`…`--space-7`
+  (2, 4, 6, 8, 12, 16, 24 px). No 1, 3, 5, 7, 9, 10, 11 or 14 px gaps.
+- **Control sizes:** `--control-h` (40 px) on the desktop, `--control-h-touch`
+  (44 px) on touch screens, `--control-h-sm` (32 px) for controls inside rows
+  (Advanced Settings selects, pickers, toggles and segments) and small icon
+  buttons in lists (Star, View Source, Search, Close), which are round.
+- **Segmented tracks** come in two sizes only, large (`--control-h`) and small
+  (`--control-h-sm`), with `--seg-pad` (3 px) of track around the options.
+- **Rows:** `--row-h-menu` (38 px) in desktop menus and popovers,
+  `--row-h-settings` (44 px) in Settings, `--list-row-h` (48 px, 44 px on
+  short screens) in phone sheets and pop-up lists.
+- **Lines:** `--glass-border` for the edge of a surface, `--line` for
+  separators between rows and groups, `--line-strong` for a focused field's
+  edge. One edge per side: a panel with a shadow has no extra border.
+- **Radii** follow radius = inner + padding: `--r-panel` (28) for the
+  composer, sidebar and modals, `--r-menu` (22) for menus and popovers,
+  `--r-item` (14) for rows and options inside them, `--r-media` (10) for tiles
+  and thumbnails, `--r-field` (10) for fields that are not pills, `--r-check`
+  (5) for checkboxes and `--r-pill` for controls, chips and every circle.
+  Nothing inside a rounded surface has square corners.
+- **Icons:** 16 px (`--icon`) for actions, 14 px (`--icon-sm`) in chips and
+  rows, 20 px (`--icon-touch`) on phone bars; the default stroke, and check
+  marks at `--check-stroke` (2.5).
 
 ## Media
 
@@ -206,7 +250,7 @@ an anchored popover; on the phone a pop-up list over Create (see
   something is picked. Clear Selection empties the selection at once and offers
   Undo in the status pill; it never asks first.
 - One tap adds or removes; a picked item highlights in place and shows its
-  order number (an empty ring, then the number on white, the same mark in
+  order number (an empty ring, then the number on amber, the same mark in
   every chooser) and stays picked across searches and tabs. It never moves and
   enabled LoRAs reveal their information below the row. The Selected tab lists
   the picks in their order with strength and enable controls.
@@ -353,16 +397,18 @@ phone) and one page at a time with its title and one line.
 - **Glass icon buttons** in a 48 px bar (the docks, the viewer bar) keep the
   40 px target, but their hover and press fill is a smaller circle
   (`--icon-fill`, 32 px), inset evenly by `--icon-fill-inset` so 8 px of glass
-  shows around it on every side. Hover is `--control-hover`, press
-  `--control-press` with a slight shrink, the keyboard ring (`--icon-ring`)
-  traces the fill circle inside the bar. Hover and focus change at
-  `--motion-fast`, presses at `--motion-instant`. Change only
-  `background-color` on these buttons: the `background` shorthand resets the
-  clip and the fill grows to the full target again.
+  shows around it on every side; the phone's 44 px bars use the same pattern.
+  Hover is `--control-hover`, a press darkens the fill and nothing moves, the
+  keyboard ring (`--icon-ring`) traces the fill circle inside the bar. Hover
+  and focus change at `--motion-fast`, presses at `--motion-instant`. Change
+  only `background-color` on these buttons: the `background` shorthand resets
+  the clip and the fill grows to the full target again.
+- **Presses:** every button, row and tile darkens in place when pressed (see
+  [Motion](#motion)); none scales, shrinks or shifts, Generate included.
 - Tile corner buttons are their own glass circles: hover darkens them, a press
-  shrinks them, and the keyboard ring sits just outside the circle. The phone
-  viewer bar's press fill is a rounded shape inset inside its cell, never
-  touching a divider or the bar's edge.
+  darkens them further, and the keyboard ring sits just outside the circle.
+  The phone viewer bar's press fill is a rounded shape inset inside its cell,
+  never touching a divider or the bar's edge.
 - A bar's tooltips open on the side away from the screen edge and nothing else
   floats on that side: the viewer's zoom pill sits in the bottom right corner,
   level with the bar, not above it.
@@ -379,12 +425,29 @@ phone) and one page at a time with its title and one line.
 
 ## Selected & Focus States
 
-- Focus rings show only for keyboard focus (`:focus-visible`). A click never
-  leaves a ring, highlight or pill behind.
-- A selected option shows its checkmark or pressed fill, not an extra row
-  highlight. Plain text (such as "N Selected") never looks selected.
-- Hover is never the only way to reach something; tile captions also show on
-  `:focus-visible`/`:focus-within`.
+Selection uses the accent (`--selected-bg`, `--selected-ink`); the keyboard
+cursor and hover in a list use the neutral `--cursor-bg`. One treatment per
+kind of element:
+
+| Element | Selected / on | Hover / keyboard cursor | Shape |
+| --- | --- | --- | --- |
+| Rows and list options (menus, pickers, filters, model, size, LoRA, starter versions) | No row fill: an amber check or lead; amber checkboxes (`--accent-amber` with an `--accent-amber-ink` check) | `--cursor-bg`, inset inside the popover | `--r-item`, never bleeding past the rounded popover |
+| Chips, tabs, segmented toggles, filter triggers, pressed toggles | `--selected-bg` with `--selected-ink` | `--control-hover` | `--r-pill`; a static fill, no sliding indicator |
+| Icon toggles in bars (Star, Search, Info, Filter) | An amber icon (Star filled); no disc | `--control-hover` inside `--icon-fill` | Circle |
+| Switches | Track `--accent-amber`, thumb `--accent-amber-ink` | — | Pill |
+| Tiles and media | A 2 px `--accent-amber` outline inside the edge and an amber check badge | `--glass-border` outline | `--r-media` |
+| Section rails (Settings sections, sidebar tabs) | As chips: `--selected-bg` with `--selected-ink`; no marker or underline | `--control-hover` | `--r-item` |
+
+- **Focus rings** show only for keyboard focus (`:focus-visible`); a click
+  never leaves a ring, highlight or pill behind, so `:focus-within` styling
+  uses `:has(:focus-visible)`. A standalone control takes
+  `box-shadow: var(--focus-ring)`; inside a surface or bar the ring is
+  `outline: 2px solid var(--icon-ring)` with `outline-offset: -2px`,
+  following the element's radius. Rings are never amber, blue or white.
+- **Hover** is one fill, `--control-hover` (on glass circles as a
+  `background-image` so the clip stays). Hover is never the only way to reach
+  something; tile captions also show on `:focus-visible`/`:focus-within`.
+- Plain text (such as "N Selected") never looks selected.
 
 ## Action Placement
 

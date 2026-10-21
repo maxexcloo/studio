@@ -19,6 +19,10 @@ version opens with a `> ` summary line.
 - **Gallery:** a Status filter (Hide Queued, Hide Failed) replaces the Failed toggle.
 - **Confirmations:** reversible actions (delete with Undo, stop, disable, restart, revoke) act at once; only Reset All Settings asks. The Confirm Before Removing Things setting is gone.
 - **Settings › Account:** no Session group or Access line; Sign Out is in the Menu.
+- **Presses:** nothing moves when you click or tap any more; buttons, rows and tiles darken in place instead of shrinking or sliding.
+- **Motion:** one set of timings everywhere, with no overshoot, hover lifts, staggered entrances, sliding highlights or endless glows; popovers fade and scale in at their trigger, and the composer opens and closes on a smooth curve.
+- **Selection:** selected chips, tabs, segments, toggles and Settings sections share one amber highlight; list rows show an amber check instead of a grey fill; switches, checkboxes and the picker order mark are amber; keyboard focus shows one neutral ring.
+- **Geometry:** shared spacing, control, row, radius, line and icon sizes; menus and their rows have rounded corners, segmented toggles come in two sizes and small icon buttons in lists are round 32 px targets.
 
 ## [0.39.0] - 2026-10-21
 
