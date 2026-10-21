@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:26.11.1-bookworm-slim AS build
+FROM node:26.12.1-bookworm-slim AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -8,7 +8,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --no-audit --no-fund --omit=dev
 
-FROM node:26.11.1-bookworm-slim AS runtime
+FROM node:26.12.1-bookworm-slim AS runtime
 
 ENV STUDIO_DATA_DIR=/data \
     STUDIO_ENV_FILE=/data/.env \
