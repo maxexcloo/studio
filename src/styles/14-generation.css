@@ -76,7 +76,6 @@
   -webkit-text-fill-color: currentColor;
   animation: none;
 }
-.generation-mosaic > .image-gen-child { height: 100%; }
 /* img-fx owns shader opacity during reveal. Apply the preview strength as a
    separate multiplier so beginning the reveal cannot jump back to full opacity. */
 .generation-mosaic > .image-gen-shader {

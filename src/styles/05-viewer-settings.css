@@ -124,7 +124,6 @@
 /* The detail actions: one white pill for the main move, the rest a quieter
    row of equal-width pills under it. Hover, press and focus come from .btn;
    .btn loads later, so the overrides carry its class too. */
-.viewer-actions { display: grid; gap: var(--space-4); min-width: 0; }
 /* Two to a row in name order; Use Settings, the main move, takes a row to itself when it would sit alone. */
 
 /* Details: each prompt unboxed under its label, its Copy and Use beside the label. */

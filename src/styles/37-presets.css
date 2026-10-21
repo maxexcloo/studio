@@ -115,15 +115,10 @@
 .library-state.is-pending strong { color: var(--accent-amber); }
 
 .library-prompt { display: grid; gap: 4px; }
-.library-prompt .set-group-title { margin: 0; }
 .library-prompt p { margin: 0; max-height: 168px; overflow-y: auto; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .library-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px 16px; margin: 0; }
 .library-settings dt { font-size: 11px; color: hsl(var(--muted-foreground)); }
 .library-settings dd { margin: 2px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-
-.library-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
-.library-group-head .set-group-title { margin-bottom: 0; }
-.library-group-actions { display: flex; gap: 6px; }
 .btn.is-sm { height: 32px; min-height: 32px; padding: 0 12px; font-size: 12.5px; }
 .library-model-choice { min-width: 0; max-width: 60%; }
 .library-model-choice .dropdown-trigger { min-width: 220px; }
@@ -161,7 +156,6 @@
   .settings-modal .library-search input { min-height: 44px; font-size: 16px; }
   .library-model-choice { max-width: none; width: 100%; }
   .library-model-choice .dropdown-trigger { min-width: 0; width: 100%; }
-  .library-group-head { flex-wrap: wrap; }
   .library-modal .modal-foot .btn { flex: 1; min-height: 44px; }
   .library-icon { width: 44px; height: 44px; }
   .set-nav-item .library-nav-count { margin-left: 6px; }

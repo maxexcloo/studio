@@ -23,14 +23,7 @@
 .ref-selected { display: block; }
 .ref-thumb { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--glass-border); border-radius: inherit; background: var(--well); color: hsl(var(--muted-foreground)); cursor: pointer; }
 .ref-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ref-remove, .ref-paint { position: absolute; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--glass-panel-bg); -webkit-backdrop-filter: var(--glass-panel-blur); backdrop-filter: var(--glass-panel-blur); color: hsl(var(--foreground)); cursor: pointer; transition: background var(--motion-fast), color var(--motion-fast); }
-.ref-remove { top: -5px; right: -5px; }
-.ref-paint { bottom: -5px; left: -5px; }
-.ref-remove:hover { background: var(--danger-fill); color: var(--danger-ink); }
-.ref-paint:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--surface-grain), var(--glass-panel-bg); }
-.ref-paint.is-active { background: linear-gradient(var(--selected-bg), var(--selected-bg)), var(--glass-panel-bg); color: var(--selected-ink); }
-.ref-paint.is-masked { color: var(--ember); }
-.ref-add:focus-visible, .ref-thumb:focus-visible, .ref-remove:focus-visible, .ref-paint:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ref-add:focus-visible, .ref-thumb:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .ref-chip.is-busy { flex-direction: column; gap: var(--space-3); background: var(--control-fill); color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 /* Chosen: the thumbnail never moves. Its menu is a panel behind it that a
@@ -88,7 +81,6 @@
 .ref-selected.is-hover .ref-menu,
 .ref-selected.is-intro .ref-menu,
 .ref-selected:focus-within .ref-menu,
-/* Revealing controls follow any focus inside (a click on Paint keeps its menu); rings stay keyboard-only. */
 .ref-selected.is-open .ref-menu { opacity: 1; pointer-events: auto; clip-path: inset(0 0 0 0 round var(--r-menu)); }
 .ref-menu > * { opacity: 0; transition: opacity var(--motion-base) var(--motion-ease); }
 .ref-selected.is-hover .ref-menu > *,
@@ -205,7 +197,6 @@
   .ref-chip { width: 56px; height: 56px; }
   .ref-add { gap: var(--space-2); padding: 5px; }
   .ref-add-label { font-size: 9px; }
-  .ref-remove, .ref-paint { width: 28px; height: 28px; }
   .reference-slot-list { gap: var(--space-4); }
 }
 
@@ -267,7 +258,6 @@
 .picker-clear-all:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .picker-clear-all:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (pointer: coarse) { .picker-clear-all { height: 44px; } }
-.reference-popover-hint { flex: 1; min-width: 0; font-size: 11.5px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .reference-upload { height: 36px; min-height: 36px; padding: 0 14px; font-variant-numeric: tabular-nums; }
 .reference-popover-close {
   flex: none;
@@ -285,7 +275,6 @@
 
 .reference-popover-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px; mask-image: linear-gradient(to bottom, transparent, #000 10px, #000); }
 .reference-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--space-4); }
-.reference-shelf-note { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 10px; font-size: 11.5px; color: hsl(var(--muted-foreground)); }
 .reference-tile { position: relative; aspect-ratio: 1; }
 .reference-tile-select {
   width: 100%;
@@ -414,7 +403,6 @@
 }
 @media (max-width: 760px) {
   .reference-popover { height: min(420px, 62dvh); }
-  .reference-popover-hint { display: none; }
   .reference-upload span { display: none; }
   .reference-upload { width: 36px; padding: 0; }
   .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
@@ -515,123 +503,26 @@
    Several references (a model that reads more than one): the first stays the
    chip in the corner, the others are a deck behind it that fans out into its
    strip on hover, followed by a + for the next (greyed once all are used). */
-.ref-deck-card {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-item);
-  background: var(--well) center / cover no-repeat;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 3px 8px rgb(0 0 0 / .35);
-  filter: brightness(.78);
-  pointer-events: none;
-  transition: transform var(--motion-slow) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), filter var(--motion-slow) var(--motion-ease);
-}
-.ref-deck-card.is-1 { transform: translateX(-9px) scale(.9); }
-.ref-deck-card.is-2 { z-index: 0; transform: translateX(-17px) scale(.8); filter: brightness(.55); }
 /* Fanned out: the strip shows them, so the deck tucks in behind the thumbnail. */
-.ref-selected.is-hover .ref-deck-card,
-.ref-selected.is-intro .ref-deck-card,
-.ref-selected:focus-within .ref-deck-card,
-.ref-selected.is-open .ref-deck-card { transform: none; opacity: 0; }
-
-.ref-stack { display: inline-flex; align-items: center; gap: var(--space-3); padding-right: 2px; }
-.ref-stack > .ref-fold > .ref-menu-divider { margin: 0 2px 0 4px; }
-.ref-stack-item { position: relative; flex: none; }
-.ref-stack-thumb,
-.ref-stack-add {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--r-media);
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-}
-.ref-stack-thumb {
-  background: var(--well);
-  box-shadow: 0 0 0 1px rgb(255 255 255 / .14);
-  transition: box-shadow var(--motion-fast);
-}
-.ref-stack-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ref-stack-thumb:hover { box-shadow: 0 0 0 1px rgb(255 255 255 / .36); }
-.ref-stack-item.is-open .ref-stack-thumb { box-shadow: 0 0 0 2px var(--accent-amber); }
-.ref-stack-item.is-new .ref-stack-thumb { animation: ref-pop var(--motion-base) var(--motion-ease); }
-.ref-stack-thumb:focus-visible,
-.ref-stack-add:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* Inside the strip's clip, so it sits on the thumbnail's own corner. */
-.ref-stack-remove {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 16px;
-  height: 16px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: rgb(40 40 40);
-  color: hsl(var(--foreground));
-  box-shadow: 0 0 0 1.5px rgb(24 24 24);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
-}
-.ref-stack-item:hover .ref-stack-remove,
-.ref-stack-item:focus-within .ref-stack-remove { opacity: 1; }
-.ref-stack-remove:hover { background: rgb(150 58 44); color: #fff; }
-.ref-stack-remove:focus-visible { outline: none; box-shadow: 0 0 0 1.5px rgb(24 24 24), var(--focus-ring); }
-.ref-stack-add {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18);
-  transition: background var(--motion-fast), color var(--motion-fast);
-}
-.ref-stack-add:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-.ref-stack-add.is-open { background: var(--selected-bg); color: var(--selected-ink); box-shadow: none; }
-.ref-stack-add.is-busy { cursor: default; }
 /* Every slot used: still there, greyed, and its tooltip says why. */
-.ref-stack-add.is-full,
 .ref-add.is-full { opacity: .38; cursor: default; }
-.ref-stack-add.is-full:hover { background: transparent; color: hsl(var(--muted-foreground)); }
 .ref-add.is-full:hover { background: rgb(34 34 34 / .55); }
-
-@media (hover: none) {
-  .ref-stack-remove { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ref-deck-card { transition: none; }
-}
 /* The deck's room sits left of the thumbnail: EDIT stays on the thumbnail's corner. */
 /* In Edit only the first picture changes: the others, which it only draws from, are greyed
    (colour back under the pointer, to see what you'd change). Ref leaves them all as they are. */
-.ref-selected.is-edit .ref-stack-thumb img,
-.ref-selected.is-edit .ref-deck-card { filter: grayscale(1) brightness(.62); }
 /* On the elements themselves, not under .is-edit, so the colour fades back as well as out. */
-.ref-stack-thumb img,
 .composer-reference-slots .ref-thumb img { transition: filter var(--motion-slow) var(--motion-ease); }
-.ref-selected.is-edit .ref-stack-thumb:is(:hover, :focus-visible) img,
-.ref-selected.is-edit .ref-stack-item.is-open .ref-stack-thumb img { filter: none; }
 /* The same in a row (phone, touch): beside the picture being edited, the others are greyed. */
 .composer-reference-slots:has(> .ref-selected.is-edit) .ref-selected:not(.is-edit) .ref-thumb img { filter: grayscale(1) brightness(.62); }
 
 /* Something Edit leaves out (the +, its divider, the phone row's empty slot): it folds to
    nothing in place, width and gap with it (Fold animates the way there). */
-.ref-fold { display: inline-flex; flex: none; align-items: center; }
-.ref-fold.is-folded { width: 0; margin-left: var(--fold-gap, -6px); opacity: 0; overflow: hidden; pointer-events: none; }
-.ref-fold.is-folding { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
-  .ref-stack-thumb img, .composer-reference-slots .ref-thumb img, .ref-selected { transition: none; }
+  .composer-reference-slots .ref-thumb img, .ref-selected { transition: none; }
 }
 /* Arriving (a second picture, or the switch appearing) they ease in from the thumbnail, not pop. */
 @starting-style {
-  .ref-deck-card.is-1,
-  .ref-deck-card.is-2 { transform: none; opacity: 0; }
   .ref-role-badge.is-on { opacity: 0; }
 }
 
@@ -661,7 +552,6 @@
 .reference-opening { position: fixed; z-index: 90; inset: auto 16px 100px; padding: 16px; border-radius: var(--r-panel); background: var(--glass-panel-bg); }
 
 /* Full capacity is said in the picker itself, on the phone too. */
-.reference-popover .reference-popover-hint.is-full { display: block; color: hsl(var(--foreground)); }
 
 
 /* One References button for a model that reads several (FLUX.3 [klein] takes

@@ -20,8 +20,6 @@
 .wf-filters, .model-filters { flex: none; display: flex; gap: var(--space-3); padding: 12px 20px 14px; overflow-x: auto; scrollbar-width: none; }
 .model-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4) var(--space-5); padding: 8px 4px 12px; overflow: visible; }
 .model-filter-group { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
-.model-filter-library { grid-column: 1 / -1; }
-.model-filter-label { width: 100%; padding: 0 4px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 600; }
 .model-filter-group:not(.model-filter-library) button { flex: 1; padding: 0 8px; }
 .wf-filter-divider { flex: none; width: 1px; height: 18px; align-self: center; margin: 0 2px; background: var(--glass-border); }
 .wf-filters::-webkit-scrollbar, .model-filters::-webkit-scrollbar { display: none; }

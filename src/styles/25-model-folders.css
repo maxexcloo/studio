@@ -176,7 +176,6 @@
 }
 .model-menu .model-filters { display: flex; gap: var(--space-3); padding: 8px 2px 12px; overflow-x: auto; }
 .model-menu .model-filter-group { flex: none; flex-wrap: nowrap; }
-.model-menu .model-filter-label { display: none; }
 .model-menu .model-filter-group:not(.model-filter-library) { padding-left: 0; border-left: 0; }
 .model-menu .model-filter-group button { flex: none; padding: 0 10px; height: 32px; }
 .model-menu-section { display: grid; gap: var(--space-1); }
