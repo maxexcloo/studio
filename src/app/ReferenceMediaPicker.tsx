@@ -257,6 +257,13 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   const pickerTitle = multiple ? "References" : "Reference";
   const heading = useSurfaceHeadingSlot(pickerTitle, Boolean(onPhone));
   const tabName = { generation: "Library", upload: "Uploads", selected: "Selected" } as const;
+  // Upload leads the Uploads grid as its first tile (UI-PATTERNS › Pickers), on the desktop and the phone.
+  const uploadLabel = upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload";
+  const uploadTile = (style: React.CSSProperties) => <div key="upload" style={style} className="reference-tile reference-upload-tile">
+    <Tip content={upload.busy ? uploadLabel : "Upload an Image"}><button type="button" className="reference-tile-select reference-upload-button" aria-label={uploadLabel} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
+      {upload.busy ? <LoaderCircle className="spin" size={18} /> : <Upload size={18} />}<span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
+    </button></Tip>
+  </div>;
   if (!box) return null;
   // In the phone studio it pops up over the Create sheet, anchored to the References row.
   // An exiting picker must not intercept Escape intended for the next overlay.
@@ -275,7 +282,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       {...popoverMotion}
       {...settling}
     >
-      {/* The chooser pattern (UI-PATTERNS › Pickers): one heading row, the title, the views, Upload, Clear Selection, search and Close. */}
+      {/* The chooser pattern (UI-PATTERNS › Pickers): one heading row, the title, the views, search, Clear Selection and Close; Upload is the first tile of Uploads. */}
       <header className="reference-popover-head">
         <strong className="picker-title surface-title"><ImagePlus size={16} aria-hidden="true" />{pickerTitle}</strong>
         <span ref={heading.ref} className="surface-head-slot" />
@@ -284,7 +291,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={16} /></button></Tip>
       </header>
       <SurfaceHeadingContext.Provider value={heading.value}>
-      <PickerTools extra={<Tip content={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload an Image"}><button type="button" className="picker-search-toggle reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>{upload.busy ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}</button></Tip>} query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
+      <PickerTools query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
         clear={multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
         onClear={multiple && selected.length > 0 && onClearAll ? onClearAll : undefined}
         views={{ label: "Reference Image Sources", current: tab === "selected" ? `Selected ${selected.length}/${max}` : tabName[tab], options: [
@@ -329,13 +336,18 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           </div>
         ) : page.error && !items.length ? (
           <EmptyState title="Images Unavailable" action={<button className="btn" onClick={() => load(source)}>Try Again</button>}>{page.error}</EmptyState>
+        ) : !items.length && tab === "upload" && !query ? (
+          <>
+            <ReferenceGrid items={items} lead={uploadTile} render={() => null} />
+            <EmptyState title="No Uploads Yet" compact>Upload one, or drop it on the prompt.</EmptyState>
+          </>
         ) : !items.length ? (
           <EmptyState title={query ? "No Matching Images" : tab === "generation" ? "No Outputs Yet" : "No Uploads Yet"}>
             {query ? "Try a different prompt or filename." : tab === "generation" ? "Finished images show up here." : "Upload one, or drop it on the prompt."}
           </EmptyState>
         ) : (
           <>
-            <ReferenceGrid items={items} render={(asset, index, style, tabIndex) => {
+            <ReferenceGrid items={items} lead={tab === "upload" && !query ? uploadTile : undefined} render={(asset, index, style, tabIndex) => {
                 const isSelected = selected.some(item => item.id === asset.id);
                 return (
                   <div

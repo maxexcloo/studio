@@ -362,10 +362,10 @@
 .zen-prompt-actions .generate,
 .lora-pill { height: var(--control-h); min-height: var(--control-h); border-radius: var(--r-pill); border-color: transparent; background: var(--well); }
 .zen-prompt-actions .generate {
-  width: 40px;
+  width: auto;
   min-width: 40px;
-  flex: 0 0 40px;
-  padding: 0;
+  flex: 0 0 auto;
+  padding: 0 16px 0 13px;
   color: #0b0b0b;
   background: linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #dededf 100%);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.55) inset, 0 -1px 1px rgb(0 0 0 / 0.06) inset;
@@ -1071,8 +1071,8 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-prompt-preview { display: none; }
 .composer-primary-actions { display: flex; flex: none; align-items: center; }
 .composer-primary-actions .composer-submit-actions { padding: 0; }
-.zen-prompt .generate { width: var(--control-h); min-width: var(--control-h); height: var(--control-h); padding: 0; border-radius: var(--r-pill); }
-.zen-prompt .generate span { display: none; }
+/* Generate is its arrow and its name, as on the phone; offline and restarting say so in the same slot. */
+.zen-prompt .generate { width: auto; min-width: var(--control-h); flex: 0 0 auto; height: var(--control-h); padding: 0 16px 0 13px; gap: var(--space-3); border-radius: var(--r-pill); white-space: nowrap; }
 .zen-prompt .composer-secondary-row { align-items: flex-start; padding: 6px 0 0; }
 .zen-prompt .zen-prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: 6px 2px 0; border-top: 1px solid var(--line); }
 .zen-prompt .zen-inline-settings { flex: 1; min-width: 0; flex-wrap: wrap; }
@@ -1140,7 +1140,6 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-advanced .list-row-control :is(.dropdown-trigger, .number-picker, .number-picker.is-sm, .list-field, .set-type-picker) { height: var(--control-h-sm); min-height: var(--control-h-sm); }
 .composer-advanced .list-row-control .dropdown-trigger { max-width: 200px; font-size: 13px; }
 .composer-advanced .list-toggle { height: var(--control-h-sm); font-size: 12px; }
-.composer-advanced .list-segments button { font-size: 12px; }
 /* Advanced Settings and Back to Recommended. */
 .list-row.list-row-action { justify-content: flex-start; gap: var(--space-4); width: 100%; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; }
 /* ------------------------------------------------------------ The prompt assistant */

@@ -337,7 +337,7 @@ export function ComposerBar(props: ComposerBarProps) {
           >
             {comfyRestarting
               ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>
-              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <ArrowUp size={18} strokeWidth={2.4} />}
+              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <><ArrowUp size={16} strokeWidth={2.4} /><span>Generate</span></>}
           </GenerateButton>
         </Tip>
         </div>

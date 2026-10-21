@@ -127,7 +127,7 @@ button.list-row { isolation: isolate; }
 .account-menu-list button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; box-shadow: none; }
 .account-menu-list button.is-danger, .account-menu-list button.is-danger > svg { color: var(--danger-ink); }
 /* -------------------------------------------------------------- List controls */
-.list-toggle, .list-segments button {
+.list-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -144,12 +144,8 @@ button.list-row { isolation: isolate; }
   cursor: pointer;
   transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.list-toggle:hover, .list-segments button:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-.list-toggle.is-on, .list-segments button[aria-pressed="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
-/* A segmented toggle is one small track (UI-PATTERNS › Geometry): --seg-pad around
-   options that fill it, the chosen one in the selected fill. */
-.list-segments { display: inline-flex; gap: var(--space-1); height: var(--control-h-sm); padding: var(--seg-pad); border-radius: var(--r-pill); background: var(--well); }
-.list-segments button { height: 100%; background: transparent; }
+.list-toggle:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.list-toggle.is-on { background-color: var(--selected-bg); color: var(--selected-ink); }
 .list-row-control .number-picker.is-sm { height: var(--control-h-sm); }
 .list-row-control input.list-field { max-width: 120px; height: var(--control-h-sm); }
 .list-row-text { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }

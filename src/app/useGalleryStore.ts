@@ -30,6 +30,8 @@ type GalleryState = {
   totalApprox: number;
   /** Emptied by a crossing to another list, not by a first load. */
   crossing?: boolean;
+  /** The previous list of the same mode, kept on screen while a search, filter or Hide Failed & Queued loads its own. */
+  held?: boolean;
 };
 
 type GalleryAction =
@@ -42,7 +44,8 @@ type GalleryAction =
   | { type: "replace"; items: GalleryItem[]; revision?: number }
   | { type: "loaded" }
   | { type: "clear" }
-  | { type: "cross"; restore: GalleryState | null };
+  | { type: "cross"; restore: GalleryState | null }
+  | { type: "hold" };
 
 const initialState: GalleryState = {
   itemsById: {},
@@ -104,6 +107,7 @@ function galleryReducer(state: GalleryState, action: GalleryAction): GalleryStat
   if (action.type === "loaded") return { ...state, loaded: true };
   if (action.type === "clear") return initialState;
   if (action.type === "cross") return action.restore || { ...initialState, crossing: true };
+  if (action.type === "hold") return state.held ? state : { ...state, held: true };
   if (action.type === "reset") {
     const pageItems = action.page.items || action.page.outputs || [];
     // Keep the existing object for an unchanged item, so memoised tiles skip re-rendering.
@@ -130,7 +134,7 @@ function galleryReducer(state: GalleryState, action: GalleryAction): GalleryStat
       totalApprox: Math.max(Number(action.page.totalApprox || pageItems.length || 0), Object.keys(itemsById).length),
     };
     const same = (Object.keys(next) as (keyof GalleryState)[]).every((key) => next[key] === state[key]);
-    return same ? state : next;
+    return same && !state.held ? state : next;
   }
   if (action.type === "append") {
     const pageItems = action.page.items || action.page.outputs || [];
@@ -237,9 +241,17 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
   useLayoutEffect(() => {
     if (previousPage.current.key === requestKey) return;
     const previous = previousPage.current;
-    if (previous.state.loaded && !JSON.parse(previous.key)[2]) pageSnapshots.current.set(previous.key, previous.state);
+    if (previous.state.loaded && !previous.state.held && !JSON.parse(previous.key)[2]) pageSnapshots.current.set(previous.key, previous.state);
     const restored = pageSnapshots.current.get(requestKey);
     restoredPage.current = restored || null;
+    // A search, a filter or Hide Failed & Queued in the same mode keeps the list on screen until its
+    // own arrives, then swaps it in place: only a first load or Images | Videos starts from nothing.
+    const sameMode = JSON.parse(previous.key)[0] === mode;
+    if (!restored && sameMode && previous.state.loaded) {
+      previousPage.current = { key: requestKey, state: previous.state };
+      dispatch({ type: "hold" });
+      return;
+    }
     previousPage.current = { key: requestKey, state: restored || initialState };
     dispatch({ type: "cross", restore: restored || null });
     setLoadedKey(restored ? requestKey : "");
@@ -292,7 +304,7 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
   const loadingMoreRef = useRef<{ cursor: string; seq: number } | null>(null);
   const loadMoreGalleryItems = useCallback(async () => {
     const seq = loadSeq.current;
-    if (!state.hasMore || !state.nextCursor || (loadingMoreRef.current?.cursor === state.nextCursor && loadingMoreRef.current.seq === seq)) return;
+    if (state.held || !state.hasMore || !state.nextCursor || (loadingMoreRef.current?.cursor === state.nextCursor && loadingMoreRef.current.seq === seq)) return;
     const request = { cursor: state.nextCursor, seq };
     loadingMoreRef.current = request;
     try {
@@ -303,10 +315,11 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
     } finally {
       if (loadingMoreRef.current === request) loadingMoreRef.current = null;
     }
-  }, [includeFailed, mode, state.hasMore, state.nextCursor]);
+  }, [includeFailed, mode, state.held, state.hasMore, state.nextCursor]);
 
   const loadGalleryDelta = useCallback(async () => {
-    if (!state.revision) return loadGallery();
+    // A held list belongs to the previous search: the new one comes as a whole page.
+    if (!state.revision || state.held) return loadGallery();
     const seq = loadSeq.current;
     const delta = await apiJson<GalleryDelta>(`/api/gallery/delta?since=${state.revision}&type=${encodeURIComponent(mode)}&includeFailed=${includeFailed}${searchQuery()}`);
     if (seq !== loadSeq.current) return delta;
@@ -315,7 +328,7 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
     if (delta.upserts?.length) dispatch({ type: "upsert", items: delta.upserts, revision: delta.revision });
     if (!delta.removes?.length && !delta.upserts?.length) dispatch({ type: "upsert", items: [], revision: delta.revision });
     return delta;
-  }, [includeFailed, loadGallery, mode, state.revision]);
+  }, [includeFailed, loadGallery, mode, state.revision, state.held]);
 
   const setGallery = useCallback((next: GalleryItem[] | ((current: GalleryItem[]) => GalleryItem[])) => {
     const items = typeof next === "function" ? next(gallery) : next;
@@ -331,7 +344,11 @@ export function useGalleryStore({ mode, showFailedItems, search = emptySearch }:
     gallery,
     visibleGallery,
     renderedGallery: visibleGallery,
-    galleryLoaded: state.loaded && loadedKey === requestKey,
+    // Also for the one render before the layout effect above holds or restores a list in the same mode:
+    // falling to the skeleton there would remount the gallery and replay its entrance.
+    galleryLoaded: state.loaded && (loadedKey === requestKey || Boolean(state.held) || (previousPage.current.key !== requestKey && JSON.parse(previousPage.current.key)[0] === mode)),
+    /** Which list is on screen (its mode, Hide Failed & Queued and search): a new one mounts its tiles in place. */
+    galleryListKey: loadedKey,
     galleryCrossing: !state.loaded && Boolean(state.crossing),
     hasMoreGallery: state.hasMore,
     galleryTotalApprox: state.totalApprox,

@@ -54,17 +54,21 @@
   -webkit-backdrop-filter: var(--glass-panel-blur); backdrop-filter: var(--glass-panel-blur);
   box-shadow: var(--glass-panel-shadow);
 }
-/* One search toggle for menus (Dropdown, gallery filters): beside the title, amber while open. */
+/* One search toggle for menus (Dropdown, gallery filters): right after the title, staying there, amber and pressed while open. */
 .dropdown-search-toggle { display: grid; flex: none; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 :is(.dropdown-search-toggle, .gallery-filter-search-toggle):hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
 :is(.dropdown-search-toggle, .gallery-filter-search-toggle).is-on { color: var(--accent-amber); }
 :is(.dropdown-search-toggle, .gallery-filter-search-toggle):focus-visible { box-shadow: var(--focus-ring); outline: none; }
-.dropdown-head > strong { flex: 1; min-width: 0; }
+/* The title, then the search icon right after it; All and Clear take the far end. */
+.dropdown-head > strong { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dropdown-head > .dropdown-head-action.is-first { margin-inline-start: auto; }
 .dropdown-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h-sm); padding: 0 4px 4px 10px; box-shadow: inset 0 -1px 0 var(--line); margin-bottom: 4px; }
-.dropdown-head strong { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.dropdown-head strong { font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); }
 .dropdown-head-action { height: 28px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background-color: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 12px; cursor: pointer; }
 .dropdown-head-action:hover:not(:disabled) { background-color: var(--control-hover); }
 .dropdown-head-action:disabled { opacity: .4; cursor: default; }
+/* The field drops down under the head (framer height at --motion-slow); its slot clips it while it moves. */
+.dropdown-search-slot { flex: none; overflow: hidden; }
 .dropdown-search { display: flex; align-items: center; gap: var(--space-3); height: var(--control-h-sm); margin: 0 0 4px; padding: 0 10px; border-radius: var(--r-pill); background: var(--well); color: hsl(var(--muted-foreground)); }
 .dropdown-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 13px; outline: none; }
 .dropdown-search button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: var(--r-pill); background-color: transparent; color: inherit; cursor: pointer; }

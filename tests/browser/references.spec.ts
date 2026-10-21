@@ -172,15 +172,23 @@ test('reference sources name their search and keep one upload action', async ({ 
     await page.keyboard.type('n');
     await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
     await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveValue('n');
-    await picker.getByRole('button', { name: 'Close Search', exact: true }).click();
+    // The icon stays, pressed while the field is open; pressing it again clears and folds the search.
+    const toggle = picker.getByRole('button', { name: 'Search Library', exact: true });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await toggle.click();
+    await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   }
   await expect(await pickerSearch(picker, 'Search Library', 'searchbox')).toHaveAttribute('placeholder', 'Search Library');
   await expect(picker.getByText('No Outputs Yet', { exact: true })).toBeVisible();
+  // Upload is the first tile of Uploads, not a heading control.
+  await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(0);
+  // The views stay beside the open search; the field takes the view's name.
   await pickerView(picker, 'Uploads');
-  await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
   await expect(await pickerSearch(picker, 'Search Uploads', 'searchbox')).toHaveAttribute('placeholder', 'Search Uploads');
-  // On the desktop the open search covers the heading's tools; closed, Upload is back, once.
-  if (!phone) await picker.getByRole('button', { name: 'Close Search', exact: true }).click();
+  await picker.getByRole('button', { name: 'Search Uploads', exact: true }).click();
+  await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
+  await expect(picker.locator('.reference-grid .reference-upload-tile').getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
   await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
   await expect(picker.locator('.empty-state button')).toHaveCount(0);
 });

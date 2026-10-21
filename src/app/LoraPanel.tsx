@@ -18,7 +18,6 @@ import { showToastTone } from './toast';
 import { knownLoraInfo, loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
 import type { LoraSnapshot } from './lora-storage';
 import type { LoraSelection, Profile } from './types';
-import type { LoraSuggestion, PromptAssistant } from './usePromptAssistant';
 
 export type LoraLibraryApi = {
   familyLabel: string;
@@ -236,7 +235,7 @@ function LoraCard({ item, count, missing, overLimit, info, otherModel, policyNot
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, suggested: assistantPicks = [], onAddSuggested, onToggleFavorite, onClearAll, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onClearAll, onAdd, onSwap, onClose }: {
   options: string[];
   profile: Profile | null;
   fitOf: FitOf;
@@ -260,10 +259,6 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     toggle: (name: string) => void;
     update: (name: string, patch: Partial<LoraSelection>) => void;
   };
-  /** The prompt assistant's picks for the current prompt: a Suggested section at the top of This Model. */
-  suggested?: LoraSuggestion[];
-  /** Adds a suggested LoRA with its strength and trigger words. */
-  onAddSuggested?: (suggestion: LoraSuggestion) => void;
   onToggleFavorite: (name: string) => void;
   /** Takes every LoRA off; shown beside the tabs while some are picked. */
   onClearAll?: () => void;
@@ -287,19 +282,20 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const move = (from: number, to: number) => { inlineSelection?.move(from, to); };
   const reorder = useReorderDrag((inlineSelection?.items || []).map((item) => item.name), move, listRef);
 
-  const filteredOptions = useMemo(() => [...new Set([...modelLoras(options, fitOf, showAll), ...(libraryView ? current : [])])], [options, fitOf, showAll, libraryView, current]);
+  // This Model lists only the model family's LoRAs; All adds the rest, and picks from other families stay in All and Selected.
+  const filteredOptions = useMemo(() => [...new Set([...modelLoras(options, fitOf, showAll), ...(libraryView && showAll ? current : [])])], [options, fitOf, showAll, libraryView, current]);
   const available = useMemo(() => new Set(filteredOptions), [filteredOptions]);
   const sections = useMemo<PickerSection[]>(() => {
     const q = query.trim().toLowerCase();
     if (q) return [{ id: 'results', label: 'Results', rows: rankedLoras(filteredOptions.filter((name) => `${name} ${nameOf(name)}`.toLowerCase().includes(q)), profile, '', fitOf).map((name) => ({ key: `q:${name}`, name })) }];
     if (reviewing) return [{ id: 'selected', label: '', rows: current.map((name) => ({ key: name, name })) }];
     if (libraryView) {
-      // Headed groups, as in Models: Favourites, then this model's family, then (under All) what the rest were made for.
       const ranked = rankedLoras(filteredOptions, profile, '', fitOf);
-      // The assistant's picks for this prompt lead as Suggested; each LoRA still has one row.
-      const picks = view === 'model' ? assistantPicks.map((item) => item.name).filter((name) => available.has(name) && fitOf(name) !== 'other') : [];
-      const listed = [...ranked, ...current.filter((name) => !ranked.includes(name))].filter((name) => !picks.includes(name));
       const family = modelFamilyLabel(profile) || 'This Model';
+      // This Model: one section, the model family's LoRAs, Favourites first within it.
+      if (view === 'model') return ranked.length ? [{ id: `group:${family}`, label: family, rows: [...ranked.filter((name) => favorites.includes(name)), ...ranked.filter((name) => !favorites.includes(name))].map((name) => ({ key: name, name })) }] : [];
+      // All: headed groups, as in Models: Favourites, then this model's family, then what the rest were made for.
+      const listed = [...ranked, ...current.filter((name) => !ranked.includes(name))];
       const own = new Set(modelLoras(options, fitOf, false));
       const groups = new Map<string, string[]>();
       for (const name of listed.filter((name) => !favorites.includes(name))) {
@@ -308,7 +304,6 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       }
       const fav = listed.filter((name) => favorites.includes(name));
       return [
-        ...(picks.length ? [{ id: 'assistant', label: 'Suggested', rows: picks.map((name) => ({ key: `a:${name}`, name })) }] : []),
         ...(fav.length ? [{ id: 'favorites', label: 'Favourites', rows: fav.map((name) => ({ key: name, name })) }] : []),
         ...[...groups].map(([label, names]) => ({ id: `group:${label}`, label, rows: names.map((name) => ({ key: name, name })) })),
       ];
@@ -324,7 +319,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       out.push({ id: group.id, label: group.label, collapsible: true, rows: group.loras.map((name) => ({ key: `${group.id}:${name}`, name })) });
     }
     return out;
-  }, [available, favorites, fitOf, filteredOptions, nameOf, baseOf, options, profile, query, recents, libraryView, current, reviewing, assistantPicks, view]);
+  }, [available, favorites, fitOf, filteredOptions, nameOf, baseOf, options, profile, query, recents, libraryView, current, reviewing, view]);
 
   const hasRows = sections.some((section) => section.rows.length > 0);
   const visibleRows = useMemo(() => sections.flatMap((section) => collapsed.has(section.id) ? [] : section.rows), [collapsed, sections]);
@@ -346,9 +341,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
     if (blocked(name)) return;
     if (libraryView && inlineSelection && !swapping) {
       const adding = !inlineSelection.items.some((item) => item.name === name);
-      const suggestion = adding && onAddSuggested ? assistantPicks.find((item) => item.name === name) : undefined;
-      if (suggestion) onAddSuggested!(suggestion);
-      else inlineSelection.toggle(name);
+      inlineSelection.toggle(name);
       // Bring the new strength controls into view once they have opened.
       if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }), 260);
       return;
@@ -427,8 +420,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                   // In use (the Selected view, on), its information replaces the one-line description.
                   const informed = Boolean(reviewing && item && item.enabled !== false);
                   const description = informed ? '' : loraDescription(info);
-                  const suggestedNote = section.id === 'assistant' ? suggestionNote(assistantPicks.find((pick) => pick.name === row.name)) : '';
-                  const note = suggestedNote ? suggestedNote : blocked(row.name) ? blockedNote(row.name) : policyNoteOf(row.name) || (fitOf(row.name) === 'other' && baseOf(row.name) ? `Made for ${baseOf(row.name)}` : '');
+                  const note = blocked(row.name) ? blockedNote(row.name) : policyNoteOf(row.name) || (fitOf(row.name) === 'other' && baseOf(row.name) ? `Made for ${baseOf(row.name)}` : '');
                   return <div key={row.key} data-lora-name={row.name} data-reorder-key={reviewing ? row.name : undefined} className={cn('lora-library-row', item && 'is-selected', reviewing && 'is-reviewing', index === highlight && 'is-cursor', reorder.rowState(row.name).dragging && 'is-dragging', reorder.rowState(row.name).over && 'is-drop-target')}>
                     {item && reviewing && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`} {...reorder.grip(row.name)}><GripVertical size={14} /></button> : null}
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
@@ -437,7 +429,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                       <span className="lora-option-copy">
                         <strong>{label}</strong>
                         {description ? <em>{description}</em> : null}
-                        {note ? <span className={cn('lora-library-note', suggestedNote && 'is-suggested')}>{note}</span> : null}
+                        {note ? <span className="lora-library-note">{note}</span> : null}
                       </span>
                       {reviewing ? null : <SelectedTick on={Boolean(item)} />}
                     </button>
@@ -511,13 +503,6 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       ) : null}
     </div>
   );
-}
-
-/** A suggested row's line: why, its strength and the trigger words it brings. */
-function suggestionNote(item?: LoraSuggestion) {
-  if (!item) return '';
-  const triggers = (item.triggers || []).filter(Boolean);
-  return [item.reason, `Strength ${round(item.strength)}`, triggers.length ? `Adds ${triggers.slice(0, 3).join(', ')}` : ''].filter(Boolean).join(' · ');
 }
 
 /* ---------------------------------------------------------------- Stacks */
@@ -623,7 +608,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
 /* ----------------------------------------------------------------- Panel */
 
 
-export function LoraPanel({ loras, setLoras, options, profile, limit, library, rememberedStrength, unavailableReason, browseFirst = false, assistant }: {
+export function LoraPanel({ loras, setLoras, options, profile, limit, library, rememberedStrength, unavailableReason, browseFirst = false }: {
   loras: LoraSelection[];
   setLoras: (update: LoraSelection[] | ((current: LoraSelection[]) => LoraSelection[])) => void;
   options: string[];
@@ -633,12 +618,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
   rememberedStrength: (name: string, fallback: number) => number;
   unavailableReason: { title: string; hint?: string } | null;
   browseFirst?: boolean;
-  /** The prompt assistant, for the picker's Suggested section. */
-  assistant?: PromptAssistant;
 }) {
-  // The Suggested section is worked out for the prompt when the picker opens (cached per prompt).
-  const loadSuggestions = assistant?.lorasOffered ? assistant.loadPickerSuggestions : undefined;
-  useEffect(() => { if (browseFirst) loadSuggestions?.(); }, [browseFirst, loadSuggestions]);
   const [picker, setPicker] = useState<{ swap: string | null } | null>(() => browseFirst ? { swap: null } : null);
   const [activeStackId, setActiveStackId] = useState('');
   useEffect(() => { setActiveStackId(''); }, [library.familyLabel]);
@@ -720,8 +700,6 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
             },
             update: (name, patch) => setLoras(current => current.map(item => item.name === name ? { ...item, ...patch } : item))
           }}
-          suggested={browseFirst && assistant?.lorasOffered ? assistant.pickerSuggestions : undefined}
-          onAddSuggested={assistant?.addSuggestion}
           onClearAll={browseFirst ? clearAll : undefined}
           onToggleFavorite={library.toggleFavorite}
           onAdd={add}

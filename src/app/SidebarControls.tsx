@@ -76,7 +76,7 @@ export function PhoneAdvancedControls({ view }: { view: SidebarView }) {
   const sampling = currentProfile?.capabilities.sampler !== false;
   const fixedSeed = String(seed || "").trim();
   const select = (label: string, value: string, options: Array<string | { label: string; value: string }>, onChange: (value: string) => void, friendly = false) => (
-    <ListItem label={label}><ListSelect label={label} value={value} options={friendly ? partOptions(options) : options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} onChange={onChange} /></ListItem>
+    <ListItem label={label}><ListSelect search={false} label={label} value={value} options={friendly ? partOptions(options) : options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} onChange={onChange} /></ListItem>
   );
   const stepper = (label: string, value: number, onChange: (value: number) => void, min: number, max: number, step: number, precision?: number) => (
     <ListItem label={label}><NumberPicker label={label} value={value} onChange={onChange} min={min} max={max} step={step} precision={precision} size="sm" density="compact" /></ListItem>
@@ -144,7 +144,7 @@ export function PhoneAdvancedControls({ view }: { view: SidebarView }) {
 
 export function ModelLoraControls({ view, browseFirst = false }: { view: SidebarView; browseFirst?: boolean }) {
   const { loraOptions, loraLimit, loraUnavailable } = loraSetup(view);
-  return <section className="model-loras" aria-label="Optional LoRAs"><h3>Optional LoRAs</h3><LoraPanel browseFirst={browseFirst} loras={view.loras} setLoras={view.setLoras} options={loraOptions} profile={view.currentProfile} limit={loraLimit} library={view.loraLibrary} rememberedStrength={view.rememberedLoraStrength} unavailableReason={loraUnavailable} assistant={view.assistant} /></section>;
+  return <section className="model-loras" aria-label="Optional LoRAs"><h3>Optional LoRAs</h3><LoraPanel browseFirst={browseFirst} loras={view.loras} setLoras={view.setLoras} options={loraOptions} profile={view.currentProfile} limit={loraLimit} library={view.loraLibrary} rememberedStrength={view.rememberedLoraStrength} unavailableReason={loraUnavailable} /></section>;
 }
 
 // The view model is rebuilt on every studio render (each keystroke in the prompt); these skip unless their data changed.

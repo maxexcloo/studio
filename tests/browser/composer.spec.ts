@@ -66,6 +66,34 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await expect(ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true })).toBeFocused();
 });
 
+// UI-PATTERNS › Composer: Generate says its name beside its arrow, in images and videos alike, and every
+// Advanced Settings choice is the one dropdown, its menu without a search field.
+test('Generate is labelled and Advanced dropdowns carry no search, in both modes', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The phone footer always labels Generate; its Advanced list is the same component.');
+  await page.goto('/');
+  const ui = studioUi(page);
+  for (const mode of ['Image', 'Video']) {
+    await ui.openComposer();
+    const toggle = ui.composer.getByRole('button', { name: mode, exact: true });
+    if (await toggle.count()) await toggle.first().click();
+    await expect(ui.generate).toHaveText('Generate');
+    await ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
+    const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
+    await expect(advanced).toBeVisible();
+    const triggers = advanced.getByRole('combobox');
+    for (let index = 0; index < await triggers.count(); index++) {
+      await triggers.nth(index).click();
+      const menu = page.locator('.dropdown-menu');
+      await expect(menu).toBeVisible();
+      await expect(menu.locator('.dropdown-search-toggle, .dropdown-search')).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+    }
+    await page.keyboard.press('Escape');
+    await expect(advanced).toHaveCount(0);
+  }
+});
+
 test('the phone prompt bar shows the prompt, marks it waiting and opens Create', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'The phone prompt bar.');
   await page.goto('/');

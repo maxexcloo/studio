@@ -812,7 +812,6 @@
 @media (pointer: coarse) {
   .picker-clear-all { height: 44px; }
 }
-.reference-upload { height: 36px; min-height: 36px; padding: 0 14px; font-variant-numeric: tabular-nums; }
 .reference-popover-close {
   flex: none;
   width: 36px;
@@ -840,6 +839,13 @@
   cursor: pointer;
   transition: outline-color var(--motion-fast) var(--motion-ease);
 }
+/* Upload, the first tile of Uploads: a quiet well with its icon and name, the tiles' size and radius. */
+.reference-upload-button { display: grid; place-content: center; justify-items: center; gap: var(--space-2); color: hsl(var(--muted-foreground)); font: inherit; font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+@media (hover: hover) {
+  .reference-upload-button:hover:not(:disabled) { color: hsl(var(--foreground)); background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
+}
+.reference-upload-button:disabled { cursor: default; }
+.reference-popover-body > .reference-grid + .empty-state.is-compact { padding-top: var(--space-6); }
 .reference-tile-select img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .reference-tile-select:hover { outline: 2px solid var(--glass-border); outline-offset: -2px; }
 .reference-tile-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
@@ -935,8 +941,6 @@
 }
 @media (max-width: 760px) {
   .reference-popover { height: min(420px, 62dvh); }
-  .reference-upload span { display: none; }
-  .reference-upload { width: 36px; padding: 0; }
   .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 }
 /* Three shelves on a phone: the words carry the tabs. */
@@ -1607,7 +1611,8 @@
 @media (hover: hover) {
   .picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 }
-.picker-search-toggle[aria-expanded="true"] { color: var(--selected-ink); }
+/* An icon toggle (UI-PATTERNS › Selected & Focus States): amber while its field is open. */
+.picker-search-toggle.is-on { color: var(--accent-amber); }
 .picker-search-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (pointer: coarse) {
   .picker-search-toggle { width: var(--control-h-touch); height: var(--control-h-touch); }
@@ -1731,17 +1736,12 @@
 .picker-heading-tools .reference-tabs button { padding: 0 10px; }
 .picker-heading-tools > .picker-controls::-webkit-scrollbar { display: none; }
 .picker-heading-tools > .picker-clear-all,
-.picker-heading-tools > .reference-upload,
 .picker-heading-tools > .dropdown-trigger { flex: none; }
 .picker-heading-tools .picker-search-toggle { margin-inline-start: 0; }
-/* Upload is a round icon in the heading; its name is in its tooltip and label. */
-.picker-heading-tools > .reference-upload { width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; justify-content: center; border-radius: var(--r-pill); }
-.picker-heading-tools > .reference-upload > span { display: none; }
-/* Search grows leftwards from its icon, beside Close, and the views give way to it. */
-.picker-heading-tools > .picker-search-field { flex: 0 1 200px; display: flex; justify-content: flex-end; min-width: 120px; margin-inline-start: auto; animation: searchIn var(--motion-fast) var(--motion-ease); transform-origin: right center; }
 .reference-popover-head .picker-heading-tools > .picker-search-field > * { box-sizing: border-box; flex: 1 1 auto; max-width: 280px; height: var(--control-h-sm); min-height: 0; margin: 0; }
-.picker-heading-tools:not(.is-searching) > .picker-controls { margin-inline-end: auto; }
-@keyframes searchIn { from { opacity: 0; transform: scaleX(.96); } to { opacity: 1; transform: none; } }
+/* The search icon follows the views; the rest (Stacks, Clear) take the far end until the field fills the room. */
+.picker-heading-tools:not(.is-searching) > .picker-search-toggle { margin-inline-end: auto; }
+.picker-heading-tools:not(:has(> .picker-search-toggle)) > .picker-controls { margin-inline-end: auto; }
 .picker-tools.is-searching .picker-toolbar > .picker-search-field { flex: 1 1 220px; min-width: 120px; }
 .picker-tools.is-searching .picker-toolbar > .picker-search-field > * { height: var(--control-h-sm); margin: 0; }
 /* The desktop model menu takes the same heading. */
@@ -1796,8 +1796,6 @@
 .picker-view-label > span { color: hsl(var(--muted-foreground)); font-weight: 450; }
 .picker-view-label > span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .reference-popover.is-pop .dropdown-trigger.lora-stacks { max-width: 130px; }
-.reference-popover.is-pop .reference-upload { width: var(--control-h-touch); height: var(--control-h-touch); padding: 0; justify-content: center; border-radius: var(--r-pill); }
-.reference-popover.is-pop .reference-upload > span { display: none; }
 .reference-popover.is-pop .picker-tools.is-heading .picker-search-row { padding: 6px 14px 2px; }
 /* LoRAs' body already insets by 14px: its field lands exactly where References' does. */
 .composer-loras.is-pop .lora-picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
@@ -1827,26 +1825,22 @@
 .model-filters.reference-tabs button { height: auto; min-height: 30px; padding: 0 12px; border: 0; box-shadow: none; background: transparent; }
 .model-filters.reference-tabs button:not(.active):hover { background-color: var(--control-hover); }
 .model-filters.reference-tabs button.active { background: var(--selected-bg); color: var(--selected-ink); }
-/* Desktop heading search: `cover` fills the heading over the views and tools; its close sits inside the field. */
+/* Desktop heading search (`inline`): the field opens right of its icon, after the views, and takes the free room. */
 .picker-heading-tools.is-searching { flex: 1 1 auto; }
-.picker-search-field.is-cover { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 0; }
-.picker-search-field.is-cover > :first-child, .picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
+/* The views never give way to the field: it takes what they leave, with Stacks down to its icon. */
+.picker-heading-tools.is-searching > .picker-controls { flex: none; }
+.picker-heading-tools.is-searching .lora-stacks .picker-dropdown-text,
+.picker-heading-tools.is-searching .dropdown-trigger.lora-stacks > svg:last-child { display: none; }
+.picker-search-field.is-inline { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 96px; transform-origin: left center; }
+.picker-search-field.is-inline > :first-child, .picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
+/* The row under a heading or toolbar drops down (framer height); its slot clips it while it moves. */
+.picker-search-slot { overflow: hidden; }
 .picker-search-field, .picker-search-row { position: relative; }
-/* It overlaps the field's end in the flex row, so it shares the field's centre line on every padding (no transform: touch screens reset button transforms). */
 .picker-search-field, .picker-search-row { display: flex; align-items: center; }
-.picker-search-close { position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 6px 0 -32px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
-.picker-search-close:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-.picker-search-close:focus-visible { box-shadow: var(--focus-ring); outline: none; }
-/* The cover field fills the heading; its close keeps its own small size, centred inside the field's end. */
-.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover { flex: 1 1 auto; justify-content: stretch; min-width: 0; margin-inline-start: 0; }
-.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover > :first-child { max-width: none; }
-.reference-popover-head .picker-heading-tools > .picker-search-field > .picker-search-close { flex: none; width: 26px; height: 26px; max-width: none; margin: 0 6px 0 -32px; }
-/* The field's own clear button would duplicate Close Search. */
-:is(.picker-search-field, .picker-search-row) .picker-search > button, :is(.picker-search-field, .picker-search-row) .lora-picker-search > button, :is(.picker-search-field, .picker-search-row) .reference-search > button, :is(.picker-search-field, .picker-search-row) .model-menu-clear { display: none; }
-:is(.picker-search-field, .picker-search-row) input { padding-right: 30px; }
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-inline { flex: 1 1 auto; justify-content: stretch; min-width: 96px; margin-inline-start: 0; }
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-inline > :first-child { max-width: none; }
 /* Desktop pickers carry no title or icon: the views lead the heading. */
 .reference-popover:not(.is-pop) > .reference-popover-head > :is(.surface-title, svg:first-child) { display: none; }
-.reference-upload.picker-search-toggle { flex: none; }
 /* One search field in every chooser (References, LoRAs, Models): the same height, width, radius, padding and fill. */
 :is(.picker-search-row, .picker-search-field) > .picker-search { box-sizing: border-box; height: var(--control-h-sm); min-height: 0; margin: 0; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-pill); background: var(--control-fill); }
 .reference-popover.is-pop :is(.picker-search-row, .picker-search-field) > .picker-search { height: var(--control-h-touch, 44px); }
@@ -1889,4 +1883,3 @@
 .model-pop-row .picker-star.is-on { color: var(--accent-amber); }
 /* The shapes: one vertical list of the shared rows, Custom last (UI-PATTERNS › Lists). */
 .size-options .size-option .list-row-label small { margin-left: var(--space-3); color: hsl(var(--muted-foreground)); font-size: 13px; }
-.lora-library-note.is-suggested { color: hsl(var(--muted-foreground)); }

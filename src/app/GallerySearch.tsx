@@ -10,7 +10,7 @@ import type { GalleryItem } from './types';
 import { searchFilterKeys, type GallerySearch } from './favorites';
 import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
-import { tweens } from '@/lib/springs';
+import { tweens, useMotionTween } from '@/lib/springs';
 import { EmptyState } from './EmptyState';
 import { Tip } from './components';
 import { SelectedTick } from './PickerTools';
@@ -28,8 +28,17 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const searching = searchable && (searchOpen || Boolean(query));
+  const grow = useMotionTween(tweens.slow);
   const searchInput = React.useRef<HTMLInputElement>(null);
   const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 280 });
+  // The full list's height as it opened: a search never shrinks the menu.
+  const [held, setHeld] = React.useState(0);
+  React.useLayoutEffect(() => {
+    if (!open) { if (held) setHeld(0); return; }
+    const height = searching ? 0 : menu.current?.offsetHeight || 0;
+    if (height && height !== held) setHeld(height);
+  });
   const anchor = React.useRef<HTMLButtonElement>(null);
   const menu = React.useRef<HTMLDivElement>(null);
   const list = React.useRef<HTMLDivElement>(null);
@@ -72,7 +81,7 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
   const summary = picked.length === 1 ? short(picked[0]) : label;
   return <>
     <Tip content={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`}><button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) { setQuery(''); setSearchOpen(false); } setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button></Tip>
-    {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={position} data-own-escape onKeyDown={event => {
+    {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={{ ...position, minHeight: searching && held ? Math.min(held, position.maxHeight) : undefined }} data-own-escape onKeyDown={event => {
       const options = [...list.current!.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const index = options.indexOf(document.activeElement as HTMLButtonElement);
       const typing = event.target instanceof HTMLInputElement;
@@ -84,11 +93,17 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
       if (searchable && !typing && event.key.length === 1 && event.key !== ' ' && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setSearchOpen(true); setQuery((value) => (value + event.key).slice(0, 100)); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); }
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
-      <div className="gallery-filter-menu-head"><strong>{label}</strong>{picked.length ? <span>{picked.length} Selected</span> : null}
-        {/* Search waits behind its icon beside the title (PickerTools pattern); typing in the menu opens it too. */}
-        {searchable && !(searchOpen || query) ? <button type="button" className="gallery-filter-search-toggle" aria-label={`Search ${label}`} aria-expanded={false} onClick={() => { setSearchOpen(true); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); }}><Search size={14} /></button> : null}
+      <div className="gallery-filter-menu-head"><strong>{label}</strong>
+        {/* Search sits right after the title and stays there, pressed while open; pressing it again clears and folds it (UI-PATTERNS › Dropdowns). Typing in the menu opens it too. */}
+        {searchable ? <button type="button" className={cn('gallery-filter-search-toggle', searching && 'is-on')} aria-label={`Search ${label}`} aria-pressed={searching} onClick={() => { if (searching) { setSearchOpen(false); setQuery(''); } else { setSearchOpen(true); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); } }}><Search size={14} /></button> : null}
+        {picked.length ? <span>{picked.length} Selected</span> : null}
         <button type="button" className="gallery-filter-clear" disabled={!picked.length} onClick={() => onChange([])}>Clear</button></div>
-      {searchable && (searchOpen || query) ? <div className="gallery-filter-search"><Search size={14} /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{/* The open field carries its own Close Search (UI-PATTERNS › Pickers): it clears and folds the search. */}<button type="button" aria-label="Close Search" onClick={() => { setSearchOpen(false); setQuery(''); requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>('.gallery-filter-search-toggle')?.focus({ preventScroll: true })); }}><X size={12} /></button></div> : null}
+      {/* The field drops down under the head and folds back up; the menu keeps the height the full list opened at. */}
+      <AnimatePresence initial={false}>
+        {searching ? <motion.div key="search" className="gallery-filter-search-slot" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={grow}>
+          <div className="gallery-filter-search"><Search size={14} /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); searchInput.current?.focus({ preventScroll: true }); }}><X size={12} /></button> : null}</div>
+        </motion.div> : null}
+      </AnimatePresence>
       <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
         const on = picked.includes(option);
         return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-name">{labelFor(option)}</span><SelectedTick on={on} /></button>;
@@ -212,7 +227,8 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
     if (open) { inputRef.current?.focus({ preventScroll: true }); inputRef.current?.select(); }
   }, [open]);
   return <motion.div ref={toolsRef} className={cn('gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={false} animate={{ opacity: 1 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
-    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={{ duration: 0 }}>
+    {/* The field opens and folds at --motion-base (the one width that animates, UI-PATTERNS › Motion); instant with reduced motion. */}
+    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : tweens.base}>
       <Tip content={"Search"}><button type="button" className="gallery-search-trigger" aria-label="Search Gallery" aria-expanded={searchExpanded} aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button></Tip>
       <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}

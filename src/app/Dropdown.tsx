@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { tweens, useMotionTween } from '@/lib/springs';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
@@ -92,6 +93,9 @@ export function Dropdown(props: DropdownProps) {
   const searchInput = React.useRef<HTMLInputElement>(null);
   const showSearch = searchable && (searchOpen || Boolean(query));
   const openSearch = (text = '') => { setSearchOpen(true); if (text) setQuery((value) => (value + text).slice(0, 100)); requestAnimationFrame(() => searchInput.current?.focus({ preventScroll: true })); };
+  // The icon stays where it is, pressed while the field is open; pressing it again clears and folds the search.
+  const toggleSearch = () => { if (showSearch) { setSearchOpen(false); setQuery(''); } else openSearch(); };
+  const grow = useMotionTween(tweens.slow);
   const head = props.multiple && props.head !== false;
   const shownPanel = open && panel ? panel(close) ?? null : null;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -153,16 +157,21 @@ export function Dropdown(props: DropdownProps) {
       </>}
     </button>
     <AnimatePresence>
-      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} fitWidth={fitMenu ? Math.max(...options.map((option) => option.label.length), 6) * 8.5 + 72 : 0} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
+      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} holdHeight={searchable && !shownPanel} fitWidth={fitMenu ? Math.max(...options.map((option) => option.label.length), 6) * 8.5 + 72 : 0} rows={shownPanel ? 3 : options.length + (searchable ? 2 : 0) + (head && !searchable ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
         {shownPanel ?? <>
         {head || searchable ? <div className="dropdown-head">
           <strong>{label}</strong>
-          {/* The icon only opens search; the open field carries its own Close Search (UI-PATTERNS › Pickers). */}
-          {searchable && !showSearch ? <button type="button" className="dropdown-search-toggle" aria-label={`Search ${label}`} aria-expanded={false} onClick={() => openSearch()}><Search size={14} /></button> : null}
-          {head ? <><button type="button" className="dropdown-head-action" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
+          {/* Search sits right after the title and stays there, pressed while open (UI-PATTERNS › Dropdowns). */}
+          {searchable ? <button type="button" className={cn('dropdown-search-toggle', showSearch && 'is-on')} aria-label={`Search ${label}`} aria-pressed={showSearch} onClick={toggleSearch}><Search size={14} /></button> : null}
+          {head ? <><button type="button" className="dropdown-head-action is-first" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
           <button type="button" className="dropdown-head-action" disabled={!picked.length} onClick={() => { if (props.multiple) props.onChange([]); }}>Clear</button></> : null}
         </div> : null}
-        {showSearch ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} /><button type="button" aria-label="Close Search" onClick={() => { setSearchOpen(false); setQuery(''); requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>('.dropdown-search-toggle')?.focus({ preventScroll: true })); }}><X size={12} /></button></div> : null}
+        {/* The field drops down under the head and folds back up; the list keeps its place below. */}
+        <AnimatePresence initial={false}>
+          {showSearch ? <motion.div key="search" className="dropdown-search-slot" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={grow}>
+            <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input ref={searchInput} aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); searchInput.current?.focus({ preventScroll: true }); }}><X size={12} /></button> : null}</div>
+          </motion.div> : null}
+        </AnimatePresence>
         <div id={id} ref={list} className="dropdown-options" role="listbox" aria-label={label} aria-multiselectable={props.multiple || undefined}>
           {matches.map((option) => {
             const on = isPicked(option.value);
@@ -193,8 +202,9 @@ export function Dropdown(props: DropdownProps) {
  * clicks and focus outside itself) or the page, placed by anchoredPlacement
  * at its trigger, and on a phone the pop-up list's width.
  */
-const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement | null; rows: number; fitWidth?: number; onKeyDown: (event: React.KeyboardEvent) => void; children: React.ReactNode }>(function DropdownSurface({ trigger, rows, fitWidth = 0, onKeyDown, children }, ref) {
+const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement | null; rows: number; fitWidth?: number; /** Keeps the height the full list opened at, so a search never shrinks the menu. */ holdHeight?: boolean; onKeyDown: (event: React.KeyboardEvent) => void; children: React.ReactNode }>(function DropdownSurface({ trigger, rows, fitWidth = 0, holdHeight = false, onKeyDown, children }, ref) {
   const settling = useSettling();
+  const [held, setHeld] = React.useState(0);
   const [place, setPlace] = React.useState<(AnchoredPlacement & { offsetLeft: number; offsetTop: number; offsetBottom: number }) | null>(null);
   // A modal ignores clicks and focus outside itself, so the menu joins it; elsewhere (a popover
   // that clips its overflow) it goes to the page.
@@ -228,11 +238,18 @@ const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement 
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: 'nearest' });
   }, [Boolean(place)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The full list's height, measured as it first shows (transforms don't change offsetHeight).
+  React.useLayoutEffect(() => {
+    if (!place || !holdHeight || held) return;
+    const height = (ref as React.RefObject<HTMLDivElement | null>).current?.offsetHeight || 0;
+    if (height) setHeld(height);
+  }, [Boolean(place), holdHeight]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!place) return null;
   const style: React.CSSProperties = {
     left: place.left - place.offsetLeft,
     width: place.width,
     maxHeight: place.maxHeight,
+    minHeight: holdHeight && held ? Math.min(held, place.maxHeight) : undefined,
     transformOrigin: place.transformOrigin,
     ...(place.upward ? { bottom: (place.bottom || 0) - place.offsetBottom } : { top: (place.top || 0) - place.offsetTop }),
   };

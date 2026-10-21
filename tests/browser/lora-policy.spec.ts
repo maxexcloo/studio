@@ -28,6 +28,13 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(picker.getByText('Compatibility has not been verified for this model variant.', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
+  // This Model is one section, the model family's LoRAs: no Suggested or Favourites heading of its own.
+  await expect(picker.locator('.lora-picker-heading')).toHaveCount(1);
+  await expect(picker.getByText('Suggested', { exact: true })).toHaveCount(0);
+  // The search icon follows the views, before Stacks and Clear.
+  const views = (await picker.locator('.picker-heading-tools > .picker-controls, .dropdown-trigger.picker-view').first().boundingBox())!;
+  const searchIcon = (await picker.getByRole('button', { name: 'Search LoRAs', exact: true }).boundingBox())!;
+  expect(searchIcon.x).toBeGreaterThanOrEqual(views.x + views.width - 1);
   await pickerView(picker, 'All');
   await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
   // Shown under All Models, an incompatible LoRA says why and can't be added.
@@ -140,7 +147,8 @@ test('LoRA library offers direct list selection with inline strengths and access
     await page.locator('.dropdown-menu').getByRole('button', { name: 'Save', exact: true }).click();
     await expect(picker.getByRole('combobox', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
   }
-  await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true }).or(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true }))).toBeVisible();
+  // The search icon stays in the heading, open or not.
+  await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true })).toBeVisible();
   // Each pick turns off and on with its own switch in the Selected view.
   await picker.getByRole('switch', { name: 'Turn Off Cards Two', exact: true }).click();
   await expect(strength).toBeDisabled();
@@ -155,7 +163,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'true');
-  // On the desktop choosing Selected closed the covering search (and its query) already.
+  // The query stays across views; clearing it shows every LoRA again.
   if (await search.count()) await search.clear();
   const other = picker.getByRole('checkbox', { name: 'Select Cards One', exact: true });
   const before = await other.boundingBox();

@@ -1,8 +1,13 @@
 import React from 'react';
 import type { ReferenceAsset } from './types';
 
-/** Square thumbnails share one measured stride; keep only visible rows and keyboard focus mounted. */
-export function ReferenceGrid({ items, render }: { items: ReferenceAsset[]; render: (asset: ReferenceAsset, index: number, style: React.CSSProperties, tabIndex: number) => React.ReactNode }) {
+/**
+ * Square thumbnails share one measured stride; keep only visible rows and keyboard focus mounted.
+ * `lead` is a tile before the first item (Upload, in Uploads): it takes the first cell, and the
+ * arrow keys still walk the items.
+ */
+export function ReferenceGrid({ items, render, lead }: { items: ReferenceAsset[]; render: (asset: ReferenceAsset, index: number, style: React.CSSProperties, tabIndex: number) => React.ReactNode; lead?: (style: React.CSSProperties) => React.ReactNode }) {
+  const shift = lead ? 1 : 0;
   const grid = React.useRef<HTMLDivElement>(null);
   const pendingFocus = React.useRef<number | null>(null);
   const [focused, setFocused] = React.useState<number | null>(null);
@@ -21,6 +26,7 @@ export function ReferenceGrid({ items, render }: { items: ReferenceAsset[]; rend
     const end = Math.min(items.length, (Math.ceil((top + body.clientHeight) / (size + gap)) + 2) * columns);
     setLayout((current) => current.columns === columns && current.size === size && current.gap === gap && current.start === start && current.end === end ? current : { columns, size, gap, start, end });
   }, [items.length]);
+  const cell = (slot: number): React.CSSProperties => ({ position: 'absolute', top: Math.floor(slot / layout.columns) * stride, left: (slot % layout.columns) * stride, width: layout.size, height: layout.size });
   React.useLayoutEffect(() => {
     const element = grid.current;
     const body = element?.closest<HTMLElement>('.reference-popover-body');
@@ -47,7 +53,7 @@ export function ReferenceGrid({ items, render }: { items: ReferenceAsset[]; rend
   indices.sort((a, b) => a - b);
   const stride = layout.size + layout.gap;
   const tabStop = focused !== null && focused < items.length ? focused : start;
-  return <div ref={grid} className="reference-grid is-virtual" data-reference-grid style={{ height: Math.max(0, Math.ceil(items.length / layout.columns) * stride - layout.gap) }}
+  return <div ref={grid} className="reference-grid is-virtual" data-reference-grid style={{ height: Math.max(0, Math.ceil((items.length + shift) / layout.columns) * stride - layout.gap) }}
     onFocusCapture={(event) => {
       const value = (event.target as HTMLElement).closest<HTMLElement>('[data-reference-index]')?.dataset.referenceIndex;
       if (value !== undefined) setFocused(Number(value));
@@ -62,11 +68,12 @@ export function ReferenceGrid({ items, render }: { items: ReferenceAsset[]; rend
       setFocused(next);
       const body = grid.current!.closest<HTMLElement>('.reference-popover-body')!;
       const inset = parseFloat(getComputedStyle(body).paddingTop) || 0;
-      const top = grid.current!.getBoundingClientRect().top - body.getBoundingClientRect().top + Math.floor(next / layout.columns) * stride;
+      const top = grid.current!.getBoundingClientRect().top - body.getBoundingClientRect().top + Math.floor((next + shift) / layout.columns) * stride;
       if (top < inset) body.scrollTop += top - inset;
       else if (top + layout.size > body.clientHeight - inset) body.scrollTop += top + layout.size - body.clientHeight + inset;
       measure();
     }}>
-    {indices.map((index) => render(items[index], index, { position: 'absolute', top: Math.floor(index / layout.columns) * stride, left: (index % layout.columns) * stride, width: layout.size, height: layout.size }, index === tabStop ? 0 : -1))}
+    {lead ? lead(cell(0)) : null}
+    {indices.map((index) => render(items[index], index, cell(index + shift), index === tabStop ? 0 : -1))}
   </div>;
 }

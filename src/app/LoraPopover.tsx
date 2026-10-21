@@ -34,8 +34,11 @@ export function ComposerSurface({ title, icon, trigger, className, bodyClassName
   </motion.div>, document.body);
 }
 
+/** The widest picker: its heading holds the views, the search field beside them, Stacks and Clear. */
+const LORAS_SIZE = { width: 560 };
+
 export function LoraPopover({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
-  return <AnimatePresence>{open ? <ComposerSurface title="LoRAs" icon={<Layers size={16} />} trigger='[data-open-trigger][aria-label="LoRAs"][aria-expanded="true"]' className="composer-loras" bodyClassName="lora-popover-body" onClose={onClose}>{children}</ComposerSurface> : null}</AnimatePresence>;
+  return <AnimatePresence>{open ? <ComposerSurface title="LoRAs" icon={<Layers size={16} />} trigger='[data-open-trigger][aria-label="LoRAs"][aria-expanded="true"]' className="composer-loras" bodyClassName="lora-popover-body" size={LORAS_SIZE} onClose={onClose}>{children}</ComposerSurface> : null}</AnimatePresence>;
 }
 
 /** One column, as tall as its rows (UI-PATTERNS › Composer). */

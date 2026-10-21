@@ -28,8 +28,10 @@ the pattern occurs in the same piece of work.
   Generate, and `--press-media` on the picture of a tile or thumbnail.
 - **Animate only `transform` and `opacity`.** Never transition `top`, `left`,
   `width`, `height`, margins, padding or grid tracks; such changes are
-  instant. The one exception is an inline section's framer `height: 'auto'`
-  at `--motion-slow`. Never `transition: all`.
+  instant. Two exceptions: an inline section's framer `height: 'auto'` at
+  `--motion-slow` (a search field dropping down under a menu's or picker's
+  head is one), and the desktop gallery search, whose pill opens and folds
+  its width at `--motion-base` while its field fades. Never `transition: all`.
 - **Enter and exit:** popovers fade and scale from 0.96 at their trigger
   (`popoverMotion` in `composerSurface.ts`, the `surfaceIn` keyframe in CSS);
   sheets, nested ones too, slide up from the bottom edge and leave the same
@@ -43,8 +45,12 @@ the pattern occurs in the same piece of work.
 - **Media:** a picture never resizes or zooms while it loads. Reserve its
   final box from its known size, show the thumbnail in it, and cross-fade the
   sharp copy over the top (no fade with reduced motion).
-- Switching Images | Videos fades the new list in as one surface at
-  `--motion-base`; tiles don't pop in one by one.
+- Switching Images | Videos (and the first load) fades the new list in as one
+  surface at `--motion-base`; tiles don't pop in one by one. Nothing else
+  replays that fade: a search, a filter or Hide Failed & Queued keeps the list
+  on screen until its own arrives, then swaps it in place (no blank frame, no
+  skeleton) and starts from the top (`useGalleryStore`'s held list,
+  `listKey` in `VirtualMasonryGallery`).
 - Gallery column changes keep moving tiles inside the grid horizontally. Clip
   overflow on the virtual spacer without creating another scrolling container,
   so focus and selection cannot pan the gallery or move its toolbar sideways.
@@ -357,11 +363,18 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
   pop-up list's width, still anchored to its trigger and one layer only. Rows
   are `--row-h-menu` (44 px on touch), `--r-item`, `--cursor-bg` under the
   pointer or keyboard cursor, and the chosen option shows the shared amber
-  tick (`SelectedTick`) with no row fill. Long lists scroll and offer a search
-  field behind an icon in the head; the open field carries its own Close
-  Search at its end (it clears and folds the search), in place of the icon.
-  The gallery's filter menus search the same way. A heading's views menu is
-  as wide as its options (within the usual bounds), on the phone too.
+  tick (`SelectedTick`) with no row fill. Long lists scroll and offer search
+  behind an icon right after the head's title (All and Clear, or the count
+  and Clear, take the far end). The icon stays where it is: pressed
+  (`aria-pressed`, the amber icon) while the field is open, and pressing it
+  again clears and folds the search. The field drops down under the head
+  (framer height at `--motion-slow`, instant with reduced motion) and has its
+  own Clear Search only while it holds text. The menu always shows the full
+  list: it keeps the height it opened at, so a search never shrinks it to the
+  matches. The gallery's filter menus search the same way. Menus without a
+  search (`searchFrom={Infinity}`, `ListSelect search={false}`) have no icon.
+  A heading's views menu is as wide as its options (within the usual bounds),
+  on the phone too.
 - **Keyboard:** the arrow keys, Home and End move between options, typing
   jumps to a name, Enter or Space chooses, Escape or a click outside closes,
   and the focus returns to the trigger.
@@ -381,30 +394,37 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
 
 - **Desktop heading:** no title or icon: the views lead (Library | Uploads |
   Selected n/max, This Model | All | Selected n/max, or the model filters All ·
-  ★ · Fast · Quality, all on the same selector track), then the LoRA
-  **Stacks** dropdown, Upload (References: an icon button styled like the
-  search icon), **Clear**, the search icon, then Close, all on one centre line.
-  There is no hint text and no toolbar row under the heading. A narrow LoRAs
-  popover drops the Stacks label first.
+  ★ · Fast · Quality, all on the same selector track), then the search icon
+  right of them, then the LoRA **Stacks** dropdown and **Clear** at the far
+  end, then Close, all on one centre line. There is no hint text and no
+  toolbar row under the heading. A narrow LoRAs popover drops the Stacks label
+  first, and an open search shows Stacks as its icon only. The LoRAs popover
+  is 560 px wide on the desktop to hold the views, the field, Stacks and Clear.
+- **Upload** (References) is the first tile of the Uploads grid, the tiles'
+  size and radius, its icon and "Upload" (its progress while uploading), on
+  the desktop and the phone. With no uploads it stands alone, with "No Uploads
+  Yet" under it; it isn't in Library or in a heading.
 - **Phone heading:** the title stays plain text and only the view after it
   is the dropdown ("LoRAs · [This Model ▾]", "Reference · [Library ▾]" or
   "References" with several slots, "Model · [All ▾]"); the filters that
   combine (Favourites with Fast or Quality) are ticks in the same menu, which
-  stays open while choosing. Then Upload (References, an icon like search),
-  Clear, the search icon and Close, every target 44 px. There are no Stacks on
+  stays open while choosing. Then Clear, the search icon and Close, every
+  target 44 px. There are no Stacks on
   the phone (Settings › Studio › LoRA Stacks edits them). The list starts
   right under the heading, with no empty tools row.
 - **Compact search:** an icon, not a permanent row. The icon (or typing
-  anywhere in the chooser) opens the field with the focus in it. On the
-  desktop References and LoRAs `cover` the heading: the field fills it, at
-  `--control-h-sm`, over the views, Stacks, Upload and Clear (Close stays);
-  Models use `row`: the field drops down under the heading, the popover's
-  width, and the filters stay. On the phone it opens under the heading. The
-  open field carries its own Close Search (an X at its end, in place of the
-  icon and of the field's own clear); Close Search clears the query and folds
-  it away, and choosing a view on the desktop starts from there. The field
-  stays open while a query is active. Choosers keep a minimum height, so a
-  short list or a narrow search doesn't shrink them.
+  anywhere in the chooser) opens the field with the focus in it; the icon
+  stays where it is, pressed (`aria-pressed`, amber) while the field is open,
+  and pressing it again clears the query and folds the field. On the desktop
+  References and LoRAs search `inline`: the field opens right of the icon, at
+  `--control-h-sm`, and takes the room the views leave (they never give way);
+  Stacks, Clear and Close stay. Models use `row`: the field drops down under
+  the heading, the popover's width, and the filters stay. On the phone it
+  drops down under the heading. A row field drops down at `--motion-slow`
+  (framer height); an inline one fades in. The field's own Clear Search shows
+  while it holds text. The query stays across views and the field stays open
+  while a query is active. Choosers keep a minimum height, so a short list or
+  a narrow search doesn't shrink them.
 - **Clear** shows only while something is picked. It empties the selection at
   once and offers Undo in the status pill; it never asks first.
 - **One selected mark:** a picked row or tile shows the amber tick
@@ -422,8 +442,10 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
 - **LoRA rows are Models rows:** the same height (58 px in the desktop
   popover; 52 px with hairlines between them and 15 px names on the phone, as
   the phone's model list), padding, rounded `--cursor-bg` hover filling the
-  whole row and section headings (Favourites, this model's family, then under
-  All what the rest were made for). The friendly name, then one muted line of
+  whole row and section headings: This Model is one section, the model
+  family's LoRAs (Favourites first within it); All has Favourites, this
+  model's family, then what the rest were made for. A pick from another
+  family shows under All and Selected, not This Model. The friendly name, then one muted line of
   its description cut short with an ellipsis; a reason it can't be added (or
   may not suit) follows in full. On the right: the amber tick when picked,
   then View Source as small icon buttons, one per host (`Globe` for
@@ -449,11 +471,9 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   Profile names show as they are, on two lines at most.
 - A model's own LoRA limit shows as one quiet line under the heading
   (Radiance video: "Up to rank 64 in total").
-- **Suggested:** with the prompt assistant, This Model opens with a Suggested
-  section for the current prompt (cached per prompt and kept while the picker
-  is open, so rows never move), each row's line giving the reason, strength
-  and the trigger words it adds; the rest follow under More LoRAs. Picking a
-  suggested row adds it like a chip: its strength, its triggers, Undo.
+- **No Suggested section:** the LoRA chooser lists LoRAs only. The prompt
+  assistant's suggestions are the chips under the prompt (see
+  [Composer](#composer)); picking a LoRA in the chooser is always plain.
 
 ## Empty States
 
@@ -541,6 +561,9 @@ A picker, tab or list with nothing to show uses `EmptyState`
   320–430 px (`phone-create.spec.ts`). Editing Prompt or Negative with the keyboard up
   shows only that field (see [Keyboard & visual viewport](#keyboard--visual-viewport)).
 
+- **Generate** on the desktop is its arrow and the word "Generate" (as the
+  phone's footer), in images and videos alike; offline and restarting say so
+  in the same slot ("ComfyUI offline", "Restarting…").
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers, each above the button that opened it. Every control stays in its bar: as room runs out they
   step down to compact and then mini chips, and there is no More Settings
@@ -550,8 +573,13 @@ A picker, tab or list with nothing to show uses `EmptyState`
   dismissal (outside click, Escape, its button again; focus returns to the
   button). It is one column about 400 px wide: the flat list, dense
   (`--row-h-menu` rows, labels on the left, dropdowns and `NumberPicker`
-  steppers on the right at `--control-h-sm`, one quiet heading per group),
-  as tall as its rows and scrolling inside past the room above, with every
+  steppers on the right at `--control-h-sm`, one quiet heading per group).
+  Every choice there is the one row dropdown (`ListSelect`, Upscale, Sampler,
+  Scheduler, Model Parts, a video's Duration and Resolution alike, never a
+  segmented toggle), its menu without a search field (`search={false}`);
+  video adds its own rows (Video: Duration, Resolution, Frames Per Second) to
+  the same list and patterns, never different ones for the same setting.
+  It is as tall as its rows and scrolling inside past the room above, with every
   option the profile exposes but Width and Height (they belong to Size). On
   the desktop it has no heading (Escape, an outside click or its button close
   it); the groups, and the rows in each, read alphabetically, with a master

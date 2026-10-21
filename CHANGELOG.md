@@ -11,6 +11,18 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Menu search:** in every dropdown and gallery filter menu, the search icon sits right after the menu's title and stays there, amber and pressed while the field is open; pressing it again clears and folds the search. The field drops down under the title and folds back up, and the menu keeps the full list's height while searching instead of shrinking to the matches.
+- **Desktop gallery:** the search field opens and folds smoothly. A search, a filter or Hide Failed & Queued keeps the list on screen until the new one arrives and swaps it in place, without the blank frame and fade of a fresh load; only the first load and Images | Videos fade in.
+- **Reference chooser:** Upload is the first tile of Uploads (with its progress while uploading), on the desktop and the phone, instead of a heading icon; the search icon sits right of the Library | Uploads | Selected views, and its field opens beside them rather than covering them.
+- **LoRA chooser:** the search icon sits right of the This Model | All | Selected views, and its field opens beside them (the popover is 560 px wide to hold it, with Stacks as its icon while searching); This Model lists only the model family's LoRAs, in one section.
+- **Choosers:** the search icon stays in place, pressed while searching, on both devices; it closes the search in place of the field's Close Search, and the field keeps its own Clear Search while it holds text. The Models chooser's field drops down under the heading.
+- **Advanced Settings:** every choice is the same row dropdown with no search field, video's Resolution included (it was a segmented toggle with two options).
+- **Generate:** the desktop composer's Generate shows its arrow and the word Generate, as on the phone; offline and restarting say so in the same slot.
+
+### Removed
+- **Suggested LoRAs in the chooser:** the LoRA chooser no longer has a Suggested section or asks the prompt assistant when it opens; the assistant's suggestions stay as the chips under the prompt.
+
 ## [0.44.0] - 2026-10-21
 
 > Details read alike for images and videos and name the profile, Copy and Recreate close Details, desktop tiles star top left, typed view models with one access model, and orphan server routes removed
