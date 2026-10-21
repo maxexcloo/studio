@@ -642,13 +642,13 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
         </button></Tip>
       {presence.mounted ? (
         <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface {...settling} onKeyDown={onMenuKey}>
-          <header className="reference-popover-head model-menu-head"><strong className="surface-title">Models</strong><span ref={heading.ref} className="surface-head-slot" /><button type="button" className="reference-popover-close" aria-label="Close Models" onClick={close}><X size={16} /></button></header>
+          <header className="reference-popover-head model-menu-head" aria-label="Models">{/* No title on the desktop: the filter dropdown leads the heading. */}<span ref={heading.ref} className="surface-head-slot" /><button type="button" className="reference-popover-close" aria-label="Close Models" onClick={close}><X size={16} /></button></header>
           {profiles.length ? null : (
             <EmptyState title="No Models Yet" action={onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}>
               {emptyHint || "No usable models in ComfyUI yet."}
             </EmptyState>
           )}
-          {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">
+          {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" searchMode="row" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">
               <Search size={14} aria-hidden="true" />
               <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}

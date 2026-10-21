@@ -51,7 +51,7 @@ export function HeadingPortal({ children }: { children: React.ReactNode }) {
 function ViewsDropdown({ views, title }: { views: PickerViews; title: string }) {
   const options = views.options.map((option) => ({ value: option.id, label: option.label, ariaLabel: option.ariaLabel, disabled: option.disabled }));
   const run = (id: string | undefined) => views.options.find((option) => option.id === id)?.onSelect();
-  const summary = <span className="picker-view-label"><strong>{title}</strong><span aria-hidden="true">·</span><span>{views.current}</span></span>;
+  const summary = title ? <span className="picker-view-label"><strong>{title}</strong><span aria-hidden="true">·</span><span>{views.current}</span></span> : <span className="picker-view-label"><span>{views.current}</span></span>;
   const checked = views.options.filter((option) => option.checked).map((option) => option.id);
   return views.multi
     ? <Dropdown multiple head={false} variant="heading" className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={(next) => run([...next.filter((id) => !checked.includes(id)), ...checked.filter((id) => !next.includes(id))][0])} />
@@ -67,13 +67,12 @@ export type PickerViewOption = { id: string; label: string; checked: boolean; di
 export type PickerViews = { label: string; current: string; options: PickerViewOption[]; multi?: boolean };
 
 /**
- * One compact controls row; search takes space only when requested. On the
- * desktop the search icon grows into a field inside the same row, beside the
- * pills. In a phone pop-up the row moves into the heading: the views as a
+ * One compact controls row; search takes space only when requested: its icon
+ * drops the field down under the heading, the popover's full width. In a phone pop-up the row moves into the heading: the views as a
  * dropdown after the title, Clear and the search icon, with the field opening
  * under the heading.
  */
-export function PickerTools({ children, extra, clear, onClear, search, query, onClearSearch, onType, searchLabel, className, views }: {
+export function PickerTools({ children, extra, clear, onClear, search, query, onClearSearch, onType, searchLabel, className, views, viewsMenu = false, searchMode = 'cover' }: {
   children: React.ReactNode;
   /** More heading controls after the views (the LoRA Stacks dropdown). */
   extra?: React.ReactNode;
@@ -88,6 +87,10 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
   searchLabel: string;
   className?: string;
   views?: PickerViews;
+  /** On the desktop too, the views are one compact dropdown instead of pills (the model chooser). */
+  viewsMenu?: boolean;
+  /** Desktop heading search: `cover` fills the heading over the other controls; `row` drops down under it. */
+  searchMode?: 'cover' | 'row';
 }) {
   const [open, setOpen] = React.useState(false);
   const expanded = open || Boolean(query);
@@ -122,7 +125,10 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
       focusSearch();
     }
   };
-  const toggleButton = search ? <button type="button" className={cn('picker-search-toggle', query && 'is-active')} aria-label={expanded ? 'Close Search' : searchLabel} aria-expanded={expanded} aria-controls={id} onClick={toggle}>{expanded ? <X size={16} /> : <Search size={16} />}</button> : null;
+  // Open search carries its own close inside the field; the heading icon only opens it.
+  const closeInField = <button type="button" className="picker-search-close" aria-label="Close Search" onClick={toggle}><X size={14} /></button>;
+  const field = (className: string) => <div id={id} className={className}>{search}{closeInField}</div>;
+  const toggleButton = search && !expanded ? <button type="button" className={cn('picker-search-toggle', query && 'is-active')} aria-label={expanded ? 'Close Search' : searchLabel} aria-expanded={expanded} aria-controls={id} onClick={toggle}>{expanded ? <X size={16} /> : <Search size={16} />}</button> : null;
 
   if (phoneHeading && views) {
     return <div ref={root} className={cn('picker-tools is-heading', className)}>
@@ -132,22 +138,25 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
         {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : null}
         {toggleButton}
       </HeadingPortal>
-      {search && expanded ? <div id={id} className="picker-search-row">{search}</div> : null}
+      {search && expanded ? field('picker-search-row') : null}
     </div>;
   }
 
   if (inHeading) {
-    // The desktop heading: title · the views · Clear · search, which grows leftwards from its icon, then Close.
+    // The desktop heading: title · the views · Clear · the search icon, then Close.
     return <div ref={root} className={cn('picker-tools is-heading', className)}>
       <HeadingPortal>
         <div className={cn('picker-heading-tools', expanded && 'is-searching')}>
-          <div className="picker-controls">{children}</div>
-          {extra}
-          {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : clear}
-          {search && expanded ? <div id={id} className="picker-search-field">{search}</div> : null}
-          {toggleButton}
+          {expanded && search && searchMode === 'cover' ? field('picker-search-field is-cover') : <>
+            {viewsMenu && views ? <ViewsDropdown views={views} title="" /> : <div className="picker-controls">{children}</div>}
+            {extra}
+            {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : clear}
+            {toggleButton}
+          </>}
         </div>
       </HeadingPortal>
+      {/* Row mode: search drops down under the heading, the full popover width. */}
+      {search && expanded && searchMode === 'row' ? field('picker-search-row') : null}
     </div>;
   }
 
@@ -156,8 +165,8 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
       <div className="picker-controls">{children}</div>
       {extra}
       {clear}
-      {search && expanded ? <div id={id} className="picker-search-field">{search}</div> : null}
       {toggleButton}
     </div>
+    {search && expanded ? field('picker-search-row') : null}
   </div>;
 }

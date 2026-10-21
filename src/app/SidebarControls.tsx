@@ -81,40 +81,17 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   );
   return (
     <div className="advanced-list">
+      {/* Groups and rows read alphabetically (Inpainting or Reference, Model Parts, Sampling, Upscale); a master control leads its dependants. */}
       {currentProfile ? <ModelSetup key={currentProfile.id} profile={currentProfile} showToast={showToast} onInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : null}
-
-      <ListSection title="Sampling">
-        {sampling ? select("Sampler", sampler, samplers, setSampler) : null}
-        {sampling ? select("Scheduler", scheduler, schedulers, setScheduler) : null}
-        {/* Distilled profiles run at their own guidance (capabilities.cfg false): no CFG to set. */}
-        {currentProfile?.capabilities?.cfg !== false ? stepper("Prompt Strength (CFG)", cfg, setCfg, cfgMeta.min ?? 0, Math.min(cfgMeta.max ?? 30, 30), cfgMeta.step || 0.5, 1) : null}
-        <ListItem label="Seed">
-          {/* Random until a seed is kept: then the number shows, to edit or copy. */}
-          {fixedSeed ? <input className="list-field" inputMode="numeric" pattern="[0-9]*" value={seed} aria-label="Seed" onChange={(event) => setSeed(event.target.value.replace(/[^0-9]/g, ""))} /> : null}
-          <button type="button" className={cn("list-toggle", !fixedSeed && "is-on")} aria-pressed={!fixedSeed} aria-label="Random Seed" title={fixedSeed ? "Use a new seed every time" : "Keep one seed: the same picture every time"} onClick={() => setSeed(fixedSeed ? "" : String(Math.floor(Math.random() * 2 ** 32)))}><Dices size={16} aria-hidden="true" /><span>Random</span></button>
-        </ListItem>
-      </ListSection>
 
       {inpaintActive ? (
         <ListSection title="Inpainting">
-          {currentProfile?.capabilities.denoise ? stepper("Inpaint Strength (%)", Math.round(inpaintStrength * 100), (value) => setInpaintStrength(value / 100), 5, 100, 5) : null}
           {stepper("Edge Softness (%)", Math.round(inpaintFeather * 100), (value) => setInpaintFeather(value / 100), 0, 100, 5)}
+          {currentProfile?.capabilities.denoise ? stepper("Inpaint Strength (%)", Math.round(inpaintStrength * 100), (value) => setInpaintStrength(value / 100), 5, 100, 5) : null}
         </ListSection>
       ) : canUseStartImage && currentProfile?.capabilities.denoise ? (
         <ListSection title="Reference">
           {stepper("Change Amount (%)", Math.round(denoise * 100), (value) => setDenoise(value / 100), Math.round((denoiseMeta.min ?? 0) * 100), Math.round((denoiseMeta.max ?? 1) * 100), Math.max(1, Math.round((denoiseMeta.step || 0.05) * 100)))}
-        </ListSection>
-      ) : null}
-
-      {upscaleOffered ? (
-        <ListSection title="Upscale">
-          {select("Upscale", String(runUpscale), [{ value: "0", label: "Off" }, { value: "2048", label: "2K" }, { value: "4096", label: "4K" }], (value) => setPrefs({ runUpscale: Number(value) }))}
-          {runUpscale ? (
-            <ListItem label="Face Detail">
-              <Switch label="Face Detail" checked={Boolean(prefs.upscaleFaceDetail) && faceDetailReady} disabled={!faceDetailReady} onChange={(next) => setPrefs({ upscaleFaceDetail: next })} />
-            </ListItem>
-          ) : null}
-          {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Upscale needs its models first: set it up in Settings › Studio.</p> : null}
         </ListSection>
       ) : null}
 
@@ -130,6 +107,30 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           {currentProfile?.capabilities.weightDtype ? select("Weight Type", weightDtype, profileOptions.weightDtypes || models?.weightDtypes || [], setWeightDtype, true) : null}
         </ListSection>
       ) : null}
+      <ListSection title="Sampling">
+        {sampling ? select("Sampler", sampler, samplers, setSampler) : null}
+        {sampling ? select("Scheduler", scheduler, schedulers, setScheduler) : null}
+        {/* Distilled profiles run at their own guidance (capabilities.cfg false): no CFG to set. */}
+        {currentProfile?.capabilities?.cfg !== false ? stepper("Prompt Strength (CFG)", cfg, setCfg, cfgMeta.min ?? 0, Math.min(cfgMeta.max ?? 30, 30), cfgMeta.step || 0.5, 1) : null}
+        <ListItem label="Seed">
+          {/* Random until a seed is kept: then the number shows, to edit or copy. */}
+          {fixedSeed ? <input className="list-field" inputMode="numeric" pattern="[0-9]*" value={seed} aria-label="Seed" onChange={(event) => setSeed(event.target.value.replace(/[^0-9]/g, ""))} /> : null}
+          <button type="button" className={cn("list-toggle", !fixedSeed && "is-on")} aria-pressed={!fixedSeed} aria-label="Random Seed" title={fixedSeed ? "Use a new seed every time" : "Keep one seed: the same picture every time"} onClick={() => setSeed(fixedSeed ? "" : String(Math.floor(Math.random() * 2 ** 32)))}><Dices size={16} aria-hidden="true" /><span>Random</span></button>
+        </ListItem>
+      </ListSection>
+
+      {upscaleOffered ? (
+        <ListSection title="Upscale">
+          {select("Upscale", String(runUpscale), [{ value: "0", label: "Off" }, { value: "2048", label: "2K" }, { value: "4096", label: "4K" }], (value) => setPrefs({ runUpscale: Number(value) }))}
+          {runUpscale ? (
+            <ListItem label="Face Detail">
+              <Switch label="Face Detail" checked={Boolean(prefs.upscaleFaceDetail) && faceDetailReady} disabled={!faceDetailReady} onChange={(next) => setPrefs({ upscaleFaceDetail: next })} />
+            </ListItem>
+          ) : null}
+          {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Upscale needs its models first: set it up in Settings › Studio.</p> : null}
+        </ListSection>
+      ) : null}
+
       {recommended?.differs ? <button type="button" className="list-row list-row-action" onClick={recommended.restore}><RotateCcw size={16} aria-hidden="true" /><span className="list-row-label">Back to Recommended</span></button> : null}
     </div>
   );

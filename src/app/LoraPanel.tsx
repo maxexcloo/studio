@@ -338,9 +338,9 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       <PickerTools className="lora-picker-tools" extra={libraryView ? stackControls : undefined} query={query} onClearSearch={() => setQuery('')} onType={typeSearch} searchLabel="Search LoRAs"
         clear={libraryView && current.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
         onClear={libraryView && current.length > 0 && onClearAll ? onClearAll : undefined}
-        views={libraryView ? { label: 'LoRA Model Filter', current: view === 'model' ? 'This Model' : view === 'all' ? 'All Models' : `Selected ${current.length}/${max}`, options: [
+        views={libraryView ? { label: 'LoRA Model Filter', current: view === 'model' ? 'This Model' : view === 'all' ? 'All' : `Selected ${current.length}/${max}`, options: [
           { id: 'model', label: 'This Model', checked: view === 'model', onSelect: () => setView('model') },
-          { id: 'all', label: 'All Models', checked: view === 'all', onSelect: () => setView('all') },
+          { id: 'all', label: 'All', checked: view === 'all', onSelect: () => setView('all') },
           { id: 'selected', label: `Selected ${current.length}/${max}`, ariaLabel: `Selected ${current.length} of ${max}`, checked: view === 'selected', disabled: !current.length, onSelect: () => setView('selected') },
         ] } : undefined}
         search={<label className={cn("lora-picker-search", libraryView && "picker-search")}>
@@ -369,7 +369,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       </label>}>
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
           <button type="button" className={cn(view === 'model' && 'active')} aria-pressed={view === 'model'} onClick={() => setView('model')}>This Model</button>
-          <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All Models</button>
+          <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All</button>
           {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
       </PickerTools>
@@ -454,8 +454,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
         }) : query
           ? <EmptyState title="No Matching LoRAs">Try a different name.</EmptyState>
           : reviewing
-            ? <EmptyState title="Nothing Selected">Pick LoRAs from This Model or All Models.</EmptyState>
-            : <EmptyState title="No LoRAs for This Model">Choose All Models to browse the rest.</EmptyState>}
+            ? <EmptyState title="Nothing Selected">Pick LoRAs from This Model or All.</EmptyState>
+            : <EmptyState title="No LoRAs for This Model">Choose All to browse the rest.</EmptyState>}
       </div>
       {multi && !libraryView ? (
         <div className="lora-picker-foot">

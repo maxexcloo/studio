@@ -9,14 +9,14 @@ import { cn } from './format';
 import { SurfaceStatus } from './StatusMessage';
 import { SurfaceHeadingContext, useSurfaceHeadingSlot } from './PickerTools';
 
-type SurfaceProps = { title: string; icon: React.ReactNode; trigger: string; className: string; bodyClassName: string; onClose: () => void; children: React.ReactNode; /** Its own width on the desktop, and whether it is only as tall as its content. */ size?: { width?: number; fit?: boolean } };
+type SurfaceProps = { title: string; icon: React.ReactNode; trigger: string; className: string; bodyClassName: string; onClose: () => void; children: React.ReactNode; /** Its own width on the desktop, and whether it is only as tall as its content. */ size?: { width?: number; fit?: boolean }; /** No heading on the desktop (Advanced Settings): Escape and an outside click close it. */ headless?: boolean };
 
 /**
  * One popover above the button that opened it (UI-PATTERNS › Surfaces): the same
  * placement, glass, motion and dismissal for LoRAs and Advanced Settings. On the phone it pops up over the Create sheet, anchored to
  * the row that opened it (Model, LoRAs, Size and Advanced use it there).
  */
-export function ComposerSurface({ title, icon, trigger, className, bodyClassName, onClose, children, size }: SurfaceProps) {
+export function ComposerSurface({ title, icon, trigger, className, bodyClassName, onClose, children, size, headless = false }: SurfaceProps) {
   const present = useIsPresent();
   const surface = React.useRef<HTMLDivElement>(null);
   const opener = React.useRef(document.querySelector<HTMLElement>(trigger) || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
@@ -29,7 +29,7 @@ export function ComposerSurface({ title, icon, trigger, className, bodyClassName
   const settling = useSettling();
   const heading = useSurfaceHeadingSlot(title, Boolean(onPhone));
   return createPortal(<motion.div ref={surface} className={cn('reference-popover', className, onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label={title} aria-hidden={!present || undefined} inert={!present} data-open-surface {...popoverMotion} {...settling}>
-    <header className="reference-popover-head">{icon}<strong className="surface-title">{title}</strong><span ref={heading.ref} className="surface-head-slot" />{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label={`Close ${title}`} onClick={close}><X size={16} /></button></header>
+    {headless && !onPhone ? null : <header className="reference-popover-head">{icon}<strong className="surface-title">{title}</strong><span ref={heading.ref} className="surface-head-slot" />{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label={`Close ${title}`} onClick={close}><X size={16} /></button></header>}
     <SurfaceHeadingContext.Provider value={heading.value}><div className={cn('reference-popover-body', bodyClassName)}>{children}</div></SurfaceHeadingContext.Provider>
   </motion.div>, document.body);
 }
@@ -43,5 +43,5 @@ const ADVANCED_SIZE = { width: 400, fit: true };
 
 /** Advanced Settings in the same popover as LoRAs and References, above its button. */
 export function AdvancedPopover({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
-  return <AnimatePresence>{open ? <ComposerSurface title="Advanced Settings" icon={<SlidersHorizontal size={16} />} trigger='[data-open-trigger][aria-label="Advanced Settings"][aria-expanded="true"]' className="composer-advanced" bodyClassName="composer-advanced-body" size={ADVANCED_SIZE} onClose={onClose}>{children}</ComposerSurface> : null}</AnimatePresence>;
+  return <AnimatePresence>{open ? <ComposerSurface title="Advanced Settings" icon={<SlidersHorizontal size={16} />} trigger='[data-open-trigger][aria-label="Advanced Settings"][aria-expanded="true"]' className="composer-advanced" bodyClassName="composer-advanced-body" size={ADVANCED_SIZE} headless onClose={onClose}>{children}</ComposerSurface> : null}</AnimatePresence>;
 }

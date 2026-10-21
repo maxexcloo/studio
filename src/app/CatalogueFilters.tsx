@@ -1,3 +1,5 @@
+import React from 'react';
+import { Star } from 'lucide-react';
 import { cn } from './format';
 import type { PickerViews } from './PickerTools';
 import { scrollSideways, useWheelRef } from './wheel';
@@ -7,17 +9,13 @@ export const emptyCatalogueFilter: CatalogueFilter = { favourites: false, speed:
 
 export function CatalogueFilters({ value, onChange }: { value: CatalogueFilter; onChange: (value: CatalogueFilter) => void }) {
   const wheelRef = useWheelRef<HTMLDivElement>(scrollSideways);
-  const button = (label: string, active: boolean, next: CatalogueFilter, title?: string) => <button type="button" aria-pressed={active} className={cn(active && 'active')} title={title} onClick={() => onChange(next)}>{label}</button>;
-  return <div ref={wheelRef} className="model-filters" role="group" aria-label="Filter Models">
-    <span className="model-filter-group model-filter-library">
-      {button('All', !value.favourites && !value.speed, emptyCatalogueFilter)}
-      {button('Favourites', value.favourites, { ...value, favourites: !value.favourites })}
-    </span>
-    <span className="model-filter-group" role="group" aria-label="Speed">
-      <span className="model-filter-label">Speed</span>
-      {button('Fast', value.speed === 'flash', { ...value, speed: value.speed === 'flash' ? '' : 'flash' }, 'Accelerated generation recipes')}
-      {button('Quality', value.speed === 'standard', { ...value, speed: value.speed === 'standard' ? '' : 'standard' }, 'Full sampling recipes')}
-    </span>
+  const button = (label: React.ReactNode, active: boolean, next: CatalogueFilter, title?: string, ariaLabel?: string) => <button type="button" aria-pressed={active} aria-label={ariaLabel} className={cn(active && 'active')} title={title} onClick={() => onChange(next)}>{label}</button>;
+  // The same selector track as References and LoRAs (UI-PATTERNS › Pickers): one segmented row.
+  return <div ref={wheelRef} className="model-filters reference-tabs" role="group" aria-label="Filter Models">
+    {button('All', !value.favourites && !value.speed, emptyCatalogueFilter)}
+    {button(<Star size={14} fill="currentColor" aria-hidden="true" />, value.favourites, { ...value, favourites: !value.favourites }, 'Favourites', 'Favourites')}
+    {button('Fast', value.speed === 'flash', { ...value, speed: value.speed === 'flash' ? '' : 'flash' }, 'Accelerated generation recipes')}
+    {button('Quality', value.speed === 'standard', { ...value, speed: value.speed === 'standard' ? '' : 'standard' }, 'Full sampling recipes')}
   </div>;
 }
 

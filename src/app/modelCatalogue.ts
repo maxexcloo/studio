@@ -30,7 +30,11 @@ export function modelDetails(profile: Profile) {
   const capacity = images.length && images.every((input) => Number.isFinite(input.max) && Number(input.max) > 0)
     ? images.reduce((sum, input) => sum + Number(input.max), 0) : 0;
   const references = capacity ? `${capacity} Reference Image${capacity === 1 ? '' : 's'}` : images.length ? 'Reference Images' : '';
-  return [...new Set([name.detail, profile.label !== name.name ? profile.label : '', modelFamily(profile), profile.kind === 'video' ? 'Video' : 'Image', references].filter(Boolean))].join(' · ');
+  // Each fact once: a label often repeats the name and its detail ("Boogu Image Base · Quality · 50 Steps").
+  const parts = [name.detail, profile.label, modelFamily(profile), profile.kind === 'video' ? 'Video' : 'Image']
+    .flatMap((part) => String(part || '').split(' · ')).map((part) => part.trim()).filter((part) => part && part !== name.name);
+  if (references && !parts.some((part) => /reference/i.test(part))) parts.push(references);
+  return [...new Set(parts)].join(' · ');
 }
 
 function profileText(profile: Profile) {

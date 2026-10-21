@@ -28,7 +28,7 @@ test('optional LoRAs show unverified variants and expose full published strength
   await expect(picker.getByText('Compatibility has not been verified for this model variant.', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
-  await pickerView(picker, 'All Models');
+  await pickerView(picker, 'All');
   await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
   // Shown under All Models, an incompatible LoRA says why and can't be added.
   const excluded = picker.getByRole('checkbox', { name: 'Select Excluded Conditioning', exact: true });
@@ -243,7 +243,7 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
   await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
-  await pickerView(picker, 'All Models');
+  await pickerView(picker, 'All');
   await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
   // Another family's LoRA is listed with its reason, never added (a Z-Image LoRA on Tesserafine).
   const crossFamily = picker.getByRole('checkbox', { name: 'Select FLUX.3 Effect', exact: true });
