@@ -167,12 +167,10 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     if (rows.length) sections.push({ title, rows });
   };
   const model = settings.modelName || (String(item.model || "").startsWith("custom:") ? "" : item.model);
-  // Names, not files: the profile it ran through, then its weights' friendly name (UI-PATTERNS › Lists).
+  // The profile it ran through, by name; never the weights file (UI-PATTERNS › Action Placement › Details).
+  // An older record without a profile names its weights instead, under the same row.
   section("Model", (add) => {
-    add("Profile", names.profile || "");
-    // Weights only when they say more than the profile's own name.
-    const weights = model ? partName(String(model)) : "";
-    if (weights && weights.trim().toLowerCase() !== String(names.profile || "").trim().toLowerCase()) add("Weights", weights);
+    add("Profile", names.profile || (model ? partName(String(model)) : ""));
   });
   // Written by the prompt assistant: its preset, and the suggested LoRAs that were chosen.
   section("Prompt", (add) => {

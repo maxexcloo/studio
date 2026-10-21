@@ -51,7 +51,11 @@ const prune = (value: unknown): unknown => {
 
 /** Copies the saved generation inputs that were set, with IDs, numbers and nested reference settings. */
 export function generationInputsText(item: GalleryItem) {
-  const settings = Object.fromEntries(Object.entries(item.settings || {}).filter(([key]) => !/^(?:output|artifact|timing|preview|thumbnail)/i.test(key) && !['createdAt', 'durationMs', 'jobId', 'url', 'filename', 'status', 'progress'].includes(key)));
+  const settings = Object.fromEntries(Object.entries(item.settings || {}).filter(([key]) => !/^(?:output|artifact|timing|preview|thumbnail)/i.test(key) && !['createdAt', 'durationMs', 'jobId', 'url', 'filename', 'status', 'progress', 'loras'].includes(key)));
+  // Details name LoRAs by their catalogue titles; Copy gives the files, so the text can rebuild the run.
+  const loraFiles = (Array.isArray(item.settings?.loras) ? item.settings!.loras : [])
+    .filter((lora: { name?: string; enabled?: boolean }) => lora?.name && lora.enabled !== false)
+    .map((lora: { name: string; strength?: number }) => `${lora.name} · ${Number(lora.strength ?? 0.7).toFixed(2)}`);
   const inputs = {
     ...settings,
     kind: item.type,
@@ -62,7 +66,7 @@ export function generationInputsText(item: GalleryItem) {
     ...(item.referenceImageName ? { startImageName: item.referenceImageName } : {}),
   };
   const labels: Record<string, string> = { seed: 'Seed', model: 'Model', kind: 'Kind', width: 'Width', height: 'Height', profileId: 'Profile ID', steps: 'Steps', cfg: 'CFG' };
-  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', assistantSummary(item) ? `Written By: ${assistantSummary(item)}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
+  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', assistantSummary(item) ? `Written By: ${assistantSummary(item)}` : '', loraFiles.length ? `LoRAs:\n${loraFiles.join('\n')}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
 }
 
 /** Copy · Refine · Recreate. Refine in Chat hands the result to the deployment's chat (refineInChat.ts). */

@@ -96,6 +96,10 @@ test('Details names each LoRA by its catalogue title, with its strength small an
   await expect(list.locator('.detail-lora-strength')).toHaveText(['0.80', '1.00']);
   // The file name is in the tooltip only; the information panel has no File line.
   await expect(list).not.toContainText('pawg_krea2.safetensors');
+  // Copy gives the files and strengths, so the text can rebuild the run.
+  await viewer.locator('.viewer-side').getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('LoRAs:\nloras/pawg_krea2.safetensors · 0.80\nsoft_light-v3.safetensors · 1.00');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain('PAWG Krea 2');
 });
 
 test('LoRA Details includes its information and both Civitai hosts', async ({ page }) => {
