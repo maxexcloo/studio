@@ -9,12 +9,14 @@ import { GrokMediaControls } from './GrokMediaControls';
 import { VideoDurationControls } from './VideoDurationControls';
 import { ListItem, ListSection, ListSelect } from './SheetList';
 import { partOptions } from './partNames';
-import { usePhone } from './device';
 import { Switch } from './SettingsControls';
 import React from 'react';
+import { memoLatest } from '@/lib/memo-latest';
+import type { SidebarView } from './useStudio';
+import type { Preferences, Profile } from './types';
 
-function loraSetup(view: any) {
-  const { currentProfile, mode, models, profileOptions } = view;
+function loraSetup(view: SidebarView) {
+  const { currentProfile, models, profileOptions } = view;
   // Always file names; tolerate {name} entries so an odd server can't crash the picker.
   const loraOptions: string[] = (profileOptions.loras || models?.loras || [])
     .map((option: unknown) => typeof option === "string" ? option : String((option as { name?: string })?.name || ""))
@@ -34,7 +36,7 @@ function loraSetup(view: any) {
  * workflow's default instead (a turbo model at 4 steps gets 1-24, one at 20
  * gets 1-60). It still reaches whatever is set now, never past the real limit.
  */
-export function practicalStepRange(profile: any, meta: { min?: number; max?: number; default?: number } | undefined, current: number) {
+export function practicalStepRange(profile: Profile | null | undefined, meta: { min?: number; max?: number; default?: number } | undefined, current: number) {
   const hardMin = Math.max(1, Number(meta?.min || 1));
   const hardMax = Math.max(hardMin, Number(meta?.max || 10000));
   const recommended = Number(profile?.defaults?.steps || meta?.default || 0);
@@ -52,24 +54,22 @@ export function practicalStepRange(profile: any, meta: { min?: number; max?: num
  * model parts, Upscale for the run, and Back to Recommended. Steps sit
  * in the composer (the phone's Create footer); width and height belong to Size.
  */
-export function PhoneAdvancedControls({ view }: { view: any }) {
+export function PhoneAdvancedControls({ view }: { view: SidebarView }) {
   const {
-    canUseStartImage, cfg, cfgMeta, currentProfile, customSize, aspectLocked, denoise, denoiseMeta,
-    height, heightMeta, mode, models, profileOptions, sampler, scheduler, seed,
-    setCfg, setDenoise, setHeight, setSampler, setScheduler, setSeed, setTextEncoder, setVae,
-    setWeightDtype, setWidth, textEncoder, vae, weightDtype, width, widthMeta,
+    canUseStartImage, cfg, cfgMeta, currentProfile, denoise, denoiseMeta,
+    mode, models, profileOptions, sampler, scheduler, seed,
+    setCfg, setDenoise, setSampler, setScheduler, setSeed, setTextEncoder, setVae,
+    setWeightDtype, textEncoder, vae, weightDtype,
     textEncoders, setTextEncoders, refreshModels, refreshWorkflows, showToast,
-    inpaintActive, inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, steps, stepsMeta, setSteps,
+    inpaintActive, inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather,
     prefs, setPrefs, upscaleStatus, recommended
   } = view;
-  const phone = usePhone();
   // Upscale as part of the run (server/run-upscale.js): offered for pictures once Settings › Studio has it on.
   const upscaleOffered = mode === "image" && Boolean(prefs?.smartUpscale) && currentProfile?.family !== "grok";
   const runUpscale = Number(prefs?.runUpscale) || 0;
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
   const samplers = profileOptions.samplers?.length ? profileOptions.samplers : models?.samplers?.length ? models.samplers : fallbackSamplers;
   const schedulers = profileOptions.schedulers?.length ? profileOptions.schedulers : models?.schedulers?.length ? models.schedulers : fallbackSchedulers;
-  const sizeStep = widthMeta.step || (mode === "video" ? 32 : 64);
   const encoderSlots = (currentProfile?.encoderSlots || []).filter((slot: { options: string[] }) => slot.options.length);
   const showVae = currentProfile?.capabilities.vae && (currentProfile.vaeBuiltIn || (profileOptions.vaes || []).length || (models?.vaes || []).length);
   const parts = encoderSlots.length || currentProfile?.capabilities.textEncoder || showVae || currentProfile?.capabilities.weightDtype;
@@ -123,7 +123,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
 
       {upscaleOffered ? (
         <ListSection title="Upscale">
-          {select("Upscale", String(runUpscale), [{ value: "0", label: "Off" }, { value: "2048", label: "2K" }, { value: "4096", label: "4K" }], (value) => setPrefs({ runUpscale: Number(value) }))}
+          {select("Upscale", String(runUpscale), [{ value: "0", label: "Off" }, { value: "2048", label: "2K" }, { value: "4096", label: "4K" }], (value) => setPrefs({ runUpscale: Number(value) as Preferences['runUpscale'] }))}
           {runUpscale ? (
             <ListItem label="Face Detail">
               <Switch label="Face Detail" checked={Boolean(prefs.upscaleFaceDetail) && faceDetailReady} disabled={!faceDetailReady} onChange={(next) => setPrefs({ upscaleFaceDetail: next })} />
@@ -142,7 +142,11 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
   );
 }
 
-export function ModelLoraControls({ view, browseFirst = false }: { view: any; browseFirst?: boolean }) {
+export function ModelLoraControls({ view, browseFirst = false }: { view: SidebarView; browseFirst?: boolean }) {
   const { loraOptions, loraLimit, loraUnavailable } = loraSetup(view);
   return <section className="model-loras" aria-label="Optional LoRAs"><h3>Optional LoRAs</h3><LoraPanel browseFirst={browseFirst} loras={view.loras} setLoras={view.setLoras} options={loraOptions} profile={view.currentProfile} limit={loraLimit} library={view.loraLibrary} rememberedStrength={view.rememberedLoraStrength} unavailableReason={loraUnavailable} assistant={view.assistant} /></section>;
 }
+
+// The view model is rebuilt on every studio render (each keystroke in the prompt); these skip unless their data changed.
+export const StableModelLoraControls = memoLatest(ModelLoraControls);
+export const StablePhoneAdvancedControls = memoLatest(PhoneAdvancedControls);

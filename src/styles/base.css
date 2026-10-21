@@ -162,7 +162,7 @@ body {
 }
 /* Windows, video gallery: Chrome may put playing videos on a hardware layer
    the blur can't read, and the glass would show them through at its tint.
-   The glass goes nearly opaque there instead (main.tsx sets the classes). */
+   The glass goes nearly opaque there instead (useAppEffects.ts sets the classes). */
 :root.is-windows.is-video-mode { --glass-bar-bg: rgb(20 20 20 / .95); --glass-panel-bg: rgb(20 20 20 / .95); }
 /* A glass surface on the move (useSettling in composerSurface.ts) skips its
    backdrop blur and takes a near-solid fill; the glass returns when it settles.

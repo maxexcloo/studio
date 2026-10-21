@@ -9,7 +9,6 @@ import { Skeleton } from './components';
 import { Modal } from './Modal';
 import { HeatMark } from './HeatMark';
 import { apiFetch, apiJson } from './api';
-import type { Models } from './types';
 import { shortcuts } from './shortcuts';
 import { SettingsDrawer } from './SettingsDrawer';
 import { knownAccountStatus } from './accounts';
@@ -19,6 +18,7 @@ import { knownDiagnostics, loadDiagnostics, troubleshootingUrl } from './diagnos
 import { AccountSettings, GroupsSettings, UsersSettings, type ProfileInfo } from './AccountSettings';
 import { DefaultsGroup, DeploymentSettingsError, inpaintFlagKey, IntegrationsOverview, useDeploymentSettings } from './DeploymentSettings';
 import { WorkerSettings } from './WorkerSettings';
+import type { StudioViewModel } from './useStudio';
 
 /** Account first, then alphabetical (UI-PATTERNS › Settings). */
 export const SETTINGS_SECTIONS = [
@@ -139,7 +139,7 @@ const credits = [
 
 /* ------------------------------------------------------------ Dialog */
 
-export function SettingsDialog({ view, open, section, onSectionChange, onClose }: { view: Record<string, any>; open: boolean; section: SettingsSection; onSectionChange: (section: SettingsSection) => void; onClose: () => void; onGetModels?: () => void }) {
+export function SettingsDialog({ view, open, section, onSectionChange, onClose }: { view: StudioViewModel; open: boolean; section: SettingsSection; onSectionChange: (section: SettingsSection) => void; onClose: () => void; onGetModels?: () => void }) {
   const {
     prefs, setPrefs,
     copyToClipboard, showToast,
@@ -149,7 +149,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
   } = view;
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) || SETTINGS_SECTIONS[0];
 
-  const modelList = models as Models | null;
+  const modelList = models;
   const profileInfo = React.useMemo<Record<string, ProfileInfo>>(() => Object.fromEntries((modelList?.profiles || []).map((profile) => [profile.id, { label: profile.displayName || profile.label, kind: profile.kind, cloud: profile.family === 'grok' || /^grok/i.test(profile.id), nsfw: profile.nsfw === true }])), [modelList]);
   // What the sign-in gate already knew, so Account and Users draw at once; checked again on each open.
   const known = knownAccountStatus();
@@ -182,8 +182,8 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
     return () => { live = false; };
   }, [open, section === 'about']); // eslint-disable-line react-hooks/exhaustive-deps
   const topWorkflowName = stats?.topWorkflow
-    ? (workflows || []).find((item: { profileId: string; name: string }) => item.profileId === stats.topWorkflow)?.name
-      || (modelProfiles || []).find((item: { id: string; displayName?: string; label?: string }) => item.id === stats.topWorkflow)?.displayName
+    ? workflows.find((item) => item.profileId === stats.topWorkflow)?.name
+      || modelProfiles.find((item) => item.id === stats.topWorkflow)?.displayName
       || stats.topWorkflow.replace(/^custom:/, '')
     : '';
 

@@ -1,9 +1,10 @@
+import type { SidebarView } from './useStudio';
 import { NumberPicker } from './components';
 import { usePhone } from './device';
 import { ListItem, ListSection, ListSelect } from './SheetList';
 
 /** A cloud video model's duration and resolution, as rows of the Advanced Settings list. */
-export function GrokMediaControls({ view }: { view: any; phone?: boolean }) {
+export function GrokMediaControls({ view }: { view: SidebarView; phone?: boolean }) {
   const native = usePhone();
   const { currentProfile: profile, duration, setDuration, resolution, setResolution } = view;
   if (!profile || (!profile.capabilities.duration && !profile.capabilities.resolution)) return null;

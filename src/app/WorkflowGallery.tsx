@@ -13,6 +13,7 @@ import { ComfyRestart, useComfyRestarting } from './ComfyRestart';
 import { scrollSideways, useWheelRef } from './wheel';
 import type { Mode, Profile, WorkflowImportPreview, WorkflowPreferences, WorkflowRisk, WorkflowSummary } from './types';
 import { useThisComputer } from './device';
+import type { StudioViewModel } from './useStudio';
 import type { ShowToast } from './toast';
 import { CopyIcon, useCopyFeedback } from "./CopyFeedback";
 import { agentPrompt, agentPromptFor, controlLabel, loraNodes, workflowControls } from "./workflowAgentGuide";
@@ -172,7 +173,7 @@ function StatusBadge({ validation }: { validation: WorkflowSummary["validation"]
   return <span className={cn("wf-status", `is-${status.state}`)}><i aria-hidden="true" />{status.label}</span>;
 }
 
-export function WorkflowGallery({ view }: { view: any }) {
+export function WorkflowGallery({ view }: { view: StudioViewModel & { onClose: () => void } }) {
   const comfyRestarting = useComfyRestarting();
   // Importing and deleting workflow files happens at the computer running Studio.
   const thisComputer = useThisComputer();
