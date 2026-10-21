@@ -1,5 +1,5 @@
 import { RotateCcw } from 'lucide-react';
-import { cn } from './format';
+import { assistantSummary, cn } from './format';
 import { Tip } from './components';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import type { GalleryItem } from './types';
@@ -62,7 +62,7 @@ export function generationInputsText(item: GalleryItem) {
     ...(item.referenceImageName ? { startImageName: item.referenceImageName } : {}),
   };
   const labels: Record<string, string> = { seed: 'Seed', model: 'Model', kind: 'Kind', width: 'Width', height: 'Height', profileId: 'Profile ID', steps: 'Steps', cfg: 'CFG' };
-  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
+  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', assistantSummary(item) ? `Written By: ${assistantSummary(item)}` : '', ...Object.entries(inputs).map(([key, value]) => [key, prune(value)] as const).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
 }
 
 export function DetailsFooter({ onCopy, onRecreate }: { onCopy: () => Promise<boolean>; onRecreate?: () => void }) {

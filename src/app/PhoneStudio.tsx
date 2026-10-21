@@ -1,5 +1,7 @@
 import { PickerTools, SelectedTick } from './PickerTools';
 import { PromptField } from './PromptField';
+import { LoraSuggestionChips, NegativeAssistantButton, PromptAssistantButton } from './PromptAssistant';
+import type { PromptAssistant } from './usePromptAssistant';
 import { CatalogueFilters, catalogueViews } from './CatalogueFilters';
 import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
 import React from 'react';
@@ -291,6 +293,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
     generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, grokMediaControls, phoneVideoDurationControls, phoneAdvancedControls, generationEstimate,
     customSize, sizeTier, sizeMax, customLimits, savedSizes, sizeArea, sizeTiers, sampler
   } = view;
+  const assistant = view.assistant as PromptAssistant | undefined;
   // Several references: Edit and Ref say what happens to all of them, not only the first.
   const picked = (referenceAssets || []) as Array<{ slot: string; asset: unknown }>;
   const many = picked.length > 1;
@@ -369,8 +372,11 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
       {/* One flat column: the prompt takes the room that's left, then one row per choice. */}
       <div className="create-flow">
         <div className="create-prompts">
-          <PromptField kind="positive" fill selectAll focusMode onFocusModeChange={setTextFocus} value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }} />
-          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} focusMode onFocusModeChange={setTextFocus} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }} /> : null}
+          <PromptField kind="positive" fill selectAll focusMode onFocusModeChange={setTextFocus} value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }}
+            assistant={assistant?.available ? ({ focused, keepFocus }) => <PromptAssistantButton assistant={assistant} phone focused={focused} keepFocus={keepFocus} hasPrompt={Boolean(prompt.trim())} /> : null} busy={assistant?.busy === 'rewrite'} />
+          {assistant ? <LoraSuggestionChips assistant={assistant} /> : null}
+          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} focusMode onFocusModeChange={setTextFocus} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }}
+            assistant={assistant?.negativeOffered ? <NegativeAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} busy={assistant?.busy === 'negative'} /> : null}
         </div>
         <div className="list-group create-options">
           <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} data-open-trigger aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={pop === 'model'} onClick={() => toggle('model')} />

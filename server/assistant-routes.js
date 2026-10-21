@@ -4,7 +4,8 @@
  * access-profile feature, works only with profiles the account may use, and Spicy needs NSFW Models.
  * LoRA suggestions need the LoRAs feature. Drafting guides and profiles is for administrators.
  *
- *   GET  /api/assistant                 what this account may use: presets, models, vision
+ *   GET  /api/assistant                 what this account may use: presets, models, vision, and the
+ *                                       profiles whose guide takes no negative (noNegative)
  *   POST /api/assistant/rewrite         { profileId, prompt, preset, references?, loras? } → streamed
  *                                       (text/event-stream: delta, done, error) or JSON
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
@@ -52,6 +53,21 @@ export async function downscaleReferences(values) {
       return { mime: 'image/jpeg', data: data.toString('base64') };
     } catch { return image; }
   }));
+}
+
+/**
+ * What a generation records about the assistant (gallery items' `assistant`): the preset, the model,
+ * where it ran (`ui` or `chat`) and the suggested LoRAs that were chosen, only those in the run's
+ * stack. Anything malformed records nothing.
+ */
+export function assistantRecord(value, loras = []) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const preset = assistantPresets.find((item) => item.id === value.preset)?.id;
+  if (!preset) return null;
+  const model = String(value.model || '').trim();
+  const stacked = new Set((Array.isArray(loras) ? loras : []).filter((item) => item && item.enabled !== false).map((item) => String(item.name || '')));
+  const chosen = [...new Set((Array.isArray(value.lorasSuggested) ? value.lorasSuggested : []).map((name) => String(name || '')).filter((name) => stacked.has(name)))].slice(0, 8);
+  return { preset, ...(modelPattern.test(model) ? { model } : {}), source: value.source === 'chat' ? 'chat' : 'ui', ...(chosen.length ? { lorasSuggested: chosen } : {}) };
 }
 
 /** Settings › Models › Integrations: the assistant's gateway, chosen models and vision. */
@@ -113,10 +129,12 @@ export function registerAssistantRoutes(app, {
     try {
       const settings = engine.settings();
       const spicy = Boolean(settings.spicyModel) && allowed(req, 'nsfwModels');
+      // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
+      const noNegative = (await profiles(req)).filter((profile) => { try { return guide(profile)?.negative?.effect === 'none'; } catch { return false; } }).map((profile) => profile.id);
       res.json({
         ok: true, available: true, model: settings.model, vision: await engine.supportsVision(settings.model), defaultPreset,
         presets: assistantPresets.filter((preset) => !preset.spicy || spicy).map(({ id, label, description }) => ({ id, label, description })),
-        spicy, loras: allowed(req, 'loras')
+        spicy, loras: allowed(req, 'loras'), noNegative
       });
     } catch (error) { fail(res, error); }
   });
