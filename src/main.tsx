@@ -27,7 +27,7 @@ import { loraName } from './app/catalogueNames';
 import { apiJson, loadDraft, referenceAssetFromGallery, saveDraft } from './app/api';
 import { characterMeta, clampText, formatElapsed, generationDetailEntries, settingMax, textLength, titleFromPrompt } from './app/format';
 import { useGalleryColumnCount } from './app/gallery';
-import { normalizeLoras } from './app/loras';
+import { maxLoras, normalizeLoras } from './app/loras';
 import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
 import { deleteLoraStack, restoreLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, toggleLoraFavorite, updateLoraStack, type LoraSnapshot } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
@@ -41,7 +41,8 @@ import { GrokMediaControls } from './app/GrokMediaControls';
 import { VideoDurationControls } from './app/VideoDurationControls';
 import { ModelLoraControls, PhoneAdvancedControls } from './app/SidebarControls';
 import { useGenerationActions } from './app/useGenerationActions';
-import { loraFit, useLoraInfo } from './app/useLoraInfo';
+import { knownLoraInfo, loraFit, useLoraInfo } from './app/useLoraInfo';
+import { usePromptAssistant } from './app/usePromptAssistant';
 import type { LoraMismatch } from './app/LoraMismatchChip';
 import { useViewerControls } from './app/useViewerControls';
 import { useGalleryGroups } from './app/useGalleryGroups';
@@ -1201,7 +1202,16 @@ function App() {
     }
   }
 
+  // The prompt assistant: the magic button, the negative writer and LoRA suggestions (usePromptAssistant.ts).
+  const assistant = usePromptAssistant({
+    prompt, setPrompt, negative, setNegative,
+    clampPrompt: (value: string) => clampText(value, promptLimit), clampNegative: (value: string) => clampText(value, negativeLimit),
+    profile: currentProfile || null, loras, setLoras: setLorasWithMemory, loraOptions: loraOptionNames, loraCap: Math.min(maxLoras, currentProfile?.maxLoras || maxLoras),
+    cfg: currentProfile?.capabilities?.cfg !== false ? cfg : undefined, references: composerReferenceAssets, showToast,
+    loraTitle: (name: string) => loraName(name, knownLoraInfo()?.[name])
+  });
   const generationActions = useGenerationActions({
+    assistantRecord: assistant.record,
     active, canUseStartImage, confirmAction, count, currentProfile, denoise, frames, fps, duration, resolution, generateDisabled, generatePostingRef, height, loadGallery, loadGalleryDelta, loras, missingRequiredReference, mode, model, negative, prefs, prompt, referenceAssets: composerReferenceAssets, inpaint: activeInpaintMask ? { mask: activeInpaintMask.dataUrl, strength: inpaintStrength, feather: inpaintFeather } : null, sizeTier, sizeMax, sizeArea, sizeStep: customLimits.width.step, sampler, scheduler, seed, setActive, setGallery, upsertGalleryItems, removeGalleryItems, removeGalleryItemsWhere, patchGalleryItems, setStatus, showToast, startImage, startImageId, startImageName, steps, cfg, textEncoder, textEncoders, vae, clipType, weightDtype, width, visibleGallery, generateDisabledReason, comfyOffline: Boolean(comfyStatus.checked && !comfyStatus.connected && !comfyStatus.checking), comfyRestarting: Boolean(comfyStatus.restarting),
     openModelSetup: () => setWorkflowGalleryOpen(true),
     retryComfyStatus,
@@ -1270,7 +1280,7 @@ function App() {
   };
   // The first reference, shown at the top of the sidebar's Basics with how much it may change.
   const sidebarReference = referenceInput && referenceAsset ? { asset: referenceAsset, label: referenceInput.role === "start" ? "Start image" : referenceInput.label || "Reference image", remove: () => removeReferenceAsset(referenceInput.id) } : null;
-  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, recommended, prefs, setPrefs, upscaleStatus };
+  const sidebarView = { sidebarReference, inpaintActive: Boolean(activeInpaintMask), inpaintStrength, setInpaintStrength, inpaintFeather, setInpaintFeather, canUseStartImage, cfg, cfgMeta, changeMode, clipType, count, countMeta, currentProfile, currentWorkflow, customSize, aspectLocked, denoise, denoiseMeta, fps, fpsMeta, frameMeta, frames, duration, resolution, height, heightMeta, loras, loraActiveCount, loraSummary, mode, models, profileOptions, readStartImage, sampler, scheduler, seed, setCfg, setCount, setDenoise, setFps, setFrames, setDuration, setResolution, setHeight, setLoras: setLorasWithMemory, setSampler, setScheduler, setSeed, setStartImage, setStartImageId, setStartImageName, setSteps, setTextEncoder, setTextEncoders, setVae, setWeightDtype, setWidth, setWorkflowGalleryOpen, startImageName, steps, stepsMeta, textEncoder, textEncoders, refreshModels, refreshWorkflows, showToast, modelFolders, vae, weightDtype, width, widthMeta, workflowPreferences, loraLibrary, rememberedLoraStrength: loraStrengthForCurrentWorkflow, recommended, prefs, setPrefs, upscaleStatus, assistant };
   // The same settings as the sidebar, laid out for the phone's Advanced sheet.
   const modelLoraControls = <StableModelLoraControls view={sidebarView} />;
   const grokMediaControls = <GrokMediaControls view={sidebarView} phone />;
@@ -1295,7 +1305,7 @@ function App() {
   } : null;
   // The phone's LoRAs row clears the stack in one tap, with Undo in the status pill.
   const clearLoras = () => { const before = loras; setLoras([]); showToast('LoRAs cleared', 'default', { action: { label: 'Undo', onClick: () => setLoras(before) } }); };
-  const view = { ...baseView, clearLoras, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
+  const view = { ...baseView, assistant, clearLoras, sampler, cfg, loraMismatch, dismissLoraMismatch, referenceAssets: composerReferenceAssets, referenceInputs, referenceInpaint, referenceRole: referenceRoleControl };
   return (
     <>
       <StudioView view={view} />
