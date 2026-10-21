@@ -122,6 +122,24 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   );
 }
 
+/* The viewer's top fade, the bottom fade turned over: the title, Star · Info · Close and the
+   phone's heading stay readable over a picture that reaches the top (desktop and phone). */
+.viewer-stage::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 140px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background) / 0.9) 0%,
+    hsl(var(--background) / 0.62) 36%,
+    hsl(var(--background) / 0.18) 72%,
+    transparent 100%
+  );
+}
+.viewer-stage > .viewer-side { z-index: 5; }
+
 .mode-tabs {
   display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1);
   padding: var(--seg-pad); border: 0;
