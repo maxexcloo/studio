@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoraStackSettings } from './LoraStackSettings';
 import { Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
 import { ComfyRestart } from './ComfyRestart';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
@@ -300,6 +301,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
             </Group>
             <Group title="Gallery">
               <SwitchRow label="Date Headers" description="Headings like “Today” and “This Evening” split the gallery by when you made things." checked={Boolean(prefs.dateHeaders)} onChange={(next) => setPrefs({ dateHeaders: next })} />
+              <SwitchRow label="Tile Captions" description="On a phone, each tile shows its prompt and name under the picture." checked={Boolean(prefs.phoneTileCaptions)} onChange={(next) => setPrefs({ phoneTileCaptions: next })} />
               <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
               <Row label="Stacks Look Like" description={prefs.runStackStyle === 'flow' ? 'A cover flow of the run inside one card.' : 'The newest image, with two edges under it.'}>
                 <Segmented
@@ -313,6 +315,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                 />
               </Row>
             </Group>
+            <LoraStackSettings />
             <Group title="Sharing">
               <SwitchRow label="Share Without Settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
             </Group>

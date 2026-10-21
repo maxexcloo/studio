@@ -45,9 +45,8 @@ async function openWorkers(page: Page) {
 
 const gpuRow = (dialog: Locator, name: string) => dialog.locator('.set-row').filter({ has: dialog.page().getByText(name, { exact: true }) });
 
-/** The phone's own picker on a phone, the studio's select on the desktop. */
-async function choose(page: Page, dialog: Locator, label: string, value: string, name: string) {
-  if (await studioUi(page).isPhone()) { await dialog.getByLabel(label).selectOption(value); return; }
+/** The shared dropdown, the same on both devices (UI-PATTERNS › Dropdowns). */
+async function choose(page: Page, dialog: Locator, label: string, _value: string, name: string) {
   await dialog.getByRole('combobox', { name: label }).click();
   await page.getByRole('option', { name, exact: true }).click();
 }
@@ -70,8 +69,7 @@ test('an administrator previews a GPU change, confirms the interruption and foll
   await expect.poll(() => posts.find((post) => post.path === '/api/ai-control/apply')?.body).toEqual({ allocation: [{ profile: 'comfyui-image', devices: ['0'] }, { profile: 'comfyui-video', devices: ['1'] }], signature: 'f'.repeat(64) });
   await expect(page.locator('[data-status-message]').filter({ hasText: 'GPU change applied' }).first()).toBeVisible();
   await expect(changes).toHaveCount(0);
-  if (!await studioUi(page).isPhone()) await expect(dialog.getByRole('combobox', { name: 'GPU 2 Workload' })).toContainText('ComfyUI Video');
-  else await expect(dialog.getByLabel('GPU 2 Workload')).toHaveValue('comfyui-video:1');
+  await expect(dialog.getByRole('combobox', { name: 'GPU 2 Workload' })).toContainText('ComfyUI Video');
 });
 
 test('ordinary accounts see what each GPU runs, read only, under Workers', async ({ page }) => {

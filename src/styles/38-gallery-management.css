@@ -228,3 +228,13 @@
 }
 .gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
 .gallery-filter-anchor.is-expanded .gallery-filter-trigger { padding: 0 var(--space-4); }
+/* Filter options are dropdown rows (UI-PATTERNS › Dropdowns): the name, then the shared amber tick at the end. */
+.gallery-filter-option { display: flex; align-items: center; gap: var(--space-4); }
+.gallery-filter-option .gallery-filter-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; }
+.gallery-filter-option.active .gallery-filter-name { color: var(--selected-ink); }
+.gallery-filter-menu-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h-sm); padding: 0 4px 0 10px; }
+.gallery-filter-menu-head > strong { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.gallery-filter-menu-head > span { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
+.gallery-filter-clear { height: 28px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background-color: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 12px; cursor: pointer; }
+.gallery-filter-clear:hover:not(:disabled) { background-color: var(--control-hover); }
+.gallery-filter-clear:disabled { opacity: .4; cursor: default; }

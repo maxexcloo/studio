@@ -47,7 +47,6 @@
 .tile-overlay > * { pointer-events: auto; }
 .tile-overlay .tile-hover-actions { pointer-events: none; }
 .tile-overlay .tile-hover-actions > * { pointer-events: auto; }
-.tile-menu-label { display: none; }
 
 /* Mouse: once the row of tile buttons shows, the row itself (its padding and
    the gaps between buttons) catches clicks. A near miss beside Delete used to
@@ -71,44 +70,8 @@
   }
 }
 
-.tile-more {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 5;
-  display: none;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgb(10 10 10 / .62);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), 0 2px 10px rgb(0 0 0 / .28);
-  color: #fff;
-}
-.tile-overlay.is-menu-open .tile-more { background: #fff; color: #0b0b0b; }
-
-/* Touch phones: one "More" button; its actions open as a grid over the tile. */
+/* Touch tablets in the full studio: the tile row shows without a hover. */
 @media (hover: none) and (max-width: 620px) {
-  .tile-more { display: grid; }
-  .tile-overlay .tile-hover-actions {
-    inset: 0;
-    top: 0;
-    right: 0;
-    display: grid;
-    grid-template-columns: repeat(2, 44px);
-    place-content: center;
-    gap: 10px;
-    background: rgb(0 0 0 / .6);
-    opacity: 0;
-    transform: none;
-    transition: opacity var(--motion-fast) var(--motion-ease);
-  }
-  .tile-overlay:not(.is-menu-open) .tile-hover-actions > * { pointer-events: none; }
-  .tile-overlay.is-menu-open .tile-hover-actions { opacity: 1; }
-  .tile-overlay .tile-hover-actions .tile-icon,
-  .tile-overlay .tile-hover-actions .tile-delete { --tile-ctl: 44px; }
   .tile-overlay .tile-action { min-height: 32px; padding: 6px 12px; }
 }
 

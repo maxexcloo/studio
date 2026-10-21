@@ -19,6 +19,7 @@ export const defaultPrefs: Preferences = {
   hideQueuedItems: false,
   // Off until chosen: a new key, so preferences saved under the old hidden showMoments don't switch it on.
   dateHeaders: false,
+  phoneTileCaptions: false,
   stackRuns: false,
   runStackStyle: "burst",
   smartUpscale: true,

@@ -4,6 +4,7 @@ import { Sheet } from './Sheet';
 import { retryRequest } from './retry';
 import { SafeImg } from './SafeImg';
 import type { GalleryItem } from './types';
+import { Dropdown } from './Dropdown';
 
 type Comparison = { id: string; createdAt: string; seed: string; vote: string | null; variants: Array<{ jobId: string; item: GalleryItem | null }> };
 type Variant = { prompt: string; settings: string };
@@ -56,7 +57,7 @@ export function CompareVariants({ items, onClose }: { items: GalleryItem[]; onCl
     catch (error) { setError((error as Error).message); }
   };
   return <Sheet open onClose={onClose} title="Compare Variants" full className="compare-variants">
-    <label>History<select aria-label="Comparison History" value={selected} onChange={event => setSelected(event.target.value)}><option value="">New Comparison</option>{history.map(item => <option key={item.id} value={item.id}>{new Date(item.createdAt).toLocaleString()} · {item.variants.length} Variants · Seed {item.seed}</option>)}</select></label>
+    <div className="compare-history"><span aria-hidden="true">History</span><Dropdown label="Comparison History" variant="field" value={selected} options={[{ value: '', label: 'New Comparison' }, ...history.map(item => ({ value: item.id, label: `${new Date(item.createdAt).toLocaleString()} · ${item.variants.length} Variants · Seed ${item.seed}` }))]} onChange={setSelected} /></div>
     {error ? <p role="alert">{error}</p> : null}
     {current ? <><p>Seed {current.seed} · A shared seed helps compare changes. Different model families can interpret it differently.</p><div className="comparison-grid">{current.variants.map(({ jobId, item }, index) => <section key={jobId}><h3>Variant {String.fromCharCode(65 + index)}</h3>{item?.status === 'done' && item.url ? <SafeImg src={item.url} alt={`Variant ${String.fromCharCode(65 + index)}`} /> : <p>{item ? item.status === 'error' ? 'Generation failed; see the gallery for details.' : 'Generating…' : 'Image unavailable'}</p>}<p>{item?.prompt}</p>{item?.settings ? <details><summary>Settings</summary><pre>{JSON.stringify(item.settings, null, 2)}</pre></details> : null}<button type="button" className="btn" disabled={item?.status !== 'done'} aria-pressed={current.vote === jobId} onClick={() => void vote(current.vote === jobId ? null : jobId)}>{current.vote === jobId ? 'Voted' : `Vote for ${String.fromCharCode(65 + index)}`}</button></section>)}</div></> : base ? <>
       <p>Make 2–4 variants with one seed. Change a prompt or generation settings, then vote on the results.</p>

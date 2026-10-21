@@ -16,7 +16,7 @@ import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
-import { PickerTools } from './PickerTools';
+import { PickerTools, SelectedTick, SurfaceHeadingContext, useSurfaceHeadingSlot } from './PickerTools';
 import { ClearSelection } from './SheetList';
 import { useReorderDrag } from './useReorderDrag';
 
@@ -256,6 +256,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
   const settling = useSettling();
+  const pickerTitle = multiple ? "References" : input.label || "Reference Image";
+  const heading = useSurfaceHeadingSlot(pickerTitle, Boolean(onPhone));
+  const tabName = { generation: "Library", upload: "Uploads", selected: "Selected" } as const;
   if (!box) return null;
   // In the phone studio it pops up over the Create sheet, anchored to the References row.
   // An exiting picker must not intercept Escape intended for the next overlay.
@@ -274,20 +277,23 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       {...popoverMotion}
       {...settling}
     >
-      {/* The chooser pattern (UI-PATTERNS › Pickers): a title bar, then the tabs with Clear Selection, then search. */}
+      {/* The chooser pattern (UI-PATTERNS › Pickers): one heading row, the title, the views, Upload, Clear Selection, search and Close. */}
       <header className="reference-popover-head">
-        <strong className="picker-title"><ImagePlus size={16} aria-hidden="true" />{multiple ? "References" : input.label || "Reference Image"}</strong>
-        <span className={cn("reference-popover-hint", atCapacity && "is-full")} role={atCapacity ? "status" : undefined}>{atCapacity ? (multiple ? "All picked · tap one to take it off" : "Tap it to take it off, then pick another") : multiple ? `Pick up to ${max} · drop or paste on the prompt` : "Drop or paste an image anywhere on the prompt"}</span>
-        <button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>
-          {upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}
-          <span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span>
-        </button>
+        <strong className="picker-title surface-title"><ImagePlus size={16} aria-hidden="true" />{pickerTitle}</strong>
+        <span ref={heading.ref} className="surface-head-slot" />
         {onPhone ? <SurfaceStatus active={present} /> : null}
         <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={16} /></button></Tip>
       </header>
-      <PickerTools query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
+      <SurfaceHeadingContext.Provider value={heading.value}>
+      <PickerTools extra={<Tip content={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload an Image"}><button type="button" className="btn is-primary reference-upload" aria-label={upload.busy ? `Uploading ${upload.progress || 0}%` : "Upload"} onClick={() => uploadInput.current?.click()} disabled={upload.busy}>{upload.busy ? <LoaderCircle className="spin" size={14} /> : <Upload size={14} />}<span>{upload.busy ? `${upload.progress || 0}%` : "Upload"}</span></button></Tip>} query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
         clear={multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+        onClear={multiple && selected.length > 0 && onClearAll ? onClearAll : undefined}
+        views={{ label: "Reference Image Sources", current: tab === "selected" ? `Selected ${selected.length}/${max}` : tabName[tab], options: [
+          { id: "generation", label: "Library", checked: tab === "generation", onSelect: () => changeTab("generation") },
+          { id: "upload", label: "Uploads", checked: tab === "upload", onSelect: () => changeTab("upload") },
+          ...(multiple ? [{ id: "selected", label: `Selected ${selected.length}/${max}`, ariaLabel: `Selected ${selected.length} of ${max}`, checked: tab === "selected", disabled: !selected.length, onSelect: () => changeTab("selected") }] : []),
+        ] }}
         search={tab !== 'selected' ? (<div className="reference-search picker-search">
         <Search size={16} aria-hidden="true" />
         <input ref={searchRef} type="search" aria-label={tab === "upload" ? "Search Uploads" : "Search Library"} placeholder={tab === "upload" ? "Search Uploads" : "Search Library"} value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -299,6 +305,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
           {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
       </PickerTools>
+      </SurfaceHeadingContext.Provider>
       <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null && tab !== "selected") memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "selected" && !selected.length ? (
           <EmptyState title="Nothing Selected">Pick images from Library or Uploads.</EmptyState>
@@ -350,7 +357,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
                       disabled={Boolean(selectingId || upload.busy)}
                     >
                       <SafeImg src={assetImage(asset)} loading="lazy" draggable={false} fallback={<ImageIcon size={16} />} />
-                      {isSelected ? <i className="reference-tile-check">{multiple ? selected.findIndex((item) => item.id === asset.id) + 1 : <Check size={12} strokeWidth={2.5} />}</i> : null}
+                      {/* Picked: the amber tick, as in every chooser; the order shows only under Selected. */}
+                      {isSelected ? <i className="reference-tile-check"><SelectedTick /></i> : null}
                     </button>
                     {asset.source === "upload" ? <button type="button" tabIndex={tabIndex} className="reference-tile-delete" aria-label={`Delete ${asset.name}`} onClick={(event) => removeUpload(event, asset)}><Trash2 size={13} /></button> : null}
                     {selectingId === asset.id ? <span className="reference-tile-busy"><LoaderCircle className="spin" size={16} /></span> : null}

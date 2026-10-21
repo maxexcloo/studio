@@ -159,7 +159,9 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
   // Names, not files: the profile it ran through, then its weights' friendly name (UI-PATTERNS › Lists).
   section("Model", (add) => {
     add("Profile", names.profile || "");
-    add("Weights", model ? partName(String(model)) : "");
+    // Weights only when they say more than the profile's own name.
+    const weights = model ? partName(String(model)) : "";
+    if (weights && weights.trim().toLowerCase() !== String(names.profile || "").trim().toLowerCase()) add("Weights", weights);
   });
   // Friendly names (the catalogue's title), the file kept beside them for a tooltip and Copy Settings.
   const loras = activeLoras(settings.loras).map((lora) => ({ name: names.lora ? names.lora(lora.name) : fileStem(lora.name), file: String(lora.name).split(/[\\/]/).pop() || String(lora.name), strength: Number(lora.strength ?? 0.7).toFixed(2) }));
@@ -197,7 +199,6 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     }
     add("File", item.outputName || item.filename);
     add("Generated", formatGeneratedAt(item.createdAt));
-    add("Type", item.type);
   });
   // Rows read alphabetically; Timing keeps measured times before the estimates that split them.
   for (const entry of sections) sortDetailRows(entry);

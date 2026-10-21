@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Boxes, Check, ChevronDown, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { Boxes, Eraser, ChevronDown, Layers, Ratio, Ruler, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { galleryAspects, gallerySizeBands, otherAspect } from '../../server/gallery-filters.js';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
@@ -11,6 +11,8 @@ import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-
 import { tweens } from '@/lib/springs';
 import { EmptyState } from './EmptyState';
 import { Tip } from './components';
+import { SelectedTick } from './PickerTools';
+import { anchoredPlacement } from './composerSurface';
 
 const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.label} (${band.detail})`]));
 const aspectLabels = new Map([...galleryAspects.map((aspect) => [aspect.id, aspect.id] as const), [otherAspect, 'Other']]);
@@ -43,14 +45,10 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
     const place = (event?: Event) => {
       // Scrolling options must never reposition or refocus the floating surface.
       if (event?.target instanceof Node && menu.current?.contains(event.target)) return;
-      const rect = anchor.current!.getBoundingClientRect();
-      const viewport = window.visualViewport;
-      const bottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      const viewportTop = viewport?.offsetTop || 0;
-      const below = bottom - rect.bottom - 16;
-      const above = rect.top - viewportTop - 16;
-      const height = Math.max(0, Math.min(320, bottom - viewportTop - 16, Math.max(below, above)));
-      const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - 268)), top: below >= Math.min(200, above) ? rect.bottom + 8 : Math.max(viewportTop + 8, rect.top - height - 8), maxHeight: height };
+      // The shared placement (UI-PATTERNS › Surfaces): a top bar's filter opens below its trigger, start-aligned.
+      const at = anchoredPlacement(anchor.current!.getBoundingClientRect(), { width: 260, minHeight: 200, maxHeight: 320, prefer: 'below' });
+      const top = at.upward ? Math.max(8, window.innerHeight - (at.bottom || 0) - at.maxHeight) : at.top || 0;
+      const next = { left: at.left, top, maxHeight: at.maxHeight };
       setPosition(current => current.left === next.left && current.top === next.top && current.maxHeight === next.maxHeight ? current : next);
     };
     place();
@@ -84,7 +82,7 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
       {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
       <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
         const on = picked.includes(option);
-        return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={2.5} /> : null}</span>{labelFor(option)}</button>;
+        return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-name">{labelFor(option)}</span><SelectedTick on={on} /></button>;
       })}{!matches.length ? <EmptyState title={query ? 'No Matches' : 'Nothing to Filter Yet'} compact /> : null}</div>
     </div>, document.body) : null}
   </>;
@@ -298,7 +296,7 @@ export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items 
           {viewControls ? <span className="phone-filter-divider" aria-hidden="true" /> : null}
           {viewControls}
           {/* Clear ends the row, in the filters' own style: it clears them all and closes the row. */}
-          <button type="button" className="gallery-filter-select phone-filter-clear" aria-label="Clear Filters" title="Clear & Close" onClick={onClose}><X size={14} aria-hidden="true" /><span>Clear</span></button>
+          <button type="button" className="gallery-filter-select phone-filter-clear" aria-label="Clear Filters" aria-description="Clears every filter and closes the row" onClick={onClose}><Eraser size={18} aria-hidden="true" /></button>
         </div>}
       </div>
     </motion.div> : null}

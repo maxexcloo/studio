@@ -369,6 +369,19 @@ export function deleteLoraStack(familyKey: string, id: string) {
   apply({ op: 'stack.delete', key: familyKey, id }, 0);
 }
 
+/** Puts a deleted stack back as it was (Undo). */
+export function restoreLoraStack(familyKey: string, stack: LoraSnapshot) {
+  apply({ op: 'stack.add', key: familyKey, stack: { ...stack, loras: normalizeLoras(stack.loras) } }, 0);
+}
+
+/** Every saved stack with the family it belongs to, for Settings › Studio › LoRA Stacks. */
+export function allLoraStacks(): Array<{ key: string; stack: LoraSnapshot }> {
+  const value = library();
+  return Object.entries(value.snapshots)
+    .filter(([key]) => key.startsWith('family:'))
+    .flatMap(([key, list]) => (list || []).map((stack) => ({ key, stack: { ...stack, loras: normalizeLoras(stack.loras) } })));
+}
+
 /* --------------------------------------------------- Favorites, recents */
 
 export function loraFavorites() {

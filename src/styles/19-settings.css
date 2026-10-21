@@ -470,20 +470,6 @@
 .multi-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multi-select-trigger > svg { flex: none; color: hsl(var(--muted-foreground)); }
 .multi-select-trigger:disabled { opacity: .45; cursor: default; }
-.multi-select-menu { position: fixed; width: 260px; }
-.multi-select-menu .gallery-filter-menu-head { display: flex; align-items: center; gap: var(--space-2); min-height: 30px; padding: 0 4px 0 8px; }
-.multi-select-menu .gallery-filter-menu-head > strong { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multi-select-menu .gallery-filter-menu-head > span { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
-.multi-select-menu .gallery-filter-clear { height: 26px; padding: 0 9px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; cursor: pointer; }
-.multi-select-menu .gallery-filter-clear:hover:not(:disabled) { background: var(--control-hover); color: hsl(var(--foreground)); }
-.multi-select-menu .gallery-filter-clear:disabled { opacity: .4; cursor: default; }
-.multi-select-menu .gallery-filter-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; margin-right: 8px; border-radius: var(--r-check); box-shadow: inset 0 0 0 1.5px hsl(var(--muted-foreground) / .6); }
-.multi-select-menu .gallery-filter-option.active .gallery-filter-check { background: var(--accent-amber); box-shadow: none; color: var(--accent-amber-ink); }
-.multi-select-option { align-items: center; }
-.multi-select-option:disabled { opacity: .5; cursor: default; }
-.multi-select-text { display: grid; min-width: 0; }
-.multi-select-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multi-select-text > small { font-size: 11px; color: hsl(var(--muted-foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Settings › Profiles: one profile's JSON, then its review (ProfilesSettings.tsx). */
 .set-sections { display: flex; flex-direction: column; gap: 22px; }

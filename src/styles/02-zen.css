@@ -305,7 +305,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 34px;
+  height: var(--control-h-sm);
   padding: 2px;
   border: 1px solid var(--glass-border);
   border-radius: var(--r-pill);
@@ -319,7 +319,7 @@
 .number-picker.is-fill { display: flex; width: 100%; justify-content: space-between; }
 .number-picker.is-fill .number-picker-value,
 .number-picker.is-fill .number-picker-input { flex: 1 1 auto; }
-.number-picker.is-sm { height: 32px; gap: 0; }
+.number-picker.is-sm { height: var(--control-h-sm); gap: 0; }
 .number-picker.is-sm .number-picker-btn { width: 24px; height: 26px; }
 .number-picker.is-sm .number-picker-value,
 .number-picker.is-sm .number-picker-input { height: 26px; min-width: 26px; font-size: 13px; }
@@ -399,7 +399,8 @@
 
 .zen-prompt .aspect-menu,
 .zen-prompt .model-menu {
-  top: auto; bottom: calc(100% + 6px);
+  /* Above the button that opened it, start-aligned (UI-PATTERNS › Surfaces). */
+  top: auto; bottom: calc(100% + 8px); left: 0; right: auto;
   animation: surfaceIn var(--motion-base) var(--motion-ease) both;
-  transform-origin: bottom center;
+  transform-origin: 20px 100%;
 }

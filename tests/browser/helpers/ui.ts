@@ -223,3 +223,28 @@ export async function pickerSearch(scope: Locator, name: string, role: 'textbox'
   await expect(field).toBeVisible();
   return field;
 }
+
+/**
+ * Chooses a picker view (UI-PATTERNS › Pickers): a tab in the desktop heading,
+ * or a row of the heading dropdown in a phone pop-up ("LoRAs · This Model").
+ * `name` matches the tab's accessible name ("This Model", /^Selected 1 of/).
+ */
+export async function pickerView(surface: Locator, name: string | RegExp) {
+  const exact = typeof name === 'string';
+  const tab = surface.getByRole('button', { name, exact }).or(surface.getByRole('tab', { name, exact }));
+  if (await tab.count()) { await tab.first().click(); return; }
+  const trigger = surface.locator('.picker-view .picker-dropdown-trigger');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await surface.getByRole('menuitemcheckbox', { name, exact }).click();
+  await expect(surface.locator('.picker-view .picker-dropdown-menu')).toHaveCount(0);
+}
+
+/** Whether a view is the one showing, on either device. */
+export async function expectPickerView(surface: Locator, name: string) {
+  const tab = surface.getByRole('button', { name, exact: true }).or(surface.getByRole('tab', { name, exact: true }));
+  if (await tab.count()) {
+    await expect.poll(async () => (await tab.first().getAttribute('aria-pressed')) || (await tab.first().getAttribute('aria-selected'))).toBe('true');
+    return;
+  }
+  await expect(surface.locator('.picker-view .picker-dropdown-trigger')).toContainText(name);
+}

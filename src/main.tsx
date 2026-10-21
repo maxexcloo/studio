@@ -21,7 +21,7 @@ import { characterMeta, clampText, clientJobUuid, formatElapsed, generationDetai
 import { useGalleryColumnCount } from './app/gallery';
 import { normalizeLoras } from './app/loras';
 import { arrangeReferences, referenceRoleFor, referenceRoleOffered, withReference, withoutReferences } from './app/referenceSlots';
-import { deleteLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
+import { deleteLoraStack, restoreLoraStack, loraFamilyKey, loraFavorites, loraRecents, loraStacks, recordLoraRecents, rememberActiveLoras, rememberedLoraStrength, rememberLoraStrengths, renameLoraStack, saveLoraStack, startLoraSync, subscribeLoraLibrary, subscribeLoraSync, toggleLoraFavorite, updateLoraStack, type LoraSnapshot, type LoraSyncStatus } from './app/lora-storage';
 import { useConfirmation } from './app/useConfirmation';
 import { StudioView } from './app/StudioView';
 import { DeviceGate } from './app/DeviceGate';
@@ -1615,10 +1615,12 @@ function App() {
     saveStack: (name: string) => { const stack = saveLoraStack(loraFamily, name, loras); bumpLoraLibrary(); return stack; },
     updateStack: (id: string) => { updateLoraStack(loraFamily, id, loras); bumpLoraLibrary(); showToast('Stack updated', 'success'); },
     renameStack: (id: string, name: string) => { renameLoraStack(loraFamily, id, name); bumpLoraLibrary(); },
+    // Reversible, so it acts at once and offers Undo (UI-PATTERNS › Messages).
     deleteStack: async (stack: LoraSnapshot) => {
-      if (!await confirmAction({ title: `Delete ${stack.name}?`, description: 'The LoRAs stay installed and in use.', action: 'Delete', destructive: true })) return false;
-      deleteLoraStack(loraFamily, stack.id);
+      const family = loraFamily;
+      deleteLoraStack(family, stack.id);
       bumpLoraLibrary();
+      showToast(`Deleted ${stack.name}`, 'removed', { action: { label: 'Undo', onClick: () => { restoreLoraStack(family, stack); bumpLoraLibrary(); } } });
       return true;
     },
     toggleFavorite: (name: string) => { toggleLoraFavorite(name); bumpLoraLibrary(); },

@@ -194,7 +194,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // A long press selects: the item's actions live in the viewer and the select bar.
   const startSelection = React.useRef(selection.start);
   startSelection.current = selection.start;
-  const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]) } : null, [phone]);
+  const phoneTileCaptions = Boolean(prefs.phoneTileCaptions);
+  const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]), captions: phoneTileCaptions } : null, [phone, phoneTileCaptions]);
   const openSearch = React.useCallback(() => {
     setSearchOpen(true);
     document.querySelector<HTMLInputElement>('.gallery-search input, .phone-tools-field input')?.focus();
@@ -666,6 +667,16 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           active.settings?.steps ? `${active.settings.steps} Steps` : '',
           active.type === 'video' && active.settings?.duration ? `${active.settings.duration} s` : '',
         ].filter(Boolean).join(' · ');
+        // The phone's title sits in the top row beside Star · Info · Close: the
+        // name, then where it is in the gallery, when it was made and its size.
+        const viewerList = (view.viewerGallery || []) as GalleryItem[];
+        const viewerIndex = viewerList.findIndex((item) => item.id === active.id);
+        const madeAt = active.createdAt ? new Date(active.createdAt) : null;
+        const phoneDetail = [
+          viewerList.length > 1 && viewerIndex >= 0 ? `${viewerIndex + 1} / ${viewerList.length}` : '',
+          madeAt && !Number.isNaN(madeAt.getTime()) ? madeAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
+          profileDetail,
+        ].filter(Boolean).join(' · ');
         return (
           <div className="scrim" role="dialog" aria-modal="true" aria-label="Image Viewer" data-focus-trap tabIndex={-1} onClick={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -674,10 +685,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           }} ref={setViewerNode}>
             <div className="viewer-shell" onClick={(event) => event.stopPropagation()}>
               <div className={cn("viewer-stage", showDetails && "with-side")} data-viewer-empty>
-                {showDetails && active.type === "image" ? <header className="viewer-profile-summary" data-open-surface>
+                {/* The title, always (UI-PATTERNS › Action Placement): the profile, then where it is, when and how it was made. */}
+                <header className={cn("viewer-profile-summary", phone && "is-phone")} data-open-surface>
                   <strong>{profileTitle}</strong>
-                  {profileDetail ? <span>{profileDetail}</span> : null}
-                </header> : null}
+                  {phoneDetail ? <span>{phoneDetail}</span> : null}
+                </header>
                 <div
                   data-generation-size={`${active.width} × ${active.height}`}
                   className={cn("viewer-canvas", active.type === 'video' && 'is-video', viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging")}

@@ -103,7 +103,8 @@ for (const promptsOnly of [false]) {
   });
 }
 
-test('queued cards show each saved model', async ({ page }) => {
+test('queued cards show each saved model', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phone tiles show only their progress.');
   const items = ['First Model.safetensors', 'Second Model.safetensors'].map((model, index) => ({ id: `queued-${index}`, url: '', filename: '', type: 'image', status: 'pending', prompt: 'Queued image', model: 'fallback.safetensors', settings: { modelName: model }, createdAt: new Date().toISOString(), width: 512, height: 512 }));
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
@@ -111,7 +112,8 @@ test('queued cards show each saved model', async ({ page }) => {
   for (const item of items) await expect(page.locator(`[data-tile-id="${item.id}"] .generate-model`)).toHaveText(item.settings.modelName);
 });
 
-test('a running card names its profile beside Stop and holds still on hover', async ({ page }) => {
+test('a running card names its profile beside Stop and holds still on hover', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Phone tiles show only their progress.');
   const items = [{ id: 'running-0', jobId: 'job-0', url: '', filename: '', type: 'image', status: 'pending', prompt: 'Running image', model: 'flux1-schnell.safetensors', settings: { profileId: 'mock-flux-schnell', modelName: 'flux1-schnell.safetensors' }, progress: { value: 2, max: 4 }, createdAt: new Date().toISOString(), width: 512, height: 512 }];
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));

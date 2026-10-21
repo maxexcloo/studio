@@ -24,15 +24,13 @@ async function openLibrary(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Image & Model Library', exact: true }).click();
 }
 
-// The model choice is the phone's own picker on a phone and the studio's select on the desktop.
-async function chooseUseWith(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator, id: string, label: string | RegExp) {
-  if (await studioUi(page).isPhone()) { await dialog.getByLabel('Use With Model').selectOption(id); return; }
+// The model choice is the shared dropdown on both devices (UI-PATTERNS › Dropdowns).
+async function chooseUseWith(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator, _id: string, label: string | RegExp) {
   await dialog.getByRole('combobox', { name: 'Use With Model' }).click();
   await page.getByRole('option', { name: label }).click();
 }
 async function expectUseWith(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator, id: string, label: string) {
-  if (await studioUi(page).isPhone()) await expect(dialog.getByLabel('Use With Model')).toHaveValue(id);
-  else await expect(dialog.getByRole('combobox', { name: 'Use With Model' })).toContainText(label);
+  await expect(dialog.getByRole('combobox', { name: 'Use With Model' })).toContainText(label);
 }
 const statusPill = (page: import('@playwright/test').Page) => page.locator('[data-status-message]');
 

@@ -194,19 +194,16 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
     max(6px, env(safe-area-inset-left));
 }
 .phone-gallery .empty.stage-empty { min-height: calc(100dvh - 200px); }
-/* The phone bar carries the way back; the lock screen's own button would sit under it. */
-.phone-shell 
-/* Tiles: no corner buttons and no caption; a long press opens the actions. */
-.phone-shell .tile-caption { display: none; }
+/* Tiles: nothing over the picture but its state (progress, a failure, a selection
+   check); the caption shows only with Tile Captions on (GalleryTile.tsx). A long press starts selecting. */
 .tile.is-pressable,
 .tile.is-pressable img {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
-.tile-overlay.is-phone .tile-more,
-.tile-overlay.is-phone .tile-hover-actions { display: none; }
-.tile-overlay.is-phone .tile-upscale:not(.is-active, .is-running) { display: none; }
+.tile-overlay.is-phone .tile-upscale:not(.is-running) { display: none; }
+.tile-overlay.is-phone .tile-upscale { pointer-events: none; }
 
 /* -------------------------------------------------------------- Sheets */
 
@@ -731,25 +728,32 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   .viewer-phone-upscale.is-indeterminate .viewer-phone-upscale-ring { animation: none; opacity: .5; }
 }
 .viewer-phone-bar button.is-danger { color: var(--danger-ink); }
-/* The title, as on the desktop: the profile name and its settings, top left, clear of Star · Info · Close. */
+/* The title, in the top row beside Star · Info · Close and on their centre line: the profile
+   name, then the position, time and size. It never pushes Details or the picture down. */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));
-  left: max(10px, env(safe-area-inset-left));
+  left: max(12px, env(safe-area-inset-left));
   right: auto;
-  max-width: calc(100vw - 3 * (var(--dock-h) + 8px) - max(10px, env(safe-area-inset-left)) - max(10px, env(safe-area-inset-right)) - 4px);
-  min-height: var(--dock-h);
+  max-width: calc(100vw - 3 * (var(--dock-h) + 8px) - max(12px, env(safe-area-inset-left)) - max(10px, env(safe-area-inset-right)) - 4px);
+  height: var(--dock-h);
+  min-height: 0;
+  display: grid;
   align-content: center;
-  padding: 6px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-item);
-  background: var(--glass-bar-bg);
-  -webkit-backdrop-filter: var(--glass-bar-blur);
-  backdrop-filter: var(--glass-bar-blur);
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   font-size: 12px;
   line-height: 1.35;
 }
-.scrim .viewer-stage.with-side:has(.viewer-phone-bar) .viewer-profile-summary { display: none; }
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary strong { font-size: 14px; font-weight: 600; }
+.scrim .viewer-stage:has(.viewer-phone-bar) .viewer-profile-summary span { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+/* The viewer covers the gallery's top bar completely: nothing of it shows behind the corner buttons. */
+body:has(.phone-shell) .scrim { z-index: calc(var(--z-phone-bar) + 1); background: hsl(var(--background)); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-canvas { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-arrow { display: none; } /* swipe steps through */
 .scrim .viewer-stage:has(.viewer-phone-bar) .viewer-side { bottom: calc(96px + env(safe-area-inset-bottom)); }

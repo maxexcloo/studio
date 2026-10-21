@@ -141,7 +141,7 @@ test.describe('with a mouse', () => {
   });
 });
 
-test('the composer model menu stays within the composer, under its trigger', async ({ page, isMobile }) => {
+test('the composer model menu opens above its trigger, start-aligned and on screen', async ({ page, isMobile }) => {
   test.skip(isMobile, 'The phone uses its own model sheet.');
   await page.goto('/');
   await page.locator('.zen-prompt').getByRole('textbox', { name: 'Prompt', exact: true }).focus();
@@ -151,8 +151,11 @@ test('the composer model menu stays within the composer, under its trigger', asy
   // Measured once its opening scale has settled.
   await menu.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)));
   const [box, composer, trigger] = await Promise.all([menu.boundingBox(), page.locator('.zen-prompt').boundingBox(), page.locator('.zen-prompt .model-picker').boundingBox()]);
-  expect(box!.x).toBeGreaterThanOrEqual(composer!.x);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(composer!.x + composer!.width + 1);
-  // Right-aligned under its trigger, unless the composer is too narrow to allow it.
-  if (trigger!.x + trigger!.width - box!.width >= composer!.x + 8) expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThan(2);
+  const viewport = page.viewportSize()!;
+  expect(composer).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(trigger!.y + 1);
+  expect(box!.x).toBeGreaterThanOrEqual(7);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - 7);
+  // Start-aligned to its trigger, unless that would run off the screen (UI-PATTERNS › Surfaces).
+  expect(Math.abs(box!.x - Math.min(trigger!.x, viewport.width - 8 - box!.width))).toBeLessThan(2);
 });

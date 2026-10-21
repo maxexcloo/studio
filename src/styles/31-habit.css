@@ -288,60 +288,7 @@
 
 /* ------------------------------------------------------------------ Stars */
 
-/* A tile's star has the top right corner to itself: shown on hover, and
-   always once starred. The other quick actions move over to make room. */
-.tile-overlay { --star-room: 35px; }
-.tile-star {
-  --tile-ctl: 30px;
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 4;
-  width: var(--tile-ctl);
-  height: var(--tile-ctl);
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: var(--glass-bar-bg);
-  -webkit-backdrop-filter: var(--glass-bar-blur);
-  backdrop-filter: var(--glass-bar-blur);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), 0 2px 10px rgb(0 0 0 / .28);
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: auto;
-  transition: background var(--motion-fast), color var(--motion-fast), opacity var(--motion-base) var(--motion-ease);
-}
-.tile-star svg { display: block; width: 14px; height: 14px; }
-.tile-star:hover { background: rgb(10 10 10 / .78); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .26), 0 2px 10px rgb(0 0 0 / .32); }
-.tile-star.is-on { opacity: 1; color: var(--ember); }
-.tile-overlay:has(.tile-star) .tile-hover-actions { right: calc(8px + var(--star-room)); }
-@media (hover: hover) {
-  .tile-motion-wrap:hover .tile-star,
-  .tile-motion-wrap:focus-within .tile-star { opacity: 1; }
-  .tile-overlay:has(.tile-star) .tile-hover-actions { right: calc(2px + var(--star-room)); }
-}
-@media (hover: none) {
-  .tile-star { opacity: 1; }
-}
-@media (max-width: 760px) {
-  .tile-overlay { --star-room: 39px; }
-  .tile-star { --tile-ctl: 34px; top: 6px; right: 6px; }
-  .tile-star svg { width: 15px; height: 15px; }
-}
-@media (max-width: 480px) {
-  .tile-overlay:has(.tile-star) .tile-hover-actions { right: calc(6px + var(--star-room)); }
-}
-/* Touch phones in the full studio: More owns the corner, so only a set star shows, under it. */
-@media (hover: none) and (max-width: 620px) {
-  .tile-star:not(.is-on) { display: none; }
-  .tile-star { top: 48px; }
-}
-/* The phone studio: a set star is a mark; the long press is where it changes. */
-.tile-overlay.is-phone .tile-star:not(.is-on) { display: none; }
-.tile-overlay.is-phone .tile-star { top: 6px; right: 6px; pointer-events: none; }
+/* A tile's Star sits in its top row (04-gallery.css); once set it stays in view. */
 
 .viewer-dock .icon-button.viewer-star.is-on,
 .viewer-dock .icon-button.viewer-star.is-on:hover { color: var(--ember); }
@@ -351,6 +298,5 @@
 @media (prefers-reduced-motion: reduce) {
   .prompt-history-row,
   .prompt-history-icon,
-  .tile-star,
   .gallery-search { transition: none; }
 }

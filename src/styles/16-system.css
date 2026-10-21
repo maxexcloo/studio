@@ -22,8 +22,7 @@
 }
 .zen-prompt,
 .model-menu,
-.aspect-menu,
-.fluid-select-content {
+.aspect-menu {
   border: 1px solid var(--glass-border);
   background: var(--surface-grain), var(--glass-panel-bg);
   -webkit-backdrop-filter: var(--glass-panel-blur);
@@ -68,8 +67,7 @@
 /* Large surfaces carry the deep shadow, small ones the tight one. */
 .zen-prompt,
 .model-menu,
-.aspect-menu,
-.fluid-select-content { box-shadow: var(--glass-panel-shadow); }
+.aspect-menu { box-shadow: var(--glass-panel-shadow); }
 .studio-dock,
 .dock-chip,
 .zen-control-button,
@@ -79,11 +77,9 @@
 /* Radius = inner control radius + padding. The composer pads its 40px pills by 8. */
 .zen-prompt { border-radius: var(--r-panel); }
 .model-menu,
-.aspect-menu,
-.fluid-select-content { border-radius: var(--r-menu); }
+.aspect-menu { border-radius: var(--r-menu); }
 .model-option,
-.aspect-option,
-.fluid-select-content [role="option"] { border-radius: var(--r-item); }
+.aspect-option { border-radius: var(--r-item); }
 
 /* ------------------------------------------------------------- 2. The deck
    Docks are a 40px control plus 4px of glass: 48px pills, bottom-aligned with
@@ -175,8 +171,7 @@
   font-size: 13px;
 }
 .settings-modal input:not(.is-framed):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) { padding: 0 16px; }
-.settings-modal input:not(.is-framed):focus-visible,
-.fluid-select-trigger:focus-visible {
+.settings-modal input:not(.is-framed):focus-visible {
   border-color: var(--line-strong);
   box-shadow: none;
 }
@@ -271,14 +266,14 @@
 
 /* ---------------------------------------------------------- 8. Tile controls
    The small buttons on a gallery tile's corners: the upscale arrow top left,
-   download, copy and delete top right. The only rules for them live here:
+   the item's actions in one row top right (itemActions.ts › tile). The only rules for them live here:
    true circles, one size per breakpoint, glass that reads on any image, and
    solid amber when the upscale is showing. */
 
 .tile-upscale,
 .tile-hover-actions .tile-icon,
 .tile-hover-actions .tile-delete {
-  --tile-ctl: 30px;
+  --tile-ctl: 32px;
   position: relative;
   z-index: 4;
   width: var(--tile-ctl);
@@ -310,10 +305,10 @@
 /* One set of states for every tile corner control: hover darkens the glass at
    --motion-fast, a press darkens it further (the shared press overlay) without
    moving, and the keyboard ring follows the circle. */
-.tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more) {
+.tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete) {
   transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), opacity var(--motion-base) var(--motion-ease);
 }
-.tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more):focus-visible { outline: 2px solid var(--icon-ring); outline-offset: 2px; }
+.tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete):focus-visible { outline: 2px solid var(--icon-ring); outline-offset: 2px; }
 
 /* Upscale: top left, hidden until the tile is hovered unless it is doing or showing something. */
 .tile-upscale { position: absolute; top: 8px; left: 8px; opacity: 0; }
@@ -356,14 +351,15 @@
 .tile-upscale.is-indeterminate .tile-upscale-ring circle { transition: none; }
 @keyframes upscale-ring-spin { from { rotate: -90deg; } to { rotate: 270deg; } }
 
+/* Each circle keeps a 40px target: 4px of reach around the 32px glass. */
+.tile-hover-actions :is(.tile-icon, .tile-delete)::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: var(--r-pill);
+}
 @media (max-width: 760px) {
-  .tile-upscale,
-  .tile-hover-actions .tile-icon,
-  .tile-hover-actions .tile-delete { --tile-ctl: 34px; }
   .tile-upscale { top: 6px; left: 6px; }
-  .tile-upscale svg,
-  .tile-hover-actions .tile-icon svg,
-  .tile-hover-actions .tile-delete svg { width: 15px; height: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tile-upscale.is-indeterminate .tile-upscale-ring { animation: none; opacity: .5; }

@@ -67,3 +67,37 @@ test('model menus show profile details without recent sections or discovery foot
   }
   await expect(menu.getByRole('button', { name: 'Browse Models', exact: true })).toHaveCount(0);
 });
+
+// UI-PATTERNS › Pickers: one heading row. Title, filters, search and Close share one centre line,
+// and the search grows leftwards from its icon inside that row without moving anything vertically.
+test('the model chooser heading keeps its filters, search and Close on one centre line', async ({ page }) => {
+  await page.goto('/');
+  const ui = studioUi(page);
+  const menu = await ui.openModelPicker();
+  const heading = menu.locator('.reference-popover-head').first();
+  const centres = () => heading.evaluate((head) => {
+    const parts = [...head.querySelectorAll<HTMLElement>('.surface-title, .picker-view .picker-dropdown-trigger, .model-filters button, .picker-search-toggle, .picker-search-field > *, .reference-popover-close')]
+      .filter((element) => element.getBoundingClientRect().height > 0)
+      .map((element) => { const box = element.getBoundingClientRect(); return box.top + box.height / 2; });
+    return { spread: Math.max(...parts) - Math.min(...parts), count: parts.length };
+  });
+  // Measured once the opening scale has settled.
+  await expect.poll(async () => (await centres()).spread).toBeLessThanOrEqual(1);
+  const before = await centres();
+  expect(before.count).toBeGreaterThanOrEqual(3);
+  // The entry scale has finished once the heading's height holds still.
+  const settled = async () => { let last = -1; await expect.poll(async () => { const next = (await heading.boundingBox())!.height; const same = Math.abs(next - last) < 0.1; last = next; return same; }, { intervals: [120] }).toBe(true); return last; };
+  const height = await settled();
+  await menu.getByRole('button', { name: 'Search Models', exact: true }).click();
+  await expect(menu.getByRole('combobox', { name: 'Search Models' }).or(menu.getByRole('textbox', { name: 'Search Models' })).first()).toBeFocused();
+  await expect.poll(async () => (await centres()).spread).toBeLessThanOrEqual(1);
+  expect((await centres()).count).toBeGreaterThan(before.count - 1);
+  expect(Math.abs((await settled()) - height)).toBeLessThanOrEqual(1);
+  // On the desktop the field sits inside the row, before Close Search, not on a row of its own.
+  if (!await ui.isPhone()) {
+    const field = await menu.locator('.picker-search-field').boundingBox();
+    const close = await menu.getByRole('button', { name: 'Close Search', exact: true }).boundingBox();
+    expect(field!.x + field!.width).toBeLessThanOrEqual(close!.x + 1);
+    expect(Math.abs((field!.y + field!.height / 2) - (close!.y + close!.height / 2))).toBeLessThanOrEqual(1);
+  }
+});

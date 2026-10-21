@@ -183,13 +183,17 @@
 .tile-action { padding: 4px 9px; }
 .tile-action:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
 
+/* A desktop tile's top row (GalleryTile.tsx tileRow): 32px glass circles on a
+   40px pitch, in the viewer bar's order, a little more room between intent
+   groups. The circles reveal one by one so a set Star stays visible in its slot. */
 .tile-hover-actions {
   position: absolute; top: 8px; right: 8px;
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3);
-  opacity: 0;
-  transition: opacity var(--motion-base) var(--motion-ease);
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4);
   pointer-events: none;
 }
+.tile-hover-actions > * { opacity: 0; transition: opacity var(--motion-base) var(--motion-ease); }
+.tile-hover-actions > .starts-group { margin-left: var(--space-2); }
+.tile-hover-actions > .is-star.is-on { opacity: 1; color: var(--accent-amber); }
 
 /* Box styling is shared with .tile-hover-actions above; only placement here. */
 /* --primary is near-white here, so an active state must flip the ink too. */
@@ -198,13 +202,13 @@
 /* The controls sit in .tile-overlay, a sibling of the tile's button, so the
    reveal keys off the wrapper that holds both. */
 @media (hover: hover) {
-  .tile-motion-wrap:hover .tile-hover-actions,
-  .tile-motion-wrap:focus-within .tile-hover-actions {
+  .tile-motion-wrap:hover .tile-hover-actions > *,
+  .tile-motion-wrap:focus-within .tile-hover-actions > * {
     opacity: 1;
   }
 }
 @media (hover: none) {
-  .tile-hover-actions { opacity: 1; }
+  .tile-hover-actions > * { opacity: 1; }
 }
 .tile-overlay .tile-action { opacity: 1; }
 /* A running tile's profile: the Stop chip's look in the opposite corner, inert so hover passes to the tile. */

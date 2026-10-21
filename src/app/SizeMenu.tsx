@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
+import { Check, Link2, Pencil, RotateCcw, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMotionTween } from '@/lib/springs';
 import { aspectIconStyle, cn } from './format';
@@ -346,7 +346,7 @@ export function MegapixelField({ current, control, custom }: {
     <div className="size-mp">
       <span className="size-mp-label">
         Megapixels
-        {set ? <button type="button" className="size-mp-reset" onClick={control.onReset}>Reset</button> : <small>{custom ? "this size" : "as the model draws"}</small>}
+        <small>{custom ? "this size" : set ? "every shape" : "as the model draws"}</small>
       </span>
       <div className={cn("size-field size-mp-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
         <input
@@ -371,6 +371,10 @@ export function MegapixelField({ current, control, custom }: {
           <span className="size-field-key" {...handlers} aria-hidden="true">MP</span>
         </Tip>
       </div>
+      {/* Its slot is always there, so the field never moves when Reset comes and goes. */}
+      <span className="size-mp-reset-slot">
+        {set ? <Tip content="Reset Megapixels to the Model's Own"><button type="button" className="size-mp-reset" aria-label="Reset Megapixels" onClick={control.onReset}><RotateCcw size={14} aria-hidden="true" /></button></Tip> : null}
+      </span>
     </div>
   );
 }

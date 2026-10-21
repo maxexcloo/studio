@@ -1,5 +1,6 @@
-import { PickerTools } from './PickerTools';
-import { CatalogueFilters } from './CatalogueFilters';
+import { PickerTools, SelectedTick, SurfaceHeadingContext, useSurfaceHeadingSlot } from './PickerTools';
+export { SelectedTick } from './PickerTools';
+import { CatalogueFilters, catalogueViews } from './CatalogueFilters';
 import { modelFamily, modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import React, { lazy, Suspense, memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -7,7 +8,8 @@ import { VideoPreview } from './VideoPreview';
 import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
 import { Brush, Check, ChevronDown, ImagePlus, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
-import { Select as FluidSelect, SelectContent as FluidSelectContent, SelectItem as FluidSelectItem, SelectTrigger as FluidSelectTrigger } from '@/components/ui/select';
+import { Dropdown } from './Dropdown';
+import { anchoredPlacement } from './composerSurface';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { EmptyState } from './EmptyState';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -99,20 +101,10 @@ export function GallerySkeleton({ columns }: { columns: number }) {
   ));
 }
 
-export function StudioSelect({ value, onChange, options, ariaLabel, side }: { value: string; onChange: (value: string) => void; options: Array<string | { label: string; value: string }>; ariaLabel?: string; side?: 'top' | 'bottom' }) {
+/** A filled dropdown for forms and Settings (UI-PATTERNS › Dropdowns): the shared Dropdown. */
+export function StudioSelect({ value, onChange, options, ariaLabel }: { value: string; onChange: (value: string) => void; options: Array<string | { label: string; value: string }>; ariaLabel?: string; /** Unused: the menu places itself (anchoredPlacement). */ side?: 'top' | 'bottom' }) {
   const normalized = options.map((option) => typeof option === "string" ? { label: option, value: option } : option);
-  return (
-    <FluidSelect value={value} onValueChange={onChange}>
-      <FluidSelectTrigger className="fluid-select-trigger" placeholder="Select" aria-label={ariaLabel} />
-      <FluidSelectContent className="fluid-select-content" side={side}>
-        {normalized.map((item, index) => (
-          <FluidSelectItem key={item.value} index={index} value={item.value}>
-            {item.label}
-          </FluidSelectItem>
-        ))}
-      </FluidSelectContent>
-    </FluidSelect>
-  );
+  return <Dropdown label={ariaLabel || "Choose"} value={value} options={normalized} onChange={onChange} variant="field" placeholder="Select" />;
 }
 
 export function Tip({ content, side, forceOpen, children }: { content: React.ReactNode; side?: "top" | "right" | "bottom" | "left"; /** false keeps it shut, e.g. while a tooltip inside it speaks instead. */ forceOpen?: boolean; children: React.ReactElement }) {
@@ -362,8 +354,9 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
   const previewLabel = captionFor(previewRow);
 
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  // While the menu is open the trigger keeps the width it opened at: its label changes as you
-  // type a size ("1:1" → "1.6:1"), and a wider button would shift the bar, and the menu with it.
+  // While the menu is open the trigger never narrows below the width it opened at: its label
+  // changes as you type a size ("1:1" → "1.6:1"), and a narrower button would shift the bar, and
+  // the menu with it. It may grow (it never cuts its label short); its face is held too, below.
   const [heldWidth, setHeldWidth] = useState<number | null>(null);
   React.useLayoutEffect(() => {
     // The exact width, rounded up: offsetWidth rounds down, and a label a fraction too wide would show "…".
@@ -395,7 +388,7 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
 
   return (
     <div className={cn("aspect-picker", density !== "full" && `is-density-${density}`)} ref={pickerRef} data-open-surface={open || undefined}>
-      <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { width: heldWidth } : undefined} aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
+      <Tip content={density === "full" ? `Size: ${what}` : `Size: ${what}`}><button ref={triggerRef} type="button" data-open-trigger className={cn("aspect-trigger", heldWidth !== null && "is-held")} style={heldWidth ? { minWidth: heldWidth } : undefined} aria-label={`Size: ${what}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((next) => !next)}>
           {/* The shape drawn to fit an 18 × 14 box, so every ratio sits in the same slot. */}
           <span className="aspect-shape-slot">
             <span className="aspect-shape" style={triggerShapeStyle(face.width, face.height)} />
@@ -529,6 +522,8 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
   useDismiss(pickerRef, open, close);
   const searchable = profiles.length > 0;
   const menuId = React.useId();
+  // One heading row like the other pickers: the title, the filters, search and Close.
+  const heading = useSurfaceHeadingSlot('Models', false);
 
   React.useLayoutEffect(() => {
     if (!open) return;
@@ -536,24 +531,19 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
       const anchor = pickerRef.current?.getBoundingClientRect();
       const surface = menuRef.current;
       if (!anchor || !surface) return;
-      // Inside the composer the menu stays within it, right-aligned under its trigger, like the
-      // composer's other pickers; elsewhere it keeps to the screen.
-      const host = pickerRef.current?.closest('.zen-prompt')?.getBoundingClientRect();
-      const bounds = host ? { left: host.left + 8, right: host.right - 8 } : { left: 16, right: window.innerWidth - 16 };
-      const width = Math.min(520, window.innerWidth - 32, bounds.right - bounds.left);
-      const above = anchor.top - 16;
-      const below = window.innerHeight - anchor.bottom - 16;
-      const upward = compact ? above >= Math.min(320, below) : below < Math.min(320, above);
-      const left = host ? Math.max(bounds.left, Math.min(anchor.right - width, bounds.right - width)) : Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16));
+      // Above the button that opened it, start-aligned and kept on screen (UI-PATTERNS › Surfaces);
+      // below it where there is no room above.
+      const at = anchoredPlacement(anchor, { width: 460, minWidth: 320, maxWidth: 520, minHeight: 320, maxHeight: 560 });
       Object.assign(surface.style, {
         position: 'absolute',
-        width: `${width}px`,
+        width: `${at.width}px`,
         minWidth: '0',
-        left: `${left - anchor.left}px`,
+        left: `${at.left - anchor.left}px`,
         right: 'auto',
-        top: upward ? 'auto' : 'calc(100% + 8px)',
-        bottom: upward ? 'calc(100% + 8px)' : 'auto',
-        maxHeight: `${Math.min(560, Math.max(0, upward ? above : below))}px`,
+        top: at.upward ? 'auto' : 'calc(100% + 8px)',
+        bottom: at.upward ? 'calc(100% + 8px)' : 'auto',
+        maxHeight: `${at.maxHeight}px`,
+        transformOrigin: at.transformOrigin,
       });
     };
     position();
@@ -624,18 +614,19 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
         </button></Tip>
       {presence.mounted ? (
         <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
+          <header className="reference-popover-head model-menu-head"><strong className="surface-title">Models</strong><span ref={heading.ref} className="surface-head-slot" /><button type="button" className="reference-popover-close" aria-label="Close Models" onClick={close}><X size={16} /></button></header>
           {profiles.length ? null : (
             <EmptyState title="No Models Yet" action={onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}>
               {emptyHint || "No usable models in ComfyUI yet."}
             </EmptyState>
           )}
-          {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" search={searchable ? (<label className="model-menu-search picker-search">
+          {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">
               <Search size={14} aria-hidden="true" />
               <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
             </label>) : undefined}>
             <CatalogueFilters value={filters} onChange={setFilters} />
-          </PickerTools> : null}
+          </PickerTools></SurfaceHeadingContext.Provider> : null}
           {profiles.length ? (
             <div id={menuId} className="model-menu-list" ref={listRef} role="listbox" aria-label="Models" tabIndex={-1} aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined}>
               {sections.map((section) => (
@@ -657,7 +648,6 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                             className={cn("model-option", profile.id === value && "active", rowIndex === cursor && "is-cursor")}
                             onClick={() => pick(profile.id)}
                           >
-                            {profile.id === value ? <Check className="model-selection-tick" size={15} aria-hidden="true" /> : null}
                             <span className="model-copy">
                               <strong>{modelName(profile).name}</strong>
                               {setupNote(profile) ? <em className="is-setup">{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(" · ")}</em> : (
@@ -665,6 +655,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                               )}
                             </span>
                             <span className="model-tags"><ModelAbilities profile={profile} showInpaint={showInpaint} onHover={(hovering) => setAbilityRow(hovering ? `${section.id}:${profile.id}` : "")} />{badge ? <span className="model-badge">{badge}</span> : null}</span>
+                            <SelectedTick on={profile.id === value} className="model-selection-tick" />
                           </button></Tip>
                         {menu ? (
                           <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from Favourites` : `Add ${profile.displayName || profile.label} to Favourites`} onClick={() => menu.toggleFavorite(profile.id)}>

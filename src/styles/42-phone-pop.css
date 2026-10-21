@@ -72,24 +72,38 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 
 /* -------------------------------------------------------------- The Create sheet */
 
-/* History, Select All and Clear stand at the middle of the field's right edge, close together. */
-.create-prompts .composer-prompt-field { padding-right: 44px; }
+/* History, Select All and Clear: one row at the field's top right, centred on the first line of
+   text, which runs beside it (a textarea cannot wrap under it). The row has room for one more
+   action. Every icon is the same quiet button: the global press, --control-hover, amber only
+   while its surface is open. */
+.create-prompts {
+  --prompt-pad: 12px;
+  --prompt-line: calc(16px * 1.45);
+  --prompt-tool-w: 36px;
+  --prompt-tool-h: 40px;
+}
+.create-prompts .is-negative { --prompt-line: calc(15px * 1.45); --prompt-pad: 11px; }
 .create-prompts .composer-field-tools,
 .create-prompts .is-negative .composer-field-tools {
   position: absolute;
-  top: 50%;
-  right: 2px;
+  top: calc(var(--prompt-pad) + var(--prompt-line) / 2 - var(--prompt-tool-h) / 2);
+  right: var(--space-1);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   align-self: auto;
   gap: 0;
   padding: 0;
-  transform: translateY(-50%);
+  transform: none;
 }
-.create-prompts .composer-field-tools .prompt-action { width: 40px; height: 36px; border-radius: var(--r-pill); }
-.create-prompts .is-negative .composer-field-tools { flex-direction: row; }
-.create-prompts .is-negative { padding-right: 84px; }
-.create-prompts .is-negative .composer-field-tools .prompt-action { width: 40px; height: 40px; }
+.create-prompts .composer-field-tools .prompt-action,
+.create-prompts .is-negative .composer-field-tools .prompt-action { width: var(--prompt-tool-w); height: var(--prompt-tool-h); border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); }
+.create-prompts .composer-field-tools .prompt-action > svg { width: var(--icon-sm); height: var(--icon-sm); }
+.create-prompts .composer-field-tools .prompt-action:is(.active, [aria-expanded="true"]) { background-color: var(--selected-bg); color: var(--selected-ink); }
+/* The text keeps clear of the row: three actions on the prompt, two on Negative. */
+.create-prompts .composer-prompt-field { padding-right: 0; }
+.create-prompts .composer-prompt-field textarea { padding-right: calc(3 * var(--prompt-tool-w) + var(--space-3)) !important; }
+.create-prompts .is-negative textarea { padding-right: calc(2 * var(--prompt-tool-w) + var(--space-3)) !important; }
 .create-prompts .is-negative .prompt-select-all { display: none; }
 .create-prompts .is-fill textarea { padding-bottom: 12px; }
 
@@ -105,7 +119,7 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .create-footer-tune .create-tune { display: flex; flex: 1; align-items: center; justify-content: space-between; min-width: 0; height: 44px; padding: 0 2px 0 14px; border-radius: var(--r-pill); background: var(--well); }
 .create-footer-tune .create-tune .number-picker-label { flex: 1; color: hsl(var(--muted-foreground)); font-size: 13px; }
 .create-footer .composer-mode-select { flex: none; }
-.create-footer .composer-mode-select button { min-height: 40px; min-width: 44px; }
+.create-footer .composer-mode-select button { min-height: var(--control-h-touch); min-width: var(--control-h-touch); }
 
 /* Advanced Settings and Back to Recommended. */
 .list-row.list-row-action { justify-content: flex-start; gap: var(--space-4); width: 100%; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; }
@@ -117,13 +131,13 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-bar.is-selecting .phone-bar-row { gap: var(--space-1); }
 .phone-bar-title { min-width: 0; overflow: hidden; padding-left: 2px; font-size: 16px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; }
 .phone-heading-name { padding-right: 4px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
-/* Images | Videos: two icons in the middle of the bar, glass-bar icon buttons whose fill is a
+/* Images | Videos: two icons at the prompt bar's left end, glass-bar icon buttons whose fill is a
    36px circle inside the 44px target; the chosen one takes the selected fill. */
-.phone-bar .phone-gallery-mode.media-mode-toggle { position: absolute; left: 50%; top: 50%; translate: -50% -50%; gap: var(--space-1); }
-.phone-bar .phone-gallery-mode button { width: var(--control-h-touch); min-width: var(--control-h-touch); height: var(--control-h-touch); padding: 4px; border-radius: var(--r-pill); background-clip: content-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
-.phone-bar .phone-gallery-mode button > svg { width: var(--icon-touch); height: var(--icon-touch); }
-.phone-bar .phone-gallery-mode button[aria-pressed="true"] { color: var(--selected-ink); background-color: var(--selected-bg); }
-.phone-bar .phone-gallery-mode button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { gap: var(--space-1); margin-left: -4px; }
+.phone-prompt-bar .phone-gallery-mode button { width: var(--control-h-touch); min-width: var(--control-h-touch); height: var(--control-h-touch); padding: 4px; border-radius: var(--r-pill); background-clip: content-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+.phone-prompt-bar .phone-gallery-mode button > svg { width: var(--icon-touch); height: var(--icon-touch); }
+.phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { color: var(--selected-ink); background-color: var(--selected-bg); }
+.phone-prompt-bar .phone-gallery-mode button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; }
 /* A message takes the middle: between "Studio" and the tools, its words centred, as tall as the bar's controls. */
 .phone-bar-row.has-message .phone-bar-gap { display: none; }
 .status-pill.is-bar { flex: 1 1 auto; justify-content: center; height: var(--bar-pill-h); margin: 0 4px; }
@@ -172,12 +186,8 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 
 /* Search's close inside its field; the filters' Clear at the end of their row, styled like them. */
 .phone-tools-field .phone-tools-close { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin-right: -8px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); }
-.phone-filter-row .phone-filter-clear { display: inline-flex; align-items: center; gap: var(--space-3); border: 0; color: hsl(var(--foreground)); }
-/* Too narrow to centre Images | Videos clear of the tools: they follow "Studio" instead. */
-@media (max-width: 389px) {
-  .phone-bar .phone-gallery-mode.media-mode-toggle { position: static; translate: none; margin-left: 2px; }
-  .phone-bar .phone-gallery-mode button { width: 40px; min-width: 40px; }
-}
+/* Clear: a round ghost icon button, like the Create footer's Clear All. */
+.phone-filter-row .gallery-filter-select.phone-filter-clear { display: inline-grid; place-items: center; width: var(--control-h-touch); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); }
 .create-footer-tune .create-tune { gap: 0; padding-left: 12px; }
 /* 44 px targets like every phone control; the value between them stays narrow. */
 .create-footer-tune .create-tune .number-picker-btn { width: 44px; min-width: 44px; height: 44px; }
@@ -255,28 +265,21 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-create.is-text-focus .create-flow { min-height: 100%; height: 100%; }
 .phone-create.is-text-focus .create-prompts { flex: 1 1 auto; min-height: 0; }
 .phone-create.is-text-focus .composer-prompt-field:not(.is-text-focused) { display: none; }
-.create-prompts .composer-prompt-field.is-text-focused { flex: 1 1 auto; flex-direction: column; min-height: 0; padding-right: 0; border-color: var(--line-strong); }
-.create-prompts .composer-prompt-field.is-text-focused textarea { order: 2; flex: 1 1 auto; height: auto !important; min-height: 0; max-height: none; overflow-y: auto; padding: 6px 14px 12px !important; }
-.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools {
-  position: static;
-  order: 1;
-  flex-direction: row;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 4px 4px 0;
-  transform: none;
-}
-.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools .prompt-action { width: 44px; height: 44px; }
-.create-prompts .composer-prompt-field.is-text-focused .prompt-select-all { display: inline-grid; }
+/* Focused: just the text, filling the room above the keyboard, with no box or border, the normal
+   padding, and the same row at the top right (44 px targets) ending in Done. */
+.create-prompts .composer-prompt-field.is-text-focused { --prompt-tool-w: 40px; --prompt-tool-h: 44px; flex: 1 1 auto; flex-direction: column; min-height: 0; border-color: transparent; background: transparent; }
+.create-prompts .composer-prompt-field.is-text-focused textarea { flex: 1 1 auto; height: auto !important; min-height: 0; max-height: none; overflow-y: auto; padding-top: var(--prompt-pad) !important; padding-bottom: var(--prompt-pad) !important; padding-right: calc(3 * var(--prompt-tool-w) + 72px) !important; }
+.create-prompts .is-negative.is-text-focused textarea { padding-right: calc(3 * var(--prompt-tool-w) + 72px) !important; }
+.create-prompts .composer-prompt-field.is-text-focused .composer-field-tools { gap: 0; }
+.create-prompts .composer-prompt-field.is-text-focused .prompt-select-all { display: inline-flex; }
 .create-prompts .composer-prompt-field.is-text-focused .composer-field-tools .prompt-action.prompt-done {
   order: 9;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: auto;
-  margin-left: 4px;
-  padding: 0 14px;
+  margin-left: var(--space-2);
+  padding: 0 12px;
   border-radius: var(--r-pill);
   background: hsl(var(--foreground));
   color: hsl(var(--background));
@@ -315,10 +318,10 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 /* While a field is focused nothing else shows, not even the page's bars under the sheet. */
 html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidden; }
 
-/* Keep the gallery modes centred and Select at the right edge on small phones. */
-.phone-heading { flex: none; }
+/* "Studio" and the status light share one line, centred on the bar; the tools keep the right edge. */
+.phone-heading { flex: none; height: var(--bar-h); }
+.phone-heading-name { line-height: 1; }
 .phone-heading .phone-running-inline { width: 32px; min-width: 32px; margin-left: -4px; padding: 0; gap: var(--space-1); font-size: 10px; }
-.phone-select-trigger { font-size: 12px; width: 48px; flex-shrink: 0; }
 @media (max-width: 379px) { .phone-heading-name { display: none; } }
 .details-copy-actions { margin-left: auto; min-width: 0; }
 .details-copy-actions .details-footer-row { display: flex; gap: var(--space-2); }
@@ -347,16 +350,5 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
   visibility: hidden;
 }
 
-/* The optional image summary belongs to Details and stays over the uncovered preview. */
-.scrim .viewer-stage.with-side:has(.viewer-phone-bar) .viewer-profile-summary {
-  display: grid;
-  top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 10px);
-  max-width: calc(100vw - 32px);
-  min-height: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-}
-
-.scrim .viewer-stage:has(.viewer-phone-bar):has(.viewer-profile-summary) .viewer-side { top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 70px); }
 /* Details' LoRA row is the box already: its information sits inside without a second card. */
 .detail-lora .lora-info-panel { padding: 4px 0 2px; border: 0; background: transparent; }

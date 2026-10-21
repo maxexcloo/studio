@@ -1,4 +1,5 @@
 import { cn } from './format';
+import type { PickerViews } from './PickerTools';
 import { scrollSideways, useWheelRef } from './wheel';
 
 export type CatalogueFilter = { favourites: boolean; speed: '' | 'standard' | 'flash' };
@@ -18,4 +19,24 @@ export function CatalogueFilters({ value, onChange }: { value: CatalogueFilter; 
       {button('Quality', value.speed === 'standard', { ...value, speed: value.speed === 'standard' ? '' : 'standard' }, 'Full sampling recipes')}
     </span>
   </div>;
+}
+
+/**
+ * The same filters for a phone picker's heading dropdown: All, then
+ * Favourites, Fast and Quality as ticks that combine (Fast and Quality take
+ * turns), so the menu stays open while choosing.
+ */
+export function catalogueViews(value: CatalogueFilter, onChange: (value: CatalogueFilter) => void): PickerViews {
+  const parts = [value.favourites && 'Favourites', value.speed === 'flash' && 'Fast', value.speed === 'standard' && 'Quality'].filter(Boolean) as string[];
+  return {
+    label: 'Filter Models',
+    current: parts.length ? parts.join(', ') : 'All',
+    multi: true,
+    options: [
+      { id: 'all', label: 'All', checked: !value.favourites && !value.speed, onSelect: () => onChange(emptyCatalogueFilter) },
+      { id: 'favourites', label: 'Favourites', checked: value.favourites, onSelect: () => onChange({ ...value, favourites: !value.favourites }) },
+      { id: 'fast', label: 'Fast', checked: value.speed === 'flash', onSelect: () => onChange({ ...value, speed: value.speed === 'flash' ? '' : 'flash' }) },
+      { id: 'quality', label: 'Quality', checked: value.speed === 'standard', onSelect: () => onChange({ ...value, speed: value.speed === 'standard' ? '' : 'standard' }) },
+    ],
+  };
 }

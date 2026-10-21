@@ -217,27 +217,6 @@ input.is-framed:focus-visible {
 .select select { border: 0; padding-left: 0; padding-right: 0; appearance: none; background: transparent; min-width: 0; min-height: 34px; }
 .select svg { color: hsl(var(--muted-foreground)); }
 
-.fluid-select-trigger {
-  min-width: 0 !important;
-  width: 100%;
-  height: var(--control-h) !important;
-  border: 1px solid transparent !important;
-  background: var(--well) !important;
-  border-radius: var(--r-pill) !important;
-  padding: 0 14px 0 16px !important;
-  font-size: 13px !important;
-  color: hsl(var(--foreground)) !important;
-  transition: background-color var(--motion-fast) var(--motion-ease) !important;
-}
-.fluid-select-trigger:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--well) !important; }
-.fluid-select-trigger > span { min-width: 0; }
-.fluid-select-content {
-  border: 1px solid var(--glass-border) !important;
-  background: hsl(var(--popover)) !important;
-  border-radius: var(--r-menu) !important;
-  padding: 4px !important;
-  box-shadow: var(--shadow-lg) !important;
-}
 
 .aspect-picker, .model-picker { position: relative; min-width: 0; }
 

@@ -1,6 +1,6 @@
-import { PickerTools } from './PickerTools';
+import { PickerTools, SelectedTick } from './PickerTools';
 import { PromptField } from './PromptField';
-import { CatalogueFilters } from './CatalogueFilters';
+import { CatalogueFilters, catalogueViews } from './CatalogueFilters';
 import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -12,7 +12,7 @@ import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useMotionTween } from '@/lib/springs';
 import { popoverMotion, useSettling } from './composerSurface';
-import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, ListRestart, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Images } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, Eraser, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
 import { Sheet } from './Sheet';
@@ -207,21 +207,21 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
           </div>
         ) : (
           <div className={cn('phone-bar-row', message && 'has-message')}>
-            {/* Left: status or running jobs share one slot beside Menu and "Studio". */}
+            {/* Left: the status light (or running jobs) and "Studio" on one line. */}
             <div className={cn('phone-heading', restarting ? 'is-restarting' : connected ? 'is-connected' : comfyStatus?.checked ? 'is-offline' : 'is-checking')}>
               {runningCount ? <button type="button" className="phone-running-inline" aria-label={runningLabel} aria-haspopup="menu" aria-expanded={runningOpen} title={runningLabel} onClick={() => setRunningOpen((value) => !value)}>
                 <LoaderCircle size={14} className="spin" aria-hidden="true" /><span>{runningCount}</span>
               </button> : <button type="button" className="phone-heading-light" aria-label={`${statusText}. Check Again`} title={statusText} onClick={retryComfyStatus}><span /></button>}
-              <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button><span className="phone-heading-name">Studio</span>
+              <span className="phone-heading-name">Studio</span>
             </div>
-            {/* Centre: Images | Videos as two icons; a message takes the slot for a moment (UI-PATTERNS › Messages). */}
-            {message ? <StatusPill message={message} className="is-bar" /> : <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />}
+            {/* Centre: empty unless a message shows (UI-PATTERNS › Messages). */}
+            {message ? <StatusPill message={message} className="is-bar" /> : <span className="phone-bar-gap" />}
             {/* A question takes the whole row but "Studio": its answers need the room, and nothing else applies until it is answered. */}
             {message?.confirm ? null : <>
-            <span className="phone-bar-gap" />
+            <button type="button" className="phone-icon phone-select-trigger" aria-label="Select" disabled={!selectable.length} onClick={startSelecting}><CheckSquare size={20} /></button>
             <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
-            <button type="button" className="phone-icon phone-select-trigger" disabled={!selectable.length} onClick={startSelecting}>Select</button>
+            <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
             </>}
           </div>
         )}
@@ -249,6 +249,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
       {!selecting ? (
         // The collapsed prompt bar (UI-PATTERNS › Phone): the prompt on one line, which opens Create, and Generate.
         <div ref={dockRef as unknown as React.RefObject<HTMLDivElement>} className={cn('phone-prompt-bar', prompt.trim() && 'has-draft', pending.length > 0 && 'is-working')}>
+          {/* The gallery's Images | Videos, at the bar's left end. */}
+          <MediaModeToggle kind="gallery" className="phone-gallery-mode" mode={mode} onChange={changeMode} tips={false} />
           <button type="button" className="phone-create-open phone-prompt-open" aria-label={prompt.trim() ? `Create: ${prompt.trim().slice(0, 80)}` : 'Create'} onClick={() => setCreateOpen(true)}>
             <span className="phone-prompt-text">{prompt.trim() || (mode === 'video' ? 'Describe a video…' : 'Describe an image…')}</span>
           </button>
@@ -355,7 +357,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           ) : null}
           <div className="create-footer">
             <ComposerModeSelect mode={mode} onChange={view.changeMode} tips={false} />
-            <button type="button" className="phone-icon create-reset" aria-label="Reset Creation" title="Reset Creation" onClick={view.resetCreation}><ListRestart size={19} /></button>
+            <button type="button" className="phone-icon create-reset" aria-label="Clear All" aria-description="Clears the prompt, negative prompt, references and LoRAs" onClick={view.resetCreation}><Eraser size={20} /></button>
             <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-description={(generateDisabled && prompt.trim() ? generateDisabledReason : estimate) || undefined} aria-disabled={blocked || undefined} onClick={go}>
               {restarting || comfyOffline ? <RefreshCw size={18} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={18} strokeWidth={2.4} />}
               <span>{restarting ? 'Restarting' : comfyOffline ? 'Check Again' : 'Generate'}</span>
@@ -447,7 +449,7 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
     <div key={profile.id} className={cn('list-row model-pop-row', profile.id === model && 'is-selected')}>
       <button type="button" className="model-pop-pick" aria-current={profile.id === model || undefined} onClick={() => { pickModel(profile.id); onPicked(); }}>
         <span className="model-pop-name">{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
-        <Check size={17} className={cn('list-row-end list-row-check', profile.id !== model && 'is-off')} aria-hidden="true" />
+        <SelectedTick on={profile.id === model} className="list-row-end" />
       </button>
       {menu ? (
         <button type="button" className={cn('picker-star', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
@@ -460,7 +462,7 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
     <>
       <div className="phone-model-tools">
         {recipes.length ? <ListItem label="Recipe"><ListSelect native label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
-        {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" search={<label className="picker-search">
+        {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={<label className="picker-search">
             <Search size={16} aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
             {query ? <button type="button" aria-label="Clear Model Search" onClick={() => setQuery('')}><X size={14} /></button> : null}

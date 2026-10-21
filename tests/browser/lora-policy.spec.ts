@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { studioUi, pickerSearch } from './helpers/ui';
+import { expectPickerView, pickerSearch, pickerView, studioUi } from './helpers/ui';
 
 test('optional LoRAs show unverified variants and expose full published strength bounds', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -16,29 +16,33 @@ test('optional LoRAs show unverified variants and expose full published strength
   await page.goto('/');
   const composer = await studioUi(page).openComposer();
   await composer.getByRole('button', { name: /^LoRAs/ }).click();
-  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
-  // Search stays behind its icon until asked for (UI-PATTERNS › Pickers).
+  // The views, Stacks, Clear and search sit in the surface's heading (UI-PATTERNS › Pickers).
+  const picker = page.getByRole('dialog', { name: 'LoRAs', exact: true });
+  // Search stays behind its icon until asked for.
   await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toHaveCount(0);
   await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
   await expect(picker.getByText('Uses file metadata.', { exact: false })).toHaveCount(0);
-  await expect(picker.getByRole('button', { name: 'This Model', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expectPickerView(picker, 'This Model');
   await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
   await expect(picker.getByText('Compatibility has not been verified for this model variant.', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
-  await picker.getByRole('button', { name: 'All Models', exact: true }).click();
+  await pickerView(picker, 'All Models');
   await expect(picker.getByText('Excluded Conditioning', { exact: true }).first()).toBeVisible();
   // Shown under All Models, an incompatible LoRA says why and can't be added.
   const excluded = picker.getByRole('checkbox', { name: 'Select Excluded Conditioning', exact: true });
   await expect(excluded).toBeDisabled();
   await expect(picker.getByText('This LoRA does not support the selected model variant.', { exact: true }).first()).toBeVisible();
-  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
+  await pickerView(picker, 'This Model');
   await expect(picker.getByText('Excluded Conditioning', { exact: true })).toHaveCount(0);
-  await picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true }).click();
-  // A pick gains its number in place; its strength is tuned in the Selected tab.
+  const slider0 = picker.getByRole('checkbox', { name: 'Select Published Slider', exact: true });
+  await slider0.click();
+  // A pick shows the amber tick in place, as in Models; its number and strength are in the Selected view.
+  await expect(slider0.locator('.selected-tick:not(.is-off)')).toHaveCount(1);
+  await expect(slider0.locator('.picker-order')).toHaveCount(0);
   await expect(page.getByLabel('Published Slider Strength Value', { exact: true })).toHaveCount(0);
-  await picker.getByRole('button', { name: /^Selected 1 of/ }).click();
+  await pickerView(picker, /^Selected 1 of/);
   const value = page.getByLabel('Published Slider Strength Value', { exact: true }).filter({ visible: true });
   await value.fill('10');
   await value.press('Enter');
@@ -82,7 +86,7 @@ test('LoRA library offers direct list selection with inline strengths and access
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
-  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
+  const picker = surface;
   const search = await pickerSearch(picker, 'Search LoRAs');
   await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
   await expect.poll(() => picker.locator('.lora-picker-items').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
@@ -95,8 +99,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   // Picking doesn't open anything under the row: nothing in the list moves.
   const strength = picker.getByLabel('Cards Two Strength Value', { exact: true });
   await expect(strength).toHaveCount(0);
-  const selectedTab = picker.getByRole('button', { name: /^Selected 1 of/ });
-  await selectedTab.click();
+  await pickerView(picker, /^Selected 1 of/);
   await expect(strength).toBeVisible();
   await strength.fill('1.25');
   await strength.press('Enter');
@@ -110,10 +113,12 @@ test('LoRA library offers direct list selection with inline strengths and access
       return children.every(child => { const box = child.getBoundingClientRect(); return box.left >= bounds.left && box.right <= bounds.right + 1; });
     })).toBe(true);
     if (!phone) {
+      // Above the button that opened it, start-aligned and kept 8px inside the screen (UI-PATTERNS › Surfaces).
+      const opener = ui.composer.getByRole('button', { name: 'LoRAs', exact: true }).first();
       await expect.poll(async () => {
-        const composer = await ui.composer.boundingBox();
+        const trigger = await opener.boundingBox();
         const popover = await surface.boundingBox();
-        return Math.abs(popover!.width - composer!.width) < 1 && Math.abs(popover!.x - composer!.x) < 1;
+        return popover!.y + popover!.height <= trigger!.y + 1 && Math.abs(popover!.x - Math.min(trigger!.x, width - 8 - popover!.width)) < 1.5 && popover!.x >= 7;
       }).toBe(true);
     }
   }
@@ -122,20 +127,26 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await row.click();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
-  await selectedTab.click();
+  await pickerView(picker, /^Selected 1 of/);
   await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
-  await picker.getByRole('button', { name: /^Save Stack/ }).click();
+  // Stacks live in the heading's Stacks dropdown; there is no footer and no Enable All or Disable All.
+  await expect(picker.getByRole('button', { name: /^(Enable|Disable) All$/ })).toHaveCount(0);
+  await picker.getByRole('button', { name: 'Stacks', exact: true }).click();
+  await picker.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
   await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
   await picker.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(picker.getByRole('button', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true }).or(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true }))).toBeVisible();
-  await picker.getByRole('button', { name: 'Disable All', exact: true }).click();
+  // Each pick turns off and on with its own switch in the Selected view.
+  await picker.getByRole('switch', { name: 'Turn Off Cards Two', exact: true }).click();
   await expect(strength).toBeDisabled();
   await expect(picker.locator('.lora-info-panel')).toHaveCount(0);
   await expect(picker.getByText('cards-two.safetensors', { exact: true })).toHaveCount(0);
-  await picker.getByRole('button', { name: 'Enable All', exact: true }).click();
+  await picker.getByRole('switch', { name: 'Turn On Cards Two', exact: true }).click();
   await expect(strength).toBeEnabled();
-  await expect(picker.getByRole('region', { name: 'Cards Two Information', exact: true })).toBeVisible();
-  await expect(picker.getByRole('region', { name: 'Cards Two Information', exact: true })).toContainText('cards-two.safetensors');
+  // With nothing published about it, an enabled LoRA shows no empty information panel and never its file name.
+  await expect(picker.getByRole('region', { name: 'Cards Two Information', exact: true })).toHaveCount(0);
+  await expect(picker.getByText('cards-two.safetensors', { exact: true })).toHaveCount(0);
   await picker.getByRole('button', { name: 'Clear Selection', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
@@ -153,7 +164,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   // Rows never move: the stack order shows in the Selected tab, where they reorder by drag, grip keys or Move.
   const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');
   await expect(picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true })).toHaveCount(0);
-  await picker.getByRole('button', { name: /^Selected 2 of / }).click();
+  await pickerView(picker, /^Selected 2 of /);
   await picker.getByRole('button', { name: 'Drag Cards One to Reorder', exact: true }).press('ArrowUp');
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Move Cards One Down', exact: true }).click();
@@ -163,7 +174,7 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(picker.getByRole('button', { name: 'Move Cards Two Up', exact: true })).toBeDisabled();
   await picker.getByRole('button', { name: 'Move Cards One Up', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Move Cards One Up', exact: true })).toBeDisabled();
-  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
+  await pickerView(picker, 'This Model');
   await expect(picker.getByRole('checkbox').first()).toHaveAttribute('aria-label', firstRow!);
   await surface.getByRole('button', { name: 'Close LoRAs', exact: true }).click();
   await expect(surface).not.toBeVisible();
@@ -226,19 +237,106 @@ test('fine-tunes retain their family, version and format while optional LoRAs fi
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
-  const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
-  // A profile's LoRA limit shows above the search (Radiance video's single rank-64 slot).
+  const picker = surface;
+  // A profile's LoRA limit shows as a quiet line under the heading (Radiance video's single rank-64 slot).
   await expect(picker.getByText('Up to rank 64 in total', { exact: true })).toBeVisible();
   await expect(picker.getByText('Krea Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('Unknown Effect', { exact: true }).first()).toBeVisible();
   await expect(picker.getByText('FLUX.3 Effect', { exact: true })).toHaveCount(0);
-  await picker.getByRole('button', { name: 'All Models', exact: true }).click();
+  await pickerView(picker, 'All Models');
   await expect(picker.getByText('FLUX.3 Effect', { exact: true }).first()).toBeVisible();
   // Another family's LoRA is listed with its reason, never added (a Z-Image LoRA on Tesserafine).
   const crossFamily = picker.getByRole('checkbox', { name: 'Select FLUX.3 Effect', exact: true });
   await expect(crossFamily).toBeDisabled();
   await expect(crossFamily).toHaveAttribute('aria-checked', 'false');
   await expect(picker.getByText(/does not support the selected model variant \(made for FLUX\.3 Klein\)/).first()).toBeVisible();
-  await picker.getByRole('button', { name: 'This Model', exact: true }).click();
+  await pickerView(picker, 'This Model');
   await expect(crossFamily).toHaveCount(0);
+});
+
+test('LoRA stacks apply, update, rename and delete from the Stacks menu with Undo, and edit in Settings', async ({ page }) => {
+  await page.route('**/api/loras/library/ops', async route => {
+    const library = await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-lora-library') || '{}'));
+    await route.fulfill({ json: { library } });
+  });
+  const models = await (await page.request.get('/api/models')).json();
+  const profile = models.profiles.find((item: any) => item.id === models.defaults.imageModel);
+  profile.options.loras = ['ink.safetensors', 'grain.safetensors'];
+  models.loras = profile.options.loras;
+  await page.route('**/api/models', route => route.fulfill({ json: models }));
+  await page.route('**/api/loras/*', route => route.fulfill({ json: { found: false, loras: [] } }));
+  await page.route('**/api/loras/info', route => route.fulfill({ json: { loras: {
+    'ink.safetensors': { title: 'Ink', families: [], base: '', triggers: [] },
+    'grain.safetensors': { title: 'Grain', families: [], base: '', triggers: [] },
+  } } }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  const composer = await ui.openComposer();
+  await composer.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true }).click();
+  const picker = page.getByRole('dialog', { name: 'LoRAs', exact: true });
+  const ink = picker.getByRole('checkbox', { name: 'Select Ink', exact: true });
+  const grain = picker.getByRole('checkbox', { name: 'Select Grain', exact: true });
+  const menu = picker.getByRole('menu', { name: /^Saved Stacks for/ });
+  const openStacks = async () => { await picker.getByRole('button', { name: /^Stacks/ }).click(); await expect(menu).toBeVisible(); };
+  await ink.click();
+  await openStacks();
+  await menu.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
+  await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Zebra');
+  await menu.getByRole('button', { name: 'Save', exact: true }).click();
+  await grain.click();
+  await openStacks();
+  await menu.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
+  await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Alpha');
+  await menu.getByRole('button', { name: 'Save', exact: true }).click();
+  // Alphabetical, the one in use ticked.
+  await openStacks();
+  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/, /^Zebra/]);
+  await expect(menu.getByRole('menuitemcheckbox', { name: /^Alpha/ })).toHaveAttribute('aria-checked', 'true');
+  // Choosing a stack applies it at once, with Undo.
+  await menu.getByRole('menuitemcheckbox', { name: /^Zebra/ }).click();
+  await expect(grain).toHaveAttribute('aria-checked', 'false');
+  // The newest host shows the message: the pop-up's heading on the phone (UI-PATTERNS › Messages).
+  const undoButton = page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true });
+  const undo = async () => { await expect(undoButton).toHaveCount(1); await undoButton.click(); };
+  await undo();
+
+  await expect(grain).toHaveAttribute('aria-checked', 'true');
+  // Update the stack in use with the current picks, rename it, then delete it with Undo.
+  await openStacks();
+  await menu.getByRole('menuitemcheckbox', { name: /^Zebra/ }).click();
+  await grain.click();
+  await openStacks();
+  await menu.getByRole('menuitem', { name: 'Update “Zebra” with Current Picks', exact: true }).click();
+  await openStacks();
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Zebra, 2 LoRAs', exact: true })).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Rename “Zebra”', exact: true }).click();
+  await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Yak');
+  await menu.getByRole('button', { name: 'Rename', exact: true }).click();
+  await openStacks();
+  await menu.getByRole('menuitem', { name: 'Delete “Yak”', exact: true }).click();
+  await openStacks();
+  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/]);
+  // Escape closes the menu only; the picker stays open.
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(picker).toBeVisible();
+  await undo();
+  await openStacks();
+  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/, /^Yak/]);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
+  await ui.closeComposer();
+  // Settings › Studio › LoRA Stacks: open a stack, change a strength and remove a LoRA, then Save.
+  await ui.openSettings();
+  await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Studio', exact: true }).click();
+  const group = page.locator('.set-group').filter({ has: page.getByRole('heading', { name: 'LoRA Stacks', exact: true }) });
+  await group.getByRole('button', { name: /^Yak/ }).click();
+  const editor = group.getByRole('group', { name: 'Edit Yak', exact: true });
+  await editor.getByRole('spinbutton', { name: 'Ink Strength', exact: true }).fill('0.5');
+  await editor.getByRole('button', { name: 'Remove Grain From Yak', exact: true }).click();
+  await editor.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(group.getByRole('button', { name: /^Yak/ })).toContainText('1 LoRA');
+  const saved = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((key) => key.includes('heiss-ui-lora-library'))!) || '{}').snapshots || {}).flat() as any[]);
+  expect(saved.find((stack: any) => stack.name === 'Yak').loras).toEqual([expect.objectContaining({ name: 'ink.safetensors', strength: 0.5 })]);
 });

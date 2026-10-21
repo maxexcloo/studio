@@ -75,7 +75,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Access Profile to Edit').click();
   await page.getByRole('option', { name: 'New Access Profile', exact: true }).click();
   await page.getByLabel('Profile Name').fill('Video Artists');
-  await page.getByRole('button', { name: 'Features', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Features', exact: true }).click();
   const features = page.getByRole('listbox', { name: 'Features', exact: true });
   await features.getByRole('option', { name: /^Video Generation/ }).click();
   await features.getByRole('option', { name: /^LoRAs/ }).click();
@@ -84,7 +84,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(features).toHaveCount(0);
   await expect(page.getByLabel('Profile Name')).toBeVisible();
   const users = page.getByRole('region', { name: 'Users', exact: true });
-  await users.getByRole('button', { name: 'Models', exact: true }).click();
+  await users.getByRole('combobox', { name: 'Models', exact: true }).click();
   await page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
@@ -103,7 +103,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Access Profile to Edit').click();
   await page.getByRole('option', { name: 'Artists', exact: true }).click();
   await expect(page.getByLabel('Profile Name')).toHaveValue('Artists');
-  await expect(users.getByRole('button', { name: 'Models', exact: true })).toContainText('image-fast');
+  await expect(users.getByRole('combobox', { name: 'Models', exact: true })).toContainText('image-fast');
 
   // The placeholder shows by name, not as its sentinel value.
   await expect(page.getByLabel('Account for librechat-user-7')).toContainText('Choose an Account');

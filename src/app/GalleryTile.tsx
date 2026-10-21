@@ -1,30 +1,54 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Check, Loader2, MoreHorizontal, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { tweens } from "@/lib/springs";
 import { cn } from './format';
 import { Tip } from './components';
 import { GenerationMedia } from './GenerationPreview';
-import { ElapsedTime } from './ElapsedTime';
-import { GenerationModel, GenerationProgress } from './GenerationProgress';
+import { GenerationModel, GenerationProfiles, GenerationProgress } from './GenerationProgress';
 import { FailureTile } from './GenerationFailure';
-import type { GalleryItem } from './types';
+import type { GalleryItem, Profile } from './types';
 import { canUpscaleItem, upscaleTooltip, useUpscaleClock } from './useUpscale';
 import { UpscaleArrow } from './UpscaleArrow';
-import { useDismiss } from './useDismiss';
 import { GallerySelectionContext } from './gallerySelection';
 import { downloadName } from './share';
-import { useItemActions } from './itemActions';
-import { ActionIcon } from './ItemActionSurfaces';
+import { useItemActions, type ItemAction } from './itemActions';
+import { ActionIcon, startsGroup } from './ItemActionSurfaces';
+import { itemProfileTitle } from './itemProfile';
 
 /**
- * The phone studio's tiles: no corner buttons, a long press opens the tile's
- * actions as a sheet instead. Null everywhere else.
+ * The phone studio's tiles: nothing over the picture but its state (progress,
+ * a failure, a selection check); a long press starts selecting. `captions`
+ * (Settings › Studio › Gallery › Tile Captions) brings back the prompt and name.
+ * Null everywhere else.
  */
 export type PhoneTiles = {
   onLongPress: (item: GalleryItem) => void;
+  captions?: boolean;
 };
 export const TileLongPressContext = React.createContext<PhoneTiles | null>(null);
+
+/** A desktop caption's second line: when it was made · the profile's friendly name (· a video's length). */
+function tileCaptionDetail(item: GalleryItem, profiles: Profile[]) {
+  const made = item.createdAt ? new Date(item.createdAt) : null;
+  const time = made && !Number.isNaN(made.getTime()) ? made.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  const duration = item.type === 'video' && item.settings?.duration ? `${item.settings.duration} s` : '';
+  return [time, itemProfileTitle(item, profiles), duration].filter(Boolean).join(' · ');
+}
+
+/* A tile's top row: 32px glass circles on a 40px pitch, right-aligned, clear of
+   the upscale corner on the left. When the tile is too narrow for every action,
+   the make group goes first, then keep; Star and Delete stay longest, and More
+   (the right-click menu) takes the last slot. */
+const TILE_SLOT = 40;
+const TILE_ROW_RESERVE = 16 + 40 + 8;
+const rowRank = { organise: 3, keep: 2, make: 1 } as const;
+export function tileRow(actions: ItemAction[], width: number) {
+  const slots = Math.max(1, Math.floor((width - TILE_ROW_RESERVE) / TILE_SLOT));
+  if (actions.length <= slots) return { shown: actions, more: false };
+  const keep = new Set([...actions.keys()].sort((a, b) => rowRank[actions[b].group] - rowRank[actions[a].group] || a - b).slice(0, Math.max(0, slots - 1)));
+  return { shown: actions.filter((_, index) => keep.has(index)), more: true };
+}
 
 type GalleryTileProps = {
   item: GalleryItem;
@@ -77,14 +101,10 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
   const isEntering = !mountedRef.current && (Date.now() - Date.parse(item.createdAt || "")) < 2000;
   useEffect(() => { mountedRef.current = true; }, []);
   const actions = useItemActions(item, "tile");
-  const star = actions.find((action) => action.id === "star");
-  // Phones get one "More" button instead of a row of circles that would not fit.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
-  useDismiss(overlayRef, menuOpen, closeMenu);
-  const act = (run: () => void) => { setMenuOpen(false); run(); };
+  const row = tileRow(actions, width);
+  const profiles = React.useContext(GenerationProfiles);
   const phoneTiles = React.useContext(TileLongPressContext);
+  const captionDetail = phoneTiles ? "" : tileCaptionDetail(item, profiles);
   const selection = React.useContext(GallerySelectionContext);
   const selectable = item.status === "done" || item.status === "error";
   const selecting = Boolean(selection?.selecting);
@@ -140,48 +160,45 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
           <GenerationProgress item={item} formatElapsed={formatElapsed} showModel={false} />
           </GenerationMedia>
         ) : item.status === "error" ? <FailureTile item={item} /> : <div className="generating stopped"><span>{titleFromPrompt(item.filename || "Failed")}</span></div>}
-        <span className="tile-caption">
+        {/* Desktop: the prompt, then when · which profile (· a video's length). The
+            phone shows nothing over a tile unless Tile Captions is on, and then the
+            prompt and the output's name or type, never the time (UI-PATTERNS › Phone). */}
+        {phoneTiles && !phoneTiles.captions ? null : <span className="tile-caption">
           <strong>{titleFromPrompt(item.prompt || item.filename)}</strong>
-          {/* A failed tile already says so in its middle; "Failed" again is noise. */}
-          {/* Phones show no generation time (UI-PATTERNS › Phone); the desktop shows it, or the clock while it runs. */}
-          {item.status === "error" || (phoneTiles && item.status === "pending") ? null : <em>{phoneTiles ? item.outputName || item.type : item.status === "pending" ? <ElapsedTime startedAt={item.createdAt} format={formatElapsed} /> : (item.timing?.runMs || item.durationMs) ? formatElapsed(item.timing?.runMs || item.durationMs || 0) : item.outputName || item.type}</em>}
-        </span>
+          {phoneTiles
+            ? item.status === "error" || item.status === "pending" ? null : <em>{item.outputName || item.type}</em>
+            : captionDetail ? <em>{captionDetail}</em> : null}
+        </span>}
       </button>
       {/* Controls are siblings of the tile's button, never inside it: a button
           inside a button is invalid and unreachable by keyboard. */}
-      <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
+      <div className={cn("tile-overlay", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
         {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={2.5} /> : null}</span> : null}
         {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} /> : null}
-                {/* Beside Stop, in the overlay, so it holds still while the tile lifts on hover. */}
-        {item.status === "pending" ? <GenerationModel item={item} className="tile-action" /> : null}
-        {item.status === "pending" ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
-        {item.status !== "pending" ? (
-          <>
-            <button type="button" className="tile-more" aria-label="More Actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal size={16} /></button>
-            <span className="tile-hover-actions">
-              {actions.map((action) => {
-                if (action.id === 'star') return null;
-                const name = action.tip || action.label;
-                const className = action.danger ? "tile-delete" : "tile-icon";
-                const body = <><ActionIcon action={action} size={action.href ? 13 : 14} /><span className="tile-menu-label">{action.label}</span></>;
-                return (
-                  <Tip key={action.id} content={name} side="left">
-                    {action.href
-                      ? <a className={className} aria-label={name} href={action.href} download={downloadName(item)} onClick={() => setMenuOpen(false)}>{body}</a>
-                      : <button type="button" className={className} aria-label={name} onClick={() => act(action.run)}>{body}</button>}
-                  </Tip>
-                );
-              })}
-            </span>
-            {/* Its own corner: always there once starred, on hover otherwise. */}
-            {star ? (
-              <Tip content={star.label} side="left">
-                <button type="button" className={cn("tile-star", star.pressed && "is-on")} aria-label={star.label} aria-pressed={star.pressed} onClick={() => act(star.run)}>
-                  <ActionIcon action={star} size={14} />
-                </button>
+        {/* Beside Stop, in the overlay, so it holds still while the tile is hovered. Phones show only the progress. */}
+        {item.status === "pending" && !phoneTiles ? <GenerationModel item={item} className="tile-action" /> : null}
+        {item.status === "pending" && !phoneTiles ? <Tip content={item.progress?.upscaling ? "Stop the Upscale · The Picture Stays" : "Stop Generation"}><button type="button" className="tile-action" onClick={() => cancelJob(item.jobId)}>Stop</button></Tip> : null}
+        {item.status !== "pending" && !phoneTiles && row.shown.length ? (
+          // One row of glass circles along the top, in the viewer bar's order; what doesn't fit waits behind More.
+          <span className="tile-hover-actions" role="group" aria-label="Item Actions">
+            {row.shown.map((action, index) => {
+              const name = action.tip || action.label;
+              const className = cn(action.danger ? "tile-delete" : "tile-icon", action.id === "star" && "is-star", action.pressed && "is-on", startsGroup(row.shown, index) && "starts-group");
+              const body = <ActionIcon action={action} size={14} />;
+              return (
+                <Tip key={action.id} content={name}>
+                  {action.href
+                    ? <a className={className} aria-label={name} href={action.href} download={downloadName(item)}>{body}</a>
+                    : <button type="button" className={className} aria-label={name} aria-pressed={action.id === "star" ? Boolean(action.pressed) : undefined} onClick={action.run}>{body}</button>}
+                </Tip>
+              );
+            })}
+            {row.more ? (
+              <Tip content="More Actions">
+                <button type="button" className="tile-icon tile-more" aria-label="More Actions" aria-haspopup="menu" onClick={(event) => selection?.menu?.(item, event)}><MoreHorizontal size={14} /></button>
               </Tip>
             ) : null}
-          </>
+          </span>
         ) : null}
       </div>
     </motion.div>

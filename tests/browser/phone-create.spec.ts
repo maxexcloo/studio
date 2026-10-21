@@ -39,3 +39,49 @@ test('the phone Create sheet is one flat column that fits every phone width', as
     await ui.closeComposer();
   }
 });
+
+test('the prompt actions are one alike row at the top right, centred on the first line, and the footer reads on one centre line', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone Create sheet.');
+  await page.goto('/');
+  const ui = studioUi(page);
+  const sheet = await ui.openComposer();
+  await ui.prompt.fill('A harbour at dawn');
+  const field = sheet.locator('.composer-prompt-field.is-fill');
+  const actions = field.locator('.composer-field-tools .prompt-action');
+  const boxes = await actions.evaluateAll((nodes) => nodes.filter((node) => (node as HTMLElement).offsetParent).map((node) => {
+    const box = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    const icon = node.querySelector('svg')!.getBoundingClientRect();
+    return { x: box.x, right: box.right, centre: box.y + box.height / 2, colour: style.color, icon: `${icon.width}x${icon.height}` };
+  }));
+  expect(boxes).toHaveLength(3);
+  for (const box of boxes) {
+    expect(Math.abs(box.centre - boxes[0].centre)).toBeLessThanOrEqual(0.5);
+    expect(box.colour).toBe(boxes[0].colour);
+    expect(box.icon).toBe(boxes[0].icon);
+  }
+  for (let index = 1; index < boxes.length; index += 1) expect(boxes[index].x).toBeGreaterThanOrEqual(boxes[index - 1].right - 0.5);
+  // The row sits at the field's top right, its centre on the first line of text.
+  const textarea = sheet.getByRole('textbox', { name: 'Prompt', exact: true });
+  const firstLine = await textarea.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const box = node.getBoundingClientRect();
+    return box.y + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop) + parseFloat(style.lineHeight) / 2;
+  });
+  expect(Math.abs(boxes[0].centre - firstLine)).toBeLessThanOrEqual(1.5);
+  const fieldBox = (await field.boundingBox())!;
+  expect(fieldBox.x + fieldBox.width - boxes[2].right).toBeLessThanOrEqual(8);
+  // The footer's Image/Video, Clear All and Generate share one centre line and height.
+  const footer = [sheet.locator('.create-footer .composer-mode-select button').first(), sheet.getByRole('button', { name: 'Clear All', exact: true }), ui.generate];
+  const centres = [];
+  for (const control of footer) {
+    const box = (await control.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    centres.push(box.y + box.height / 2);
+  }
+  for (const centre of centres) expect(Math.abs(centre - centres[0])).toBeLessThanOrEqual(1);
+  // Steps comes before the image count, as in the desktop composer.
+  const steps = await sheet.getByRole('button', { name: 'Decrease Steps', exact: true }).boundingBox();
+  const images = await sheet.getByRole('button', { name: 'Decrease Images', exact: true }).boundingBox();
+  if (steps && images) expect(steps.x + steps.y * 1000).toBeLessThan(images.x + images.y * 1000);
+});

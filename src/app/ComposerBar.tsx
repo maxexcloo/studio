@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
-import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, RefreshCw, ListRestart, SlidersHorizontal } from 'lucide-react';
+import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, RefreshCw, Eraser, SlidersHorizontal } from 'lucide-react';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
 import { recipesFor } from './modelRecipes';
@@ -12,6 +12,7 @@ import type { AspectPreset, MediaInput, Profile, SavedSize, ReferenceAsset, Refe
 import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGenerationEstimate';
 import type { MegapixelControl, SizeTier } from './SizeMenu';
 import type { SideLimits } from './sizing';
+import { Dropdown } from './Dropdown';
 
 /* ---------------------------------------------------------------------------
    The density ladder
@@ -284,7 +285,7 @@ export function ComposerBar(props: ComposerBarProps) {
   useComposerHeightVar(rowRef);
 
   /* Every control is a function of its density: the ladder picks how large each shows. */
-  const recipePicker = models && recipesFor(modelProfiles, model).length ? <label className="recipe-control">Recipe<select className="is-framed" aria-label="Recipe" value={model} onChange={(event) => chooseModel(event.target.value)}>{recipesFor(modelProfiles, model).map((profile) => <option key={profile.id} value={profile.id}>{profile.recipe!.label}</option>)}</select></label> : null;
+  const recipePicker = models && recipesFor(modelProfiles, model).length ? <span className="recipe-control"><span aria-hidden="true">Recipe</span><Dropdown label="Recipe" variant="pill" value={model} options={recipesFor(modelProfiles, model).map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={chooseModel} /></span> : null;
 
   const workflowPicker = (density: ControlDensity) => models
     ? <>
@@ -390,7 +391,7 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("variants", variantsPicker)}
           {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={16} /></button></Tip> : null}
         </div>
-        {onReset ? <Tip content="Reset Creation"><button type="button" className="icon-button composer-reset" aria-label="Reset Creation" onClick={onReset}><ListRestart size={16} /></button></Tip> : null}
+        {onReset ? <Tip content="Clear All: Prompt, Negative, References & LoRAs"><button type="button" className="icon-button composer-reset" aria-label="Clear All" onClick={onReset}><Eraser size={16} /></button></Tip> : null}
         {primaryTarget ? null : submitActions}
       </div>
     </>

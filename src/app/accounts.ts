@@ -44,8 +44,12 @@ export const updateCachedMe = (next: Partial<Me>) => { if (meCache) meCache = { 
 type Confirm =(options: { title: string; description: string; action: string; destructive?: boolean }) => Promise<boolean>;
 
 /** Sign Out from a menu: asks first only while something is generating, which keeps running on the server. */
-export async function signOutChecked(running: number, confirm: Confirm) {
-  if (running > 0 && !await confirm({ title: 'Sign Out?', description: `${running === 1 ? 'A generation is' : `${running} generations are`} still running. ${running === 1 ? 'It finishes' : 'They finish'} on the server and ${running === 1 ? 'appears' : 'appear'} in your gallery when you sign back in.`, action: 'Sign Out' })) return false;
+/**
+ * Signs out at once (UI-PATTERNS › Messages: almost nothing asks first). Running
+ * generations finish on the server and appear in the gallery on the next sign-in.
+ * Callers still pass what's running and their confirmation; neither is needed now.
+ */
+export async function signOutChecked(_running: number, _confirm: Confirm) {
   await signOutAccount();
   return true;
 }
